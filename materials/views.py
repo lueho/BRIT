@@ -954,6 +954,13 @@ class ComponentMeasurementModalUpdateView(UserCreatedObjectModalUpdateView):
         return self.object.get_absolute_url()
 
 
+class ComponentMeasurementModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = ComponentMeasurement
+
+    def get_success_url(self):
+        return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
+
+
 # ----------- Analytical Method CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -1442,6 +1449,8 @@ class SampleDetailView(UserCreatedObjectDetailView):
     def _build_composition_charts(self, compositions):
         charts = {}
         for composition in compositions:
+            if not composition["shares"]:
+                continue
             labels = [share["component_name"] for share in composition["shares"]]
             values = [share["percent"] for share in composition["shares"]]
             chart = DoughnutChart(
@@ -1509,7 +1518,9 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 {measurement.group_id for measurement in component_measurements}
             ),
             "property_value_count": property_values.count(),
-            "composition_count": len(compositions),
+            "composition_count": sum(
+                bool(composition["shares"]) for composition in compositions
+            ),
             "sample_source_count": self.object.sources.count(),
         }
 

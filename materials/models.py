@@ -248,6 +248,8 @@ class MaterialComponentGroup(NamedUserCreatedObject):
     model: Composition. This is a container that allows to identify comparable compositions.
     """
 
+    is_compositional = models.BooleanField(default=True)
+
     objects = MaterialComponentGroupManager()
 
     class Meta:
@@ -1268,13 +1270,16 @@ class ComponentMeasurement(
 
     def clean(self):
         super().clean()
+        errors = {}
+        if self.average is not None and self.average < 0:
+            errors["average"] = "Component measurement averages cannot be negative."
         if self.unit_id and not self.unit.is_weight_fraction:
-            raise ValidationError(
-                {
-                    "unit": "Component measurements must use a weight-fraction unit "
-                    "(e.g. %, g/kg, mg/kg)."
-                }
+            errors["unit"] = (
+                "Component measurements must use a weight-fraction unit "
+                "(e.g. %, g/kg, mg/kg)."
             )
+        if errors:
+            raise ValidationError(errors)
 
     def duplicate(self, creator, sample=None):
         duplicate = ComponentMeasurement.objects.create(

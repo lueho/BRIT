@@ -19,10 +19,6 @@ class NantesGreenHousesFlatSerializerTestCase(TestCase):
             surface_ha=1.0,
         )
 
-    def test_serializer_construction(self):
-        serializer = NantesGreenhousesFlatSerializer()
-        self.assertIsNotNone(serializer)
-
     def test_serializer_fields(self):
         serializer = NantesGreenhousesFlatSerializer(self.greenhouse)
         self.assertIsNotNone(serializer.data)

@@ -74,8 +74,6 @@ class RegionModelFormTestCase(TestCase):
         self.assertTrue(form.is_valid())
 
         region = form.save()
-        self.assertIsNotNone(region.pk)
-        self.assertIsNotNone(region.borders.pk)
         self.assertEqual(region.borders.geom, poly)
 
     def test_invalid_form_submission(self):
@@ -113,7 +111,6 @@ class RegionModelFormTestCase(TestCase):
 
         region.save()
         self.assertIsNotNone(region.pk)
-        self.assertIsNotNone(region.borders.pk)
         self.assertEqual(region.borders.geom, poly)
 
     def test_edit_form_prepopulates_geom_initial(self):

@@ -1,7 +1,7 @@
 from urllib.parse import urlencode
 
 from crispy_forms.helper import FormHelper
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import HttpResponseRedirect, JsonResponse, QueryDict
 from django.template.loader import render_to_string
 from django.views.generic import ListView, TemplateView
 
@@ -152,6 +152,7 @@ class FilterDefaultsMixin:
 
     initial_values = {}
     filterset_class = None
+    stripped_get_params = ("csrfmiddlewaretoken",)
 
     def get_default_filters(self):
         initial_values = {}
@@ -165,6 +166,8 @@ class FilterDefaultsMixin:
         Overrides the get method of the FilterView.
         If the request method is GET and the request's parameters are empty,
         it redirects to the same page but with the default filters as parameters.
+        Parameters listed in ``stripped_get_params`` are removed from stale
+        URLs the same way.
 
         Args:
             request: The request that triggered this view.
@@ -174,11 +177,18 @@ class FilterDefaultsMixin:
         Returns:
             HttpResponse: The HttpResponse object.
         """
-        if request.method == "GET" and not request.GET:
-            self.initial_values = self.get_default_filters()
-            if self.initial_values:
-                params = urlencode(self.initial_values)
-                return HttpResponseRedirect(f"{request.path}?{params}")
+        if request.method == "GET":
+            params = request.GET.copy()
+            for param in self.stripped_get_params:
+                params.pop(param, None)
+            if not params:
+                self.initial_values = self.get_default_filters()
+                if self.initial_values:
+                    params = QueryDict(urlencode(self.initial_values))
+            if params != request.GET:
+                query = params.urlencode()
+                url = f"{request.path}?{query}" if query else request.path
+                return HttpResponseRedirect(url)
 
         return super().get(request, *args, **kwargs)
 

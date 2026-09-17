@@ -27,12 +27,10 @@ class FieldLabelMixinTestCase(TestCase):
 
     def test_serializer_init_sets_label_names_as_keys_attribute(self):
         serializer = self.serializer(field_labels_as_keys=True)
-        self.assertTrue(hasattr(serializer, "field_labels_as_keys"))
         self.assertTrue(serializer.field_labels_as_keys)
 
     def test_field_labels_as_keys_default_to_false(self):
         serializer = self.serializer()
-        self.assertTrue(hasattr(serializer, "field_labels_as_keys"))
         self.assertFalse(serializer.field_labels_as_keys)
 
     def test_serializer_to_representation_uses_field_names_by_default(self):

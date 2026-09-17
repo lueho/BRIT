@@ -1,9 +1,9 @@
 import os
 import ssl
-from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
+from celery.schedules import crontab
 from django.core.management.utils import get_random_secret_key
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -317,10 +317,22 @@ CELERY_REDIS_BACKEND_USE_SSL = _redis_ssl_settings(REDIS_URL)
 # are removed from storage.
 FILE_EXPORT_RETENTION_DAYS = int(os.environ.get("FILE_EXPORT_RETENTION_DAYS", "7"))
 
+# Calendar-based (crontab) schedules, not timedelta: a timedelta interval
+# restarts from whenever beat last ran, and the beat schedule state file is
+# ephemeral on Heroku (dynos restart at least daily, wiping it). With
+# crontab, the next run is computed from the wall clock, so restarts cannot
+# keep deferring the task indefinitely.
 CELERY_BEAT_SCHEDULE = {
     "cleanup-expired-user-exports": {
         "task": "utils.file_export.generic_tasks.cleanup_expired_exports",
-        "schedule": timedelta(hours=24),
+        "schedule": crontab(hour=4, minute=0),
+    },
+    # Safety net for the GeoJSON caches: data changes already trigger warmup
+    # via signals, and a warmup is queued on every worker start, but a daily
+    # pass also covers cache evictions/flushes that no signal observes.
+    "warm-geojson-caches": {
+        "task": "warm_all_geojson_caches",
+        "schedule": crontab(hour=3, minute=0),
     },
 }
 

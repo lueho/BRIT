@@ -346,7 +346,7 @@
               <div class="sdv2-section-heading">
                 <h2 class="sdv2-section-title">Composition</h2>
                 <span class="sdv2-section-hint">
-                  Charts show the normalized composition; the raw measurements behind it are listed below each chart.
+                  Charts are shown only for compatible compositional measurements; raw observations remain available for every analytical group.
                   <a href="#composition-methodology" class="sdv2-methodology-link">How is the composition normalized?</a>
                 </span>
               </div>
@@ -389,7 +389,11 @@
                       <a href="{% url 'materialcomponentgroup-detail-modal' group_pk %}"
                          class="modal-link sdv2-group-name">{{ composition.group_name }}</a>
                       <span class="sdv2-group-badges">
-                        <span class="sdv2-group-fractions">% of {{ composition.fractions_of_name }}</span>
+                        {% if composition.fractions_of_name %}
+                          <span class="sdv2-group-fractions">% of {{ composition.fractions_of_name }}</span>
+                        {% else %}
+                          <span class="sdv2-group-fractions">Raw measurements only</span>
+                        {% endif %}
                       </span>
                     </div>
                     <div class="sdv2-group-tools" role="group" aria-label="Group actions">
@@ -463,6 +467,7 @@
                       {% endfor %}
                     </div>
                   {% endif %}
+                  {% if composition.shares %}
                   <div class="sdv2-group-body">
                     <div class="sdv2-group-chart">
                       <div id="composition-chart-{{ composition.id }}"
@@ -501,8 +506,9 @@
                       </table>
                     </div>
                   </div>
+                  {% endif %}
                   {% if raws %}
-                    <details class="sdv2-raws">
+                    <details class="sdv2-raws"{% if not composition.shares %} open{% endif %}>
                       <summary>
                         <span class="sdv2-raws-label">Raw measurements</span>
                         <span class="sdv2-raws-count">{{ raws|length }}</span>
@@ -581,12 +587,24 @@
                                 {% if edit_mode_enabled %}
                                   <td class="sdv2-num">
                                     {% object_policy measurement as mp %}
-                                    {% if mp.can_edit %}
-                                      <a href="{% url 'componentmeasurement-update' measurement.pk %}"
-                                         title="Edit measurement">
-                                        <i class="fas fa-pen-to-square"></i>
-                                      </a>
-                                    {% endif %}
+                                    <span class="sdv2-row-tools">
+                                      {% if mp.can_edit %}
+                                        <a class="sdv2-btn sdv2-btn-edit sdv2-btn-icon sdv2-btn-sm"
+                                           href="{% url 'componentmeasurement-update' measurement.pk %}"
+                                           title="Edit measurement">
+                                          <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+                                          <span class="visually-hidden">Edit</span>
+                                        </a>
+                                      {% endif %}
+                                      {% if mp.can_delete %}
+                                        <a class="sdv2-btn sdv2-btn-danger sdv2-btn-icon sdv2-btn-sm modal-link"
+                                           href="{% url 'componentmeasurement-delete-modal' measurement.pk %}?next={{ request|path_without_return_params|urlencode }}"
+                                           title="Delete measurement">
+                                          <i class="fas fa-trash" aria-hidden="true"></i>
+                                          <span class="visually-hidden">Delete</span>
+                                        </a>
+                                      {% endif %}
+                                    </span>
                                   </td>
                                 {% endif %}
                               </tr>
@@ -631,6 +649,8 @@
                     The raw values themselves are shown unchanged in the <em>Raw measurements</em> table of each group.
                   </p>
                   <ul>
+                    <li>Only compositional groups with one consistent basis and one observation per component are normalized. Other groups retain their raw measurement tables.</li>
+                    <li>Less-than and below-detection-limit observations contribute zero to aggregation as an explicit approximation; their stored values are not changed. Other qualified values require a separate aggregation policy.</li>
                     <li>All measurements are first converted to weight percent (e.g. g/kg → %, mg/kg → %); component measurements only accept weight-fraction units.</li>
                     <li>If the raw shares sum to more than 100%, all shares are scaled down proportionally.</li>
                     <li>If they sum to less than 100%, the gap is shown as <em>Other</em>.</li>

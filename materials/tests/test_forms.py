@@ -12,6 +12,7 @@ from utils.properties.models import Unit
 
 from ..forms import (
     AddCompositionModalForm,
+    ComponentGroupModelForm,
     ComponentMeasurementModelForm,
     ComponentModelForm,
     MaterialPropertyModelForm,
@@ -429,3 +430,19 @@ class SampleModelFormTestCase(TestCase):
 
         self.assertIn(self.substrate_material, material_queryset)
         self.assertIn(self.non_substrate_material, material_queryset)
+
+
+class ComponentGroupModelFormTestCase(TestCase):
+    def test_is_compositional_field_can_be_disabled(self):
+        form = ComponentGroupModelForm(
+            data={
+                "name": "Non-compositional group",
+                "description": "",
+                "is_compositional": False,
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        group = form.save()
+
+        self.assertFalse(group.is_compositional)

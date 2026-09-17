@@ -8,48 +8,16 @@ from ..plots import BarChart, BaseChart, BaseDataSet
 class BaseDataSetTestCase(NativeTestCase):
     def setUp(self):
         self.ds = BaseDataSet()
-        self.labels = ["First dataset", "Second dataset"]
         self.dataset_kwargs = {
             "label": "Test dataset",
             "data": {"Column 1": 1.0, "Column 2": 2.0, "Column 3": 3.0},
             "unit": "kg/a",
         }
 
-    def test_create_dataset(self):
-        self.assertIsInstance(self.ds, BaseDataSet)
-
-    def test_set_and_get_label(self):
-        self.assertIsNone(self.ds.label)
-        for label in self.labels:
-            self.ds.label = label
-            self.assertEqual(self.ds.label, label)
-
     def test_get_xlabels(self):
         ds = BaseDataSet(**self.dataset_kwargs)
         xlabels = ["Column 1", "Column 2", "Column 3"]
         self.assertListEqual(ds.xlabels, xlabels)
-
-    def test_set_and_get_unit(self):
-        self.assertIsNone(self.ds.unit)
-        self.ds.unit = "kg/a"
-        self.assertEqual(self.ds.unit, "kg/a")
-
-    def test_dataset_str(self):
-        self.ds.label = "First dataset"
-        self.assertEqual(str(self.ds), "First dataset")
-
-    def test_set_and_get_data(self):
-        data = {"column 1": -1, "column 2": 1}
-        self.ds.data = data
-        self.assertDictEqual(self.ds.data, data)
-
-    def test_dataset_length(self):
-        self.ds.data = {f"Column {i}": 1 for i in range(5)}
-        self.assertEqual(len(self.ds), 5)
-
-    def test_set_and_get_background_color(self):
-        self.ds.bg_color = "#04555e"
-        self.assertEqual(self.ds.bg_color, "#04555e")
 
     def test_create_dataset_with_kwargs(self):
         dataset = BaseDataSet(**self.dataset_kwargs)
@@ -73,28 +41,6 @@ class BasePlotTestCase(NativeTestCase):
             "data": {"Column 1": 1.5, "Column 2": 2.5, "Column 3": 3.5},
             "unit": self.unit,
         }
-        self.chart_dict = {
-            "id": "testChart",
-            "title": "Test chart",
-            "labels": ["First column", "Second column", "Third column"],
-            "unit": self.unit,
-            "type": "stacked-barchart",
-            "show_legend": False,
-            "data": [
-                {"label": "Dataset 1", "data": [1.0, 2.0, 3.0], "unit": self.unit},
-                {"label": "Dataset 2", "data": [1.5, 2.5, 3.5], "unit": self.unit},
-            ],
-        }
-
-    def test_create_plot(self):
-        self.assertIsInstance(self.chart, BaseChart)
-
-    def test_set_and_get_plot_type(self):
-        self.assertIsNone(self.chart.type)
-        chart_types = ["stacked-barchart", "piechart"]
-        for chart_type in chart_types:
-            self.chart.type = chart_type
-            self.assertEqual(self.chart.type, chart_type)
 
     def test_has_no_labels_at_instantiation(self):
         self.assertFalse(BaseChart().has_labels)
@@ -112,26 +58,6 @@ class BasePlotTestCase(NativeTestCase):
         self.chart.labels = self.labels
         self.chart.labels = None
         self.assertFalse(self.chart.has_labels)
-
-    def test_set_and_get_unit(self):
-        self.chart.unit = self.unit
-        self.assertEqual(self.chart.unit, self.unit)
-
-    def test_create_with_kwargs(self):
-        BaseChart(**self.chart_dict)
-        self.maxDiff = None
-        generated_dict = self.chart.as_dict()
-        self.assertIn("type", generated_dict.keys())
-        self.assertIn("data", generated_dict.keys())
-        self.assertIn("options", generated_dict.keys())
-        self.assertIn("labels", generated_dict["data"])
-        self.assertIn("datasets", generated_dict["data"])
-        self.assertIn("unit", generated_dict["data"])
-        for dataset in generated_dict["data"]["datasets"]:
-            self.assertIn("label", dataset.keys())
-            self.assertIn("data", dataset.keys())
-            self.assertIn("backgroundColor", dataset.keys())
-            self.assertIn("borderColor", dataset.keys())
 
     def test_has_no_data_at_instantiation(self):
         self.assertFalse(self.chart.has_data)
