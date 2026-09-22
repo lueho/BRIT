@@ -147,7 +147,7 @@ class MaterialPropertyModelForm(SimpleModelForm):
 
     class Meta:
         model = MaterialProperty
-        fields = ("name", "unit", "description", "comparable_property")
+        fields = ("name", "allowed_units", "description", "comparable_property")
 
 
 class MaterialPropertyModalModelForm(ModalModelFormMixin, MaterialPropertyModelForm):
@@ -366,10 +366,6 @@ class MaterialPropertyValueModelForm(
             cleaned_data["basis_component"] = basis_component
         if property_obj and not unit:
             unit = property_obj.allowed_units.first()
-            if unit is None and property_obj.unit:
-                unit = Unit.resolve_legacy_label(
-                    property_obj.unit, owner=property_obj.owner
-                )
             if unit is None:
                 unit = Unit.objects.filter(pk=get_default_unit_pk()).first()
             cleaned_data["unit"] = unit
@@ -683,16 +679,22 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
 
     def clean(self):
         cleaned_data = super().clean()
-        if "standalone" not in self.fields and "series" not in self.fields:
-            return cleaned_data
-        standalone = cleaned_data.get("standalone", False)
-        series = cleaned_data.get("series")
-        if not standalone and series is None:
-            self.add_error(
-                "series",
-                "A series is required when the sample is not standalone. "
-                "Either assign a series or check 'Standalone'.",
-            )
+        if "series" in self.fields:
+            series = cleaned_data.get("series")
+        else:
+            series = self.instance.series if self.instance.series_id else None
+        if "standalone" in self.fields or "series" in self.fields:
+            standalone = cleaned_data.get("standalone", False)
+            if not standalone and series is None:
+                self.add_error(
+                    "series",
+                    "A series is required when the sample is not standalone. "
+                    "Either assign a series or check 'Standalone'.",
+                )
+        if series is not None:
+            # A sample's material always matches the material of its series.
+            cleaned_data["material"] = series.material
+            self.instance.material = series.material
         return cleaned_data
 
     class Meta:
@@ -793,13 +795,14 @@ class SampleMaintenanceForm(WorkspaceReferenceScopeMixin, SampleModelForm):
 
     def _update_errors(self, errors):
         # Sample.clean() reports the standalone/series invariant against
-        # "series"; sections that edit neither field cannot fix or display it.
-        if (
-            "standalone" not in self.fields
-            and "series" not in self.fields
-            and hasattr(errors, "error_dict")
-        ):
-            errors.error_dict.pop("series", None)
+        # "series" and the series-material consistency against "material";
+        # sections that cannot edit the respective field cannot fix or
+        # display the error.
+        if hasattr(errors, "error_dict"):
+            if "standalone" not in self.fields and "series" not in self.fields:
+                errors.error_dict.pop("series", None)
+            if "material" not in self.fields:
+                errors.error_dict.pop("material", None)
             if not errors.error_dict:
                 return
         super()._update_errors(errors)

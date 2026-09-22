@@ -199,10 +199,10 @@ class MaterialPropertyCanonicalTestCase(CanonicalRelationTestMixin, TestCase):
     comparable_attr = "comparable_property"
 
     def test_canonical_property_defaults_to_self(self):
-        self._test_canonical_defaults_to_self(MaterialProperty, unit="%")
+        self._test_canonical_defaults_to_self(MaterialProperty)
 
     def test_canonical_property_follows_comparable_property(self):
-        self._test_canonical_follows_comparable(MaterialProperty, unit="%")
+        self._test_canonical_follows_comparable(MaterialProperty)
 
 
 class MaterialTestCase(TestCase):
@@ -505,6 +505,25 @@ class SampleSeriesTestCase(TestCase):
             series_with_sample.publication_status, SampleSeries.STATUS_PUBLISHED
         )
 
+    def test_duplicate_with_new_material_applies_it_to_copied_samples(self):
+        creator = User.objects.create(username="dup_material_creator")
+        other_material = Material.objects.create(name="Duplicate Target Material")
+        duplicate = self.sample_series.duplicate(creator, material=other_material)
+        self.assertEqual(duplicate.material, other_material)
+        self.assertTrue(duplicate.samples.exists())
+        self.assertFalse(duplicate.samples.exclude(material=other_material).exists())
+
+    def test_save_with_changed_material_updates_linked_samples(self):
+        other_material = Material.objects.create(name="Changed Series Material")
+        self.assertTrue(self.sample_series.samples.exists())
+        self.sample_series.material = other_material
+        self.sample_series.save()
+        self.assertFalse(
+            self.sample_series.samples.exclude(material=other_material).exists()
+        )
+        for sample in self.sample_series.samples.all():
+            sample.clean()
+
     def test_duplicate_is_atomic(self):
         """SampleSeries.duplicate must run inside transaction.atomic."""
         creator = User.objects.create(username=f"dup_atomic_{uuid4().hex[:8]}")
@@ -612,7 +631,7 @@ class MaterialPropertyValueTestCase(TestCase):
         self.assertEqual(duplicate.standard_deviation, value.standard_deviation)
 
     def test_display_standard_deviation_is_none_when_missing(self):
-        prop = MaterialProperty.objects.create(name="Nitrogen", unit="g/kg")
+        prop = MaterialProperty.objects.create(name="Nitrogen")
         unit = Unit.objects.create(name="mg/kg")
         value = MaterialPropertyValue.objects.create(
             property=prop,
@@ -624,7 +643,7 @@ class MaterialPropertyValueTestCase(TestCase):
         self.assertIsNone(value.display_standard_deviation)
 
     def test_shared_numeric_measurement_properties_are_available(self):
-        prop = MaterialProperty.objects.create(name="Nitrogen", unit="g/kg")
+        prop = MaterialProperty.objects.create(name="Nitrogen")
         unit = Unit.objects.create(name="mg/kg")
         value = MaterialPropertyValue.objects.create(
             property=prop,
@@ -641,7 +660,7 @@ class MaterialPropertyValueTestCase(TestCase):
     def test_related_sample_prefers_direct_sample_fk(self):
         material = Material.objects.create(name="Digestate")
         sample = Sample.objects.create(name="Owned Sample", material=material)
-        prop = MaterialProperty.objects.create(name="Nitrogen", unit="g/kg")
+        prop = MaterialProperty.objects.create(name="Nitrogen")
         unit = Unit.objects.create(name="mg/kg")
         value = MaterialPropertyValue.objects.create(
             sample=sample,
@@ -660,12 +679,10 @@ class MaterialPropertyValueCleanTestCase(TestCase):
     def setUp(self):
         self.allowed_unit = Unit.objects.create(name="g/kg test")
         self.other_unit = Unit.objects.create(name="mg/kg test")
-        self.prop_with_allowed = MaterialProperty.objects.create(
-            name="Nitrogen test", unit="g/kg test"
-        )
+        self.prop_with_allowed = MaterialProperty.objects.create(name="Nitrogen test")
         self.prop_with_allowed.allowed_units.add(self.allowed_unit)
         self.prop_no_allowed = MaterialProperty.objects.create(
-            name="Free property test", unit="%"
+            name="Free property test"
         )
 
     def test_clean_raises_when_unit_not_in_allowed_units(self):
@@ -888,7 +905,7 @@ class SampleTestCase(TestCase):
                 material=material, series=series, timestep=Timestep.objects.default()
             )
 
-        prop = MaterialProperty.objects.create(name="Test Property", unit="Test Unit")
+        prop = MaterialProperty.objects.create(name="Test Property")
         MaterialPropertyValue.objects.create(
             property=prop, average=Decimal("12.3"), standard_deviation=Decimal("0.321")
         )
@@ -1034,6 +1051,22 @@ class SampleTestCase(TestCase):
         sample = Sample(material=material, standalone=True, series=None)
         # Should not raise
         sample.clean()
+
+    def test_clean_raises_when_material_differs_from_series_material(self):
+        series = SampleSeries.objects.get(name="Test Series")
+        other_material = Material.objects.create(name="Other Material")
+        sample = Sample(material=other_material, standalone=False, series=series)
+        with self.assertRaises(ValidationError) as ctx:
+            sample.clean()
+        self.assertIn("material", ctx.exception.message_dict)
+
+    def test_clean_raises_for_standalone_sample_with_mismatched_series(self):
+        series = SampleSeries.objects.get(name="Test Series")
+        other_material = Material.objects.create(name="Other Material")
+        sample = Sample(material=other_material, standalone=True, series=series)
+        with self.assertRaises(ValidationError) as ctx:
+            sample.clean()
+        self.assertIn("material", ctx.exception.message_dict)
 
 
 class CompositionTestCase(TestCase):

@@ -17,6 +17,9 @@ from .utils import set_geojson_cache_payload
 # Threshold for switching to streaming response (number of features)
 STREAMING_THRESHOLD = 1000
 
+# Approximate size in bytes of each buffered chunk emitted by _stream_geojson.
+STREAM_CHUNK_BYTES = 65536
+
 # Enable streaming for large uncached requests
 STREAMING_ENABLED = True
 
@@ -352,8 +355,11 @@ class CachedGeoJSONMixin:
     def _stream_geojson(self, queryset):
         """Generator that streams GeoJSON features to reduce memory usage.
 
-        Yields the GeoJSON structure piece by piece, serializing features
-        one at a time to avoid loading all data into memory.
+        Serializes features one at a time to avoid loading all data into
+        memory, but buffers serialized features into chunks of roughly
+        STREAM_CHUNK_BYTES before yielding. Per-feature yields would make the
+        browser pay a reader.read() cycle per feature, which dominates
+        end-to-end load time for datasets with small features.
         """
         # Get the serializer class (not instance)
         get_serializer_class = getattr(
@@ -361,17 +367,14 @@ class CachedGeoJSONMixin:
         )
         serializer_class = get_serializer_class()
 
-        yield '{"type": "FeatureCollection", "features": ['
+        parts = ['{"type": "FeatureCollection", "features": [']
+        parts_size = len(parts[0])
 
         first = True
-        for obj in queryset.iterator(chunk_size=100):
-            if not first:
-                yield ","
-            first = False
-            # Serialize single feature
+        for obj in queryset.iterator(chunk_size=1000):
             try:
                 serializer = serializer_class(obj, context={"request": self.request})
-                yield json.dumps(serializer.data)
+                feature_json = json.dumps(serializer.data)
             except Exception as e:
                 # Log error but continue streaming
                 import logging
@@ -380,8 +383,19 @@ class CachedGeoJSONMixin:
                     "Error serializing feature %s: %s", getattr(obj, "pk", "?"), e
                 )
                 continue
+            if not first:
+                parts.append(",")
+                parts_size += 1
+            first = False
+            parts.append(feature_json)
+            parts_size += len(feature_json)
+            if parts_size >= STREAM_CHUNK_BYTES:
+                yield "".join(parts)
+                parts = []
+                parts_size = 0
 
-        yield "]}"
+        parts.append("]}")
+        yield "".join(parts)
 
     @action(detail=False, methods=["get", "head"])
     def version(self, request, *args, **kwargs):

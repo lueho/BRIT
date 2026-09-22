@@ -884,8 +884,8 @@ class MaterialPropertyCRUDViewsTestCase(
     view_modal_update_name = "materialproperty-update-modal"
     view_delete_name = "materialproperty-delete-modal"
 
-    create_object_data = {"name": "Test Property", "unit": "Test Unit"}
-    update_object_data = {"name": "Updated Test Property", "unit": "Test Unit"}
+    create_object_data = {"name": "Test Property"}
+    update_object_data = {"name": "Updated Test Property"}
 
 
 # ----------- Material Property Value CRUD -----------------------------------------------------------------------------
@@ -899,9 +899,7 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        prop = MaterialProperty.objects.create(
-            owner=cls.member, name="Test Property", unit="Test Unit"
-        )
+        prop = MaterialProperty.objects.create(owner=cls.member, name="Test Property")
         material = Material.objects.create(
             name="Test Material",
         )
@@ -1005,7 +1003,6 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         cls.property = MaterialProperty.objects.create(
             owner=cls.owner,
             name="Dry Matter",
-            unit="mg/L",
             default_basis_component=cls.default_basis,
             publication_status="published",
         )
@@ -1071,13 +1068,11 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         canonical_property = MaterialProperty.objects.create(
             owner=self.owner,
             name="Organic matter",
-            unit="%",
             publication_status="published",
         )
         aliased_property = MaterialProperty.objects.create(
             owner=self.owner,
             name="Volatile solids",
-            unit="%",
             comparable_property=canonical_property,
             publication_status="published",
         )
@@ -1171,7 +1166,6 @@ class MaterialPropertyValueCreateAndDetailViewTestCase(ViewWithPermissionsTestCa
         cls.property = MaterialProperty.objects.create(
             owner=cls.member,
             name="Dry Matter",
-            unit="g/L",
             default_basis_component=cls.default_basis,
             publication_status="published",
         )
@@ -1713,7 +1707,6 @@ class AnalyticalMethodDetailViewSamplesTestCase(ViewWithPermissionsTestCase):
         cls.property = MaterialProperty.objects.create(
             owner=cls.owner,
             name="Dry matter",
-            unit="%",
             publication_status="published",
         )
         cls.group = MaterialComponentGroup.objects.create(
@@ -1864,6 +1857,33 @@ class SampleSeriesCreateDuplicateViewTestCase(
                 name="Test Material", publication_status="published"
             )
         }
+
+    def get_update_success_url(self, pk=None):
+        duplicate = SampleSeries.objects.exclude(pk=pk).latest("pk")
+        return duplicate.get_absolute_url()
+
+    def test_post_leaves_original_untouched_and_redirects_to_duplicate(self):
+        original = SampleSeries.objects.get(pk=self.unpublished_object.pk)
+        original_name = original.name
+        original_material = original.material
+        new_material = Material.objects.create(
+            name="Duplicate Material", publication_status="published"
+        )
+        self.client.force_login(self.owner_user)
+        response = self.client.post(
+            reverse(self.view_update_name, kwargs={"pk": original.pk}),
+            {"name": "Duplicated Series", "material": new_material.pk},
+        )
+        duplicate = SampleSeries.objects.get(name="Duplicated Series")
+        self.assertNotEqual(duplicate.pk, original.pk)
+        self.assertEqual(duplicate.material, new_material)
+        self.assertFalse(duplicate.samples.exclude(material=new_material).exists())
+        self.assertRedirects(
+            response, duplicate.get_absolute_url(), fetch_redirect_response=False
+        )
+        original.refresh_from_db()
+        self.assertEqual(original.name, original_name)
+        self.assertEqual(original.material, original_material)
 
 
 # ----------- Back URL Navigation Tests ----------------------------------------------------------------------------------
@@ -2406,7 +2426,7 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         )
         material.categories.add(substrate_category)
         cls.property = MaterialProperty.objects.create(
-            name="Test Property", unit="Test Unit", publication_status="published"
+            name="Test Property", publication_status="published"
         )
         return {"material": material}
 
@@ -3151,7 +3171,6 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         )
         cls.property = MaterialProperty.objects.create(
             name="Test Property",
-            unit="Test Unit",
             owner=cls.owner,
             default_basis_component=cls.default_basis,
         )
@@ -3330,7 +3349,6 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         )
         cls.property = MaterialProperty.objects.create(
             name="Test Property",
-            unit="Test Unit",
             owner=cls.owner,
             default_basis_component=cls.default_basis,
         )
@@ -8054,7 +8072,6 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
         cls.prop = MaterialProperty.objects.create(
             owner=cls.owner,
             name="Qualifier property",
-            unit="%",
             publication_status="published",
         )
         cls.hostile_raw = '<img src=x onerror="alert(31337)">'

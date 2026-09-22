@@ -507,6 +507,28 @@ class ProcessDashboardViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse("processes:dashboard"))
         self.assertEqual(200, response.status_code)
 
+    def test_total_categories_reflects_user_visibility(self):
+        """The dashboard counter must use the same read policy as the lists
+        and autocomplete, so user-visible unpublished categories are counted."""
+        ProcessCategory.objects.create(
+            name="Published Category",
+            owner=self.owner,
+            publication_status="published",
+        )
+        ProcessCategory.objects.create(name="Member Category", owner=self.member)
+        ProcessCategory.objects.create(name="Outsider Category", owner=self.outsider)
+
+        response = self.client.get(reverse("processes:dashboard"))
+        self.assertEqual(1, response.context["total_categories"])
+
+        self.client.force_login(self.member)
+        response = self.client.get(reverse("processes:dashboard"))
+        self.assertEqual(2, response.context["total_categories"])
+        self.assertEqual(
+            {"Published Category", "Member Category"},
+            {category.name for category in response.context["categories_with_counts"]},
+        )
+
 
 # ==============================================================================
 # ProcessCategory CRUD Tests

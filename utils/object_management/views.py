@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import logging
-from collections import defaultdict, namedtuple
-from datetime import datetime
+from collections import defaultdict
+from collections.abc import Iterable
+from datetime import date, datetime
+from typing import Any, NamedTuple
 from urllib.parse import unquote, urlparse
 
 from django.conf import settings
@@ -22,9 +26,10 @@ from django.core.exceptions import (
     ValidationError,
 )
 from django.db import DatabaseError
-from django.db.models import CharField, Q, Value
+from django.db.models import CharField, Q, QuerySet, Value
 from django.http import (
     Http404,
+    HttpRequest,
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseNotAllowed,
@@ -36,6 +41,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.text import capfirst
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
+from django_filters import FilterSet
 from django_filters.views import FilterView
 from django_tomselect.autocompletes import AutocompleteModelView
 from django_tomselect.constants import EXCLUDEBY_VAR, FILTERBY_VAR
@@ -83,9 +89,18 @@ from .redirects import ReviewActionRedirectResolver
 
 logger = logging.getLogger(__name__)
 
-ReviewItemReference = namedtuple(
-    "ReviewItemReference", ("model", "pk", "name", "submitted_at")
-)
+
+class ReviewItemReference(NamedTuple):
+    """Lightweight stand-in for a reviewable object before hydration.
+
+    The dashboard collects these per model from a single ``values_list``
+    query and hydrates only the paginated page's worth of objects.
+    """
+
+    model: type[UserCreatedObject]
+    pk: int
+    name: str | None
+    submitted_at: datetime | None
 
 
 DEFAULT_BREADCRUMB_MODULES = {
@@ -303,17 +318,19 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
     filterset_class = ReviewDashboardFilterSet
     context_object_name = "review_items"
     paginate_by = getattr(settings, "REVIEW_DASHBOARD_PAGE_SIZE", 20)
-    _available_models_cache = None
+    _available_models_cache: list[type[UserCreatedObject]] | None = None
     breadcrumb_module_label = "Review"
     breadcrumb_page_title = "Content Review"
 
-    def setup(self, request, *args, **kwargs):
+    def setup(self, request: HttpRequest, *args: Any, **kwargs: Any) -> None:
         """Reset per-request cache."""
         super().setup(request, *args, **kwargs)
         self._available_models_cache = None
 
     @staticmethod
-    def _in_review_queryset_for_model(model):
+    def _in_review_queryset_for_model(
+        model: type[UserCreatedObject],
+    ) -> QuerySet[UserCreatedObject]:
         """Return a queryset containing review items for the provided model.
 
         Supports models whose manager either:
@@ -339,7 +356,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         return queryset.filter(publication_status=UserCreatedObject.STATUS_REVIEW)
 
     @staticmethod
-    def _is_primary_model_module(model):
+    def _is_primary_model_module(model: type[UserCreatedObject]) -> bool:
         """Return whether a model is defined in the app's models module tree."""
         module_name = getattr(model, "__module__", "")
         app_config = getattr(model._meta, "app_config", None)
@@ -349,7 +366,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             f"{expected_prefix}."
         )
 
-    def get_available_models(self):
+    def get_available_models(self) -> list[type[UserCreatedObject]]:
         """Discover all concrete UserCreatedObject subclasses that have items in review.
 
         Returns models that either:
@@ -453,7 +470,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         self._available_models_cache = available_models
         return available_models
 
-    def _get_fallback_queryset(self):
+    def _get_fallback_queryset(self) -> QuerySet:
         from django.apps import apps
 
         fallback_models = sorted(
@@ -473,7 +490,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             return fallback_models[0].objects.none()
         return ReviewAction.objects.none()
 
-    def get_filterset_kwargs(self, filterset_class):
+    def get_filterset_kwargs(self, filterset_class: type[FilterSet]) -> dict[str, Any]:
         """Override to pass available_models and provide a dummy queryset.
 
         Since we're working with a heterogeneous list of objects rather than
@@ -496,7 +513,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         kwargs["available_models"] = available_models
         return kwargs
 
-    def _has_active_query_filters(self):
+    def _has_active_query_filters(self) -> bool:
         """Return whether any non-ordering filters are active."""
         return bool(
             self.request.GET.get("search", "").strip()
@@ -506,7 +523,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             or self.request.GET.get("submitted_before")
         )
 
-    def _get_selected_model_type_ids(self):
+    def _get_selected_model_type_ids(self) -> set[int]:
         """Return valid selected content type IDs from the request."""
         return {
             int(model_type)
@@ -515,7 +532,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         }
 
     @staticmethod
-    def _get_select_related_fields(model_class):
+    def _get_select_related_fields(model_class: type[UserCreatedObject]) -> list[str]:
         """Return common foreign keys that are safe to select_related."""
         select_fields = ["owner", "approved_by"]
         for field_name in (
@@ -535,7 +552,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                 select_fields.append(field_name)
         return select_fields
 
-    def _parse_submitted_date(self, parameter_name):
+    def _parse_submitted_date(self, parameter_name: str) -> date | None:
         """Parse a submitted date filter, returning None for invalid values."""
         raw_value = (self.request.GET.get(parameter_name) or "").strip()
         if not raw_value:
@@ -547,7 +564,9 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             return None
 
     @staticmethod
-    def _matches_selected_model_types(model_class, selected_model_type_ids):
+    def _matches_selected_model_types(
+        model_class: type[UserCreatedObject], selected_model_type_ids: set[int]
+    ) -> bool:
         """Return whether a model is included by the selected model_type filter."""
         if not selected_model_type_ids:
             return True
@@ -555,7 +574,12 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             ContentType.objects.get_for_model(model_class).id in selected_model_type_ids
         )
 
-    def _apply_search_filter(self, queryset, model_class, search):
+    def _apply_search_filter(
+        self,
+        queryset: QuerySet[UserCreatedObject],
+        model_class: type[UserCreatedObject],
+        search: str,
+    ) -> QuerySet[UserCreatedObject]:
         """Apply model-specific search filters at the database level."""
         search_filters = []
 
@@ -576,7 +600,11 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             combined_filter |= search_filter
         return queryset.filter(combined_filter)
 
-    def _apply_database_review_filters(self, queryset, model_class):
+    def _apply_database_review_filters(
+        self,
+        queryset: QuerySet[UserCreatedObject],
+        model_class: type[UserCreatedObject],
+    ) -> QuerySet[UserCreatedObject]:
         """Apply active dashboard filters directly to a model queryset."""
         queryset = queryset.exclude(owner=self.request.user)
 
@@ -601,13 +629,22 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
 
         return queryset
 
-    def _apply_requested_ordering(self, items):
+    def _apply_requested_ordering(
+        self, items: Iterable[ReviewItemReference]
+    ) -> list[ReviewItemReference]:
         """Sort heterogeneous review items using the dashboard ordering option."""
         ordering = self.request.GET.get("ordering", "-submitted_at")
         filter_obj = ReviewItemFilter([], self.request.GET)
         return filter_obj._apply_ordering(list(items), ordering)
 
-    def _get_review_references(self, available_models, limit_per_model=None):
+    def _get_review_references(
+        self,
+        available_models: list[type[UserCreatedObject]],
+        limit_per_model: int | None = None,
+    ) -> tuple[
+        list[ReviewItemReference],
+        dict[type[UserCreatedObject], QuerySet[UserCreatedObject]],
+    ]:
         """Filter in SQL and sort lightweight references without loading full objects."""
         references = []
         querysets = {}
@@ -653,7 +690,11 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
 
         return self._apply_requested_ordering(references), querysets
 
-    def _hydrate_review_references(self, references, querysets):
+    def _hydrate_review_references(
+        self,
+        references: Iterable[ReviewItemReference],
+        querysets: dict[type[UserCreatedObject], QuerySet[UserCreatedObject]],
+    ) -> list[UserCreatedObject]:
         """Load only selected objects, retaining the original visibility filters."""
         ids_by_model = defaultdict(list)
         for reference in references:
@@ -673,7 +714,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             if (reference.model, reference.pk) in objects
         ]
 
-    def collect_review_items(self):
+    def collect_review_items(self) -> list[UserCreatedObject]:
         """Keep the unpaginated JSON queue's existing result shape and fetch limits."""
         available_models = self.get_available_models()
         limit = (
@@ -684,7 +725,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         references, querysets = self._get_review_references(available_models, limit)
         return self._hydrate_review_references(references, querysets)
 
-    def has_review_items(self):
+    def has_review_items(self) -> bool:
         """Return whether the user can moderate any pending review item."""
         from django.apps import apps
         from django.contrib.auth.models import Permission
@@ -748,7 +789,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
 
         return False
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[UserCreatedObject]:
         """Override to return dummy queryset for FilterView compatibility.
 
         The actual items are collected in get_context_data().
@@ -759,7 +800,9 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             return available_models[0].objects.none()
         return self._get_fallback_queryset()
 
-    def paginate_queryset(self, queryset, page_size):
+    def paginate_queryset(
+        self, queryset: QuerySet[UserCreatedObject], page_size: int
+    ) -> tuple[None, None, None, None]:
         """Override to prevent parent FilterView from paginating the dummy queryset.
 
         The parent MultipleObjectMixin tries to paginate get_queryset() which returns
@@ -770,7 +813,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         """
         return (None, None, None, None)
 
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
 
         references, querysets = self._get_review_references(self.get_available_models())

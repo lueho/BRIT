@@ -468,9 +468,9 @@ class SampleSeries(NamedUserCreatedObject):
                 )
 
                 for sample in self.samples.all():
-                    sample_duplicate = sample.duplicate(creator)
-                    sample_duplicate.series = duplicate
-                    sample_duplicate.save()
+                    sample.duplicate(
+                        creator, series=duplicate, material=duplicate.material
+                    )
 
                 duplicate.temporal_distributions.set(self.temporal_distributions.all())
             finally:
@@ -479,6 +479,19 @@ class SampleSeries(NamedUserCreatedObject):
                 )
 
             return duplicate
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            stale_ids = list(
+                self.samples.select_for_update()
+                .exclude(material_id=self.material_id)
+                .values_list("pk", flat=True)
+            )
+            if stale_ids:
+                Sample.objects.filter(pk__in=stale_ids).update(
+                    material_id=self.material_id
+                )
 
     def clean(self):
         super().clean()
@@ -1006,15 +1019,22 @@ class Sample(NamedUserCreatedObject):
 
     def clean(self):
         super().clean()
+        errors = {}
         if not self.standalone and self.series_id is None:
-            raise ValidationError(
-                {
-                    "series": (
-                        "A series is required when the sample is not standalone. "
-                        "Either assign a series or mark the sample as standalone."
-                    )
-                }
+            errors["series"] = (
+                "A series is required when the sample is not standalone. "
+                "Either assign a series or mark the sample as standalone."
             )
+        if (
+            self.series_id is not None
+            and self.material_id
+            and self.material_id != self.series.material_id
+        ):
+            errors["material"] = (
+                "The sample material must match the material of its series."
+            )
+        if errors:
+            raise ValidationError(errors)
 
     def approve(self, user=None):
         """

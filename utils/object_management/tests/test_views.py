@@ -1,4 +1,6 @@
+import inspect
 from datetime import timedelta
+from typing import get_type_hints
 from unittest.mock import patch
 from urllib.parse import urlencode
 
@@ -52,6 +54,7 @@ from utils.object_management.permissions import (
 from utils.object_management.views import (
     BaseReviewActionView,
     ReviewDashboardView,
+    ReviewItemReference,
     SubmitForReviewView,
     UserCreatedObjectCreateView,
     WithdrawFromReviewView,
@@ -565,6 +568,59 @@ class ReviewDetailAccessTests(TestCase):
     # Dashboard behavior is covered in ReviewWorkflowViewTests.
 
 
+class ReviewPipelineTypeHintTests(TestCase):
+    """The review dashboard's filtering/collection pipeline is type-annotated.
+
+    ``typing.get_type_hints`` resolves string annotations; a bad forward
+    reference would raise, so this also guards against stale annotations.
+    """
+
+    def test_review_item_filter_is_fully_annotated(self):
+        from utils.object_management.review_filtering import ReviewItemFilter
+
+        for method_name in (
+            "__init__",
+            "filter",
+            "_apply_search",
+            "_apply_model_type_filter",
+            "_apply_owner_filter",
+            "_apply_date_filter",
+            "_apply_ordering",
+            "_apply_default_sort",
+        ):
+            with self.subTest(method=method_name):
+                method = getattr(ReviewItemFilter, method_name)
+                hints = get_type_hints(method)
+                self.assertIn("return", hints)
+                self.assertTrue(
+                    all(
+                        name in hints
+                        for name in inspect.signature(method).parameters
+                        if name != "self"
+                    )
+                )
+
+    def test_review_dashboard_pipeline_methods_are_annotated(self):
+        for method_name in (
+            "get_available_models",
+            "_get_review_references",
+            "_hydrate_review_references",
+            "collect_review_items",
+            "has_review_items",
+            "get_queryset",
+            "_apply_database_review_filters",
+            "_apply_requested_ordering",
+        ):
+            with self.subTest(method=method_name):
+                hints = get_type_hints(getattr(ReviewDashboardView, method_name))
+                self.assertIn("return", hints)
+
+    def test_review_item_reference_is_a_typed_namedtuple(self):
+        hints = get_type_hints(ReviewItemReference)
+        self.assertEqual(list(hints), ["model", "pk", "name", "submitted_at"])
+        self.assertTrue(issubclass(ReviewItemReference, tuple))
+
+
 class ReviewExceptionHandlingTests(TestCase):
     """Review views must only swallow expected, recoverable exceptions.
 
@@ -850,7 +906,7 @@ class MockFilterView(FilterDefaultsMixin, FilterView):
 
 class TestPropertyCreateView(UserCreatedObjectCreateView):
     model = Property
-    fields = ["name", "unit"]
+    fields = ["name"]
     permission_required = "properties.add_property"
 
 
@@ -1615,7 +1671,7 @@ class CollectionPropertyValueReviewDashboardTest(TestCase):
         cls.owner_user = User.objects.create_user(username="owner", password="test123")
 
         cls.unit = Unit.objects.create(name="kg")
-        cls.property = Property.objects.create(name="Test Property", unit="kg")
+        cls.property = Property.objects.create(name="Test Property")
 
         with mute_signals(post_save, pre_save):
             cls.collection = Collection.objects.create(

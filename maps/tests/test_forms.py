@@ -214,9 +214,7 @@ class RegionAttributeValueModelFormTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.region = Region.objects.create(name="Test Region")
-        cls.property = RegionProperty.objects.create(
-            name="Population density", unit="1/km²"
-        )
+        cls.property = RegionProperty.objects.create(name="Population density")
 
     def test_numeric_measurement_fields_use_any_step(self):
         form = RegionAttributeValueModelForm()
@@ -228,6 +226,7 @@ class RegionAttributeValueModelFormTestCase(TestCase):
 
     def test_clean_assigns_matching_unit_from_property_when_available(self):
         expected_unit = Unit.objects.create(name="1/km²", symbol="1/km²")
+        self.property.allowed_units.add(expected_unit)
 
         form = RegionAttributeValueModelForm()
         form.cleaned_data = {
@@ -243,17 +242,17 @@ class RegionAttributeValueModelFormTestCase(TestCase):
 
         self.assertEqual(cleaned_data["unit"], expected_unit)
 
-    def test_clean_assigns_symbol_match_when_name_differs(self):
-        expected_unit = Unit.objects.create(
-            name="People per square kilometre",
-            symbol="1/km²",
+    def test_clean_keeps_submitted_unit_over_allowed_units_default(self):
+        self.property.allowed_units.add(
+            Unit.objects.create(name="People per square kilometre", symbol="1/km²")
         )
+        submitted_unit = Unit.objects.create(name="hectare", symbol="ha")
 
         form = RegionAttributeValueModelForm()
         form.cleaned_data = {
             "region": self.region,
             "property": self.property,
-            "unit": None,
+            "unit": submitted_unit,
             "date": None,
             "value": 123.321,
             "standard_deviation": 1.25,
@@ -261,10 +260,10 @@ class RegionAttributeValueModelFormTestCase(TestCase):
 
         cleaned_data = form.clean()
 
-        self.assertEqual(cleaned_data["unit"], expected_unit)
+        self.assertEqual(cleaned_data["unit"], submitted_unit)
 
-    def test_clean_keeps_unit_empty_when_no_matching_unit_exists(self):
-        unresolved_property = RegionProperty.objects.create(name="Area", unit="km²")
+    def test_clean_keeps_unit_empty_when_property_has_no_allowed_units(self):
+        unresolved_property = RegionProperty.objects.create(name="Area")
 
         form = RegionAttributeValueModelForm()
         form.cleaned_data = {

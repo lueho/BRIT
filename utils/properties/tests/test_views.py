@@ -123,16 +123,16 @@ class PropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
     update_object_data = {"name": "Updated Test Property"}
 
     @classmethod
-    def create_related_objects(cls):
+    def create_util_objects(cls):
         return {
-            "unit": Unit.objects.create(
+            "allowed_unit": Unit.objects.create(
                 name="Test Unit", publication_status="published"
             )
         }
 
     def related_objects_post_data(self):
         data = super().related_objects_post_data()
-        data["allowed_units"] = [self.related_objects["unit"].pk]
+        data["allowed_units"] = [self.util_objects["allowed_unit"].pk]
         return data
 
 
