@@ -1,7 +1,7 @@
 """Filter tests for the processes module."""
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 
 from materials.models import Material
 
@@ -118,6 +118,20 @@ class ProcessFilterTestCase(TestCase):
             data={"categories": [self.category1.pk]}, queryset=Process.objects.all()
         )
         self.assertEqual(filterset.qs.count(), 2)
+
+    def test_categories_filter_is_removed_when_no_categories_are_visible(self):
+        """A scoped queryset with no visible categories must not render a
+        label-only filter widget."""
+        ProcessCategory.objects.update(owner=self.owner, publication_status="private")
+        viewer = get_user_model().objects.create(username="viewer")
+        request = RequestFactory().get("/")
+        request.user = viewer
+
+        filterset = ProcessFilter(
+            data={}, queryset=Process.objects.all(), request=request
+        )
+        self.assertNotIn("categories", filterset.filters)
+        self.assertNotIn("categories", filterset.form.fields)
 
     def test_filter_by_parent(self):
         """Filter should find child processes by parent."""
