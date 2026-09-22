@@ -5,11 +5,14 @@ from django.conf import settings
 from django.contrib.gis.geos import Polygon
 from django.core.cache import caches
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Count, Max, Min
+from django.db.models import BigIntegerField, Count, Max, Min
+from django.db.models.expressions import RawSQL
 from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+from .utils import set_geojson_cache_payload
 
 # Threshold for switching to streaming response (number of features)
 STREAMING_THRESHOLD = 1000
@@ -213,39 +216,138 @@ class CachedGeoJSONMixin:
         )
         return serializer.data
 
+    def get_stats_queryset(self, request):
+        """Return the queryset used for count and dataset-version statistics.
+
+        Defaults to the GeoJSON queryset. ViewSets may override this to drop
+        serialization-only annotations or joins; statistics only need the
+        filtered row set.
+        """
+        return self.get_geojson_queryset_with_bbox(request)
+
+    def _version_aggregates(self):
+        """Aggregate expressions feeding the dataset version token.
+
+        ``cnt`` doubles as the feature count for the current request, so that
+        key must stay intact. Override to add related-model dependencies.
+        """
+        return {
+            "cnt": Count("pk"),
+            "max_mod": Max("lastmodified_at"),
+            "min_id": Min("pk"),
+            "max_id": Max("pk"),
+        }
+
+    def _version_timestamp(self, agg):
+        """Change indicator used in the version token for an aggregate result.
+
+        Epoch seconds of ``max_mod`` normally; for models without
+        ``lastmodified_at``, ``max_xmin`` holds the newest PostgreSQL
+        transaction id instead, which rotates on inserts, updates, and
+        reimports no matter which client writes the table.
+        """
+        max_mod = agg.get("max_mod")
+        if max_mod:
+            return int(max_mod.timestamp())
+        return agg.get("max_xmin") or 0
+
+    def _version_token(self, agg):
+        cnt = agg.get("cnt") or 0
+        min_id = agg.get("min_id") or 0
+        max_id = agg.get("max_id") or 0
+        base = f"{cnt}:{self._version_timestamp(agg)}:{min_id}:{max_id}"
+        return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
+
+    def get_dataset_stats(self, request):
+        """Return ``{"count": int, "version": str}`` from one aggregate query.
+
+        Models with lastmodified_at use count, max modification time, and ID
+        range as version inputs. Models without it add the newest row
+        transaction id (xmin), so inserts, deletes, in-place updates, and
+        reimports preserving the ID range still rotate the token.
+        """
+        cached = getattr(self, "_dataset_stats", None)
+        if cached is not None and cached[0] is request:
+            return cached[1]
+        queryset = self.get_stats_queryset(request)
+        model = queryset.model
+        field_names = [f.name for f in model._meta.get_fields()]
+        if "lastmodified_at" in field_names:
+            aggregates = self._version_aggregates()
+        else:
+            aggregates = {
+                "cnt": Count("pk"),
+                "min_id": Min("pk"),
+                "max_id": Max("pk"),
+                "max_xmin": Max(
+                    RawSQL(
+                        "xmin::text::bigint",
+                        [],
+                        output_field=BigIntegerField(),
+                    )
+                ),
+            }
+        agg = queryset.aggregate(**aggregates)
+        stats = {"count": agg.get("cnt") or 0, "version": self._version_token(agg)}
+        # Memoize per request: get_cache_key() implementations that embed the
+        # dataset version and the geojson() stats path share one aggregate.
+        self._dataset_stats = (request, stats)
+        return stats
+
     def get_dataset_version(self, request):
         """Return a short hash representing the current dataset state.
 
         Computes a version based on count, max lastmodified_at, and ID range.
-        ViewSets may override this to include additional dependencies (e.g.,
+        ViewSets may extend the inputs via ``_version_aggregates`` and
+        ``_version_timestamp`` to include additional dependencies (e.g.,
         related model timestamps).
-
-        Falls back to get_cache_key if the model lacks lastmodified_at.
         """
-        queryset = self.get_geojson_queryset_with_bbox(request)
-        model = queryset.model
+        return self.get_dataset_stats(request)["version"]
 
-        # Check if model has lastmodified_at field
-        field_names = [f.name for f in model._meta.get_fields()]
-        if "lastmodified_at" not in field_names:
-            # Fallback to cache key for models without timestamp
-            if hasattr(self, "get_cache_key"):
-                return self.get_cache_key(request)
-            return "unknown"
+    def _payload_ttl(self, cache, cache_key):
+        """Timeout for a companion entry so it expires with its payload.
 
-        agg = queryset.aggregate(
-            cnt=Count("pk"),
-            max_mod=Max("lastmodified_at"),
-            min_id=Min("pk"),
-            max_id=Max("pk"),
+        django-redis exposes ``ttl()`` (seconds, ``None`` for persistent keys,
+        ``0`` for missing ones); other backends fall back to the view timeout.
+        """
+        if hasattr(cache, "ttl"):
+            return cache.ttl(cache_key)
+        return getattr(self, "cache_timeout", None)
+
+    def _cached_geojson_head(self, request, cache, cache_key):
+        """Metadata-only HEAD response for a cached payload, or None on a miss.
+
+        The feature count is served from a small companion cache entry so a
+        warm HEAD does not fetch and deserialize the full GeoJSON payload.
+        Entries cached before the companion entry existed are healed here.
+        """
+        meta_key = f"{cache_key}:count"
+        count = cache.get(meta_key)
+        if count is not None:
+            if not cache.has_key(cache_key):
+                cache.delete(meta_key)
+                return None
+        else:
+            data = cache.get(cache_key)
+            if data is None:
+                return None
+            if isinstance(data, dict) and "features" in data:
+                count = len(data["features"])
+                cache.set(meta_key, count, timeout=self._payload_ttl(cache, cache_key))
+
+        data_version = self.get_dataset_version(request)
+        response = StreamingHttpResponse(
+            (),
+            content_type=getattr(request, "accepted_media_type", "application/json"),
         )
-        cnt = agg.get("cnt") or 0
-        max_mod = agg.get("max_mod")
-        ts = int(max_mod.timestamp()) if max_mod else 0
-        min_id = agg.get("min_id") or 0
-        max_id = agg.get("max_id") or 0
-        base = f"{cnt}:{ts}:{min_id}:{max_id}"
-        return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
+        response["X-Cache-Status"] = "HIT"
+        if count is not None:
+            response["X-Total-Count"] = str(count)
+        response["X-Data-Version"] = data_version
+        response["Access-Control-Expose-Headers"] = (
+            "X-Total-Count, X-Cache-Status, X-Data-Version"
+        )
+        return response
 
     def _stream_geojson(self, queryset):
         """Generator that streams GeoJSON features to reduce memory usage.
@@ -310,37 +412,35 @@ class CachedGeoJSONMixin:
         use_stream = request.query_params.get("stream", "").lower() == "true"
         bbox = self._parse_bbox(request)
         cache_key = self.get_cache_key(request)
+        geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
 
         # Try cache first (unless streaming is explicitly requested)
         if not use_stream and not bbox:
-            data = caches[getattr(settings, "GEOJSON_CACHE", "default")].get(cache_key)
-
-            if data is not None:
-                data_version = self.get_dataset_version(request)
-                response = (
-                    StreamingHttpResponse(
-                        (),
-                        content_type=getattr(
-                            request, "accepted_media_type", "application/json"
-                        ),
+            if request.method == "HEAD":
+                head_response = self._cached_geojson_head(
+                    request, geojson_cache, cache_key
+                )
+                if head_response is not None:
+                    return head_response
+            else:
+                data = geojson_cache.get(cache_key)
+                if data is not None:
+                    data_version = self.get_dataset_version(request)
+                    response = Response(data)
+                    response["X-Cache-Status"] = "HIT"
+                    # Add feature count for frontend progress
+                    if isinstance(data, dict) and "features" in data:
+                        response["X-Total-Count"] = str(len(data["features"]))
+                    # Add version header for client-side cache validation
+                    response["X-Data-Version"] = data_version
+                    response["Access-Control-Expose-Headers"] = (
+                        "X-Total-Count, X-Cache-Status, X-Data-Version"
                     )
-                    if request.method == "HEAD"
-                    else Response(data)
-                )
-                response["X-Cache-Status"] = "HIT"
-                # Add feature count for frontend progress
-                if isinstance(data, dict) and "features" in data:
-                    response["X-Total-Count"] = str(len(data["features"]))
-                # Add version header for client-side cache validation
-                response["X-Data-Version"] = data_version
-                response["Access-Control-Expose-Headers"] = (
-                    "X-Total-Count, X-Cache-Status, X-Data-Version"
-                )
-                return response
+                    return response
 
-        # Cache miss or streaming requested - get queryset
-        queryset = self.get_geojson_queryset_with_bbox(request)
-        count = queryset.count()
+        # Cache miss or streaming requested - count and version share one query
+        stats = self.get_dataset_stats(request)
+        count = stats["count"]
         rejection_response = get_unbounded_geojson_rejection_response(
             request,
             count,
@@ -351,7 +451,7 @@ class CachedGeoJSONMixin:
         if rejection_response is not None:
             return rejection_response
 
-        data_version = self.get_dataset_version(request)
+        data_version = stats["version"]
 
         if request.method == "HEAD":
             is_streaming = STREAMING_ENABLED and count > STREAMING_THRESHOLD
@@ -370,6 +470,8 @@ class CachedGeoJSONMixin:
                 "X-Total-Count, X-Cache-Status, X-Data-Version"
             )
             return response
+
+        queryset = self.get_geojson_queryset_with_bbox(request)
 
         # Use streaming for large datasets to prevent memory issues
         if STREAMING_ENABLED and count > STREAMING_THRESHOLD:
@@ -397,10 +499,8 @@ class CachedGeoJSONMixin:
 
         # Cache the result if no bbox filter
         if not bbox:
-            cache_key = self.get_cache_key(request)
             timeout = getattr(self, "cache_timeout", None)
-            cache_alias = getattr(settings, "GEOJSON_CACHE", "default")
-            caches[cache_alias].set(cache_key, data, timeout=timeout)
+            set_geojson_cache_payload(geojson_cache, cache_key, data, timeout=timeout)
 
         response = Response(data)
         response["X-Cache-Status"] = "MISS"

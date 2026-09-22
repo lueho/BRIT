@@ -15,14 +15,17 @@ from django.contrib.auth.mixins import (
     UserPassesTestMixin,
 )
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.messages.api import MessageFailure
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import (
     FieldDoesNotExist,
+    FieldError,
     ImproperlyConfigured,
     ObjectDoesNotExist,
     PermissionDenied,
     ValidationError,
 )
+from django.db import DatabaseError
 from django.db.models import CharField, Q, QuerySet, Value
 from django.http import (
     Http404,
@@ -444,12 +447,17 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                     try:
                         if has_visible_review_items(model):
                             available_models.append(model)
-                    except (AttributeError, Exception) as e:
+                    except (
+                        AttributeError,
+                        FieldDoesNotExist,
+                        FieldError,
+                        TypeError,
+                        ValueError,
+                    ) as e:
                         # Model may not have in_review() manager method or other issues
                         logger.debug(
                             f"Could not check review items for {model.__name__}: {e}"
                         )
-                        pass
 
         available_models.sort(
             key=lambda model: (
@@ -650,7 +658,13 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                 continue
             try:
                 queryset = self._in_review_queryset_for_model(model_class)
-            except Exception as exc:
+            except (
+                AttributeError,
+                FieldDoesNotExist,
+                FieldError,
+                TypeError,
+                ValueError,
+            ) as exc:
                 logger.warning(
                     "Could not build in-review queryset for %s: %s",
                     model_class.__name__,
@@ -756,7 +770,13 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                     .exclude(owner=user)
                     .exists()
                 )
-            except Exception as exc:
+            except (
+                AttributeError,
+                FieldDoesNotExist,
+                FieldError,
+                TypeError,
+                ValueError,
+            ) as exc:
                 logger.debug(
                     "Could not check review items for %s: %s",
                     model_class.__name__,
@@ -894,7 +914,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
                 },
             )
             return urlparse(url).path == review_path
-        except Exception:
+        except (NoReverseMatch, ValueError):
             return False
 
     def _format_action_error(self, error):
@@ -925,13 +945,13 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
             perm = UserCreatedObjectPermission()
             checker = getattr(perm, str(self.permission_method), None)
             return bool(checker(request, obj)) if callable(checker) else False
-        except Exception:
+        except (AttributeError, TypeError, ObjectDoesNotExist):
             return False
 
     def test_func(self):  # type: ignore[override]
         try:
             obj = self.get_object()
-        except Exception:
+        except (Http404, ValueError, TypeError, ValidationError):
             return False
         return self.has_action_permission(self.request, obj)
 
@@ -1011,7 +1031,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
                 try:
                     self.object.approved_by = request.user
                     self.object.save(update_fields=["approved_by"])
-                except Exception:
+                except (AttributeError, ValueError, DatabaseError):
                     pass
 
             # Log review action
@@ -1025,7 +1045,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
                     action=self.review_action,
                     comment=comment,
                 )
-            except Exception as e:
+            except DatabaseError as e:
                 logger.warning(
                     "Failed to create ReviewAction for %s: %s", self.action_attr_name, e
                 )
@@ -1035,13 +1055,13 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
                 messages.success(
                     request, self.get_success_message(self.object, previous_status)
                 )
-            except Exception:
+            except MessageFailure:
                 pass
 
             # Hook for model-specific post-action behavior (e.g., cascading)
             self.post_action_hook(request, previous_status)
 
-        except Exception as e:
+        except (ValidationError, ImproperlyConfigured) as e:
             messages.error(request, self._format_action_error(e))
             return HttpResponseRedirect(self.get_failure_url())
 
@@ -1073,7 +1093,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
                 actor=getattr(request, "user", None),
                 previous_status=previous_status,
             )
-        except Exception as exc:
+        except (AttributeError, TypeError, ValidationError, DatabaseError) as exc:
             logger.warning(
                 "Review action cascade failed for %s: %s",
                 obj,
@@ -1099,7 +1119,7 @@ class SubmitForReviewView(BaseReviewActionView):
         """Handle preflight AJAX from modal-forms so real POST carries checkbox."""
         try:
             is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
-        except Exception:
+        except AttributeError:
             is_ajax = False
         if is_ajax:
             # Optional early permission check to fail fast within the modal
@@ -1142,7 +1162,7 @@ class WithdrawFromReviewView(BaseReviewActionView):
                         "object_id": obj.pk,
                     },
                 )
-            except Exception:
+            except (NoReverseMatch, ValueError):
                 review_path = None
 
             if review_path:
@@ -1150,7 +1170,7 @@ class WithdrawFromReviewView(BaseReviewActionView):
                 if parsed_next.path == review_path:
                     try:
                         return obj.get_absolute_url()
-                    except Exception:
+                    except (AttributeError, NoReverseMatch, TypeError):
                         pass
 
         return super().get_success_url()
@@ -1195,7 +1215,13 @@ class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
             if action:
                 try:
                     context["cascade_author_count"] = obj.affected_author_count(action)
-                except Exception:
+                except (
+                    AttributeError,
+                    TypeError,
+                    FieldDoesNotExist,
+                    FieldError,
+                    DatabaseError,
+                ):
                     context["cascade_author_count"] = 0
         return context
 
@@ -1210,7 +1236,7 @@ class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
         # Detect AJAX request as used by the package (X-Requested-With)
         try:
             is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
-        except Exception:
+        except AttributeError:
             is_ajax = False
 
         if is_ajax:
@@ -2350,7 +2376,7 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
         if show_panel:
             try:
                 logs = list(ReviewAction.for_object(obj).select_related("user"))
-            except Exception:
+            except (DatabaseError, FieldError, AttributeError):
                 logs = []
 
         context.update(
@@ -2576,7 +2602,7 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
                 .select_related("user")
                 .order_by("-created_at", "-id")
             )
-        except Exception:
+        except (DatabaseError, FieldError, AttributeError):
             actions = []
 
         # Old variable used by wrapper; keep for compatibility

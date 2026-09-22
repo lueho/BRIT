@@ -44,6 +44,12 @@ class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     def get_geojson_queryset(self):
         return HamburgRoadsideTrees.objects.only("id", "geom").order_by()
 
+    def get_stats_queryset(self, request):
+        """Stats row set; a missing request (cache warm-up) means unfiltered."""
+        if request is None:
+            return self.get_geojson_queryset()
+        return super().get_stats_queryset(request)
+
     def get_geojson_serializer_class(self):
         return HamburgRoadsideTreeGeometrySerializer
 
@@ -63,15 +69,17 @@ class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
             elif len(values) > 1:
                 filters[key] = sorted(values)
 
-        if not filters:
-            return "tree_geojson:all"
+        # The table is managed outside the ORM, so signal-based invalidation
+        # cannot reach these entries; embedding the dataset version orphans
+        # stale payloads instead of serving them under a rotated version.
+        dataset_version = self.get_dataset_stats(request)["version"]
 
-        if self._is_default_filter_state(filters):
-            return "tree_geojson:all"
+        if not filters or self._is_default_filter_state(filters):
+            return f"tree_geojson:all:dv:{dataset_version}"
 
         filter_string = json.dumps(dict(sorted(filters.items())), sort_keys=True)
         filter_hash = hashlib.sha1(filter_string.encode("utf-8")).hexdigest()[:16]
-        return f"tree_geojson:filter:{filter_hash}"
+        return f"tree_geojson:filter:{filter_hash}:dv:{dataset_version}"
 
     def _is_default_filter_state(self, filters):
         range_filter_keys = {

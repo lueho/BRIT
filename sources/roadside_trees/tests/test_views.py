@@ -1,6 +1,8 @@
 import json
+from unittest.mock import patch
 
 from django.contrib.gis.geos import Point
+from django.test import override_settings
 from django.urls import reverse
 
 from maps.models import (
@@ -13,6 +15,7 @@ from maps.models import (
     MapLayerStyle,
     Region,
 )
+from maps.signals import get_geojson_cache
 from utils.tests.testcases import ViewWithPermissionsTestCase
 
 from ..models import HamburgRoadsideTrees
@@ -125,6 +128,96 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
         ids = {feature["id"] for feature in get.data["features"]}
         self.assertEqual(ids, {self.tree.pk})
         self.assertNotIn(outside.pk, ids)
+
+    def test_geojson_version_changes_when_tree_data_changes(self):
+        url = reverse("api-hamburg-roadside-trees-version")
+        before = self.client.get(url, REMOTE_ADDR="10.9.8.1").json()["version"]
+        HamburgRoadsideTrees.objects.create(geom=Point(2, 2, srid=4326))
+        after = self.client.get(url, REMOTE_ADDR="10.9.8.1").json()["version"]
+        self.assertNotEqual(before, after)
+
+    def test_geojson_version_changes_when_tree_geom_updated(self):
+        url = reverse("api-hamburg-roadside-trees-version")
+        before = self.client.get(url, REMOTE_ADDR="10.9.8.1").json()["version"]
+        self.tree.geom = Point(5, 5, srid=4326)
+        self.tree.save()
+        after = self.client.get(url, REMOTE_ADDR="10.9.8.1").json()["version"]
+        self.assertNotEqual(before, after)
+
+    def test_geojson_version_changes_on_reimport_preserving_ids(self):
+        url = reverse("api-hamburg-roadside-trees-version")
+        before = self.client.get(url, REMOTE_ADDR="10.9.8.1").json()["version"]
+        HamburgRoadsideTrees.objects.all().delete()
+        HamburgRoadsideTrees.objects.create(
+            id=self.tree.pk, geom=Point(9, 9, srid=4326)
+        )
+        after = self.client.get(url, REMOTE_ADDR="10.9.8.1").json()["version"]
+        self.assertNotEqual(before, after)
+
+    def test_geojson_get_returns_fresh_geometry_after_tree_change(self):
+        # No cache clearing: the shared test cache is used by parallel
+        # workers. Versioned keys make the assertions deterministic anyway —
+        # a stale entry under the old version is simply never looked up.
+        url = reverse("api-hamburg-roadside-trees-geojson")
+
+        first = self.client.get(url, REMOTE_ADDR="10.9.8.5")
+        self.assertEqual(first.status_code, 200)
+        old_version = first["X-Data-Version"]
+        self.assertEqual(
+            list(json.loads(first.content)["features"][0]["geometry"]["coordinates"]),
+            [0.0, 0.0],
+        )
+
+        self.tree.geom = Point(5, 5, srid=4326)
+        self.tree.save()
+
+        # The externally managed table changed, so the rotated dataset version
+        # must orphan the stale payload instead of serving it.
+        second = self.client.get(url, REMOTE_ADDR="10.9.8.5")
+        self.assertEqual(second["X-Cache-Status"], "MISS")
+        self.assertNotEqual(second["X-Data-Version"], old_version)
+        self.assertEqual(
+            list(json.loads(second.content)["features"][0]["geometry"]["coordinates"]),
+            [5.0, 5.0],
+        )
+
+    @override_settings(
+        GEOJSON_CACHE="geojson",
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "tree-warm-default",
+            },
+            "geojson": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "tree-warm-geojson",
+            },
+        },
+    )
+    def test_warmed_cache_head_never_reads_payload(self):
+        # Isolated cache backend: the real geojson cache is shared across
+        # parallel test workers, so clearing or relying on it would flake.
+        from ..tasks import warm_roadside_tree_geojson_cache
+
+        cache = get_geojson_cache()
+
+        result = warm_roadside_tree_geojson_cache.run()
+        self.assertEqual(result["status"], "success")
+
+        version = self.client.get(
+            reverse("api-hamburg-roadside-trees-version"), REMOTE_ADDR="10.9.8.3"
+        ).json()["version"]
+        cache_key = f"tree_geojson:all:dv:{version}"
+        self.assertEqual(cache.get(f"{cache_key}:count"), 1)
+
+        url = reverse("api-hamburg-roadside-trees-geojson")
+        with patch.object(cache, "get", wraps=cache.get) as cache_get:
+            head = self.client.head(url, REMOTE_ADDR="10.9.8.4")
+        self.assertEqual(head.status_code, 200)
+        self.assertEqual(head["X-Cache-Status"], "HIT")
+        self.assertEqual(head["X-Total-Count"], "1")
+        keys = [call.args[0] for call in cache_get.call_args_list]
+        self.assertNotIn(cache_key, keys)
 
 
 class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestCase):

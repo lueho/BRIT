@@ -16,7 +16,11 @@ from maps.serializers import (
     NutsRegionGeometrySerializer,
     RegionGeoFeatureModelSerializer,
 )
-from maps.utils import get_nuts_region_cache_key, get_region_cache_key
+from maps.utils import (
+    get_nuts_region_cache_key,
+    get_region_cache_key,
+    set_geojson_cache_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,13 +56,13 @@ def warm_nuts_geojson_cache(nuts_levels=None, limit=None):
         for region in queryset:
             cache_key = get_nuts_region_cache_key(nuts_id=region.id, version=year)
             serializer = NutsRegionGeometrySerializer([region], many=True)
-            geojson_cache.set(cache_key, serializer.data)
+            set_geojson_cache_payload(geojson_cache, cache_key, serializer.data)
             warmed += 1
 
         # Also cache the per-level collection
         cache_key = get_nuts_region_cache_key(level=level, version=year)
         serializer = NutsRegionGeometrySerializer(queryset, many=True)
-        geojson_cache.set(cache_key, serializer.data)
+        set_geojson_cache_payload(geojson_cache, cache_key, serializer.data)
 
     logger.info("NUTS GeoJSON cache warmed: %d entries", warmed)
     return {"status": "success", "features_count": warmed}
@@ -92,7 +96,9 @@ def warm_region_geojson_cache(limit=None):
     for region in queryset:
         cache_key = get_region_cache_key(region_id=region.id)
         serializer = RegionGeoFeatureModelSerializer([region], many=True)
-        geojson_cache.set(cache_key, serializer.data, timeout=timeout)
+        set_geojson_cache_payload(
+            geojson_cache, cache_key, serializer.data, timeout=timeout
+        )
         warmed += 1
 
     logger.info("Region GeoJSON cache warmed: %d entries", warmed)
