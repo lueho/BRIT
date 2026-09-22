@@ -3569,7 +3569,9 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
 
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertCountEqual(response.context["form"].initial["sample_groups"], [group])
+        self.assertCountEqual(
+            response.context["form"].initial["sample_groups"], [group]
+        )
 
         data = {
             "name": "Test Sample Duplicate",
