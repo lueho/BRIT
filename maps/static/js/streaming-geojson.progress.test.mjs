@@ -78,6 +78,27 @@ test("streamed progress never moves backward", async () => {
   assert.deepStrictEqual(reported[reported.length - 1], [total, total]);
 });
 
+test("completion reports the exact parsed count when the stream is short", async () => {
+  // Server skipped one feature mid-stream but X-Total-Count still says 1000.
+  const advertised = 1000;
+  const streamed = 999;
+  const payload = JSON.stringify({ type: "FeatureCollection", features: makeFeatures(streamed) });
+  const reported = [];
+  const loader = new StreamingGeoJSONLoader({
+    onProgress: (loaded, totalCount) => reported.push([loaded, totalCount]),
+  });
+
+  // Content-Length matches the body, so byte progress reaches `advertised`.
+  const geojson = await loader._parseStreamingResponse(
+    fakeResponse(payload, 16 * 1024),
+    advertised,
+    payload.length,
+  );
+
+  assert.strictEqual(geojson.features.length, streamed);
+  assert.deepStrictEqual(reported[reported.length - 1], [streamed, advertised]);
+});
+
 test("progress still advances between chunks", async () => {
   const total = 1000;
   const payload = JSON.stringify({ type: "FeatureCollection", features: makeFeatures(total) });
