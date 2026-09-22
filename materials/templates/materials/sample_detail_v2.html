@@ -171,6 +171,14 @@
               {{ object.timestep }}
             </li>
           {% endif %}
+          {% if related_groups %}
+            <li>
+              <span class="sdv2-meta-label">Groups</span>
+              {% for group in related_groups %}
+                <a href="{% url 'samplegroup-detail' group.pk %}">{{ group.name }}</a>{% if not forloop.last %}, {% endif %}
+              {% endfor %}
+            </li>
+          {% endif %}
           {% if object.datetime %}
             <li>
               <span class="sdv2-meta-label">Sampled</span>

@@ -11,6 +11,7 @@ from .models import (
     MaterialPropertyGroup,
     MaterialPropertyValue,
     Sample,
+    SampleGroup,
     SampleSeries,
 )
 
@@ -145,6 +146,15 @@ class SampleSeriesAdmin(admin.ModelAdmin):
     ordering = ("name",)
 
 
+@admin.register(SampleGroup)
+class SampleGroupAdmin(admin.ModelAdmin):
+    list_display = ("name", "kind", "owner", "publication_status")
+    search_fields = ("name", "description", "sources__title")
+    list_filter = ("kind", "publication_status")
+    ordering = ("name",)
+    autocomplete_fields = ("sources",)
+
+
 @admin.register(Sample)
 class SampleAdmin(admin.ModelAdmin):
     list_display = (
@@ -157,9 +167,10 @@ class SampleAdmin(admin.ModelAdmin):
         "publication_status",
     )
     search_fields = ("name", "material__name", "location")
-    list_filter = ("publication_status", "standalone")
+    list_filter = ("publication_status", "standalone", "sample_groups")
     ordering = ("name",)
     autocomplete_fields = ("sources",)
+    filter_horizontal = ("sample_groups",)
 
 
 @admin.register(Composition)

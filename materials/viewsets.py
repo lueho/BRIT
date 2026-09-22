@@ -6,6 +6,7 @@ from .filters import (
     CompositionFilterSet,
     MaterialFilterSet,
     SampleFilterSet,
+    SampleGroupFilterSet,
     SampleSeriesFilterSet,
 )
 from .models import (
@@ -14,6 +15,7 @@ from .models import (
     Material,
     MaterialPropertyValue,
     Sample,
+    SampleGroup,
     SampleSeries,
 )
 from .permissions import can_add_data_to_sample
@@ -27,6 +29,8 @@ from .serializers import (
     MaterialPropertyValueWriteSerializer,
     MaterialWriteSerializer,
     SampleAPISerializer,
+    SampleGroupAPISerializer,
+    SampleGroupWriteSerializer,
     SampleSeriesAPISerializer,
     SampleSeriesWriteSerializer,
     SampleWriteSerializer,
@@ -81,6 +85,17 @@ class SampleSeriesViewSet(UserCreatedObjectViewSet):
         if self.action in ("create", "update", "partial_update"):
             return SampleSeriesWriteSerializer
         return SampleSeriesAPISerializer
+
+
+class SampleGroupViewSet(UserCreatedObjectViewSet):
+    queryset = SampleGroup.objects.all()
+    serializer_class = SampleGroupAPISerializer
+    filterset_class = SampleGroupFilterSet
+
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update"):
+            return SampleGroupWriteSerializer
+        return SampleGroupAPISerializer
 
 
 class SampleViewSet(UserCreatedObjectViewSet):

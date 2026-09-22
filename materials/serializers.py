@@ -13,6 +13,7 @@ from rest_framework.serializers import (
 from bibliography.models import Source
 from bibliography.serializers import SourceAbbreviationSerializer
 from distributions.models import TemporalDistribution
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.serializers import NumericMeasurementSerializerMixin
 
 from .composition_normalization import get_sample_normalized_compositions
@@ -22,6 +23,7 @@ from .models import (
     Material,
     MaterialPropertyValue,
     Sample,
+    SampleGroup,
     SampleSeries,
 )
 
@@ -32,6 +34,15 @@ def _get_composition_shares(composition):
         if normalized.get("settings_pk") == composition.pk:
             return normalized["shares"]
     return []
+
+
+def _visible_related(queryset, context):
+    """Related objects the request user may see; published-only without one."""
+    request = context.get("request")
+    user = getattr(request, "user", None)
+    if user is None:
+        return queryset.filter(publication_status="published")
+    return filter_queryset_for_user(queryset, user)
 
 
 class NormalizedCompositionsField(Field):
@@ -319,10 +330,23 @@ class CompositionAPISerializer(ModelSerializer):
         fields = ("group", "fractions_of", "shares")
 
 
+class SampleGroupSummarySerializer(ModelSerializer):
+    """Compact group representation embedded in sample payloads."""
+
+    class Meta:
+        model = SampleGroup
+        fields = ("id", "name", "kind")
+
+
 class SampleAPISerializer(ModelSerializer):
     timestep = StringRelatedField()
     compositions = NormalizedCompositionsField()
     properties = SerializerMethodField()
+    sample_groups = SerializerMethodField()
+
+    def get_sample_groups(self, obj):
+        queryset = _visible_related(obj.sample_groups.all(), self.context)
+        return SampleGroupSummarySerializer(queryset, many=True).data
 
     def get_properties(self, obj):
         queryset = obj.get_property_values_queryset().select_related(
@@ -336,7 +360,7 @@ class SampleAPISerializer(ModelSerializer):
 
     class Meta:
         model = Sample
-        fields = ("name", "timestep", "properties", "compositions")
+        fields = ("name", "timestep", "properties", "compositions", "sample_groups")
 
 
 class SampleSeriesAPISerializer(ModelSerializer):
@@ -346,6 +370,32 @@ class SampleSeriesAPISerializer(ModelSerializer):
     class Meta:
         model = SampleSeries
         fields = ("material", "samples")
+
+
+class SampleGroupMemberSerializer(ModelSerializer):
+    material = StringRelatedField()
+    timestep = StringRelatedField()
+
+    class Meta:
+        model = Sample
+        fields = ("id", "name", "material", "timestep")
+
+
+class SampleGroupAPISerializer(ModelSerializer):
+    sources = SerializerMethodField()
+    samples = SerializerMethodField()
+
+    def get_sources(self, obj):
+        queryset = _visible_related(obj.sources.all(), self.context)
+        return SourceAbbreviationSerializer(queryset, many=True).data
+
+    def get_samples(self, obj):
+        queryset = _visible_related(obj.samples.all(), self.context)
+        return SampleGroupMemberSerializer(queryset, many=True).data
+
+    class Meta:
+        model = SampleGroup
+        fields = ("id", "name", "kind", "description", "sources", "samples")
 
 
 # ----------- Write (mutation) serializers -----------------------------------------------------------------------------
@@ -378,6 +428,93 @@ class SampleSeriesWriteSerializer(ModelSerializer):
         )
 
 
+def _request_user(context):
+    return getattr(context.get("request"), "user", None)
+
+
+def _editable_by(queryset, user):
+    if getattr(user, "is_staff", False):
+        return queryset.all()
+    if getattr(user, "is_authenticated", False):
+        return queryset.editable_by_user(user)
+    return queryset.none()
+
+
+def _validate_related_pks(value, queryset, message):
+    if any(not queryset.filter(pk=item.pk).exists() for item in value):
+        raise ValidationError(message)
+    return value
+
+
+def _update_m2m_preserving_locked(manager, new_members, editable):
+    locked = list(manager.exclude(pk__in=editable).values_list("pk", flat=True))
+    manager.set(new_members)
+    manager.add(*locked)
+
+
+class SampleGroupWriteSerializer(ModelSerializer):
+    sources = PrimaryKeyRelatedField(
+        many=True,
+        queryset=Source.objects.all(),
+        required=False,
+    )
+    samples = PrimaryKeyRelatedField(
+        many=True,
+        queryset=Sample.objects.all(),
+        required=False,
+    )
+
+    def validate_sources(self, value):
+        user = _request_user(self.context)
+        if not getattr(user, "is_authenticated", False):
+            if value:
+                raise ValidationError(
+                    "Authentication is required to assign related objects."
+                )
+            return value
+        return _validate_related_pks(
+            value,
+            filter_queryset_for_user(Source.objects.all(), user),
+            "One or more selected objects are not accessible.",
+        )
+
+    def validate_samples(self, value):
+        user = _request_user(self.context)
+        if not getattr(user, "is_authenticated", False):
+            if value:
+                raise ValidationError(
+                    "Authentication is required to assign related objects."
+                )
+            return value
+        return _validate_related_pks(
+            value,
+            _editable_by(Sample.objects, user),
+            "One or more selected samples cannot be edited.",
+        )
+
+    def update(self, instance, validated_data):
+        samples = validated_data.pop("samples", None)
+        instance = super().update(instance, validated_data)
+        if samples is not None:
+            _update_m2m_preserving_locked(
+                instance.samples,
+                samples,
+                _editable_by(Sample.objects, _request_user(self.context)),
+            )
+        return instance
+
+    class Meta:
+        model = SampleGroup
+        fields = (
+            "id",
+            "name",
+            "kind",
+            "description",
+            "sources",
+            "samples",
+        )
+
+
 class SampleWriteSerializer(ModelSerializer):
     # sources is a M2M field without blank=True on the model; make it optional
     # in the API so callers can add sources later.
@@ -386,6 +523,36 @@ class SampleWriteSerializer(ModelSerializer):
         queryset=Source.objects.all(),
         required=False,
     )
+    sample_groups = PrimaryKeyRelatedField(
+        many=True,
+        queryset=SampleGroup.objects.all(),
+        required=False,
+    )
+
+    def validate_sample_groups(self, value):
+        user = _request_user(self.context)
+        if not getattr(user, "is_authenticated", False):
+            if value:
+                raise ValidationError(
+                    "Authentication is required to assign sample groups."
+                )
+            return value
+        return _validate_related_pks(
+            value,
+            _editable_by(SampleGroup.objects, user),
+            "One or more selected sample groups cannot be edited.",
+        )
+
+    def update(self, instance, validated_data):
+        sample_groups = validated_data.pop("sample_groups", None)
+        instance = super().update(instance, validated_data)
+        if sample_groups is not None:
+            _update_m2m_preserving_locked(
+                instance.sample_groups,
+                sample_groups,
+                _editable_by(SampleGroup.objects, _request_user(self.context)),
+            )
+        return instance
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -412,6 +579,7 @@ class SampleWriteSerializer(ModelSerializer):
             "series",
             "standalone",
             "timestep",
+            "sample_groups",
             "datetime",
             "datetime_precision",
             "location",

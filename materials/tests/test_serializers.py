@@ -3,6 +3,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.db.models.signals import post_save
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
@@ -11,6 +12,7 @@ from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import Timestep
+from utils.object_management.models import ObjectEditorGrant
 from utils.properties.models import Unit
 
 from ..models import (
@@ -23,6 +25,7 @@ from ..models import (
     MaterialPropertyValue,
     MeasurementValueQualifier,
     Sample,
+    SampleGroup,
     SampleSeries,
 )
 from ..serializers import (
@@ -35,6 +38,8 @@ from ..serializers import (
     MaterialPropertyValueReadSerializer,
     SampleAPISerializer,
     SampleFlatSerializer,
+    SampleGroupAPISerializer,
+    SampleGroupWriteSerializer,
     SampleModelSerializer,
     SampleSeriesModelSerializer,
     SampleWriteSerializer,
@@ -705,3 +710,348 @@ class MeasurementQualifierSerializerTestCase(TestCase):
         self.assertEqual(data["raw_value"], raw)
         self.assertEqual(data["display_value"], raw)
         self.assertIsInstance(data["display_value"], str)
+
+
+class SampleGroupAPISerializerTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create_user(
+            username="group-serializer-owner"
+        )
+        cls.material = Material.objects.create(name="Grouped material", owner=cls.owner)
+        cls.sample = Sample.objects.create(
+            name="Member sample",
+            material=cls.material,
+            timestep=Timestep.objects.default(),
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.group = SampleGroup.objects.create(
+            name="Serializer group",
+            kind="experiment",
+            description="A test group",
+            owner=cls.owner,
+        )
+        cls.sample.sample_groups.add(cls.group)
+        with mute_signals(post_save):
+            cls.source = Source.objects.create(
+                title="Group source",
+                owner=cls.owner,
+                publication_status="published",
+            )
+        cls.group.sources.add(cls.source)
+        cls.other = get_user_model().objects.create_user(
+            username="group-serializer-other"
+        )
+
+    def _request(self, user=None):
+        request = RequestFactory().get("/")
+        request.user = user if user is not None else AnonymousUser()
+        return request
+
+    def _add_private_relations(self):
+        private_sample = Sample.objects.create(
+            name="Private member sample",
+            material=self.material,
+            owner=self.owner,
+            publication_status="private",
+        )
+        private_sample.sample_groups.add(self.group)
+        with mute_signals(post_save):
+            private_source = Source.objects.create(
+                title="Private group source",
+                owner=self.owner,
+                publication_status="private",
+            )
+        self.group.sources.add(private_source)
+        return private_sample, private_source
+
+    def test_read_shape(self):
+        data = SampleGroupAPISerializer(self.group).data
+
+        self.assertEqual(
+            set(data.keys()),
+            {"id", "name", "kind", "description", "sources", "samples"},
+        )
+        self.assertEqual(data["kind"], "experiment")
+        self.assertEqual(len(data["samples"]), 1)
+        self.assertEqual(
+            set(data["samples"][0].keys()),
+            {"id", "name", "material", "timestep"},
+        )
+        self.assertEqual(data["samples"][0]["material"], "Grouped material")
+
+    def test_no_request_returns_only_published_relations(self):
+        private_sample, private_source = self._add_private_relations()
+
+        data = SampleGroupAPISerializer(self.group).data
+
+        self.assertEqual(
+            [sample["name"] for sample in data["samples"]], ["Member sample"]
+        )
+        self.assertNotIn(private_sample.name, str(data["samples"]))
+        self.assertNotIn(private_source.title, str(data["sources"]))
+
+    def test_anonymous_request_hides_private_relations(self):
+        private_sample, private_source = self._add_private_relations()
+
+        data = SampleGroupAPISerializer(
+            self.group, context={"request": self._request()}
+        ).data
+
+        self.assertNotIn(private_sample.name, str(data["samples"]))
+        self.assertNotIn(private_source.title, str(data["sources"]))
+
+    def test_owner_request_sees_private_relations(self):
+        private_sample, private_source = self._add_private_relations()
+
+        data = SampleGroupAPISerializer(
+            self.group, context={"request": self._request(self.owner)}
+        ).data
+
+        self.assertIn(private_sample.name, str(data["samples"]))
+        self.assertEqual(len(data["sources"]), 2)
+
+    def test_write_fields(self):
+        self.assertEqual(
+            list(SampleGroupWriteSerializer.Meta.fields),
+            ["id", "name", "kind", "description", "sources", "samples"],
+        )
+
+    def test_write_roundtrip(self):
+        serializer = SampleGroupWriteSerializer(
+            data={"name": "New group", "kind": "analysis", "description": ""}
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        group = serializer.save(owner=self.owner)
+
+        self.assertEqual(group.kind, "analysis")
+        self.assertFalse(group.samples.exists())
+
+    def test_write_sets_members_and_sources(self):
+        serializer = SampleGroupWriteSerializer(
+            data={
+                "name": "Group with members",
+                "kind": "study",
+                "samples": [self.sample.pk],
+                "sources": [self.source.pk],
+            },
+            context={"request": self._request(self.owner)},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        group = serializer.save(owner=self.owner)
+
+        self.assertCountEqual(group.samples.all(), [self.sample])
+        self.assertCountEqual(group.sources.all(), [self.source])
+
+    def test_write_rejects_inaccessible_private_sample(self):
+        foreign_sample = Sample.objects.create(
+            name="Foreign sample",
+            material=self.material,
+            owner=self.other,
+            publication_status="private",
+        )
+        serializer = SampleGroupWriteSerializer(
+            data={
+                "name": "Bad group",
+                "kind": "study",
+                "samples": [foreign_sample.pk],
+            },
+            context={"request": self._request(self.owner)},
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("samples", serializer.errors)
+
+    def test_write_rejects_visible_but_not_editable_sample(self):
+        foreign_sample = Sample.objects.create(
+            name="Foreign published sample",
+            material=self.material,
+            owner=self.other,
+            publication_status="published",
+        )
+        serializer = SampleGroupWriteSerializer(
+            data={
+                "name": "Bad group",
+                "kind": "study",
+                "samples": [foreign_sample.pk],
+            },
+            context={"request": self._request(self.owner)},
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("samples", serializer.errors)
+
+    def test_write_update_preserves_members_editor_cannot_manage(self):
+        foreign_sample = Sample.objects.create(
+            name="Foreign published sample",
+            material=self.material,
+            owner=self.other,
+            publication_status="published",
+        )
+        own_sample = Sample.objects.create(
+            name="Own sample", material=self.material, owner=self.owner
+        )
+        foreign_sample.sample_groups.add(self.group)
+        serializer = SampleGroupWriteSerializer(
+            instance=self.group,
+            data={"samples": [own_sample.pk]},
+            partial=True,
+            context={"request": self._request(self.owner)},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+
+        self.assertCountEqual(self.group.samples.all(), [own_sample, foreign_sample])
+
+    def test_write_rejects_inaccessible_private_source(self):
+        with mute_signals(post_save):
+            foreign_source = Source.objects.create(
+                title="Foreign source",
+                owner=self.other,
+                publication_status="private",
+            )
+        serializer = SampleGroupWriteSerializer(
+            data={
+                "name": "Bad group",
+                "kind": "study",
+                "sources": [foreign_source.pk],
+            },
+            context={"request": self._request(self.owner)},
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("sources", serializer.errors)
+
+
+class SampleGroupMembershipSerializerTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create_user(username="membership-owner")
+        cls.other = get_user_model().objects.create_user(username="membership-other")
+        cls.material = Material.objects.create(
+            name="Membership material", owner=cls.owner
+        )
+        cls.sample = Sample.objects.create(
+            name="Membership sample", material=cls.material, owner=cls.owner
+        )
+        cls.group = SampleGroup.objects.create(
+            name="Accessible group",
+            kind="study",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.private_group = SampleGroup.objects.create(
+            name="Foreign private group",
+            kind="other",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.foreign_published_group = SampleGroup.objects.create(
+            name="Foreign published group",
+            kind="other",
+            owner=cls.other,
+            publication_status="published",
+        )
+
+    def _request(self, user):
+        request = RequestFactory().get("/")
+        request.user = user
+        return request
+
+    def test_sample_api_serializer_exposes_compact_groups(self):
+        self.sample.sample_groups.add(self.group)
+
+        data = SampleAPISerializer(self.sample).data
+
+        self.assertIn("sample_groups", data)
+        self.assertEqual(len(data["sample_groups"]), 1)
+        self.assertEqual(set(data["sample_groups"][0].keys()), {"id", "name", "kind"})
+        self.assertEqual(data["sample_groups"][0]["name"], "Accessible group")
+
+    def test_sample_write_serializer_accepts_group_pks(self):
+        serializer = SampleWriteSerializer(
+            instance=self.sample,
+            data={"sample_groups": [self.group.pk]},
+            partial=True,
+            context={"request": self._request(self.owner)},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+
+        self.assertCountEqual(self.sample.sample_groups.all(), [self.group])
+
+    def test_serializer_without_request_hides_private_groups(self):
+        self.sample.sample_groups.add(self.group, self.private_group)
+
+        data = SampleAPISerializer(self.sample).data
+
+        names = [group["name"] for group in data["sample_groups"]]
+        self.assertIn("Accessible group", names)
+        self.assertNotIn("Foreign private group", names)
+
+    def test_anonymous_request_hides_private_groups(self):
+        self.sample.sample_groups.add(self.group, self.private_group)
+        request = RequestFactory().get("/")
+        request.user = AnonymousUser()
+
+        data = SampleAPISerializer(self.sample, context={"request": request}).data
+
+        names = [group["name"] for group in data["sample_groups"]]
+        self.assertNotIn("Foreign private group", names)
+
+    def test_sample_write_serializer_rejects_inaccessible_group_pks(self):
+        serializer = SampleWriteSerializer(
+            instance=self.sample,
+            data={"sample_groups": [self.private_group.pk]},
+            partial=True,
+            context={"request": self._request(self.owner)},
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("sample_groups", serializer.errors)
+
+    def test_sample_write_serializer_rejects_visible_but_not_editable_group(self):
+        serializer = SampleWriteSerializer(
+            instance=self.sample,
+            data={"sample_groups": [self.foreign_published_group.pk]},
+            partial=True,
+            context={"request": self._request(self.owner)},
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("sample_groups", serializer.errors)
+
+    def test_sample_write_serializer_preserves_groups_editor_cannot_manage(self):
+        self.sample.sample_groups.add(self.foreign_published_group)
+        serializer = SampleWriteSerializer(
+            instance=self.sample,
+            data={"sample_groups": [self.group.pk]},
+            partial=True,
+            context={"request": self._request(self.owner)},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+
+        self.assertCountEqual(
+            self.sample.sample_groups.all(),
+            [self.group, self.foreign_published_group],
+        )
+
+    def test_sample_write_serializer_accepts_editor_granted_group(self):
+        ObjectEditorGrant.objects.create(
+            content_object=self.private_group, editor=self.owner
+        )
+        serializer = SampleWriteSerializer(
+            instance=self.sample,
+            data={"sample_groups": [self.private_group.pk]},
+            partial=True,
+            context={"request": self._request(self.owner)},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
