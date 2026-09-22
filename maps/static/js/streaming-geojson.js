@@ -96,8 +96,15 @@ class StreamingGeoJSONLoader {
         const features = [];
         let bytesReceived = 0;
 
-        // Report initial progress
-        this.onProgress(0, totalCount);
+        // Byte-based estimates and exact feature counts interleave; never let
+        // a lower estimate overwrite a higher value already shown.
+        let reportedProgress = 0;
+        const reportProgress = (loaded) => {
+            reportedProgress = Math.max(reportedProgress, loaded);
+            this.onProgress(reportedProgress, totalCount);
+        };
+
+        reportProgress(0);
 
         // Parser state - GeoJSON structure is: {"type":"FeatureCollection","features":[{...},{...}]}
         // braceDepth 0 = outside, 1 = inside FeatureCollection, 2 = inside a Feature
@@ -128,7 +135,7 @@ class StreamingGeoJSONLoader {
                 );
 
                 // Update progress on every chunk based on bytes received
-                this.onProgress(estimatedProgress, totalCount);
+                reportProgress(estimatedProgress);
 
                 // Process each character in the chunk
                 for (let i = 0; i < chunk.length; i++) {
@@ -182,7 +189,7 @@ class StreamingGeoJSONLoader {
                                     // updates are wasteful on large datasets.
                                     if (features.length - lastFeatureProgress >= 250) {
                                         lastFeatureProgress = features.length;
-                                        this.onProgress(features.length, totalCount);
+                                        reportProgress(features.length);
                                     }
                                 }
                             } catch (e) {
@@ -205,7 +212,7 @@ class StreamingGeoJSONLoader {
                 features: features
             };
 
-            this.onProgress(features.length, totalCount);
+            reportProgress(features.length);
             this.onComplete(geojson, dataVersion);
             return geojson;
 
