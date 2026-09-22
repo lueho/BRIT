@@ -950,12 +950,56 @@ async function clickedFeature(event) {
     // This is a hook for implementing behaviour when a feature is clicked.
 }
 
+// Query parameters that describe navigation or display state rather than a
+// constraint on the dataset. They do not count as meaningful filters for the
+// unfiltered-load guard on maps flagged as large.
+const NON_CONSTRAINING_FILTER_PARAMETERS = new Set([
+    'csrfmiddlewaretoken',
+    'page',
+    'scope',
+    'mode',
+    'tab',
+    'ordering',
+    'sort',
+    'map_config_id',
+    'load_region',
+    'load_catchment',
+    'load_features',
+    'show_composed_of',
+]);
+
+function hasConstrainingFilterParameters(params) {
+    if (!params) {
+        return false;
+    }
+    const searchParams = params instanceof URLSearchParams
+        ? params
+        : new URLSearchParams(params);
+    for (const [key, value] of searchParams.entries()) {
+        if (!NON_CONSTRAINING_FILTER_PARAMETERS.has(key) && value !== '') {
+            return true;
+        }
+    }
+    return false;
+}
+
 function clickedFilterButton() {
     let params;
     try {
         params = parseFilterParameters();
     } catch (error) {
         console.warn('Filter parameters could not be parsed:', error);
+    }
+    if (mapConfig.guardUnfilteredLoad && !hasConstrainingFilterParameters(params)) {
+        const proceed = window.confirm(
+            'No filter parameters are selected. ' +
+            'Loading the complete dataset can take a while. Load everything anyway?'
+        );
+        if (!proceed) {
+            showMapOverlay();
+            return;
+        }
+        mapConfig.guardUnfilteredLoad = false;
     }
     prepareMapRefresh();
     mapConfig.loadFeatures = true;
@@ -1087,6 +1131,7 @@ function loadLayers(params) {
             promises.push(fetchFeaturesLayerSummary(filterParameters));
         }
     } else {
+        mapConfig.guardUnfilteredLoad = true;
         try {
             showMapOverlay();
         } catch (error) {
