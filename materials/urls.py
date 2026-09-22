@@ -207,6 +207,11 @@ urlpatterns = [
         name="samplegroup-autocomplete",
     ),
     path(
+        "sample_groups/autocomplete/editable/",
+        views.EditableSampleGroupAutoCompleteView.as_view(),
+        name="samplegroup-autocomplete-editable",
+    ),
+    path(
         "sample_groups/user/",
         views.SampleGroupPrivateListView.as_view(),
         name="samplegroup-list-owned",
@@ -281,6 +286,11 @@ urlpatterns = [
         "samples/autocomplete/user/",
         views.UserOwnedSampleAutoCompleteView.as_view(),
         name="sample-autocomplete-user",
+    ),
+    path(
+        "samples/autocomplete/editable/",
+        views.EditableSampleAutoCompleteView.as_view(),
+        name="sample-autocomplete-editable",
     ),
     path(
         "samples/featured/",

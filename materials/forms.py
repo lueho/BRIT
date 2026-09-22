@@ -510,7 +510,7 @@ class SampleGroupModelForm(
         queryset=Sample.objects.all(),
         required=False,
         config=TomSelectConfig(
-            url="sample-autocomplete",
+            url="sample-autocomplete-editable",
             label_field="name",
             value_field="id",
         ),
@@ -600,7 +600,7 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
         queryset=SampleGroup.objects.all(),
         required=False,
         config=TomSelectConfig(
-            url="samplegroup-autocomplete",
+            url="samplegroup-autocomplete-editable",
             label_field="name",
             value_field="id",
         ),
@@ -791,7 +791,7 @@ class SampleMaintenanceForm(WorkspaceReferenceScopeMixin, SampleModelForm):
         queryset=SampleGroup.objects.all(),
         required=False,
         config=TomSelectConfig(
-            url="samplegroup-autocomplete",
+            url="samplegroup-autocomplete-editable",
             label_field="name",
             value_field="id",
         ),

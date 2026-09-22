@@ -8510,6 +8510,45 @@ class SampleGroupDetailViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 302)
         self.assertCountEqual(group.samples.all(), [own_sample])
 
+    def test_editable_sample_autocomplete_excludes_other_users_published_sample(
+        self,
+    ):
+        own_sample = Sample.objects.create(
+            name="Member owned sample",
+            material=self.material,
+            owner=self.member,
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse("sample-autocomplete-editable"), {"q": "sample"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(own_sample.pk, ids)
+        self.assertNotIn(self.published_sample.pk, ids)
+
+    def test_editable_group_autocomplete_excludes_other_users_published_group(
+        self,
+    ):
+        own_group = SampleGroup.objects.create(
+            name="Member owned group",
+            owner=self.member,
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse("samplegroup-autocomplete-editable"), {"q": "group"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(own_group.pk, ids)
+        self.assertNotIn(self.group.pk, ids)
+
     def test_group_update_rejects_other_users_published_sample(self):
         group = SampleGroup.objects.create(
             name="Editable Group",

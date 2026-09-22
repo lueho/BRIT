@@ -1239,6 +1239,22 @@ class SampleGroupAutoCompleteView(UserCreatedObjectAutocompleteView):
     model = SampleGroup
 
 
+class EditableAutocompleteMixin:
+    """Restricts autocomplete results to objects the request user may edit."""
+
+    def hook_queryset(self, queryset):
+        user = self.request.user
+        if user.is_staff:
+            return super().hook_queryset(queryset)
+        return super().hook_queryset(queryset).editable_by_user(user)
+
+
+class EditableSampleGroupAutoCompleteView(
+    EditableAutocompleteMixin, SampleGroupAutoCompleteView
+):
+    pass
+
+
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -2013,6 +2029,10 @@ class PublishedSampleAutoCompleteView(SampleAutocompleteView):
 class UserOwnedSampleAutoCompleteView(SampleAutocompleteView):
     def get_queryset(self):
         return super().get_queryset().filter(owner=self.request.user)
+
+
+class EditableSampleAutoCompleteView(EditableAutocompleteMixin, SampleAutocompleteView):
+    pass
 
 
 class SampleAddCompositionView(SampleBoundCreateMixin, UserCreatedObjectCreateView):
