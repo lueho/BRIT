@@ -89,6 +89,35 @@ class AuthorAutoCompleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(1, len(response.json()["results"]))
         self.assertDictEqual(expected_result, response.json()["results"][0])
 
+    def test_get_excludes_person_authors_without_letters_in_surname(self):
+        """Legacy rows that bypassed clean() must not pollute the dropdown."""
+        Author.objects.create(
+            first_names="", last_names="30.379", publication_status="published"
+        )
+        valid = Author.objects.create(
+            first_names="Test", last_names="Author", publication_status="published"
+        )
+        response = self.client.get(reverse("author-autocomplete"))
+        ids = [result["id"] for result in response.json()["results"]]
+        self.assertIn(valid.pk, ids)
+        self.assertNotIn(Author.objects.get(last_names="30.379").pk, ids)
+
+    def test_get_excludes_organizations_without_letters_in_name(self):
+        Author.objects.create(
+            author_type="organization",
+            organization_name="70",
+            publication_status="published",
+        )
+        valid = Author.objects.create(
+            author_type="organization",
+            organization_name="3M Company",
+            publication_status="published",
+        )
+        response = self.client.get(reverse("author-autocomplete"))
+        ids = [result["id"] for result in response.json()["results"]]
+        self.assertIn(valid.pk, ids)
+        self.assertNotIn(Author.objects.get(organization_name="70").pk, ids)
+
 
 class AuthorQuickCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ["add_author"]

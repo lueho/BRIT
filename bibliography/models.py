@@ -34,13 +34,26 @@ class Author(UserCreatedObject):
 
     def clean(self):
         super().clean()
-        if (
-            self.author_type == "organization"
-            and not (self.organization_name or "").strip()
-        ):
-            raise ValidationError({"organization_name": "Organizations need a name."})
-        if self.author_type == "person" and not (self.last_names or "").strip():
-            raise ValidationError({"last_names": "People need a surname."})
+        if self.author_type == "organization":
+            organization_name = (self.organization_name or "").strip()
+            if not organization_name:
+                raise ValidationError(
+                    {"organization_name": "Organizations need a name."}
+                )
+            if not any(char.isalpha() for char in organization_name):
+                raise ValidationError(
+                    {
+                        "organization_name": "Organization names must contain at least one letter."
+                    }
+                )
+        if self.author_type == "person":
+            last_names = (self.last_names or "").strip()
+            if not last_names:
+                raise ValidationError({"last_names": "People need a surname."})
+            if not any(char.isalpha() for char in last_names):
+                raise ValidationError(
+                    {"last_names": "Surnames must contain at least one letter."}
+                )
 
     def __str__(self):
         if self.author_type == "organization":

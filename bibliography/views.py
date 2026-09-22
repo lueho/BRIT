@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -149,6 +150,15 @@ class AuthorAutocompleteView(UserCreatedObjectAutocompleteView):
         "organization_name",
     ]
     virtual_fields = ["label"]
+
+    def hook_queryset(self, queryset):
+        queryset = super().hook_queryset(queryset)
+        # Exclude legacy rows that bypassed clean() and carry no letter in
+        # their display name (e.g. imported "30.379" surnames).
+        return queryset.filter(
+            Q(author_type="organization", organization_name__regex=r"[[:alpha:]]")
+            | Q(author_type="person", last_names__regex=r"[[:alpha:]]")
+        )
 
     def hook_prepare_results(self, results):
         for result in results:
