@@ -961,6 +961,22 @@ class SampleTestCase(TestCase):
         # Should not raise
         sample.clean()
 
+    def test_clean_raises_when_material_differs_from_series_material(self):
+        series = SampleSeries.objects.get(name="Test Series")
+        other_material = Material.objects.create(name="Other Material")
+        sample = Sample(material=other_material, standalone=False, series=series)
+        with self.assertRaises(ValidationError) as ctx:
+            sample.clean()
+        self.assertIn("material", ctx.exception.message_dict)
+
+    def test_clean_raises_for_standalone_sample_with_mismatched_series(self):
+        series = SampleSeries.objects.get(name="Test Series")
+        other_material = Material.objects.create(name="Other Material")
+        sample = Sample(material=other_material, standalone=True, series=series)
+        with self.assertRaises(ValidationError) as ctx:
+            sample.clean()
+        self.assertIn("material", ctx.exception.message_dict)
+
 
 class CompositionTestCase(TestCase):
     @classmethod

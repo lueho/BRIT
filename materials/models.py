@@ -963,15 +963,22 @@ class Sample(NamedUserCreatedObject):
 
     def clean(self):
         super().clean()
+        errors = {}
         if not self.standalone and self.series_id is None:
-            raise ValidationError(
-                {
-                    "series": (
-                        "A series is required when the sample is not standalone. "
-                        "Either assign a series or mark the sample as standalone."
-                    )
-                }
+            errors["series"] = (
+                "A series is required when the sample is not standalone. "
+                "Either assign a series or mark the sample as standalone."
             )
+        if (
+            self.series_id is not None
+            and self.material_id
+            and self.material_id != self.series.material_id
+        ):
+            errors["material"] = (
+                "The sample material must match the material of its series."
+            )
+        if errors:
+            raise ValidationError(errors)
 
     def approve(self, user=None):
         """
