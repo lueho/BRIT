@@ -188,12 +188,8 @@ class SampleMeasurementsXLSXRendererTestCase(TestCase):
             value_qualifier="less_than",
         )
 
-        exact_property = MaterialProperty.objects.create(
-            name="Exact Property", unit="%"
-        )
-        censored_property = MaterialProperty.objects.create(
-            name="Censored Property", unit="%"
-        )
+        exact_property = MaterialProperty.objects.create(name="Exact Property")
+        censored_property = MaterialProperty.objects.create(name="Censored Property")
         MaterialPropertyValue.objects.create(
             sample=sample,
             property=exact_property,

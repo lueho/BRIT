@@ -99,7 +99,7 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
         cls.allowed_unit = Unit.objects.create(name="mg/L")
         cls.disallowed_unit = Unit.objects.create(name="g/L")
         cls.default_basis = MaterialComponent.objects.create(name="Dry Matter")
-        cls.property = MaterialProperty.objects.create(name="Nitrogen", unit="g/L")
+        cls.property = MaterialProperty.objects.create(name="Nitrogen")
         cls.property.allowed_units.add(cls.allowed_unit)
         cls.property.default_basis_component = cls.default_basis
         cls.property.save(update_fields=["default_basis_component"])
@@ -143,12 +143,13 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
             str(form["standard_deviation"]),
         )
 
-    def test_form_defaults_unit_from_property_symbol_match(self):
-        property_obj = MaterialProperty.objects.create(name="Phosphorus", unit="kg/m³")
+    def test_form_defaults_unit_from_property_allowed_units(self):
+        property_obj = MaterialProperty.objects.create(name="Phosphorus")
         expected_unit = Unit.objects.create(
             name="Kilogram per cubic metre",
             symbol="kg/m³",
         )
+        property_obj.allowed_units.add(expected_unit)
 
         data = QueryDict("", mutable=True)
         data.update(

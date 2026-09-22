@@ -84,7 +84,7 @@ class CollectionResearchPerformanceTests(CollectionViewSetTestCase):
             parent=nuts0,
         )
         collection = self._create_nuts_backed_collection("NUTS3 Research", nuts3)
-        population = RegionProperty.objects.create(name="Population", unit="")
+        population = RegionProperty.objects.create(name="Population")
         RegionAttributeValue.objects.create(
             region=nuts3.region_ptr,
             property=population,

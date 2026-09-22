@@ -850,7 +850,7 @@ class MockFilterView(FilterDefaultsMixin, FilterView):
 
 class TestPropertyCreateView(UserCreatedObjectCreateView):
     model = Property
-    fields = ["name", "unit"]
+    fields = ["name"]
     permission_required = "properties.add_property"
 
 
@@ -1615,7 +1615,7 @@ class CollectionPropertyValueReviewDashboardTest(TestCase):
         cls.owner_user = User.objects.create_user(username="owner", password="test123")
 
         cls.unit = Unit.objects.create(name="kg")
-        cls.property = Property.objects.create(name="Test Property", unit="kg")
+        cls.property = Property.objects.create(name="Test Property")
 
         with mute_signals(post_save, pre_save):
             cls.collection = Collection.objects.create(

@@ -92,7 +92,6 @@ class MaterialComponentGroupAdmin(admin.ModelAdmin):
 class MaterialPropertyAdmin(admin.ModelAdmin):
     list_display = (
         "name",
-        "unit",
         "abbreviation",
         "comparable_property",
         "group",

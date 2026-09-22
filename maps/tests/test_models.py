@@ -232,7 +232,6 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         region = Region.objects.create(name="Test Region")
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
         )
         value = RegionAttributeValue.objects.create(
             region=region,
@@ -242,7 +241,7 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         )
 
         self.assertEqual(value.measurement_name, region_property.name)
-        self.assertEqual(value.measurement_unit_label, region_property.unit)
+        self.assertIsNone(value.measurement_unit_label)
         self.assertEqual(value.display_average, value.value)
         self.assertEqual(value.display_standard_deviation, value.standard_deviation)
 
@@ -250,12 +249,12 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         region = Region.objects.create(name="Test Region")
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
         )
         unit = Unit.objects.create(
             name="People per square kilometre",
             symbol="1/km²",
         )
+        region_property.allowed_units.add(unit)
 
         value = RegionAttributeValue.objects.create(
             region=region,
@@ -266,10 +265,10 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         self.assertEqual(value.unit, unit)
         self.assertEqual(value.measurement_unit_label, unit.name)
 
-    def test_save_leaves_unit_empty_when_property_unit_cannot_be_resolved(self):
+    def test_save_leaves_unit_empty_when_property_has_no_allowed_units(self):
         value = RegionAttributeValue.objects.create(
             region=Region.objects.create(name="Test Region"),
-            property=RegionProperty.objects.create(name="Area", unit="km²"),
+            property=RegionProperty.objects.create(name="Area"),
             value=123.321,
         )
 
@@ -279,7 +278,9 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         region = Region.objects.create(name="Test Region")
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
+        )
+        region_property.allowed_units.add(
+            Unit.objects.create(name="inhabitants", symbol="cap")
         )
         unit = Unit.objects.create(name="1/km²", symbol="1/km²")
         value = RegionAttributeValue.objects.create(
@@ -303,7 +304,6 @@ class RegionPropertyBaseContractTestCase(TestCase):
     def test_region_property_uses_shared_property_base_contract(self):
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
         )
 
         self.assertIsInstance(region_property, PropertyBase)

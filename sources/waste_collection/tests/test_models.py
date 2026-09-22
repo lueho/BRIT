@@ -142,7 +142,6 @@ class WasteFlyerUrlCheckSignalTestCase(TestCase):
         self.property = Property.objects.create(
             owner=self.owner,
             name="Signal Property",
-            unit="kg",
         )
         self.unit = Unit.objects.create(owner=self.owner, name="kg", symbol="kg")
         self.property.allowed_units.add(self.unit)

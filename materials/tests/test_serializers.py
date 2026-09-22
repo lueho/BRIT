@@ -86,7 +86,7 @@ class ComponentMeasurementWriteSerializerTestCase(TestCase):
 class MaterialPropertySerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        prop = MaterialProperty.objects.create(name="Test Property", unit="g/kg")
+        prop = MaterialProperty.objects.create(name="Test Property")
         basis = MaterialComponent.objects.create(name="Dry Matter")
         unit = Unit.objects.create(name="mg/kg")
         MaterialPropertyValue.objects.create(
@@ -116,7 +116,6 @@ class MaterialPropertySerializerTestCase(TestCase):
         self.assertIn("unit", data)
         self.assertEqual(data["basis_component"], self.value.basis_component.name)
         self.assertEqual(data["unit"], self.value.unit.name)
-        self.assertNotEqual(data["unit"], self.value.property.unit)
 
 
 class SampleSeriesModelSerializerTestCase(TestCase):
@@ -314,7 +313,6 @@ class SampleSerializerTestCase(TestCase):
         sample.sources.add(source)
         property_obj = MaterialProperty.objects.create(
             name="Dry Matter",
-            unit="%",
             owner=cls.owner,
         )
         unit = Unit.objects.create(name="Percent")
@@ -379,7 +377,6 @@ class SampleSerializerTestCase(TestCase):
         first_value.sources.add(first_source)
         second_property = MaterialProperty.objects.create(
             name="Ash",
-            unit="%",
             owner=self.owner,
         )
         second_value = MaterialPropertyValue.objects.create(
@@ -577,7 +574,7 @@ class MeasurementQualifierSerializerTestCase(TestCase):
             name="Qualifier component", owner=cls.owner
         )
         cls.prop = MaterialProperty.objects.create(
-            name="Qualifier property", unit="%", owner=cls.owner
+            name="Qualifier property", owner=cls.owner
         )
         cls.unit = Unit.objects.filter(name="%").first() or Unit.objects.create(
             name="%", symbol="percent", owner=cls.owner

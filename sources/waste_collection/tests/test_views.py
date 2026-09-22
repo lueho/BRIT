@@ -5212,11 +5212,10 @@ class GenericMapTemplateTests(TestCase):
 class WasteAtlasPopulationViewSetTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        RegionProperty.objects.create(name="Atlas population filler 1", unit="cap")
-        RegionProperty.objects.create(name="Atlas population filler 2", unit="cap")
+        RegionProperty.objects.create(name="Atlas population filler 1")
+        RegionProperty.objects.create(name="Atlas population filler 2")
         cls.population_attribute = RegionProperty.objects.create(
             name="Population [atlas population filter test]",
-            unit="cap",
         )
         cls.collection_system = CollectionSystem.objects.create(
             name="Atlas population filter system"

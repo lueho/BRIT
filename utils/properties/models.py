@@ -54,20 +54,15 @@ class NumericMeasurementMixin:
     @builtin_property
     def measurement_unit_label(self):
         measurement_unit = self.get_measurement_unit()
-        if measurement_unit is not None:
-            unit_symbol = getattr(measurement_unit, "symbol", "") or ""
-            if (
-                getattr(measurement_unit, "dimensionless", False)
-                and not unit_symbol.strip()
-            ):
-                return None
-            return getattr(measurement_unit, "name", None) or str(measurement_unit)
-
-        measurement_property = self.get_measurement_property()
-        if measurement_property is None:
+        if measurement_unit is None:
             return None
-
-        return getattr(measurement_property, "unit", None)
+        unit_symbol = getattr(measurement_unit, "symbol", "") or ""
+        if (
+            getattr(measurement_unit, "dimensionless", False)
+            and not unit_symbol.strip()
+        ):
+            return None
+        return getattr(measurement_unit, "name", None) or str(measurement_unit)
 
     @builtin_property
     def display_average(self):
@@ -96,8 +91,6 @@ class PropertyBase(NamedUserCreatedObject):
     subclass while ``utils.properties`` keeps the shared review workflow,
     ownership model, naming contract, and measurement helpers centralized.
     """
-
-    unit = models.CharField(max_length=63, blank=True, default="")
 
     class Meta:
         abstract = True
