@@ -14,7 +14,10 @@ from django.views.generic import ListView, TemplateView
 
 from utils.forms import workspace_section_formsets
 from utils.object_management.models import ReviewAction
-from utils.object_management.permissions import get_object_policy
+from utils.object_management.permissions import (
+    filter_queryset_for_user,
+    get_object_policy,
+)
 from utils.object_management.views import (
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
@@ -101,9 +104,10 @@ class ProcessDashboardView(BreadcrumbContextMixin, TemplateView):
         context["total_processes"] = Process.objects.filter(
             publication_status="published"
         ).count()
-        context["total_categories"] = ProcessCategory.objects.filter(
-            publication_status="published"
-        ).count()
+        visible_categories = filter_queryset_for_user(
+            ProcessCategory.objects.all(), self.request.user
+        )
+        context["total_categories"] = visible_categories.count()
 
         # Recent processes
         context["recent_processes"] = (
@@ -114,7 +118,7 @@ class ProcessDashboardView(BreadcrumbContextMixin, TemplateView):
 
         # Categories with process counts
         context["categories_with_counts"] = with_published_process_count(
-            ProcessCategory.objects.filter(publication_status="published")
+            visible_categories
         ).order_by("-process_count")[:10]
 
         # User's private processes if authenticated

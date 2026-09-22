@@ -153,14 +153,23 @@ class ProcessFilter(UserCreatedObjectScopedFilterSet):
 
         parent_qs = queryset.filter(parent__isnull=True)
         self.filters["parent"].queryset = parent_qs
-        self.filters["categories"].queryset = category_queryset
+
+        # Drop the categories filter entirely when the scoped queryset is
+        # empty so the form does not render a label-only filter widget.
+        if category_queryset.exists():
+            self.filters["categories"].queryset = category_queryset
+        else:
+            del self.filters["categories"]
 
         # The form may already be instantiated (e.g. by _apply_shared_field_visibility
         # accessing self.form). Sync ModelChoiceFilter querysets to the form fields so
         # validation uses the correct queryset regardless of instantiation order.
         if "_form" in self.__dict__ and self._form is not None:
             self._form.fields["parent"].queryset = parent_qs
-            self._form.fields["categories"].queryset = category_queryset
+            if "categories" in self.filters:
+                self._form.fields["categories"].queryset = category_queryset
+            else:
+                self._form.fields.pop("categories", None)
 
     def filter_by_input_material(self, queryset, name, value):
         """Filter processes that have a specific material as input."""

@@ -2,7 +2,7 @@
 
 from django.contrib.auth import get_user_model
 from django.forms import inlineformset_factory
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 
 from bibliography.models import Author, Source
 from materials.models import Material
@@ -174,6 +174,84 @@ class ProcessFormTestCase(TestCase):
             }
         )
         self.assertTrue(form.is_valid())
+
+    def test_categories_queryset_is_scoped_to_request_user(self):
+        """Request-bound forms must not offer categories the user cannot see."""
+        category_owner = get_user_model().objects.create(username="category_owner")
+        viewer = get_user_model().objects.create(username="viewer")
+        published_category = ProcessCategory.objects.create(
+            name="Published Category",
+            owner=category_owner,
+            publication_status="published",
+        )
+        private_category = ProcessCategory.objects.create(
+            name="Private Category", owner=category_owner
+        )
+        request = RequestFactory().post("/")
+        request.user = viewer
+
+        valid_form = ProcessModalModelForm(
+            data={
+                "name": "Test Process",
+                "short_description": "Test description",
+                "categories": [published_category.pk],
+            },
+            request=request,
+        )
+        self.assertTrue(valid_form.is_valid(), valid_form.errors)
+        self.assertEqual(
+            [published_category],
+            list(valid_form.cleaned_data["categories"]),
+        )
+
+        invalid_form = ProcessModalModelForm(
+            data={
+                "name": "Test Process",
+                "short_description": "Test description",
+                "categories": [private_category.pk],
+            },
+            request=request,
+        )
+        self.assertTrue(invalid_form.is_valid(), invalid_form.errors)
+        self.assertEqual([], list(invalid_form.cleaned_data["categories"]))
+
+    def test_archived_categories_are_not_newly_assignable_but_stay_on_edit(self):
+        """Owners see archived categories, but they must not become new selections."""
+        owner = get_user_model().objects.create(username="archived_owner")
+        archived_category = ProcessCategory.objects.create(
+            name="Archived Category",
+            owner=owner,
+            publication_status=ProcessCategory.STATUS_ARCHIVED,
+        )
+        request = RequestFactory().post("/")
+        request.user = owner
+
+        create_form = ProcessModalModelForm(
+            data={
+                "name": "Test Process",
+                "short_description": "Test description",
+                "categories": [archived_category.pk],
+            },
+            request=request,
+        )
+        self.assertTrue(create_form.is_valid(), create_form.errors)
+        self.assertEqual([], list(create_form.cleaned_data["categories"]))
+
+        process = Process.objects.create(name="Existing Process", owner=owner)
+        process.categories.add(archived_category)
+        edit_form = ProcessModalModelForm(
+            data={
+                "name": "Existing Process",
+                "short_description": "Test description",
+                "categories": [archived_category.pk],
+            },
+            instance=process,
+            request=request,
+        )
+        self.assertTrue(edit_form.is_valid(), edit_form.errors)
+        self.assertEqual(
+            [archived_category], list(edit_form.cleaned_data["categories"])
+        )
 
 
 class ProcessMaterialFormSetTestCase(TestCase):

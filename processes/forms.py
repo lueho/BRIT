@@ -116,6 +116,29 @@ class ProcessModelForm(SimpleModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Scope category choices to the request user's read policy, matching
+        # the processcategory-autocomplete endpoint. Existing selections stay
+        # valid so edits do not drop values the user can no longer see.
+        request = getattr(self, "request", None)
+        if request is not None and hasattr(request, "user"):
+            from utils.object_management.permissions import (
+                filter_queryset_for_user,
+            )
+
+            categories_field = self.fields["categories"]
+            queryset = filter_queryset_for_user(
+                ProcessCategory.objects.all(), request.user
+            ).exclude(publication_status=ProcessCategory.STATUS_ARCHIVED)
+            if self.instance.pk:
+                queryset = queryset | ProcessCategory.objects.filter(
+                    pk__in=self.instance.categories.all()
+                )
+            categories_field.queryset = queryset.distinct()
+            # TomSelect fields re-resolve their queryset from the widget
+            # during clean(); pin the widget to the scoped queryset.
+            categories_field.widget.get_queryset = lambda field=categories_field: (
+                field.queryset
+            )
         # Override TomSelect field validation to use queryset instead of URL endpoint
         # This fixes form validation in tests while maintaining autocomplete in production
         for field_name in ["parent", "categories"]:
