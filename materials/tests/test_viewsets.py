@@ -1583,6 +1583,12 @@ class SampleGroupViewSetTestCase(ViewSetWithPermissionsTestCase):
         self.assertNotIn(self.foreign_private_source, self.private_group.sources.all())
 
     def test_post_create_sets_samples_and_sources(self):
+        own_sample = Sample.objects.create(
+            name="VS member owned",
+            material=self.material,
+            owner=self.member,
+            publication_status="private",
+        )
         self.client.force_login(self.member)
         response = self.client.post(
             reverse("api-samplegroup-list"),
@@ -1590,7 +1596,7 @@ class SampleGroupViewSetTestCase(ViewSetWithPermissionsTestCase):
                 {
                     "name": "Populated Group",
                     "kind": "study",
-                    "samples": [self.published_sample.pk],
+                    "samples": [own_sample.pk],
                     "sources": [self.published_source.pk],
                 }
             ),
@@ -1599,8 +1605,25 @@ class SampleGroupViewSetTestCase(ViewSetWithPermissionsTestCase):
 
         self.assertEqual(response.status_code, 201)
         group = SampleGroup.objects.get(name="Populated Group")
-        self.assertCountEqual(group.samples.all(), [self.published_sample])
+        self.assertCountEqual(group.samples.all(), [own_sample])
         self.assertCountEqual(group.sources.all(), [self.published_source])
+
+    def test_post_create_rejects_other_users_published_sample(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("api-samplegroup-list"),
+            data=json.dumps(
+                {
+                    "name": "Populated Group",
+                    "kind": "study",
+                    "samples": [self.published_sample.pk],
+                }
+            ),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(SampleGroup.objects.filter(name="Populated Group").exists())
 
     # --- delete ---
 

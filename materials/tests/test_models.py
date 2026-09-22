@@ -589,6 +589,32 @@ class SampleGroupTestCase(TestCase):
 
         self.assertIn(source, group.sources.all())
 
+    def test_duplicate_copies_group_memberships_by_default(self):
+        group = SampleGroup.objects.create(name="Copied group", owner=self.owner)
+        sample = Sample.objects.create(
+            name="Original", material=self.material_a, owner=self.owner
+        )
+        sample.sample_groups.add(group)
+
+        duplicate = sample.duplicate(self.owner)
+
+        self.assertCountEqual(duplicate.sample_groups.all(), [group])
+        self.assertCountEqual(sample.sample_groups.all(), [group])
+
+    def test_duplicate_applies_supplied_group_memberships(self):
+        group1 = SampleGroup.objects.create(name="Group 1", owner=self.owner)
+        group2 = SampleGroup.objects.create(name="Group 2", owner=self.owner)
+        sample = Sample.objects.create(
+            name="Original", material=self.material_a, owner=self.owner
+        )
+        sample.sample_groups.add(group1)
+
+        duplicate = sample.duplicate(
+            self.owner, sample_groups=SampleGroup.objects.filter(pk=group2.pk)
+        )
+
+        self.assertCountEqual(duplicate.sample_groups.all(), [group2])
+
     def test_deleting_group_removes_membership_only(self):
         group = SampleGroup.objects.create(name="Doomed", owner=self.owner)
         sample = Sample.objects.create(

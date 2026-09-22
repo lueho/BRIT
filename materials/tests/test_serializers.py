@@ -865,6 +865,48 @@ class SampleGroupAPISerializerTestCase(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("samples", serializer.errors)
 
+    def test_write_rejects_visible_but_not_editable_sample(self):
+        foreign_sample = Sample.objects.create(
+            name="Foreign published sample",
+            material=self.material,
+            owner=self.other,
+            publication_status="published",
+        )
+        serializer = SampleGroupWriteSerializer(
+            data={
+                "name": "Bad group",
+                "kind": "study",
+                "samples": [foreign_sample.pk],
+            },
+            context={"request": self._request(self.owner)},
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("samples", serializer.errors)
+
+    def test_write_update_preserves_members_editor_cannot_manage(self):
+        foreign_sample = Sample.objects.create(
+            name="Foreign published sample",
+            material=self.material,
+            owner=self.other,
+            publication_status="published",
+        )
+        own_sample = Sample.objects.create(
+            name="Own sample", material=self.material, owner=self.owner
+        )
+        foreign_sample.sample_groups.add(self.group)
+        serializer = SampleGroupWriteSerializer(
+            instance=self.group,
+            data={"samples": [own_sample.pk]},
+            partial=True,
+            context={"request": self._request(self.owner)},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+
+        self.assertCountEqual(self.group.samples.all(), [own_sample, foreign_sample])
+
     def test_write_rejects_inaccessible_private_source(self):
         with mute_signals(post_save):
             foreign_source = Source.objects.create(
@@ -983,6 +1025,23 @@ class SampleGroupMembershipSerializerTestCase(TestCase):
 
         self.assertFalse(serializer.is_valid())
         self.assertIn("sample_groups", serializer.errors)
+
+    def test_sample_write_serializer_preserves_groups_editor_cannot_manage(self):
+        self.sample.sample_groups.add(self.foreign_published_group)
+        serializer = SampleWriteSerializer(
+            instance=self.sample,
+            data={"sample_groups": [self.group.pk]},
+            partial=True,
+            context={"request": self._request(self.owner)},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+
+        self.assertCountEqual(
+            self.sample.sample_groups.all(),
+            [self.group, self.foreign_published_group],
+        )
 
     def test_sample_write_serializer_accepts_editor_granted_group(self):
         ObjectEditorGrant.objects.create(

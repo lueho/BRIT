@@ -1089,6 +1089,10 @@ class Sample(NamedUserCreatedObject):
             finally:
                 post_save.connect(add_default_composition, sender=Sample)
 
+            duplicate.sample_groups.set(
+                kwargs.get("sample_groups", self.sample_groups.all())
+            )
+
             for composition in self.compositions.all():
                 duplicate_composition = composition.duplicate(creator)
                 duplicate_composition.sample = duplicate

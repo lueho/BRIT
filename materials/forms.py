@@ -33,7 +33,6 @@ from utils.forms import (
     configure_tomselect_inline_create,
     image_metadata_section,
 )
-from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.forms import NumericMeasurementFieldsFormMixin
 from utils.properties.models import Unit, get_default_unit_pk
 
@@ -488,12 +487,20 @@ class SampleSeriesModalModelForm(ModalModelFormMixin, SampleSeriesModelForm):
     pass
 
 
-def _sample_groups_editable_by(user):
+def _editable_by(queryset, user):
     if getattr(user, "is_staff", False):
-        return SampleGroup.objects.all()
+        return queryset.all()
     if getattr(user, "is_authenticated", False):
-        return SampleGroup.objects.editable_by_user(user)
-    return SampleGroup.objects.none()
+        return queryset.editable_by_user(user)
+    return queryset.none()
+
+
+def _sample_groups_editable_by(user):
+    return _editable_by(SampleGroup.objects, user)
+
+
+def _samples_editable_by(user):
+    return _editable_by(Sample.objects, user)
 
 
 class SampleGroupModelForm(
@@ -513,14 +520,20 @@ class SampleGroupModelForm(
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         request = getattr(self, "request", None)
-        if request is not None:
-            self.fields["samples"].queryset = filter_queryset_for_user(
-                Sample.objects.all(), request.user
-            )
-        else:
-            self.fields["samples"].queryset = Sample.objects.none()
+        editable = (
+            _samples_editable_by(request.user)
+            if request is not None
+            else Sample.objects.none()
+        )
+        self.fields["samples"].queryset = editable
+        self._locked_sample_ids = []
         if self.instance.pk:
             self.initial["samples"] = self.instance.samples.all()
+            self._locked_sample_ids = list(
+                self.instance.samples.exclude(pk__in=editable).values_list(
+                    "pk", flat=True
+                )
+            )
         self.helper.layout = Layout(
             "name",
             "kind",
@@ -532,6 +545,7 @@ class SampleGroupModelForm(
     def _save_m2m(self):
         super()._save_m2m()
         self.instance.samples.set(self.cleaned_data["samples"])
+        self.instance.samples.add(*self._locked_sample_ids)
 
     class Meta:
         model = SampleGroup
@@ -628,6 +642,13 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             if request is not None
             else SampleGroup.objects.none()
         )
+        self._locked_group_ids = []
+        if self.instance.pk:
+            self._locked_group_ids = list(
+                self.instance.sample_groups.exclude(
+                    pk__in=groups_field.queryset
+                ).values_list("pk", flat=True)
+            )
         self.helper.layout = Layout(
             "name",
             "material",
@@ -648,6 +669,11 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
                 "analysis_objective",
             ),
         )
+
+    def _save_m2m(self):
+        super()._save_m2m()
+        if "sample_groups" in self.fields:
+            self.instance.sample_groups.add(*self._locked_group_ids)
 
     def clean_datetime(self):
         value = self.cleaned_data["datetime"]

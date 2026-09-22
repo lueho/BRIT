@@ -553,6 +553,12 @@ class SampleGroupModelFormTestCase(TestCase):
             owner=cls.other,
             publication_status="private",
         )
+        cls.foreign_published_sample = Sample.objects.create(
+            name="Foreign published member",
+            material=cls.material,
+            owner=cls.other,
+            publication_status="published",
+        )
 
     def setUp(self):
         self.factory = RequestFactory()
@@ -620,6 +626,48 @@ class SampleGroupModelFormTestCase(TestCase):
         queryset = form.fields["samples"].queryset
         self.assertIn(self.sample1, queryset)
         self.assertNotIn(self.foreign_private_sample, queryset)
+
+    def test_choices_exclude_foreign_published_samples(self):
+        form = self._form()
+
+        self.assertNotIn(self.foreign_published_sample, form.fields["samples"].queryset)
+
+    def test_rejects_other_users_published_sample(self):
+        data = QueryDict(mutable=True)
+        data.update({"name": "Bad group", "kind": "study"})
+        data.setlist("samples", [str(self.foreign_published_sample.pk)])
+        form = self._form(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("samples", form.errors)
+
+    def test_staff_may_add_other_users_published_sample(self):
+        staff = User.objects.create_user(username="group-form-staff", is_staff=True)
+        data = QueryDict(mutable=True)
+        data.update({"name": "Staff group", "kind": "study"})
+        data.setlist("samples", [str(self.foreign_published_sample.pk)])
+        form = self._form(data=data, user=staff)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        group = form.save()
+
+        self.assertCountEqual(group.samples.all(), [self.foreign_published_sample])
+
+    def test_update_preserves_members_editor_cannot_manage(self):
+        group = SampleGroup.objects.create(name="Editable group", owner=self.owner)
+        self.foreign_published_sample.sample_groups.add(group)
+        self.sample1.sample_groups.add(group)
+        data = QueryDict(mutable=True)
+        data.update({"name": "Editable group", "kind": "study"})
+        data.setlist("samples", [str(self.sample2.pk)])
+        form = self._form(data=data, instance=group)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        self.assertCountEqual(
+            group.samples.all(), [self.sample2, self.foreign_published_sample]
+        )
 
 
 class SampleModelFormSampleGroupsTestCase(TestCase):
@@ -733,6 +781,32 @@ class SampleModelFormSampleGroupsTestCase(TestCase):
 
         self.assertFalse(form.is_valid())
         self.assertIn("sample_groups", form.errors)
+
+    def test_update_preserves_memberships_editor_cannot_manage(self):
+        sample = Sample.objects.create(
+            name="Grouped sample",
+            material=self.material,
+            owner=self.owner,
+            standalone=True,
+        )
+        sample.sample_groups.add(self.group1, self.foreign_published_group)
+        data = QueryDict(mutable=True)
+        data.update(
+            {
+                "name": "Grouped sample",
+                "material": str(self.material.pk),
+                "standalone": "on",
+            }
+        )
+        data.setlist("sample_groups", [str(self.group2.pk)])
+        form = self._form(data=data, instance=sample)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        self.assertCountEqual(
+            sample.sample_groups.all(), [self.group2, self.foreign_published_group]
+        )
 
 
 class ComponentGroupModelFormTestCase(TestCase):

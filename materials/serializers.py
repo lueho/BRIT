@@ -428,6 +428,30 @@ class SampleSeriesWriteSerializer(ModelSerializer):
         )
 
 
+def _request_user(context):
+    return getattr(context.get("request"), "user", None)
+
+
+def _editable_by(queryset, user):
+    if getattr(user, "is_staff", False):
+        return queryset.all()
+    if getattr(user, "is_authenticated", False):
+        return queryset.editable_by_user(user)
+    return queryset.none()
+
+
+def _validate_related_pks(value, queryset, message):
+    if any(not queryset.filter(pk=item.pk).exists() for item in value):
+        raise ValidationError(message)
+    return value
+
+
+def _update_m2m_preserving_locked(manager, new_members, editable):
+    locked = list(manager.exclude(pk__in=editable).values_list("pk", flat=True))
+    manager.set(new_members)
+    manager.add(*locked)
+
+
 class SampleGroupWriteSerializer(ModelSerializer):
     sources = PrimaryKeyRelatedField(
         many=True,
@@ -441,24 +465,43 @@ class SampleGroupWriteSerializer(ModelSerializer):
     )
 
     def validate_sources(self, value):
-        return self._validate_visible(value, Source)
-
-    def validate_samples(self, value):
-        return self._validate_visible(value, Sample)
-
-    def _validate_visible(self, value, model):
-        request = self.context.get("request")
-        user = getattr(request, "user", None)
+        user = _request_user(self.context)
         if not getattr(user, "is_authenticated", False):
             if value:
                 raise ValidationError(
                     "Authentication is required to assign related objects."
                 )
             return value
-        visible = filter_queryset_for_user(model.objects.all(), user)
-        if any(not visible.filter(pk=item.pk).exists() for item in value):
-            raise ValidationError("One or more selected objects are not accessible.")
-        return value
+        return _validate_related_pks(
+            value,
+            filter_queryset_for_user(Source.objects.all(), user),
+            "One or more selected objects are not accessible.",
+        )
+
+    def validate_samples(self, value):
+        user = _request_user(self.context)
+        if not getattr(user, "is_authenticated", False):
+            if value:
+                raise ValidationError(
+                    "Authentication is required to assign related objects."
+                )
+            return value
+        return _validate_related_pks(
+            value,
+            _editable_by(Sample.objects, user),
+            "One or more selected samples cannot be edited.",
+        )
+
+    def update(self, instance, validated_data):
+        samples = validated_data.pop("samples", None)
+        instance = super().update(instance, validated_data)
+        if samples is not None:
+            _update_m2m_preserving_locked(
+                instance.samples,
+                samples,
+                _editable_by(Sample.objects, _request_user(self.context)),
+            )
+        return instance
 
     class Meta:
         model = SampleGroup
@@ -487,23 +530,29 @@ class SampleWriteSerializer(ModelSerializer):
     )
 
     def validate_sample_groups(self, value):
-        request = self.context.get("request")
-        user = getattr(request, "user", None)
+        user = _request_user(self.context)
         if not getattr(user, "is_authenticated", False):
             if value:
                 raise ValidationError(
                     "Authentication is required to assign sample groups."
                 )
             return value
-        if user.is_staff:
-            editable = SampleGroup.objects.all()
-        else:
-            editable = SampleGroup.objects.editable_by_user(user)
-        if any(not editable.filter(pk=group.pk).exists() for group in value):
-            raise ValidationError(
-                "One or more selected sample groups cannot be edited."
+        return _validate_related_pks(
+            value,
+            _editable_by(SampleGroup.objects, user),
+            "One or more selected sample groups cannot be edited.",
+        )
+
+    def update(self, instance, validated_data):
+        sample_groups = validated_data.pop("sample_groups", None)
+        instance = super().update(instance, validated_data)
+        if sample_groups is not None:
+            _update_m2m_preserving_locked(
+                instance.sample_groups,
+                sample_groups,
+                _editable_by(SampleGroup.objects, _request_user(self.context)),
             )
-        return value
+        return instance
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

@@ -8490,6 +8490,32 @@ class SampleGroupDetailViewTestCase(ViewWithPermissionsTestCase):
             owner=self.member,
             publication_status="private",
         )
+        own_sample = Sample.objects.create(
+            name="Member owned sample",
+            material=self.material,
+            owner=self.member,
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("samplegroup-update", kwargs={"pk": group.pk}),
+            data={
+                "name": "Editable Group",
+                "kind": "experiment",
+                "samples": [str(own_sample.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertCountEqual(group.samples.all(), [own_sample])
+
+    def test_group_update_rejects_other_users_published_sample(self):
+        group = SampleGroup.objects.create(
+            name="Editable Group",
+            owner=self.member,
+            publication_status="private",
+        )
         self.client.force_login(self.member)
 
         response = self.client.post(
@@ -8501,8 +8527,8 @@ class SampleGroupDetailViewTestCase(ViewWithPermissionsTestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 302)
-        self.assertCountEqual(group.samples.all(), [self.published_sample])
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(group.samples.exists())
 
 
 class SampleDetailSampleGroupsTestCase(ViewWithPermissionsTestCase):
