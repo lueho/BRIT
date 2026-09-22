@@ -1,11 +1,13 @@
 from datetime import datetime
 
 from django.contrib.auth.models import Permission, User
+from django.db.models.signals import post_save
 from django.http import QueryDict
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.forms import TomSelectModelChoiceField
+from factory.django import mute_signals
 
 from utils.forms import CreateEnabledTomSelectModelMultipleChoiceField
 from utils.properties.models import Unit
@@ -17,6 +19,7 @@ from ..forms import (
     ComponentModelForm,
     MaterialPropertyModelForm,
     MaterialPropertyValueModelForm,
+    SampleMaintenanceForm,
     SampleModelForm,
 )
 from ..models import (
@@ -384,6 +387,98 @@ class SampleModelFormTestCase(TestCase):
             "sample-substrate-material-autocomplete",
         )
         self.assertEqual(form.fields["material"].label, "Substrate")
+
+    def test_material_is_derived_from_selected_series(self):
+        series_material = Material.objects.create(
+            name="Series material", owner=self.owner
+        )
+        with mute_signals(post_save):
+            series = SampleSeries.objects.create(
+                name="Test series",
+                material=series_material,
+                owner=self.owner,
+                publication_status="published",
+            )
+        data = QueryDict(mutable=True)
+        data.update(
+            {
+                "name": "Series sample",
+                "material": str(self.substrate_material.pk),
+                "series": str(series.pk),
+            }
+        )
+        form = SampleModelForm(
+            data=data,
+            instance=Sample(owner=self.owner),
+            request=self._build_request(self.owner),
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        sample = form.save()
+        self.assertEqual(sample.material, series_material)
+
+    def test_section_without_series_field_keeps_material_of_existing_series(self):
+        series_material = Material.objects.create(
+            name="Series material", owner=self.owner
+        )
+        with mute_signals(post_save):
+            series = SampleSeries.objects.create(
+                name="Test series", material=series_material, owner=self.owner
+            )
+            sample = Sample.objects.create(
+                name="Series sample",
+                owner=self.owner,
+                material=series_material,
+                series=series,
+                standalone=False,
+            )
+        data = QueryDict(mutable=True)
+        data.update(
+            {
+                "name": "Renamed sample",
+                "material": str(self.substrate_material.pk),
+                "description": "",
+            }
+        )
+        form = SampleMaintenanceForm(
+            data=data,
+            instance=sample,
+            fields=("name", "material", "description"),
+            request=self._build_request(self.owner),
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        saved = form.save()
+        self.assertEqual(saved.name, "Renamed sample")
+        self.assertEqual(saved.material, series_material)
+
+    def test_section_without_material_field_adopts_material_of_new_series(self):
+        series_material = Material.objects.create(
+            name="Series material", owner=self.owner
+        )
+        with mute_signals(post_save):
+            series = SampleSeries.objects.create(
+                name="Test series", material=series_material, owner=self.owner
+            )
+            sample = Sample.objects.create(
+                name="Standalone sample",
+                owner=self.owner,
+                material=self.substrate_material,
+                standalone=True,
+            )
+        data = QueryDict(mutable=True)
+        data.update({"series": str(series.pk)})
+        form = SampleMaintenanceForm(
+            data=data,
+            instance=sample,
+            fields=("datetime", "location", "standalone", "series", "timestep"),
+            request=self._build_request(self.owner),
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        saved = form.save()
+        self.assertEqual(saved.series, series)
+        self.assertEqual(saved.material, series_material)
 
     def test_material_field_sets_help_text_and_quick_create_url(self):
         form = SampleModelForm(request=self._build_request(self.owner))

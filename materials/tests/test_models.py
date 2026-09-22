@@ -503,6 +503,25 @@ class SampleSeriesTestCase(TestCase):
             series_with_sample.publication_status, SampleSeries.STATUS_PUBLISHED
         )
 
+    def test_duplicate_with_new_material_applies_it_to_copied_samples(self):
+        creator = User.objects.create(username="dup_material_creator")
+        other_material = Material.objects.create(name="Duplicate Target Material")
+        duplicate = self.sample_series.duplicate(creator, material=other_material)
+        self.assertEqual(duplicate.material, other_material)
+        self.assertTrue(duplicate.samples.exists())
+        self.assertFalse(duplicate.samples.exclude(material=other_material).exists())
+
+    def test_save_with_changed_material_updates_linked_samples(self):
+        other_material = Material.objects.create(name="Changed Series Material")
+        self.assertTrue(self.sample_series.samples.exists())
+        self.sample_series.material = other_material
+        self.sample_series.save()
+        self.assertFalse(
+            self.sample_series.samples.exclude(material=other_material).exists()
+        )
+        for sample in self.sample_series.samples.all():
+            sample.clean()
+
     def test_duplicate_is_atomic(self):
         """SampleSeries.duplicate must run inside transaction.atomic."""
         creator = User.objects.create(username=f"dup_atomic_{uuid4().hex[:8]}")
@@ -960,6 +979,22 @@ class SampleTestCase(TestCase):
         sample = Sample(material=material, standalone=True, series=None)
         # Should not raise
         sample.clean()
+
+    def test_clean_raises_when_material_differs_from_series_material(self):
+        series = SampleSeries.objects.get(name="Test Series")
+        other_material = Material.objects.create(name="Other Material")
+        sample = Sample(material=other_material, standalone=False, series=series)
+        with self.assertRaises(ValidationError) as ctx:
+            sample.clean()
+        self.assertIn("material", ctx.exception.message_dict)
+
+    def test_clean_raises_for_standalone_sample_with_mismatched_series(self):
+        series = SampleSeries.objects.get(name="Test Series")
+        other_material = Material.objects.create(name="Other Material")
+        sample = Sample(material=other_material, standalone=True, series=series)
+        with self.assertRaises(ValidationError) as ctx:
+            sample.clean()
+        self.assertIn("material", ctx.exception.message_dict)
 
 
 class CompositionTestCase(TestCase):
