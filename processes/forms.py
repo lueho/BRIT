@@ -128,7 +128,7 @@ class ProcessModelForm(SimpleModelForm):
             categories_field = self.fields["categories"]
             queryset = filter_queryset_for_user(
                 ProcessCategory.objects.all(), request.user
-            )
+            ).exclude(publication_status=ProcessCategory.STATUS_ARCHIVED)
             if self.instance.pk:
                 queryset = queryset | ProcessCategory.objects.filter(
                     pk__in=self.instance.categories.all()
