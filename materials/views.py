@@ -1127,7 +1127,7 @@ class SampleSeriesCreateDuplicateView(UserCreatedObjectUpdateView):
         self.object = self.object.duplicate(
             creator=self.request.user, **form.cleaned_data
         )
-        return super().form_valid(form)
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class SampleSeriesModalAddDistributionView(UserCreatedObjectModalUpdateView):

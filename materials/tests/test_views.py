@@ -1864,6 +1864,33 @@ class SampleSeriesCreateDuplicateViewTestCase(
             )
         }
 
+    def get_update_success_url(self, pk=None):
+        duplicate = SampleSeries.objects.exclude(pk=pk).latest("pk")
+        return duplicate.get_absolute_url()
+
+    def test_post_leaves_original_untouched_and_redirects_to_duplicate(self):
+        original = SampleSeries.objects.get(pk=self.unpublished_object.pk)
+        original_name = original.name
+        original_material = original.material
+        new_material = Material.objects.create(
+            name="Duplicate Material", publication_status="published"
+        )
+        self.client.force_login(self.owner_user)
+        response = self.client.post(
+            reverse(self.view_update_name, kwargs={"pk": original.pk}),
+            {"name": "Duplicated Series", "material": new_material.pk},
+        )
+        duplicate = SampleSeries.objects.get(name="Duplicated Series")
+        self.assertNotEqual(duplicate.pk, original.pk)
+        self.assertEqual(duplicate.material, new_material)
+        self.assertFalse(duplicate.samples.exclude(material=new_material).exists())
+        self.assertRedirects(
+            response, duplicate.get_absolute_url(), fetch_redirect_response=False
+        )
+        original.refresh_from_db()
+        self.assertEqual(original.name, original_name)
+        self.assertEqual(original.material, original_material)
+
 
 # ----------- Back URL Navigation Tests ----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
