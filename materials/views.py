@@ -1213,6 +1213,8 @@ class SampleGroupDetailView(UserCreatedObjectDetailView):
         ).count()
         context["group_samples_list_url"] = (
             f"{reverse('sample-list')}?sample_group={self.object.pk}"
+            if context["group_samples_published_total"]
+            else None
         )
         context["visible_sources"] = list(
             filter_queryset_for_user(self.object.sources.all(), user)

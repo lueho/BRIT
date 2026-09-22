@@ -8440,6 +8440,18 @@ class SampleGroupDetailViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.context["group_samples_published_total"], 1)
         self.assertContains(response, "View all 1 published")
 
+    def test_group_detail_omits_public_link_without_published_members(self):
+        self.published_sample.sample_groups.remove(self.group)
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("samplegroup-detail", kwargs={"pk": self.group.pk})
+        )
+
+        self.assertEqual(response.context["group_samples_total"], 1)
+        self.assertIsNone(response.context["group_samples_list_url"])
+        self.assertNotContains(response, "published</a>")
+
     def test_group_detail_hides_private_members_for_outsider(self):
         self.client.force_login(self.outsider)
 
