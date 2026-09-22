@@ -829,7 +829,6 @@ class CollectionReviewActionApiTestCase(APITestCase):
         cls.unit = Unit.objects.create(name="Test Unit", publication_status="published")
         cls.property = Property.objects.create(
             name="Test Property",
-            unit="kg",
             publication_status="published",
         )
         cls.property.allowed_units.add(cls.unit)
@@ -3328,7 +3327,6 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
         cls.total_unit = Unit.objects.create(name="Mg/a [green-atlas-test]")
         cls.population_attribute = RegionProperty.objects.create(
             name="Population [green-atlas-test]",
-            unit="cap",
         )
 
         cls.region = Region.objects.create(name="Region DE Amount", country="DE")
@@ -3858,7 +3856,6 @@ class OrganicAmountViewSetTests(APITestCase):
         cls.total_unit = Unit.objects.create(name="Mg/a [organic-atlas-test]")
         cls.population_attribute = RegionProperty.objects.create(
             name="Population [organic-atlas-test]",
-            unit="cap",
         )
 
         cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
@@ -4125,7 +4122,6 @@ class WasteRatioMixedNumericTypesTests(APITestCase):
         cls.total_unit = Unit.objects.create(name="Mg/a [ratio-type-test]")
         cls.population_attribute = RegionProperty.objects.create(
             name="Population [ratio-type-test]",
-            unit="cap",
         )
 
         bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")

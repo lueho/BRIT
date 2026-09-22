@@ -41,6 +41,7 @@ from ..models import (
     MeasurementValueQualifier,
     Sample,
     SampleExternalRecord,
+    SampleGroup,
     SampleSeries,
     get_sample_substrate_category_name,
 )
@@ -883,8 +884,8 @@ class MaterialPropertyCRUDViewsTestCase(
     view_modal_update_name = "materialproperty-update-modal"
     view_delete_name = "materialproperty-delete-modal"
 
-    create_object_data = {"name": "Test Property", "unit": "Test Unit"}
-    update_object_data = {"name": "Updated Test Property", "unit": "Test Unit"}
+    create_object_data = {"name": "Test Property"}
+    update_object_data = {"name": "Updated Test Property"}
 
 
 # ----------- Material Property Value CRUD -----------------------------------------------------------------------------
@@ -898,9 +899,7 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        prop = MaterialProperty.objects.create(
-            owner=cls.member, name="Test Property", unit="Test Unit"
-        )
+        prop = MaterialProperty.objects.create(owner=cls.member, name="Test Property")
         material = Material.objects.create(
             name="Test Material",
         )
@@ -1004,7 +1003,6 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         cls.property = MaterialProperty.objects.create(
             owner=cls.owner,
             name="Dry Matter",
-            unit="mg/L",
             default_basis_component=cls.default_basis,
             publication_status="published",
         )
@@ -1070,13 +1068,11 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         canonical_property = MaterialProperty.objects.create(
             owner=self.owner,
             name="Organic matter",
-            unit="%",
             publication_status="published",
         )
         aliased_property = MaterialProperty.objects.create(
             owner=self.owner,
             name="Volatile solids",
-            unit="%",
             comparable_property=canonical_property,
             publication_status="published",
         )
@@ -1170,7 +1166,6 @@ class MaterialPropertyValueCreateAndDetailViewTestCase(ViewWithPermissionsTestCa
         cls.property = MaterialProperty.objects.create(
             owner=cls.member,
             name="Dry Matter",
-            unit="g/L",
             default_basis_component=cls.default_basis,
             publication_status="published",
         )
@@ -1712,7 +1707,6 @@ class AnalyticalMethodDetailViewSamplesTestCase(ViewWithPermissionsTestCase):
         cls.property = MaterialProperty.objects.create(
             owner=cls.owner,
             name="Dry matter",
-            unit="%",
             publication_status="published",
         )
         cls.group = MaterialComponentGroup.objects.create(
@@ -2432,7 +2426,7 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         )
         material.categories.add(substrate_category)
         cls.property = MaterialProperty.objects.create(
-            name="Test Property", unit="Test Unit", publication_status="published"
+            name="Test Property", publication_status="published"
         )
         return {"material": material}
 
@@ -3177,7 +3171,6 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         )
         cls.property = MaterialProperty.objects.create(
             name="Test Property",
-            unit="Test Unit",
             owner=cls.owner,
             default_basis_component=cls.default_basis,
         )
@@ -3356,7 +3349,6 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         )
         cls.property = MaterialProperty.objects.create(
             name="Test Property",
-            unit="Test Unit",
             owner=cls.owner,
             default_basis_component=cls.default_basis,
         )
@@ -3568,6 +3560,29 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(
             Sample.objects.get(name="Test Sample Duplicate").owner, self.sample.owner
         )
+
+    def test_get_preselects_editable_groups_and_post_copies_them(self):
+        group = SampleGroup.objects.create(name="Owned group", owner=self.sample.owner)
+        self.sample.sample_groups.add(group)
+        self.client.force_login(self.sample.owner)
+        url = reverse("sample-duplicate", kwargs={"pk": self.sample.pk})
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(
+            response.context["form"].initial["sample_groups"], [group]
+        )
+
+        data = {
+            "name": "Test Sample Duplicate",
+            "material": self.material.pk,
+            "series": self.series.pk,
+            "timestep": Timestep.objects.get(name="Test Timestep 2").pk,
+            "sample_groups": [group.pk],
+        }
+        self.client.post(url, data)
+        duplicate = Sample.objects.get(name="Test Sample Duplicate")
+        self.assertCountEqual(duplicate.sample_groups.all(), [group])
 
 
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------
@@ -8080,7 +8095,6 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
         cls.prop = MaterialProperty.objects.create(
             owner=cls.owner,
             name="Qualifier property",
-            unit="%",
             publication_status="published",
         )
         cls.hostile_raw = '<img src=x onerror="alert(31337)">'
@@ -8329,3 +8343,375 @@ class SampleCompositionSafetyViewTestCase(TestCase):
                 valid = compositions[self.valid_group.pk]
                 self.assertNotEqual(valid["shares"], [])
                 self.assertEqual(valid["normalization_status"], "normalized")
+
+
+# ----------- Sample Group CRUD --------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class SampleGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
+    modal_create_view = True
+    modal_update_view = True
+    add_scope_query_param_to_list_urls = True
+
+    model = SampleGroup
+
+    view_dashboard_name = "materials-explorer"
+    view_create_name = "samplegroup-create"
+    view_modal_create_name = "samplegroup-create-modal"
+    view_published_list_name = "samplegroup-list"
+    view_private_list_name = "samplegroup-list-owned"
+    view_detail_name = "samplegroup-detail"
+    view_modal_detail_name = "samplegroup-detail-modal"
+    view_update_name = "samplegroup-update"
+    view_modal_update_name = "samplegroup-update-modal"
+    view_delete_name = "samplegroup-delete-modal"
+
+    create_object_data = {"name": "Test Group", "kind": "study"}
+    update_object_data = {"name": "Updated Test Group", "kind": "experiment"}
+
+
+class SampleGroupDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ("view_samplegroup", "change_samplegroup")
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.material = Material.objects.create(
+            name="Group Detail Material",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.group = SampleGroup.objects.create(
+            name="Visible Group",
+            kind="experiment",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.published_sample = Sample.objects.create(
+            name="Published member sample",
+            material=cls.material,
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.private_sample = Sample.objects.create(
+            name="Private member sample",
+            material=cls.material,
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.published_sample.sample_groups.add(cls.group)
+        cls.private_sample.sample_groups.add(cls.group)
+        with mute_signals(post_save):
+            cls.published_source = Source.objects.create(
+                title="Visible group source",
+                citation_key="VisibleGroupSource",
+                owner=cls.owner,
+                publication_status="published",
+            )
+            cls.private_source = Source.objects.create(
+                title="Hidden group source",
+                citation_key="HiddenGroupSource",
+                owner=cls.owner,
+                publication_status="private",
+            )
+        cls.group.sources.add(cls.published_source, cls.private_source)
+
+    def test_group_detail_lists_visible_members_for_owner(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("samplegroup-detail", kwargs={"pk": self.group.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Published member sample")
+        self.assertContains(response, "Private member sample")
+
+    def test_group_detail_view_all_counts_published_members_only(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("samplegroup-detail", kwargs={"pk": self.group.pk})
+        )
+
+        self.assertEqual(response.context["group_samples_total"], 2)
+        self.assertEqual(response.context["group_samples_published_total"], 1)
+        self.assertContains(response, "View all 1 published")
+
+    def test_group_detail_omits_public_link_without_published_members(self):
+        self.published_sample.sample_groups.remove(self.group)
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("samplegroup-detail", kwargs={"pk": self.group.pk})
+        )
+
+        self.assertEqual(response.context["group_samples_total"], 1)
+        self.assertIsNone(response.context["group_samples_list_url"])
+        self.assertNotContains(response, "published</a>")
+
+    def test_group_detail_hides_private_members_for_outsider(self):
+        self.client.force_login(self.outsider)
+
+        response = self.client.get(
+            reverse("samplegroup-detail", kwargs={"pk": self.group.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Published member sample")
+        self.assertNotContains(response, "Private member sample")
+
+    def test_anonymous_published_group_detail_hides_private_sample(self):
+        response = self.client.get(
+            reverse("samplegroup-detail", kwargs={"pk": self.group.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Published member sample")
+        self.assertNotContains(response, "Private member sample")
+        self.assertNotContains(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.private_sample.pk}),
+        )
+
+    def test_private_group_detail_forbidden_for_outsider(self):
+        private_group = SampleGroup.objects.create(
+            name="Hidden Group", owner=self.owner, publication_status="private"
+        )
+        self.client.force_login(self.outsider)
+
+        response = self.client.get(
+            reverse("samplegroup-detail", kwargs={"pk": private_group.pk})
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_group_detail_shows_all_sources_for_owner(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("samplegroup-detail", kwargs={"pk": self.group.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "VisibleGroupSource")
+        self.assertContains(response, "HiddenGroupSource")
+
+    def test_group_detail_hides_private_sources_for_outsider(self):
+        self.client.force_login(self.outsider)
+
+        response = self.client.get(
+            reverse("samplegroup-detail", kwargs={"pk": self.group.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "VisibleGroupSource")
+        self.assertNotContains(response, "HiddenGroupSource")
+
+    def test_anonymous_group_detail_hides_private_sources(self):
+        response = self.client.get(
+            reverse("samplegroup-detail", kwargs={"pk": self.group.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "VisibleGroupSource")
+        self.assertNotContains(response, "HiddenGroupSource")
+
+    def test_published_list_counts_only_published_members(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(reverse("samplegroup-list"), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        group = next(
+            obj for obj in response.context["object_list"] if obj.pk == self.group.pk
+        )
+        self.assertEqual(group.member_count, 1)
+
+    def test_group_update_manages_members(self):
+        group = SampleGroup.objects.create(
+            name="Editable Group",
+            owner=self.member,
+            publication_status="private",
+        )
+        own_sample = Sample.objects.create(
+            name="Member owned sample",
+            material=self.material,
+            owner=self.member,
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("samplegroup-update", kwargs={"pk": group.pk}),
+            data={
+                "name": "Editable Group",
+                "kind": "experiment",
+                "samples": [str(own_sample.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertCountEqual(group.samples.all(), [own_sample])
+
+    def test_editable_sample_autocomplete_excludes_other_users_published_sample(
+        self,
+    ):
+        own_sample = Sample.objects.create(
+            name="Member owned sample",
+            material=self.material,
+            owner=self.member,
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse("sample-autocomplete-editable"), {"q": "sample"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(own_sample.pk, ids)
+        self.assertNotIn(self.published_sample.pk, ids)
+
+    def test_editable_group_autocomplete_excludes_other_users_published_group(
+        self,
+    ):
+        own_group = SampleGroup.objects.create(
+            name="Member owned group",
+            owner=self.member,
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse("samplegroup-autocomplete-editable"), {"q": "group"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(own_group.pk, ids)
+        self.assertNotIn(self.group.pk, ids)
+
+    def test_group_update_rejects_other_users_published_sample(self):
+        group = SampleGroup.objects.create(
+            name="Editable Group",
+            owner=self.member,
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("samplegroup-update", kwargs={"pk": group.pk}),
+            data={
+                "name": "Editable Group",
+                "kind": "experiment",
+                "samples": [str(self.published_sample.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(group.samples.exists())
+
+
+class SampleDetailSampleGroupsTestCase(ViewWithPermissionsTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.material = Material.objects.create(
+            name="Sample Groups Material",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            name="Grouped detail sample",
+            material=cls.material,
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.visible_group = SampleGroup.objects.create(
+            name="Visible group",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.hidden_group = SampleGroup.objects.create(
+            name="Hidden private group",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.sample.sample_groups.add(cls.visible_group, cls.hidden_group)
+
+    def test_sample_detail_shows_visible_groups_for_outsider(self):
+        self.client.force_login(self.outsider)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Visible group")
+        self.assertContains(
+            response,
+            reverse("samplegroup-detail", kwargs={"pk": self.visible_group.pk}),
+        )
+        self.assertNotContains(response, "Hidden private group")
+
+    def test_sample_detail_shows_own_groups_for_owner(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Visible group")
+        self.assertContains(response, "Hidden private group")
+
+    def test_sample_detail_hides_private_groups_for_anonymous(self):
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Visible group")
+        self.assertNotContains(response, "Hidden private group")
+
+
+class SampleListFilterByGroupTestCase(ViewWithPermissionsTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.material = Material.objects.create(
+            name="List Filter Material",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.group = SampleGroup.objects.create(
+            name="List filter group",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.member_sample = Sample.objects.create(
+            name="List member sample",
+            material=cls.material,
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.other_sample = Sample.objects.create(
+            name="List other sample",
+            material=cls.material,
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.member_sample.sample_groups.add(cls.group)
+
+    def test_sample_list_filters_by_group(self):
+        response = self.client.get(
+            reverse("sample-list"), {"sample_group": str(self.group.pk)}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "List member sample")
+        self.assertNotContains(response, "List other sample")

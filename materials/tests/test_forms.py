@@ -19,6 +19,7 @@ from ..forms import (
     ComponentModelForm,
     MaterialPropertyModelForm,
     MaterialPropertyValueModelForm,
+    SampleGroupModelForm,
     SampleMaintenanceForm,
     SampleModelForm,
 )
@@ -29,6 +30,7 @@ from ..models import (
     MaterialComponentGroup,
     MaterialProperty,
     Sample,
+    SampleGroup,
     SampleSeries,
     get_sample_substrate_category_name,
 )
@@ -102,7 +104,7 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
         cls.allowed_unit = Unit.objects.create(name="mg/L")
         cls.disallowed_unit = Unit.objects.create(name="g/L")
         cls.default_basis = MaterialComponent.objects.create(name="Dry Matter")
-        cls.property = MaterialProperty.objects.create(name="Nitrogen", unit="g/L")
+        cls.property = MaterialProperty.objects.create(name="Nitrogen")
         cls.property.allowed_units.add(cls.allowed_unit)
         cls.property.default_basis_component = cls.default_basis
         cls.property.save(update_fields=["default_basis_component"])
@@ -146,12 +148,13 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
             str(form["standard_deviation"]),
         )
 
-    def test_form_defaults_unit_from_property_symbol_match(self):
-        property_obj = MaterialProperty.objects.create(name="Phosphorus", unit="kg/m³")
+    def test_form_defaults_unit_from_property_allowed_units(self):
+        property_obj = MaterialProperty.objects.create(name="Phosphorus")
         expected_unit = Unit.objects.create(
             name="Kilogram per cubic metre",
             symbol="kg/m³",
         )
+        property_obj.allowed_units.add(expected_unit)
 
         data = QueryDict("", mutable=True)
         data.update(
@@ -525,6 +528,305 @@ class SampleModelFormTestCase(TestCase):
 
         self.assertIn(self.substrate_material, material_queryset)
         self.assertIn(self.non_substrate_material, material_queryset)
+
+
+class SampleGroupModelFormTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="group-form-owner")
+        cls.other = User.objects.create_user(username="group-form-other")
+        cls.material = Material.objects.create(
+            name="Group member material", owner=cls.owner
+        )
+        cls.sample1 = Sample.objects.create(
+            name="Member one",
+            material=cls.material,
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.sample2 = Sample.objects.create(
+            name="Member two", material=cls.material, owner=cls.owner
+        )
+        cls.foreign_private_sample = Sample.objects.create(
+            name="Foreign member",
+            material=cls.material,
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.foreign_published_sample = Sample.objects.create(
+            name="Foreign published member",
+            material=cls.material,
+            owner=cls.other,
+            publication_status="published",
+        )
+
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def _form(self, data=None, user=None, **kwargs):
+        request = self.factory.get("/")
+        request.user = user or self.owner
+        return SampleGroupModelForm(data=data, request=request, **kwargs)
+
+    def test_exposes_exact_editable_fields(self):
+        form = self._form()
+
+        self.assertEqual(
+            list(form.Meta.fields), ["name", "kind", "description", "sources"]
+        )
+        self.assertEqual(
+            set(form.fields),
+            {"name", "kind", "samples", "description", "sources"},
+        )
+
+    def test_saves_samples_on_create(self):
+        data = QueryDict(mutable=True)
+        data.update({"name": "Populated group", "kind": "study"})
+        data.setlist("samples", [str(self.sample1.pk), str(self.sample2.pk)])
+        form = self._form(data=data)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        group = form.save()
+
+        self.assertCountEqual(group.samples.all(), [self.sample1, self.sample2])
+
+    def test_update_replaces_samples(self):
+        group = SampleGroup.objects.create(name="Editable group", owner=self.owner)
+        self.sample1.sample_groups.add(group)
+        data = QueryDict(mutable=True)
+        data.update({"name": "Editable group", "kind": "study"})
+        data.setlist("samples", [str(self.sample2.pk)])
+        form = self._form(data=data, instance=group)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        self.assertCountEqual(group.samples.all(), [self.sample2])
+
+    def test_initial_contains_current_members(self):
+        group = SampleGroup.objects.create(name="Editable group", owner=self.owner)
+        self.sample1.sample_groups.add(group)
+
+        form = self._form(instance=group)
+
+        self.assertIn(self.sample1, form.initial["samples"])
+
+    def test_rejects_other_users_private_sample(self):
+        data = QueryDict(mutable=True)
+        data.update({"name": "Bad group", "kind": "study"})
+        data.setlist("samples", [str(self.foreign_private_sample.pk)])
+        form = self._form(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("samples", form.errors)
+
+    def test_choices_exclude_foreign_private_samples(self):
+        form = self._form()
+
+        queryset = form.fields["samples"].queryset
+        self.assertIn(self.sample1, queryset)
+        self.assertNotIn(self.foreign_private_sample, queryset)
+
+    def test_choices_exclude_foreign_published_samples(self):
+        form = self._form()
+
+        self.assertNotIn(self.foreign_published_sample, form.fields["samples"].queryset)
+
+    def test_rejects_other_users_published_sample(self):
+        data = QueryDict(mutable=True)
+        data.update({"name": "Bad group", "kind": "study"})
+        data.setlist("samples", [str(self.foreign_published_sample.pk)])
+        form = self._form(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("samples", form.errors)
+
+    def test_staff_may_add_other_users_published_sample(self):
+        staff = User.objects.create_user(username="group-form-staff", is_staff=True)
+        data = QueryDict(mutable=True)
+        data.update({"name": "Staff group", "kind": "study"})
+        data.setlist("samples", [str(self.foreign_published_sample.pk)])
+        form = self._form(data=data, user=staff)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        group = form.save()
+
+        self.assertCountEqual(group.samples.all(), [self.foreign_published_sample])
+
+    def test_update_preserves_members_editor_cannot_manage(self):
+        group = SampleGroup.objects.create(name="Editable group", owner=self.owner)
+        self.foreign_published_sample.sample_groups.add(group)
+        self.sample1.sample_groups.add(group)
+        data = QueryDict(mutable=True)
+        data.update({"name": "Editable group", "kind": "study"})
+        data.setlist("samples", [str(self.sample2.pk)])
+        form = self._form(data=data, instance=group)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        self.assertCountEqual(
+            group.samples.all(), [self.sample2, self.foreign_published_sample]
+        )
+
+    def test_update_preselects_only_editable_members(self):
+        group = SampleGroup.objects.create(name="Editable group", owner=self.owner)
+        self.foreign_published_sample.sample_groups.add(group)
+        self.sample1.sample_groups.add(group)
+        form = self._form(instance=group)
+
+        self.assertCountEqual(form.initial["samples"], [self.sample1])
+
+
+class SampleModelFormSampleGroupsTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="group-form-owner")
+        cls.other = User.objects.create_user(username="group-form-other")
+        cls.substrate_category, _ = MaterialCategory.objects.get_or_create(
+            name=get_sample_substrate_category_name()
+        )
+        cls.material = Material.objects.create(
+            name="Group form substrate",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.material.categories.add(cls.substrate_category)
+        cls.group1 = SampleGroup.objects.create(name="Group One", owner=cls.owner)
+        cls.group2 = SampleGroup.objects.create(name="Group Two", owner=cls.owner)
+        cls.inaccessible_group = SampleGroup.objects.create(
+            name="Other private group",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.foreign_published_group = SampleGroup.objects.create(
+            name="Other published group",
+            owner=cls.other,
+            publication_status="published",
+        )
+
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def _request(self, user):
+        request = self.factory.get("/")
+        request.user = user
+        return request
+
+    def _form(self, data, **kwargs):
+        return SampleModelForm(data=data, request=self._request(self.owner), **kwargs)
+
+    def test_saves_multiple_sample_groups_independently_of_series(self):
+        data = QueryDict(mutable=True)
+        data.update(
+            {
+                "name": "Grouped sample",
+                "material": str(self.material.pk),
+                "standalone": "on",
+            }
+        )
+        data.setlist("sample_groups", [str(self.group1.pk), str(self.group2.pk)])
+        form = self._form(data=data)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        sample = form.save()
+
+        self.assertCountEqual(sample.sample_groups.all(), [self.group1, self.group2])
+        self.assertIsNone(sample.series)
+
+    def test_sample_groups_saved_alongside_series(self):
+        series = SampleSeries.objects.create(
+            material=self.material,
+            owner=self.owner,
+            publication_status="published",
+        )
+        data = QueryDict(mutable=True)
+        data.update(
+            {
+                "name": "Grouped series sample",
+                "material": str(self.material.pk),
+                "series": str(series.pk),
+            }
+        )
+        data.setlist("sample_groups", [str(self.group1.pk)])
+        form = self._form(data=data)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        sample = form.save()
+
+        self.assertEqual(sample.series, series)
+        self.assertCountEqual(sample.sample_groups.all(), [self.group1])
+
+    def test_inaccessible_private_groups_are_absent_from_choices(self):
+        form = self._form(data=None)
+
+        queryset = form.fields["sample_groups"].queryset
+        self.assertIn(self.group1, queryset)
+        self.assertNotIn(self.inaccessible_group, queryset)
+
+    def test_visible_but_not_editable_groups_are_absent_from_choices(self):
+        form = self._form(data=None)
+
+        queryset = form.fields["sample_groups"].queryset
+        self.assertNotIn(self.foreign_published_group, queryset)
+
+    def test_form_without_request_exposes_no_group_choices(self):
+        form = SampleModelForm()
+
+        self.assertFalse(form.fields["sample_groups"].queryset.exists())
+
+    def test_submitted_foreign_published_group_is_rejected(self):
+        data = QueryDict(mutable=True)
+        data.update(
+            {
+                "name": "Grouped sample",
+                "material": str(self.material.pk),
+                "standalone": "on",
+            }
+        )
+        data.setlist("sample_groups", [str(self.foreign_published_group.pk)])
+        form = self._form(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("sample_groups", form.errors)
+
+    def test_update_preselects_only_editable_groups(self):
+        sample = Sample.objects.create(
+            name="Grouped sample",
+            material=self.material,
+            owner=self.owner,
+            standalone=True,
+        )
+        sample.sample_groups.add(self.group1, self.foreign_published_group)
+        form = self._form(data=None, instance=sample)
+
+        self.assertCountEqual(form.initial["sample_groups"], [self.group1])
+
+    def test_update_preserves_memberships_editor_cannot_manage(self):
+        sample = Sample.objects.create(
+            name="Grouped sample",
+            material=self.material,
+            owner=self.owner,
+            standalone=True,
+        )
+        sample.sample_groups.add(self.group1, self.foreign_published_group)
+        data = QueryDict(mutable=True)
+        data.update(
+            {
+                "name": "Grouped sample",
+                "material": str(self.material.pk),
+                "standalone": "on",
+            }
+        )
+        data.setlist("sample_groups", [str(self.group2.pk)])
+        form = self._form(data=data, instance=sample)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        self.assertCountEqual(
+            sample.sample_groups.all(), [self.group2, self.foreign_published_group]
+        )
 
 
 class ComponentGroupModelFormTestCase(TestCase):

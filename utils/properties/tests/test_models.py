@@ -138,19 +138,19 @@ class NumericMeasurementMixinTestCase(TestCase):
             self.value = value
             self.standard_deviation = standard_deviation
 
-    def test_measurement_unit_label_falls_back_to_property_unit(self):
+    def test_measurement_unit_label_is_none_without_value_unit(self):
         measurement = self.DummyMeasurement(
-            property_obj=SimpleNamespace(name="Dry matter", unit="g/kg"),
+            property_obj=SimpleNamespace(name="Dry matter"),
             average=Decimal("12.34"),
             standard_deviation=Decimal("0.56"),
         )
 
         self.assertEqual(measurement.measurement_name, "Dry matter")
-        self.assertEqual(measurement.measurement_unit_label, "g/kg")
+        self.assertIsNone(measurement.measurement_unit_label)
 
     def test_measurement_unit_label_hides_canonical_no_unit(self):
         measurement = self.DummyMeasurement(
-            property_obj=SimpleNamespace(name="Population", unit=""),
+            property_obj=SimpleNamespace(name="Population"),
             average=Decimal("12.34"),
             standard_deviation=Decimal("0.56"),
             unit=Unit.objects.get(owner=get_default_owner(), name="No unit"),
@@ -170,13 +170,13 @@ class NumericMeasurementMixinTestCase(TestCase):
 
     def test_custom_field_mapping_supports_attribute_value_patterns(self):
         measurement = self.DummyAttributeMeasurement(
-            attribute=SimpleNamespace(name="Population density", unit="1/km²"),
+            attribute=SimpleNamespace(name="Population density"),
             value=123.321,
             standard_deviation=1.25,
         )
 
         self.assertEqual(measurement.measurement_name, "Population density")
-        self.assertEqual(measurement.measurement_unit_label, "1/km²")
+        self.assertIsNone(measurement.measurement_unit_label)
         self.assertEqual(measurement.display_average, 123.321)
         self.assertEqual(measurement.display_standard_deviation, 1.25)
 

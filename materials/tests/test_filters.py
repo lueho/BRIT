@@ -12,6 +12,7 @@ from ..filters import (
     MaterialListFilter,
     MaterialPropertyListFilter,
     SampleFilter,
+    SampleGroupFilter,
     SampleSeriesFilter,
 )
 from ..models import (
@@ -25,6 +26,7 @@ from ..models import (
     MaterialProperty,
     MaterialPropertyValue,
     Sample,
+    SampleGroup,
     SampleSeries,
     get_sample_substrate_category_name,
 )
@@ -60,11 +62,9 @@ class SampleFilterTestCase(TestCase):
         cls.parameter_k = MaterialProperty.objects.create(name="Potassium")
         cls.organic_matter_property = MaterialProperty.objects.create(
             name="Organic matter",
-            unit="%",
         )
         cls.volatile_solids_property = MaterialProperty.objects.create(
             name="Volatile solids",
-            unit="%",
             comparable_property=cls.organic_matter_property,
         )
 
@@ -377,6 +377,52 @@ class SampleFilterTestCase(TestCase):
         )
 
         self.assertEqual(list(filtr.qs), [])
+
+
+class SampleGroupFilterTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.material_a = Material.objects.create(name="Group Filter Material A")
+        cls.material_b = Material.objects.create(name="Group Filter Material B")
+        cls.sample_a = Sample.objects.create(
+            name="Grouped sample A", material=cls.material_a
+        )
+        cls.sample_b = Sample.objects.create(
+            name="Grouped sample B", material=cls.material_b
+        )
+        cls.sample_unrelated = Sample.objects.create(
+            name="Ungrouped sample", material=cls.material_a
+        )
+        cls.group = SampleGroup.objects.create(
+            name="Experiment group", kind="experiment"
+        )
+        cls.other_group = SampleGroup.objects.create(name="Study group", kind="study")
+        cls.sample_a.sample_groups.add(cls.group)
+        cls.sample_b.sample_groups.add(cls.group)
+        cls.sample_unrelated.sample_groups.add(cls.other_group)
+
+    def test_sample_group_filter_returns_members_across_materials(self):
+        filtr = SampleFilter(
+            data={"sample_group": str(self.group.pk)},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertCountEqual(list(filtr.qs), [self.sample_a, self.sample_b])
+
+    def test_sample_group_filter_excludes_other_groups(self):
+        filtr = SampleFilter(
+            data={"sample_group": str(self.other_group.pk)},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertEqual(list(filtr.qs), [self.sample_unrelated])
+
+    def test_group_list_kind_filter(self):
+        filtr = SampleGroupFilter(
+            data={"kind": "experiment"}, queryset=SampleGroup.objects.all()
+        )
+
+        self.assertEqual(list(filtr.qs), [self.group])
 
 
 class RelatedListFilterTestCase(TestCase):
