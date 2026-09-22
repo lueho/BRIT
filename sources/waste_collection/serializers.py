@@ -636,6 +636,13 @@ class CollectionFlatSerializer(
         return ordered_representation
 
 
+class CollectionAnalysisSerializer(CollectionFlatSerializer):
+    """Export values with stable identifiers for reproducible external analyses."""
+
+    class Meta(CollectionFlatSerializer.Meta):
+        fields = ("id", "publication_status") + CollectionFlatSerializer.Meta.fields
+
+
 class CollectionResearchSerializer(
     CollectionReferenceFieldsMixin,
     CollectionDisplayFieldsMixin,

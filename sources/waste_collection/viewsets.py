@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import connection, transaction
 from django.db.models import Exists, F, OuterRef, Prefetch, Q
 from django.urls import reverse
+from django.utils import timezone
 from django_filters import rest_framework as rf_filters
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -36,6 +37,7 @@ from sources.waste_collection.models import (
 from sources.waste_collection.serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
     AggregatedCollectionPropertyValueMutationSerializer,
+    CollectionAnalysisSerializer,
     CollectionFlatSerializer,
     CollectionFrequencyMutationSerializer,
     CollectionFrequencyReferenceSerializer,
@@ -116,7 +118,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        if getattr(self, "action", None) != "list":
+        if getattr(self, "action", None) not in {"list", "analysis"}:
             return queryset
 
         relation_queryset = Collection.objects.only("pk").order_by("pk")
@@ -230,7 +232,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         API endpoints do not render filter widgets, so they can skip
         expensive min/max slider calculations performed during filterset init.
         """
-        if getattr(self, "action", None) in {"geojson", "list", "version"}:
+        if getattr(self, "action", None) in {"geojson", "list", "version", "analysis"}:
             return {"skip_min_max": True}
         return {}
 
@@ -244,6 +246,29 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             raise NotAuthenticated(
                 f"Authentication is required to access the '{scope}' scope."
             )
+
+    @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
+    def analysis(self, request):
+        """Paginated flat data, including year-specific metrics and their units.
+
+        Uses the same visibility policy and filters as the collection list. A
+        live paginated read is not a transactionally isolated database snapshot;
+        external analyses should archive the received data with their code.
+        """
+        self._enforce_authenticated_non_public_scope(request)
+        queryset = self.filter_queryset(self.get_queryset()).order_by("pk")
+        page = self.paginate_queryset(queryset)
+        serializer = CollectionAnalysisSerializer(
+            page, many=True, context=self.get_serializer_context()
+        )
+        response = self.get_paginated_response(serializer.data)
+        response.data.update(
+            schema_version="1.0",
+            generated_at=timezone.now().isoformat(),
+            snapshot_isolation=False,
+        )
+        response["Cache-Control"] = "private, no-store"
+        return response
 
     def list(self, request, *args, **kwargs):
         self._enforce_authenticated_non_public_scope(request)

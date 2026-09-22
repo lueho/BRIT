@@ -1,0 +1,30 @@
+[
+  {
+    "file": "scripts/Catalonia.R",
+    "original_sha256": "edbe7501559f16cdf13bf3bd04c59533e3ec1bc2f2feb5ad10f4196294225c49"
+  },
+  {
+    "file": "scripts/Catalonia_Impropis_Derivationandsummary.R",
+    "original_sha256": "b637875be822fb9ceeb59ee56a4d36ebb24706f0ca45543d5b4575f49f8c0332"
+  },
+  {
+    "file": "scripts/NRW.R",
+    "original_sha256": "16c419d54e5ce22592bb4fafecf4af7fbdc30e204fad013d1ad3f88689e074a5"
+  },
+  {
+    "file": "scripts/RLP.R",
+    "original_sha256": "7a39a39e1d732d84d23ee6c878f56145f5b8ed0d381c1d01f2e23e232a9b0a94"
+  },
+  {
+    "file": "scripts/RLP_BW.R",
+    "original_sha256": "12603528848bb3413c6270df54c309335e96a2d46713b072e04c9fe06117b043"
+  },
+  {
+    "file": "scripts/South Tyrol.R",
+    "original_sha256": "3acd68c9b0906d2637eb30fd4863b78c6bbb0d37ed7d7b2180f851e664a9e080"
+  },
+  {
+    "file": "scripts/Sweden.R",
+    "original_sha256": "fe819452e8cb77fc192ac0030247b315e46ed05dd2a63ea103fd98b6c4c9b7d6"
+  }
+]
