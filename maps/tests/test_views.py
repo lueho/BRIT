@@ -2210,6 +2210,26 @@ class GeoJSONHeadTests(TestCase):
         keys = [call.args[0] for call in cache_get.call_args_list]
         self.assertNotIn("head-test-data", keys)
 
+    def test_orphaned_count_meta_reports_miss(self):
+        self.request("get")
+        self.cache.delete("head-test-data")
+        self.assertEqual(self.cache.get("head-test-data:count"), 2)
+        head = self.request("head")
+        self.assertEqual(head["X-Cache-Status"], "MISS")
+        self.assertEqual(head["X-Total-Count"], "2")
+        self.assertIsNone(self.cache.get("head-test-data:count"))
+
+    def test_healed_count_meta_inherits_payload_ttl(self):
+        self.request("get")
+        self.cache.delete("head-test-data:count")
+        self.cache.ttl = Mock(return_value=60)
+        self.addCleanup(delattr, self.cache, "ttl")
+        with patch.object(self.cache, "set", wraps=self.cache.set) as cache_set:
+            head = self.request("head")
+        self.assertEqual(head["X-Cache-Status"], "HIT")
+        self.cache.ttl.assert_called_once_with("head-test-data")
+        cache_set.assert_called_once_with("head-test-data:count", 2, timeout=60)
+
     def test_cached_head_has_no_response_payload(self):
         self.request("get")
         with patch.object(

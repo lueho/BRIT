@@ -304,6 +304,16 @@ class CachedGeoJSONMixin:
         """
         return self.get_dataset_stats(request)["version"]
 
+    def _payload_ttl(self, cache, cache_key):
+        """Timeout for a companion entry so it expires with its payload.
+
+        django-redis exposes ``ttl()`` (seconds, ``None`` for persistent keys,
+        ``0`` for missing ones); other backends fall back to the view timeout.
+        """
+        if hasattr(cache, "ttl"):
+            return cache.ttl(cache_key)
+        return getattr(self, "cache_timeout", None)
+
     def _cached_geojson_head(self, request, cache, cache_key):
         """Metadata-only HEAD response for a cached payload, or None on a miss.
 
@@ -313,20 +323,17 @@ class CachedGeoJSONMixin:
         """
         meta_key = f"{cache_key}:count"
         count = cache.get(meta_key)
-        hit = count is not None
-        if not hit:
+        if count is not None:
+            if not cache.has_key(cache_key):
+                cache.delete(meta_key)
+                return None
+        else:
             data = cache.get(cache_key)
-            if data is not None:
-                hit = True
-                if isinstance(data, dict) and "features" in data:
-                    count = len(data["features"])
-                    cache.set(
-                        meta_key,
-                        count,
-                        timeout=getattr(self, "cache_timeout", None),
-                    )
-        if not hit:
-            return None
+            if data is None:
+                return None
+            if isinstance(data, dict) and "features" in data:
+                count = len(data["features"])
+                cache.set(meta_key, count, timeout=self._payload_ttl(cache, cache_key))
 
         data_version = self.get_dataset_version(request)
         response = StreamingHttpResponse(
