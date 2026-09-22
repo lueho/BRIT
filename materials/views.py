@@ -1601,25 +1601,32 @@ class SampleDetailView(UserCreatedObjectDetailView):
         List and featured-gallery links on the detail page should return the
         user to the same list scope they came from. The scope is read from the
         validated same-host ``back`` (regular detail) or ``next`` (review
-        detail) parameter; anything else falls back to the published scope.
-        Anonymous visitors always get published links and the review scope is
-        only honoured for moderators.
+        detail) parameter and is only honoured when the return path is the
+        sample list or gallery route of that scope; anything else falls back
+        to the published scope. Anonymous visitors always get published links
+        and the review scope is only honoured for moderators.
         """
         user = self.request.user
         if not user.is_authenticated:
             return "published"
         return_url = self.request.GET.get("back") or self.request.GET.get("next", "")
-        if return_url and url_has_allowed_host_and_scheme(
+        if not return_url or not url_has_allowed_host_and_scheme(
             return_url,
             allowed_hosts={self.request.get_host()},
             require_https=self.request.is_secure(),
         ):
-            scope = dict(parse_qsl(urlsplit(return_url).query)).get("scope")
-            if scope == "private":
-                return scope
-            if scope == "review" and user_is_moderator_for_model(user, Sample):
-                return scope
-        return "published"
+            return "published"
+        parts = urlsplit(return_url)
+        scope = dict(parse_qsl(parts.query)).get("scope")
+        scoped_paths = {
+            "private": {reverse("sample-list-owned"), reverse("sample-gallery-owned")},
+            "review": {reverse("sample-list-review"), reverse("sample-gallery-review")},
+        }
+        if parts.path not in scoped_paths.get(scope, ()):
+            return "published"
+        if scope == "review" and not user_is_moderator_for_model(user, Sample):
+            return "published"
+        return scope
 
     def _build_v2_context(
         self,

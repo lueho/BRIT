@@ -2473,6 +2473,23 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         self.assertIn(f"{reverse('sample-gallery')}?scope=published", nav)
         self.assertNotIn(reverse("sample-gallery-review"), nav)
 
+    def test_detail_nav_ignores_scope_on_unrelated_return_path(self):
+        self.client.force_login(self.staff)
+        for back_url in (
+            f"{reverse('material-list')}?scope=private",
+            f"{reverse('sample-list')}?scope=review",
+            f"{reverse('sample-list-owned')}?scope=review",
+        ):
+            with self.subTest(back_url=back_url):
+                response = self.client.get(
+                    reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+                    {"back": back_url},
+                )
+                self.assertEqual(response.status_code, 200)
+                nav = self._context_nav_html(response)
+                self.assertIn(f"{reverse('sample-list')}?scope=published", nav)
+                self.assertIn(f"{reverse('sample-gallery')}?scope=published", nav)
+
     def test_detail_nav_defaults_to_published_scope(self):
         response = self.client.get(
             reverse("sample-detail", kwargs={"pk": self.sample.pk})
