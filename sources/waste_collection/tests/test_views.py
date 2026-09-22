@@ -2357,6 +2357,66 @@ class CollectionVersionLinkVisibilityTestCase(TestCase):
         )
 
 
+class CollectionStatYearIndicatorTestCase(TestCase):
+    """The detail page flags statistics whose year lies outside the valid period."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.collection = Collection.objects.create(
+            name="Indicator collection",
+            valid_from=date(2020, 1, 1),
+            valid_until=date(2022, 12, 31),
+            publication_status="published",
+        )
+        cls.prop = Property.objects.create(
+            name="Indicator Property", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="Indicator Unit", publication_status="published"
+        )
+
+    def _cpv(self, year):
+        return CollectionPropertyValue.objects.create(
+            collection=self.collection,
+            property=self.prop,
+            unit=self.unit,
+            year=year,
+            average=1,
+            publication_status="published",
+        )
+
+    def _get_detail(self):
+        return self.client.get(
+            reverse("collection-detail", kwargs={"pk": self.collection.pk})
+        )
+
+    def test_detail_flags_stat_year_before_valid_from(self):
+        self._cpv(2019)
+        response = self._get_detail()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "outside the collection validity period")
+
+    def test_detail_flags_stat_year_after_valid_until(self):
+        self._cpv(2023)
+        response = self._get_detail()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "outside the collection validity period")
+
+    def test_detail_does_not_flag_stat_year_within_period(self):
+        self._cpv(2021)
+        response = self._get_detail()
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "outside the collection validity period")
+
+    def test_cpv_detail_flags_out_of_period_year(self):
+        cpv = self._cpv(2015)
+        response = self.client.get(
+            reverse("collectionpropertyvalue-detail", kwargs={"pk": cpv.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "outside the collection validity period")
+
+
 class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "add_collection"
     url_name = "collection-new-version"

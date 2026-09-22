@@ -716,6 +716,60 @@ class CollectionStatisticsAccessorsTestCase(TestCase):
             _ = [value.owner.username for value in values]
 
 
+class CollectionPropertyValueYearIndicatorTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.collection = Collection.objects.create(
+            name="Indicator Collection",
+            valid_from=date(2020, 1, 1),
+            valid_until=date(2022, 12, 31),
+            publication_status="published",
+        )
+        cls.prop = Property.objects.create(
+            name="Indicator Prop", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="Indicator Unit", publication_status="published"
+        )
+
+    def _cpv(self, year, collection=None):
+        return CollectionPropertyValue.objects.create(
+            collection=collection or self.collection,
+            property=self.prop,
+            unit=self.unit,
+            year=year,
+            average=1,
+            publication_status="published",
+        )
+
+    def test_year_before_valid_from_flags(self):
+        self.assertTrue(self._cpv(2019).year_outside_collection_period)
+
+    def test_year_after_valid_until_flags(self):
+        self.assertTrue(self._cpv(2023).year_outside_collection_period)
+
+    def test_year_within_period_does_not_flag(self):
+        for year in (2020, 2021, 2022):
+            with self.subTest(year=year):
+                self.assertFalse(self._cpv(year).year_outside_collection_period)
+
+    def test_missing_year_does_not_flag(self):
+        self.assertFalse(self._cpv(None).year_outside_collection_period)
+
+    def test_open_ended_collection_flags_only_earlier_years(self):
+        open_collection = Collection.objects.create(
+            name="Open Indicator Collection",
+            valid_from=date(2020, 1, 1),
+            publication_status="published",
+        )
+        self.assertTrue(
+            self._cpv(2019, collection=open_collection).year_outside_collection_period
+        )
+        self.assertFalse(
+            self._cpv(2030, collection=open_collection).year_outside_collection_period
+        )
+
+
 class CollectionSeasonTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
