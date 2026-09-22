@@ -197,10 +197,10 @@ class MaterialPropertyCanonicalTestCase(CanonicalRelationTestMixin, TestCase):
     comparable_attr = "comparable_property"
 
     def test_canonical_property_defaults_to_self(self):
-        self._test_canonical_defaults_to_self(MaterialProperty, unit="%")
+        self._test_canonical_defaults_to_self(MaterialProperty)
 
     def test_canonical_property_follows_comparable_property(self):
-        self._test_canonical_follows_comparable(MaterialProperty, unit="%")
+        self._test_canonical_follows_comparable(MaterialProperty)
 
 
 class MaterialTestCase(TestCase):
@@ -557,7 +557,7 @@ class MaterialPropertyValueTestCase(TestCase):
         self.assertEqual(duplicate.standard_deviation, value.standard_deviation)
 
     def test_display_standard_deviation_is_none_when_missing(self):
-        prop = MaterialProperty.objects.create(name="Nitrogen", unit="g/kg")
+        prop = MaterialProperty.objects.create(name="Nitrogen")
         unit = Unit.objects.create(name="mg/kg")
         value = MaterialPropertyValue.objects.create(
             property=prop,
@@ -569,7 +569,7 @@ class MaterialPropertyValueTestCase(TestCase):
         self.assertIsNone(value.display_standard_deviation)
 
     def test_shared_numeric_measurement_properties_are_available(self):
-        prop = MaterialProperty.objects.create(name="Nitrogen", unit="g/kg")
+        prop = MaterialProperty.objects.create(name="Nitrogen")
         unit = Unit.objects.create(name="mg/kg")
         value = MaterialPropertyValue.objects.create(
             property=prop,
@@ -586,7 +586,7 @@ class MaterialPropertyValueTestCase(TestCase):
     def test_related_sample_prefers_direct_sample_fk(self):
         material = Material.objects.create(name="Digestate")
         sample = Sample.objects.create(name="Owned Sample", material=material)
-        prop = MaterialProperty.objects.create(name="Nitrogen", unit="g/kg")
+        prop = MaterialProperty.objects.create(name="Nitrogen")
         unit = Unit.objects.create(name="mg/kg")
         value = MaterialPropertyValue.objects.create(
             sample=sample,
@@ -605,12 +605,10 @@ class MaterialPropertyValueCleanTestCase(TestCase):
     def setUp(self):
         self.allowed_unit = Unit.objects.create(name="g/kg test")
         self.other_unit = Unit.objects.create(name="mg/kg test")
-        self.prop_with_allowed = MaterialProperty.objects.create(
-            name="Nitrogen test", unit="g/kg test"
-        )
+        self.prop_with_allowed = MaterialProperty.objects.create(name="Nitrogen test")
         self.prop_with_allowed.allowed_units.add(self.allowed_unit)
         self.prop_no_allowed = MaterialProperty.objects.create(
-            name="Free property test", unit="%"
+            name="Free property test"
         )
 
     def test_clean_raises_when_unit_not_in_allowed_units(self):
@@ -833,7 +831,7 @@ class SampleTestCase(TestCase):
                 material=material, series=series, timestep=Timestep.objects.default()
             )
 
-        prop = MaterialProperty.objects.create(name="Test Property", unit="Test Unit")
+        prop = MaterialProperty.objects.create(name="Test Property")
         MaterialPropertyValue.objects.create(
             property=prop, average=Decimal("12.3"), standard_deviation=Decimal("0.321")
         )

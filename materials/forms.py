@@ -144,7 +144,7 @@ class MaterialPropertyModelForm(SimpleModelForm):
 
     class Meta:
         model = MaterialProperty
-        fields = ("name", "unit", "description", "comparable_property")
+        fields = ("name", "allowed_units", "description", "comparable_property")
 
 
 class MaterialPropertyModalModelForm(ModalModelFormMixin, MaterialPropertyModelForm):
@@ -363,10 +363,6 @@ class MaterialPropertyValueModelForm(
             cleaned_data["basis_component"] = basis_component
         if property_obj and not unit:
             unit = property_obj.allowed_units.first()
-            if unit is None and property_obj.unit:
-                unit = Unit.resolve_legacy_label(
-                    property_obj.unit, owner=property_obj.owner
-                )
             if unit is None:
                 unit = Unit.objects.filter(pk=get_default_unit_pk()).first()
             cleaned_data["unit"] = unit

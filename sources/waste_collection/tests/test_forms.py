@@ -277,7 +277,7 @@ class CollectionPropertyValueModelFormTestCase(TestCase):
         from utils.properties.models import Property, Unit
 
         cls.unit = Unit.objects.create(name="kg/a")
-        cls.property = Property.objects.create(name="Test property", unit="kg/a")
+        cls.property = Property.objects.create(name="Test property")
         cls.property.allowed_units.add(cls.unit)
 
     def test_numeric_measurement_fields_use_any_step(self):
@@ -1173,7 +1173,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
 
         # Create a property value that references a flyer via sources
         unit = Unit.objects.create(name="Test Unit")
-        prop = Property.objects.create(name="Test Property", unit="kg")
+        prop = Property.objects.create(name="Test Property")
         prop_value = CollectionPropertyValue.objects.create(
             name="Test Property Value",
             collection=self.collection,
@@ -1220,7 +1220,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         # Create aggregated property value that references a flyer via sources
         unit = Unit.objects.create(name="Test Unit 2", publication_status="published")
         prop = Property.objects.create(
-            name="Test Property 2", unit="kg", publication_status="published"
+            name="Test Property 2", publication_status="published"
         )
         prop.allowed_units.add(unit)
         agg_prop_value = AggregatedCollectionPropertyValue.objects.create(

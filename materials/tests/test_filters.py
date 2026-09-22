@@ -60,11 +60,9 @@ class SampleFilterTestCase(TestCase):
         cls.parameter_k = MaterialProperty.objects.create(name="Potassium")
         cls.organic_matter_property = MaterialProperty.objects.create(
             name="Organic matter",
-            unit="%",
         )
         cls.volatile_solids_property = MaterialProperty.objects.create(
             name="Volatile solids",
-            unit="%",
             comparable_property=cls.organic_matter_property,
         )
 

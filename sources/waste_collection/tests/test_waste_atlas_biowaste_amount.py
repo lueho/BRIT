@@ -55,7 +55,6 @@ class BiowasteCollectionAmountViewSetTests(APITestCase):
         cls.total_unit = Unit.objects.create(name="Mg/a [bio-atlas-test]")
         cls.population_attribute = RegionProperty.objects.create(
             name="Population [bio-atlas-test]",
-            unit="cap",
         )
 
         cls.biowaste, _ = WasteCategory.objects.get_or_create(name="Biowaste")
