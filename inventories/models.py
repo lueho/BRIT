@@ -4,8 +4,10 @@ import pkgutil
 from celery.result import AsyncResult
 from celery.states import READY_STATES
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models, transaction
+from django.db.models import Q
 from django.db.models.query import QuerySet
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
@@ -15,8 +17,9 @@ import sources
 from bibliography.models import Source
 from distributions.models import Timestep
 from maps.models import Catchment, GeoDataset, Region
-from materials.models import Material, SampleSeries
+from materials.models import Material, Sample, SampleSeries
 from utils.object_management.models import NamedUserCreatedObject
+from utils.object_management.permissions import filter_queryset_for_user
 
 from .exceptions import BlockedRunningScenario
 
@@ -46,6 +49,8 @@ class InventoryAlgorithm(models.Model):
     default = models.BooleanField(
         "Default for this combination of geodataset and feedstock", default=False
     )
+    supports_standalone_samples = models.BooleanField(default=False)
+    supports_sample_series = models.BooleanField(default=True)
     source = models.ForeignKey(Source, on_delete=models.PROTECT, null=True)
 
     # TODO: How are default values controlled?
@@ -281,6 +286,120 @@ class FeedstockNotImplemented(Exception):
         )
 
 
+class InventoryInputQuerySet(models.QuerySet):
+    def accessible_by_user(self, user):
+        visible_samples = filter_queryset_for_user(
+            Sample.objects.filter(standalone=True), user
+        )
+        visible_series = filter_queryset_for_user(SampleSeries.objects.all(), user)
+        return self.filter(
+            Q(sample_id__in=visible_samples.values("pk"))
+            | Q(series_id__in=visible_series.values("pk"))
+        )
+
+
+class InventoryInputManager(models.Manager.from_queryset(InventoryInputQuerySet)):
+    def for_object(self, value):
+        if isinstance(value, Sample):
+            if not value.standalone:
+                raise ValidationError(
+                    {"sample": "Only standalone samples can be inventory inputs."}
+                )
+            return self.get_or_create(sample=value, defaults={"series": None})[0]
+        if isinstance(value, SampleSeries):
+            return self.get_or_create(series=value, defaults={"sample": None})[0]
+        if isinstance(value, InventoryInput):
+            return value
+        raise TypeError("Inventory inputs must wrap a Sample or SampleSeries.")
+
+
+class InventoryInput(models.Model):
+    """
+    Adapter that lets scenarios, inventory amount shares and result layers
+    reference either a standalone Sample or a temporal SampleSeries through a
+    single feedstock relation.
+    """
+
+    sample = models.OneToOneField(
+        Sample,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="inventory_input",
+    )
+    series = models.OneToOneField(
+        SampleSeries,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="inventory_input",
+    )
+
+    objects = InventoryInputManager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(sample__isnull=False, series__isnull=True)
+                    | Q(sample__isnull=True, series__isnull=False)
+                ),
+                name="inventory_input_exactly_one_source",
+            )
+        ]
+
+    def clean(self):
+        super().clean()
+        if (self.sample_id is None) == (self.series_id is None):
+            raise ValidationError("Select exactly one sample or sample series.")
+        if self.sample_id and not self.sample.standalone:
+            raise ValidationError(
+                {"sample": "Only standalone samples can be inventory inputs."}
+            )
+
+    @property
+    def input_object(self):
+        return self.series or self.sample
+
+    @property
+    def material(self):
+        return self.input_object.material
+
+    @property
+    def name(self):
+        return self.input_object.name
+
+    @property
+    def is_temporal(self):
+        return self.series_id is not None
+
+    @property
+    def kind(self):
+        return "series" if self.is_temporal else "sample"
+
+    @property
+    def publication_status(self):
+        return self.input_object.publication_status
+
+    def __str__(self):
+        label = "Series" if self.is_temporal else "Sample"
+        return f"{label}: {self.material} — {self.name}"
+
+
+@receiver(post_save, sender=Sample)
+def create_inventory_input_for_sample(sender, instance, raw=False, **kwargs):
+    if raw or not instance.standalone:
+        return
+    InventoryInput.objects.for_object(instance)
+
+
+@receiver(post_save, sender=SampleSeries)
+def create_inventory_input_for_series(sender, instance, raw=False, **kwargs):
+    if raw:
+        return
+    InventoryInput.objects.for_object(instance)
+
+
 SCENARIO_STATUS = (
     ("administrative", "administrative"),
     ("custom", "custom"),
@@ -340,41 +459,71 @@ class Scenario(NamedUserCreatedObject):
                 update_fields.extend(["failed_algorithm", "failure_message"])
             self.scenariostatus.save(update_fields=update_fields)
 
-    def available_feedstocks(self):
+    def available_feedstocks(self, user=None):
         """
-        Returns all materials that can be included in this scenario.
+        Returns all inventory inputs that can be included in this scenario.
         """
-        materials = Material.objects.filter(
-            id__in=self.available_inventory_algorithms().values("feedstocks")
+        algorithms = self.available_inventory_algorithms().prefetch_related(
+            "feedstocks"
         )
-        return SampleSeries.objects.filter(material__in=materials)
+        supported = set()
+        for algorithm in algorithms:
+            for material in algorithm.feedstocks.all():
+                if algorithm.supports_sample_series:
+                    supported.add((material.id, "series"))
+                if algorithm.supports_standalone_samples:
+                    supported.add((material.id, "sample"))
+
+        candidates = InventoryInput.objects.select_related(
+            "sample__material", "series__material"
+        ).filter(Q(series__isnull=False) | Q(sample__standalone=True))
+        if user is not None:
+            candidates = candidates.accessible_by_user(user)
+        return candidates.filter(
+            pk__in=[
+                candidate.pk
+                for candidate in candidates
+                if (candidate.material.id, candidate.kind) in supported
+            ]
+        )
 
     def feedstocks(self):
         """
-        Returns all materials (SampleSeries) that have been included in this scenario.
+        Returns all inventory inputs that have been included in this scenario.
         """
-        return SampleSeries.objects.filter(
+        return InventoryInput.objects.filter(
             id__in=self.scenarioinventoryconfiguration_set.all().values("feedstock")
         )
+
+    @staticmethod
+    def _feedstock_materials(feedstock):
+        material = (
+            feedstock.material if isinstance(feedstock, InventoryInput) else feedstock
+        )
+        return Material.objects.filter(id=material.id)
 
     def available_geodatasets(
         self, feedstock: Material = None, feedstocks: QuerySet = None
     ):
         """
-        Returns a queryset of geodatasets that can be used in this scenario. By providing either a Material object or
-        a queryset of Materials as keyword argument feedstock/feedstocks respectively, the query is reduced to
-        geodatasets which have algorithms for these given feedstocks.
+        Returns a queryset of geodatasets that can be used in this scenario. By providing either a Material or
+        InventoryInput object or a queryset of Materials as keyword argument feedstock/feedstocks respectively,
+        the query is reduced to geodatasets which have algorithms for these given feedstocks.
         """
         if feedstocks is None and feedstock is None:
             feedstocks = Material.objects.filter(type="material")
         elif feedstocks is None and feedstock is not None:
-            feedstocks = Material.objects.filter(id=feedstock.id)
+            feedstocks = self._feedstock_materials(feedstock)
 
-        return GeoDataset.objects.filter(
-            id__in=InventoryAlgorithm.objects.filter(
-                feedstocks__in=feedstocks, geodataset__region=self.region
-            ).values("geodataset")
+        algorithms = InventoryAlgorithm.objects.filter(
+            feedstocks__in=feedstocks, geodataset__region=self.region
         )
+        if isinstance(feedstock, InventoryInput):
+            if feedstock.is_temporal:
+                algorithms = algorithms.filter(supports_sample_series=True)
+            else:
+                algorithms = algorithms.filter(supports_standalone_samples=True)
+        return GeoDataset.objects.filter(id__in=algorithms.values("geodataset"))
 
     def evaluated_geodatasets(
         self, feedstock: Material = None, feedstocks: QuerySet = None
@@ -382,10 +531,12 @@ class Scenario(NamedUserCreatedObject):
         if feedstocks is None and feedstock is None:
             feedstocks = Material.objects.filter(type="material")
         elif feedstocks is None and feedstock is not None:
-            feedstocks = Material.objects.filter(id=feedstock.id)
+            feedstocks = self._feedstock_materials(feedstock)
         return GeoDataset.objects.filter(
             id__in=ScenarioInventoryConfiguration.objects.filter(
-                scenario=self, feedstock__material__in=feedstocks
+                Q(feedstock__series__material__in=feedstocks)
+                | Q(feedstock__sample__material__in=feedstocks),
+                scenario=self,
             ).values("geodataset")
         )
 
@@ -395,10 +546,10 @@ class Scenario(NamedUserCreatedObject):
         if feedstocks is None and feedstock is None:
             feedstocks = Material.objects.filter(type="material")
         elif feedstocks is None and feedstock is not None:
-            feedstocks = Material.objects.filter(id=feedstock.id)
-        return self.available_geodatasets(feedstocks=feedstocks).difference(
-            self.evaluated_geodatasets(feedstocks=feedstocks)
-        )
+            feedstocks = self._feedstock_materials(feedstock)
+        return self.available_geodatasets(
+            feedstock=feedstock, feedstocks=feedstocks
+        ).difference(self.evaluated_geodatasets(feedstocks=feedstocks))
 
     def available_inventory_algorithms(
         self,
@@ -410,7 +561,12 @@ class Scenario(NamedUserCreatedObject):
         if feedstocks is None and feedstock is None:
             feedstocks = Material.objects.filter(type="material")
         elif feedstocks is None and feedstock is not None:
-            feedstocks = Material.objects.filter(id=feedstock.id)
+            material = (
+                feedstock.material
+                if isinstance(feedstock, InventoryInput)
+                else feedstock
+            )
+            feedstocks = Material.objects.filter(id=material.id)
 
         if geodatasets is None and geodataset is None:
             geodatasets = GeoDataset.objects.all()
@@ -419,9 +575,15 @@ class Scenario(NamedUserCreatedObject):
 
         geodatasets = geodatasets.filter(region=self.region)
 
-        return InventoryAlgorithm.objects.filter(
+        algorithms = InventoryAlgorithm.objects.filter(
             feedstocks__in=feedstocks, geodataset__in=geodatasets
         )
+        if isinstance(feedstock, InventoryInput):
+            if feedstock.is_temporal:
+                algorithms = algorithms.filter(supports_sample_series=True)
+            else:
+                algorithms = algorithms.filter(supports_standalone_samples=True)
+        return algorithms
 
     def evaluated_inventory_algorithms(self):
         return InventoryAlgorithm.objects.filter(
@@ -435,10 +597,15 @@ class Scenario(NamedUserCreatedObject):
             scenario=self, feedstock=feedstock, geodataset=geodataset
         ):
             return InventoryAlgorithm.objects.none()
-        else:
-            return InventoryAlgorithm.objects.filter(
-                feedstock=feedstock.material, geodataset=geodataset
-            )
+        algorithms = InventoryAlgorithm.objects.filter(
+            feedstocks=feedstock.material, geodataset=geodataset
+        )
+        if isinstance(feedstock, InventoryInput):
+            if feedstock.is_temporal:
+                algorithms = algorithms.filter(supports_sample_series=True)
+            else:
+                algorithms = algorithms.filter(supports_standalone_samples=True)
+        return algorithms
 
     def default_inventory_algorithms(self):
         return InventoryAlgorithm.objects.filter(
@@ -476,7 +643,20 @@ class Scenario(NamedUserCreatedObject):
 
         # self.remove_inventory_algorithm(algorithm, feedstock)
 
+        feedstock = InventoryInput.objects.for_object(feedstock)
+
         if feedstock not in self.available_feedstocks():
+            raise FeedstockNotImplemented(feedstock)
+
+        supported = (
+            algorithm.supports_sample_series
+            if feedstock.is_temporal
+            else algorithm.supports_standalone_samples
+        )
+        if (
+            not supported
+            or not algorithm.feedstocks.filter(pk=feedstock.material.pk).exists()
+        ):
             raise FeedstockNotImplemented(feedstock)
 
         if custom_parameter_values:
@@ -516,6 +696,7 @@ class Scenario(NamedUserCreatedObject):
         """
         Remove all entries from the configuration that are associated with the given algorithm.
         """
+        feedstock = InventoryInput.objects.for_object(feedstock)
         for config_entry in self.configuration().filter(
             inventory_algorithm=algorithm, feedstock=feedstock
         ):
@@ -586,7 +767,11 @@ class Scenario(NamedUserCreatedObject):
     def inventory_execution_plan(self):
         inventory_config = {}
         for entry in self.configuration().select_related(
-            "inventory_algorithm", "inventory_parameter", "inventory_value"
+            "inventory_algorithm",
+            "inventory_parameter",
+            "inventory_value",
+            "feedstock__sample",
+            "feedstock__series",
         ):
             feedstock = entry.feedstock.id
             algorithm = entry.inventory_algorithm
@@ -607,7 +792,9 @@ class Scenario(NamedUserCreatedObject):
                     "kwargs": {
                         "catchment_id": self.catchment.id,
                         "scenario_id": self.id,
-                        "feedstock_id": feedstock,
+                        "inventory_input_id": entry.feedstock.id,
+                        "feedstock_id": entry.feedstock.input_object.id,
+                        "feedstock_kind": entry.feedstock.kind,
                     },
                 }
             if (
@@ -628,7 +815,9 @@ class Scenario(NamedUserCreatedObject):
     def serialize_inventory_execution_plan(self, execution_plan):
         inventory_config = {}
         for execution in execution_plan:
-            feedstock = execution["kwargs"]["feedstock_id"]
+            feedstock = execution["kwargs"].get(
+                "inventory_input_id", execution["kwargs"]["feedstock_id"]
+            )
             function = execution["algorithm"].task_reference
             if feedstock not in inventory_config.keys():
                 inventory_config[feedstock] = {}
@@ -639,7 +828,11 @@ class Scenario(NamedUserCreatedObject):
     def configuration_for_template(self):
         config = {}
         for entry in self.configuration().select_related(
-            "feedstock", "inventory_algorithm", "inventory_parameter", "inventory_value"
+            "feedstock__sample",
+            "feedstock__series",
+            "inventory_algorithm",
+            "inventory_parameter",
+            "inventory_value",
         ):
             feedstock = entry.feedstock
             algorithm = entry.inventory_algorithm
@@ -694,10 +887,19 @@ class Scenario(NamedUserCreatedObject):
 class InventoryAmountShare(models.Model):
     owner = models.ForeignKey(User, default=1, on_delete=models.CASCADE)
     scenario = models.ForeignKey(Scenario, null=True, on_delete=models.CASCADE)
-    feedstock = models.ForeignKey(SampleSeries, null=True, on_delete=models.CASCADE)
+    feedstock = models.ForeignKey(InventoryInput, null=True, on_delete=models.CASCADE)
     timestep = models.ForeignKey(Timestep, null=True, on_delete=models.CASCADE)
     average = models.FloatField(default=0.0)
     standard_deviation = models.FloatField(default=0.0)
+
+    def clean(self):
+        super().clean()
+        if self.feedstock_id and not self.feedstock.is_temporal:
+            raise ValidationError(
+                {
+                    "feedstock": "Inventory amount shares require a temporal sample series."
+                }
+            )
 
 
 @receiver(pre_save, sender=Scenario)
@@ -750,7 +952,7 @@ def manage_scenario_status(sender, instance, created, **kwargs):
 
 class ScenarioInventoryConfiguration(models.Model):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
-    feedstock = models.ForeignKey(SampleSeries, on_delete=models.CASCADE, null=True)
+    feedstock = models.ForeignKey(InventoryInput, on_delete=models.CASCADE, null=True)
     geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)
     inventory_algorithm = models.ForeignKey(
         InventoryAlgorithm, on_delete=models.CASCADE

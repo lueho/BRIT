@@ -4,8 +4,8 @@ from django.db import connection, models
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
-from inventories.models import InventoryAlgorithm, Scenario
-from materials.models import MaterialComponent, SampleSeries
+from inventories.models import InventoryAlgorithm, InventoryInput, Scenario
+from materials.models import MaterialComponent
 
 from .exceptions import InvalidGeometryType, NoFeaturesProvided, TableAlreadyExists
 
@@ -73,13 +73,19 @@ class LayerManager(models.Manager):
             if kwargs["geom_type"] not in self.supported_geometry_types:
                 raise InvalidGeometryType(kwargs["geom_type"])
 
+            feedstock = kwargs["feedstock"]
+            feedstock_suffix = (
+                f"feedstock_{feedstock.id}"
+                if feedstock.is_temporal
+                else f"feedstock_sample_{feedstock.id}"
+            )
             kwargs["table_name"] = (
                 "result_of_scenario_"
                 + str(kwargs["scenario"].id)
                 + "_algorithm_"
                 + str(kwargs["algorithm"].id)
-                + "_feedstock_"
-                + str(kwargs["feedstock"].id)
+                + "_"
+                + feedstock_suffix
             )
 
             layer, created = super().get_or_create(
@@ -127,7 +133,7 @@ class Layer(models.Model):
     geom_type = models.CharField(max_length=20)
     table_name = models.CharField(max_length=200)
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
-    feedstock = models.ForeignKey(SampleSeries, on_delete=models.CASCADE)
+    feedstock = models.ForeignKey(InventoryInput, on_delete=models.CASCADE)
     algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE)
     layer_fields = models.ManyToManyField(LayerField)
 

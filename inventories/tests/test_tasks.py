@@ -4,9 +4,15 @@ from uuid import uuid4
 from django.test import TestCase
 
 from maps.models import GeoDataset, Region
-from materials.models import Material, SampleSeries
+from materials.models import Material, Sample, SampleSeries
 
-from ..models import InventoryAlgorithm, RunningTask, Scenario, ScenarioStatus
+from ..models import (
+    InventoryAlgorithm,
+    InventoryInput,
+    RunningTask,
+    Scenario,
+    ScenarioStatus,
+)
 from ..tasks import mark_inventory_failed, run_inventory, run_inventory_algorithm
 
 
@@ -118,6 +124,7 @@ class InventoryTaskFailureTests(TestCase):
             run_inventory_algorithm.run(
                 algorithm.pk,
                 scenario_id=scenario.pk,
+                inventory_input_id=feedstock.inventory_input.pk,
                 feedstock_id=feedstock.pk,
             )
 
@@ -129,6 +136,89 @@ class InventoryTaskFailureTests(TestCase):
             "calculation failed",
         )
         self.assertFalse(RunningTask.objects.filter(scenario=scenario).exists())
+
+    @patch("inventories.tasks.Layer.objects.create_or_replace")
+    @patch("inventories.tasks.InventoryAlgorithm.execute")
+    def test_run_inventory_algorithm_resolves_inventory_input(
+        self,
+        execute_algorithm,
+        create_result_layer,
+    ):
+        execute_algorithm.return_value = {"result": 1}
+        create_result_layer.return_value = (Mock(), Mock())
+        region = Region.objects.create(name="Input Resolution Region")
+        scenario = Scenario.objects.create(
+            name="Input Resolution Scenario",
+            region=region,
+        )
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Input Resolution",
+            function_name="input_resolution",
+            geodataset=GeoDataset.objects.create(
+                name="Input Resolution Dataset",
+                region=region,
+            ),
+        )
+        sample = Sample.objects.create(
+            name="Static Input Sample",
+            material=Material.objects.create(name="Static Input Material"),
+            standalone=True,
+        )
+        inventory_input = InventoryInput.objects.get(sample=sample)
+        scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        run_inventory_algorithm.run(
+            algorithm.pk,
+            scenario_id=scenario.pk,
+            inventory_input_id=inventory_input.pk,
+            feedstock_id=sample.pk,
+        )
+
+        create_result_layer.assert_called_once()
+        self.assertEqual(
+            create_result_layer.call_args.kwargs["feedstock"], inventory_input
+        )
+        execute_algorithm.assert_called_once()
+
+    @patch("inventories.tasks.Layer.objects.create_or_replace")
+    @patch("inventories.tasks.InventoryAlgorithm.execute")
+    def test_legacy_feedstock_id_only_resolves_adapter(
+        self,
+        execute_algorithm,
+        create_result_layer,
+    ):
+        execute_algorithm.return_value = {"result": 1}
+        create_result_layer.return_value = (Mock(), Mock())
+        region = Region.objects.create(name="Legacy Task Region")
+        scenario = Scenario.objects.create(
+            name="Legacy Task Scenario",
+            region=region,
+        )
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Legacy Task",
+            function_name="legacy_task",
+            geodataset=GeoDataset.objects.create(
+                name="Legacy Task Dataset",
+                region=region,
+            ),
+        )
+        series = SampleSeries.objects.create(
+            name="Legacy Task Feedstock",
+            material=Material.objects.create(name="Legacy Task Material"),
+        )
+        inventory_input = InventoryInput.objects.get(series=series)
+        scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        run_inventory_algorithm.run(
+            algorithm.pk,
+            scenario_id=scenario.pk,
+            feedstock_id=inventory_input.pk,
+        )
+
+        create_result_layer.assert_called_once()
+        self.assertEqual(
+            create_result_layer.call_args.kwargs["feedstock"], inventory_input
+        )
 
     @patch("inventories.tasks.Layer.objects.create_or_replace")
     @patch("inventories.tasks.InventoryAlgorithm.execute")
@@ -167,6 +257,7 @@ class InventoryTaskFailureTests(TestCase):
             run_inventory_algorithm.run(
                 algorithm.pk,
                 scenario_id=scenario.pk,
+                inventory_input_id=feedstock.inventory_input.pk,
                 feedstock_id=feedstock.pk,
             )
 

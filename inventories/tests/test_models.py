@@ -1,16 +1,20 @@
+import importlib
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from django.apps import apps
-from django.db import connection
+from django.contrib.auth.models import AnonymousUser, User
+from django.core.exceptions import ValidationError
+from django.db import connection, transaction
+from django.db.utils import IntegrityError
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
 from distributions.models import TemporalDistribution, Timestep
 from layer_manager.models import Layer, LayerAggregatedDistribution
 from maps.models import Catchment, Region
-from materials.models import SampleSeries
+from materials.models import Sample, SampleSeries
 from sources.greenhouses.inventory.algorithms import (
     InventoryAlgorithms as GreenhouseInventoryAlgorithms,
 )
@@ -18,10 +22,13 @@ from sources.greenhouses.inventory.algorithms import (
 from ..evaluations import ScenarioResult
 from ..exceptions import BlockedRunningScenario
 from ..models import (
+    FeedstockNotImplemented,
     GeoDataset,
     InventoryAlgorithm,
     InventoryAlgorithmParameter,
     InventoryAlgorithmParameterValue,
+    InventoryAmountShare,
+    InventoryInput,
     Material,
     RunningTask,
     Scenario,
@@ -264,7 +271,8 @@ class ScenarioTestCase(TestCase):
                 "kwargs": {
                     "catchment_id": 11,
                     "scenario_id": self.scenario.id,
-                    "feedstock_id": 7,
+                    "inventory_input_id": 7,
+                    "feedstock_id": 3,
                     "point_yield": {"value": 1.0, "standard_deviation": 0.1},
                 },
             }
@@ -279,7 +287,8 @@ class ScenarioTestCase(TestCase):
                     algorithm.task_reference: {
                         "catchment_id": 11,
                         "scenario_id": self.scenario.id,
-                        "feedstock_id": 7,
+                        "inventory_input_id": 7,
+                        "feedstock_id": 3,
                         "point_yield": {"value": 1.0, "standard_deviation": 0.1},
                     }
                 }
@@ -288,6 +297,29 @@ class ScenarioTestCase(TestCase):
         self.assertIsNot(
             config[7][algorithm.task_reference], execution_plan[0]["kwargs"]
         )
+
+    def test_serialize_inventory_execution_plan_falls_back_to_feedstock_id(self):
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Legacy Plan Algorithm",
+            source_module="flexibi_hamburg",
+            function_name="hamburg_roadside_tree_production",
+            geodataset=GeoDataset.objects.get(name="Test Dataset"),
+        )
+        execution_plan = [
+            {
+                "algorithm": algorithm,
+                "kwargs": {
+                    "catchment_id": 11,
+                    "scenario_id": self.scenario.id,
+                    "feedstock_id": 7,
+                },
+            }
+        ]
+
+        config = self.scenario.serialize_inventory_execution_plan(execution_plan)
+
+        self.assertIn(7, config)
+        self.assertIn(algorithm.task_reference, config[7])
 
     def test_is_valid_configuration_scopes_required_parameters_to_current_scenario(
         self,
@@ -319,7 +351,7 @@ class ScenarioTestCase(TestCase):
 
         ScenarioInventoryConfiguration.objects.create(
             scenario=self.scenario,
-            feedstock=feedstock,
+            feedstock=feedstock.inventory_input,
             geodataset=geodataset,
             inventory_algorithm=algorithm,
         )
@@ -330,7 +362,7 @@ class ScenarioTestCase(TestCase):
         )
         ScenarioInventoryConfiguration.objects.create(
             scenario=other_scenario,
-            feedstock=feedstock,
+            feedstock=feedstock.inventory_input,
             geodataset=geodataset,
             inventory_algorithm=algorithm,
             inventory_parameter=parameter,
@@ -382,7 +414,7 @@ class ScenarioTestCase(TestCase):
 
         ScenarioInventoryConfiguration.objects.create(
             scenario=self.scenario,
-            feedstock=feedstock,
+            feedstock=feedstock.inventory_input,
             geodataset=geodataset,
             inventory_algorithm=algorithm,
             inventory_parameter=parameter,
@@ -390,17 +422,19 @@ class ScenarioTestCase(TestCase):
         )
         ScenarioInventoryConfiguration.objects.create(
             scenario=self.scenario,
-            feedstock=other_feedstock,
+            feedstock=other_feedstock.inventory_input,
             geodataset=geodataset,
             inventory_algorithm=algorithm,
             inventory_parameter=parameter,
             inventory_value=other_value,
         )
 
-        config = self.scenario.inventory_algorithm_config(algorithm, feedstock)
+        config = self.scenario.inventory_algorithm_config(
+            algorithm, feedstock.inventory_input
+        )
 
         self.assertEqual(config["scenario"], self.scenario)
-        self.assertEqual(config["feedstock"], feedstock)
+        self.assertEqual(config["feedstock"], feedstock.inventory_input)
         self.assertEqual(config["geodataset"], geodataset)
         self.assertEqual(config["inventory_algorithm"], algorithm)
         self.assertEqual(config["parameters"], [{"point_yield": value.id}])
@@ -430,7 +464,9 @@ class ScenarioTestCase(TestCase):
         self.scenario.add_inventory_algorithm(feedstock, algorithm)
 
         configs = ScenarioInventoryConfiguration.objects.filter(
-            scenario=self.scenario, inventory_algorithm=algorithm, feedstock=feedstock
+            scenario=self.scenario,
+            inventory_algorithm=algorithm,
+            feedstock=feedstock.inventory_input,
         )
         self.assertTrue(configs.exists())
 
@@ -456,7 +492,7 @@ class ScenarioTestCase(TestCase):
         )
         ScenarioInventoryConfiguration.objects.create(
             scenario=self.scenario,
-            feedstock=feedstock,
+            feedstock=feedstock.inventory_input,
             geodataset=geodataset,
             inventory_algorithm=algorithm,
             inventory_parameter=parameter,
@@ -488,7 +524,7 @@ class ScenarioTestCase(TestCase):
         algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
         ScenarioInventoryConfiguration.objects.create(
             scenario=self.scenario,
-            feedstock=feedstock,
+            feedstock=feedstock.inventory_input,
             geodataset=geodataset,
             inventory_algorithm=algorithm,
         )
@@ -583,7 +619,7 @@ class ScenarioTestCase(TestCase):
         entry = ScenarioInventoryConfiguration.objects.get(
             scenario=self.scenario, inventory_parameter=parameter
         )
-        self.assertEqual(entry.feedstock, feedstock)
+        self.assertEqual(entry.feedstock, feedstock.inventory_input)
         self.assertEqual(entry.inventory_algorithm, algorithm)
         self.assertEqual(entry.geodataset, algorithm.geodataset)
         self.assertEqual(entry.inventory_value, default_value)
@@ -592,6 +628,10 @@ class ScenarioTestCase(TestCase):
         plan = self.scenario.inventory_execution_plan()
         self.assertEqual(len(plan), 1)
         self.assertEqual(plan[0]["kwargs"]["feedstock_id"], feedstock.id)
+        self.assertEqual(
+            plan[0]["kwargs"]["inventory_input_id"], feedstock.inventory_input.id
+        )
+        self.assertEqual(plan[0]["kwargs"]["feedstock_kind"], "series")
         self.assertEqual(plan[0]["kwargs"]["test_param"]["value"], 1.0)
 
     def test_create_default_configuration_creates_one_configuration_per_series(
@@ -607,8 +647,8 @@ class ScenarioTestCase(TestCase):
         self.scenario.create_default_configuration()
 
         self.assertQuerySetEqual(
-            self.scenario.feedstocks().order_by("name"),
-            [series_a, series_b],
+            self.scenario.feedstocks().order_by("series__name"),
+            [series_a.inventory_input, series_b.inventory_input],
         )
         self.assertFalse(
             self.scenario.configuration().filter(feedstock__isnull=True).exists()
@@ -660,7 +700,7 @@ class ScenarioTestCase(TestCase):
         for _ in range(2):
             ScenarioInventoryConfiguration.objects.create(
                 scenario=self.scenario,
-                feedstock=feedstock,
+                feedstock=feedstock.inventory_input,
                 geodataset=geodataset,
                 inventory_algorithm=algorithm,
                 inventory_parameter=parameter,
@@ -687,7 +727,9 @@ class ScenarioResultHomogenizeTimestepsTestCase(TestCase):
             name="TS Algorithm", geodataset=geodataset
         )
         cls.algorithm.feedstocks.add(material)
-        cls.feedstock = SampleSeries.objects.create(name="TS Series", material=material)
+        cls.feedstock = SampleSeries.objects.create(
+            name="TS Series", material=material
+        ).inventory_input
 
     def tearDown(self):
         for name in list(apps.all_models["layer_manager"]):
@@ -748,3 +790,500 @@ class ScenarioResultHomogenizeTimestepsTestCase(TestCase):
 
         result = ScenarioResult(self.scenario)
         self.assertEqual(result.timesteps, [])
+
+
+class InventoryInputTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create(username="ii_owner")
+        cls.other_user = User.objects.create(username="ii_other")
+        cls.material = Material.objects.create(
+            owner=cls.owner, name="II Material", publication_status="published"
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.owner,
+            name="II Sample",
+            material=cls.material,
+            publication_status="published",
+            standalone=True,
+        )
+        cls.series = SampleSeries.objects.create(
+            owner=cls.owner,
+            name="II Series",
+            material=cls.material,
+            publication_status="published",
+        )
+
+    def test_wrapper_created_for_sample_series(self):
+        inventory_input = InventoryInput.objects.get(series=self.series)
+        self.assertIsNone(inventory_input.sample_id)
+        self.assertTrue(inventory_input.is_temporal)
+
+    def test_wrapper_created_for_standalone_sample(self):
+        inventory_input = InventoryInput.objects.get(sample=self.sample)
+        self.assertIsNone(inventory_input.series_id)
+        self.assertFalse(inventory_input.is_temporal)
+
+    def test_no_wrapper_for_non_standalone_sample(self):
+        sample = Sample.objects.create(
+            name="II Series Member", material=self.material, series=self.series
+        )
+        self.assertFalse(InventoryInput.objects.filter(sample=sample).exists())
+
+    def test_clean_requires_exactly_one_source(self):
+        with self.assertRaisesMessage(
+            ValidationError, "Select exactly one sample or sample series."
+        ):
+            InventoryInput().clean()
+        with self.assertRaisesMessage(
+            ValidationError, "Select exactly one sample or sample series."
+        ):
+            InventoryInput(sample=self.sample, series=self.series).clean()
+
+    def test_check_constraint_enforced(self):
+        sample = Sample.objects.create(
+            name="II Constraint Sample", material=self.material, standalone=True
+        )
+        series = SampleSeries.objects.create(
+            name="II Constraint Series", material=self.material
+        )
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                InventoryInput.objects.create(sample=sample, series=series)
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                InventoryInput.objects.create()
+
+    def test_clean_rejects_non_standalone_sample(self):
+        sample = Sample.objects.create(
+            name="II Not Standalone", material=self.material, series=self.series
+        )
+        inventory_input = InventoryInput(sample=sample)
+        with self.assertRaises(ValidationError) as context:
+            inventory_input.clean()
+        self.assertIn("sample", context.exception.message_dict)
+
+    def test_for_object_wraps_sample_series_and_input(self):
+        sample_input = InventoryInput.objects.for_object(self.sample)
+        self.assertEqual(sample_input.sample, self.sample)
+        series_input = InventoryInput.objects.for_object(self.series)
+        self.assertEqual(series_input.series, self.series)
+        self.assertIs(InventoryInput.objects.for_object(series_input), series_input)
+
+    def test_for_object_is_idempotent(self):
+        first = InventoryInput.objects.for_object(self.series)
+        second = InventoryInput.objects.for_object(self.series)
+        self.assertEqual(first.pk, second.pk)
+        self.assertEqual(InventoryInput.objects.filter(series=self.series).count(), 1)
+
+    def test_for_object_rejects_unsupported_type(self):
+        with self.assertRaises(TypeError):
+            InventoryInput.objects.for_object(self.material)
+
+    def test_for_object_rejects_non_standalone_sample(self):
+        member = Sample.objects.create(
+            name="II Member", material=self.material, series=self.series
+        )
+        with self.assertRaises(ValidationError) as context:
+            InventoryInput.objects.for_object(member)
+        self.assertIn("sample", context.exception.message_dict)
+
+    def test_inventory_amount_share_requires_temporal_input(self):
+        distribution = TemporalDistribution.objects.create(name="II Share Dist")
+        timestep = Timestep.objects.create(
+            name="II Share TS", distribution=distribution
+        )
+        temporal_share = InventoryAmountShare(
+            feedstock=self.series.inventory_input, timestep=timestep, average=0.5
+        )
+        temporal_share.clean()
+
+        static_share = InventoryAmountShare(
+            feedstock=self.sample.inventory_input, timestep=timestep, average=0.5
+        )
+        with self.assertRaises(ValidationError) as context:
+            static_share.clean()
+        self.assertIn("feedstock", context.exception.message_dict)
+
+    def test_delegated_properties(self):
+        sample_input = InventoryInput.objects.get(sample=self.sample)
+        series_input = InventoryInput.objects.get(series=self.series)
+        self.assertEqual(sample_input.input_object, self.sample)
+        self.assertEqual(series_input.input_object, self.series)
+        self.assertEqual(sample_input.material, self.material)
+        self.assertEqual(series_input.material, self.material)
+        self.assertEqual(sample_input.name, "II Sample")
+        self.assertEqual(series_input.name, "II Series")
+        self.assertEqual(sample_input.kind, "sample")
+        self.assertEqual(series_input.kind, "series")
+        self.assertEqual(sample_input.publication_status, "published")
+        self.assertEqual(str(series_input), "Series: II Material — II Series")
+        self.assertEqual(str(sample_input), "Sample: II Material — II Sample")
+
+    def test_accessible_by_user_scopes_visibility(self):
+        other_private = SampleSeries.objects.create(
+            owner=self.other_user,
+            name="II Other Private",
+            material=self.material,
+            publication_status="private",
+        )
+        own_private = SampleSeries.objects.create(
+            owner=self.owner,
+            name="II Own Private",
+            material=self.material,
+            publication_status="private",
+        )
+        other_private_input = InventoryInput.objects.get(series=other_private)
+        own_private_input = InventoryInput.objects.get(series=own_private)
+        published_input = InventoryInput.objects.get(series=self.series)
+
+        user_qs = InventoryInput.objects.accessible_by_user(self.owner)
+        self.assertIn(own_private_input, user_qs)
+        self.assertIn(published_input, user_qs)
+        self.assertNotIn(other_private_input, user_qs)
+
+        anonymous_qs = InventoryInput.objects.accessible_by_user(AnonymousUser())
+        self.assertIn(published_input, anonymous_qs)
+        self.assertNotIn(own_private_input, anonymous_qs)
+        self.assertNotIn(other_private_input, anonymous_qs)
+
+
+class FeedstockForeignKeyMetadataTestCase(TestCase):
+    def referenced_tables(self, table, column):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT ccu.table_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                  ON kcu.constraint_name = tc.constraint_name
+                 AND kcu.table_schema = tc.table_schema
+                JOIN information_schema.constraint_column_usage ccu
+                  ON ccu.constraint_name = tc.constraint_name
+                 AND ccu.table_schema = tc.table_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_schema = current_schema()
+                  AND tc.table_name = %s
+                  AND kcu.column_name = %s
+                """,
+                [table, column],
+            )
+            return {row[0] for row in cursor.fetchall()}
+
+    def test_inventory_amount_share_feedstock_fk_targets_inventory_input(self):
+        self.assertEqual(
+            {"inventories_inventoryinput"},
+            self.referenced_tables("inventories_inventoryamountshare", "feedstock_id"),
+        )
+
+    def test_scenario_configuration_feedstock_fk_targets_inventory_input(self):
+        self.assertEqual(
+            {"inventories_inventoryinput"},
+            self.referenced_tables(
+                "inventories_scenarioinventoryconfiguration", "feedstock_id"
+            ),
+        )
+
+
+class InventoryInputBackfillTestCase(TestCase):
+    def test_backfill_preserves_series_ids_offsets_samples_and_resets_sequence(
+        self,
+    ):
+        migration = importlib.import_module(
+            "inventories.migrations.0008_inventoryinput_and_more"
+        )
+        material = Material.objects.create(name="Backfill Material")
+        sample = Sample.objects.create(
+            name="Backfill Sample", material=material, standalone=True
+        )
+        series = SampleSeries.objects.create(name="Backfill Series", material=material)
+        InventoryInput.objects.all().delete()
+
+        migration.create_inventory_inputs(apps, SimpleNamespace(connection=connection))
+
+        series_input = InventoryInput.objects.get(series=series)
+        self.assertEqual(series_input.pk, series.pk)
+        offset = SampleSeries.objects.order_by("-pk").first().pk
+        sample_input = InventoryInput.objects.get(sample=sample)
+        self.assertEqual(sample_input.pk, offset + sample.pk)
+
+        region = Region.objects.create(name="Backfill Region")
+        scenario = Scenario.objects.create(name="Backfill Scenario", region=region)
+        geodataset = GeoDataset.objects.create(name="Backfill Dataset", region=region)
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Backfill Algorithm", geodataset=geodataset
+        )
+        config = ScenarioInventoryConfiguration.objects.create(
+            scenario=scenario,
+            feedstock_id=series.pk,
+            geodataset=geodataset,
+            inventory_algorithm=algorithm,
+        )
+        self.assertEqual(config.feedstock, series_input)
+
+        distribution = TemporalDistribution.objects.create(name="Backfill Dist")
+        timestep = Timestep.objects.create(
+            name="Backfill TS", distribution=distribution
+        )
+        share = InventoryAmountShare.objects.create(
+            scenario=scenario,
+            feedstock_id=series.pk,
+            timestep=timestep,
+            average=0.5,
+        )
+        self.assertEqual(share.feedstock, series_input)
+
+        layer = Layer.objects.create(
+            name="Backfill Layer",
+            geom_type="Point",
+            table_name="backfill_layer",
+            scenario=scenario,
+            feedstock_id=series.pk,
+            algorithm=algorithm,
+        )
+        self.assertEqual(layer.feedstock, series_input)
+        layer.delete()
+
+        later_series = SampleSeries.objects.create(
+            name="Backfill Later Series", material=material
+        )
+        later_input = InventoryInput.objects.get(series=later_series)
+        self.assertNotIn(later_input.pk, [series_input.pk, sample_input.pk])
+
+
+class ScenarioInventoryInputTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create(username="scenario_input_owner")
+        cls.other_user = User.objects.create(username="scenario_input_other")
+        cls.region = Region.objects.create(name="SI Region")
+        cls.catchment = Catchment.objects.create(name="SI Catchment", region=cls.region)
+        cls.scenario = Scenario.objects.create(
+            name="SI Scenario", region=cls.region, catchment=cls.catchment
+        )
+        cls.material = Material.objects.create(
+            owner=cls.owner, name="SI Material", publication_status="published"
+        )
+        cls.series = SampleSeries.objects.create(
+            owner=cls.owner,
+            name="SI Series",
+            material=cls.material,
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.owner,
+            name="SI Sample",
+            material=cls.material,
+            publication_status="published",
+            standalone=True,
+        )
+        cls.geodataset = GeoDataset.objects.create(name="SI Dataset", region=cls.region)
+        cls.series_algorithm = InventoryAlgorithm.objects.create(
+            name="SI Series Algorithm", geodataset=cls.geodataset
+        )
+        cls.series_algorithm.feedstocks.add(cls.material)
+        cls.static_algorithm = InventoryAlgorithm.objects.create(
+            name="SI Static Algorithm",
+            geodataset=cls.geodataset,
+            supports_standalone_samples=True,
+        )
+        cls.static_algorithm.feedstocks.add(cls.material)
+
+    def test_algorithm_capability_defaults(self):
+        algorithm = InventoryAlgorithm.objects.create(
+            name="SI Defaults", geodataset=self.geodataset
+        )
+        self.assertTrue(algorithm.supports_sample_series)
+        self.assertFalse(algorithm.supports_standalone_samples)
+
+    def test_available_feedstocks_returns_both_kinds(self):
+        available = self.scenario.available_feedstocks()
+        self.assertIn(self.series.inventory_input, available)
+        self.assertIn(self.sample.inventory_input, available)
+
+    def test_available_feedstocks_excludes_unsupported_materials(self):
+        other_material = Material.objects.create(name="SI Other Material")
+        other_sample = Sample.objects.create(
+            name="SI Other Sample", material=other_material, standalone=True
+        )
+        available = self.scenario.available_feedstocks()
+        self.assertNotIn(other_sample.inventory_input, available)
+
+    def test_available_feedstocks_scoped_to_user(self):
+        private_sample = Sample.objects.create(
+            owner=self.other_user,
+            name="SI Other Private Sample",
+            material=self.material,
+            standalone=True,
+        )
+        available = self.scenario.available_feedstocks(user=self.owner)
+        self.assertNotIn(private_sample.inventory_input, available)
+        available = self.scenario.available_feedstocks(user=self.other_user)
+        self.assertIn(private_sample.inventory_input, available)
+
+    def test_available_feedstocks_excludes_series_member_sample_wrappers(self):
+        member = Sample.objects.create(
+            name="SI Member",
+            material=self.material,
+            series=self.series,
+            publication_status="published",
+        )
+        member_input = InventoryInput.objects.create(sample=member)
+        self.assertNotIn(member_input, self.scenario.available_feedstocks())
+        self.assertNotIn(
+            member_input, self.scenario.available_feedstocks(user=self.owner)
+        )
+
+    def test_available_geodatasets_uses_underlying_material(self):
+        wrapper = self.sample.inventory_input
+        wrapper.delete()
+        wrapper = InventoryInput.objects.create(
+            pk=self.material.pk + 999999, sample=self.sample
+        )
+        self.assertNotEqual(wrapper.pk, self.material.pk)
+        available = self.scenario.available_geodatasets(feedstock=wrapper)
+        self.assertIn(self.geodataset, available)
+
+    def test_available_geodatasets_filters_by_input_kind(self):
+        series_only_dataset = GeoDataset.objects.create(
+            name="SI Series Only Dataset", region=self.region
+        )
+        series_only_algorithm = InventoryAlgorithm.objects.create(
+            name="SI Series Only", geodataset=series_only_dataset
+        )
+        series_only_algorithm.feedstocks.add(self.material)
+
+        self.assertIn(
+            series_only_dataset,
+            self.scenario.available_geodatasets(feedstock=self.series.inventory_input),
+        )
+        self.assertNotIn(
+            series_only_dataset,
+            self.scenario.available_geodatasets(feedstock=self.sample.inventory_input),
+        )
+        self.assertNotIn(
+            series_only_dataset,
+            self.scenario.remaining_geodataset_options(
+                feedstock=self.sample.inventory_input
+            ),
+        )
+
+    def test_evaluated_and_remaining_geodatasets_use_underlying_material(self):
+        wrapper = self.sample.inventory_input
+        wrapper.delete()
+        wrapper = InventoryInput.objects.create(
+            pk=self.material.pk + 999999, sample=self.sample
+        )
+        other_dataset = GeoDataset.objects.create(
+            name="SI Other Dataset", region=self.region
+        )
+        other_algorithm = InventoryAlgorithm.objects.create(
+            name="SI Other Algorithm", geodataset=other_dataset
+        )
+        other_algorithm.feedstocks.add(self.material)
+
+        self.scenario.add_inventory_algorithm(wrapper, self.static_algorithm)
+
+        self.assertIn(
+            self.geodataset,
+            self.scenario.evaluated_geodatasets(feedstock=wrapper),
+        )
+        remaining = self.scenario.remaining_geodataset_options(
+            feedstock=self.series.inventory_input
+        )
+        self.assertNotIn(self.geodataset, remaining)
+        self.assertIn(other_dataset, remaining)
+
+    def test_feedstocks_returns_inventory_inputs(self):
+        self.scenario.add_inventory_algorithm(self.series, self.series_algorithm)
+        feedstocks = self.scenario.feedstocks()
+        self.assertQuerySetEqual(feedstocks, [self.series.inventory_input])
+
+    def test_add_inventory_algorithm_accepts_all_wrapper_types(self):
+        self.scenario.add_inventory_algorithm(self.series, self.series_algorithm)
+        self.scenario.add_inventory_algorithm(self.sample, self.static_algorithm)
+        self.scenario.add_inventory_algorithm(
+            self.sample.inventory_input, self.static_algorithm
+        )
+        self.assertTrue(
+            self.scenario.configuration()
+            .filter(feedstock=self.series.inventory_input)
+            .exists()
+        )
+        self.assertTrue(
+            self.scenario.configuration()
+            .filter(feedstock=self.sample.inventory_input)
+            .exists()
+        )
+
+    def test_add_inventory_algorithm_rejects_unsupported_kind(self):
+        with self.assertRaises(FeedstockNotImplemented):
+            self.scenario.add_inventory_algorithm(self.sample, self.series_algorithm)
+
+    def test_default_configuration_uses_series_inputs_only(self):
+        self.static_algorithm.default = True
+        self.static_algorithm.save()
+        self.series_algorithm.default = True
+        self.series_algorithm.save()
+
+        self.scenario.create_default_configuration()
+
+        self.assertTrue(
+            self.scenario.configuration()
+            .filter(feedstock=self.series.inventory_input)
+            .exists()
+        )
+        self.assertFalse(
+            self.scenario.configuration()
+            .filter(feedstock=self.sample.inventory_input)
+            .exists()
+        )
+
+    def test_execution_plan_includes_feedstock_kind(self):
+        self.scenario.add_inventory_algorithm(self.series, self.series_algorithm)
+        self.scenario.add_inventory_algorithm(self.sample, self.static_algorithm)
+
+        plan = {
+            entry["kwargs"]["inventory_input_id"]: entry["kwargs"]
+            for entry in self.scenario.inventory_execution_plan()
+        }
+
+        series_kwargs = plan[self.series.inventory_input.pk]
+        self.assertEqual(series_kwargs["feedstock_id"], self.series.pk)
+        self.assertEqual(series_kwargs["feedstock_kind"], "series")
+        sample_kwargs = plan[self.sample.inventory_input.pk]
+        self.assertEqual(sample_kwargs["feedstock_id"], self.sample.pk)
+        self.assertEqual(sample_kwargs["feedstock_kind"], "sample")
+
+    def test_execution_plan_separates_adapter_and_domain_ids(self):
+        wrapper = self.series.inventory_input
+        wrapper.delete()
+        wrapper = InventoryInput.objects.create(
+            pk=self.series.pk + 999999, series=self.series
+        )
+        self.assertNotEqual(wrapper.pk, self.series.pk)
+
+        self.scenario.add_inventory_algorithm(wrapper, self.series_algorithm)
+        plan = self.scenario.inventory_execution_plan()
+
+        kwargs = plan[0]["kwargs"]
+        self.assertEqual(kwargs["feedstock_id"], self.series.pk)
+        self.assertEqual(kwargs["inventory_input_id"], wrapper.pk)
+        # A legacy algorithm resolving the domain object by feedstock_id
+        # still finds the series.
+        self.assertEqual(
+            SampleSeries.objects.get(id=kwargs["feedstock_id"]), self.series
+        )
+
+    def test_available_inventory_algorithms_filters_supported_kind(self):
+        algorithms = self.scenario.available_inventory_algorithms(
+            feedstock=self.sample.inventory_input
+        )
+        self.assertIn(self.static_algorithm, algorithms)
+        self.assertNotIn(self.series_algorithm, algorithms)
+
+        algorithms = self.scenario.available_inventory_algorithms(
+            feedstock=self.series.inventory_input
+        )
+        self.assertIn(self.series_algorithm, algorithms)
+        self.assertIn(self.static_algorithm, algorithms)

@@ -14,7 +14,7 @@ from layer_manager.models import (
     LayerField,
 )
 from maps.models import Catchment, GeoDataset, Region
-from materials.models import Material, MaterialComponent, SampleSeries
+from materials.models import Material, MaterialComponent, Sample, SampleSeries
 from sources.urban_green_spaces.models import HamburgGreenAreas
 
 
@@ -60,6 +60,7 @@ class LayerTestCase(TestCase):
         self.feedstock_sample_series = SampleSeries.objects.get(
             name="Feedstock Test Series"
         )
+        self.feedstock_input = self.feedstock_sample_series.inventory_input
 
         self.testkwargs = {
             "name": "test name",
@@ -69,7 +70,7 @@ class LayerTestCase(TestCase):
             ),
             "geom_type": "Point",
             "table_name": "test_table_name",
-            "feedstock": self.feedstock_sample_series,
+            "feedstock": self.feedstock_input,
         }
         self.fields = {"field1": "float", "field2": "int"}
 
@@ -112,7 +113,7 @@ class LayerTestCase(TestCase):
         layer, feature_collection = Layer.objects.create_or_replace(
             name="new layer",
             scenario=self.scenario,
-            feedstock=self.feedstock_sample_series,
+            feedstock=self.feedstock_input,
             algorithm=algorithm,
             results=results["avg_area_yield"],
         )
@@ -120,7 +121,7 @@ class LayerTestCase(TestCase):
         # Is the table name generated correctly?
         self.assertEqual(
             layer.table_name,
-            f"result_of_scenario_{self.scenario.id}_algorithm_{algorithm.id}_feedstock_{self.feedstock_sample_series.id}",
+            f"result_of_scenario_{self.scenario.id}_algorithm_{algorithm.id}_feedstock_{self.feedstock_input.id}",
         )
         # Have all fields been created correctly?
         stored_fields = {}
@@ -129,7 +130,7 @@ class LayerTestCase(TestCase):
         expected_fields = {"yield": "float"}
         self.assertDictEqual(stored_fields, expected_fields)
         # Was the new table created in the database?
-        table_name = f"result_of_scenario_{self.scenario.id}_algorithm_{algorithm.id}_feedstock_{self.feedstock_sample_series.id}"
+        table_name = f"result_of_scenario_{self.scenario.id}_algorithm_{algorithm.id}_feedstock_{self.feedstock_input.id}"
         with connection.cursor() as cursor:
             cursor.execute(f"SELECT to_regclass('{table_name}')")
             self.assertTrue(cursor.fetchone()[0])
@@ -142,7 +143,7 @@ class LayerTestCase(TestCase):
         Layer.objects.create_or_replace(
             name="second new layer",
             scenario=self.scenario,
-            feedstock=self.feedstock_sample_series,
+            feedstock=self.feedstock_input,
             algorithm=algorithm,
             results=results["avg_area_yield"],
         )
@@ -167,7 +168,7 @@ class LayerTestCase(TestCase):
         Layer.objects.create_or_replace(
             name="second layer",
             scenario=self.scenario,
-            feedstock=self.feedstock_sample_series,
+            feedstock=self.feedstock_input,
             algorithm=algorithm,
             results=results["avg_area_yield"],
         )
@@ -176,7 +177,7 @@ class LayerTestCase(TestCase):
         layer = Layer.objects.get(name="second layer")
         self.assertEqual(
             layer.table_name,
-            f"result_of_scenario_{self.scenario.id}_algorithm_{algorithm.id}_feedstock_{self.feedstock_sample_series.id}",
+            f"result_of_scenario_{self.scenario.id}_algorithm_{algorithm.id}_feedstock_{self.feedstock_input.id}",
         )
         self.assertIn(layer.table_name, apps.all_models["layer_manager"])
         layer_model = layer.get_feature_collection()
@@ -187,7 +188,7 @@ class LayerTestCase(TestCase):
 
         # If the model is not registered and needs to be recreated
         del apps.all_models["layer_manager"][
-            f"result_of_scenario_{self.scenario.id}_algorithm_{algorithm.id}_feedstock_{self.feedstock_sample_series.id}"
+            f"result_of_scenario_{self.scenario.id}_algorithm_{algorithm.id}_feedstock_{self.feedstock_input.id}"
         ]
         recreated_model = Layer.objects.get(
             name="second layer"
@@ -205,7 +206,7 @@ class LayerTestCase(TestCase):
             ),
             avg_yield=12.5,
         )
-        table_name = f"result_of_scenario_{self.scenario.id}_algorithm_{algorithm.id}_feedstock_{self.feedstock_sample_series.id}"
+        table_name = f"result_of_scenario_{self.scenario.id}_algorithm_{algorithm.id}_feedstock_{self.feedstock_input.id}"
         query = f"""
             -- noinspection SqlResolve
             SELECT avg_yield FROM {table_name}
@@ -221,7 +222,7 @@ class LayerTestCase(TestCase):
         kwargs = {
             "table_name": "test_table",
             "geom_type": "point",
-            "feedstock": self.feedstock_sample_series,
+            "feedstock": self.feedstock_input,
             "scenario": self.scenario,
             "algorithm": InventoryAlgorithm.objects.get(name="Average Point Yield"),
         }
@@ -235,6 +236,41 @@ class LayerTestCase(TestCase):
 
         kwargs["fields"] = field_definitions
         self.assertTrue(layer.is_defined_by(**kwargs))
+
+    def test_create_or_replace_static_sample_uses_distinct_table_name(self):
+        results = {
+            "aggregated_values": [
+                {"name": "Total production", "value": 10000, "unit": "kg"}
+            ],
+            "features": [{"geom": Point(1, 1, srid=4326), "yield": 12.5}],
+        }
+        sample = Sample.objects.create(
+            name="Static Feedstock Sample",
+            material=Material.objects.create(name="Static Feedstock Material"),
+            standalone=True,
+        )
+        inventory_input = sample.inventory_input
+        algorithm = InventoryAlgorithm.objects.get(function_name="avg_area_yield")
+
+        layer, feature_collection = Layer.objects.create_or_replace(
+            name="static layer",
+            scenario=self.scenario,
+            feedstock=inventory_input,
+            algorithm=algorithm,
+            results=results,
+        )
+
+        expected_table_name = (
+            f"result_of_scenario_{self.scenario.id}_algorithm_{algorithm.id}"
+            f"_feedstock_sample_{inventory_input.id}"
+        )
+        self.assertEqual(layer.table_name, expected_table_name)
+        self.assertNotEqual(
+            layer.table_name,
+            f"result_of_scenario_{self.scenario.id}_algorithm_{algorithm.id}"
+            f"_feedstock_{self.feedstock_input.id}",
+        )
+        del apps.all_models["layer_manager"][layer.table_name]
 
 
 class LayerAggregatedDistributionTestCase(TestCase):
@@ -290,3 +326,26 @@ class LayerAggregatedDistributionTestCase(TestCase):
         )
         with self.assertRaises(DistributionShare.MultipleObjectsReturned):
             _ = self.aggregated_distribution.serialized
+
+
+class LayerFeedstockForeignKeyMetadataTestCase(TestCase):
+    def test_layer_feedstock_fk_targets_inventory_input(self):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT ccu.table_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                  ON kcu.constraint_name = tc.constraint_name
+                 AND kcu.table_schema = tc.table_schema
+                JOIN information_schema.constraint_column_usage ccu
+                  ON ccu.constraint_name = tc.constraint_name
+                 AND ccu.table_schema = tc.table_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_schema = current_schema()
+                  AND tc.table_name = 'layer_manager_layer'
+                  AND kcu.column_name = 'feedstock_id'
+                """
+            )
+            referenced = {row[0] for row in cursor.fetchall()}
+        self.assertEqual({"inventories_inventoryinput"}, referenced)
