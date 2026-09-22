@@ -87,13 +87,16 @@ function controlledResponse(payload, chunkSize, { failAfterChunks = Infinity } =
   return { response, release };
 }
 
-function makeSandbox(responsesByUrl) {
-  const calls = { batches: [], resets: 0, rendered: [], errors: [] };
+function makeSandbox(responsesByUrl, { cached = {} } = {}) {
+  const calls = { batches: [], resets: 0, rendered: [], errors: [], progressVisible: false };
   const element = () => ({
     dataset: {},
     textContent: "",
     setAttribute() {},
-    classList: { add() {}, remove() {} },
+    classList: {
+      add(name) { if (name === "map-progress-visible") calls.progressVisible = true; },
+      remove(name) { if (name === "map-progress-visible") calls.progressVisible = false; },
+    },
     style: {},
     querySelector() { return element(); },
     appendChild() {},
@@ -114,7 +117,7 @@ function makeSandbox(responsesByUrl) {
     hideMapOverlay() {},
     buildUrl(base, params) { return `${base}?${params.toString()}`; },
     normalizeUrl(url) { return url; },
-    async getFromIndexedDB() { return null; },
+    async getFromIndexedDB(key) { return cached[key] || null; },
     async storeInIndexedDB() {},
     async cleanupCache() {},
     orderLayers() {},
@@ -199,4 +202,32 @@ test("a failed stream removes its partially rendered layer", async () => {
   await assert.rejects(load, /connection dropped/);
   assert.equal(calls.resets, 2, "partial layer removed after the stream failed");
   assert.equal(calls.errors.length, 1);
+});
+
+test("a cached replacement hides the aborted load's progress bar", async () => {
+  const a = controlledResponse(
+    JSON.stringify({ type: "FeatureCollection", features: makeFeatures(2500, "A") }),
+    120000,
+  );
+  const cachedB = { type: "FeatureCollection", features: makeFeatures(3, "B") };
+  const head = {
+    response: { ok: true, headers: { get: (n) => (n === "X-Data-Version" ? "v1" : null) } },
+  };
+  const { sandbox, calls } = makeSandbox(
+    { "/geom?f=a": a, "/geom?f=b": head },
+    { cached: { "/geom?f=b": { data: cachedB, version: "v1" } } },
+  );
+
+  const loadA = sandbox.fetchFeatureGeometriesWithProgress({ f: "a" });
+  a.release(1);
+  await settle();
+  assert.equal(calls.progressVisible, true, "A shows the progress bar");
+
+  await sandbox.fetchFeatureGeometriesWithProgress({ f: "b" });
+  a.release(10);
+  await Promise.allSettled([loadA]);
+
+  assert.equal(calls.progressVisible, false, "bar hidden after cached replacement");
+  assert.deepEqual(calls.rendered, [cachedB]);
+  assert.equal(calls.errors.length, 0);
 });

@@ -344,6 +344,8 @@ async function fetchFeatureGeometriesWithProgress(params) {
     if (activeFeatureLoader) {
         activeFeatureLoader.abort();
         activeFeatureLoader = null;
+        // Aborts bypass onError, so the superseded load's bar must go here.
+        createMapProgressBar().hide();
     }
 
     // Start with provided params, add featuresId if set
