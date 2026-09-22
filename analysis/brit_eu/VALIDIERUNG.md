@@ -18,6 +18,8 @@ Stand: 22.09.2026. Getestet unter Linux/Ubuntu 24.04 mit R 4.6.1 und den Paketve
 
 Der vollständige Lauf wurde mit `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/analysis" brit-eu-r:2026-09-22 run.R` durchgeführt. Der Image-Build verwendet den mitgelieferten Dockerfile. `results/session-info.txt` dokumentiert die ausgeführte Umgebung; `results/input-provenance.json` enthält Datenvariante und Code-Prüfsummen. Diese Dateien entstehen bei jedem eigenen Lauf neu.
 
+Der erste vollständige BRIT-Prüflauf war einschließlich erreichbarer Datenbank erfolgreich. Der abschließende Lauf mit `--no-up` bestätigte Ruff, Formatierung und fehlende Modelländerungen erneut; seine zusätzliche Prüfung der Datenbank-Migrationshistorie konnte wegen nicht auflösbarem Hostnamen `db` nicht erfolgen. Der zugehörige Warnhinweis bleibt im Prüfprotokoll erhalten. Die 55 Django-Tests wurden zuvor erfolgreich gegen die isolierte Testdatenbank ausgeführt. Es wurden keine Modelle oder Migrationen geändert.
+
 Die Serverprüfung im isolierten BRIT-Zweig verwendete:
 
 ```sh
