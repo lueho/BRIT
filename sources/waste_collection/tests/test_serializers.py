@@ -246,6 +246,9 @@ class CollectionFlatSerializerTestCase(TestCase):
         )
         population = RegionProperty.objects.create(name="Population")
         population_density = RegionProperty.objects.create(name="Population density")
+        population_density.allowed_units.add(
+            Unit.objects.create(name="1/km", symbol="1/km")
+        )
         RegionAttributeValue.objects.create(
             region=nutsregion.region_ptr,
             property=population,

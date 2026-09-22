@@ -3469,7 +3469,7 @@ class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
         # Using get_or_create for Property to avoid issues if tests are run multiple times
         # and the "Connection rate" property might already exist from a previous run.
         cls.connection_rate_property, _ = Property.objects.get_or_create(
-            name="Connection rate", defaults={"unit": "%"}
+            name="Connection rate"
         )
         CollectionPropertyValue.objects.create(
             collection=cls.collection1,
