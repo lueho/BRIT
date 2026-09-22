@@ -3561,6 +3561,27 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
             Sample.objects.get(name="Test Sample Duplicate").owner, self.sample.owner
         )
 
+    def test_get_preselects_editable_groups_and_post_copies_them(self):
+        group = SampleGroup.objects.create(name="Owned group", owner=self.sample.owner)
+        self.sample.sample_groups.add(group)
+        self.client.force_login(self.sample.owner)
+        url = reverse("sample-duplicate", kwargs={"pk": self.sample.pk})
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(response.context["form"].initial["sample_groups"], [group])
+
+        data = {
+            "name": "Test Sample Duplicate",
+            "material": self.material.pk,
+            "series": self.series.pk,
+            "timestep": Timestep.objects.get(name="Test Timestep 2").pk,
+            "sample_groups": [group.pk],
+        }
+        self.client.post(url, data)
+        duplicate = Sample.objects.get(name="Test Sample Duplicate")
+        self.assertCountEqual(duplicate.sample_groups.all(), [group])
+
 
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------

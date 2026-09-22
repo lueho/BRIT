@@ -528,7 +528,7 @@ class SampleGroupModelForm(
         self.fields["samples"].queryset = editable
         self._locked_sample_ids = []
         if self.instance.pk:
-            self.initial["samples"] = self.instance.samples.all()
+            self.initial["samples"] = self.instance.samples.filter(pk__in=editable)
             self._locked_sample_ids = list(
                 self.instance.samples.exclude(pk__in=editable).values_list(
                     "pk", flat=True
@@ -644,6 +644,9 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
         )
         self._locked_group_ids = []
         if self.instance.pk:
+            self.initial["sample_groups"] = self.instance.sample_groups.filter(
+                pk__in=groups_field.queryset
+            )
             self._locked_group_ids = list(
                 self.instance.sample_groups.exclude(
                     pk__in=groups_field.queryset

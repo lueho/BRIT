@@ -669,6 +669,14 @@ class SampleGroupModelFormTestCase(TestCase):
             group.samples.all(), [self.sample2, self.foreign_published_sample]
         )
 
+    def test_update_preselects_only_editable_members(self):
+        group = SampleGroup.objects.create(name="Editable group", owner=self.owner)
+        self.foreign_published_sample.sample_groups.add(group)
+        self.sample1.sample_groups.add(group)
+        form = self._form(instance=group)
+
+        self.assertCountEqual(form.initial["samples"], [self.sample1])
+
 
 class SampleModelFormSampleGroupsTestCase(TestCase):
     @classmethod
@@ -781,6 +789,18 @@ class SampleModelFormSampleGroupsTestCase(TestCase):
 
         self.assertFalse(form.is_valid())
         self.assertIn("sample_groups", form.errors)
+
+    def test_update_preselects_only_editable_groups(self):
+        sample = Sample.objects.create(
+            name="Grouped sample",
+            material=self.material,
+            owner=self.owner,
+            standalone=True,
+        )
+        sample.sample_groups.add(self.group1, self.foreign_published_group)
+        form = self._form(data=None, instance=sample)
+
+        self.assertCountEqual(form.initial["sample_groups"], [self.group1])
 
     def test_update_preserves_memberships_editor_cannot_manage(self):
         sample = Sample.objects.create(
