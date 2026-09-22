@@ -97,8 +97,8 @@ class StreamingGeoJSONLoader {
         let bytesReceived = 0;
 
         // Byte-based estimates and exact feature counts interleave; never let
-        // a lower estimate overwrite a higher value already shown. Completion
-        // reports the exact parsed count directly.
+        // a lower estimate overwrite a higher value already shown; the exact
+        // parsed count is carried by onComplete(geojson).
         let reportedProgress = 0;
         const reportProgress = (loaded) => {
             reportedProgress = Math.max(reportedProgress, loaded);
@@ -213,7 +213,7 @@ class StreamingGeoJSONLoader {
                 features: features
             };
 
-            this.onProgress(features.length, totalCount);
+            reportProgress(features.length);
             this.onComplete(geojson, dataVersion);
             return geojson;
 
