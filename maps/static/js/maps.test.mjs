@@ -8,7 +8,11 @@ const source = readFileSync(new URL("./maps.js", import.meta.url), "utf8");
 // Function declarations inside maps.js overwrite same-named sandbox globals at
 // evaluation time, so spies for those must be installed after eval. Stubs for
 // externals that live in other files (filter_utils.js) are seeded beforehand.
-function setup({ confirmResult = true, parsedParams = new URLSearchParams() } = {}) {
+function setup({
+    confirmResult = true,
+    parsedParams = new URLSearchParams(),
+    sliders = [],
+} = {}) {
     const calls = {
         loadLayers: [],
         showMapOverlay: 0,
@@ -17,6 +21,10 @@ function setup({ confirmResult = true, parsedParams = new URLSearchParams() } = 
         cleanup: 0,
     };
     const mapConfig = { loadFeatures: false };
+    const sliderElements = sliders.map(({ id, rangeMin, rangeMax }) => ({
+        id,
+        dataset: { range_min: rangeMin, range_max: rangeMax },
+    }));
     const window = {
         location: new URL("http://localhost/maps/geodatasets/3/map/"),
         history: { replaceState() {} },
@@ -27,9 +35,20 @@ function setup({ confirmResult = true, parsedParams = new URLSearchParams() } = 
     const sandbox = {
         window,
         document: {
-            getElementById: () => null,
+            getElementById: (id) => {
+                for (const { id: sliderId, name } of sliders) {
+                    for (const suffix of ["min", "max", "is_null"]) {
+                        if (id === `${sliderId}_${suffix}`) {
+                            return { name: `${name}_${suffix}` };
+                        }
+                    }
+                }
+                return null;
+            },
             querySelector: () => null,
-            querySelectorAll: () => [],
+            querySelectorAll: (selector) => (
+                selector === ".numeric-slider-range" ? sliderElements : []
+            ),
         },
         console,
         URL,
@@ -90,6 +109,83 @@ test("hasConstrainingFilterParameters detects a real filter value", () => {
     const { sandbox } = setup();
     const params = new URLSearchParams({ scope: "published", name: "oak" });
     assert.equal(sandbox.hasConstrainingFilterParameters(params), true);
+});
+
+test("untouched slider state is not constraining", () => {
+    const { sandbox } = setup({
+        sliders: [{
+            id: "id_plantation_year",
+            name: "plantation_year",
+            rangeMin: "1900",
+            rangeMax: "2025",
+        }],
+    });
+    const params = new URLSearchParams(
+        "plantation_year_min=1900.00&plantation_year_max=2025.00&" +
+        "plantation_year_is_null=true&scope=published",
+    );
+    assert.equal(sandbox.hasConstrainingFilterParameters(params), false);
+});
+
+test("narrowed slider is constraining", () => {
+    const { sandbox } = setup({
+        sliders: [{
+            id: "id_plantation_year",
+            name: "plantation_year",
+            rangeMin: "1900",
+            rangeMax: "2025",
+        }],
+    });
+    const params = new URLSearchParams(
+        "plantation_year_min=1950.00&plantation_year_max=2025.00&" +
+        "plantation_year_is_null=true",
+    );
+    assert.equal(sandbox.hasConstrainingFilterParameters(params), true);
+});
+
+test("excluding unknowns is constraining", () => {
+    const { sandbox } = setup({
+        sliders: [{
+            id: "id_plantation_year",
+            name: "plantation_year",
+            rangeMin: "1900",
+            rangeMax: "2025",
+        }],
+    });
+    const params = new URLSearchParams(
+        "plantation_year_min=1900.00&plantation_year_max=2025.00&" +
+        "plantation_year_is_null=false",
+    );
+    assert.equal(sandbox.hasConstrainingFilterParameters(params), true);
+});
+
+test("default slider values on a guarded map still trigger confirmation", () => {
+    const untouchedParams = new URLSearchParams(
+        "plantation_year_min=1900.00&plantation_year_max=2025.00&" +
+        "plantation_year_is_null=true&scope=published",
+    );
+    const { sandbox, calls, mapConfig } = setup({
+        confirmResult: false,
+        sliders: [{
+            id: "id_plantation_year",
+            name: "plantation_year",
+            rangeMin: "1900",
+            rangeMax: "2025",
+        }],
+        parsedParams: untouchedParams,
+    });
+    mapConfig.guardUnfilteredLoad = true;
+    sandbox.clickedFilterButton();
+    assert.equal(calls.confirm, 1);
+    assert.equal(calls.loadLayers.length, 0);
+});
+
+test("range-like params without a matching slider remain constraining", () => {
+    const { sandbox } = setup();
+    assert.equal(
+        sandbox.hasConstrainingFilterParameters(new URLSearchParams("foo_min=1")),
+        true,
+    );
 });
 
 test("deferred features flag the unfiltered-load guard", () => {

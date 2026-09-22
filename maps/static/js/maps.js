@@ -968,6 +968,33 @@ const NON_CONSTRAINING_FILTER_PARAMETERS = new Set([
     'show_composed_of',
 ]);
 
+function rangeSliderDefaultValues() {
+    const defaults = new Map();
+    if (typeof document === 'undefined' || !document.querySelectorAll) {
+        return defaults;
+    }
+    document.querySelectorAll('.numeric-slider-range').forEach(slider => {
+        const bounds = {
+            min: slider.dataset.range_min,
+            max: slider.dataset.range_max,
+            is_null: 'true',
+        };
+        for (const [suffix, value] of Object.entries(bounds)) {
+            const input = document.getElementById(`${slider.id}_${suffix}`);
+            if (input && input.name) {
+                defaults.set(input.name, value);
+            }
+        }
+    });
+    return defaults;
+}
+
+function isDefaultRangeSliderValue(value, defaultValue) {
+    if (defaultValue === undefined) return false;
+    if (defaultValue === 'true') return value === 'true';
+    return Number(value) === Number(defaultValue);
+}
+
 function hasConstrainingFilterParameters(params) {
     if (!params) {
         return false;
@@ -975,8 +1002,13 @@ function hasConstrainingFilterParameters(params) {
     const searchParams = params instanceof URLSearchParams
         ? params
         : new URLSearchParams(params);
+    const sliderDefaults = rangeSliderDefaultValues();
     for (const [key, value] of searchParams.entries()) {
-        if (!NON_CONSTRAINING_FILTER_PARAMETERS.has(key) && value !== '') {
+        if (
+            !NON_CONSTRAINING_FILTER_PARAMETERS.has(key) &&
+            value !== '' &&
+            !isDefaultRangeSliderValue(value, sliderDefaults.get(key))
+        ) {
             return true;
         }
     }
