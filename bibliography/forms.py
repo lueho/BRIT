@@ -15,7 +15,7 @@ from .bibtex import (
     BibtexArticleParseError,
     parse_bibtex_article_entries,
 )
-from .models import Author, Licence, Source, SourceAuthor
+from .models import Author, Licence, Source, SourceAuthor, author_name_has_letter
 
 
 class AuthorModelForm(SimpleModelForm):
@@ -179,12 +179,12 @@ class SourceBibtexArticleImportForm(SimpleForm):
             )
             suffix = " ".join(str(parsed_author.get("suffix") or "").split())
             if author_type == "organization":
-                if not organization_name:
+                if not author_name_has_letter(organization_name):
                     continue
                 first_names = ""
                 last_names = ""
                 suffix = ""
-            elif not last_names:
+            elif not author_name_has_letter(last_names):
                 continue
 
             if author_type == "organization":

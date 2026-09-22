@@ -34,6 +34,31 @@ class SourceBibtexArticleImportFormTestCase(TestCase):
 
         self.assertEqual(list(source.authors.all()), [organization])
 
+    def test_form_skips_letterless_authors(self):
+        owner = User.objects.create(username="owner")
+        owner.user_permissions.add(Permission.objects.get(codename="add_author"))
+        form = SourceBibtexArticleImportForm(
+            data={
+                "bibtex_entry": """
+                @article{Letterless2024,
+                    author = {70, and {30.379} and Lovelace, Ada},
+                    title = {Numeric artefacts},
+                    journal = {Data Cleaning},
+                    year = {2024}
+                }
+                """
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        source = form.create_source(owner=owner)
+
+        self.assertEqual(
+            list(source.authors.values_list("last_names", flat=True)), ["Lovelace"]
+        )
+        self.assertFalse(Author.objects.filter(last_names="70").exists())
+        self.assertFalse(Author.objects.filter(organization_name="30.379").exists())
+
     def test_form_creates_article_source_from_bibtex_with_existing_authors(self):
         owner = User.objects.create(username="owner")
         ada = Author.objects.create(
