@@ -24,6 +24,10 @@
 class StreamingGeoJSONLoader {
     constructor(options = {}) {
         this.onProgress = options.onProgress || (() => { });
+        // Called with arrays of parsed features while the stream is still
+        // running, so consumers can render incrementally. Still receives the
+        // full collection via onComplete for caching/final state.
+        this.onFeatureBatch = options.onFeatureBatch || (() => { });
         this.onComplete = options.onComplete || (() => { });
         this.onError = options.onError || console.error;
         this.abortController = null;
@@ -115,6 +119,8 @@ class StreamingGeoJSONLoader {
         let escapeNext = false;
         let featureStart = -1;
         let lastFeatureProgress = 0;
+        let pendingBatch = [];
+        const FEATURE_BATCH_SIZE = 1000;
 
         try {
             let chunkCount = 0;
@@ -186,6 +192,11 @@ class StreamingGeoJSONLoader {
                                 const feature = JSON.parse(featureStr);
                                 if (feature.type === 'Feature') {
                                     features.push(feature);
+                                    pendingBatch.push(feature);
+                                    if (pendingBatch.length >= FEATURE_BATCH_SIZE) {
+                                        this.onFeatureBatch(pendingBatch);
+                                        pendingBatch = [];
+                                    }
                                     // Progress updates hit the DOM; per-feature
                                     // updates are wasteful on large datasets.
                                     if (features.length - lastFeatureProgress >= 250) {
@@ -207,6 +218,11 @@ class StreamingGeoJSONLoader {
 
             // Handle any remaining data
             decoder.decode(); // Flush
+
+            // Flush any features not yet handed to the incremental renderer.
+            if (pendingBatch.length) {
+                this.onFeatureBatch(pendingBatch);
+            }
 
             const geojson = {
                 type: 'FeatureCollection',
@@ -356,14 +372,31 @@ async function fetchFeatureGeometriesWithProgress(params) {
         console.warn('IndexedDB cache check failed:', e);
     }
 
+    // Fresh network load: clear the previous layer up front so stale or
+    // partially rendered features are never mixed into the new result.
+    if (typeof resetFeaturesLayer === 'function') resetFeaturesLayer();
+
     // Create progress bar and show indeterminate state while connecting
     const progressBar = createMapProgressBar();
     progressBar.show();
     progressBar.showConnecting();
 
+    // Tracks whether the incremental renderer handled every batch; when it
+    // did, the final renderFeatures pass is redundant. A rejected batch
+    // (unsupported geometry) leaves gaps, so it forces the full render.
+    let incrementalRendered = false;
+    let incrementalFailed = false;
+
     const loader = new StreamingGeoJSONLoader({
         onProgress: (loaded, total) => {
             progressBar.update(loaded, total);
+        },
+        onFeatureBatch: (batch) => {
+            if (typeof addFeatureBatch === 'function' && addFeatureBatch(batch)) {
+                incrementalRendered = true;
+            } else {
+                incrementalFailed = true;
+            }
         },
         onComplete: async (geojson, version) => {
             progressBar.hide();
@@ -376,7 +409,9 @@ async function fetchFeatureGeometriesWithProgress(params) {
                 console.warn('Failed to cache GeoJSON:', e);
             }
 
-            renderFeatures(geojson);
+            if (!incrementalRendered || incrementalFailed) {
+                renderFeatures(geojson);
+            }
             if (typeof orderLayers === 'function') orderLayers();
         },
         onError: (error) => {
