@@ -34,8 +34,8 @@
         </section>
     {% endif %}
     {% if policy.can_edit %}
-        {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples in this group" items=group_samples item_url_name="sample-detail" section_total=group_samples_total section_more=group_samples_more section_list_url=group_samples_list_url empty_title="No samples" empty_body="No samples are linked to this group yet. Use the edit action to manage the samples in this group." %}
+        {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples in this group" items=group_samples item_url_name="sample-detail" section_total=group_samples_published_total section_more=group_samples_more section_list_url=group_samples_list_url empty_title="No samples" empty_body="No samples are linked to this group yet. Use the edit action to manage the samples in this group." %}
     {% else %}
-        {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples in this group" items=group_samples item_url_name="sample-detail" section_total=group_samples_total section_more=group_samples_more section_list_url=group_samples_list_url empty_title="No samples" empty_body="No samples are linked to this group yet." %}
+        {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples in this group" items=group_samples item_url_name="sample-detail" section_total=group_samples_published_total section_more=group_samples_more section_list_url=group_samples_list_url empty_title="No samples" empty_body="No samples are linked to this group yet." %}
     {% endif %}
 {% endblock detail_sections %}

@@ -636,22 +636,23 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
                 create_url=reverse("sample-substrate-material-quick-create"),
                 error_message="Could not create substrate.",
             )
-        groups_field = self.fields["sample_groups"]
-        groups_field.queryset = (
-            _sample_groups_editable_by(request.user)
-            if request is not None
-            else SampleGroup.objects.none()
-        )
         self._locked_group_ids = []
-        if self.instance.pk:
-            self.initial["sample_groups"] = self.instance.sample_groups.filter(
-                pk__in=groups_field.queryset
+        groups_field = self.fields.get("sample_groups")
+        if groups_field is not None:
+            groups_field.queryset = (
+                _sample_groups_editable_by(request.user)
+                if request is not None
+                else SampleGroup.objects.none()
             )
-            self._locked_group_ids = list(
-                self.instance.sample_groups.exclude(
+            if self.instance.pk:
+                self.initial["sample_groups"] = self.instance.sample_groups.filter(
                     pk__in=groups_field.queryset
-                ).values_list("pk", flat=True)
-            )
+                )
+                self._locked_group_ids = list(
+                    self.instance.sample_groups.exclude(
+                        pk__in=groups_field.queryset
+                    ).values_list("pk", flat=True)
+                )
         self.helper.layout = Layout(
             "name",
             "material",

@@ -8429,6 +8429,17 @@ class SampleGroupDetailViewTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, "Published member sample")
         self.assertContains(response, "Private member sample")
 
+    def test_group_detail_view_all_counts_published_members_only(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("samplegroup-detail", kwargs={"pk": self.group.pk})
+        )
+
+        self.assertEqual(response.context["group_samples_total"], 2)
+        self.assertEqual(response.context["group_samples_published_total"], 1)
+        self.assertContains(response, "View all 1 published")
+
     def test_group_detail_hides_private_members_for_outsider(self):
         self.client.force_login(self.outsider)
 

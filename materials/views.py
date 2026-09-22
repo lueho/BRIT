@@ -1208,6 +1208,9 @@ class SampleGroupDetailView(UserCreatedObjectDetailView):
             context["group_samples_total"],
             context["group_samples_more"],
         ) = _capped_related(visible_samples.order_by("name", "pk"))
+        context["group_samples_published_total"] = visible_samples.filter(
+            publication_status="published"
+        ).count()
         context["group_samples_list_url"] = (
             f"{reverse('sample-list')}?sample_group={self.object.pk}"
         )
