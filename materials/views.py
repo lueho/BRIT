@@ -2,6 +2,7 @@ import json
 import logging
 from collections import defaultdict
 from decimal import Decimal
+from urllib.parse import parse_qsl, urlsplit
 
 from django.contrib import messages
 from django.contrib.auth.mixins import (
@@ -21,6 +22,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse, reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext
 from django.views.generic import RedirectView, TemplateView, View
 from django.views.generic.detail import SingleObjectMixin
@@ -1578,6 +1580,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 "public_map_url": None,
                 "private_map_url": None,
                 "review_map_url": None,
+                "sample_nav_scope": self._sample_nav_scope(),
             }
         )
 
@@ -1591,6 +1594,27 @@ class SampleDetailView(UserCreatedObjectDetailView):
         )
 
         return context
+
+    def _sample_nav_scope(self):
+        """Scope for the detail context-nav links, kept from the back URL.
+
+        List and featured-gallery links on the detail page should return the
+        user to the same list scope they came from. The scope is read from the
+        validated same-host ``back`` parameter; anything else falls back to
+        the published scope. Anonymous visitors always get published links.
+        """
+        if not self.request.user.is_authenticated:
+            return "published"
+        back = self.request.GET.get("back", "")
+        if back and url_has_allowed_host_and_scheme(
+            back,
+            allowed_hosts={self.request.get_host()},
+            require_https=self.request.is_secure(),
+        ):
+            scope = dict(parse_qsl(urlsplit(back).query)).get("scope")
+            if scope in {"published", "private", "review"}:
+                return scope
+        return "published"
 
     def _build_v2_context(
         self,

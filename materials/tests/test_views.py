@@ -2389,6 +2389,68 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, reverse("materials-explorer"))
         self.assertContains(response, "Materials explorer")
 
+    @staticmethod
+    def _context_nav_html(response):
+        """Return the rendered sample context-nav block of a detail response."""
+        body = response.content.decode()
+        return body.split('aria-label="Sample navigation"', 1)[1].split("</nav>", 1)[0]
+
+    def test_list_links_to_explorer_exactly_once(self):
+        # One affordance in the card header next to the view switcher plus the
+        # breadcrumb module link — no duplicated button in the options pane.
+        for url_name in ("sample-list", "sample-gallery"):
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name), {"scope": "published"})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    response.content.decode().count(reverse("materials-explorer")),
+                    2,
+                )
+
+    def test_detail_nav_preserves_private_scope_from_back_url(self):
+        self.client.force_login(self.owner)
+        back_url = f"{reverse('sample-list-owned')}?scope=private"
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+            {"back": back_url},
+        )
+        self.assertEqual(response.status_code, 200)
+        nav = self._context_nav_html(response)
+        self.assertIn(f"{reverse('sample-list-owned')}?scope=private", nav)
+        self.assertIn(f"{reverse('sample-gallery-owned')}?scope=private", nav)
+
+    def test_detail_nav_preserves_review_scope_from_back_url(self):
+        self.client.force_login(self.staff)
+        back_url = f"{reverse('sample-list-review')}?scope=review"
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+            {"back": back_url},
+        )
+        self.assertEqual(response.status_code, 200)
+        nav = self._context_nav_html(response)
+        self.assertIn(f"{reverse('sample-list-review')}?scope=review", nav)
+        self.assertIn(f"{reverse('sample-gallery-review')}?scope=review", nav)
+
+    def test_detail_nav_defaults_to_published_scope(self):
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        nav = self._context_nav_html(response)
+        self.assertIn(f"{reverse('sample-list')}?scope=published", nav)
+        self.assertIn(f"{reverse('sample-gallery')}?scope=published", nav)
+
+    def test_detail_nav_ignores_private_scope_for_anonymous(self):
+        back_url = f"{reverse('sample-list-owned')}?scope=private"
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+            {"back": back_url},
+        )
+        self.assertEqual(response.status_code, 200)
+        nav = self._context_nav_html(response)
+        self.assertIn(f"{reverse('sample-list')}?scope=published", nav)
+        self.assertIn(f"{reverse('sample-gallery')}?scope=published", nav)
+
 
 class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_create_view = True
