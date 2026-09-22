@@ -308,6 +308,18 @@ class RegionPropertyBaseContractTestCase(TestCase):
 
         self.assertIsInstance(region_property, PropertyBase)
 
+    def test_str_of_unsaved_region_property_returns_name(self):
+        region_property = RegionProperty(name="Population density")
+
+        self.assertEqual(str(region_property), "Population density")
+
+    def test_str_lists_allowed_units(self):
+        region_property = RegionProperty.objects.create(name="Population density")
+        unit = Unit.objects.create(name="1/km²", symbol="1/km²")
+        region_property.allowed_units.add(unit)
+
+        self.assertEqual(str(region_property), "Population density [1/km²]")
+
 
 class RegionAttributeTextValueCategoricalAttributeTestCase(TestCase):
     def test_text_values_use_separate_categorical_attribute_definition(self):

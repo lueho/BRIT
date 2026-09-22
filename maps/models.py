@@ -1097,8 +1097,9 @@ class RegionProperty(PropertyBase):
         verbose_name_plural = "region properties"
 
     def __str__(self):
-        units = self.allowed_units.all()
-        unit_labels = ", ".join(u.name for u in units) if units else ""
+        if not self.pk:
+            return self.name
+        unit_labels = ", ".join(u.name for u in self.allowed_units.all())
         if unit_labels:
             return f"{self.name} [{unit_labels}]"
         return self.name
