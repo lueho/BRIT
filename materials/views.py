@@ -1596,23 +1596,28 @@ class SampleDetailView(UserCreatedObjectDetailView):
         return context
 
     def _sample_nav_scope(self):
-        """Scope for the detail context-nav links, kept from the back URL.
+        """Scope for the detail context-nav links, kept from the return URL.
 
         List and featured-gallery links on the detail page should return the
         user to the same list scope they came from. The scope is read from the
-        validated same-host ``back`` parameter; anything else falls back to
-        the published scope. Anonymous visitors always get published links.
+        validated same-host ``back`` (regular detail) or ``next`` (review
+        detail) parameter; anything else falls back to the published scope.
+        Anonymous visitors always get published links and the review scope is
+        only honoured for moderators.
         """
-        if not self.request.user.is_authenticated:
+        user = self.request.user
+        if not user.is_authenticated:
             return "published"
-        back = self.request.GET.get("back", "")
-        if back and url_has_allowed_host_and_scheme(
-            back,
+        return_url = self.request.GET.get("back") or self.request.GET.get("next", "")
+        if return_url and url_has_allowed_host_and_scheme(
+            return_url,
             allowed_hosts={self.request.get_host()},
             require_https=self.request.is_secure(),
         ):
-            scope = dict(parse_qsl(urlsplit(back).query)).get("scope")
-            if scope in {"published", "private", "review"}:
+            scope = dict(parse_qsl(urlsplit(return_url).query)).get("scope")
+            if scope == "private":
+                return scope
+            if scope == "review" and user_is_moderator_for_model(user, Sample):
                 return scope
         return "published"
 

@@ -2431,6 +2431,48 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         self.assertIn(f"{reverse('sample-list-review')}?scope=review", nav)
         self.assertIn(f"{reverse('sample-gallery-review')}?scope=review", nav)
 
+    def test_review_detail_nav_preserves_review_scope_from_next_url(self):
+        review_sample = Sample.objects.create(
+            owner=self.owner,
+            name="Review Sample",
+            publication_status="review",
+            material=self.material,
+            standalone=True,
+        )
+        self.client.force_login(self.staff)
+        list_response = self.client.get(
+            reverse("sample-list-review"), {"scope": "review"}
+        )
+        self.assertEqual(list_response.status_code, 200)
+        review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(Sample).id,
+                "object_id": review_sample.pk,
+            },
+        )
+        next_url = f"{reverse('sample-list-review')}?scope=review"
+        card_url = f"{review_url}?next={quote(next_url, safe='')}"
+        self.assertContains(list_response, card_url)
+        response = self.client.get(card_url)
+        self.assertEqual(response.status_code, 200)
+        nav = self._context_nav_html(response)
+        self.assertIn(f"{reverse('sample-list-review')}?scope=review", nav)
+        self.assertIn(f"{reverse('sample-gallery-review')}?scope=review", nav)
+
+    def test_detail_nav_ignores_review_scope_for_non_moderator(self):
+        self.client.force_login(self.owner)
+        back_url = f"{reverse('sample-list-review')}?scope=review"
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+            {"back": back_url},
+        )
+        self.assertEqual(response.status_code, 200)
+        nav = self._context_nav_html(response)
+        self.assertIn(f"{reverse('sample-list')}?scope=published", nav)
+        self.assertIn(f"{reverse('sample-gallery')}?scope=published", nav)
+        self.assertNotIn(reverse("sample-gallery-review"), nav)
+
     def test_detail_nav_defaults_to_published_scope(self):
         response = self.client.get(
             reverse("sample-detail", kwargs={"pk": self.sample.pk})
