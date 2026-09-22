@@ -21,6 +21,9 @@ def _resolve_unit_label(Unit, label, owner_id):
 
 
 def _get_or_create_unit(Unit, User, label, owner_id):
+    label = (label or "").strip()
+    if not label:
+        return None
     unit = _resolve_unit_label(Unit, label, owner_id)
     if unit is not None:
         return unit
@@ -51,7 +54,9 @@ def migrate_units_to_allowed_units(apps, schema_editor):
 
     unit_cache = {}
     for prop in RegionProperty.objects.exclude(unit=""):
-        unit = _get_or_create_unit(Unit, User, prop.unit.strip(), prop.owner_id)
+        unit = _get_or_create_unit(Unit, User, prop.unit, prop.owner_id)
+        if unit is None:
+            continue
         prop.allowed_units.add(unit)
         unit_cache[prop.pk] = unit
 
@@ -76,7 +81,7 @@ def reverse_migrate_units(apps, schema_editor):
     for prop in RegionProperty.objects.all():
         unit = prop.allowed_units.first()
         if unit is not None:
-            prop.unit = unit.name
+            prop.unit = unit.name[:127]
             prop.save(update_fields=["unit"])
 
 
