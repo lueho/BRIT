@@ -46,7 +46,15 @@ from .forms import (
     SourceModelForm,
 )
 from .inlines import SourceAuthorInline
-from .models import SOURCE_TYPES, Author, Licence, Source
+from .models import (
+    LETTERLESS_ORGANIZATION_NAME_MESSAGE,
+    LETTERLESS_SURNAME_MESSAGE,
+    SOURCE_TYPES,
+    Author,
+    Licence,
+    Source,
+    author_name_has_letter,
+)
 from .serializers import HyperlinkedSourceSerializer, SourceCreateSerializer
 from .tasks import check_source_url, check_source_urls
 
@@ -388,6 +396,11 @@ class AuthorQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     {"error": "Organizations need a name."},
                     status=400,
                 )
+            if not author_name_has_letter(organization_name):
+                return JsonResponse(
+                    {"error": LETTERLESS_ORGANIZATION_NAME_MESSAGE},
+                    status=400,
+                )
 
             author = Author.objects.filter(
                 author_type="organization",
@@ -424,6 +437,8 @@ class AuthorQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 {"error": "A non-empty last name is required to create an author."},
                 status=400,
             )
+        if not author_name_has_letter(last_names):
+            return JsonResponse({"error": LETTERLESS_SURNAME_MESSAGE}, status=400)
 
         author = Author.objects.filter(
             first_names__iexact=first_names,
@@ -493,7 +508,7 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     organization_name = self._normalize_name_part(
                         raw_author.get("organization_name")
                     )
-                    if not organization_name:
+                    if not author_name_has_letter(organization_name):
                         continue
 
                     author = Author.objects.filter(
@@ -523,7 +538,7 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                         raw_author.get("first_names")
                     )
                     last_names = self._normalize_name_part(raw_author.get("last_names"))
-                    if not last_names:
+                    if not author_name_has_letter(last_names):
                         continue
 
                     author = Author.objects.filter(

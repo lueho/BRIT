@@ -148,6 +148,28 @@ class AuthorQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_post_http_400_bad_request_when_last_name_has_no_letter(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("author-quick-create"),
+            data=json.dumps({"first_names": "", "last_names": "70"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Author.objects.filter(last_names="70").exists())
+
+    def test_post_http_400_bad_request_when_organization_name_has_no_letter(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("author-quick-create"),
+            data=json.dumps(
+                {"author_type": "organization", "organization_name": "30.379,"}
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Author.objects.filter(organization_name="30.379,").exists())
+
     def test_post_http_201_creates_author_for_member(self):
         self.client.force_login(self.member)
         response = self.client.post(
@@ -900,6 +922,37 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(source_author.author_id, author.pk)
         self.assertEqual(source_author.position, 1)
         self.assertEqual(payload["label"], "Lovelace, A.. Inline source")
+
+    def test_post_skips_letterless_inline_authors(self):
+        add_author_permission = Permission.objects.get(codename="add_author")
+        self.member.user_permissions.add(add_author_permission)
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps(
+                {
+                    "title": "Inline source",
+                    "authors": [
+                        {"first_names": "", "last_names": "70"},
+                        {
+                            "author_type": "organization",
+                            "organization_name": "30.379",
+                        },
+                        {"first_names": "Ada", "last_names": "Lovelace"},
+                    ],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        source = Source.objects.get(pk=response.json()["id"])
+        self.assertEqual(
+            list(source.authors.values_list("last_names", flat=True)), ["Lovelace"]
+        )
+        self.assertFalse(Author.objects.filter(last_names="70").exists())
+        self.assertFalse(Author.objects.filter(organization_name="30.379").exists())
 
     def test_post_http_201_creates_source_and_new_author_when_permitted(self):
         add_author_permission = Permission.objects.get(codename="add_author")
