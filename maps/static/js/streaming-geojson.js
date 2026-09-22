@@ -24,9 +24,11 @@
 class StreamingGeoJSONLoader {
     constructor(options = {}) {
         this.onProgress = options.onProgress || (() => { });
-        // Called with arrays of parsed features while the stream is still
-        // running, so consumers can render incrementally. Still receives the
-        // full collection via onComplete for caching/final state.
+        // Called with arrays of parsed features while a STREAM response is
+        // still being parsed, so consumers can render incrementally; awaited
+        // if it returns a promise. Non-streaming responses (and streams of
+        // at most 100 features) arrive as one JSON body and go straight to
+        // onComplete, which always receives the full collection.
         this.onFeatureBatch = options.onFeatureBatch || (() => { });
         this.onComplete = options.onComplete || (() => { });
         this.onError = options.onError || console.error;
@@ -193,7 +195,7 @@ class StreamingGeoJSONLoader {
                                 features.push(feature);
                                 pendingBatch.push(feature);
                                 if (pendingBatch.length >= FEATURE_BATCH_SIZE) {
-                                    this.onFeatureBatch(pendingBatch);
+                                    await this.onFeatureBatch(pendingBatch);
                                     pendingBatch = [];
                                 }
                                 // Progress updates hit the DOM; per-feature
@@ -220,7 +222,7 @@ class StreamingGeoJSONLoader {
 
         // Flush any features not yet handed to the incremental renderer.
         if (pendingBatch.length) {
-            this.onFeatureBatch(pendingBatch);
+            await this.onFeatureBatch(pendingBatch);
         }
 
         const geojson = {

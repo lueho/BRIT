@@ -128,3 +128,23 @@ test("loader without onFeatureBatch still works", async () => {
   assert.strictEqual(geojson.features.length, total);
   assert.strictEqual(completed.features.length, total);
 });
+
+test("an async onFeatureBatch is awaited before the next batch and onComplete", async () => {
+  const payload = JSON.stringify({ type: "FeatureCollection", features: makeFeatures(2500) });
+  const order = [];
+  const loader = new StreamingGeoJSONLoader({
+    onFeatureBatch: async (batch) => {
+      order.push(`start:${batch.length}`);
+      await new Promise((r) => setTimeout(r, 5));
+      order.push(`end:${batch.length}`);
+    },
+    onComplete: () => order.push("complete"),
+  });
+  await loader._parseStreamingResponse(fakeResponse(payload, 4096), 2500);
+  assert.deepEqual(order, [
+    "start:1000", "end:1000",
+    "start:1000", "end:1000",
+    "start:500", "end:500",
+    "complete",
+  ]);
+});
