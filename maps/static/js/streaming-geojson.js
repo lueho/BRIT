@@ -106,6 +106,7 @@ class StreamingGeoJSONLoader {
         let inString = false;
         let escapeNext = false;
         let featureStart = -1;
+        let lastFeatureProgress = 0;
 
         try {
             let chunkCount = 0;
@@ -128,8 +129,6 @@ class StreamingGeoJSONLoader {
 
                 // Update progress on every chunk based on bytes received
                 this.onProgress(estimatedProgress, totalCount);
-
-                console.log(`Chunk ${chunkCount}: ${chunk.length} bytes, total: ${bytesReceived}, est progress: ${estimatedProgress}/${totalCount}`);
 
                 // Process each character in the chunk
                 for (let i = 0; i < chunk.length; i++) {
@@ -179,7 +178,12 @@ class StreamingGeoJSONLoader {
                                 const feature = JSON.parse(featureStr);
                                 if (feature.type === 'Feature') {
                                     features.push(feature);
-                                    this.onProgress(features.length, totalCount);
+                                    // Progress updates hit the DOM; per-feature
+                                    // updates are wasteful on large datasets.
+                                    if (features.length - lastFeatureProgress >= 250) {
+                                        lastFeatureProgress = features.length;
+                                        this.onProgress(features.length, totalCount);
+                                    }
                                 }
                             } catch (e) {
                                 console.warn('Failed to parse feature:', e);
