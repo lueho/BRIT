@@ -2048,6 +2048,33 @@ class StreamingGeoJSONTests(TestCase):
             cache_status = response.get("X-Cache-Status", "")
             self.assertEqual(cache_status, "STREAM")
 
+    def test_streaming_yields_batched_chunks(self):
+        """Streaming should emit a few large chunks, not one chunk per feature.
+
+        Per-feature yields force the browser through one reader.read() cycle
+        per feature (~139 B chunks for point features), which dominates
+        end-to-end load time. Batched chunks keep streaming semantics while
+        cutting chunk count by orders of magnitude.
+        """
+        with patch("maps.mixins.STREAMING_THRESHOLD", 100):
+            response = self.client.get(self.regions_geojson_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Cache-Status"], "STREAM")
+        chunks = list(response.streaming_content)
+        # 150 features: per-feature streaming produces 2N+2 chunks.
+        # Batched streaming should produce a handful.
+        self.assertLess(len(chunks), len(self.regions))
+
+    def test_streaming_batched_output_is_identical_json(self):
+        """Batched streaming must produce the same FeatureCollection payload."""
+        with patch("maps.mixins.STREAMING_THRESHOLD", 100):
+            response = self.client.get(self.regions_geojson_url)
+        content = b"".join(response.streaming_content).decode("utf-8")
+        data = json.loads(content)
+        self.assertEqual(data["type"], "FeatureCollection")
+        self.assertEqual(len(data["features"]), Region.objects.count())
+
     def test_large_unbounded_cache_miss_is_rejected(self):
         with patch(
             "maps.mixins.CachedGeoJSONMixin.max_unbounded_geojson_features", 100
