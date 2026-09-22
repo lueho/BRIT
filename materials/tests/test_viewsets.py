@@ -1,8 +1,11 @@
 import json
 from decimal import Decimal
 
+from django.db.models.signals import post_save
 from django.urls import reverse
+from factory.django import mute_signals
 
+from bibliography.models import Source
 from utils.properties.models import Unit
 from utils.tests.testcases import ViewSetWithPermissionsTestCase
 
@@ -15,6 +18,7 @@ from ..models import (
     MaterialProperty,
     MaterialPropertyValue,
     Sample,
+    SampleGroup,
     SampleSeries,
 )
 from ..serializers import (
@@ -1332,3 +1336,368 @@ class MaterialPropertyValueViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 204)
         self.assertFalse(MaterialPropertyValue.objects.filter(pk=to_delete.pk).exists())
+
+
+class SampleGroupViewSetTestCase(ViewSetWithPermissionsTestCase):
+    member_permissions = (
+        "view_samplegroup",
+        "add_samplegroup",
+        "change_samplegroup",
+        "delete_samplegroup",
+    )
+    published_group = None
+    private_group = None
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.published_group = SampleGroup.objects.create(
+            name="Published Group",
+            owner=cls.owner,
+            kind="study",
+            publication_status="published",
+        )
+        cls.private_group = SampleGroup.objects.create(
+            name="Private Group",
+            owner=cls.owner,
+            kind="experiment",
+            publication_status="private",
+        )
+        cls.material = Material.objects.create(
+            name="Group VS Material",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.published_sample = Sample.objects.create(
+            name="VS published member",
+            material=cls.material,
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.private_sample = Sample.objects.create(
+            name="VS private member",
+            material=cls.material,
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.published_sample.sample_groups.add(cls.published_group)
+        cls.private_sample.sample_groups.add(cls.published_group)
+        cls.foreign_private_sample = Sample.objects.create(
+            name="Foreign private sample",
+            material=cls.material,
+            owner=cls.outsider,
+            publication_status="private",
+        )
+        with mute_signals(post_save):
+            cls.published_source = Source.objects.create(
+                title="VS published source",
+                owner=cls.owner,
+                publication_status="published",
+            )
+            cls.private_source = Source.objects.create(
+                title="VS private source",
+                owner=cls.owner,
+                publication_status="private",
+            )
+            cls.foreign_private_source = Source.objects.create(
+                title="Foreign private source",
+                owner=cls.outsider,
+                publication_status="private",
+            )
+        cls.published_group.sources.add(cls.published_source, cls.private_source)
+
+    def _list_names(self, response):
+        return [item["name"] for item in response.data]
+
+    # --- list visibility ---
+
+    def test_get_list_http_200_ok_for_anonymous_user(self):
+        response = self.client.get(reverse("api-samplegroup-list"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_list_returns_only_published_for_anonymous_user(self):
+        response = self.client.get(reverse("api-samplegroup-list"))
+        names = self._list_names(response)
+        self.assertIn(self.published_group.name, names)
+        self.assertNotIn(self.private_group.name, names)
+
+    def test_get_list_returns_only_published_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse("api-samplegroup-list"))
+        names = self._list_names(response)
+        self.assertIn(self.published_group.name, names)
+        self.assertNotIn(self.private_group.name, names)
+
+    def test_get_list_returns_own_private_for_owner(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("api-samplegroup-list") + "?scope=private")
+        names = self._list_names(response)
+        self.assertIn(self.private_group.name, names)
+
+    # --- detail visibility ---
+
+    def test_get_detail_http_200_ok_for_anonymous_on_published(self):
+        response = self.client.get(
+            reverse("api-samplegroup-detail", kwargs={"pk": self.published_group.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_detail_http_401_for_anonymous_on_private(self):
+        response = self.client.get(
+            reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk})
+        )
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_get_detail_http_403_for_outsider_on_private(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(
+            reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_detail_http_200_ok_for_owner_on_private(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_detail_returns_public_shape(self):
+        response = self.client.get(
+            reverse("api-samplegroup-detail", kwargs={"pk": self.published_group.pk})
+        )
+        self.assertEqual(
+            set(response.data.keys()),
+            {"id", "name", "kind", "description", "sources", "samples"},
+        )
+
+    def _detail(self, user=None):
+        if user is not None:
+            self.client.force_login(user)
+        return self.client.get(
+            reverse("api-samplegroup-detail", kwargs={"pk": self.published_group.pk})
+        )
+
+    def test_detail_hides_private_members_and_sources_for_anonymous(self):
+        response = self._detail()
+
+        self.assertEqual(response.status_code, 200)
+        names = [sample["name"] for sample in response.data["samples"]]
+        self.assertEqual(names, ["VS published member"])
+        source_pks = [source["pk"] for source in response.data["sources"]]
+        self.assertEqual(source_pks, [self.published_source.pk])
+
+    def test_detail_hides_private_members_and_sources_for_outsider(self):
+        response = self._detail(self.outsider)
+
+        self.assertEqual(response.status_code, 200)
+        names = [sample["name"] for sample in response.data["samples"]]
+        self.assertNotIn("VS private member", names)
+        source_pks = [source["pk"] for source in response.data["sources"]]
+        self.assertNotIn(self.private_source.pk, source_pks)
+
+    def test_detail_shows_private_members_and_sources_for_owner(self):
+        response = self._detail(self.owner)
+
+        self.assertEqual(response.status_code, 200)
+        names = [sample["name"] for sample in response.data["samples"]]
+        self.assertIn("VS private member", names)
+        source_pks = [source["pk"] for source in response.data["sources"]]
+        self.assertIn(self.private_source.pk, source_pks)
+
+    # --- create ---
+
+    def test_post_http_403_for_unauthenticated(self):
+        response = self.client.post(
+            reverse("api-samplegroup-list"),
+            data=json.dumps({"name": "New Group"}),
+            content_type=JSON,
+        )
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_post_http_201_for_member_with_add_permission(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("api-samplegroup-list"),
+            data=json.dumps({"name": "Member Group", "kind": "experiment"}),
+            content_type=JSON,
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(
+            SampleGroup.objects.filter(name="Member Group", owner=self.member).exists()
+        )
+
+    # --- update ---
+
+    def test_patch_http_403_for_outsider_on_private(self):
+        self.client.force_login(self.outsider)
+        response = self.client.patch(
+            reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk}),
+            data=json.dumps({"name": "Hacked"}),
+            content_type=JSON,
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_patch_http_200_for_owner_on_private(self):
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk}),
+            data=json.dumps({"name": "Updated Group"}),
+            content_type=JSON,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.private_group.refresh_from_db()
+        self.assertEqual(self.private_group.name, "Updated Group")
+
+    def test_patch_samples_sets_membership(self):
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk}),
+            data=json.dumps({"samples": [self.published_sample.pk]}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(self.private_group.samples.all(), [self.published_sample])
+
+    def test_patch_samples_rejects_foreign_private_sample(self):
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk}),
+            data=json.dumps({"samples": [self.foreign_private_sample.pk]}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertNotIn(self.foreign_private_sample, self.private_group.samples.all())
+
+    def test_patch_sources_rejects_foreign_private_source(self):
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk}),
+            data=json.dumps({"sources": [self.foreign_private_source.pk]}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertNotIn(self.foreign_private_source, self.private_group.sources.all())
+
+    def test_post_create_sets_samples_and_sources(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("api-samplegroup-list"),
+            data=json.dumps(
+                {
+                    "name": "Populated Group",
+                    "kind": "study",
+                    "samples": [self.published_sample.pk],
+                    "sources": [self.published_source.pk],
+                }
+            ),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        group = SampleGroup.objects.get(name="Populated Group")
+        self.assertCountEqual(group.samples.all(), [self.published_sample])
+        self.assertCountEqual(group.sources.all(), [self.published_source])
+
+    # --- delete ---
+
+    def test_delete_http_204_for_owner_on_private(self):
+        to_delete = SampleGroup.objects.create(
+            name="To Delete Group",
+            owner=self.owner,
+            publication_status="private",
+        )
+        self.client.force_login(self.owner)
+        response = self.client.delete(
+            reverse("api-samplegroup-detail", kwargs={"pk": to_delete.pk})
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(SampleGroup.objects.filter(pk=to_delete.pk).exists())
+
+
+class SampleViewSetSampleGroupsTestCase(ViewSetWithPermissionsTestCase):
+    member_permissions = ("view_sample", "add_sample", "change_sample")
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.material = Material.objects.create(
+            name="Group API Material",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            name="Group API Sample",
+            material=cls.material,
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.group = SampleGroup.objects.create(
+            name="API Group", kind="study", owner=cls.owner
+        )
+        cls.foreign_private_group = SampleGroup.objects.create(
+            name="Foreign Private Group",
+            kind="other",
+            owner=cls.outsider,
+            publication_status="private",
+        )
+        cls.foreign_published_group = SampleGroup.objects.create(
+            name="Foreign Published Group",
+            kind="other",
+            owner=cls.outsider,
+            publication_status="published",
+        )
+
+    def test_sample_detail_reads_compact_groups(self):
+        self.sample.sample_groups.add(self.group)
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("api-sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["sample_groups"]), 1)
+        self.assertEqual(
+            set(response.data["sample_groups"][0].keys()),
+            {"id", "name", "kind"},
+        )
+
+    def test_sample_write_sets_group_membership(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.patch(
+            reverse("api-sample-detail", kwargs={"pk": self.sample.pk}),
+            data=json.dumps({"sample_groups": [self.group.pk]}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(self.sample.sample_groups.all(), [self.group])
+
+    def test_sample_write_rejects_inaccessible_private_group(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.patch(
+            reverse("api-sample-detail", kwargs={"pk": self.sample.pk}),
+            data=json.dumps({"sample_groups": [self.foreign_private_group.pk]}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(self.sample.sample_groups.exists())
+
+    def test_sample_write_rejects_visible_but_not_editable_group(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.patch(
+            reverse("api-sample-detail", kwargs={"pk": self.sample.pk}),
+            data=json.dumps({"sample_groups": [self.foreign_published_group.pk]}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(self.sample.sample_groups.exists())

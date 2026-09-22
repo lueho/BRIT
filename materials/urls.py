@@ -196,6 +196,61 @@ urlpatterns = [
         views.SampleSeriesCreateDuplicateView.as_view(),
         name="sampleseries-duplicate",
     ),
+    path(
+        "sample_groups/",
+        views.SampleGroupPublishedListView.as_view(),
+        name="samplegroup-list",
+    ),
+    path(
+        "sample_groups/autocomplete/",
+        views.SampleGroupAutoCompleteView.as_view(),
+        name="samplegroup-autocomplete",
+    ),
+    path(
+        "sample_groups/user/",
+        views.SampleGroupPrivateListView.as_view(),
+        name="samplegroup-list-owned",
+    ),
+    path(
+        "sample_groups/review/",
+        views.SampleGroupReviewListView.as_view(),
+        name="samplegroup-list-review",
+    ),
+    path(
+        "sample_groups/create/",
+        views.SampleGroupCreateView.as_view(),
+        name="samplegroup-create",
+    ),
+    path(
+        "sample_groups/create/modal/",
+        views.SampleGroupModalCreateView.as_view(),
+        name="samplegroup-create-modal",
+    ),
+    path(
+        "sample_groups/<int:pk>/",
+        views.SampleGroupDetailView.as_view(),
+        name="samplegroup-detail",
+    ),
+    path(
+        "sample_groups/<int:pk>/modal/",
+        views.SampleGroupModalDetailView.as_view(),
+        name="samplegroup-detail-modal",
+    ),
+    path(
+        "sample_groups/<int:pk>/update/",
+        views.SampleGroupUpdateView.as_view(),
+        name="samplegroup-update",
+    ),
+    path(
+        "sample_groups/<int:pk>/update/modal/",
+        views.SampleGroupModalUpdateView.as_view(),
+        name="samplegroup-update-modal",
+    ),
+    path(
+        "sample_groups/<int:pk>/delete/modal/",
+        views.SampleGroupModalDeleteView.as_view(),
+        name="samplegroup-delete-modal",
+    ),
     path("samples/", views.SamplePublishedListView.as_view(), name="sample-list"),
     path(
         "samples/gallery/",

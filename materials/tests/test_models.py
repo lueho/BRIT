@@ -26,6 +26,8 @@ from materials.models import (
     MeasurementValueQualifier,
     Sample,
     SampleExternalRecord,
+    SampleGroup,
+    SampleGroupKind,
     SampleSeries,
 )
 from utils.properties.models import Unit
@@ -512,6 +514,78 @@ class SampleSeriesTestCase(TestCase):
             duplicate.temporal_distributions.all().order_by("id"),
             self.sample_series.temporal_distributions.all().order_by("id"),
         )
+
+
+class SampleGroupTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create(username="group-owner")
+        cls.material_a = Material.objects.create(
+            name="Group Material A", owner=cls.owner
+        )
+        cls.material_b = Material.objects.create(
+            name="Group Material B", owner=cls.owner
+        )
+        with mute_signals(signals.post_save):
+            cls.series = SampleSeries.objects.create(
+                material=cls.material_a, owner=cls.owner
+            )
+
+    def test_group_contains_samples_of_different_materials_and_series(self):
+        group = SampleGroup.objects.create(name="Study A", owner=self.owner)
+        sample_a = Sample.objects.create(
+            name="Series sample",
+            material=self.material_a,
+            series=self.series,
+            owner=self.owner,
+        )
+        sample_b = Sample.objects.create(
+            name="Other material sample",
+            material=self.material_b,
+            owner=self.owner,
+        )
+        sample_a.sample_groups.add(group)
+        sample_b.sample_groups.add(group)
+
+        self.assertCountEqual(group.samples.all(), [sample_a, sample_b])
+        self.assertEqual(sample_a.series, self.series)
+
+    def test_sample_can_belong_to_multiple_groups(self):
+        group1 = SampleGroup.objects.create(name="Group 1", owner=self.owner)
+        group2 = SampleGroup.objects.create(name="Group 2", owner=self.owner)
+        sample = Sample.objects.create(
+            name="Multi-group sample", material=self.material_a, owner=self.owner
+        )
+        sample.sample_groups.add(group1, group2)
+
+        self.assertCountEqual(sample.sample_groups.all(), [group1, group2])
+
+    def test_default_kind_is_study_and_sources_m2m_works(self):
+        group = SampleGroup.objects.create(name="Defaults", owner=self.owner)
+        self.assertEqual(group.kind, SampleGroupKind.STUDY)
+
+        with mute_signals(signals.post_save):
+            source = Source.objects.create(title="Group source", owner=self.owner)
+        group.sources.add(source)
+
+        self.assertIn(source, group.sources.all())
+
+    def test_deleting_group_removes_membership_only(self):
+        group = SampleGroup.objects.create(name="Doomed", owner=self.owner)
+        sample = Sample.objects.create(
+            name="Surviving sample",
+            material=self.material_a,
+            series=self.series,
+            owner=self.owner,
+        )
+        sample.sample_groups.add(group)
+
+        group.delete()
+
+        sample.refresh_from_db()
+        self.assertEqual(sample.series, self.series)
+        self.assertEqual(sample.sample_groups.count(), 0)
+        self.assertTrue(SampleSeries.objects.filter(pk=self.series.pk).exists())
 
 
 class MaterialPropertyValueTestCase(TestCase):

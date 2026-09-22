@@ -14,6 +14,7 @@ from django.utils import timezone
 from django_tomselect.forms import (
     TomSelectConfig,
     TomSelectModelChoiceField,
+    TomSelectModelMultipleChoiceField,
 )
 
 from bibliography.models import Source
@@ -32,6 +33,7 @@ from utils.forms import (
     configure_tomselect_inline_create,
     image_metadata_section,
 )
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.forms import NumericMeasurementFieldsFormMixin
 from utils.properties.models import Unit, get_default_unit_pk
 
@@ -46,6 +48,7 @@ from .models import (
     MaterialProperty,
     MaterialPropertyValue,
     Sample,
+    SampleGroup,
     SampleSeries,
     get_or_create_sample_substrate_category,
 )
@@ -489,6 +492,60 @@ class SampleSeriesModalModelForm(ModalModelFormMixin, SampleSeriesModelForm):
     pass
 
 
+def _sample_groups_editable_by(user):
+    if getattr(user, "is_staff", False):
+        return SampleGroup.objects.all()
+    if getattr(user, "is_authenticated", False):
+        return SampleGroup.objects.editable_by_user(user)
+    return SampleGroup.objects.none()
+
+
+class SampleGroupModelForm(
+    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+):
+    samples = QuerysetTomSelectModelMultipleChoiceField(
+        queryset=Sample.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="sample-autocomplete",
+            label_field="name",
+            value_field="id",
+        ),
+        label="Samples",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        if request is not None:
+            self.fields["samples"].queryset = filter_queryset_for_user(
+                Sample.objects.all(), request.user
+            )
+        else:
+            self.fields["samples"].queryset = Sample.objects.none()
+        if self.instance.pk:
+            self.initial["samples"] = self.instance.samples.all()
+        self.helper.layout = Layout(
+            "name",
+            "kind",
+            "samples",
+            "description",
+            "sources",
+        )
+
+    def _save_m2m(self):
+        super()._save_m2m()
+        self.instance.samples.set(self.cleaned_data["samples"])
+
+    class Meta:
+        model = SampleGroup
+        fields = ("name", "kind", "description", "sources")
+
+
+class SampleGroupModalModelForm(ModalModelFormMixin, SampleGroupModelForm):
+    pass
+
+
 class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
     distribution = ModelChoiceField(queryset=TemporalDistribution.objects.all())
 
@@ -529,6 +586,16 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
         required=False,
         label="Series",
     )
+    sample_groups = TomSelectModelMultipleChoiceField(
+        queryset=SampleGroup.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="samplegroup-autocomplete",
+            label_field="name",
+            value_field="id",
+        ),
+        label="Sample groups",
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -559,6 +626,12 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
                 create_url=reverse("sample-substrate-material-quick-create"),
                 error_message="Could not create substrate.",
             )
+        groups_field = self.fields["sample_groups"]
+        groups_field.queryset = (
+            _sample_groups_editable_by(request.user)
+            if request is not None
+            else SampleGroup.objects.none()
+        )
         self.helper.layout = Layout(
             "name",
             "material",
@@ -569,6 +642,7 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             "standalone",
             "series",
             "timestep",
+            "sample_groups",
             "sources",
             Fieldset(
                 "Analysis",
@@ -636,6 +710,7 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             "standalone",
             "series",
             "timestep",
+            "sample_groups",
             "sources",
             "analysis_date",
             "analysis_laboratory",
@@ -684,6 +759,16 @@ class SampleMaintenanceForm(WorkspaceReferenceScopeMixin, SampleModelForm):
         ),
         label="Series",
     )
+    sample_groups = QuerysetTomSelectModelMultipleChoiceField(
+        queryset=SampleGroup.objects.all(),
+        required=False,
+        config=TomSelectConfig(
+            url="samplegroup-autocomplete",
+            label_field="name",
+            value_field="id",
+        ),
+        label="Sample groups",
+    )
     sources = QuerysetTomSelectModelMultipleChoiceField(
         queryset=Source.objects.all(),
         required=False,
@@ -697,6 +782,11 @@ class SampleMaintenanceForm(WorkspaceReferenceScopeMixin, SampleModelForm):
     def __init__(self, *args, fields=None, **kwargs):
         selected = fields if fields is not None else self.Meta.fields
         super().__init__(*args, field_names=selected, **kwargs)
+        request = getattr(self, "request", None)
+        if request is not None and "sample_groups" in self.fields:
+            self.fields["sample_groups"].queryset = _sample_groups_editable_by(
+                request.user
+            )
         if "sources" in self.fields:
             self.fields["sources"].workspace_autocomplete_url += "?label=abbreviation"
         self.helper.layout = Layout(*self.fields)
@@ -729,7 +819,14 @@ SAMPLE_SECTIONS = {
     },
     "sampling": {
         "label": "Sampling",
-        "fields": ("datetime", "location", "standalone", "series", "timestep"),
+        "fields": (
+            "datetime",
+            "location",
+            "standalone",
+            "series",
+            "timestep",
+            "sample_groups",
+        ),
     },
     "analysis": {
         "label": "Analysis",
