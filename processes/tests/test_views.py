@@ -300,6 +300,16 @@ class ProcessMaintenanceViewsTestCase(TestCase):
         response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
         self.assertContains(response, "(range: 1 – 9)")
 
+    def test_detail_descriptive_fields_keep_single_line_breaks_and_paragraphs(self):
+        self.process.description = "First line\nSecond line\n\nNew paragraph"
+        self.process.process_technology = "First step\nSecond step\n\nNew stage"
+        self.process.save()
+        response = self.client.get(self.process.get_absolute_url())
+        self.assertContains(response, "<p>First line<br>Second line</p>", html=True)
+        self.assertContains(response, "<p>New paragraph</p>", html=True)
+        self.assertContains(response, "<p>First step<br>Second step</p>", html=True)
+        self.assertContains(response, "<p>New stage</p>", html=True)
+
     def test_input_editor_does_not_render_outputs_or_parameters(self):
         response = self.client.get(self.section_url("inputs"))
         self.assertContains(response, "Workshop substrate")
