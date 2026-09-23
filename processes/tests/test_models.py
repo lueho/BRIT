@@ -451,6 +451,46 @@ class ProcessModelTestCase(TestCase):
         self.assertEqual(parameter.get_nominal_value_display(), "25.25")
         self.assertEqual(parameter.get_value_max_display(), "30.1234")
 
+    def test_operating_parameter_range_display_lower_bound_only(self):
+        process = Process.objects.create(name="Lower Bound", owner=self.owner)
+        parameter = ProcessOperatingParameter.objects.create(
+            process=process,
+            parameter=ProcessOperatingParameter.Parameter.TEMPERATURE,
+            value_min=Decimal("0"),
+            unit=self.unit_celsius,
+        )
+        self.assertEqual(parameter.get_value_range_display(), "at least 0")
+
+    def test_operating_parameter_range_display_upper_bound_only(self):
+        process = Process.objects.create(name="Upper Bound", owner=self.owner)
+        parameter = ProcessOperatingParameter.objects.create(
+            process=process,
+            parameter=ProcessOperatingParameter.Parameter.PRESSURE,
+            value_max=Decimal("0"),
+        )
+        self.assertEqual(parameter.get_value_range_display(), "at most 0")
+
+        parameter.value_max = Decimal("30.1234")
+        self.assertEqual(parameter.get_value_range_display(), "at most 30.1234")
+
+    def test_operating_parameter_range_display_two_sided(self):
+        process = Process.objects.create(name="Two-Sided", owner=self.owner)
+        parameter = ProcessOperatingParameter.objects.create(
+            process=process,
+            parameter=ProcessOperatingParameter.Parameter.TEMPERATURE,
+            value_min=Decimal("0"),
+            value_max=Decimal("39"),
+        )
+        self.assertEqual(parameter.get_value_range_display(), "0 – 39")
+
+    def test_operating_parameter_range_display_empty_without_bounds(self):
+        process = Process.objects.create(name="No Bounds", owner=self.owner)
+        parameter = ProcessOperatingParameter(
+            process=process,
+            parameter=ProcessOperatingParameter.Parameter.PRESSURE,
+        )
+        self.assertEqual(parameter.get_value_range_display(), "")
+
     def test_operating_parameter_custom_type_with_name(self):
         """Test that custom parameters display their custom name."""
         process = Process.objects.create(name="Custom Process", owner=self.owner)
