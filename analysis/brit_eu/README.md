@@ -4,7 +4,17 @@ Dieses Paket enthält die ursprünglichen Fallstudienanalysen als ausführbare R
 
 ## 1. Die ursprünglichen Analysen ausführen
 
-**Voraussetzungen:** R 4.6.1 und Internetzugang zur erstmaligen Installation der in `renv.lock` festgelegten Pakete. Unter Windows/macOS werden verfügbare Binärpakete verwendet. Unter Linux können Systembibliotheken und Compiler erforderlich sein; der unten beschriebene Docker-Weg enthält diese bereits.
+**Voraussetzungen:** R 4.3.3 (Paketversion von Ubuntu 24.04 LTS) und Internetzugang zur erstmaligen Installation der in `renv.lock` festgelegten Pakete. Unter Windows/macOS werden verfügbare Binärpakete verwendet. Unter Linux können Systembibliotheken und Compiler erforderlich sein; der unten beschriebene Docker-Weg enthält diese bereits.
+
+Auf Ubuntu 24.04 können die benötigten Systempakete so installiert werden (falls sie noch fehlen):
+
+```sh
+sudo apt update
+sudo apt install r-base r-base-dev libcurl4-openssl-dev libssl-dev libxml2-dev \
+  libfontconfig1-dev libfreetype6-dev libharfbuzz-dev libfribidi-dev \
+  libpng-dev libtiff-dev libjpeg-dev libgit2-dev libx11-dev cmake make g++ gfortran \
+  pandoc fonts-dejavu-core
+```
 
 Das **vollständige Release-ZIP** entpacken. Es enthält acht Rohdateien unter `data/raw/` und den archivierten, bereinigten Katalonien-Analysestand unter `data/reference/`. Die Version aus dem BRIT-Git-Repository enthält aus Gründen der getrennten Datenbereitstellung nur Code und das Datenmanifest.
 
@@ -15,7 +25,7 @@ Rscript --vanilla setup.R
 Rscript run.R
 ```
 
-Alternativ `BRIT.Rproj` in RStudio öffnen, einmal `source("setup.R")` und danach `source("run.R")` ausführen. Die Installation kann beim ersten Mal einige Minuten dauern. Anschließend benötigen die historischen Analysen keinen BRIT-Server und keinen API-Schlüssel.
+Alternativ `BRIT.Rproj` in RStudio öffnen, einmal `source("setup.R")` und danach `source("run.R")` ausführen. Die erstmalige Installation kann unter Linux wegen der Quellcodekompilierung deutlich länger dauern. Anschließend benötigen die historischen Analysen keinen BRIT-Server und keinen API-Schlüssel.
 
 Einzelne Fallstudie:
 
@@ -36,7 +46,7 @@ Ergebnisse:
 
 ## 2. Vollständig definierte Laufzeit mit Docker
 
-Der Dockerfile fixiert R 4.6.1 über den Image-Digest und installiert die Versionen aus `renv.lock`.
+Der Dockerfile verwendet ein über seinen Digest fixiertes Ubuntu-24.04-Image, installiert daraus R 4.3.3 und die Analysepakete aus dem festen CRAN-Stand vom 15.04.2024. Beim Bau werden alle installierten Versionen gegen `renv.lock` geprüft. Für die Nutzung unter Ubuntu 24.04 kann auch das Paket `r-base` aus den regulären Ubuntu-Paketquellen verwendet werden; danach genügt `Rscript --vanilla setup.R` im entpackten Projektordner.
 
 ```sh
 docker build -t brit-eu-r .

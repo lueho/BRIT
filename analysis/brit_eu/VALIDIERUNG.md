@@ -1,6 +1,18 @@
 # Validierung des BRIT-EU-Analysepakets
 
-Stand: 22.09.2026. Getestet unter Linux/Ubuntu 24.04 mit R 4.6.1 und den Paketversionen aus `renv.lock`. Windows und macOS wurden nicht separat ausgeführt; für die geprüfte Laufzeit steht der Dockerfile bereit.
+## Kompatibilität mit Ubuntu-R (23.09.2026)
+
+Ubuntu 24.04 stellt R 4.3.3 über `r-base` bereit. Das bisherige Lockfile für R 4.6.1 scheiterte im gezielten Test bereits an der R-Mindestversion. Das neue Lockfile wurde aus einer sauberen Ubuntu-24.04-Umgebung mit R 4.3.3 und dem datierten CRAN-Stand 15.04.2024 erzeugt. Es enthält 149 Paketversionen. `Rscript --vanilla tests/test_environment.R` bestätigte, dass alle 149 unter R 4.3.3 geladen werden und der aufgezeichneten Version entsprechen.
+
+Der vollständige Lauf mit `Rscript --vanilla run.R` in der vorbereiteten Ubuntu-Umgebung war erfolgreich: sieben Skripte, 38 PNG-Abbildungen, sieben PDF-Dateien und sieben RDS-Dateien mit Analyseobjekten; keine R-Warnungen. `Rscript --vanilla tests/test_client.R` sowie der HTTP-Integrationstest mit `Rscript --vanilla tests/test_http.R` waren ebenfalls erfolgreich. Für den HTTP-Test lief der mitgelieferte lokale Server `python3 tests/http_fixture.py` im selben Container.
+
+Für den Zahlenvergleich wurden 157 statistische Objekte aus dem früheren R-4.6.1-Lauf und dem neuen R-4.3.3-Lauf in einfache Datenstrukturen übertragen. `Rscript --vanilla tests/compare_numeric_results.R validation/numeric-reference-r461.rds validation/numeric-current-r433.rds` bestand: Bei 145 Objekten stimmen sämtliche geprüften Werte bis auf eine Rechentoleranz von 1e-8 überein. Bei 12 Objekten unterscheiden sich ausschließlich p-Werte und ihre Adjustierungen. Die größte absolute Abweichung beträgt 0,000460253; keine Entscheidung an der 5-%-Grenze ändert sich. Diese Differenzen entstehen beim Wechsel der R- und Paketversionen. Für eine buchstabengetreue Wiederholung der alten p-Werte bleibt die frühere Umgebung maßgeblich; der hier veröffentlichte R-4.3.3-Stand ist in sich festgelegt.
+
+Die neue Docker-Rezeptur verwendet das per Digest festgelegte Ubuntu-24.04-Image, die regulären R-4.3.3-Pakete und den festen CRAN-Stand. Die lokale Testumgebung wurde mit denselben Installationsschritten aufgebaut; der Paketstand wurde zusätzlich gegen das Lockfile geprüft.
+
+Auch der für Nutzer vorgesehene Einrichtungsweg wurde in einer frischen Paketkopie geprüft: `Rscript --vanilla setup.R` stellte die Projektbibliothek vollständig wieder her und bestätigte anschließend alle 149 Paketversionen mit `tests/test_environment.R`. Der Befehl endete ohne Fehler. Das zugehörige Protokoll liegt unter `validation/native-setup-r433.txt`.
+
+Historischer Prüfstand 22.09.2026: Die erste Ausgabe lief unter Linux/Ubuntu 24.04 mit R 4.6.1 und dem **damaligen** `renv.lock`. Diese Prüfung ist die Vergleichsbasis für die neue Ausgabe. Der aktuelle Paketstand zielt auf Ubuntu 24.04 mit R 4.3.3; dessen zusätzliche Prüfergebnisse stehen im Abschnitt „Kompatibilität mit Ubuntu-R“. Windows und macOS wurden nicht separat ausgeführt.
 
 ## Ausgeführte Prüfungen
 
@@ -10,13 +22,13 @@ Stand: 22.09.2026. Getestet unter Linux/Ubuntu 24.04 mit R 4.6.1 und den Paketve
 | Katalonien-Rohdatenvariante: `Rscript run.R --case=catalonia --rebuild-catalonia` | Separater vollständiger Lauf erfolgreich; Variante in der Provenienz als `rebuilt_from_raw` markiert |
 | Ergebnisdateien | 38 PNG-Abbildungen, sieben PDF-Sammlungen, sieben RDS-Dateien mit Analyseobjekten |
 | Originale Eingaben | Acht Rohdateien und ein bereinigter Katalonien-Analysestand, bytegleich zum gelieferten Projekt, SHA-256 im Manifest |
-| Normale R-Einrichtung: `Rscript --vanilla setup.R` | Eigene Projektbibliothek erfolgreich wiederhergestellt; anschließend Client-Tests unter aktivierter renv-Umgebung erfolgreich |
+| Normale R-Einrichtung im historischen Prüfstand: `Rscript --vanilla setup.R` | Eigene Projektbibliothek erfolgreich wiederhergestellt; anschließend Client-Tests unter aktivierter renv-Umgebung erfolgreich |
 | R-Client: `Rscript --vanilla tests/test_client.R` | Erfolgreich: Pagination, Schema, Gebietskennungen, Nullwerte, vollständig fehlende Spalten, wechselnder Server, doppelte IDs, Zählfehler, leerer Bestand und Snapshot-Manipulation |
 | HTTP: `Rscript --vanilla tests/test_http.R` mit lokalem Testserver | Erfolgreich: tatsächlicher JSON-Abruf über zwei Seiten, Einheiten, HTTP-404-Hinweis, Download eines Datenrelease mit Prüfsumme |
 | Django-API und benachbarte Funktionen | 55 Tests erfolgreich; darunter acht neue Tests des Analyse-Endpunkts |
 | BRIT-Codeprüfung | Ruff, Formatprüfung und Prüfung auf fehlende Migrationen erfolgreich |
 
-Der vollständige Lauf wurde mit `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/analysis" brit-eu-r:2026-09-22 run.R` durchgeführt. Der Image-Build verwendet den mitgelieferten Dockerfile. `results/session-info.txt` dokumentiert die ausgeführte Umgebung; `results/input-provenance.json` enthält Datenvariante und Code-Prüfsummen. Diese Dateien entstehen bei jedem eigenen Lauf neu.
+Der vollständige Lauf wurde mit `docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/analysis" brit-eu-r:2026-09-22 run.R` durchgeführt. Der damalige Image-Build verwendete den seinerzeit mitgelieferten Dockerfile. `results/session-info.txt` dokumentiert die ausgeführte Umgebung; `results/input-provenance.json` enthält Datenvariante und Code-Prüfsummen. Diese Dateien entstehen bei jedem eigenen Lauf neu.
 
 Der erste vollständige BRIT-Prüflauf war einschließlich erreichbarer Datenbank erfolgreich. Der abschließende Lauf mit `--no-up` bestätigte Ruff, Formatierung und fehlende Modelländerungen erneut; seine zusätzliche Prüfung der Datenbank-Migrationshistorie konnte wegen nicht auflösbarem Hostnamen `db` nicht erfolgen. Der zugehörige Warnhinweis bleibt im Prüfprotokoll erhalten. Die 55 Django-Tests wurden zuvor erfolgreich gegen die isolierte Testdatenbank ausgeführt. Es wurden keine Modelle oder Migrationen geändert.
 

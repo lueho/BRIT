@@ -1,3 +1,5 @@
 *
 !Dockerfile
 !renv.lock
+!tests/
+!tests/test_environment.R
