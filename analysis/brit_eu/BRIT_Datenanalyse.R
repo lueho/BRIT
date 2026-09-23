@@ -115,8 +115,12 @@ brit_eu_collections <- function(base_url, filters, token, page_size = 200L, max_
     if (url %in% visited || length(visited) >= max_pages) stop("Seitenumbruch unvollstaendig oder wiederholt.")
     visited <- c(visited, url)
     page <- brit_eu_json(url, token = token)
-    if (!identical(page$schema_version, "1.0") || is.null(page$count) ||
-        is.null(page$results) || !is.list(page$results)) stop("BRIT-API-Schema unerwartet.")
+    if (!identical(page$schema_version, "1.0")) {
+      stop("BRIT liefert noch nicht das Schema der erweiterten Sammlungsansicht (Version 1.0). Bitte den BRIT-Server aktualisieren.")
+    }
+    if (is.null(page$count) || is.null(page$results) || !is.list(page$results)) {
+      stop("BRIT-API-Schema unerwartet.")
+    }
     if (is.null(count)) count <- page$count
     if (page$count != count) stop("Datensatz wurde waehrend des Abrufs veraendert. Bitte erneut versuchen.")
     rows <- c(rows, page$results)

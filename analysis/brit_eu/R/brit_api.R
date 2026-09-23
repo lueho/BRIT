@@ -52,7 +52,9 @@ brit_collections <- function(base_url = Sys.getenv("BRIT_API_URL", "https://brit
     if (length(visited) >= max_pages) stop("Maximum pages reached; incomplete result discarded")
     visited <- c(visited, url)
     page <- fetch(url, token)
-    if (!identical(page$schema_version, "1.0")) stop("Unsupported or missing BRIT schema version")
+    if (!identical(page$schema_version, "1.0")) {
+      stop("BRIT does not provide the extended collection schema (version 1.0); update the BRIT server before live analysis")
+    }
     if (is.null(page$count) || !is.numeric(page$count) || length(page$count) != 1L || page$count < 0 ||
         is.null(page$results) || !is.list(page$results)) stop("Invalid paginated response")
     if (is.null(expected)) expected <- page$count
