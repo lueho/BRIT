@@ -37,13 +37,15 @@
         {% if parameter.nominal_value is not None %}
           {{ parameter.get_nominal_value_display }}
         {% elif parameter.value_min is not None or parameter.value_max is not None %}
-          {{ parameter.get_value_min_display|default:'—' }} – {{ parameter.get_value_max_display|default:'—' }}
+          {{ parameter.get_value_range_display }}
         {% else %}
           No value added yet
         {% endif %}
         {% if parameter.unit %}{{ parameter.unit.name }}{% endif %}
-        {% if parameter.nominal_value is not None and parameter.value_min is not None or parameter.nominal_value is not None and parameter.value_max is not None %}
-          <span class="small">(range: {{ parameter.get_value_min_display|default:'—' }} – {{ parameter.get_value_max_display|default:'—' }})</span>
+        {% if parameter.nominal_value is not None and parameter.value_min is not None and parameter.value_max is not None %}
+          <span class="small">(range: {{ parameter.get_value_range_display }})</span>
+        {% elif parameter.nominal_value is not None and parameter.get_value_range_display %}
+          <span class="small">({{ parameter.get_value_range_display }})</span>
         {% endif %}
         {% if parameter.basis %}<div class="small">Basis: {{ parameter.basis }}</div>{% endif %}
         {% if parameter.notes %}<div class="text-muted small">{{ parameter.notes|linebreaksbr }}</div>{% endif %}

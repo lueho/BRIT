@@ -252,6 +252,54 @@ class ProcessMaintenanceViewsTestCase(TestCase):
         )
         self.assertEqual(self.process.process_materials.count(), 2)
 
+    def test_detail_view_shows_one_sided_parameter_bounds(self):
+        ProcessOperatingParameter.objects.create(
+            process=self.process, parameter="pressure", value_min=Decimal("2")
+        )
+        ProcessOperatingParameter.objects.create(
+            process=self.process, parameter="yield", value_max=Decimal("39")
+        )
+        response = self.client.get(self.process.get_absolute_url())
+        self.assertContains(response, "at least 2")
+        self.assertContains(response, "at most 39")
+        self.assertNotContains(response, "2 – -")
+        self.assertNotContains(response, "- – 39")
+
+    def test_edit_workspace_summary_shows_one_sided_parameter_bounds(self):
+        ProcessOperatingParameter.objects.create(
+            process=self.process, parameter="pressure", value_min=Decimal("0")
+        )
+        ProcessOperatingParameter.objects.create(
+            process=self.process, parameter="yield", value_max=Decimal("39")
+        )
+        response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
+        self.assertContains(response, "at least 0")
+        self.assertContains(response, "at most 39")
+        self.assertNotContains(response, "0 – —")
+        self.assertNotContains(response, "— – 39")
+
+    def test_edit_workspace_summary_shows_single_bound_with_nominal(self):
+        ProcessOperatingParameter.objects.create(
+            process=self.process,
+            parameter="pressure",
+            nominal_value=Decimal("5"),
+            value_min=Decimal("1"),
+        )
+        response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
+        self.assertContains(response, "(at least 1)")
+        self.assertNotContains(response, "(range:")
+
+    def test_edit_workspace_summary_keeps_range_label_for_two_sided_bounds(self):
+        ProcessOperatingParameter.objects.create(
+            process=self.process,
+            parameter="pressure",
+            nominal_value=Decimal("5"),
+            value_min=Decimal("1"),
+            value_max=Decimal("9"),
+        )
+        response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
+        self.assertContains(response, "(range: 1 – 9)")
+
     def test_input_editor_does_not_render_outputs_or_parameters(self):
         response = self.client.get(self.section_url("inputs"))
         self.assertContains(response, "Workshop substrate")
