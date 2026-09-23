@@ -430,6 +430,16 @@ class NutsRegionSummarySerializerTestCase(TestCase):
         self.assertIn("nuts_id", data)
         self.assertIn("name", data)
 
+    def test_name_prefers_english_when_held(self):
+        self.region.name_en = "Test NUTS English"
+        self.region.save()
+        data = NutsRegionSummarySerializer(self.region).data
+        self.assertEqual(data["name"], "Test NUTS English")
+
+    def test_name_falls_back_to_latin_name(self):
+        data = NutsRegionSummarySerializer(self.region).data
+        self.assertEqual(data["name"], "Test NUTS")
+
     def test_population_method_field_returns_value_as_integer(self):
         RegionAttributeValue.objects.create(
             property=RegionProperty.objects.get(name="Population"),

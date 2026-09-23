@@ -315,10 +315,16 @@ class GeoPolygon(models.Model):
 class Region(NamedUserCreatedObject):
     country = models.CharField(max_length=56, null=False)
     type = models.CharField(max_length=14, choices=TYPES, default="custom")
+    name_en = models.CharField(max_length=113, blank=True, null=True)
     borders = models.ForeignKey(GeoPolygon, on_delete=models.PROTECT, null=True)
     composed_of = models.ManyToManyField(
         "self", symmetrical=False, related_name="composing_regions", blank=True
     )
+
+    @property
+    def display_name(self):
+        """The name to present in the UI: English where known, else the source name."""
+        return self.name_en or self.name
 
     @property
     def geom(self):
@@ -530,6 +536,11 @@ class NutsRegion(Region):
 
         return pedigree
 
+    @property
+    def display_name(self):
+        """English where known, else the Latin transcription, else the source name."""
+        return self.name_en or self.name_latn or self.nuts_name or self.name
+
     def save(self, *args, **kwargs):
         """Set type to 'nuts' and default the vintage to the current one."""
         self.type = "nuts"
@@ -538,7 +549,7 @@ class NutsRegion(Region):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.nuts_name} ({self.nuts_id})"
+        return f"{self.display_name} ({self.nuts_id})"
 
     class Meta:
         ordering = ["name"]
@@ -559,13 +570,18 @@ class LauRegion(Region):
         NutsRegion, related_name="lau_children", on_delete=models.PROTECT, null=True
     )
 
+    @property
+    def display_name(self):
+        """English where known, else the LAU source name."""
+        return self.name_en or self.lau_name or self.name
+
     def save(self, *args, **kwargs):
         """Automatically set type to 'lau' for LAU regions."""
         self.type = "lau"
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.lau_name} ({self.lau_id})"
+        return f"{self.display_name} ({self.lau_id})"
 
 
 class CatchmentQueryset(UserCreatedObjectQuerySet, TreeQuerySet):

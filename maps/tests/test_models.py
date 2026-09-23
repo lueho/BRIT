@@ -552,3 +552,51 @@ class NutsRegionTestCase(TestCase):
         for key, value in pedigree.items():
             self.assertIsInstance(value, QuerySet)
             self.assertEqual(set(pedigree[key]), set(expected[key]))
+
+
+class RegionEnglishNameTestCase(TestCase):
+    """display_name prefers an English name where one is held (#60)."""
+
+    def test_nuts_region_display_name_prefers_english(self):
+        region = NutsRegion.objects.create(
+            nuts_id="DE2",
+            levl_code=1,
+            name_latn="Bayern",
+            nuts_name="Bayern",
+            name_en="Bavaria",
+        )
+        self.assertEqual(region.display_name, "Bavaria")
+        self.assertEqual(str(region), "Bavaria (DE2)")
+
+    def test_nuts_region_display_name_falls_back_to_latin_transcription(self):
+        """Latin script beats native script for an English-language UI."""
+        region = NutsRegion.objects.create(
+            nuts_id="EL3",
+            levl_code=1,
+            name_latn="Attiki",
+            nuts_name="Αττική",
+        )
+        self.assertEqual(region.display_name, "Attiki")
+        self.assertEqual(str(region), "Attiki (EL3)")
+
+    def test_lau_region_display_name_prefers_english(self):
+        region = LauRegion.objects.create(
+            lau_id="123", lau_name="München", name_en="Munich"
+        )
+        self.assertEqual(region.display_name, "Munich")
+        self.assertEqual(str(region), "Munich (123)")
+
+    def test_lau_region_display_name_falls_back_to_lau_name(self):
+        region = LauRegion.objects.create(lau_id="234", lau_name="Freising")
+        self.assertEqual(region.display_name, "Freising")
+        self.assertEqual(str(region), "Freising (234)")
+
+    def test_custom_region_display_name_prefers_english(self):
+        region = Region.objects.create(
+            name="Meine Region", country="DE", name_en="My Region"
+        )
+        self.assertEqual(region.display_name, "My Region")
+
+    def test_custom_region_display_name_falls_back_to_name(self):
+        region = Region.objects.create(name="Meine Region", country="DE")
+        self.assertEqual(region.display_name, "Meine Region")

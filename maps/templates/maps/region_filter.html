@@ -27,7 +27,7 @@
                             <td data-label="Region" class="ps-3">
                                 <a href="{% detail_or_review_url object use_back=True %}"
                                    class="text-decoration-none">
-                                    <strong class="d-block">{{ object.name }}</strong>
+                                    <strong class="d-block">{{ object.display_name }}</strong>
                                     <span class="text-muted small">{{ object.get_type_display }} · {{ object.country }}</span>
                                 </a>
                             </td>

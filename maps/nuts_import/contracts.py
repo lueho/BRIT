@@ -7,6 +7,12 @@ This payload is the seam between the two.
 
 The JSON Schema below documents the ``1.0`` payload and is served at
 ``GET /maps/nuts/api/import/schema/``.
+
+Versioning policy: ``SCHEMA_VERSION`` is a compatibility marker, not a
+changelog. Adding an optional field stays within the current version, because
+every payload that was valid before remains valid. Renaming or removing a
+field, making one required, or changing a field's type or meaning bumps the
+version, and BRIT-data producers are updated in the same release.
 """
 
 SCHEMA_VERSION = "1.0"
@@ -85,6 +91,15 @@ NUTS_IMPORT_SCHEMA = {
                     "cntr_code": {"type": "string", "maxLength": 2},
                     "name_latn": {"type": "string", "maxLength": 70},
                     "nuts_name": {"type": "string", "maxLength": 106},
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 113,
+                        "description": (
+                            "English display name where one is known (e.g. a "
+                            "Wikidata English label). The source-language name "
+                            "remains the fallback."
+                        ),
+                    },
                     "mount_type": {"type": ["integer", "null"]},
                     "urbn_type": {"type": ["integer", "null"]},
                     "coast_type": {"type": ["integer", "null"]},

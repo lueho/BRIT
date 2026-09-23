@@ -17,6 +17,7 @@ FIELDS = (
     "cntr_code",
     "name_latn",
     "nuts_name",
+    "name_en",
     "mount_type",
     "urbn_type",
     "coast_type",

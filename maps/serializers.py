@@ -294,7 +294,7 @@ class NutsRegionCatchmentOptionSerializer(ModelSerializer):
 
 
 class NutsRegionSummarySerializer(FieldLabelModelSerializer):
-    name = CharField(source="name_latn")
+    name = CharField(source="display_name")
     population = SerializerMethodField()
     population_density = SerializerMethodField()
     urban_rural_remoteness = SerializerMethodField()
@@ -346,7 +346,7 @@ class NutsRegionSummarySerializer(FieldLabelModelSerializer):
 
 
 class LauRegionSummarySerializer(FieldLabelModelSerializer):
-    name = CharField(source="lau_name")
+    name = CharField(source="display_name")
 
     class Meta:
         model = LauRegion
