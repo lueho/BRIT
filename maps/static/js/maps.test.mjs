@@ -232,3 +232,30 @@ test("unguarded map does not ask for confirmation", () => {
     assert.equal(calls.confirm, 0);
     assert.equal(calls.loadLayers.length, 1);
 });
+
+test("loadLayers skips refreshMap when the feature load was superseded", async () => {
+    const { sandbox, calls, mapConfig } = setup();
+    mapConfig.loadFeatures = true;
+    let refreshes = 0;
+    sandbox.refreshMap = () => { refreshes += 1; };
+    sandbox.fetchFeatureGeometries = () => Promise.resolve({ superseded: true });
+
+    sandbox.loadLayers(new URLSearchParams({ name: "oak" }));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(refreshes, 0);
+    assert.equal(calls.cleanup, 0);
+});
+
+test("loadLayers refreshes when the feature load completed normally", async () => {
+    const { sandbox, mapConfig } = setup();
+    mapConfig.loadFeatures = true;
+    let refreshes = 0;
+    sandbox.refreshMap = () => { refreshes += 1; };
+    sandbox.fetchFeatureGeometries = () => Promise.resolve();
+
+    sandbox.loadLayers(new URLSearchParams({ name: "oak" }));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(refreshes, 1);
+});

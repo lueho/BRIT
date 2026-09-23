@@ -337,7 +337,12 @@ let featureLoadGeneration = 0;
  * 
  * Drop-in replacement for the standard fetchFeatureGeometries function.
  * Falls back to regular fetch for cached responses.
+ *
+ * Resolves with SUPERSEDED_FEATURE_LOAD when a newer load replaced this one,
+ * so the caller's load lifecycle can skip its shared-UI refresh.
  */
+const SUPERSEDED_FEATURE_LOAD = Object.freeze({ superseded: true });
+
 async function fetchFeatureGeometriesWithProgress(params) {
     hideMapOverlay();
 
@@ -368,7 +373,7 @@ async function fetchFeatureGeometriesWithProgress(params) {
                     headers: { 'Accept': 'application/geo+json, application/json' }
                 });
                 const currentVersion = response.headers.get('X-Data-Version');
-                if (!isCurrent()) return;
+                if (!isCurrent()) return SUPERSEDED_FEATURE_LOAD;
                 if (response.ok && currentVersion && currentVersion === cached.version && cached.data.features && cached.data.features.length) {
                     console.log('Cache hit for feature data');
                     renderFeatures(cached.data);
@@ -383,7 +388,7 @@ async function fetchFeatureGeometriesWithProgress(params) {
     } catch (e) {
         console.warn('IndexedDB cache check failed:', e);
     }
-    if (!isCurrent()) return;
+    if (!isCurrent()) return SUPERSEDED_FEATURE_LOAD;
 
     // Fresh network load: clear the previous layer up front so stale or
     // partially rendered features are never mixed into the new result.
@@ -435,10 +440,10 @@ async function fetchFeatureGeometriesWithProgress(params) {
             if (!isCurrent()) return;
             progressBar.hide();
             console.error('Error fetching feature geometries:', error);
-            // Batches already drawn belong to a response that never completed.
-            if (incrementalRendered && typeof resetFeaturesLayer === 'function') {
-                resetFeaturesLayer();
-            }
+            // The layer was cleared before this load, so anything on it now
+            // belongs to the failed response (including a batch that threw
+            // after Leaflet had already added part of it).
+            if (typeof resetFeaturesLayer === 'function') resetFeaturesLayer();
 
             // Display user-friendly message for rate limiting
             if (error.isRateLimited) {
@@ -457,6 +462,7 @@ async function fetchFeatureGeometriesWithProgress(params) {
     activeFeatureLoader = loader;
     try {
         await loader.fetch(url);
+        if (!isCurrent()) return SUPERSEDED_FEATURE_LOAD;
     } catch (error) {
         if (isCurrent()) progressBar.hide();
         throw error;

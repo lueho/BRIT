@@ -231,3 +231,40 @@ test("a cached replacement hides the aborted load's progress bar", async () => {
   assert.deepEqual(calls.rendered, [cachedB]);
   assert.equal(calls.errors.length, 0);
 });
+
+test("a superseded load resolves with a superseded marker instead of undefined", async () => {
+  const a = controlledResponse(
+    JSON.stringify({ type: "FeatureCollection", features: makeFeatures(2500, "A") }),
+    120000,
+  );
+  const b = controlledResponse(
+    JSON.stringify({ type: "FeatureCollection", features: makeFeatures(2500, "B") }),
+    120000,
+  );
+  const { sandbox } = makeSandbox({ "/geom?f=a": a, "/geom?f=b": b });
+
+  const loadA = sandbox.fetchFeatureGeometriesWithProgress({ f: "a" });
+  a.release(1);
+  await settle();
+  const loadB = sandbox.fetchFeatureGeometriesWithProgress({ f: "b" });
+  a.release(10);
+  b.release(10);
+
+  const [resultA, resultB] = await Promise.all([loadA, loadB]);
+  assert.deepEqual(resultA, { superseded: true });
+  assert.equal(resultB, undefined);
+});
+
+test("a failure inside the first batch still removes the attached layer", async () => {
+  const a = controlledResponse(
+    JSON.stringify({ type: "FeatureCollection", features: makeFeatures(2500, "A") }),
+    120000,
+  );
+  const { sandbox, calls } = makeSandbox({ "/geom?f=a": a });
+  sandbox.addFeatureBatch = () => { throw new Error("Invalid GeoJSON object."); };
+
+  const load = sandbox.fetchFeatureGeometriesWithProgress({ f: "a" });
+  a.release(10);
+  await assert.rejects(load, /Invalid GeoJSON/);
+  assert.equal(calls.resets, 2, "layer reset after the first-batch failure");
+});

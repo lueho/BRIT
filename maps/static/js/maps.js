@@ -1214,7 +1214,12 @@ function loadLayers(params) {
 
     if (promises.length > 0) {
         Promise.all(promises)
-            .then(() => {
+            .then((results) => {
+                // A newer load owns the shared spinner, filter lock and
+                // bounds now; refreshing here would tear them down early.
+                if (results.some((result) => result && result.superseded)) {
+                    return;
+                }
                 return refreshMap(promises);
             })
             .catch(error => console.error('Error loading layers or refreshing map:', error));
