@@ -21,7 +21,7 @@ class GeoDataSetModelFormTestCase(TestCase):
 
         self.assertIn("region", form.fields)
         self.assertEqual(form.fields["region"].config.url, "region-autocomplete")
-        self.assertEqual(form.fields["region"].config.label_field, "name")
+        self.assertEqual(form.fields["region"].config.label_field, "display_name")
 
     def test_form_saves_region_for_local_relation_dataset(self):
         region = Region.objects.create(

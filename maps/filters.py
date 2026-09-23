@@ -175,7 +175,7 @@ class GeoDataSetFilterSet(UserCreatedObjectScopedFilterSet):
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="region-autocomplete",
-                label_field="name",
+                label_field="display_name",
                 filter_by=("scope", "name"),
             )
         ),
