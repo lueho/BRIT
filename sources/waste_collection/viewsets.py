@@ -22,7 +22,10 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from maps.db_functions import SimplifyPreserveTopology
 from maps.mixins import CachedGeoJSONMixin
 from maps.utils import build_collection_cache_key
-from sources.waste_collection.filters import CollectionFilterSet
+from sources.waste_collection.filters import (
+    CollectionAnalysisFilterSet,
+    CollectionFilterSet,
+)
 from sources.waste_collection.importers import CollectionImporter
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
@@ -247,7 +250,12 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 f"Authentication is required to access the '{scope}' scope."
             )
 
-    @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[permissions.AllowAny],
+        filterset_class=CollectionAnalysisFilterSet,
+    )
     def analysis(self, request):
         """Paginated flat data, including year-specific metrics and their units.
 

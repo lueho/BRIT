@@ -63,6 +63,28 @@ class CollectionAnalysisApiTests(APITestCase):
         self.assertIn(self.private_collection.pk, ids)
         self.assertNotIn(self.other_user_private_collection.pk, ids)
 
+    def test_password_login_token_can_read_own_private_analysis(self):
+        self.regular_user.set_password("test-password")
+        self.regular_user.save(update_fields=["password"])
+        login = self.client.post(
+            reverse("api-token-auth"),
+            {"username": self.regular_user.username, "password": "test-password"},
+        )
+        self.assertEqual(login.status_code, 200)
+        self.assertIn("token", login.data)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {login.data['token']}")
+        response = self.client.get(self.endpoint(), {"scope": "private"})
+        self.assertEqual(response.status_code, 200)
+        ids = {row["id"] for row in response.data["results"]}
+        self.assertIn(self.private_collection.pk, ids)
+        self.assertNotIn(self.other_user_private_collection.pk, ids)
+        all_visible = self.client.get(self.endpoint(), {"scope": "all"})
+        self.assertEqual(all_visible.status_code, 200)
+        visible_ids = {row["id"] for row in all_visible.data["results"]}
+        self.assertIn(self.published_collection.pk, visible_ids)
+        self.assertIn(self.private_collection.pk, visible_ids)
+        self.assertNotIn(self.other_user_private_collection.pk, visible_ids)
+
     def test_metrics_keep_zero_and_units_but_hide_private_values(self):
         prop = Property.objects.get_or_create(name="Connection rate")[0]
         unit = Unit.objects.get_or_create(name="%")[0]

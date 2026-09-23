@@ -730,6 +730,29 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         return qs.filter(forbidden_materials__in=values).distinct()
 
 
+class CollectionAnalysisFilterSet(CollectionFilterSet):
+    """Allow the analysis API to return all collections visible to a user."""
+
+    scope = ChoiceFilter(
+        choices=(
+            ("published", "Published"),
+            ("private", "Private"),
+            ("review", "Review"),
+            ("all", "All visible"),
+        ),
+        widget=HiddenInput(),
+        method="filter_scope",
+        initial="published",
+    )
+
+    def filter_scope(self, queryset, name, value):
+        if value == "all":
+            return filter_queryset_for_user(
+                queryset, getattr(self.request, "user", None)
+            )
+        return super().filter_scope(queryset, name, value)
+
+
 class WasteFlyerFilter(UserCreatedObjectScopedFilterSet):
     url_valid = BooleanFilter(
         widget=RadioSelect(choices=((True, "True"), (False, "False")))

@@ -79,6 +79,12 @@ Die neue API muss auf der angesprochenen BRIT-Instanz bereitgestellt sein:
 GET /waste_collection/api/collection/analysis/
 ```
 
+**Einzeldatei für den direkten Einstieg:** [`BRIT_Datenanalyse.R`](BRIT_Datenanalyse.R) kann auch allein heruntergeladen werden. R ab Version 4.3.3 genügt; das Skript installiert beim ersten Start seine vier R-Pakete in die Benutzerbibliothek. In RStudio die Datei öffnen und **Source** wählen oder im Terminal `Rscript BRIT_Datenanalyse.R` ausführen. Danach nur den BRIT-Benutzernamen und das Passwort eingeben. Die Datei tauscht diese Angaben über `/api-token-auth/` gegen ein Token, hält es nur im Arbeitsspeicher und speichert es nicht in Ergebnissen. Das Passwort wird verdeckt abgefragt.
+
+Voreingestellt ist `FILTER <- list(scope = "all")`: Es werden alle für das Konto sichtbaren Sammlungen abgerufen, möglicherweise einschließlich privater Daten. Der Ordner `BRIT_Ergebnisse` enthält CSV, RDS, Prüfsummen und eine einfache Zusammenfassung nach Land und Abfallkategorie. Diese Dateien entsprechend den eigenen Datenrechten behandeln. Für eigene Fragen `FILTER` und die Beispielauswertung am Ende der R-Datei ändern. Die Einzeldatei nutzt aktuelle BRIT-Daten; für die sieben historischen Projektanalysen mit dem festen Datenstand bleibt das vollständige Release-ZIP vorgesehen.
+
+Die Einzeldatei setzt den lokal implementierten Analyse-Endpunkt auf dem verwendeten BRIT-Server voraus. Solange er dort nicht bereitgestellt ist, zeigt ein HTTP-404-Hinweis diesen fehlenden Schritt an. Ein lokal erfolgreicher Test allein macht die Produktionsinstanz noch nicht nutzbar.
+
 Sie liefert flache Datensätze einschließlich stabiler IDs, Quellenangaben, zeitlicher Gültigkeit, Regionsmerkmalen und verfügbaren Jahreswerten mit Einheiten. Der öffentliche Zugriff liefert ausschließlich freigegebene Daten. Nicht öffentliche Daten benötigen ein BRIT-Token und die entsprechenden bestehenden Berechtigungen.
 
 ```r
