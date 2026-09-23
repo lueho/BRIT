@@ -49,10 +49,12 @@ class ScenarioResult:
     def material_component_groups(self):
         group_settings = []
         material_settings = self.scenario.feedstocks()
-        for material_setting in material_settings:
+        for feedstock in material_settings:
+            if not feedstock.is_temporal:
+                continue
             for (
                 group_setting
-            ) in material_setting.materialcomponentgroupsettings_set.all():
+            ) in feedstock.series.materialcomponentgroupsettings_set.all():
                 if not group_setting.group == MaterialComponentGroup.objects.default():
                     group_settings.append(group_setting)
         return list(set(group_settings))

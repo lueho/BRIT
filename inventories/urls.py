@@ -4,6 +4,7 @@ from .views import (
     InventoriesExplorerView,
     InventoryAlgorithmAutocompleteView,
     InventoryAlgorithmParametersAPIView,
+    InventoryInputAutocompleteView,
     PrivateScenarioFilterView,
     PublishedScenarioFilterView,
     ResultMapAPI,
@@ -42,6 +43,11 @@ urlpatterns = [
         "inventory-algorithms/autocomplete/",
         InventoryAlgorithmAutocompleteView.as_view(),
         name="inventoryalgorithm-autocomplete",
+    ),
+    path(
+        "inventory-inputs/autocomplete/",
+        InventoryInputAutocompleteView.as_view(),
+        name="inventoryinput-autocomplete",
     ),
     path(
         "inventory-algorithms/scenario-autocomplete/",

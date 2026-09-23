@@ -4,7 +4,15 @@ import json
 from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.http import Http404, HttpResponse, HttpResponseForbidden, JsonResponse
+from django.db import transaction
+from django.db.models import Q
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseForbidden,
+    JsonResponse,
+)
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, TemplateView, View
@@ -18,7 +26,7 @@ from layer_manager.models import Layer
 from maps.models import GeoDataset
 from maps.serializers import BaseResultMapSerializer
 from maps.views import GeoDataSetAutocompleteView, MapMixin
-from materials.models import Material, SampleSeries
+from materials.models import Material
 from utils.object_management.permissions import get_object_policy
 from utils.object_management.views import (
     PrivateObjectFilterView,
@@ -41,9 +49,11 @@ from .forms import (
     SeasonalDistributionModelForm,
 )
 from .models import (
+    FeedstockNotImplemented,
     InventoryAlgorithm,
     InventoryAlgorithmParameter,
     InventoryAlgorithmParameterValue,
+    InventoryInput,
     RunningTask,
     Scenario,
     ScenarioInventoryConfiguration,
@@ -201,9 +211,25 @@ class ScenarioAddInventoryAlgorithmView(
 
     def post(self, request, *args, **kwargs):
         scenario = Scenario.objects.get(id=self.kwargs.get("pk"))
-        feedstock = SampleSeries.objects.get(id=request.POST.get("feedstock"))
+        feedstock = InventoryInput.objects.get(id=request.POST.get("feedstock"))
+        if (
+            not scenario.available_feedstocks(request.user)
+            .filter(pk=feedstock.pk)
+            .exists()
+        ):
+            return HttpResponseForbidden()
         algorithm_id = request.POST.get("inventory_algorithm")
         algorithm = InventoryAlgorithm.objects.get(id=algorithm_id)
+        if (
+            not scenario.available_inventory_algorithms(
+                feedstock=feedstock, geodataset=algorithm.geodataset
+            )
+            .filter(pk=algorithm.pk)
+            .exists()
+        ):
+            return HttpResponseBadRequest(
+                "The selected algorithm does not support this feedstock."
+            )
         parameters = algorithm.inventoryalgorithmparameter_set.all()
         values = {}
         for parameter in parameters:
@@ -214,7 +240,10 @@ class ScenarioAddInventoryAlgorithmView(
                 values[parameter].append(
                     InventoryAlgorithmParameterValue.objects.get(id=value_id)
                 )
-        scenario.add_inventory_algorithm(feedstock, algorithm, values)
+        try:
+            scenario.add_inventory_algorithm(feedstock, algorithm, values)
+        except FeedstockNotImplemented as exc:
+            return HttpResponseBadRequest(str(exc))
         return redirect("scenario-detail", pk=scenario.pk)
 
     def get_object(self, **kwargs):
@@ -222,7 +251,7 @@ class ScenarioAddInventoryAlgorithmView(
 
     def get_initial(self):
         return {
-            "feedstocks": self.object.available_feedstocks(),
+            "feedstocks": self.object.available_feedstocks(self.request.user),
             "scenario": self.object,
         }
 
@@ -261,12 +290,29 @@ class ScenarioAlgorithmConfigurationUpdateView(
         current_algorithm = InventoryAlgorithm.objects.get(
             id=self.kwargs.get("algorithm_pk")
         )
-        current_feedstock = SampleSeries.objects.get(id=self.kwargs.get("feedstock_pk"))
-        scenario.remove_inventory_algorithm(current_algorithm, current_feedstock)
-        feedstock = SampleSeries.objects.get(id=request.POST.get("feedstock"))
+        current_feedstock = InventoryInput.objects.get(
+            id=self.kwargs.get("feedstock_pk")
+        )
+        feedstock = InventoryInput.objects.get(id=request.POST.get("feedstock"))
+        if (
+            not scenario.available_feedstocks(request.user)
+            .filter(pk=feedstock.pk)
+            .exists()
+        ):
+            return HttpResponseForbidden()
         new_algorithm = InventoryAlgorithm.objects.get(
             id=request.POST.get("inventory_algorithm")
         )
+        supported = (
+            new_algorithm.supports_sample_series
+            if feedstock.is_temporal
+            else new_algorithm.supports_standalone_samples
+        )
+        if (
+            not supported
+            or not new_algorithm.feedstocks.filter(pk=feedstock.material.pk).exists()
+        ):
+            return HttpResponseForbidden()
         parameters = new_algorithm.inventoryalgorithmparameter_set.all()
         values = {}
         for parameter in parameters:
@@ -277,7 +323,9 @@ class ScenarioAlgorithmConfigurationUpdateView(
                 values[parameter].append(
                     InventoryAlgorithmParameterValue.objects.get(id=value_id)
                 )
-        scenario.add_inventory_algorithm(feedstock, new_algorithm, values)
+        with transaction.atomic():
+            scenario.remove_inventory_algorithm(current_algorithm, current_feedstock)
+            scenario.add_inventory_algorithm(feedstock, new_algorithm, values)
         return redirect("scenario-detail", pk=scenario.pk)
 
     def get_object(self, **kwargs):
@@ -286,8 +334,9 @@ class ScenarioAlgorithmConfigurationUpdateView(
     def get_initial(self):
         scenario = Scenario.objects.get(id=self.kwargs.get("scenario_pk"))
         algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get("algorithm_pk"))
-        feedstock = SampleSeries.objects.get(id=self.kwargs.get("feedstock_pk"))
+        feedstock = InventoryInput.objects.get(id=self.kwargs.get("feedstock_pk"))
         config = scenario.inventory_algorithm_config(algorithm, feedstock)
+        config["feedstocks"] = scenario.available_feedstocks(self.request.user)
         return config
 
     def get_context_data(self, **kwargs):
@@ -323,7 +372,7 @@ class ScenarioRemoveInventoryAlgorithmView(
         self.algorithm = InventoryAlgorithm.objects.get(
             id=self.kwargs.get("algorithm_pk")
         )
-        self.feedstock = SampleSeries.objects.get(id=self.kwargs.get("feedstock_pk"))
+        self.feedstock = InventoryInput.objects.get(id=self.kwargs.get("feedstock_pk"))
         self.scenario.remove_inventory_algorithm(
             algorithm=self.algorithm, feedstock=self.feedstock
         )
@@ -354,15 +403,17 @@ class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
 
         try:
             scenario = Scenario.objects.get(pk=scenario_id)
-            feedstock_series = SampleSeries.objects.get(pk=feedstock_id)
-        except (Scenario.DoesNotExist, SampleSeries.DoesNotExist):
+            inventory_input = InventoryInput.objects.accessible_by_user(
+                self.request.user
+            ).get(pk=feedstock_id)
+        except (Scenario.DoesNotExist, InventoryInput.DoesNotExist):
             return GeoDataset.objects.none()
 
         # Resolve which Material objects to consider
-        if feedstock_series is None:
+        if inventory_input is None:
             feedstocks_qs = Material.objects.filter(type="material")
         else:
-            feedstocks_qs = Material.objects.filter(id=feedstock_series.material_id)
+            feedstocks_qs = Material.objects.filter(id=inventory_input.material.id)
 
         # Build a single query using EXISTS sub-queries
         from django.db.models import Exists, OuterRef
@@ -372,10 +423,16 @@ class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
             geodataset__region=scenario.region,
             feedstocks__in=feedstocks_qs,
         )
+        if inventory_input.is_temporal:
+            available_q = available_q.filter(supports_sample_series=True)
+        else:
+            available_q = available_q.filter(supports_standalone_samples=True)
         evaluated_q = ScenarioInventoryConfiguration.objects.filter(
             geodataset=OuterRef("pk"),
             scenario=scenario,
-            feedstock__material__in=feedstocks_qs,
+        ).filter(
+            Q(feedstock__series__material__in=feedstocks_qs)
+            | Q(feedstock__sample__material__in=feedstocks_qs)
         )
 
         return GeoDataset.objects.annotate(
@@ -407,15 +464,65 @@ class ScenarioInventoryAlgorithmAutocompleteView(InventoryAlgorithmAutocompleteV
             return InventoryAlgorithm.objects.none()
 
         try:
-            feedstock_series = SampleSeries.objects.get(pk=feedstock_id)
+            inventory_input = InventoryInput.objects.accessible_by_user(
+                self.request.user
+            ).get(pk=feedstock_id)
             geodataset = GeoDataset.objects.get(pk=geodataset_id)
-        except (SampleSeries.DoesNotExist, GeoDataset.DoesNotExist):
+        except (InventoryInput.DoesNotExist, GeoDataset.DoesNotExist):
             return InventoryAlgorithm.objects.none()
 
-        return InventoryAlgorithm.objects.filter(
-            feedstocks=feedstock_series.material,
+        algorithms = InventoryAlgorithm.objects.filter(
+            feedstocks=inventory_input.material,
             geodataset=geodataset,
         )
+        if inventory_input.is_temporal:
+            return algorithms.filter(supports_sample_series=True)
+        return algorithms.filter(supports_standalone_samples=True)
+
+
+class InventoryInputAutocompleteView(UserCreatedObjectAutocompleteView):
+    """Autocomplete over InventoryInput adapters wrapping samples and series."""
+
+    model = InventoryInput
+    search_lookups = [
+        "sample__name__icontains",
+        "series__name__icontains",
+        "sample__material__name__icontains",
+        "series__material__name__icontains",
+    ]
+    value_fields = [
+        "sample__name",
+        "series__name",
+        "sample__material__name",
+        "series__material__name",
+    ]
+    ordering = ["series__name", "sample__name"]
+
+    def hook_queryset(self, queryset):
+        return queryset.accessible_by_user(self.request.user).select_related(
+            "sample__material", "series__material"
+        )
+
+    def apply_filters(self, queryset):
+        scenario_id = get_tomselect_filter_value(self, lookup="scenario_id")
+        if not scenario_id:
+            return queryset
+        try:
+            scenario = Scenario.objects.get(pk=scenario_id)
+        except (Scenario.DoesNotExist, ValueError):
+            return queryset.none()
+        eligible = scenario.available_feedstocks(self.request.user)
+        return queryset.filter(pk__in=eligible.values("pk"))
+
+    def hook_prepare_results(self, results):
+        for item in results:
+            name = item.get("series__name") or item.get("sample__name")
+            material = item.get("series__material__name") or item.get(
+                "sample__material__name"
+            )
+            label = "Series" if item.get("series__name") else "Sample"
+            item["name"] = f"{label}: {material} — {name}"
+        return results
 
 
 class InventoryAlgorithmParametersAPIView(APIView):
@@ -552,7 +659,7 @@ class ScenarioResultDetailMapView(MapMixin, DetailView):
     def get_object(self, **kwargs):
         scenario = Scenario.objects.get(id=self.kwargs.get("pk"))
         algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get("algorithm_pk"))
-        feedstock = SampleSeries.objects.get(id=self.kwargs.get("feedstock_pk"))
+        feedstock = InventoryInput.objects.get(id=self.kwargs.get("feedstock_pk"))
         return Layer.objects.get(
             scenario=scenario, algorithm=algorithm, feedstock=feedstock
         )

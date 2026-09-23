@@ -5,7 +5,12 @@ from distributions.models import TemporalDistribution
 from maps.models import GeoDataset
 from utils.forms import ModalModelFormMixin, SimpleModelForm
 
-from .models import InventoryAlgorithm, Scenario, ScenarioInventoryConfiguration
+from .models import (
+    InventoryAlgorithm,
+    InventoryInput,
+    Scenario,
+    ScenarioInventoryConfiguration,
+)
 
 
 class SeasonalDistributionModelForm(SimpleModelForm):
@@ -44,10 +49,14 @@ class ScenarioModalModelForm(ModalModelFormMixin, ScenarioModelForm):
 class ScenarioInventoryConfigurationForm(SimpleModelForm):
     feedstock = TomSelectModelChoiceField(
         config=TomSelectConfig(
-            url="sampleseries-autocomplete",
+            url="inventoryinput-autocomplete",
             label_field="name",
+            filter_by=(
+                "scenario",
+                "scenario_id",
+            ),
         ),
-        label="Feedstock",
+        label="Inventory input",
     )
     geodataset = TomSelectModelChoiceField(
         config=TomSelectConfig(
@@ -105,7 +114,9 @@ class ScenarioInventoryConfigurationAddForm(ScenarioInventoryConfigurationForm):
         self.fields["scenario"].queryset = Scenario.objects.all()
         self.fields["scenario"].initial = initial.get("scenario")
         self.fields["scenario"].widget = HiddenInput()
-        self.fields["feedstock"].queryset = initial.get("feedstocks")
+        self.fields["feedstock"].queryset = initial.get(
+            "feedstocks", InventoryInput.objects.none()
+        )
         self.fields["geodataset"].queryset = GeoDataset.objects.none()
         self.fields["inventory_algorithm"].queryset = InventoryAlgorithm.objects.none()
 
@@ -123,7 +134,9 @@ class ScenarioInventoryConfigurationUpdateForm(ScenarioInventoryConfigurationFor
         self.fields["scenario"].queryset = Scenario.objects.all()
         self.fields["scenario"].initial = scenario
         self.fields["scenario"].widget = HiddenInput()
-        self.fields["feedstock"].queryset = scenario.available_feedstocks()
+        self.fields["feedstock"].queryset = initial.get(
+            "feedstocks", scenario.available_feedstocks()
+        )
         self.fields["feedstock"].initial = feedstock
         self.fields["geodataset"].queryset = scenario.available_geodatasets(
             feedstock=feedstock

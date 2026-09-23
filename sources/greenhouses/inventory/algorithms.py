@@ -3,8 +3,7 @@ from django.db.models import Sum
 from distributions.models import TemporalDistribution
 from distributions.plots import Distribution
 from inventories.algorithms import InventoryAlgorithmsBase
-from inventories.models import Scenario
-from materials.models import SampleSeries
+from inventories.models import InventoryInput, Scenario
 from sources.greenhouses.models import Greenhouse, NantesGreenhouses
 
 
@@ -15,7 +14,13 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         Here all the algorithms that are specific to the case study of the greenhouses in Nantes region are implemented.
         """
         scenario = Scenario.objects.get(id=kwargs.get("scenario_id"))
-        feedstock = SampleSeries.objects.get(id=kwargs.get("feedstock_id"))
+        input_id = kwargs.get("inventory_input_id", kwargs.get("feedstock_id"))
+        feedstock = InventoryInput.objects.get(id=input_id)
+        if not feedstock.is_temporal:
+            raise ValueError(
+                "This inventory algorithm requires a temporal sample series."
+            )
+        series = feedstock.series
         catchment = scenario.catchment
 
         result = {
@@ -64,7 +69,7 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
 
         # Filter the greenhouse dataset by type of greenhouse and apply specific values
         for greenhouse_type in greenhouse_types:
-            if feedstock.culture_set.first().name in list(
+            if series.culture_set.first().name in list(
                 greenhouse_type.cultures().values()
             ):
                 greenhouse_group = clipped.filter(**greenhouse_type.filter_kwargs)
@@ -78,7 +83,7 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
                     total_surface += total_group_surface
                     greenhouse_count += greenhouse_group.count()
                     for share in greenhouse_type.shares:
-                        if share.timestepset.growth_cycle.culture.residue == feedstock:
+                        if share.timestepset.growth_cycle.culture.residue == series:
                             share_average = float(share.average)
                             distribution.add_share(
                                 share.timestepset.timestep,

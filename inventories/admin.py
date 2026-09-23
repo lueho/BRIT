@@ -7,6 +7,7 @@ from .models import (
     InventoryAlgorithmParameter,
     InventoryAlgorithmParameterValue,
     InventoryAmountShare,
+    InventoryInput,
     RunningTask,
     Scenario,
     ScenarioInventoryConfiguration,
@@ -14,11 +15,25 @@ from .models import (
 )
 
 
+@admin.register(InventoryInput)
+class InventoryInputAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "kind", "input_object", "publication_status")
+    search_fields = ("sample__name", "series__name")
+    list_select_related = ("sample__material", "series__material")
+
+
 @admin.register(InventoryAlgorithm)
 class InventoryAlgorithmAdmin(admin.ModelAdmin):
-    list_display = ("name", "geodataset_link", "default", "description")
+    list_display = (
+        "name",
+        "geodataset_link",
+        "default",
+        "supports_sample_series",
+        "supports_standalone_samples",
+        "description",
+    )
     search_fields = ("name", "description", "function_name")
-    list_filter = ("default",)
+    list_filter = ("default", "supports_sample_series", "supports_standalone_samples")
     ordering = ("name",)
 
     @staticmethod
@@ -72,7 +87,11 @@ class ScenarioInventoryConfigurationAdmin(admin.ModelAdmin):
     def feedstock_link(obj):
         if not obj.feedstock:
             return "-"
-        url = reverse("admin:materials_sampleseries_change", args=(obj.feedstock.id,))
+        target = obj.feedstock.input_object
+        url = reverse(
+            f"admin:{target._meta.app_label}_{target._meta.model_name}_change",
+            args=(target.id,),
+        )
         return format_html("<a href='{}'>{}</a>", url, obj.feedstock.name)
 
     @staticmethod

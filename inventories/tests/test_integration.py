@@ -14,7 +14,7 @@ from inventories.models import (
     Scenario,
 )
 from inventories.tasks import run_inventory_algorithm
-from layer_manager.models import Layer
+from layer_manager.models import DistributionShare, Layer
 from maps.models import Catchment, GeoDataset, Region
 from materials.models import (
     ComponentMeasurement,
@@ -22,6 +22,7 @@ from materials.models import (
     Material,
     MaterialComponent,
     MaterialComponentGroup,
+    Sample,
     SampleSeries,
 )
 from sources.greenhouses.models import (
@@ -254,18 +255,26 @@ class InventoryExecutionIntegrationTests(TestCase):
     def configure_and_run_single_inventory(
         self, scenario, feedstock, algorithm, values
     ):
+        inventory_input = feedstock.inventory_input
         scenario.add_inventory_algorithm(feedstock, algorithm, values)
         execution_plan = scenario.inventory_execution_plan()
         self.assertEqual(len(execution_plan), 1)
         self.assertEqual(execution_plan[0]["algorithm"], algorithm)
         self.assertEqual(execution_plan[0]["kwargs"]["feedstock_id"], feedstock.id)
+        self.assertEqual(
+            execution_plan[0]["kwargs"]["inventory_input_id"], inventory_input.id
+        )
+        self.assertEqual(
+            execution_plan[0]["kwargs"]["feedstock_kind"],
+            "series" if isinstance(feedstock, SampleSeries) else "sample",
+        )
 
         self.assertTrue(
             run_inventory_algorithm.run(algorithm.id, **execution_plan[0]["kwargs"])
         )
 
         return Layer.objects.get(
-            scenario=scenario, feedstock=feedstock, algorithm=algorithm
+            scenario=scenario, feedstock=inventory_input, algorithm=algorithm
         )
 
     def build_hamburg_feedstock_profile(self, feedstock, scenario):
@@ -317,7 +326,7 @@ class InventoryExecutionIntegrationTests(TestCase):
         InventoryAmountShare.objects.create(
             owner=self.default_owner,
             scenario=scenario,
-            feedstock=feedstock,
+            feedstock=feedstock.inventory_input,
             timestep=summer,
             average=0.75,
             standard_deviation=0.0,
@@ -325,7 +334,7 @@ class InventoryExecutionIntegrationTests(TestCase):
         InventoryAmountShare.objects.create(
             owner=self.default_owner,
             scenario=scenario,
-            feedstock=feedstock,
+            feedstock=feedstock.inventory_input,
             timestep=winter,
             average=0.25,
             standard_deviation=0.0,
@@ -396,7 +405,7 @@ class InventoryExecutionIntegrationTests(TestCase):
         InventoryAmountShare.objects.create(
             owner=self.default_owner,
             scenario=scenario,
-            feedstock=feedstock,
+            feedstock=feedstock.inventory_input,
             timestep=summer,
             average=0.6,
             standard_deviation=0.0,
@@ -404,7 +413,7 @@ class InventoryExecutionIntegrationTests(TestCase):
         InventoryAmountShare.objects.create(
             owner=self.default_owner,
             scenario=scenario,
-            feedstock=feedstock,
+            feedstock=feedstock.inventory_input,
             timestep=winter,
             average=0.4,
             standard_deviation=0.0,
@@ -767,3 +776,180 @@ class InventoryExecutionIntegrationTests(TestCase):
         self.assertIn("productionPerFeedstockBarChart", charts)
         self.assertIn("seasonalFeedstockBarChart", charts)
         self.assertTrue(charts["seasonalFeedstockBarChart"]["data"])
+
+    def test_hamburg_roadside_tree_static_sample_runs_end_to_end(self):
+        region, _catchment, scenario = self.create_region_and_catchment(
+            "Hamburg Trees Static",
+            offset=60,
+        )
+        material = Material.objects.create(
+            owner=self.default_owner,
+            name="Static Tree Residues",
+            publication_status="published",
+        )
+        sample = Sample.objects.create(
+            owner=self.default_owner,
+            name="Static Tree Sample",
+            material=material,
+            standalone=True,
+            publication_status="published",
+        )
+        macro_components = MaterialComponentGroup.objects.create(
+            owner=self.default_owner,
+            name="Macro Components",
+            publication_status="published",
+        )
+        biomass = MaterialComponent.objects.create(
+            owner=self.default_owner,
+            name="Static Biomass",
+            publication_status="published",
+        )
+        ComponentMeasurement.objects.create(
+            owner=self.default_owner,
+            sample=sample,
+            group=macro_components,
+            component=biomass,
+            average=0.8,
+            standard_deviation=0.0,
+        )
+
+        geodataset = self.create_geodataset(
+            region,
+            "HamburgRoadsideTrees",
+            "Hamburg Roadside Trees Static",
+        )
+        algorithm, values = self.create_algorithm_with_values(
+            name="Hamburg roadside tree production static",
+            source_module="flexibi_hamburg",
+            function_name="hamburg_roadside_tree_production",
+            geodataset=geodataset,
+            feedstock=sample,
+            parameter_specs=[
+                {
+                    "descriptive_name": "Point yield",
+                    "short_name": "point_yield",
+                    "unit": "kg/a",
+                    "value": 12.0,
+                    "standard_deviation": 2.0,
+                }
+            ],
+        )
+        algorithm.supports_standalone_samples = True
+        algorithm.save()
+
+        HamburgRoadsideTrees.objects.create(geom=Point(61, 61, srid=4326), baumid=61)
+        HamburgRoadsideTrees.objects.create(geom=Point(62, 62, srid=4326), baumid=62)
+
+        layer = self.configure_and_run_single_inventory(
+            scenario, sample, algorithm, values
+        )
+
+        self.assertEqual(layer.feedstock, sample.inventory_input)
+        self.assertIn("feedstock_sample_", layer.table_name)
+        total = layer.layeraggregatedvalue_set.get(name="Total production")
+        distribution = layer.layeraggregateddistribution_set.get(
+            name="Seasonal production per component"
+        )
+        share = DistributionShare.objects.get(
+            distribution_set__aggregated_distribution=distribution
+        )
+        self.assertEqual(share.component, biomass)
+        self.assertEqual(share.distribution_set.timestep.name, "Average")
+        self.assertAlmostEqual(share.average, 0.8 * float(total.value), places=6)
+        self.assertFalse(
+            InventoryAmountShare.objects.filter(
+                feedstock=sample.inventory_input
+            ).exists()
+        )
+        charts = ScenarioResult(scenario).get_charts()
+        self.assertIn("seasonalFeedstockBarChart", charts)
+        self.assertTrue(charts["seasonalFeedstockBarChart"]["data"])
+
+    def test_hamburg_roadside_tree_static_sample_without_measurements(self):
+        region, _catchment, scenario = self.create_region_and_catchment(
+            "Hamburg Trees Static No Components",
+            offset=70,
+        )
+        material = Material.objects.create(
+            owner=self.default_owner,
+            name="Static Tree Residues No Components",
+            publication_status="published",
+        )
+        sample = Sample.objects.create(
+            owner=self.default_owner,
+            name="Static Tree Sample No Components",
+            material=material,
+            standalone=True,
+            publication_status="published",
+        )
+
+        geodataset = self.create_geodataset(
+            region,
+            "HamburgRoadsideTrees",
+            "Hamburg Roadside Trees Static No Components",
+        )
+        algorithm, values = self.create_algorithm_with_values(
+            name="Hamburg roadside tree production static no components",
+            source_module="flexibi_hamburg",
+            function_name="hamburg_roadside_tree_production",
+            geodataset=geodataset,
+            feedstock=sample,
+            parameter_specs=[
+                {
+                    "descriptive_name": "Point yield",
+                    "short_name": "point_yield",
+                    "unit": "kg/a",
+                    "value": 12.0,
+                    "standard_deviation": 2.0,
+                }
+            ],
+        )
+        algorithm.supports_standalone_samples = True
+        algorithm.save()
+
+        HamburgRoadsideTrees.objects.create(geom=Point(71, 71, srid=4326), baumid=71)
+
+        layer = self.configure_and_run_single_inventory(
+            scenario, sample, algorithm, values
+        )
+
+        self.assertTrue(
+            layer.layeraggregatedvalue_set.filter(name="Total production").exists()
+        )
+        self.assertFalse(
+            layer.layeraggregateddistribution_set.filter(
+                name="Seasonal production per component"
+            ).exists()
+        )
+
+    def test_greenhouse_algorithm_rejects_static_input(self):
+        _region, _catchment, scenario = self.create_region_and_catchment(
+            "Greenhouses Static Rejection",
+            offset=80,
+        )
+        material = Material.objects.create(
+            owner=self.default_owner,
+            name="Static Greenhouse Residues",
+            publication_status="published",
+        )
+        sample = Sample.objects.create(
+            owner=self.default_owner,
+            name="Static Greenhouse Sample",
+            material=material,
+            standalone=True,
+            publication_status="published",
+        )
+
+        from sources.greenhouses.inventory.algorithms import (
+            InventoryAlgorithms as GreenhouseInventoryAlgorithms,
+        )
+
+        with self.assertRaisesMessage(ValueError, "temporal sample series"):
+            GreenhouseInventoryAlgorithms.nantes_greenhouse_production(
+                scenario_id=scenario.id,
+                feedstock_id=sample.inventory_input.pk,
+                heated={"value": 1},
+                lit={"value": 0},
+                high_wire={"value": 1},
+                above_ground={"value": 0},
+            )
