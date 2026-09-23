@@ -41,6 +41,9 @@ let map;
 let regionLayer;
 let catchmentLayer;
 let featuresLayer;
+// Bumped per loadLayers call; companion fetchers check it before rendering so
+// an out-of-order response from a superseded load cannot overwrite the map.
+let mapLoadGeneration = 0;
 let regionLayerStyle;
 let catchmentLayerStyle;
 let featuresLayerStyle;
@@ -459,13 +462,14 @@ function buildUrl(base, params) {
     return url.toString();
 }
 
-async function fetchRegionGeometry(params) {
+async function fetchRegionGeometry(params, isCurrent = () => true) {
     validateParams(params, ['id']);
     const url = buildUrl(mapConfig.regionLayerGeometriesUrl, { id: params.id });
     const cacheKey = normalizeUrl(url);
 
     try {
         const { data } = await fetchWithVersionValidation(url, cacheKey);
+        if (!isCurrent()) return;
         renderRegion(data);
     } catch (error) {
         console.error('Error fetching region geometry:', error);
@@ -473,13 +477,14 @@ async function fetchRegionGeometry(params) {
     }
 }
 
-async function fetchCatchmentGeometry(params) {
+async function fetchCatchmentGeometry(params, isCurrent = () => true) {
     validateParams(params, ['id']);
     const url = buildUrl(mapConfig.catchmentLayerGeometriesUrl, { id: params.id });
     const cacheKey = normalizeUrl(url);
 
     try {
         const { data } = await fetchWithVersionValidation(url, cacheKey);
+        if (!isCurrent()) return;
         renderCatchment(data);
     } catch (error) {
         console.error('Error fetching catchment geometry:', error);
@@ -537,7 +542,7 @@ async function fetchFeatureDetails(feature) {
     }
 }
 
-async function fetchFeaturesLayerSummary(params) {
+async function fetchFeaturesLayerSummary(params, isCurrent = () => true) {
     const url = mapConfig.featuresLayerSummariesUrl + '?' + transformSearchParams(params).toString();
     try {
         const response = await fetch(url);
@@ -546,6 +551,7 @@ async function fetchFeaturesLayerSummary(params) {
         }
 
         const summaries = await response.json();
+        if (!isCurrent()) return;
         renderSummaries(summaries);
 
     } catch (error) {
@@ -1170,6 +1176,8 @@ function loadLayers(params) {
     // Use passed params if provided, otherwise get from form/URL
     let filterParameters = params || getFeaturesLayerFilterParameters();
     const promises = [];
+    const generation = ++mapLoadGeneration;
+    const isCurrent = () => generation === mapLoadGeneration;
 
     if (mapConfig.showComposedOf && mapConfig.composedOfRegionId) {
         mapConfig.loadFeatures = true;
@@ -1182,7 +1190,7 @@ function loadLayers(params) {
 
     const region_id = filterParameters.get('region') || (mapConfig.loadRegion ? mapConfig.regionId : null);
     if (region_id) {
-        promises.push(fetchRegionGeometry({ id: region_id }));
+        promises.push(fetchRegionGeometry({ id: region_id }, isCurrent));
     } else {
         // Remove region layer if filter was cleared
         removeExistingLayer(regionLayer);
@@ -1191,7 +1199,7 @@ function loadLayers(params) {
 
     const catchment_id = filterParameters.get('catchment') || (mapConfig.loadCatchment ? mapConfig.catchmentId : null);
     if (catchment_id) {
-        promises.push(fetchCatchmentGeometry({ id: catchment_id }));
+        promises.push(fetchCatchmentGeometry({ id: catchment_id }, isCurrent));
     } else {
         // Remove catchment layer if filter was cleared
         removeExistingLayer(catchmentLayer);
@@ -1201,7 +1209,7 @@ function loadLayers(params) {
     if (mapConfig.loadFeatures === true) {
         promises.push(fetchFeatureGeometries(filterParameters));
         if (mapConfig.loadFeaturesLayerSummary === true && mapConfig.featuresLayerSummariesUrl) {
-            promises.push(fetchFeaturesLayerSummary(filterParameters));
+            promises.push(fetchFeaturesLayerSummary(filterParameters, isCurrent));
         }
     } else {
         mapConfig.guardUnfilteredLoad = true;
@@ -1218,13 +1226,20 @@ function loadLayers(params) {
                 // A newer load owns the filter lock and bounds now; only
                 // release this load's spin() reference (Leaflet.Spin
                 // refcounts) so the newer load's spinner stays balanced.
-                if (results.some((result) => result && result.superseded)) {
+                if (!isCurrent() || results.some((result) => result && result.superseded)) {
                     hideLoadingIndicator();
                     return;
                 }
                 return refreshMap(promises);
             })
-            .catch(error => console.error('Error loading layers or refreshing map:', error));
+            .catch(error => {
+                console.error('Error loading layers or refreshing map:', error);
+                if (isCurrent()) {
+                    cleanup();
+                } else {
+                    hideLoadingIndicator();
+                }
+            });
     } else {
         console.warn('No layers to load.');
         cleanup();

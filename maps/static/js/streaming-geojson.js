@@ -189,24 +189,28 @@ class StreamingGeoJSONLoader {
                     // End of a feature
                     if (braceDepth === 2 && bracketDepth >= 1 && featureStart >= 0) {
                         const featureStr = buffer.substring(featureStart);
+                        let feature = null;
                         try {
-                            const feature = JSON.parse(featureStr);
-                            if (feature.type === 'Feature') {
-                                features.push(feature);
-                                pendingBatch.push(feature);
-                                if (pendingBatch.length >= FEATURE_BATCH_SIZE) {
-                                    await this.onFeatureBatch(pendingBatch);
-                                    pendingBatch = [];
-                                }
-                                // Progress updates hit the DOM; per-feature
-                                // updates are wasteful on large datasets.
-                                if (features.length - lastFeatureProgress >= 250) {
-                                    lastFeatureProgress = features.length;
-                                    reportProgress(features.length);
-                                }
-                            }
+                            feature = JSON.parse(featureStr);
                         } catch (e) {
                             console.warn('Failed to parse feature:', e);
+                        }
+                        // Consumer errors must propagate to onError rather
+                        // than be mistaken for a malformed feature.
+                        if (feature && feature.type === 'Feature') {
+                            features.push(feature);
+                            pendingBatch.push(feature);
+                            if (pendingBatch.length >= FEATURE_BATCH_SIZE) {
+                                const batch = pendingBatch;
+                                pendingBatch = [];
+                                await this.onFeatureBatch(batch);
+                            }
+                            // Progress updates hit the DOM; per-feature
+                            // updates are wasteful on large datasets.
+                            if (features.length - lastFeatureProgress >= 250) {
+                                lastFeatureProgress = features.length;
+                                reportProgress(features.length);
+                            }
                         }
                         // Clear processed data from buffer to save memory
                         buffer = '';

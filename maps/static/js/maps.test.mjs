@@ -264,3 +264,72 @@ test("loadLayers refreshes when the feature load completed normally", async () =
 
     assert.equal(refreshes, 1);
 });
+
+test("loadLayers cleans up once when the current feature load rejects", async () => {
+    const { sandbox, calls, mapConfig } = setup();
+    mapConfig.loadFeatures = true;
+    let refreshes = 0;
+    sandbox.refreshMap = () => { refreshes += 1; };
+    sandbox.fetchFeatureGeometries = () => Promise.reject(new Error("stream truncated"));
+
+    sandbox.loadLayers(new URLSearchParams({ name: "oak" }));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(refreshes, 0);
+    assert.equal(calls.cleanup, 1);
+});
+
+test("a superseded loadLayers call does not render its companion layers", async () => {
+    const { sandbox, mapConfig } = setup();
+    mapConfig.loadFeatures = true;
+    mapConfig.loadRegion = true;
+    mapConfig.regionId = 7;
+    mapConfig.regionLayerGeometriesUrl = "/regions/geojson/";
+    mapConfig.loadFeaturesLayerSummary = true;
+    mapConfig.featuresLayerSummariesUrl = "/summaries/";
+    const rendered = [];
+    sandbox.renderRegion = (data) => rendered.push(["region", data]);
+    sandbox.renderSummaries = (data) => rendered.push(["summary", data]);
+    sandbox.refreshMap = () => {};
+
+    // setup() stubs the companion fetchers; put the real ones back so the
+    // generation guard inside them is exercised.
+    const fresh = vm.createContext({ ...sandbox });
+    vm.runInContext(source, fresh);
+    sandbox.fetchRegionGeometry = fresh.fetchRegionGeometry;
+    sandbox.fetchFeaturesLayerSummary = fresh.fetchFeaturesLayerSummary;
+    fresh.mapConfig = mapConfig;
+    fresh.renderRegion = sandbox.renderRegion;
+    fresh.renderSummaries = sandbox.renderSummaries;
+
+    let releaseA;
+    const gateA = new Promise((r) => { releaseA = r; });
+    let fetchCount = 0;
+    fresh.fetchWithVersionValidation = async () => {
+        fetchCount += 1;
+        if (fetchCount === 1) await gateA;
+        return { data: { id: fetchCount } };
+    };
+    let summaryCount = 0;
+    fresh.fetch = async () => {
+        summaryCount += 1;
+        if (summaryCount === 1) await gateA;
+        const id = summaryCount;
+        return { ok: true, json: async () => ({ id }) };
+    };
+    let featureCount = 0;
+    sandbox.fetchFeatureGeometries = () => {
+        featureCount += 1;
+        return featureCount === 1
+            ? Promise.resolve({ superseded: true })
+            : Promise.resolve();
+    };
+
+    sandbox.loadLayers(new URLSearchParams({ name: "oak" }));
+    sandbox.loadLayers(new URLSearchParams({ name: "beech" }));
+    await new Promise((r) => setImmediate(r));
+    releaseA();
+    for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+
+    assert.deepEqual(rendered, [["region", { id: 2 }], ["summary", { id: 2 }]]);
+});
