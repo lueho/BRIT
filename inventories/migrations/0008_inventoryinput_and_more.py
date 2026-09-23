@@ -23,7 +23,10 @@ def create_inventory_inputs(apps, schema_editor):
 
     offset = max(series_ids, default=0)
     sample_ids = list(
-        Sample.objects.using(alias).order_by("pk").values_list("pk", flat=True)
+        Sample.objects.using(alias)
+        .filter(standalone=True)
+        .order_by("pk")
+        .values_list("pk", flat=True)
     )
     InventoryInput.objects.using(alias).bulk_create(
         [InventoryInput(id=offset + pk, sample_id=pk) for pk in sample_ids]

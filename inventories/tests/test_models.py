@@ -998,6 +998,9 @@ class InventoryInputBackfillTestCase(TestCase):
             name="Backfill Sample", material=material, standalone=True
         )
         series = SampleSeries.objects.create(name="Backfill Series", material=material)
+        member = Sample.objects.create(
+            name="Backfill Member", material=material, series=series
+        )
         InventoryInput.objects.all().delete()
 
         migration.create_inventory_inputs(apps, SimpleNamespace(connection=connection))
@@ -1007,6 +1010,7 @@ class InventoryInputBackfillTestCase(TestCase):
         offset = SampleSeries.objects.order_by("-pk").first().pk
         sample_input = InventoryInput.objects.get(sample=sample)
         self.assertEqual(sample_input.pk, offset + sample.pk)
+        self.assertFalse(InventoryInput.objects.filter(sample=member).exists())
 
         region = Region.objects.create(name="Backfill Region")
         scenario = Scenario.objects.create(name="Backfill Scenario", region=region)
