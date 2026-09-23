@@ -1215,9 +1215,11 @@ function loadLayers(params) {
     if (promises.length > 0) {
         Promise.all(promises)
             .then((results) => {
-                // A newer load owns the shared spinner, filter lock and
-                // bounds now; refreshing here would tear them down early.
+                // A newer load owns the filter lock and bounds now; only
+                // release this load's spin() reference (Leaflet.Spin
+                // refcounts) so the newer load's spinner stays balanced.
                 if (results.some((result) => result && result.superseded)) {
+                    hideLoadingIndicator();
                     return;
                 }
                 return refreshMap(promises);

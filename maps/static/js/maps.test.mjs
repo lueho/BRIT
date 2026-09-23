@@ -237,7 +237,9 @@ test("loadLayers skips refreshMap when the feature load was superseded", async (
     const { sandbox, calls, mapConfig } = setup();
     mapConfig.loadFeatures = true;
     let refreshes = 0;
+    let hides = 0;
     sandbox.refreshMap = () => { refreshes += 1; };
+    sandbox.hideLoadingIndicator = () => { hides += 1; };
     sandbox.fetchFeatureGeometries = () => Promise.resolve({ superseded: true });
 
     sandbox.loadLayers(new URLSearchParams({ name: "oak" }));
@@ -245,6 +247,9 @@ test("loadLayers skips refreshMap when the feature load was superseded", async (
 
     assert.equal(refreshes, 0);
     assert.equal(calls.cleanup, 0);
+    // Leaflet.Spin refcounts spin(true) calls, so the superseded load must
+    // still release its own reference without touching the filter lock.
+    assert.equal(hides, 1);
 });
 
 test("loadLayers refreshes when the feature load completed normally", async () => {
