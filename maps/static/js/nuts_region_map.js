@@ -102,7 +102,11 @@ function withVintage(params) {
     return vintage ? { ...params, version: vintage } : params;
 }
 
+let nutsUpdateGeneration = 0;
+
 async function updateLayers({ region_params, catchment_params, feature_params } = {}) {
+    const generation = ++nutsUpdateGeneration;
+    const isCurrent = () => generation === nutsUpdateGeneration;
     if (feature_params) {
         feature_params = withVintage(feature_params);
     }
@@ -113,11 +117,29 @@ async function updateLayers({ region_params, catchment_params, feature_params } 
         catchmentLayer = null;
     }
     const promises = [
-        region_params && fetchRegionGeometry(region_params),
-        catchment_params && fetchCatchmentGeometry(catchment_params),
+        region_params && fetchRegionGeometry(region_params, isCurrent),
+        catchment_params && fetchCatchmentGeometry(catchment_params, isCurrent),
         feature_params && fetchFeatureGeometries(feature_params)
     ].filter(Boolean);
     prepareMapRefresh();
+    let results;
+    try {
+        results = await Promise.all(promises);
+    } catch (error) {
+        console.error('Error loading NUTS layers:', error);
+        if (isCurrent()) {
+            cleanup();
+        } else {
+            hideLoadingIndicator();
+        }
+        return;
+    }
+    // A newer selection owns the form lock and bounds; only release this
+    // call's spin() reference (Leaflet.Spin refcounts).
+    if (!isCurrent() || results.some((result) => result && result.superseded)) {
+        hideLoadingIndicator();
+        return;
+    }
     await refreshMap(promises);
 }
 

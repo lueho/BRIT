@@ -148,3 +148,25 @@ test("an async onFeatureBatch is awaited before the next batch and onComplete", 
     "complete",
   ]);
 });
+
+test("a throwing onFeatureBatch rejects the parse instead of re-emitting the batch", async () => {
+    const payload = JSON.stringify({
+        type: "FeatureCollection",
+        features: makeFeatures(2500),
+    });
+    const batches = [];
+    let completed = false;
+    const loader = new StreamingGeoJSONLoader({
+        onFeatureBatch: (batch) => {
+            batches.push(batch.length);
+            throw new Error("Invalid GeoJSON object.");
+        },
+        onComplete: () => { completed = true; },
+    });
+    await assert.rejects(
+        loader._parseStreamingResponse(fakeResponse(payload, 4096), 2500),
+        /Invalid GeoJSON/,
+    );
+    assert.deepEqual(batches, [1000]);
+    assert.equal(completed, false);
+});
