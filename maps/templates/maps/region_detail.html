@@ -1,15 +1,15 @@
 {% extends 'geo_detail_card.html' %}
 {% load moderation_tags %}
 
-{% block title %}BRIT | Maps | Region: {{ object.name }}{% endblock %}
+{% block title %}BRIT | Maps | Region: {{ object.display_name }}{% endblock %}
 
-{% block detail_header %}Region: {{ object.name }}{% endblock %}
+{% block detail_header %}Region: {{ object.display_name }}{% endblock %}
 
 {% block detail_body %}
     <p class="card-text">
         <strong>Name:</strong>
         <br>
-        {{ object.name }}
+        {{ object.display_name }}
     </p>
     {% if object.country %}
         <p class="card-text">

@@ -85,6 +85,15 @@ NUTS_IMPORT_SCHEMA = {
                     "cntr_code": {"type": "string", "maxLength": 2},
                     "name_latn": {"type": "string", "maxLength": 70},
                     "nuts_name": {"type": "string", "maxLength": 106},
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 113,
+                        "description": (
+                            "English display name where one is known (e.g. a "
+                            "Wikidata English label). The source-language name "
+                            "remains the fallback."
+                        ),
+                    },
                     "mount_type": {"type": ["integer", "null"]},
                     "urbn_type": {"type": ["integer", "null"]},
                     "coast_type": {"type": ["integer", "null"]},

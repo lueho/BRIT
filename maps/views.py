@@ -6,7 +6,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
-from django.db.models import Q, Subquery
+from django.db.models import Q, Subquery, Value
+from django.db.models.functions import Coalesce, NullIf
 from django.forms import formset_factory
 from django.http import Http404, JsonResponse, StreamingHttpResponse
 from django.urls import NoReverseMatch, reverse, reverse_lazy
@@ -1346,13 +1347,29 @@ class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
     model = NutsRegion
     # Lookups that cannot take a search term (an id, an integer level) make
     # django-tomselect drop the whole search and list everything instead.
-    search_lookups = ["name__icontains", "name_latn__icontains", "nuts_id__icontains"]
-    value_fields = ["id", "name_latn", "levl_code", "parent_id", "nuts_id"]
+    search_lookups = [
+        "name__icontains",
+        "name_latn__icontains",
+        "name_en__icontains",
+        "nuts_id__icontains",
+    ]
+    value_fields = [
+        "id",
+        "display_name",
+        "name_latn",
+        "levl_code",
+        "parent_id",
+        "nuts_id",
+    ]
 
     def hook_queryset(self, queryset):
         """Offer each territory once, from the vintage the map is showing."""
         queryset = super().hook_queryset(queryset)
-        return queryset.in_vintage(NutsVintage.from_request(self.request))
+        return queryset.in_vintage(NutsVintage.from_request(self.request)).annotate(
+            display_name=Coalesce(
+                NullIf("name_en", Value("")), "name_latn", "nuts_name", "name"
+            )
+        )
 
     def apply_filters(self, queryset):
         # Check for ancestor filtering (nuts_id prefix matching)
@@ -1403,8 +1420,12 @@ class NutsRegionLevel3AutocompleteView(NutsRegionAutocompleteView):
 
 class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Region
-    search_lookups = ["name__icontains", "lauregion__lau_id__contains"]
-    value_fields = ["name", "lauregion__lau_id", "lauregion__lau_name"]
+    search_lookups = [
+        "name__icontains",
+        "name_en__icontains",
+        "lauregion__lau_id__contains",
+    ]
+    value_fields = ["name", "name_en", "lauregion__lau_id", "lauregion__lau_name"]
 
     def hook_queryset(self, queryset):
         """
@@ -1415,12 +1436,12 @@ class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):
     def hook_prepare_results(self, results):
         """
         Customize the display label to include the LAU ID code, similar to
-        LauRegion.__str__ method: f"{self.lau_name} ({self.lau_id})"
+        LauRegion.__str__ method: f"{self.display_name} ({self.lau_id})"
         """
         for item in results:
             # Get the LAU ID from the related LauRegion object
             lau_id = item.get("lauregion__lau_id")
-            lau_name = item.get("lauregion__lau_name")
+            lau_name = item.get("name_en") or item.get("lauregion__lau_name")
             item["text"] = f"{lau_name} ({lau_id})"
         return results
 

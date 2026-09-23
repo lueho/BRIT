@@ -1512,6 +1512,74 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         ids = [region["id"] for region in json.loads(response.content)["results"]]
         self.assertListEqual([lau.id for lau in LauRegion.objects.all()], ids)
 
+    def test_english_name_is_the_label_when_held(self):
+        lau = LauRegion.objects.get(lau_id="123")
+        lau.name_en = "English Region Name"
+        lau.save()
+        response = self.client.get(self.url, data={"q": "123"})
+        item = next(
+            r for r in json.loads(response.content)["results"] if r["id"] == lau.pk
+        )
+        self.assertEqual(item["text"], "English Region Name (123)")
+
+    def test_search_finds_regions_by_english_name(self):
+        lau = LauRegion.objects.get(lau_id="123")
+        lau.name_en = "Unique English Moniker"
+        lau.save()
+        response = self.client.get(self.url, data={"q": "Moniker"})
+        ids = [r["id"] for r in json.loads(response.content)["results"]]
+        self.assertIn(lau.pk, ids)
+
+
+class NutsRegionEnglishNameTestCase(ViewWithPermissionsTestCase):
+    url = reverse("nutsregion-autocomplete")
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.region = NutsRegion.objects.create(
+            name="Bayern",
+            name_latn="Bayern",
+            nuts_name="Bayern",
+            name_en="Bavaria",
+            nuts_id="DE2",
+            levl_code=1,
+            publication_status="published",
+        )
+        cls.without_english = NutsRegion.objects.create(
+            name="Freising",
+            name_latn="Freising",
+            nuts_name="Freising",
+            nuts_id="DE21",
+            levl_code=2,
+            parent=cls.region,
+            publication_status="published",
+        )
+
+    def test_english_name_is_served_as_display_label(self):
+        response = self.client.get(self.url, data={"q": "DE2"})
+        item = next(r for r in response.json()["results"] if r["id"] == self.region.pk)
+        self.assertEqual(item["display_name"], "Bavaria")
+
+    def test_display_label_falls_back_to_latin_name(self):
+        response = self.client.get(self.url, data={"q": "DE21"})
+        item = next(
+            r for r in response.json()["results"] if r["id"] == self.without_english.pk
+        )
+        self.assertEqual(item["display_name"], "Freising")
+
+    def test_search_finds_regions_by_english_name(self):
+        response = self.client.get(self.url, data={"q": "Bavaria"})
+        ids = [r["id"] for r in response.json()["results"]]
+        self.assertIn(self.region.pk, ids)
+
+    def test_region_detail_shows_english_name(self):
+        response = self.client.get(
+            reverse("region-detail", kwargs={"pk": self.region.region_ptr_id})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bavaria")
+
 
 class NutsRegionAutocompleteFilterParsingTestCase(ViewWithPermissionsTestCase):
     url = reverse("nutsregion-autocomplete-level1")

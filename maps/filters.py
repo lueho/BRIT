@@ -87,7 +87,7 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
             config=TomSelectConfig(
                 url="nutsregion-autocomplete-level0",
                 value_field="region_ptr",
-                label_field="name_latn",
+                label_field="display_name",
                 placeholder="NUTS 0 (country)",
             )
         ),
@@ -101,7 +101,7 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
             config=TomSelectConfig(
                 url="nutsregion-autocomplete-level1",
                 value_field="region_ptr",
-                label_field="name_latn",
+                label_field="display_name",
                 filter_by=("level_0", "parent_id"),
                 placeholder="NUTS 1 region",
             ),
@@ -116,7 +116,7 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
             config=TomSelectConfig(
                 url="nutsregion-autocomplete-level2",
                 value_field="id",
-                label_field="name_latn",
+                label_field="display_name",
                 filter_by=("level_1", "parent_id"),
                 placeholder="NUTS 2 region",
             ),
@@ -131,7 +131,7 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
             config=TomSelectConfig(
                 url="nutsregion-autocomplete-level3",
                 value_field="id",
-                label_field="name_latn",
+                label_field="display_name",
                 filter_by=("level_2", "parent_id"),
                 placeholder="NUTS 3 region",
             ),

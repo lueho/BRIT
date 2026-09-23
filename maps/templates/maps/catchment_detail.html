@@ -23,14 +23,14 @@
         <p class="card-text">
             <strong>Region:</strong>
             <br>
-            <a href="{% url "region-detail" object.region.pk %}">{{ object.region.name }}</a>
+            <a href="{% url "region-detail" object.region.pk %}">{{ object.region.display_name }}</a>
         </p>
     {% endif %}
     {% if object.parent_region %}
         <p class="card-text">
             <strong>Parent region:</strong>
             <br>
-            <a href="{% url "region-detail" object.parent_region.pk %}">{{ object.parent_region.name }}</a>
+            <a href="{% url "region-detail" object.parent_region.pk %}">{{ object.parent_region.display_name }}</a>
         </p>
     {% endif %}
     {% if object.description %}
