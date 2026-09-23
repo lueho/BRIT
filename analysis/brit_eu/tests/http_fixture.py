@@ -29,7 +29,9 @@ class Handler(BaseHTTPRequestHandler):
         base = f"http://127.0.0.1:{self.server.server_port}"
         parsed = urlsplit(self.path)
         path = parsed.path
-        if path == "/waste_collection/api/collection/analysis/":
+        if path == "/waste_collection/api/collection/" and parse_qs(parsed.query).get(
+            "view"
+        ) == ["extended"]:
             private = (
                 parse_qs(parsed.query).get("scope", ["published"])[0] != "published"
             )

@@ -730,8 +730,8 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         return qs.filter(forbidden_materials__in=values).distinct()
 
 
-class CollectionAnalysisFilterSet(CollectionFilterSet):
-    """Allow the analysis API to return all collections visible to a user."""
+class CollectionExtendedFilterSet(CollectionFilterSet):
+    """Allow the extended collection list to return all visible collections."""
 
     scope = ChoiceFilter(
         choices=(

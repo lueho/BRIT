@@ -73,17 +73,17 @@ Für eigene Daten eine Kopie des Pakets anlegen und die Spaltenkonventionen beib
 
 ## 4. Aktuelle BRIT-Daten über die Live-API
 
-Die neue API muss auf der angesprochenen BRIT-Instanz bereitgestellt sein:
+Die bestehende Sammlungs-API muss auf der angesprochenen BRIT-Instanz die erweiterte Ansicht unterstützen:
 
 ```text
-GET /waste_collection/api/collection/analysis/
+GET /waste_collection/api/collection/?view=extended
 ```
 
 **Einzeldatei für den direkten Einstieg:** [`BRIT_Datenanalyse.R`](BRIT_Datenanalyse.R) kann auch allein heruntergeladen werden. Vorausgesetzt werden R ab Version 4.3.3 und Internetzugang; das Skript installiert beim ersten Start seine vier R-Pakete in die Benutzerbibliothek. Unter Linux können dafür die oben genannten Systembibliotheken nötig sein. In RStudio die Datei öffnen und **Source** wählen oder im Terminal `Rscript BRIT_Datenanalyse.R` ausführen. Danach nur den BRIT-Benutzernamen und das Passwort eingeben. Die Datei tauscht diese Angaben über `/api-token-auth/` gegen ein Token, hält es nur im Arbeitsspeicher und speichert es nicht in Ergebnissen. Das Passwort wird verdeckt abgefragt.
 
 Voreingestellt ist `FILTER <- list(scope = "all")`: Es werden alle für das Konto sichtbaren Sammlungen abgerufen, möglicherweise einschließlich privater Daten. Der Ordner `BRIT_Ergebnisse` enthält CSV, RDS, Prüfsummen und eine einfache Zusammenfassung nach Land und Abfallkategorie. Diese Dateien entsprechend den eigenen Datenrechten behandeln. Für eigene Fragen `FILTER` und die Beispielauswertung am Ende der R-Datei ändern. Die Einzeldatei nutzt aktuelle BRIT-Daten; für die sieben historischen Projektanalysen mit dem festen Datenstand bleibt das vollständige Release-ZIP vorgesehen.
 
-Die Einzeldatei setzt den lokal implementierten Analyse-Endpunkt auf dem verwendeten BRIT-Server voraus. Der öffentliche Server antwortete bei der Prüfung am 23.09.2026 auf diesen Pfad mit HTTP 500, ebenso auf einen bewusst ungültigen Sammlungs-Detailpfad. Das deutet auf eine noch fehlende Route hin; ein anderer Serverfehler ist ohne Serverprotokolle nicht ausgeschlossen. Die Datei weist bei HTTP 404 oder 500 darauf hin. Ein lokal erfolgreicher Test allein macht die Produktionsinstanz noch nicht nutzbar.
+Die Einzeldatei setzt die lokal implementierte erweiterte Listenansicht auf dem verwendeten BRIT-Server voraus. Der öffentliche Server lieferte bei der Prüfung am 23.09.2026 auf `?view=extended` noch die schlanke Standardantwort ohne `schema_version` und Jahreswerte. Bis zur Bereitstellung bricht der R-Client deshalb mit einem Schemafehler ab, statt unvollständige Daten auszuwerten. Ohne `view` bleibt die bisherige Listen-API unverändert.
 
 Sie liefert flache Datensätze einschließlich stabiler IDs, Quellenangaben, zeitlicher Gültigkeit, Regionsmerkmalen und verfügbaren Jahreswerten mit Einheiten. Der öffentliche Zugriff liefert ausschließlich freigegebene Daten. Nicht öffentliche Daten benötigen ein BRIT-Token und die entsprechenden bestehenden Berechtigungen.
 
@@ -108,7 +108,7 @@ Der Client lädt automatisch alle Seiten, prüft Schemaversion, Gesamtzahl und d
 
 **Die Live-Daten werden nicht stillschweigend in die historischen Factsheet-Skripte eingesetzt.** Die Fallstudien verwenden ergänzende Zuordnungen, Sortieranalysen und eigene Bezugsgrößen. Eine Übertragung auf neue Daten benötigt diese fachlichen Schritte erneut. `live.R` zeigt deshalb einen eigenständigen, frei anpassbaren Auswertungsweg. Aggregierte Angaben sind nicht ohne Prüfung unabhängige kommunale Beobachtungen; Einheiten und Datenlücken sind vor Berechnungen zu berücksichtigen.
 
-Der API-Code liegt im BRIT-Zweig `feat/reproducible-r-analysis`. Vor dessen Bereitstellung meldet der Client einen eindeutigen HTTP-404-Hinweis; die archivierten Analysen funktionieren unabhängig davon.
+Der API-Code liegt im BRIT-Zweig `feat/reproducible-r-analysis`. Vor dessen Bereitstellung meldet der Client bei der heutigen öffentlichen Instanz einen eindeutigen Schemafehler; die archivierten Analysen funktionieren unabhängig davon.
 
 ## 5. Optionaler Download von einem archivierten Datenrelease
 

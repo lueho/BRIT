@@ -1,4 +1,4 @@
-"""Contract for the paginated, permission-aware R analysis interface."""
+"""Contract for the optional extended collection list representation."""
 
 from django.urls import reverse
 from rest_framework.test import APITestCase
@@ -17,10 +17,40 @@ class CollectionAnalysisApiTests(APITestCase):
     )
 
     def endpoint(self):
-        return reverse("api-waste-collection-analysis")
+        return reverse("api-waste-collection-list")
+
+    def get_extended(self, params=None):
+        return self.client.get(self.endpoint(), {"view": "extended", **(params or {})})
+
+    def test_default_list_remains_lean(self):
+        prop = Property.objects.get_or_create(name="Connection rate")[0]
+        unit = Unit.objects.get_or_create(name="%")[0]
+        CollectionPropertyValue.objects.create(
+            collection=self.published_collection,
+            property=prop,
+            unit=unit,
+            year=2024,
+            average=42,
+            owner=self.regular_user,
+            publication_status="published",
+        )
+        response = self.client.get(self.endpoint(), {"page_size": 1})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("schema_version", response.data)
+        self.assertNotIn("generated_at", response.data)
+        self.assertNotIn("snapshot_isolation", response.data)
+        self.assertNotIn("connection_rate_2024", response.data["results"][0])
+        self.client.force_authenticate(self.regular_user)
+        self.assertEqual(
+            self.client.get(self.endpoint(), {"scope": "all"}).status_code, 400
+        )
+
+    def test_unknown_view_is_rejected(self):
+        response = self.client.get(self.endpoint(), {"view": "unknown"})
+        self.assertEqual(response.status_code, 400)
 
     def test_public_page_has_versioned_contract_and_stable_identifiers(self):
-        response = self.client.get(self.endpoint(), {"page_size": 1})
+        response = self.get_extended({"page_size": 1})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["schema_version"], "1.0")
         self.assertEqual(response.data["count"], 2)
@@ -33,16 +63,14 @@ class CollectionAnalysisApiTests(APITestCase):
         self.assertIn("bibliography_sources", row)
 
     def test_all_pages_are_disjoint_and_use_same_contract(self):
-        first = self.client.get(self.endpoint(), {"page_size": 1}).data
+        first = self.get_extended({"page_size": 1}).data
         second = self.client.get(first["next"]).data
         self.assertEqual(second["schema_version"], first["schema_version"])
         self.assertNotEqual(first["results"][0]["id"], second["results"][0]["id"])
         self.assertIsNone(second["next"])
 
     def test_collection_filter_is_applied(self):
-        response = self.client.get(
-            self.endpoint(), {"id": self.published_collection.pk}
-        )
+        response = self.get_extended({"id": self.published_collection.pk})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(
@@ -52,12 +80,12 @@ class CollectionAnalysisApiTests(APITestCase):
     def test_anonymous_cannot_request_non_public_scope(self):
         for scope in ("private", "review", "all"):
             with self.subTest(scope=scope):
-                response = self.client.get(self.endpoint(), {"scope": scope})
+                response = self.get_extended({"scope": scope})
                 self.assertIn(response.status_code, (401, 403))
 
     def test_owner_scope_does_not_expose_other_owners_private_data(self):
         self.client.force_authenticate(self.regular_user)
-        response = self.client.get(self.endpoint(), {"scope": "private"})
+        response = self.get_extended({"scope": "private"})
         self.assertEqual(response.status_code, 200)
         ids = {row["id"] for row in response.data["results"]}
         self.assertIn(self.private_collection.pk, ids)
@@ -73,12 +101,12 @@ class CollectionAnalysisApiTests(APITestCase):
         self.assertEqual(login.status_code, 200)
         self.assertIn("token", login.data)
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {login.data['token']}")
-        response = self.client.get(self.endpoint(), {"scope": "private"})
+        response = self.get_extended({"scope": "private"})
         self.assertEqual(response.status_code, 200)
         ids = {row["id"] for row in response.data["results"]}
         self.assertIn(self.private_collection.pk, ids)
         self.assertNotIn(self.other_user_private_collection.pk, ids)
-        all_visible = self.client.get(self.endpoint(), {"scope": "all"})
+        all_visible = self.get_extended({"scope": "all"})
         self.assertEqual(all_visible.status_code, 200)
         visible_ids = {row["id"] for row in all_visible.data["results"]}
         self.assertIn(self.published_collection.pk, visible_ids)
@@ -98,9 +126,7 @@ class CollectionAnalysisApiTests(APITestCase):
                 owner=self.regular_user,
                 publication_status=state,
             )
-        response = self.client.get(
-            self.endpoint(), {"id": self.published_collection.pk}
-        )
+        response = self.get_extended({"id": self.published_collection.pk})
         self.assertEqual(response.status_code, 200)
         row = response.data["results"][0]
         self.assertEqual(row["connection_rate_2024"], 0)
@@ -108,11 +134,7 @@ class CollectionAnalysisApiTests(APITestCase):
         self.assertNotIn("connection_rate_2025", row)
 
     def test_empty_result_still_has_a_versioned_envelope(self):
-        response = self.client.get(self.endpoint(), {"publication_status": "private"})
+        response = self.get_extended({"publication_status": "private"})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["schema_version"], "1.0")
         self.assertEqual(response.data["results"], [])
-
-    def test_read_only_action(self):
-        self.client.force_authenticate(self.staff_user)
-        self.assertEqual(self.client.post(self.endpoint(), {}).status_code, 405)

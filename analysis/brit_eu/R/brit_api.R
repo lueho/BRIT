@@ -15,7 +15,7 @@ brit_http_json <- function(url, token = "") {
     Sys.sleep(2^(attempt - 1))
   }
   if (response$status_code != 200L) {
-    hint <- if (response$status_code == 404L) " Deploy the BRIT analysis endpoint first, or check BRIT_API_URL." else ""
+    hint <- if (response$status_code == 404L) " Deploy BRIT's extended collection list first, or check BRIT_API_URL." else ""
     stop(sprintf("BRIT returned HTTP %d.%s", response$status_code, hint))
   }
   tryCatch(jsonlite::fromJSON(rawToChar(response$content), simplifyVector = FALSE),
@@ -33,15 +33,16 @@ brit_collections <- function(base_url = Sys.getenv("BRIT_API_URL", "https://brit
     stop("Use HTTPS for authenticated requests")
   }
   if (!is.list(filters) || is.null(names(filters))) stop("filters must be a named list")
-  if (any(names(filters) %in% c("page", "page_size", "token", "Authorization"))) {
-    stop("Pagination and credentials must not be supplied as filters")
+  if (any(names(filters) %in% c("page", "page_size", "view", "token", "Authorization"))) {
+    stop("Pagination, view and credentials must not be supplied as filters")
   }
-  params <- c(filters, list(page_size = min(200L, max(1L, as.integer(page_size)))))
+  params <- c(list(view = "extended"), filters,
+              list(page_size = min(200L, max(1L, as.integer(page_size)))))
   query <- unlist(lapply(names(params), function(key) {
     vapply(as.character(params[[key]]), function(value)
       paste0(utils::URLencode(key, reserved = TRUE), "=", utils::URLencode(value, reserved = TRUE)), "")
   }), use.names = FALSE)
-  url <- paste0(base_url, "/waste_collection/api/collection/analysis/?", paste(query, collapse = "&"))
+  url <- paste0(base_url, "/waste_collection/api/collection/?", paste(query, collapse = "&"))
   initial_url <- url
   visited <- character(); rows <- list(); expected <- NULL
   started <- format(Sys.time(), tz = "UTC", usetz = TRUE)

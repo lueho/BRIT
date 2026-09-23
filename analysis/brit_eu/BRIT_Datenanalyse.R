@@ -52,7 +52,7 @@ brit_eu_json <- function(url, token = "", form = NULL) {
   if (response$status_code != 200L) {
     if (!is.null(form)) stop("BRIT-Anmeldung fehlgeschlagen (HTTP ", response$status_code, ").")
     hint <- if (response$status_code %in% c(404L, 500L)) {
-      " Der Analyse-Endpunkt fehlt auf dieser Instanz moeglicherweise; bei HTTP 500 kann auch ein Serverfehler vorliegen."
+      " Die erweiterte Listenansicht fehlt auf dieser Instanz moeglicherweise; bei HTTP 500 kann auch ein Serverfehler vorliegen."
     } else ""
     stop("BRIT-Datenabruf fehlgeschlagen (HTTP ", response$status_code, ").", hint)
   }
@@ -94,17 +94,18 @@ brit_eu_column <- function(rows, field) {
 brit_eu_collections <- function(base_url, filters, token, page_size = 200L, max_pages = 10000L) {
   base_url <- brit_eu_base(base_url)
   if (!is.list(filters) || is.null(names(filters)) || any(!nzchar(names(filters))) ||
-      any(names(filters) %in% c("page", "page_size", "token", "Authorization"))) {
+      any(names(filters) %in% c("page", "page_size", "view", "token", "Authorization"))) {
     stop("FILTER muss eine benannte Liste gueltiger BRIT-Filter sein.")
   }
-  params <- c(filters, list(page_size = min(200L, max(1L, as.integer(page_size)))))
+  params <- c(list(view = "extended"), filters,
+              list(page_size = min(200L, max(1L, as.integer(page_size)))))
   query <- unlist(lapply(names(params), function(name) {
     vapply(as.character(params[[name]]), function(value) {
       paste0(utils::URLencode(name, reserved = TRUE), "=",
              utils::URLencode(value, reserved = TRUE))
     }, "")
   }), use.names = FALSE)
-  url <- paste0(base_url, "/waste_collection/api/collection/analysis/?", paste(query, collapse = "&"))
+  url <- paste0(base_url, "/waste_collection/api/collection/?", paste(query, collapse = "&"))
   requested <- url
   visited <- character()
   rows <- list()

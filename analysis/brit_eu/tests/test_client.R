@@ -15,8 +15,15 @@ for (i in seq_along(pages)) {
   pages[[i]]["next"] <- list(pages[[i]]$next_url)
   pages[[i]]$next_url <- NULL
 }
-fetch <- local({ i <- 0L; function(url, token) { i <<- i + 1L; pages[[i]] } })
+requested <- character()
+fetch <- local({ i <- 0L; function(url, token) {
+  i <<- i + 1L
+  requested <<- c(requested, url)
+  pages[[i]]
+} })
 data <- brit_collections("https://example.org", fetch = fetch)
+stopifnot(grepl("^https://example.org/waste_collection/api/collection/\\?view=extended&",
+                requested[1]))
 stopifnot(nrow(data) == 2L, identical(data$nuts_or_lau_id, c("00123", "00456")),
           data$connection_rate_2024[1] == 0, is.na(data$connection_rate_2024[2]),
           data$specific_waste_collected_2024[2] == 42,

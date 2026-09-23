@@ -23,7 +23,7 @@ from maps.db_functions import SimplifyPreserveTopology
 from maps.mixins import CachedGeoJSONMixin
 from maps.utils import build_collection_cache_key
 from sources.waste_collection.filters import (
-    CollectionAnalysisFilterSet,
+    CollectionExtendedFilterSet,
     CollectionFilterSet,
 )
 from sources.waste_collection.importers import CollectionImporter
@@ -69,6 +69,11 @@ logger = logging.getLogger(__name__)
 
 class CollectionDjangoFilterBackend(rf_filters.DjangoFilterBackend):
     """DjangoFilterBackend variant that accepts extra view-provided kwargs."""
+
+    def get_filterset_class(self, view, queryset=None):
+        if view._extended_list_requested():
+            return CollectionExtendedFilterSet
+        return super().get_filterset_class(view, queryset)
 
     def get_filterset_kwargs(self, request, queryset, view):
         kwargs = super().get_filterset_kwargs(request, queryset, view)
@@ -121,11 +126,11 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        if getattr(self, "action", None) not in {"list", "analysis"}:
+        if getattr(self, "action", None) != "list":
             return queryset
 
         relation_queryset = Collection.objects.only("pk").order_by("pk")
-        return queryset.select_related(
+        queryset = queryset.select_related(
             "owner",
             "catchment",
             "catchment__region",
@@ -153,6 +158,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 to_attr="_prefetched_successors",
             ),
         )
+        return queryset.order_by("pk") if self._extended_list_requested() else queryset
 
     def get_geojson_queryset(self):
         """Return optimized queryset for GeoJSON with simplified geometry.
@@ -222,8 +228,15 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         if action == "retrieve":
             return CollectionModelSerializer
         if action == "list":
+            if self._extended_list_requested():
+                return CollectionAnalysisSerializer
             return CollectionResearchSerializer
         return super().get_serializer_class()
+
+    def _extended_list_requested(self):
+        return getattr(self, "action", None) == "list" and (
+            self.request.query_params.get("view") == "extended"
+        )
 
     # Ensure CachedGeoJSONMixin uses the GeoJSON serializer class
     def get_geojson_serializer_class(self):
@@ -235,7 +248,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         API endpoints do not render filter widgets, so they can skip
         expensive min/max slider calculations performed during filterset init.
         """
-        if getattr(self, "action", None) in {"geojson", "list", "version", "analysis"}:
+        if getattr(self, "action", None) in {"geojson", "list", "version"}:
             return {"skip_min_max": True}
         return {}
 
@@ -250,35 +263,9 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 f"Authentication is required to access the '{scope}' scope."
             )
 
-    @action(
-        detail=False,
-        methods=["get"],
-        permission_classes=[permissions.AllowAny],
-        filterset_class=CollectionAnalysisFilterSet,
-    )
-    def analysis(self, request):
-        """Paginated flat data, including year-specific metrics and their units.
-
-        Uses the same visibility policy and filters as the collection list. A
-        live paginated read is not a transactionally isolated database snapshot;
-        external analyses should archive the received data with their code.
-        """
-        self._enforce_authenticated_non_public_scope(request)
-        queryset = self.filter_queryset(self.get_queryset()).order_by("pk")
-        page = self.paginate_queryset(queryset)
-        serializer = CollectionAnalysisSerializer(
-            page, many=True, context=self.get_serializer_context()
-        )
-        response = self.get_paginated_response(serializer.data)
-        response.data.update(
-            schema_version="1.0",
-            generated_at=timezone.now().isoformat(),
-            snapshot_isolation=False,
-        )
-        response["Cache-Control"] = "private, no-store"
-        return response
-
     def list(self, request, *args, **kwargs):
+        if "view" in request.query_params and not self._extended_list_requested():
+            raise ValidationError({"view": "Use 'extended' or omit this parameter."})
         self._enforce_authenticated_non_public_scope(request)
         started_at = time.perf_counter()
         query_count_start = (
@@ -288,6 +275,14 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         )
 
         response = super().list(request, *args, **kwargs)
+
+        if self._extended_list_requested():
+            response.data.update(
+                schema_version="1.0",
+                generated_at=timezone.now().isoformat(),
+                snapshot_isolation=False,
+            )
+            response["Cache-Control"] = "private, no-store"
 
         duration_seconds = time.perf_counter() - started_at
         if duration_seconds >= self.collection_list_slow_log_threshold_seconds:
