@@ -6,7 +6,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db import transaction
 from django.db.models import Q
-from django.http import Http404, HttpResponse, HttpResponseForbidden, JsonResponse
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseForbidden,
+    JsonResponse,
+)
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, TemplateView, View
@@ -43,6 +49,7 @@ from .forms import (
     SeasonalDistributionModelForm,
 )
 from .models import (
+    FeedstockNotImplemented,
     InventoryAlgorithm,
     InventoryAlgorithmParameter,
     InventoryAlgorithmParameterValue,
@@ -213,6 +220,16 @@ class ScenarioAddInventoryAlgorithmView(
             return HttpResponseForbidden()
         algorithm_id = request.POST.get("inventory_algorithm")
         algorithm = InventoryAlgorithm.objects.get(id=algorithm_id)
+        if (
+            not scenario.available_inventory_algorithms(
+                feedstock=feedstock, geodataset=algorithm.geodataset
+            )
+            .filter(pk=algorithm.pk)
+            .exists()
+        ):
+            return HttpResponseBadRequest(
+                "The selected algorithm does not support this feedstock."
+            )
         parameters = algorithm.inventoryalgorithmparameter_set.all()
         values = {}
         for parameter in parameters:
@@ -223,7 +240,10 @@ class ScenarioAddInventoryAlgorithmView(
                 values[parameter].append(
                     InventoryAlgorithmParameterValue.objects.get(id=value_id)
                 )
-        scenario.add_inventory_algorithm(feedstock, algorithm, values)
+        try:
+            scenario.add_inventory_algorithm(feedstock, algorithm, values)
+        except FeedstockNotImplemented as exc:
+            return HttpResponseBadRequest(str(exc))
         return redirect("scenario-detail", pk=scenario.pk)
 
     def get_object(self, **kwargs):

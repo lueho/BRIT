@@ -3,6 +3,7 @@
 import django.db.models.deletion
 from django.core.management.color import no_style
 from django.db import migrations, models
+from django.db.migrations.exceptions import IrreversibleError
 
 
 def create_inventory_inputs(apps, schema_editor):
@@ -40,7 +41,9 @@ def create_inventory_inputs(apps, schema_editor):
             cursor.execute(sql)
 
 
-def _retarget_fk(schema_editor, table, column, target_table, constraint_name):
+def _retarget_fk(
+    schema_editor, table, column, target_table, constraint_name, rewrite=None
+):
     quote = schema_editor.quote_name
     with schema_editor.connection.cursor() as cursor:
         cursor.execute(
@@ -63,11 +66,41 @@ def _retarget_fk(schema_editor, table, column, target_table, constraint_name):
             cursor.execute(
                 f"ALTER TABLE {quote(table)} DROP CONSTRAINT {quote(existing_name)}"
             )
+        if rewrite is not None:
+            rewrite(schema_editor, table, column)
         cursor.execute(
             f"ALTER TABLE {quote(table)} "
             f"ADD CONSTRAINT {quote(constraint_name)} "
             f"FOREIGN KEY ({quote(column)}) REFERENCES {quote(target_table)} ({quote('id')}) "
             "DEFERRABLE INITIALLY DEFERRED"
+        )
+
+
+def map_feedstock_to_series(schema_editor, table, column="feedstock_id"):
+    """Rewrite adapter IDs in ``table.column`` to the wrapped series IDs.
+
+    Rows that wrap a standalone sample have no series equivalent, so the
+    reverse migration refuses to run while such rows exist.
+    """
+    quote = schema_editor.quote_name
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute(
+            f"SELECT COUNT(*) FROM {quote(table)} t "
+            f"JOIN {quote('inventories_inventoryinput')} ii ON ii.id = t.{quote(column)} "
+            "WHERE ii.series_id IS NULL"
+        )
+        standalone_count = cursor.fetchone()[0]
+        if standalone_count:
+            raise IrreversibleError(
+                f"{standalone_count} row(s) in {table}.{column} reference standalone "
+                "sample inventory inputs, which have no sample series equivalent. "
+                "Delete those scenario configurations and result layers before "
+                "reversing this migration."
+            )
+        cursor.execute(
+            f"UPDATE {quote(table)} t SET {quote(column)} = ii.series_id "
+            f"FROM {quote('inventories_inventoryinput')} ii "
+            f"WHERE ii.id = t.{quote(column)}"
         )
 
 
@@ -95,6 +128,7 @@ def retarget_feedstock_fks_to_sampleseries(apps, schema_editor):
         "feedstock_id",
         "materials_sampleseries",
         "inventoryamountshare_feedstock_sampleseries_fk",
+        rewrite=map_feedstock_to_series,
     )
     _retarget_fk(
         schema_editor,
@@ -102,6 +136,7 @@ def retarget_feedstock_fks_to_sampleseries(apps, schema_editor):
         "feedstock_id",
         "materials_sampleseries",
         "scenarioconfig_feedstock_sampleseries_fk",
+        rewrite=map_feedstock_to_series,
     )
 
 

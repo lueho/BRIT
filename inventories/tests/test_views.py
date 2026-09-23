@@ -552,6 +552,50 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
         )
         mock_add.assert_called_once()
 
+    def test_post_with_unsupported_algorithm_returns_bad_request(self):
+        material = self.feedstock.material
+        sample = Sample.objects.create(
+            name="Static", owner=self.owner_a, material=material, standalone=True
+        )
+        static_algorithm = InventoryAlgorithm.objects.create(
+            name="Static Algorithm",
+            geodataset=self.algorithm.geodataset,
+            supports_standalone_samples=True,
+        )
+        static_algorithm.feedstocks.add(material)
+
+        self.client.force_login(self.owner_a)
+        url = reverse("scenario-add-configuration", kwargs={"pk": self.scenario_a.pk})
+        response = self.client.post(
+            url,
+            {
+                "feedstock": sample.inventory_input.pk,
+                "inventory_algorithm": self.algorithm.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(self.scenario_a.configuration().exists())
+
+    def test_post_catches_feedstock_not_implemented(self):
+        from ..models import FeedstockNotImplemented
+
+        self.client.force_login(self.owner_a)
+        url = reverse("scenario-add-configuration", kwargs={"pk": self.scenario_a.pk})
+        with patch.object(
+            Scenario,
+            "add_inventory_algorithm",
+            side_effect=FeedstockNotImplemented("x"),
+        ):
+            response = self.client.post(
+                url,
+                {
+                    "feedstock": self.feedstock.inventory_input.pk,
+                    "inventory_algorithm": self.algorithm.pk,
+                },
+            )
+        self.assertEqual(response.status_code, 400)
+
 
 class InventoryInputAutocompleteTestCase(TestCase):
     @classmethod

@@ -7,6 +7,7 @@ from django.apps import apps
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
+from django.db.migrations.exceptions import IrreversibleError
 from django.db.utils import IntegrityError
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
@@ -1051,6 +1052,69 @@ class InventoryInputBackfillTestCase(TestCase):
         self.assertNotIn(later_input.pk, [series_input.pk, sample_input.pk])
 
 
+class InventoryInputReverseMigrationTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.material = Material.objects.create(name="Reverse Material")
+        cls.region = Region.objects.create(name="Reverse Region")
+        cls.scenario = Scenario.objects.create(
+            name="Reverse Scenario", region=cls.region
+        )
+        cls.geodataset = GeoDataset.objects.create(
+            name="Reverse Dataset", region=cls.region
+        )
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="Reverse Algorithm", geodataset=cls.geodataset
+        )
+
+    @staticmethod
+    def reverse_feedstock_fks():
+        migration = importlib.import_module(
+            "inventories.migrations.0008_inventoryinput_and_more"
+        )
+        with connection.cursor() as cursor:
+            cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+        with connection.schema_editor() as schema_editor:
+            migration.retarget_feedstock_fks_to_sampleseries(None, schema_editor)
+
+    def test_reverse_maps_temporal_rows_through_series_id(self):
+        series = SampleSeries.objects.create(
+            name="Reverse Series", material=self.material
+        )
+        wrapper = series.inventory_input
+        wrapper.delete()
+        wrapper = InventoryInput.objects.create(pk=series.pk + 100000, series=series)
+        config = ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=wrapper,
+            geodataset=self.geodataset,
+            inventory_algorithm=self.algorithm,
+        )
+
+        self.reverse_feedstock_fks()
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT feedstock_id FROM inventories_scenarioinventoryconfiguration WHERE id = %s",
+                [config.pk],
+            )
+            self.assertEqual(cursor.fetchone()[0], series.pk)
+
+    def test_reverse_refuses_standalone_rows(self):
+        sample = Sample.objects.create(
+            name="Reverse Sample", material=self.material, standalone=True
+        )
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=sample.inventory_input,
+            geodataset=self.geodataset,
+            inventory_algorithm=self.algorithm,
+        )
+
+        with self.assertRaises(IrreversibleError):
+            self.reverse_feedstock_fks()
+
+
 class ScenarioInventoryInputTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -1238,6 +1302,49 @@ class ScenarioInventoryInputTestCase(TestCase):
             .filter(feedstock=self.sample.inventory_input)
             .exists()
         )
+
+    def test_default_configuration_skips_series_for_static_only_algorithm(self):
+        self.static_algorithm.default = True
+        self.static_algorithm.supports_sample_series = False
+        self.static_algorithm.save()
+        self.series_algorithm.default = True
+        self.series_algorithm.save()
+
+        self.scenario.create_default_configuration()
+
+        configuration = self.scenario.configuration()
+        self.assertTrue(
+            configuration.filter(
+                feedstock=self.series.inventory_input,
+                inventory_algorithm=self.series_algorithm,
+            ).exists()
+        )
+        self.assertFalse(
+            configuration.filter(inventory_algorithm=self.static_algorithm).exists()
+        )
+
+    def test_sample_losing_standalone_retires_inventory_input(self):
+        sample = Sample.objects.create(
+            owner=self.owner,
+            name="SI Transient Sample",
+            material=self.material,
+            publication_status="published",
+            standalone=True,
+        )
+        wrapper = sample.inventory_input
+        self.scenario.add_inventory_algorithm(sample, self.static_algorithm)
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        sample.standalone = False
+        sample.series = self.series
+        sample.save()
+
+        self.assertFalse(InventoryInput.objects.filter(pk=wrapper.pk).exists())
+        self.assertFalse(
+            self.scenario.configuration().filter(feedstock_id=wrapper.pk).exists()
+        )
+        self.scenario.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
 
     def test_execution_plan_includes_feedstock_kind(self):
         self.scenario.add_inventory_algorithm(self.series, self.series_algorithm)

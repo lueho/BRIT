@@ -385,12 +385,35 @@ class InventoryInput(models.Model):
         label = "Series" if self.is_temporal else "Sample"
         return f"{label}: {self.material} — {self.name}"
 
+    def retire(self):
+        """
+        Remove this input together with every scenario configuration and
+        result layer that references it, and flag the affected scenarios.
+        """
+        with transaction.atomic():
+            scenario_ids = set(
+                ScenarioInventoryConfiguration.objects.filter(feedstock=self)
+                .values_list("scenario_id", flat=True)
+                .distinct()
+            )
+            for layer in self.layer_set.all():
+                scenario_ids.add(layer.scenario_id)
+                layer.delete()
+            self.delete()
+            for scenario in Scenario.objects.filter(id__in=scenario_ids):
+                scenario.set_status(ScenarioStatus.Status.CHANGED)
+
 
 @receiver(post_save, sender=Sample)
 def create_inventory_input_for_sample(sender, instance, raw=False, **kwargs):
-    if raw or not instance.standalone:
+    if raw:
         return
-    InventoryInput.objects.for_object(instance)
+    if instance.standalone:
+        InventoryInput.objects.for_object(instance)
+        return
+    stale = InventoryInput.objects.filter(sample=instance).first()
+    if stale is not None:
+        stale.retire()
 
 
 @receiver(post_save, sender=SampleSeries)
@@ -756,6 +779,8 @@ class Scenario(NamedUserCreatedObject):
         :return:
         """
         for algorithm in self.default_inventory_algorithms():
+            if not algorithm.supports_sample_series:
+                continue
             for feedstock in SampleSeries.objects.filter(
                 material__in=algorithm.feedstocks.all()
             ):
