@@ -2,6 +2,7 @@ import json
 import logging
 from collections import defaultdict
 from decimal import Decimal
+from urllib.parse import parse_qsl, urlsplit
 
 from django.contrib import messages
 from django.contrib.auth.mixins import (
@@ -21,6 +22,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse, reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext
 from django.views.generic import RedirectView, TemplateView, View
 from django.views.generic.detail import SingleObjectMixin
@@ -1695,6 +1697,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 "public_map_url": None,
                 "private_map_url": None,
                 "review_map_url": None,
+                "sample_nav_scope": self._sample_nav_scope(),
             }
         )
 
@@ -1714,6 +1717,39 @@ class SampleDetailView(UserCreatedObjectDetailView):
         )
 
         return context
+
+    def _sample_nav_scope(self):
+        """Scope for the detail context-nav links, kept from the return URL.
+
+        List and featured-gallery links on the detail page should return the
+        user to the same list scope they came from. The scope is read from the
+        validated same-host ``back`` (regular detail) or ``next`` (review
+        detail) parameter and is only honoured when the return path is the
+        sample list or gallery route of that scope; anything else falls back
+        to the published scope. Anonymous visitors always get published links
+        and the review scope is only honoured for moderators.
+        """
+        user = self.request.user
+        if not user.is_authenticated:
+            return "published"
+        return_url = self.request.GET.get("back") or self.request.GET.get("next", "")
+        if not return_url or not url_has_allowed_host_and_scheme(
+            return_url,
+            allowed_hosts={self.request.get_host()},
+            require_https=self.request.is_secure(),
+        ):
+            return "published"
+        parts = urlsplit(return_url)
+        scope = dict(parse_qsl(parts.query)).get("scope")
+        scoped_paths = {
+            "private": {reverse("sample-list-owned"), reverse("sample-gallery-owned")},
+            "review": {reverse("sample-list-review"), reverse("sample-gallery-review")},
+        }
+        if parts.path not in scoped_paths.get(scope, ()):
+            return "published"
+        if scope == "review" and not user_is_moderator_for_model(user, Sample):
+            return "published"
+        return scope
 
     def _build_v2_context(
         self,
