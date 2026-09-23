@@ -51,8 +51,10 @@ brit_eu_json <- function(url, token = "", form = NULL) {
   response <- curl::curl_fetch_memory(url, handle = handle)
   if (response$status_code != 200L) {
     if (!is.null(form)) stop("BRIT-Anmeldung fehlgeschlagen (HTTP ", response$status_code, ").")
-    stop("BRIT-Datenabruf fehlgeschlagen (HTTP ", response$status_code,
-         "). Falls HTTP 404: Der Analyse-Endpunkt muss zuerst bereitgestellt werden.")
+    hint <- if (response$status_code %in% c(404L, 500L)) {
+      " Der Analyse-Endpunkt fehlt auf dieser Instanz moeglicherweise; bei HTTP 500 kann auch ein Serverfehler vorliegen."
+    } else ""
+    stop("BRIT-Datenabruf fehlgeschlagen (HTTP ", response$status_code, ").", hint)
   }
   tryCatch(jsonlite::fromJSON(rawToChar(response$content), simplifyVector = FALSE),
            error = function(e) stop("BRIT hat keine gueltige JSON-Antwort gesendet."))

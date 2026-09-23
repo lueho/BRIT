@@ -79,6 +79,9 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(CSV)
             return
+        elif path == "/server-error":
+            self.send_error(500)
+            return
         else:
             self.send_error(404)
             return

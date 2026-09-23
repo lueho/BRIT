@@ -16,6 +16,7 @@ token <- brit_eu_login(base, "demo", "päss&word")
 stopifnot(identical(token, "fixture-secret"))
 expect_error(brit_eu_login(base, "demo", "wrong-secret"), "Anmeldung|credentials")
 expect_error(brit_eu_login("http://example.org", "demo", "secret"), "HTTPS")
+expect_error(brit_eu_json(paste0(base, "/server-error")), "Endpunkt.*fehlt")
 
 data <- brit_eu_collections(base, list(scope = "private"), token)
 stopifnot(nrow(data) == 2L, identical(data$nuts_or_lau_id, c("00123", "00456")),

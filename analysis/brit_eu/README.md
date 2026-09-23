@@ -83,7 +83,7 @@ GET /waste_collection/api/collection/analysis/
 
 Voreingestellt ist `FILTER <- list(scope = "all")`: Es werden alle für das Konto sichtbaren Sammlungen abgerufen, möglicherweise einschließlich privater Daten. Der Ordner `BRIT_Ergebnisse` enthält CSV, RDS, Prüfsummen und eine einfache Zusammenfassung nach Land und Abfallkategorie. Diese Dateien entsprechend den eigenen Datenrechten behandeln. Für eigene Fragen `FILTER` und die Beispielauswertung am Ende der R-Datei ändern. Die Einzeldatei nutzt aktuelle BRIT-Daten; für die sieben historischen Projektanalysen mit dem festen Datenstand bleibt das vollständige Release-ZIP vorgesehen.
 
-Die Einzeldatei setzt den lokal implementierten Analyse-Endpunkt auf dem verwendeten BRIT-Server voraus. Solange er dort nicht bereitgestellt ist, zeigt ein HTTP-404-Hinweis diesen fehlenden Schritt an. Ein lokal erfolgreicher Test allein macht die Produktionsinstanz noch nicht nutzbar.
+Die Einzeldatei setzt den lokal implementierten Analyse-Endpunkt auf dem verwendeten BRIT-Server voraus. Der öffentliche Server antwortete bei der Prüfung am 23.09.2026 auf diesen Pfad mit HTTP 500, ebenso auf einen bewusst ungültigen Sammlungs-Detailpfad. Das deutet auf eine noch fehlende Route hin; ein anderer Serverfehler ist ohne Serverprotokolle nicht ausgeschlossen. Die Datei weist bei HTTP 404 oder 500 darauf hin. Ein lokal erfolgreicher Test allein macht die Produktionsinstanz noch nicht nutzbar.
 
 Sie liefert flache Datensätze einschließlich stabiler IDs, Quellenangaben, zeitlicher Gültigkeit, Regionsmerkmalen und verfügbaren Jahreswerten mit Einheiten. Der öffentliche Zugriff liefert ausschließlich freigegebene Daten. Nicht öffentliche Daten benötigen ein BRIT-Token und die entsprechenden bestehenden Berechtigungen.
 
