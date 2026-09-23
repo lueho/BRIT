@@ -61,7 +61,6 @@ class DerivedValuesTestCase(TestCase):
         cls.unit_total = Unit.objects.create(name="Mg/a [test]")
         cls.population_attribute = RegionProperty.objects.create(
             name="Population [test]",
-            unit="cap",
         )
 
         cls.collection_system = CollectionSystem.objects.create(

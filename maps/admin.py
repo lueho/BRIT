@@ -43,6 +43,7 @@ class AttributeModelAdmin(admin.ModelAdmin):
 @admin.register(RegionProperty)
 class RegionPropertyModelAdmin(admin.ModelAdmin):
     search_fields = ["name"]
+    filter_horizontal = ["allowed_units"]
 
 
 @admin.register(CategoricalAttribute)

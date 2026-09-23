@@ -5,6 +5,7 @@ from materials.viewsets import (
     CompositionViewSet,
     MaterialPropertyValueViewSet,
     MaterialViewSet,
+    SampleGroupViewSet,
     SampleSeriesViewSet,
     SampleViewSet,
 )
@@ -14,6 +15,7 @@ router.register("material", MaterialViewSet, basename="api-material")
 router.register("composition", CompositionViewSet, basename="api-composition")
 router.register("sample", SampleViewSet, basename="api-sample")
 router.register("sampleseries", SampleSeriesViewSet, basename="api-sampleseries")
+router.register("samplegroup", SampleGroupViewSet, basename="api-samplegroup")
 router.register(
     "componentmeasurement",
     ComponentMeasurementViewSet,

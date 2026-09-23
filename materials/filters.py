@@ -25,6 +25,8 @@ from .models import (
     MaterialProperty,
     MaterialPropertyAggregationKind,
     Sample,
+    SampleGroup,
+    SampleGroupKind,
     SampleSeries,
     get_or_create_sample_substrate_category,
 )
@@ -351,6 +353,15 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             config=TomSelectConfig(url="sampleseries-autocomplete")
         ),
     )
+    sample_group = ModelChoiceFilter(
+        queryset=SampleGroup.objects.none(),
+        method="filter_sample_group",
+        label="Sample group",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="samplegroup-autocomplete")
+        ),
+    )
     sample_date = DateFromToRangeFilter(
         field_name="datetime",
         label="Sample date",
@@ -387,6 +398,9 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             | Q(component_measurements__analytical_method=value)
         ).distinct()
 
+    def filter_sample_group(self, queryset, name, value):
+        return queryset.filter(sample_groups=value).distinct()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         substrate_category, _ = get_or_create_sample_substrate_category()
@@ -405,6 +419,9 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
         self.filters["component_group"].queryset = self.scoped_choice_queryset(
             MaterialComponentGroup.objects.all()
         )
+        self.filters["sample_group"].queryset = self.scoped_choice_queryset(
+            SampleGroup.objects.all()
+        )
 
     class Meta:
         model = Sample
@@ -418,6 +435,7 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             "component_group",
             "analytical_method",
             "series",
+            "sample_group",
             "sample_date",
         )
 
@@ -469,12 +487,27 @@ class SampleSeriesFilter(UserCreatedObjectScopedFilterSet):
         fields = ("scope", "material")
 
 
+class SampleGroupFilter(UserCreatedObjectScopedFilterSet):
+    sortable_fields = {"name": "name"}
+    kind = ChoiceFilter(
+        field_name="kind",
+        label="Kind",
+        choices=SampleGroupKind.choices,
+        empty_label="All",
+    )
+
+    class Meta:
+        model = SampleGroup
+        fields = ("scope", "kind")
+
+
 class SampleFilterSet(rf_filters.FilterSet):
     class Meta:
         model = Sample
         fields = (
             "timestep",
             "property_values",
+            "sample_groups",
         )
 
 
@@ -482,3 +515,9 @@ class SampleSeriesFilterSet(rf_filters.FilterSet):
     class Meta:
         model = SampleSeries
         fields = ("material",)
+
+
+class SampleGroupFilterSet(rf_filters.FilterSet):
+    class Meta:
+        model = SampleGroup
+        fields = ("kind", "samples")

@@ -1,0 +1,41 @@
+{% extends "detail_v2.html" %}
+
+{% block detail_page_title %}Sample group: {{ object.name }}{% endblock detail_page_title %}
+
+{% block detail_kicker %}Sample group{% endblock detail_kicker %}
+
+{% block detail_title %}{{ object.name }}{% endblock detail_title %}
+
+{% block hero_lede %}
+    {% if object.description %}
+        <div class="sdv2-hero-material">{{ object.description|linebreaks }}</div>
+    {% endif %}
+{% endblock hero_lede %}
+
+{% block hero_meta_items %}
+    <li><span class="sdv2-meta-label">Kind</span>{{ object.get_kind_display }}</li>
+    <li><span class="sdv2-meta-label">Samples</span>{{ group_samples_total }}</li>
+    <li><span class="sdv2-meta-label">Owner</span>{{ object.owner.username|default:object.owner }}</li>
+{% endblock hero_meta_items %}
+
+{% block detail_sections %}
+    {% if visible_sources %}
+        <section class="sdv2-section-panel" aria-label="Sources">
+            <div class="sdv2-section-header">
+                <div class="sdv2-section-heading">
+                    <h2 class="sdv2-section-title">Sources</h2>
+                </div>
+            </div>
+            <ul class="sdv2-related-list mt-3">
+                {% for source in visible_sources %}
+                    <li><span class="sdv2-related-name">{{ source }}</span></li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+    {% if policy.can_edit %}
+        {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples in this group" items=group_samples item_url_name="sample-detail" section_total=group_samples_published_total section_more=group_samples_more section_list_url=group_samples_list_url empty_title="No samples" empty_body="No samples are linked to this group yet. Use the edit action to manage the samples in this group." %}
+    {% else %}
+        {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples in this group" items=group_samples item_url_name="sample-detail" section_total=group_samples_published_total section_more=group_samples_more section_list_url=group_samples_list_url empty_title="No samples" empty_body="No samples are linked to this group yet." %}
+    {% endif %}
+{% endblock detail_sections %}

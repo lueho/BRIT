@@ -73,6 +73,11 @@
         <strong>Year:</strong>
         <br>
         {{ object.year }}
+        {% if object.year_outside_collection_period %}
+            <i class="fas fa-triangle-exclamation text-warning ms-1"
+               title="Reference year {{ object.year }} is outside the collection validity period ({{ object.collection.valid_from|date:'Y' }}-{% if object.collection.valid_until %}{{ object.collection.valid_until|date:'Y' }}{% else %}present{% endif %})"
+               aria-label="Reference year outside collection validity period"></i>
+        {% endif %}
     </p>
     {% if object.standard_deviation %}
         <p class="card-text">

@@ -291,6 +291,11 @@
                 {% if val.is_derived %}<span class="text-muted fst-italic">(derived)</span>{% endif %}
               {% endif %}
             </a>
+            {% if val.year_outside_collection_period %}
+              <i class="fas fa-triangle-exclamation text-warning ms-1"
+                 title="Reference year {{ val.year }} is outside the collection validity period ({{ val.collection.valid_from|date:'Y' }}-{% if val.collection.valid_until %}{{ val.collection.valid_until|date:'Y' }}{% else %}present{% endif %})"
+                 aria-label="Reference year outside collection validity period"></i>
+            {% endif %}
             {% if val_policy.can_submit_review or val_policy.can_withdraw_review %}
               <div class="mt-1 d-flex flex-wrap gap-2">
                 {% if val_policy.can_submit_review %}

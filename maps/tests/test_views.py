@@ -515,7 +515,6 @@ class RegionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     def test_detail_view_renders_region_attribute_values(self):
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
         )
         unit = Unit.objects.create(name="people/km²", symbol="1/km²")
         RegionAttributeValue.objects.create(
@@ -637,7 +636,6 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     def test_detail_view_renders_value_level_region_attribute_unit(self):
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
         )
         unit = Unit.objects.create(name="people/km²", symbol="1/km²")
         RegionAttributeValue.objects.create(
@@ -1457,7 +1455,7 @@ class RegionAttributeValueCRUDViewsTestCase(
                 owner=cls.owner_user, name="Test Region", publication_status="published"
             ),
             "property": RegionProperty.objects.create(
-                name="Test Property", unit="Test Unit", publication_status="published"
+                name="Test Property", publication_status="published"
             ),
         }
 

@@ -357,8 +357,9 @@ class AnalyticalMethod(NamedUserCreatedObject):
 class SampleSeries(NamedUserCreatedObject):
     """
     Sample series are used to add concrete experimental data to the abstract semantic definition of materials. A sample
-    series consists of several samples that are taken from a comparable source at different times. That way a temporal
-    distribution of material properties and compositions over time can be described.
+    series is a strictly temporal series: it consists of several samples of the same material taken from a comparable
+    source at defined timesteps. That way a temporal distribution of material properties and compositions over time
+    can be described. For non-temporal groupings of samples across materials, see SampleGroup.
     """
 
     class Meta(NamedUserCreatedObject.Meta):
@@ -521,6 +522,37 @@ class SampleSeries(NamedUserCreatedObject):
 def add_default_temporal_distribution(sender, instance, created, **kwargs):
     if created:
         instance.add_temporal_distribution(TemporalDistribution.objects.default())
+
+
+class SampleGroupKind(models.TextChoices):
+    STUDY = "study", "Study"
+    EXPERIMENT = "experiment", "Experiment"
+    SAMPLING_CAMPAIGN = "sampling_campaign", "Sampling campaign"
+    ANALYSIS = "analysis", "Analysis"
+    OTHER = "other", "Other"
+
+
+class SampleGroup(NamedUserCreatedObject):
+    """
+    A non-temporal grouping of samples. Sample groups relate samples of
+    potentially different materials to each other through a shared study,
+    experiment, sampling campaign, or analysis, without implying the temporal
+    order that a SampleSeries represents.
+    """
+
+    class Meta(NamedUserCreatedObject.Meta):
+        verbose_name_plural = "sample groups"
+
+    kind = models.CharField(
+        max_length=32,
+        choices=SampleGroupKind.choices,
+        default=SampleGroupKind.STUDY,
+    )
+    sources = models.ManyToManyField(
+        Source,
+        blank=True,
+        related_name="sample_groups",
+    )
 
 
 class MaterialProperty(PropertyBase):
@@ -771,8 +803,9 @@ class MaterialPropertyValue(
 
 class Sample(NamedUserCreatedObject):
     """
-    Representation of a single sample that was taken at a specific location and time. Equivalent samples are associated
-    with a SampleSeries to temporal distribution of properties and composition.
+    Representation of a single sample that was taken at a specific location and time. Equivalent samples of the same
+    material are associated with a SampleSeries to describe a temporal distribution of properties and composition.
+    Samples can additionally belong to any number of non-temporal SampleGroups.
     """
 
     image = models.ImageField(upload_to="materials_sample/", blank=True, null=True)
@@ -846,11 +879,12 @@ class Sample(NamedUserCreatedObject):
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
-        help_text="If this sample belongs to a sample series or campaign, select it here.",
+        help_text="Temporal series for samples of the same material at defined timesteps.",
     )
     standalone = models.BooleanField(
         default=False,
-        help_text="True if this sample is not part of a sample series.",
+        help_text="True if this sample is not part of a temporal sample series. "
+        "Standalone samples may still belong to sample groups.",
     )
     timestep = models.ForeignKey(
         Timestep,
@@ -861,6 +895,15 @@ class Sample(NamedUserCreatedObject):
         help_text="If the sample represents a specific time step in a series, select it here.",
     )
     sources = models.ManyToManyField(Source)
+    sample_groups = models.ManyToManyField(
+        SampleGroup,
+        related_name="samples",
+        blank=True,
+        help_text=(
+            "Studies, experiments, campaigns, or analyses that relate this sample "
+            "to other samples without implying a temporal series."
+        ),
+    )
 
     @property
     def _sampling_datetime(self):
@@ -1045,6 +1088,10 @@ class Sample(NamedUserCreatedObject):
                 )
             finally:
                 post_save.connect(add_default_composition, sender=Sample)
+
+            duplicate.sample_groups.set(
+                kwargs.get("sample_groups", self.sample_groups.all())
+            )
 
             for composition in self.compositions.all():
                 duplicate_composition = composition.duplicate(creator)

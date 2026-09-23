@@ -13,6 +13,7 @@ from ..serializers import (
     HyperlinkedLicenceSerializer,
     HyperlinkedSourceSerializer,
     SourceAbbreviationSerializer,
+    SourceCreateSerializer,
     SourceModelSerializer,
 )
 
@@ -87,6 +88,27 @@ class SourceSerializerTest(TestCase):
         self.assertEqual(updated_source.title, "Updated Test Source")
 
 
+class SourceCreateSerializerAuthorValidationTestCase(TestCase):
+    def test_letterless_person_author_is_invalid(self):
+        serializer = SourceCreateSerializer(
+            data={"title": "Source", "authors": [{"last_names": "70"}]}
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("authors", serializer.errors)
+
+    def test_letterless_organization_author_is_invalid(self):
+        serializer = SourceCreateSerializer(
+            data={
+                "title": "Source",
+                "authors": [
+                    {"author_type": "organization", "organization_name": "30.379"}
+                ],
+            }
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("authors", serializer.errors)
+
+
 class AuthorModelSerializerTestCase(TestCase):
     def setUp(self):
         self.author_attributes = {
@@ -107,6 +129,20 @@ class AuthorModelSerializerTestCase(TestCase):
 
         self.author = Author.objects.create(**self.author_attributes)
         self.serializer = AuthorModelSerializer(instance=self.author)
+
+    def test_letterless_surname_is_invalid(self):
+        serializer = AuthorModelSerializer(
+            data={"author_type": "person", "last_names": "70"}
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("last_names", serializer.errors)
+
+    def test_letterless_organization_name_is_invalid(self):
+        serializer = AuthorModelSerializer(
+            data={"author_type": "organization", "organization_name": "30.379"}
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("organization_name", serializer.errors)
 
     def test_contains_expected_fields(self):
         data = self.serializer.data

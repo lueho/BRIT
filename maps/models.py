@@ -1103,13 +1103,22 @@ class RegionProperty(PropertyBase):
     Maps-owned quantitative property definition that will replace ``Attribute``.
     """
 
-    unit = models.CharField(max_length=127)
+    allowed_units = models.ManyToManyField(
+        Unit,
+        blank=True,
+        help_text="Units that are acceptable for this property.",
+    )
 
     class Meta(PropertyBase.Meta):
         verbose_name_plural = "region properties"
 
     def __str__(self):
-        return f"{self.name} [{self.unit}]"
+        if not self.pk:
+            return self.name
+        unit_labels = ", ".join(u.name for u in self.allowed_units.all())
+        if unit_labels:
+            return f"{self.name} [{unit_labels}]"
+        return self.name
 
 
 class CategoricalAttribute(NamedUserCreatedObject):
@@ -1144,7 +1153,7 @@ class RegionAttributeValue(NumericMeasurementMixin, NamedUserCreatedObject):
         if property_obj is None:
             return None
 
-        unit = Unit.resolve_legacy_label(property_obj.unit, owner=property_obj.owner)
+        unit = property_obj.allowed_units.first()
         if unit is not None:
             self.unit = unit
         return self.unit

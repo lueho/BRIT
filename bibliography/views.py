@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -45,7 +46,15 @@ from .forms import (
     SourceModelForm,
 )
 from .inlines import SourceAuthorInline
-from .models import SOURCE_TYPES, Author, Licence, Source
+from .models import (
+    LETTERLESS_ORGANIZATION_NAME_MESSAGE,
+    LETTERLESS_SURNAME_MESSAGE,
+    SOURCE_TYPES,
+    Author,
+    Licence,
+    Source,
+    author_name_has_letter,
+)
 from .serializers import HyperlinkedSourceSerializer, SourceCreateSerializer
 from .tasks import check_source_url, check_source_urls
 
@@ -149,6 +158,15 @@ class AuthorAutocompleteView(UserCreatedObjectAutocompleteView):
         "organization_name",
     ]
     virtual_fields = ["label"]
+
+    def hook_queryset(self, queryset):
+        queryset = super().hook_queryset(queryset)
+        # Exclude legacy rows that bypassed clean() and carry no letter in
+        # their display name (e.g. imported "30.379" surnames).
+        return queryset.filter(
+            Q(author_type="organization", organization_name__regex=r"[[:alpha:]]")
+            | Q(author_type="person", last_names__regex=r"[[:alpha:]]")
+        )
 
     def hook_prepare_results(self, results):
         for result in results:
@@ -378,6 +396,11 @@ class AuthorQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     {"error": "Organizations need a name."},
                     status=400,
                 )
+            if not author_name_has_letter(organization_name):
+                return JsonResponse(
+                    {"error": LETTERLESS_ORGANIZATION_NAME_MESSAGE},
+                    status=400,
+                )
 
             author = Author.objects.filter(
                 author_type="organization",
@@ -414,6 +437,8 @@ class AuthorQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 {"error": "A non-empty last name is required to create an author."},
                 status=400,
             )
+        if not author_name_has_letter(last_names):
+            return JsonResponse({"error": LETTERLESS_SURNAME_MESSAGE}, status=400)
 
         author = Author.objects.filter(
             first_names__iexact=first_names,
@@ -483,7 +508,7 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     organization_name = self._normalize_name_part(
                         raw_author.get("organization_name")
                     )
-                    if not organization_name:
+                    if not author_name_has_letter(organization_name):
                         continue
 
                     author = Author.objects.filter(
@@ -513,7 +538,7 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                         raw_author.get("first_names")
                     )
                     last_names = self._normalize_name_part(raw_author.get("last_names"))
-                    if not last_names:
+                    if not author_name_has_letter(last_names):
                         continue
 
                     author = Author.objects.filter(
