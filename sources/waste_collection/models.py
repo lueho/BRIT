@@ -951,6 +951,21 @@ class CollectionPropertyValue(PropertyValue):
         help_text="True when this value was computed from another property (e.g. total ↔ specific via population).",
     )
 
+    @property
+    def year_outside_collection_period(self):
+        """True when ``year`` falls outside the collection's valid period.
+
+        Statistics can describe a year the collection did not (or does not
+        yet) cover; the UI flags those so readers do not misattribute the
+        value's timeframe.
+        """
+        if self.year is None or self.collection_id is None:
+            return False
+        collection = self.collection
+        if self.year < collection.valid_from.year:
+            return True
+        return bool(collection.valid_until and self.year > collection.valid_until.year)
+
     class Meta(PropertyValue.Meta):
         constraints = [
             models.UniqueConstraint(
