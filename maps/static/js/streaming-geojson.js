@@ -24,6 +24,12 @@
 class StreamingGeoJSONLoader {
     constructor(options = {}) {
         this.onProgress = options.onProgress || (() => { });
+        // Called with arrays of parsed features while a STREAM response is
+        // still being parsed, so consumers can render incrementally; awaited
+        // if it returns a promise. Non-streaming responses (and streams of
+        // at most 100 features) arrive as one JSON body and go straight to
+        // onComplete, which always receives the full collection.
+        this.onFeatureBatch = options.onFeatureBatch || (() => { });
         this.onComplete = options.onComplete || (() => { });
         this.onError = options.onError || console.error;
         this.abortController = null;
@@ -115,112 +121,118 @@ class StreamingGeoJSONLoader {
         let escapeNext = false;
         let featureStart = -1;
         let lastFeatureProgress = 0;
+        let pendingBatch = [];
+        const FEATURE_BATCH_SIZE = 1000;
 
-        try {
-            let chunkCount = 0;
-            while (true) {
-                const { done, value } = await reader.read();
+        let chunkCount = 0;
+        while (true) {
+            const { done, value } = await reader.read();
 
-                if (done) break;
+            if (done) break;
 
-                chunkCount++;
-                bytesReceived += value.length;
-                const chunk = decoder.decode(value, { stream: true });
+            chunkCount++;
+            bytesReceived += value.length;
+            const chunk = decoder.decode(value, { stream: true });
 
-                // Estimate average bytes per feature for progress calculation
-                // Typical GeoJSON feature is ~2-5KB, use 3KB as estimate
-                const estimatedBytesPerFeature = contentLength > 0 ? contentLength / totalCount : 3000;
-                const estimatedProgress = Math.min(
-                    Math.round(bytesReceived / estimatedBytesPerFeature),
-                    totalCount
-                );
+            // Estimate average bytes per feature for progress calculation
+            // Typical GeoJSON feature is ~2-5KB, use 3KB as estimate
+            const estimatedBytesPerFeature = contentLength > 0 ? contentLength / totalCount : 3000;
+            const estimatedProgress = Math.min(
+                Math.round(bytesReceived / estimatedBytesPerFeature),
+                totalCount
+            );
 
-                // Update progress on every chunk based on bytes received
-                reportProgress(estimatedProgress);
+            // Update progress on every chunk based on bytes received
+            reportProgress(estimatedProgress);
 
-                // Process each character in the chunk
-                for (let i = 0; i < chunk.length; i++) {
-                    const char = chunk[i];
-                    buffer += char;
+            // Process each character in the chunk
+            for (let i = 0; i < chunk.length; i++) {
+                const char = chunk[i];
+                buffer += char;
 
-                    // Handle escape sequences in strings
-                    if (escapeNext) {
-                        escapeNext = false;
-                        continue;
+                // Handle escape sequences in strings
+                if (escapeNext) {
+                    escapeNext = false;
+                    continue;
+                }
+
+                if (char === '\\' && inString) {
+                    escapeNext = true;
+                    continue;
+                }
+
+                // Toggle string state
+                if (char === '"') {
+                    inString = !inString;
+                    continue;
+                }
+
+                // Skip if inside a string
+                if (inString) continue;
+
+                // Track bracket depth for features array
+                if (char === '[') {
+                    bracketDepth++;
+                } else if (char === ']') {
+                    bracketDepth--;
+                }
+
+                // Track brace depth for feature extraction
+                // Features are objects inside the features array (bracketDepth >= 1)
+                if (char === '{') {
+                    braceDepth++;
+                    // Start of a feature: we're at depth 2 (inside FeatureCollection, inside features array)
+                    if (braceDepth === 2 && bracketDepth >= 1) {
+                        featureStart = buffer.length - 1;
                     }
-
-                    if (char === '\\' && inString) {
-                        escapeNext = true;
-                        continue;
-                    }
-
-                    // Toggle string state
-                    if (char === '"') {
-                        inString = !inString;
-                        continue;
-                    }
-
-                    // Skip if inside a string
-                    if (inString) continue;
-
-                    // Track bracket depth for features array
-                    if (char === '[') {
-                        bracketDepth++;
-                    } else if (char === ']') {
-                        bracketDepth--;
-                    }
-
-                    // Track brace depth for feature extraction
-                    // Features are objects inside the features array (bracketDepth >= 1)
-                    if (char === '{') {
-                        braceDepth++;
-                        // Start of a feature: we're at depth 2 (inside FeatureCollection, inside features array)
-                        if (braceDepth === 2 && bracketDepth >= 1) {
-                            featureStart = buffer.length - 1;
-                        }
-                    } else if (char === '}') {
-                        // End of a feature
-                        if (braceDepth === 2 && bracketDepth >= 1 && featureStart >= 0) {
-                            const featureStr = buffer.substring(featureStart);
-                            try {
-                                const feature = JSON.parse(featureStr);
-                                if (feature.type === 'Feature') {
-                                    features.push(feature);
-                                    // Progress updates hit the DOM; per-feature
-                                    // updates are wasteful on large datasets.
-                                    if (features.length - lastFeatureProgress >= 250) {
-                                        lastFeatureProgress = features.length;
-                                        reportProgress(features.length);
-                                    }
+                } else if (char === '}') {
+                    // End of a feature
+                    if (braceDepth === 2 && bracketDepth >= 1 && featureStart >= 0) {
+                        const featureStr = buffer.substring(featureStart);
+                        try {
+                            const feature = JSON.parse(featureStr);
+                            if (feature.type === 'Feature') {
+                                features.push(feature);
+                                pendingBatch.push(feature);
+                                if (pendingBatch.length >= FEATURE_BATCH_SIZE) {
+                                    await this.onFeatureBatch(pendingBatch);
+                                    pendingBatch = [];
                                 }
-                            } catch (e) {
-                                console.warn('Failed to parse feature:', e);
+                                // Progress updates hit the DOM; per-feature
+                                // updates are wasteful on large datasets.
+                                if (features.length - lastFeatureProgress >= 250) {
+                                    lastFeatureProgress = features.length;
+                                    reportProgress(features.length);
+                                }
                             }
-                            // Clear processed data from buffer to save memory
-                            buffer = '';
-                            featureStart = -1;
+                        } catch (e) {
+                            console.warn('Failed to parse feature:', e);
                         }
-                        braceDepth--;
+                        // Clear processed data from buffer to save memory
+                        buffer = '';
+                        featureStart = -1;
                     }
+                    braceDepth--;
                 }
             }
-
-            // Handle any remaining data
-            decoder.decode(); // Flush
-
-            const geojson = {
-                type: 'FeatureCollection',
-                features: features
-            };
-
-            reportProgress(features.length);
-            this.onComplete(geojson, dataVersion);
-            return geojson;
-
-        } catch (error) {
-            this.onError(error);
-            throw error;
         }
+
+        // Handle any remaining data
+        decoder.decode(); // Flush
+
+        // Flush any features not yet handed to the incremental renderer.
+        if (pendingBatch.length) {
+            await this.onFeatureBatch(pendingBatch);
+        }
+
+        const geojson = {
+            type: 'FeatureCollection',
+            features: features
+        };
+
+        reportProgress(features.length);
+        this.onComplete(geojson, dataVersion);
+        return geojson;
     }
 }
 
@@ -314,6 +326,12 @@ function createMapProgressBar(containerId = 'map-progress-container') {
     };
 }
 
+// Only the most recent feature load may touch the shared features layer,
+// progress bar and cache. Starting a new load aborts the previous loader and
+// bumps the generation so any callbacks it still emits are ignored.
+let activeFeatureLoader = null;
+let featureLoadGeneration = 0;
+
 /**
  * Enhanced fetchFeatureGeometries with streaming support and progress
  * 
@@ -322,6 +340,15 @@ function createMapProgressBar(containerId = 'map-progress-container') {
  */
 async function fetchFeatureGeometriesWithProgress(params) {
     hideMapOverlay();
+
+    const generation = ++featureLoadGeneration;
+    const isCurrent = () => generation === featureLoadGeneration;
+    if (activeFeatureLoader) {
+        activeFeatureLoader.abort();
+        activeFeatureLoader = null;
+        // Aborts bypass onError, so the superseded load's bar must go here.
+        createMapProgressBar().hide();
+    }
 
     // Start with provided params, add featuresId if set
     const finalParams = params instanceof URLSearchParams ? params : new URLSearchParams(params || {});
@@ -341,6 +368,7 @@ async function fetchFeatureGeometriesWithProgress(params) {
                     headers: { 'Accept': 'application/geo+json, application/json' }
                 });
                 const currentVersion = response.headers.get('X-Data-Version');
+                if (!isCurrent()) return;
                 if (response.ok && currentVersion && currentVersion === cached.version && cached.data.features && cached.data.features.length) {
                     console.log('Cache hit for feature data');
                     renderFeatures(cached.data);
@@ -355,17 +383,38 @@ async function fetchFeatureGeometriesWithProgress(params) {
     } catch (e) {
         console.warn('IndexedDB cache check failed:', e);
     }
+    if (!isCurrent()) return;
+
+    // Fresh network load: clear the previous layer up front so stale or
+    // partially rendered features are never mixed into the new result.
+    if (typeof resetFeaturesLayer === 'function') resetFeaturesLayer();
 
     // Create progress bar and show indeterminate state while connecting
     const progressBar = createMapProgressBar();
     progressBar.show();
     progressBar.showConnecting();
 
+    // Tracks whether the incremental renderer handled every batch; when it
+    // did, the final renderFeatures pass is redundant. A rejected batch
+    // (unsupported geometry) leaves gaps, so it forces the full render.
+    let incrementalRendered = false;
+    let incrementalFailed = false;
+
     const loader = new StreamingGeoJSONLoader({
         onProgress: (loaded, total) => {
+            if (!isCurrent()) return;
             progressBar.update(loaded, total);
         },
+        onFeatureBatch: (batch) => {
+            if (!isCurrent()) return;
+            if (typeof addFeatureBatch === 'function' && addFeatureBatch(batch)) {
+                incrementalRendered = true;
+            } else {
+                incrementalFailed = true;
+            }
+        },
         onComplete: async (geojson, version) => {
+            if (!isCurrent()) return;
             progressBar.hide();
 
             // Cache the result with version for future validation
@@ -375,13 +424,21 @@ async function fetchFeatureGeometriesWithProgress(params) {
             } catch (e) {
                 console.warn('Failed to cache GeoJSON:', e);
             }
+            if (!isCurrent()) return;
 
-            renderFeatures(geojson);
+            if (!incrementalRendered || incrementalFailed) {
+                renderFeatures(geojson);
+            }
             if (typeof orderLayers === 'function') orderLayers();
         },
         onError: (error) => {
+            if (!isCurrent()) return;
             progressBar.hide();
             console.error('Error fetching feature geometries:', error);
+            // Batches already drawn belong to a response that never completed.
+            if (incrementalRendered && typeof resetFeaturesLayer === 'function') {
+                resetFeaturesLayer();
+            }
 
             // Display user-friendly message for rate limiting
             if (error.isRateLimited) {
@@ -397,11 +454,14 @@ async function fetchFeatureGeometriesWithProgress(params) {
         }
     });
 
+    activeFeatureLoader = loader;
     try {
         await loader.fetch(url);
     } catch (error) {
-        progressBar.hide();
+        if (isCurrent()) progressBar.hide();
         throw error;
+    } finally {
+        if (activeFeatureLoader === loader) activeFeatureLoader = null;
     }
 }
 

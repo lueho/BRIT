@@ -610,6 +610,47 @@ function createFeatureLayerBindings(layer) {
 }
 
 
+function resetFeaturesLayer() {
+    removeExistingLayer(featuresLayer);
+    featuresLayer = null;
+}
+
+/**
+ * Render a batch of features while the stream is still running.
+ * Lazily creates the features layer using the same geometry-type dispatch
+ * as renderFeatures, then appends each batch with addData.
+ * @param {Array} features - Array of GeoJSON feature objects.
+ * @returns {boolean} true when the batch was rendered incrementally,
+ * false when the caller should fall back to renderFeatures.
+ */
+function addFeatureBatch(features) {
+    if (!features || features.length === 0) {
+        return false;
+    }
+
+    if (!featuresLayer) {
+        const geometryType = features[0].geometry.type;
+        if (geometryType === "Polygon" || geometryType === "MultiPolygon") {
+            featuresLayer = L.geoJson(null, {
+                style: featuresLayerStyle,
+                pane: 'featuresPane',
+            });
+        } else if (geometryType === "Point") {
+            featuresLayer = L.geoJson(null, {
+                pointToLayer: (feature, latlng) => L.circleMarker(latlng, featuresLayerStyle),
+                pane: 'featuresPane',
+            });
+        } else {
+            return false;
+        }
+        createFeatureLayerBindings(featuresLayer);
+        featuresLayer.addTo(map);
+    }
+
+    featuresLayer.addData(features);
+    return true;
+}
+
 function renderFeatures(geoJson) {
 
     if (!geoJson || !geoJson.features || geoJson.features.length === 0) {
@@ -617,7 +658,7 @@ function renderFeatures(geoJson) {
         return;
     }
 
-    removeExistingLayer(featuresLayer);
+    resetFeaturesLayer();
 
     const geometryType = geoJson.features[0].geometry.type;
     if (geometryType === "Polygon" || geometryType === "MultiPolygon") {
