@@ -1553,6 +1553,14 @@ class NutsRegionEnglishNameTestCase(ViewWithPermissionsTestCase):
             parent=cls.region,
             publication_status="published",
         )
+        cls.blank_latin = NutsRegion.objects.create(
+            name="Attiki",
+            name_latn="",
+            nuts_name="Αττική",
+            nuts_id="EL3",
+            levl_code=1,
+            publication_status="published",
+        )
 
     def test_english_name_is_served_as_display_label(self):
         response = self.client.get(self.url, data={"q": "DE2"})
@@ -1565,6 +1573,13 @@ class NutsRegionEnglishNameTestCase(ViewWithPermissionsTestCase):
             r for r in response.json()["results"] if r["id"] == self.without_english.pk
         )
         self.assertEqual(item["display_name"], "Freising")
+
+    def test_display_label_skips_blank_latin_name(self):
+        response = self.client.get(self.url, data={"q": "EL3"})
+        item = next(
+            r for r in response.json()["results"] if r["id"] == self.blank_latin.pk
+        )
+        self.assertEqual(item["display_name"], "Αττική")
 
     def test_search_finds_regions_by_english_name(self):
         response = self.client.get(self.url, data={"q": "Bavaria"})

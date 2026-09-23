@@ -1367,7 +1367,10 @@ class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
         queryset = super().hook_queryset(queryset)
         return queryset.in_vintage(NutsVintage.from_request(self.request)).annotate(
             display_name=Coalesce(
-                NullIf("name_en", Value("")), "name_latn", "nuts_name", "name"
+                NullIf("name_en", Value("")),
+                NullIf("name_latn", Value("")),
+                NullIf("nuts_name", Value("")),
+                "name",
             )
         )
 

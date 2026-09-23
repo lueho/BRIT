@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("maps", "0017_catchment_revisions"),
+        ("maps", "0018_remove_regionproperty_unit_and_more"),
     ]
 
     operations = [
