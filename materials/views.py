@@ -60,7 +60,7 @@ from utils.object_management.views import (
 )
 from utils.properties.models import Unit
 from utils.properties.units import UnitConversionError
-from utils.views import NextOrSuccessUrlMixin
+from utils.views import NextOrSuccessUrlMixin, get_safe_next_url
 
 from .composition_normalization import (
     get_sample_composition_settings_by_group,
@@ -888,7 +888,8 @@ class SampleBoundCreateMixin(UserPassesTestMixin):
         return context
 
     def get_success_url(self):
-        return self.sample.get_absolute_url()
+        next_url = get_safe_next_url(self.request)
+        return next_url if next_url else self.sample.get_absolute_url()
 
 
 class MaterialPropertyValueCreateView(
@@ -914,6 +915,9 @@ class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = MaterialPropertyValue
 
     def get_success_url(self):
+        next_url = get_safe_next_url(self.request)
+        if next_url:
+            return next_url
         related_sample = self.object.related_sample
         if related_sample is None:
             return ""
@@ -923,9 +927,6 @@ class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
 class MaterialPropertyValueUpdateView(UserCreatedObjectUpdateView):
     model = MaterialPropertyValue
     form_class = MaterialPropertyValueModelForm
-
-    def get_success_url(self):
-        return self.object.get_absolute_url()
 
 
 class ComponentMeasurementCreateView(
@@ -951,22 +952,19 @@ class ComponentMeasurementUpdateView(UserCreatedObjectUpdateView):
     model = ComponentMeasurement
     form_class = ComponentMeasurementModelForm
 
-    def get_success_url(self):
-        return self.object.get_absolute_url()
-
 
 class ComponentMeasurementModalUpdateView(UserCreatedObjectModalUpdateView):
     model = ComponentMeasurement
     form_class = ComponentMeasurementModalModelForm
-
-    def get_success_url(self):
-        return self.object.get_absolute_url()
 
 
 class ComponentMeasurementModalDeleteView(UserCreatedObjectModalDeleteView):
     model = ComponentMeasurement
 
     def get_success_url(self):
+        next_url = get_safe_next_url(self.request)
+        if next_url:
+            return next_url
         return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
 
 
@@ -2194,14 +2192,14 @@ class CompositionUpdateView(
     form_class = CompositionModelForm
     sample_policy_key = "can_manage_samples"
 
-    def get_success_url(self):
-        return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
-
 
 class CompositionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Composition
 
     def get_success_url(self):
+        next_url = get_safe_next_url(self.request)
+        if next_url:
+            return next_url
         return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
 
 
@@ -2215,6 +2213,9 @@ class CompositionOrderUpView(UserOwnsObjectMixin, SingleObjectMixin, RedirectVie
     permission_required = "materials.change_composition"
 
     def get_redirect_url(self, *args, **kwargs):
+        next_url = get_safe_next_url(self.request)
+        if next_url:
+            return next_url
         return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
 
     def get(self, request, *args, **kwargs):
@@ -2229,6 +2230,9 @@ class CompositionOrderDownView(UserOwnsObjectMixin, SingleObjectMixin, RedirectV
     permission_required = "materials.change_composition"
 
     def get_redirect_url(self, *args, **kwargs):
+        next_url = get_safe_next_url(self.request)
+        if next_url:
+            return next_url
         return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
 
     def get(self, request, *args, **kwargs):
@@ -2284,6 +2288,9 @@ class _DerivedCompositionOrderView(
         return policy["can_manage_samples"]
 
     def get_redirect_url(self, *args, **kwargs):
+        next_url = get_safe_next_url(self.request)
+        if next_url:
+            return next_url
         return reverse("sample-detail", kwargs={"pk": self.get_sample().pk})
 
 

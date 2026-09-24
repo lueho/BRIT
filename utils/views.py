@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 from crispy_forms.helper import FormHelper
 from django.http import HttpResponseRedirect, JsonResponse, QueryDict
 from django.template.loader import render_to_string
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import ListView, TemplateView
 
 
@@ -99,6 +100,21 @@ class BreadcrumbContextMixin:
         return context
 
 
+def get_safe_next_url(request):
+    """
+    Return the 'next' parameter from POST or GET if it points to this site,
+    otherwise None. Prevents open redirects to external URLs.
+    """
+    next_url = request.POST.get("next") or request.GET.get("next")
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return None
+
+
 class NextOrSuccessUrlMixin:
     """
     If a 'next=<url>' parameter is given in the query string of the url,
@@ -108,7 +124,7 @@ class NextOrSuccessUrlMixin:
 
     def get_success_url(self):
         # Prefer POST 'next' (form-hidden field), fall back to GET 'next'
-        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        next_url = get_safe_next_url(self.request)
         return next_url if next_url else super().get_success_url()
 
 
