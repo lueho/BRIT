@@ -30,6 +30,7 @@ from materials.models import (
     SampleGroupKind,
     SampleSeries,
 )
+from utils.object_management.models import get_default_owner
 from utils.properties.models import Unit
 from utils.tests.test_utils import CanonicalRelationTestMixin
 
@@ -117,6 +118,20 @@ class MaterialComponentTestCase(TestCase):
         default = MaterialComponent.objects.default()
         self.assertIsInstance(default, MaterialComponent)
         self.assertEqual(default.name, "Fresh Matter (FM)")
+
+    @override_settings(DEFAULT_MATERIALCOMPONENT_NAME="Missing Default Component")
+    def test_default_material_component_is_created_when_missing(self):
+        default = MaterialComponent.objects.default()
+
+        self.assertIsInstance(default, MaterialComponent)
+        self.assertEqual(default.name, "Missing Default Component")
+        self.assertEqual(default.owner, get_default_owner())
+
+    def test_default_material_component_is_not_duplicated(self):
+        first = MaterialComponent.objects.default()
+        second = MaterialComponent.objects.default()
+
+        self.assertEqual(first.pk, second.pk)
 
     def test_get_other_material_component_manager_function(self):
         default = MaterialComponent.objects.other()
