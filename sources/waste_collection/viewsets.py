@@ -158,7 +158,18 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 to_attr="_prefetched_successors",
             ),
         )
-        return queryset.order_by("pk") if self._extended_list_requested() else queryset
+        if not self._extended_list_requested():
+            return queryset
+        nuts_ancestry = [
+            "catchment__region__nutsregion__parent",
+            "catchment__region__nutsregion__parent__parent",
+            "catchment__region__nutsregion__parent__parent__parent",
+            "catchment__region__lauregion__nuts_parent",
+            "catchment__region__lauregion__nuts_parent__parent",
+            "catchment__region__lauregion__nuts_parent__parent__parent",
+            "catchment__region__lauregion__nuts_parent__parent__parent__parent",
+        ]
+        return queryset.select_related(*nuts_ancestry).order_by("pk")
 
     def get_geojson_queryset(self):
         """Return optimized queryset for GeoJSON with simplified geometry.

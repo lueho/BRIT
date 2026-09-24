@@ -7,7 +7,13 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
-from maps.models import Region, RegionAttributeValue, RegionProperty
+from maps.models import (
+    LauRegion,
+    NutsRegion,
+    Region,
+    RegionAttributeValue,
+    RegionProperty,
+)
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
     Collection,
@@ -143,8 +149,9 @@ class CollectionAnalysisApiTests(APITestCase):
         self.assertEqual(row["connection_rate_2024_unit"], "%")
         self.assertNotIn("connection_rate_2025", row)
 
-    def _create_regional_collection(self, name, region_name):
-        region = Region.objects.create(name=region_name, country="DE")
+    def _create_regional_collection(self, name, region_name, region=None):
+        if region is None:
+            region = Region.objects.create(name=region_name, country="DE")
         catchment = CollectionCatchment.objects.create(name=name, region=region)
         collection = Collection.objects.create(
             name=name,
@@ -198,10 +205,44 @@ class CollectionAnalysisApiTests(APITestCase):
         total = Property.objects.get_or_create(name="total waste collected")[0]
         unit = Unit.objects.get_or_create(name="%")[0]
         population = RegionProperty.objects.get_or_create(name="Population")[0]
+        nuts0 = NutsRegion.objects.create(
+            name="Germany", country="DE", nuts_id="DE", levl_code=0
+        )
         ids = []
         for index in range(4):
+            nuts1 = NutsRegion.objects.create(
+                name=f"Land {index}",
+                country="DE",
+                nuts_id=f"DE{index}",
+                levl_code=1,
+                parent=nuts0,
+            )
+            nuts2 = NutsRegion.objects.create(
+                name=f"Bezirk {index}",
+                country="DE",
+                nuts_id=f"DE{index}1",
+                levl_code=2,
+                parent=nuts1,
+            )
+            nuts3 = NutsRegion.objects.create(
+                name=f"Kreis {index}",
+                country="DE",
+                nuts_id=f"DE{index}11",
+                levl_code=3,
+                parent=nuts2,
+            )
+            if index % 2:
+                lau = LauRegion.objects.create(
+                    name=f"Gemeinde {index}",
+                    country="DE",
+                    lau_id=f"0{index}",
+                    nuts_parent=nuts3,
+                )
+                region = lau.region_ptr
+            else:
+                region = nuts3.region_ptr
             region, collection = self._create_regional_collection(
-                f"Regional {index}", f"Region {index}"
+                f"Regional {index}", f"Region {index}", region=region
             )
             successor = Collection.objects.create(
                 name=f"Regional {index} v2",
@@ -256,6 +297,8 @@ class CollectionAnalysisApiTests(APITestCase):
             self.assertEqual(row["total_waste_collected_2024"], 10 + index)
             self.assertTrue(row["aggregated"])
             self.assertEqual(row["population_2024"], 100 + index)
+            self.assertEqual(row["nuts_0_id"], "DE")
+            self.assertEqual(row["nuts_3_id"], f"DE{index}11")
         self.assertEqual(len(several), len(single))
 
     def test_empty_result_still_has_a_versioned_envelope(self):
