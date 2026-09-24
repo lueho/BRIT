@@ -212,6 +212,10 @@ CACHES = {
 # Use the geojson cache for all geojson-related operations
 GEOJSON_CACHE = "geojson"
 
+# Identifies the deployed release (Heroku dyno metadata sets
+# HEROKU_RELEASE_VERSION); used to scope per-release startup work.
+RELEASE_ID = os.environ.get("HEROKU_RELEASE_VERSION", "")
+
 
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"

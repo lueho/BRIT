@@ -8,6 +8,8 @@ import logging
 
 from celery import shared_task
 from celery.signals import worker_ready
+from django.conf import settings
+from django.core.cache import caches
 
 from maps.cache_warmup import (
     DEFAULT_NUTS_LEVELS,
@@ -18,6 +20,20 @@ from maps.cache_warmup import (
 from maps.registry import get_source_domain_geojson_cache_warmers
 
 logger = logging.getLogger(__name__)
+
+# Re-arm window for the startup warmup. ``worker_ready`` fires on every dyno
+# start — including crash restarts — so without a guard a warmup that kills
+# the worker (e.g. OOM on an oversized geometry) re-triggers itself on every
+# restart and keeps the dyno crash-looping. One attempt per window is enough:
+# beat also schedules a daily warmup and data changes trigger their own.
+# The flag is scoped per release so a fresh deploy always gets its warmup.
+STARTUP_WARMUP_FLAG_CACHE_KEY_PREFIX = "geojson_warmup:startup_queued"
+STARTUP_WARMUP_COOLDOWN_SECONDS = 3600
+
+
+def startup_warmup_flag_cache_key():
+    release_id = getattr(settings, "RELEASE_ID", "") or "unknown"
+    return f"{STARTUP_WARMUP_FLAG_CACHE_KEY_PREFIX}:{release_id}"
 
 
 def _warm_base_geojson_caches(nuts_levels, regions_limit, nuts_limit=None):
@@ -110,5 +126,19 @@ def warm_geojson_caches_on_worker_ready(sender=None, **kwargs):
     introduced caches). ``worker_ready`` fires only in the freshly started
     worker, so the warmup is guaranteed to run on the new release's code —
     on deploys and on routine dyno restarts alike.
+
+    The flag in the GeoJSON cache rate-limits queueing: it survives restarts,
+    so a warmup that crashed the worker does not immediately re-arm on the
+    restarted dyno. It is keyed by ``settings.RELEASE_ID`` so a new release
+    is never blocked by the previous release's flag.
     """
-    warm_all_geojson_caches.apply_async(countdown=30)
+    geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
+    flag_key = startup_warmup_flag_cache_key()
+    if not geojson_cache.add(flag_key, True, STARTUP_WARMUP_COOLDOWN_SECONDS):
+        logger.info("Startup GeoJSON warmup already queued recently; skipping.")
+        return
+    try:
+        warm_all_geojson_caches.apply_async(countdown=30)
+    except Exception:
+        geojson_cache.delete(flag_key)
+        raise
