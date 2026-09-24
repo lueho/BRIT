@@ -98,25 +98,27 @@ def warm_region_geojson_cache(limit=None, max_points=None):
     if max_points is None:
         max_points = REGION_GEOJSON_WARMUP_MAX_POINTS
 
-    queryset = (
-        Region.objects.select_related("borders")
-        .filter(borders__isnull=False)
+    # Decide from the point counts alone which regions to warm: selecting
+    # the geometries up front would load every oversized geometry into the
+    # worker before it is skipped.
+    candidates = (
+        Region.objects.filter(borders__isnull=False)
         .annotate(num_points=NumPoints("borders__geom"))
-        .order_by("-num_points")[:limit]
+        .order_by("-num_points")
+        .values_list("id", "name", "num_points")[:limit]
     )
 
-    warmed = 0
+    eligible_ids = []
     skipped = []
-    for region in queryset:
-        if (region.num_points or 0) > max_points:
-            skipped.append(
-                {
-                    "id": region.id,
-                    "name": region.name,
-                    "num_points": region.num_points,
-                }
-            )
-            continue
+    for region_id, name, num_points in candidates:
+        if (num_points or 0) > max_points:
+            skipped.append({"id": region_id, "name": name, "num_points": num_points})
+        else:
+            eligible_ids.append(region_id)
+
+    warmed = 0
+    for region_id in eligible_ids:
+        region = Region.objects.select_related("borders").get(id=region_id)
         cache_key = get_region_cache_key(region_id=region.id)
         serializer = RegionGeoFeatureModelSerializer([region], many=True)
         set_geojson_cache_payload(

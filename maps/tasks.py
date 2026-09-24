@@ -26,8 +26,14 @@ logger = logging.getLogger(__name__)
 # the worker (e.g. OOM on an oversized geometry) re-triggers itself on every
 # restart and keeps the dyno crash-looping. One attempt per window is enough:
 # beat also schedules a daily warmup and data changes trigger their own.
-STARTUP_WARMUP_FLAG_CACHE_KEY = "geojson_warmup:startup_queued"
+# The flag is scoped per release so a fresh deploy always gets its warmup.
+STARTUP_WARMUP_FLAG_CACHE_KEY_PREFIX = "geojson_warmup:startup_queued"
 STARTUP_WARMUP_COOLDOWN_SECONDS = 3600
+
+
+def startup_warmup_flag_cache_key():
+    release_id = getattr(settings, "RELEASE_ID", "") or "unknown"
+    return f"{STARTUP_WARMUP_FLAG_CACHE_KEY_PREFIX}:{release_id}"
 
 
 def _warm_base_geojson_caches(nuts_levels, regions_limit, nuts_limit=None):
@@ -123,16 +129,16 @@ def warm_geojson_caches_on_worker_ready(sender=None, **kwargs):
 
     The flag in the GeoJSON cache rate-limits queueing: it survives restarts,
     so a warmup that crashed the worker does not immediately re-arm on the
-    restarted dyno.
+    restarted dyno. It is keyed by ``settings.RELEASE_ID`` so a new release
+    is never blocked by the previous release's flag.
     """
     geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
-    if not geojson_cache.add(
-        STARTUP_WARMUP_FLAG_CACHE_KEY, True, STARTUP_WARMUP_COOLDOWN_SECONDS
-    ):
+    flag_key = startup_warmup_flag_cache_key()
+    if not geojson_cache.add(flag_key, True, STARTUP_WARMUP_COOLDOWN_SECONDS):
         logger.info("Startup GeoJSON warmup already queued recently; skipping.")
         return
     try:
         warm_all_geojson_caches.apply_async(countdown=30)
     except Exception:
-        geojson_cache.delete(STARTUP_WARMUP_FLAG_CACHE_KEY)
+        geojson_cache.delete(flag_key)
         raise
