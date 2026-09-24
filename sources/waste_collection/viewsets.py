@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import connection, transaction
 from django.db.models import Exists, F, OuterRef, Prefetch, Q
 from django.urls import reverse
+from django.utils import timezone
 from django_filters import rest_framework as rf_filters
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -21,7 +22,10 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from maps.db_functions import SimplifyPreserveTopology
 from maps.mixins import CachedGeoJSONMixin
 from maps.utils import build_collection_cache_key
-from sources.waste_collection.filters import CollectionFilterSet
+from sources.waste_collection.filters import (
+    CollectionExtendedFilterSet,
+    CollectionFilterSet,
+)
 from sources.waste_collection.importers import CollectionImporter
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
@@ -36,6 +40,7 @@ from sources.waste_collection.models import (
 from sources.waste_collection.serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
     AggregatedCollectionPropertyValueMutationSerializer,
+    CollectionAnalysisSerializer,
     CollectionFlatSerializer,
     CollectionFrequencyMutationSerializer,
     CollectionFrequencyReferenceSerializer,
@@ -64,6 +69,11 @@ logger = logging.getLogger(__name__)
 
 class CollectionDjangoFilterBackend(rf_filters.DjangoFilterBackend):
     """DjangoFilterBackend variant that accepts extra view-provided kwargs."""
+
+    def get_filterset_class(self, view, queryset=None):
+        if view._extended_list_requested():
+            return CollectionExtendedFilterSet
+        return super().get_filterset_class(view, queryset)
 
     def get_filterset_kwargs(self, request, queryset, view):
         kwargs = super().get_filterset_kwargs(request, queryset, view)
@@ -120,7 +130,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             return queryset
 
         relation_queryset = Collection.objects.only("pk").order_by("pk")
-        return queryset.select_related(
+        queryset = queryset.select_related(
             "owner",
             "catchment",
             "catchment__region",
@@ -148,6 +158,18 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 to_attr="_prefetched_successors",
             ),
         )
+        if not self._extended_list_requested():
+            return queryset
+        nuts_ancestry = [
+            "catchment__region__nutsregion__parent",
+            "catchment__region__nutsregion__parent__parent",
+            "catchment__region__nutsregion__parent__parent__parent",
+            "catchment__region__lauregion__nuts_parent",
+            "catchment__region__lauregion__nuts_parent__parent",
+            "catchment__region__lauregion__nuts_parent__parent__parent",
+            "catchment__region__lauregion__nuts_parent__parent__parent__parent",
+        ]
+        return queryset.select_related(*nuts_ancestry).order_by("pk")
 
     def get_geojson_queryset(self):
         """Return optimized queryset for GeoJSON with simplified geometry.
@@ -231,8 +253,15 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         if action == "retrieve":
             return CollectionModelSerializer
         if action == "list":
+            if self._extended_list_requested():
+                return CollectionAnalysisSerializer
             return CollectionResearchSerializer
         return super().get_serializer_class()
+
+    def _extended_list_requested(self):
+        return getattr(self, "action", None) == "list" and (
+            self.request.query_params.get("view") == "extended"
+        )
 
     # Ensure CachedGeoJSONMixin uses the GeoJSON serializer class
     def get_geojson_serializer_class(self):
@@ -248,6 +277,21 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             return {"skip_min_max": True}
         return {}
 
+    analysis_group_name = "analysis_api"
+
+    def _enforce_analysis_group(self, request):
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            raise NotAuthenticated(
+                "Authentication is required for the extended collection list."
+            )
+        if user.is_staff or user.groups.filter(name=self.analysis_group_name).exists():
+            return
+        raise PermissionDenied(
+            f"Membership in the '{self.analysis_group_name}' group is required "
+            "for the extended collection list."
+        )
+
     def _enforce_authenticated_non_public_scope(self, request):
         scope = (request.query_params.get("scope") or "published").lower()
         if scope == "published":
@@ -260,6 +304,10 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             )
 
     def list(self, request, *args, **kwargs):
+        if "view" in request.query_params and not self._extended_list_requested():
+            raise ValidationError({"view": "Use 'extended' or omit this parameter."})
+        if self._extended_list_requested():
+            self._enforce_analysis_group(request)
         self._enforce_authenticated_non_public_scope(request)
         started_at = time.perf_counter()
         query_count_start = (
@@ -269,6 +317,14 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         )
 
         response = super().list(request, *args, **kwargs)
+
+        if self._extended_list_requested():
+            response.data.update(
+                schema_version="1.0",
+                generated_at=timezone.now().isoformat(),
+                snapshot_isolation=False,
+            )
+            response["Cache-Control"] = "private, no-store"
 
         duration_seconds = time.perf_counter() - started_at
         if duration_seconds >= self.collection_list_slow_log_threshold_seconds:

@@ -29,7 +29,49 @@ from ..serializers import (
     CollectionImportRecordSerializer,
     CollectionModelSerializer,
     CollectionResearchSerializer,
+    _set_measurement_columns,
 )
+
+
+class SetMeasurementColumnsTestCase(TestCase):
+    def test_repeated_same_unit_values_keep_plain_column_with_last_value(self):
+        representation = {}
+        _set_measurement_columns(
+            representation, "population_2024", [(1.0, ""), (2.0, None)]
+        )
+        self.assertEqual(
+            representation, {"population_2024": 2.0, "population_2024_unit": ""}
+        )
+
+    def test_distinct_units_get_suffixed_columns(self):
+        representation = {}
+        _set_measurement_columns(
+            representation, "total_2024", [(5.0, "Mg/a"), (6.0, "kg/a"), (7.0, "kg/a")]
+        )
+        self.assertEqual(
+            representation,
+            {
+                "total_2024_mg_a": 5.0,
+                "total_2024_mg_a_unit": "Mg/a",
+                "total_2024_kg_a": 7.0,
+                "total_2024_kg_a_unit": "kg/a",
+            },
+        )
+
+    def test_colliding_unit_slugs_stay_distinct(self):
+        representation = {}
+        _set_measurement_columns(
+            representation, "total_2024", [(5.0, "kg/a"), (6.0, "kg-a")]
+        )
+        self.assertEqual(
+            representation,
+            {
+                "total_2024_kg_a": 5.0,
+                "total_2024_kg_a_unit": "kg/a",
+                "total_2024_kg_a_2": 6.0,
+                "total_2024_kg_a_2_unit": "kg-a",
+            },
+        )
 
 
 class CollectionModelSerializerTestCase(TestCase):
@@ -254,12 +296,14 @@ class CollectionFlatSerializerTestCase(TestCase):
             property=population,
             date=date(2020, 1, 1),
             value=123321,
+            publication_status="published",
         )
         RegionAttributeValue.objects.create(
             region=nutsregion.region_ptr,
             property=population_density,
             date=date(2020, 1, 1),
             value=123.5,
+            publication_status="published",
         )
         catchment1 = CollectionCatchment.objects.create(
             name="Test Catchment", region=nutsregion.region_ptr
