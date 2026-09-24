@@ -176,7 +176,10 @@
         }
 
         stripScripts(fragment) {
-            fragment.querySelectorAll("script").forEach((script) => script.remove());
+            // noscript fallbacks only apply to server-rendered full pages. Inside a
+            // template fragment Chrome/Safari parse their contents as regular
+            // markup, so they would show up even though JavaScript is running.
+            fragment.querySelectorAll("script, noscript").forEach((node) => node.remove());
             fragment.querySelectorAll("template").forEach((template) => {
                 if (template.dataset.workspaceMedia === undefined) this.stripScripts(template.content);
             });
