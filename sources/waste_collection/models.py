@@ -607,11 +607,47 @@ class Collection(NamedUserCreatedObject):
 
         return ordered
 
-    def collectionpropertyvalues_for_display(self, user=None):
-        """Return collection-specific property values visible to ``user`` across the chain."""
+    @classmethod
+    def version_chains_for(cls, collection_ids):
+        """Map each requested pk to the set of pks connected through versions.
+
+        Walks the predecessor/successor graph breadth-first in batched queries
+        instead of one traversal per collection.
+        """
+
+        through = cls.predecessors.through
+        parent = {pk: pk for pk in collection_ids}
+
+        def find(pk):
+            while parent[pk] != pk:
+                parent[pk] = parent[parent[pk]]
+                pk = parent[pk]
+            return pk
+
+        frontier = set(parent)
+        while frontier:
+            edges = through.objects.filter(
+                Q(from_collection_id__in=frontier) | Q(to_collection_id__in=frontier)
+            ).values_list("from_collection_id", "to_collection_id")
+            frontier = set()
+            for left, right in edges:
+                for pk in (left, right):
+                    if pk not in parent:
+                        parent[pk] = pk
+                        frontier.add(pk)
+                parent[find(left)] = find(right)
+
+        chains = {}
+        for pk in parent:
+            chains.setdefault(find(pk), set()).add(pk)
+        return {pk: chains[find(pk)] for pk in collection_ids}
+
+    @staticmethod
+    def visible_collectionpropertyvalues(collection_ids, user=None):
+        """Return an ordered queryset of values on ``collection_ids`` visible to ``user``."""
 
         qs = (
-            CollectionPropertyValue.objects.filter(collection__in=self.all_versions())
+            CollectionPropertyValue.objects.filter(collection_id__in=collection_ids)
             .select_related("property", "unit", "collection", "owner", "approved_by")
             .prefetch_related("sources")
         )
@@ -623,7 +659,7 @@ class Collection(NamedUserCreatedObject):
         )
         user_id = getattr(user, "id", None)
 
-        qs = qs.annotate(
+        return qs.annotate(
             owner_order=Case(
                 When(owner_id=user_id, then=Value(0)),
                 default=Value(1),
@@ -647,14 +683,20 @@ class Collection(NamedUserCreatedObject):
             "pk",
         )
 
-        return self._deduplicate_property_values(qs)
+    def collectionpropertyvalues_for_display(self, user=None):
+        """Return collection-specific property values visible to ``user`` across the chain."""
 
-    def aggregatedcollectionpropertyvalues_for_display(self, user=None):
-        """Return aggregated property values visible to ``user`` across the chain."""
+        return self._deduplicate_property_values(
+            self.visible_collectionpropertyvalues(self.version_chain_ids, user)
+        )
+
+    @staticmethod
+    def visible_aggregatedcollectionpropertyvalues(collection_ids, user=None):
+        """Return an ordered queryset of aggregated values touching ``collection_ids``."""
 
         qs = (
             AggregatedCollectionPropertyValue.objects.filter(
-                collections__in=self.all_versions()
+                collections__in=collection_ids
             )
             .select_related("property", "unit", "owner", "approved_by")
             .prefetch_related("collections", "sources")
@@ -668,7 +710,7 @@ class Collection(NamedUserCreatedObject):
         )
         user_id = getattr(user, "id", None)
 
-        qs = qs.annotate(
+        return qs.annotate(
             owner_order=Case(
                 When(owner_id=user_id, then=Value(0)),
                 default=Value(1),
@@ -691,7 +733,14 @@ class Collection(NamedUserCreatedObject):
             "-pk",
         )
 
-        return list(qs)
+    def aggregatedcollectionpropertyvalues_for_display(self, user=None):
+        """Return aggregated property values visible to ``user`` across the chain."""
+
+        return list(
+            self.visible_aggregatedcollectionpropertyvalues(
+                self.version_chain_ids, user
+            )
+        )
 
     def construct_name(self):
         """

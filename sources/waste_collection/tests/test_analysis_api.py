@@ -1,9 +1,19 @@
 """Contract for the optional extended collection list representation."""
 
+from datetime import date
+
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
-from sources.waste_collection.models import CollectionPropertyValue
+from maps.models import Region, RegionAttributeValue, RegionProperty
+from sources.waste_collection.models import (
+    AggregatedCollectionPropertyValue,
+    Collection,
+    CollectionCatchment,
+    CollectionPropertyValue,
+)
 from sources.waste_collection.tests import test_viewsets as fixtures
 from utils.properties.models import Property, Unit
 
@@ -132,6 +142,121 @@ class CollectionAnalysisApiTests(APITestCase):
         self.assertEqual(row["connection_rate_2024"], 0)
         self.assertEqual(row["connection_rate_2024_unit"], "%")
         self.assertNotIn("connection_rate_2025", row)
+
+    def _create_regional_collection(self, name, region_name):
+        region = Region.objects.create(name=region_name, country="DE")
+        catchment = CollectionCatchment.objects.create(name=name, region=region)
+        collection = Collection.objects.create(
+            name=name,
+            owner=self.regular_user,
+            catchment=catchment,
+            waste_category=self.waste_category,
+            collection_system=self.collection_system,
+            publication_status="published",
+            collector=self.collector,
+        )
+        return region, collection
+
+    def test_private_region_attribute_values_are_hidden_from_anonymous(self):
+        region, collection = self._create_regional_collection("Regional", "Region A")
+        population = RegionProperty.objects.get_or_create(name="Population")[0]
+        for year, state in ((2023, "private"), (2024, "published")):
+            RegionAttributeValue.objects.create(
+                name=f"Population {year}",
+                region=region,
+                property=population,
+                date=date(year, 1, 1),
+                value=1000 + year,
+                owner=self.staff_user,
+                publication_status=state,
+            )
+        row = self.get_extended({"id": collection.pk}).data["results"][0]
+        self.assertEqual(row["population_2024"], 3024)
+        self.assertNotIn("population_2023", row)
+
+    def test_metrics_with_different_units_are_all_kept(self):
+        prop = Property.objects.get_or_create(name="total waste collected")[0]
+        for unit_name, value in (("Mg/a", 5), ("kg/a", 5000)):
+            CollectionPropertyValue.objects.create(
+                collection=self.published_collection,
+                property=prop,
+                unit=Unit.objects.get_or_create(name=unit_name)[0],
+                year=2024,
+                average=value,
+                owner=self.regular_user,
+                publication_status="published",
+            )
+        row = self.get_extended({"id": self.published_collection.pk}).data["results"][0]
+        self.assertNotIn("total_waste_collected_2024", row)
+        self.assertEqual(row["total_waste_collected_2024_kg_a"], 5000)
+        self.assertEqual(row["total_waste_collected_2024_kg_a_unit"], "kg/a")
+        self.assertEqual(row["total_waste_collected_2024_mg_a"], 5)
+        self.assertEqual(row["total_waste_collected_2024_mg_a_unit"], "Mg/a")
+
+    def test_query_count_does_not_grow_with_page_size(self):
+        prop = Property.objects.get_or_create(name="Connection rate")[0]
+        total = Property.objects.get_or_create(name="total waste collected")[0]
+        unit = Unit.objects.get_or_create(name="%")[0]
+        population = RegionProperty.objects.get_or_create(name="Population")[0]
+        ids = []
+        for index in range(4):
+            region, collection = self._create_regional_collection(
+                f"Regional {index}", f"Region {index}"
+            )
+            successor = Collection.objects.create(
+                name=f"Regional {index} v2",
+                owner=self.regular_user,
+                catchment=collection.catchment,
+                waste_category=self.waste_category,
+                collection_system=self.collection_system,
+                publication_status="published",
+                collector=self.collector,
+                valid_from=date(2025, 1, 1),
+            )
+            successor.predecessors.add(collection)
+            CollectionPropertyValue.objects.create(
+                collection=collection,
+                property=prop,
+                unit=unit,
+                year=2024,
+                average=index,
+                owner=self.regular_user,
+                publication_status="published",
+            )
+            aggregated = AggregatedCollectionPropertyValue.objects.create(
+                property=total,
+                unit=unit,
+                year=2024,
+                average=10 + index,
+                owner=self.regular_user,
+                publication_status="published",
+            )
+            aggregated.collections.add(collection)
+            RegionAttributeValue.objects.create(
+                name=f"Population {index}",
+                region=region,
+                property=population,
+                date=date(2024, 1, 1),
+                value=100 + index,
+                owner=self.regular_user,
+                publication_status="published",
+            )
+            ids.append(successor.pk)
+
+        with CaptureQueriesContext(connection) as single:
+            one = self.get_extended({"id": ids[:1], "page_size": 1})
+        with CaptureQueriesContext(connection) as several:
+            many = self.get_extended({"id": ids, "page_size": 4})
+
+        self.assertEqual(one.status_code, 200)
+        self.assertEqual(many.status_code, 200)
+        self.assertEqual(len(many.data["results"]), 4)
+        for index, row in enumerate(many.data["results"]):
+            self.assertEqual(row["connection_rate_2024"], index)
+            self.assertEqual(row["total_waste_collected_2024"], 10 + index)
+            self.assertTrue(row["aggregated"])
+            self.assertEqual(row["population_2024"], 100 + index)
+        self.assertEqual(len(several), len(single))
 
     def test_empty_result_still_has_a_versioned_envelope(self):
         response = self.get_extended({"publication_status": "private"})

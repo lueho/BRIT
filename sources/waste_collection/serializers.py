@@ -1,4 +1,5 @@
-from collections import OrderedDict
+import re
+from collections import OrderedDict, defaultdict
 
 from django.urls import reverse
 from rest_framework import serializers
@@ -7,6 +8,7 @@ from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
+from maps.models import RegionAttributeValue
 from materials.models import Material
 from sources.waste_collection import models
 from sources.waste_collection.description_formatting import (
@@ -18,7 +20,10 @@ from sources.waste_collection.frequency_service import (
     CADENCE_CUSTOM,
     CollectionFrequencyScheduleService,
 )
-from utils.object_management.permissions import get_object_policy
+from utils.object_management.permissions import (
+    filter_queryset_for_user,
+    get_object_policy,
+)
 from utils.properties.models import Property
 from utils.serializers import FieldLabelModelSerializer
 
@@ -358,6 +363,29 @@ class CollectionModelSerializer(
             return {}
 
 
+def _column_slug(label):
+    return re.sub(r"[^a-z0-9]+", "_", str(label).lower()).strip("_")
+
+
+def _set_measurement_columns(representation, base_column, values):
+    """Write ``(value, unit_label)`` pairs under ``base_column``.
+
+    A single measurement keeps the plain column; measurements in different
+    units for the same column each get a unit-suffixed column so none is lost.
+    """
+    columns = (
+        [(base_column, values[0])]
+        if len(values) == 1
+        else [
+            (f"{base_column}_{_column_slug(unit)}", (value, unit))
+            for value, unit in values
+        ]
+    )
+    for column, (value, unit) in columns:
+        representation[column] = value
+        representation[f"{column}_unit"] = unit if unit else ""
+
+
 def _get_nuts_hierarchy(region):
     """
     Return an OrderedDict of NUTS level → (nuts_id, nuts_name) for all ancestor NUTS
@@ -557,6 +585,31 @@ class CollectionFlatSerializer(
             self._collection_metric_properties = properties
         return properties
 
+    def get_user(self):
+        return (
+            getattr(self.context.get("request"), "user", None) if self.context else None
+        )
+
+    region_attribute_names = ("Population", "Population density")
+
+    def get_region_attribute_values(self, region):
+        qs = (
+            region.regionattributevalue_set.filter(
+                property__name__in=self.region_attribute_names
+            )
+            .select_related("property", "unit")
+            .order_by("property__name", "date", "pk")
+        )
+        return filter_queryset_for_user(qs, self.get_user())
+
+    def get_collection_property_values(self, instance):
+        return instance.collectionpropertyvalues_for_display(user=self.get_user())
+
+    def get_aggregated_property_values(self, instance):
+        return instance.aggregatedcollectionpropertyvalues_for_display(
+            user=self.get_user()
+        )
+
     def to_representation(self, instance):
         representation = super().to_representation(instance)
 
@@ -579,68 +632,162 @@ class CollectionFlatSerializer(
                         ordered_representation[f"nuts_{level}_name"] = nuts_name
 
         if self.include_region_attributes:
-            region_attributes = ["Population", "Population density"]
             try:
                 region = instance.catchment.region
             except AttributeError:
                 region = None
             if region is not None:
-                for attr_name in region_attributes:
-                    col_prefix = attr_name.lower().replace(" ", "_")
-                    rav_qs = (
-                        region.regionattributevalue_set.filter(property__name=attr_name)
-                        .select_related("property", "unit")
-                        .order_by("date")
-                    )
-                    for rav in rav_qs:
-                        year = rav.date.year if rav.date else None
-                        col = f"{col_prefix}_{year}" if year else col_prefix
-                        ordered_representation[col] = rav.value
-                        unit = rav.measurement_unit_label
-                        ordered_representation[f"{col}_unit"] = unit if unit else ""
+                by_column = defaultdict(list)
+                for rav in self.get_region_attribute_values(region):
+                    col_prefix = rav.property.name.lower().replace(" ", "_")
+                    year = rav.date.year if rav.date else None
+                    col = f"{col_prefix}_{year}" if year else col_prefix
+                    by_column[col].append((rav.value, rav.measurement_unit_label))
+                for col, measurements in by_column.items():
+                    _set_measurement_columns(ordered_representation, col, measurements)
 
         if not self.include_collection_metrics:
             return ordered_representation
 
-        user = (
-            getattr(self.context.get("request"), "user", None) if self.context else None
-        )
+        collection_values = None
+        aggregated_values = None
         for property_name, specific_property in self.get_collection_metric_properties():
+            if collection_values is None:
+                collection_values = self.get_collection_property_values(instance)
             values = [
                 value
-                for value in instance.collectionpropertyvalues_for_display(user=user)
+                for value in collection_values
                 if value.property_id == specific_property.pk
             ]
 
             if not values:
+                if aggregated_values is None:
+                    aggregated_values = self.get_aggregated_property_values(instance)
                 values = [
                     value
-                    for value in instance.aggregatedcollectionpropertyvalues_for_display(
-                        user=user
-                    )
+                    for value in aggregated_values
                     if value.property_id == specific_property.pk
                 ]
                 is_aggregated = bool(values)
             else:
                 is_aggregated = False
 
+            by_column = defaultdict(list)
             for value in values:
                 column_name = f"{property_name.lower().replace(' ', '_')}_{value.year}"
-                ordered_representation[column_name] = value.average
-                ordered_representation[f"{column_name}_unit"] = (
-                    str(value.unit) if value.unit else ""
+                by_column[column_name].append(
+                    (value.average, str(value.unit) if value.unit else "")
                 )
-                if is_aggregated:
-                    ordered_representation["aggregated"] = True
+            for column_name, measurements in by_column.items():
+                _set_measurement_columns(
+                    ordered_representation, column_name, measurements
+                )
+            if is_aggregated:
+                ordered_representation["aggregated"] = True
 
         return ordered_representation
+
+
+class CollectionAnalysisListSerializer(serializers.ListSerializer):
+    """Load the dynamic columns of a whole page with a fixed number of queries."""
+
+    def to_representation(self, data):
+        instances = list(data.all() if hasattr(data, "all") else data)
+        self.child.page_data = self.load_page_data(instances)
+        try:
+            return super().to_representation(instances)
+        finally:
+            self.child.page_data = None
+
+    def load_page_data(self, instances):
+        child = self.child
+        user = child.get_user()
+
+        region_ids = set()
+        for instance in instances:
+            try:
+                region_ids.add(instance.catchment.region_id)
+            except AttributeError:
+                pass
+        region_ids.discard(None)
+        region_values = defaultdict(list)
+        if region_ids:
+            rav_qs = (
+                RegionAttributeValue.objects.filter(
+                    region_id__in=region_ids,
+                    property__name__in=child.region_attribute_names,
+                )
+                .select_related("property", "unit")
+                .order_by("property__name", "date", "pk")
+            )
+            for rav in filter_queryset_for_user(rav_qs, user):
+                region_values[rav.region_id].append(rav)
+
+        chains = models.Collection.version_chains_for(
+            [instance.pk for instance in instances if instance.pk]
+        )
+        chain_ids = set().union(*chains.values()) if chains else set()
+        anchor_of = {}
+        for chain in chains.values():
+            anchor = min(chain)
+            for pk in chain:
+                anchor_of[pk] = anchor
+
+        collection_values = defaultdict(list)
+        aggregated_values = defaultdict(list)
+        if chain_ids and child.include_collection_metrics:
+            for value in models.Collection.visible_collectionpropertyvalues(
+                chain_ids, user
+            ):
+                collection_values[anchor_of[value.collection_id]].append(value)
+            for anchor, values in collection_values.items():
+                collection_values[anchor] = (
+                    models.Collection._deduplicate_property_values(values)
+                )
+            for value in models.Collection.visible_aggregatedcollectionpropertyvalues(
+                chain_ids, user
+            ):
+                anchors = {
+                    anchor_of[collection.pk]
+                    for collection in value.collections.all()
+                    if collection.pk in anchor_of
+                }
+                for anchor in anchors:
+                    aggregated_values[anchor].append(value)
+
+        return {
+            "region_values": region_values,
+            "anchor_of": anchor_of,
+            "collection_values": collection_values,
+            "aggregated_values": aggregated_values,
+        }
 
 
 class CollectionAnalysisSerializer(CollectionFlatSerializer):
     """Export values with stable identifiers for reproducible external analyses."""
 
+    page_data = None
+
     class Meta(CollectionFlatSerializer.Meta):
         fields = ("id", "publication_status") + CollectionFlatSerializer.Meta.fields
+        list_serializer_class = CollectionAnalysisListSerializer
+
+    def get_region_attribute_values(self, region):
+        if self.page_data is None:
+            return super().get_region_attribute_values(region)
+        return self.page_data["region_values"].get(region.pk, [])
+
+    def get_collection_property_values(self, instance):
+        if self.page_data is None:
+            return super().get_collection_property_values(instance)
+        anchor = self.page_data["anchor_of"].get(instance.pk)
+        return self.page_data["collection_values"].get(anchor, [])
+
+    def get_aggregated_property_values(self, instance):
+        if self.page_data is None:
+            return super().get_aggregated_property_values(instance)
+        anchor = self.page_data["anchor_of"].get(instance.pk)
+        return self.page_data["aggregated_values"].get(anchor, [])
 
 
 class CollectionResearchSerializer(

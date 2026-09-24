@@ -253,12 +253,14 @@ class CollectionFlatSerializerTestCase(TestCase):
             property=population,
             date=date(2020, 1, 1),
             value=123321,
+            publication_status="published",
         )
         RegionAttributeValue.objects.create(
             region=nutsregion.region_ptr,
             property=population_density,
             date=date(2020, 1, 1),
             value=123.5,
+            publication_status="published",
         )
         catchment1 = CollectionCatchment.objects.create(
             name="Test Catchment", region=nutsregion.region_ptr
