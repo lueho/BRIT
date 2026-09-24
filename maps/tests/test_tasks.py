@@ -17,6 +17,7 @@ from maps.utils import (
     get_nuts_region_cache_key,
     get_region_cache_key,
 )
+from utils.tests.testrunner import serial_test
 
 
 class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
@@ -149,6 +150,7 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
         mock_warm_all.apply_async.assert_called_once_with(countdown=30)
 
 
+@serial_test
 class WarmBaseGeojsonCachesTaskTests(TestCase):
     def setUp(self):
         self.geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
