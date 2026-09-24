@@ -517,6 +517,63 @@ test("media trust is restricted to the configured static TomSelect package", () 
     assert.throws(() => workspace.trustedMediaURL("/static/django_tomselect/css/x.css", "script"));
 });
 
+test("an in-flight same-URL script does not satisfy widget dependencies", async () => {
+    const fixture = setup();
+    const url = "https://brit.test/static/django_tomselect/js/django-tomselect.min.js";
+    const foreign = element({ src: url });
+    const appended = [];
+    fixture.document.querySelectorAll = (selector) => selector === "script[src]" ? [foreign] : [];
+    fixture.document.createElement = (tag) => element({ tagName: tag.toUpperCase() });
+    fixture.document.head = { appendChild(node) { appended.push(node); } };
+    const script = element({ getAttribute: () => url });
+    const promise = fixture.workspace.loadAsset(script, "script");
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0].src, url);
+    appended[0].onload();
+    await promise;
+});
+
+test("a failed stylesheet does not block editor script loading", async () => {
+    const { workspace } = setup();
+    const requested = [];
+    let removed = false;
+    workspace.loadAsset = async (node, kind) => {
+        requested.push(kind);
+        if (kind === "style") throw new Error("Editor asset unavailable");
+    };
+    const template = element({
+        content: element({
+            querySelectorAll: (selector) => selector === 'link[rel="stylesheet"]' ? [element()] : [element()],
+        }),
+        remove() { removed = true; },
+    });
+    const fragment = element({ querySelector: () => element(), querySelectorAll: () => [template] });
+    await workspace.loadMedia(fragment);
+    assert.deepEqual(requested, ["style", "script"]);
+    assert.equal(removed, true);
+});
+
+test("one failing select does not abort widget initialization for the rest", () => {
+    const fixture = setup();
+    const widget = (name) => element({
+        tagName: "SELECT", type: "select-one", dataset: { workspaceSelect: "", autocompleteUrl: "/materials/autocomplete/" },
+        classList: { add() { } }, closest: () => null, labels: [{ textContent: name }],
+    });
+    const bad = widget("Broken");
+    const good = widget("Working");
+    fixture.window.TomSelect = class {
+        constructor(node) {
+            if (node === bad) throw new Error("widget setup failed");
+            node.tomselect = { ready: true };
+        }
+    };
+    const container = element({ querySelectorAll: (selector) => selector === "select[data-workspace-select]" ? [bad, good] : [] });
+    fixture.workspace.initializeWidgets(container);
+    assert.equal(bad.tomselect, undefined);
+    assert.ok(good.tomselect);
+    assert.match(fixture.status.textContent, /search/i);
+});
+
 function pasteFixture(fixture, { text, results = {}, maxRows = Infinity, columns = "component,average" }) {
     const errors = {};
     const rowsContainer = { lastElementChild: element({ fields: {}, querySelector: () => null }) };
