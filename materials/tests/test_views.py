@@ -10,7 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models.signals import post_save, pre_save
 from django.template.loader import render_to_string
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import escape
@@ -4320,6 +4320,14 @@ class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'type="submit"')
+
+    @override_settings(DEFAULT_MATERIALCOMPONENT_NAME="Missing Default Component")
+    def test_get_http_200_ok_when_default_component_is_missing(self):
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("sample-add-composition", kwargs={"pk": self.sample.pk})
+        )
+        self.assertEqual(response.status_code, 200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("sample-add-composition", kwargs={"pk": self.sample.pk})
