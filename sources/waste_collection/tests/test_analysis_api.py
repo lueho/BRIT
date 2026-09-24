@@ -2,6 +2,7 @@
 
 from datetime import date
 
+from django.contrib.auth.models import Group, User
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -21,6 +22,7 @@ from sources.waste_collection.models import (
     CollectionPropertyValue,
 )
 from sources.waste_collection.tests import test_viewsets as fixtures
+from sources.waste_collection.viewsets import CollectionViewSet
 from utils.properties.models import Property, Unit
 
 
@@ -32,11 +34,33 @@ class CollectionAnalysisApiTests(APITestCase):
         fixtures.CollectionViewSetTestCase._create_collection.__func__
     )
 
+    def setUp(self):
+        super().setUp()
+        self.analysis_group = Group.objects.get_or_create(
+            name=CollectionViewSet.analysis_group_name
+        )[0]
+        self.analyst = User.objects.create_user(username="analyst")
+        self.analyst.groups.add(self.analysis_group)
+        self.regular_user.groups.add(self.analysis_group)
+        self.client.force_authenticate(self.analyst)
+
     def endpoint(self):
         return reverse("api-waste-collection-list")
 
     def get_extended(self, params=None):
         return self.client.get(self.endpoint(), {"view": "extended", **(params or {})})
+
+    def test_extended_view_requires_analysis_group(self):
+        self.client.force_authenticate(None)
+        self.assertEqual(self.get_extended().status_code, 401)
+        outsider = User.objects.create_user(username="outsider")
+        self.client.force_authenticate(outsider)
+        self.assertEqual(self.get_extended().status_code, 403)
+        self.assertEqual(
+            self.client.get(self.endpoint(), {"page_size": 1}).status_code, 200
+        )
+        self.client.force_authenticate(self.staff_user)
+        self.assertEqual(self.get_extended().status_code, 200)
 
     def test_default_list_remains_lean(self):
         prop = Property.objects.get_or_create(name="Connection rate")[0]
@@ -94,6 +118,7 @@ class CollectionAnalysisApiTests(APITestCase):
         )
 
     def test_anonymous_cannot_request_non_public_scope(self):
+        self.client.force_authenticate(None)
         for scope in ("private", "review", "all"):
             with self.subTest(scope=scope):
                 response = self.get_extended({"scope": scope})
@@ -108,6 +133,7 @@ class CollectionAnalysisApiTests(APITestCase):
         self.assertNotIn(self.other_user_private_collection.pk, ids)
 
     def test_password_login_token_can_read_own_private_analysis(self):
+        self.client.force_authenticate(None)
         self.regular_user.set_password("test-password")
         self.regular_user.save(update_fields=["password"])
         login = self.client.post(
@@ -164,7 +190,7 @@ class CollectionAnalysisApiTests(APITestCase):
         )
         return region, collection
 
-    def test_private_region_attribute_values_are_hidden_from_anonymous(self):
+    def test_private_region_attribute_values_are_hidden_from_other_users(self):
         region, collection = self._create_regional_collection("Regional", "Region A")
         population = RegionProperty.objects.get_or_create(name="Population")[0]
         for year, state in ((2023, "private"), (2024, "published")):
@@ -284,6 +310,7 @@ class CollectionAnalysisApiTests(APITestCase):
             )
             ids.append(successor.pk)
 
+        self.get_extended({"id": ids[:1], "page_size": 1})
         with CaptureQueriesContext(connection) as single:
             one = self.get_extended({"id": ids[:1], "page_size": 1})
         with CaptureQueriesContext(connection) as several:

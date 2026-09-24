@@ -263,6 +263,21 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             return {"skip_min_max": True}
         return {}
 
+    analysis_group_name = "analysis_api"
+
+    def _enforce_analysis_group(self, request):
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            raise NotAuthenticated(
+                "Authentication is required for the extended collection list."
+            )
+        if user.is_staff or user.groups.filter(name=self.analysis_group_name).exists():
+            return
+        raise PermissionDenied(
+            f"Membership in the '{self.analysis_group_name}' group is required "
+            "for the extended collection list."
+        )
+
     def _enforce_authenticated_non_public_scope(self, request):
         scope = (request.query_params.get("scope") or "published").lower()
         if scope == "published":
@@ -277,6 +292,8 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     def list(self, request, *args, **kwargs):
         if "view" in request.query_params and not self._extended_list_requested():
             raise ValidationError({"view": "Use 'extended' or omit this parameter."})
+        if self._extended_list_requested():
+            self._enforce_analysis_group(request)
         self._enforce_authenticated_non_public_scope(request)
         started_at = time.perf_counter()
         query_count_start = (
