@@ -238,7 +238,10 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
     def test_skips_regions_over_point_budget(self):
         """Serializing a multi-hundred-thousand-point geometry OOMs the
         worker dyno; oversized regions must be skipped, not warmed."""
-        with patch("maps.cache_warmup.REGION_GEOJSON_WARMUP_MAX_POINTS", 4):
+        with (
+            patch("maps.cache_warmup.REGION_GEOJSON_WARMUP_MAX_POINTS", 4),
+            self.assertLogs("maps.cache_warmup", level="WARNING"),
+        ):
             result = warm_base_geojson_caches.run(nuts_levels=None, regions_limit=10)
 
         self.assertIsNone(
@@ -253,6 +256,7 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
         their geometries into the worker defeats the memory budget."""
         with (
             patch("maps.cache_warmup.REGION_GEOJSON_WARMUP_MAX_POINTS", 4),
+            self.assertLogs("maps.cache_warmup", level="WARNING"),
             CaptureQueriesContext(connection) as ctx,
         ):
             warm_base_geojson_caches.run(nuts_levels=None, regions_limit=10)

@@ -85,6 +85,7 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
         lookup_expr="gte",
         label="Submitted after",
         help_text="Show items submitted after this date",
+        method="filter_submitted_after",
     )
 
     submitted_before = DateFilter(
@@ -92,6 +93,7 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
         lookup_expr="lte",
         label="Submitted before",
         help_text="Show items submitted before this date",
+        method="filter_submitted_before",
     )
 
     ordering = OrderingFilter(
@@ -156,6 +158,24 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
         """Filter by owner/submitter.
 
         This is a form-only filter; the view filters each real model queryset.
+        """
+        # Return queryset unchanged; filtering happens in view
+        return queryset
+
+    def filter_submitted_after(self, queryset, name, value):
+        """Filter by submission date lower bound.
+
+        This is a form-only filter; the view applies ``submitted_at__date__gte``
+        to each real model queryset.
+        """
+        # Return queryset unchanged; filtering happens in view
+        return queryset
+
+    def filter_submitted_before(self, queryset, name, value):
+        """Filter by submission date upper bound.
+
+        This is a form-only filter; the view applies ``submitted_at__date__lte``
+        to each real model queryset.
         """
         # Return queryset unchanged; filtering happens in view
         return queryset
