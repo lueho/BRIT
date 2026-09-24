@@ -480,6 +480,25 @@ test("inert media templates survive script stripping for on-demand row initializ
     assert.equal(removed, false);
 });
 
+test("injected editor fragments drop noscript fallbacks meant for full-page rendering", () => {
+    const { workspace } = setup();
+    const removed = [];
+    const noscript = element({ remove() { removed.push("noscript"); } });
+    const script = element({ remove() { removed.push("script"); } });
+    const fragment = element({
+        querySelectorAll(selector) {
+            return {
+                "script, noscript": [script, noscript],
+                script: [script],
+                noscript: [noscript],
+                template: [],
+            }[selector] || [];
+        },
+    });
+    workspace.stripScripts(fragment);
+    assert.deepEqual(removed.sort(), ["noscript", "script"]);
+});
+
 test("late search errors from a closed editor do not overwrite the current status", async () => {
     const fixture = setup();
     const { config, instance, select } = remoteWidget(fixture);
