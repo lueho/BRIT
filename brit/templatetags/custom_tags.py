@@ -70,27 +70,70 @@ def trim_decimal(value, places=10):
     return "0" if text == "-0" else text
 
 
-def _chip_format_temporal(value):
-    """Format date/datetime range bounds without noisy time components."""
+def _chip_format_range_bound(value):
+    """Format date/datetime/numeric range bounds without noisy components."""
     if value is None:
         return ""
     if hasattr(value, "date"):
         return value.date().isoformat()
+    if isinstance(value, (int, float, Decimal)):
+        return trim_decimal(value)
     return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
+def _chip_format_range(filter_, start, stop):
+    """Render a range for chip display, appending the filter's unit if any."""
+    unit = getattr(filter_, "unit", "") or ""
+    start_txt = _chip_format_range_bound(start)
+    stop_txt = _chip_format_range_bound(stop)
+    if start_txt and stop_txt:
+        return f"{start_txt} – {stop_txt} {unit}".rstrip()
+    if start_txt:
+        return f"from {start_txt} {unit}".rstrip()
+    if stop_txt:
+        return f"until {stop_txt} {unit}".rstrip()
+    return ""
+
+
+def _nullable_range_is_unconstrained(filter_, range_slice, include_nulls):
+    """Return True when a nullable-range slider covers its full span plus nulls.
+
+    Such a value matches every row, so advertising it as an active filter chip
+    would be noise rather than information.
+    """
+    if not include_nulls:
+        return False
+    widget = getattr(getattr(filter_, "field", None), "widget", None)
+    range_min = getattr(widget, "range_min", None)
+    range_max = getattr(widget, "range_max", None)
+    if range_min is None:
+        getter = getattr(filter_, "get_filter_range_min", None)
+        range_min = getter() if getter else None
+    if range_max is None:
+        getter = getattr(filter_, "get_filter_range_max", None)
+        range_max = getter() if getter else None
+    if range_min is None or range_max is None:
+        return False
+    covers_min = range_slice.start is None or float(range_slice.start) <= float(
+        range_min
+    )
+    covers_max = range_slice.stop is None or float(range_slice.stop) >= float(range_max)
+    return covers_min and covers_max
 
 
 def _chip_display_value(filter_, value):
     """Render a human-readable label for an active filter value."""
     if isinstance(value, slice):
-        start = _chip_format_temporal(value.start)
-        stop = _chip_format_temporal(value.stop)
-        if start and stop:
-            return f"{start} – {stop}"
-        if start:
-            return f"from {start}"
-        if stop:
-            return f"until {stop}"
-        return ""
+        return _chip_format_range(filter_, value.start, value.stop)
+    if isinstance(value, tuple) and len(value) == 2 and isinstance(value[0], slice):
+        # NullableRangeField compresses to (slice, include_nulls).
+        range_slice, include_nulls = value
+        if _nullable_range_is_unconstrained(filter_, range_slice, include_nulls):
+            return ""
+        display = _chip_format_range(filter_, range_slice.start, range_slice.stop)
+        if include_nulls and display:
+            display += " (incl. unknown)"
+        return display
     if hasattr(value, "pk"):
         return str(value)
     field = getattr(filter_, "field", None)

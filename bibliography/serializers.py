@@ -11,7 +11,15 @@ from rest_framework.serializers import (
     ValidationError,
 )
 
-from .models import Author, Licence, Source, SourceAuthor
+from .models import (
+    LETTERLESS_ORGANIZATION_NAME_MESSAGE,
+    LETTERLESS_SURNAME_MESSAGE,
+    Author,
+    Licence,
+    Source,
+    SourceAuthor,
+    author_name_has_letter,
+)
 
 
 class AuthorModelSerializer(ModelSerializer):
@@ -28,12 +36,18 @@ class AuthorModelSerializer(ModelSerializer):
                 raise ValidationError(
                     {"organization_name": "Organizations need a name."}
                 )
+            if not author_name_has_letter(organization_name):
+                raise ValidationError(
+                    {"organization_name": LETTERLESS_ORGANIZATION_NAME_MESSAGE}
+                )
         else:
             last_names = attrs.get(
                 "last_names", getattr(self.instance, "last_names", "")
             )
             if not str(last_names or "").strip():
                 raise ValidationError({"last_names": "People need a surname."})
+            if not author_name_has_letter(last_names):
+                raise ValidationError({"last_names": LETTERLESS_SURNAME_MESSAGE})
         return attrs
 
     class Meta:
@@ -83,23 +97,27 @@ class SourceCreateAuthorSerializer(ModelSerializer):
         ]
 
     def validate(self, attrs):
+        if attrs.get("id") not in (None, ""):
+            return attrs
         author_type = attrs.get("author_type", "person")
-        if (
-            attrs.get("id") in (None, "")
-            and author_type == "organization"
-            and not attrs.get("organization_name", "").strip()
-        ):
-            raise ValidationError(
-                {"organization_name": "This field is required for organizations."}
-            )
-        if (
-            attrs.get("id") in (None, "")
-            and author_type == "person"
-            and not attrs.get("last_names", "").strip()
-        ):
-            raise ValidationError(
-                {"last_names": "This field is required when id is not provided."}
-            )
+        if author_type == "organization":
+            organization_name = attrs.get("organization_name", "")
+            if not organization_name.strip():
+                raise ValidationError(
+                    {"organization_name": "This field is required for organizations."}
+                )
+            if not author_name_has_letter(organization_name):
+                raise ValidationError(
+                    {"organization_name": LETTERLESS_ORGANIZATION_NAME_MESSAGE}
+                )
+        if author_type == "person":
+            last_names = attrs.get("last_names", "")
+            if not last_names.strip():
+                raise ValidationError(
+                    {"last_names": "This field is required when id is not provided."}
+                )
+            if not author_name_has_letter(last_names):
+                raise ValidationError({"last_names": LETTERLESS_SURNAME_MESSAGE})
         return attrs
 
 

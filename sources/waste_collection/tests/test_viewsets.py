@@ -756,6 +756,24 @@ class CollectionViewSetTestCase(APITestCase):
             "Private collections should not be shared between users",
         )
 
+    def test_geojson_head_stats_query_skips_geometry_annotation(self):
+        url = reverse("api-waste-collection-geojson")
+        with CaptureQueriesContext(connection) as queries:
+            head = self.client.head(
+                url, {"scope": "published"}, REMOTE_ADDR="10.9.9.13"
+            )
+        self.assertEqual(head.status_code, 200)
+        # The cache key embeds a scope-level dataset version (one aggregate,
+        # shared with the warm-up task); the filtered count/version stats are
+        # the second aggregate. Neither may carry the geometry annotation.
+        stats_queries = [
+            q["sql"] for q in queries.captured_queries if "COUNT(" in q["sql"].upper()
+        ]
+        if len(stats_queries) != 2:
+            self.fail("stats queries:\n" + "\n---\n".join(stats_queries))
+        for sql in stats_queries:
+            self.assertNotIn("simplify", sql.lower())
+
     def test_geojson_head_preserves_scope_visibility(self):
         url = reverse("api-waste-collection-geojson")
         for user in (None, self.regular_user, self.staff_user):
@@ -811,7 +829,6 @@ class CollectionReviewActionApiTestCase(APITestCase):
         cls.unit = Unit.objects.create(name="Test Unit", publication_status="published")
         cls.property = Property.objects.create(
             name="Test Property",
-            unit="kg",
             publication_status="published",
         )
         cls.property.allowed_units.add(cls.unit)
@@ -3310,7 +3327,6 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
         cls.total_unit = Unit.objects.create(name="Mg/a [green-atlas-test]")
         cls.population_attribute = RegionProperty.objects.create(
             name="Population [green-atlas-test]",
-            unit="cap",
         )
 
         cls.region = Region.objects.create(name="Region DE Amount", country="DE")
@@ -3840,7 +3856,6 @@ class OrganicAmountViewSetTests(APITestCase):
         cls.total_unit = Unit.objects.create(name="Mg/a [organic-atlas-test]")
         cls.population_attribute = RegionProperty.objects.create(
             name="Population [organic-atlas-test]",
-            unit="cap",
         )
 
         cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
@@ -4107,7 +4122,6 @@ class WasteRatioMixedNumericTypesTests(APITestCase):
         cls.total_unit = Unit.objects.create(name="Mg/a [ratio-type-test]")
         cls.population_attribute = RegionProperty.objects.create(
             name="Population [ratio-type-test]",
-            unit="cap",
         )
 
         bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")

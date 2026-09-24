@@ -204,6 +204,20 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         queryset = super().get_geojson_queryset_with_bbox(request)
         return self._latest_visible_versions_queryset(queryset, request)
 
+    def get_stats_queryset(self, request):
+        """Return the count/version row set without the geometry annotation.
+
+        The statistics aggregate only needs the filtered rows; carrying the
+        ST_SimplifyPreserveTopology annotation into it would plan or evaluate
+        geometry simplification for every matching collection.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        queryset = self._apply_id_filter(queryset, request)
+        bbox = self._parse_bbox(request)
+        if bbox:
+            queryset = self._apply_bbox_filter(queryset, bbox)
+        return self._latest_visible_versions_queryset(queryset, request)
+
     def _latest_visible_versions_queryset(self, queryset, request):
         """Return latest visible versions unless an explicit temporal/id filter is set.
 

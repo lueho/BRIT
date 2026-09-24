@@ -2,6 +2,7 @@ import json
 import logging
 from collections import defaultdict
 from decimal import Decimal
+from urllib.parse import parse_qsl, urlsplit
 
 from django.contrib import messages
 from django.contrib.auth.mixins import (
@@ -21,6 +22,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse, reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext
 from django.views.generic import RedirectView, TemplateView, View
 from django.views.generic.detail import SingleObjectMixin
@@ -75,6 +77,7 @@ from .filters import (
     MaterialPropertyListFilter,
     PublishedSampleFilter,
     SampleFilter,
+    SampleGroupFilter,
     SampleSeriesFilter,
     UserOwnedSampleFilter,
     sampled_substrate_material_q,
@@ -102,6 +105,8 @@ from .forms import (
     MaterialPropertyValueModalModelForm,
     MaterialPropertyValueModelForm,
     SampleAddCompositionForm,
+    SampleGroupModalModelForm,
+    SampleGroupModelForm,
     SampleMaintenanceForm,
     SampleModalModelForm,
     SampleModelForm,
@@ -120,6 +125,7 @@ from .models import (
     MaterialProperty,
     MaterialPropertyValue,
     Sample,
+    SampleGroup,
     SampleSeries,
     get_or_create_sample_substrate_category,
 )
@@ -175,6 +181,9 @@ class MaterialsExplorerView(TemplateView):
             publication_status="published"
         ).count()
         context["series_count"] = SampleSeries.objects.filter(
+            publication_status="published"
+        ).count()
+        context["sample_group_count"] = SampleGroup.objects.filter(
             publication_status="published"
         ).count()
         context["method_count"] = AnalyticalMethod.objects.filter(
@@ -954,6 +963,13 @@ class ComponentMeasurementModalUpdateView(UserCreatedObjectModalUpdateView):
         return self.object.get_absolute_url()
 
 
+class ComponentMeasurementModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = ComponentMeasurement
+
+    def get_success_url(self):
+        return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
+
+
 # ----------- Analytical Method CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -1120,7 +1136,7 @@ class SampleSeriesCreateDuplicateView(UserCreatedObjectUpdateView):
         self.object = self.object.duplicate(
             creator=self.request.user, **form.cleaned_data
         )
-        return super().form_valid(form)
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class SampleSeriesModalAddDistributionView(UserCreatedObjectModalUpdateView):
@@ -1134,6 +1150,116 @@ class SampleSeriesModalAddDistributionView(UserCreatedObjectModalUpdateView):
 
 class SampleSeriesAutoCompleteView(UserCreatedObjectAutocompleteView):
     model = SampleSeries
+
+
+# ----------- Sample Group CRUD --------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class SampleGroupPublishedListView(PublishedObjectFilterView):
+    model = SampleGroup
+    filterset_class = SampleGroupFilter
+    queryset = SampleGroup.objects.annotate(
+        member_count=Count("samples", filter=Q(samples__publication_status="published"))
+    )
+    dashboard_url = reverse_lazy("materials-explorer")
+
+
+class SampleGroupPrivateListView(PrivateObjectFilterView):
+    model = SampleGroup
+    filterset_class = SampleGroupFilter
+    queryset = SampleGroup.objects.annotate(member_count=Count("samples"))
+    dashboard_url = reverse_lazy("materials-explorer")
+
+
+class SampleGroupReviewListView(ReviewObjectFilterView):
+    model = SampleGroup
+    filterset_class = SampleGroupFilter
+    queryset = SampleGroup.objects.annotate(member_count=Count("samples"))
+    dashboard_url = reverse_lazy("materials-explorer")
+
+
+class SampleGroupCreateView(UserCreatedObjectCreateView):
+    form_class = SampleGroupModelForm
+    permission_required = "materials.add_samplegroup"
+
+
+class SampleGroupModalCreateView(UserCreatedObjectModalCreateView):
+    form_class = SampleGroupModalModelForm
+    permission_required = "materials.add_samplegroup"
+
+
+class SampleGroupDetailView(UserCreatedObjectDetailView):
+    model = SampleGroup
+
+    def get_queryset(self):
+        return super().get_queryset().prefetch_related("sources")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        if user.is_authenticated:
+            visible_samples = Sample.objects.accessible_by_user(user).filter(
+                sample_groups=self.object
+            )
+        else:
+            visible_samples = self.object.samples.filter(publication_status="published")
+        visible_samples = visible_samples.select_related("material", "timestep")
+        (
+            context["group_samples"],
+            context["group_samples_total"],
+            context["group_samples_more"],
+        ) = _capped_related(visible_samples.order_by("name", "pk"))
+        context["group_samples_published_total"] = visible_samples.filter(
+            publication_status="published"
+        ).count()
+        context["group_samples_list_url"] = (
+            f"{reverse('sample-list')}?sample_group={self.object.pk}"
+            if context["group_samples_published_total"]
+            else None
+        )
+        context["visible_sources"] = list(
+            filter_queryset_for_user(self.object.sources.all(), user)
+        )
+        return context
+
+
+class SampleGroupModalDetailView(UserCreatedObjectModalDetailView):
+    model = SampleGroup
+
+
+class SampleGroupUpdateView(UserCreatedObjectUpdateView):
+    model = SampleGroup
+    form_class = SampleGroupModelForm
+
+
+class SampleGroupModalUpdateView(UserCreatedObjectModalUpdateView):
+    model = SampleGroup
+    form_class = SampleGroupModalModelForm
+
+
+class SampleGroupModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = SampleGroup
+
+
+class SampleGroupAutoCompleteView(UserCreatedObjectAutocompleteView):
+    model = SampleGroup
+
+
+class EditableAutocompleteMixin:
+    """Restricts autocomplete results to objects the request user may edit."""
+
+    def hook_queryset(self, queryset):
+        user = self.request.user
+        if user.is_staff:
+            return super().hook_queryset(queryset)
+        return super().hook_queryset(queryset).editable_by_user(user)
+
+
+class EditableSampleGroupAutoCompleteView(
+    EditableAutocompleteMixin, SampleGroupAutoCompleteView
+):
+    pass
 
 
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------
@@ -1571,6 +1697,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 "public_map_url": None,
                 "private_map_url": None,
                 "review_map_url": None,
+                "sample_nav_scope": self._sample_nav_scope(),
             }
         )
 
@@ -1583,7 +1710,46 @@ class SampleDetailView(UserCreatedObjectDetailView):
             )
         )
 
+        context["related_groups"] = list(
+            filter_queryset_for_user(
+                self.object.sample_groups.all(), self.request.user
+            ).order_by("name", "pk")
+        )
+
         return context
+
+    def _sample_nav_scope(self):
+        """Scope for the detail context-nav links, kept from the return URL.
+
+        List and featured-gallery links on the detail page should return the
+        user to the same list scope they came from. The scope is read from the
+        validated same-host ``back`` (regular detail) or ``next`` (review
+        detail) parameter and is only honoured when the return path is the
+        sample list or gallery route of that scope; anything else falls back
+        to the published scope. Anonymous visitors always get published links
+        and the review scope is only honoured for moderators.
+        """
+        user = self.request.user
+        if not user.is_authenticated:
+            return "published"
+        return_url = self.request.GET.get("back") or self.request.GET.get("next", "")
+        if not return_url or not url_has_allowed_host_and_scheme(
+            return_url,
+            allowed_hosts={self.request.get_host()},
+            require_https=self.request.is_secure(),
+        ):
+            return "published"
+        parts = urlsplit(return_url)
+        scope = dict(parse_qsl(parts.query)).get("scope")
+        scoped_paths = {
+            "private": {reverse("sample-list-owned"), reverse("sample-gallery-owned")},
+            "review": {reverse("sample-list-review"), reverse("sample-gallery-review")},
+        }
+        if parts.path not in scoped_paths.get(scope, ()):
+            return "published"
+        if scope == "review" and not user_is_moderator_for_model(user, Sample):
+            return "published"
+        return scope
 
     def _build_v2_context(
         self,
@@ -1759,6 +1925,11 @@ class SampleSeriesReviewItemDetailView(ReviewItemDetailView):
     detail_view_class = SampleSeriesDetailView
 
 
+class SampleGroupReviewItemDetailView(ReviewItemDetailView):
+    model = SampleGroup
+    detail_view_class = SampleGroupDetailView
+
+
 for _model, _review_view in (
     (MaterialCategory, MaterialCategoryReviewItemDetailView),
     (Material, MaterialReviewItemDetailView),
@@ -1767,6 +1938,7 @@ for _model, _review_view in (
     (MaterialProperty, MaterialPropertyReviewItemDetailView),
     (AnalyticalMethod, AnalyticalMethodReviewItemDetailView),
     (SampleSeries, SampleSeriesReviewItemDetailView),
+    (SampleGroup, SampleGroupReviewItemDetailView),
 ):
     _review_view.register_for_model(_model)
 
@@ -1898,6 +2070,10 @@ class PublishedSampleAutoCompleteView(SampleAutocompleteView):
 class UserOwnedSampleAutoCompleteView(SampleAutocompleteView):
     def get_queryset(self):
         return super().get_queryset().filter(owner=self.request.user)
+
+
+class EditableSampleAutoCompleteView(EditableAutocompleteMixin, SampleAutocompleteView):
+    pass
 
 
 class SampleAddCompositionView(SampleBoundCreateMixin, UserCreatedObjectCreateView):

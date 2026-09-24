@@ -19,7 +19,7 @@ class UnitAdmin(admin.ModelAdmin):
 
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
-    list_display = ("name", "unit", "owner", "publication_status")
+    list_display = ("name", "owner", "publication_status")
     search_fields = ("name",)
     list_filter = ("publication_status",)
     ordering = ("name",)

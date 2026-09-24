@@ -3,6 +3,7 @@
 Comprehensive tests for all CRUD views following BRIT testing patterns.
 """
 
+import re
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -250,6 +251,64 @@ class ProcessMaintenanceViewsTestCase(TestCase):
             ProcessOperatingParameter.objects.filter(pk=self.parameter.pk).exists()
         )
         self.assertEqual(self.process.process_materials.count(), 2)
+
+    def test_detail_view_shows_one_sided_parameter_bounds(self):
+        ProcessOperatingParameter.objects.create(
+            process=self.process, parameter="pressure", value_min=Decimal("2")
+        )
+        ProcessOperatingParameter.objects.create(
+            process=self.process, parameter="yield", value_max=Decimal("39")
+        )
+        response = self.client.get(self.process.get_absolute_url())
+        self.assertContains(response, "at least 2")
+        self.assertContains(response, "at most 39")
+        self.assertNotContains(response, "2 – -")
+        self.assertNotContains(response, "- – 39")
+
+    def test_edit_workspace_summary_shows_one_sided_parameter_bounds(self):
+        ProcessOperatingParameter.objects.create(
+            process=self.process, parameter="pressure", value_min=Decimal("0")
+        )
+        ProcessOperatingParameter.objects.create(
+            process=self.process, parameter="yield", value_max=Decimal("39")
+        )
+        response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
+        self.assertContains(response, "at least 0")
+        self.assertContains(response, "at most 39")
+        self.assertNotContains(response, "0 – —")
+        self.assertNotContains(response, "— – 39")
+
+    def test_edit_workspace_summary_shows_single_bound_with_nominal(self):
+        ProcessOperatingParameter.objects.create(
+            process=self.process,
+            parameter="pressure",
+            nominal_value=Decimal("5"),
+            value_min=Decimal("1"),
+        )
+        response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
+        self.assertContains(response, "(at least 1)")
+        self.assertNotContains(response, "(range:")
+
+    def test_edit_workspace_summary_keeps_range_label_for_two_sided_bounds(self):
+        ProcessOperatingParameter.objects.create(
+            process=self.process,
+            parameter="pressure",
+            nominal_value=Decimal("5"),
+            value_min=Decimal("1"),
+            value_max=Decimal("9"),
+        )
+        response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
+        self.assertContains(response, "(range: 1 – 9)")
+
+    def test_detail_descriptive_fields_keep_single_line_breaks_and_paragraphs(self):
+        self.process.description = "First line\nSecond line\n\nNew paragraph"
+        self.process.process_technology = "First step\nSecond step\n\nNew stage"
+        self.process.save()
+        response = self.client.get(self.process.get_absolute_url())
+        self.assertContains(response, "<p>First line<br>Second line</p>", html=True)
+        self.assertContains(response, "<p>New paragraph</p>", html=True)
+        self.assertContains(response, "<p>First step<br>Second step</p>", html=True)
+        self.assertContains(response, "<p>New stage</p>", html=True)
 
     def test_input_editor_does_not_render_outputs_or_parameters(self):
         response = self.client.get(self.section_url("inputs"))
@@ -505,6 +564,28 @@ class ProcessDashboardViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse("processes:dashboard"))
         self.assertEqual(200, response.status_code)
+
+    def test_total_categories_reflects_user_visibility(self):
+        """The dashboard counter must use the same read policy as the lists
+        and autocomplete, so user-visible unpublished categories are counted."""
+        ProcessCategory.objects.create(
+            name="Published Category",
+            owner=self.owner,
+            publication_status="published",
+        )
+        ProcessCategory.objects.create(name="Member Category", owner=self.member)
+        ProcessCategory.objects.create(name="Outsider Category", owner=self.outsider)
+
+        response = self.client.get(reverse("processes:dashboard"))
+        self.assertEqual(1, response.context["total_categories"])
+
+        self.client.force_login(self.member)
+        response = self.client.get(reverse("processes:dashboard"))
+        self.assertEqual(2, response.context["total_categories"])
+        self.assertEqual(
+            {"Published Category", "Member Category"},
+            {category.name for category in response.context["categories_with_counts"]},
+        )
 
 
 # ==============================================================================
@@ -1458,6 +1539,56 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
                 process=self.unpublished_object, source=private_source
             ).exists()
         )
+
+
+class ProcessFilterUrlTestCase(TestCase):
+    """Filter URLs must not leak CSRF tokens or stale parameters (issue #153)."""
+
+    def _get_form_html(self, response):
+        content = response.content.decode()
+        return re.findall(
+            r'<form[^>]*method="get"[^>]*>.*?</form>',
+            content,
+            re.DOTALL | re.IGNORECASE,
+        )
+
+    def test_get_filter_form_renders_no_csrf_token(self):
+        response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+        self.assertEqual(response.status_code, 200)
+        get_forms = self._get_form_html(response)
+        self.assertTrue(get_forms, "Expected a GET filter form on the list page")
+        for form_html in get_forms:
+            self.assertNotIn("csrfmiddlewaretoken", form_html)
+
+    def test_stale_csrf_param_redirects_to_clean_url(self):
+        response = self.client.get(
+            reverse("processes:process-list"),
+            {
+                "scope": "published",
+                "csrfmiddlewaretoken": "stale-token",
+                "name": "compost",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"], "/processes/list/?scope=published&name=compost"
+        )
+
+    def test_csrf_only_params_redirect_to_default_filters(self):
+        response = self.client.get(
+            reverse("processes:process-list"), {"csrfmiddlewaretoken": "stale-token"}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/processes/list/?scope=published")
+
+    def test_filter_url_without_csrf_is_not_redirected(self):
+        response = self.client.get(
+            reverse("processes:process-list"),
+            {"scope": "published", "name": "compost"},
+        )
+        self.assertEqual(response.status_code, 200)
 
 
 class ProcessAutocompleteViewTestCase(ViewWithPermissionsTestCase):

@@ -14,6 +14,16 @@ from utils.object_management.models import (
 
 AUTHOR_TYPES = (("person", "Person"), ("organization", "Organization"))
 
+LETTERLESS_ORGANIZATION_NAME_MESSAGE = (
+    "Organization names must contain at least one letter."
+)
+LETTERLESS_SURNAME_MESSAGE = "Surnames must contain at least one letter."
+
+
+def author_name_has_letter(value):
+    """Return whether an author name contains at least one letter."""
+    return any(char.isalpha() for char in str(value or ""))
+
 
 class Author(UserCreatedObject):
     author_type = models.CharField(
@@ -34,13 +44,22 @@ class Author(UserCreatedObject):
 
     def clean(self):
         super().clean()
-        if (
-            self.author_type == "organization"
-            and not (self.organization_name or "").strip()
-        ):
-            raise ValidationError({"organization_name": "Organizations need a name."})
-        if self.author_type == "person" and not (self.last_names or "").strip():
-            raise ValidationError({"last_names": "People need a surname."})
+        if self.author_type == "organization":
+            organization_name = (self.organization_name or "").strip()
+            if not organization_name:
+                raise ValidationError(
+                    {"organization_name": "Organizations need a name."}
+                )
+            if not author_name_has_letter(organization_name):
+                raise ValidationError(
+                    {"organization_name": LETTERLESS_ORGANIZATION_NAME_MESSAGE}
+                )
+        if self.author_type == "person":
+            last_names = (self.last_names or "").strip()
+            if not last_names:
+                raise ValidationError({"last_names": "People need a surname."})
+            if not author_name_has_letter(last_names):
+                raise ValidationError({"last_names": LETTERLESS_SURNAME_MESSAGE})
 
     def __str__(self):
         if self.author_type == "organization":

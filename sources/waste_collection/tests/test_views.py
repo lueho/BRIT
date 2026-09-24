@@ -2357,6 +2357,66 @@ class CollectionVersionLinkVisibilityTestCase(TestCase):
         )
 
 
+class CollectionStatYearIndicatorTestCase(TestCase):
+    """The detail page flags statistics whose year lies outside the valid period."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.collection = Collection.objects.create(
+            name="Indicator collection",
+            valid_from=date(2020, 1, 1),
+            valid_until=date(2022, 12, 31),
+            publication_status="published",
+        )
+        cls.prop = Property.objects.create(
+            name="Indicator Property", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="Indicator Unit", publication_status="published"
+        )
+
+    def _cpv(self, year):
+        return CollectionPropertyValue.objects.create(
+            collection=self.collection,
+            property=self.prop,
+            unit=self.unit,
+            year=year,
+            average=1,
+            publication_status="published",
+        )
+
+    def _get_detail(self):
+        return self.client.get(
+            reverse("collection-detail", kwargs={"pk": self.collection.pk})
+        )
+
+    def test_detail_flags_stat_year_before_valid_from(self):
+        self._cpv(2019)
+        response = self._get_detail()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "outside the collection validity period")
+
+    def test_detail_flags_stat_year_after_valid_until(self):
+        self._cpv(2023)
+        response = self._get_detail()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "outside the collection validity period")
+
+    def test_detail_does_not_flag_stat_year_within_period(self):
+        self._cpv(2021)
+        response = self._get_detail()
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "outside the collection validity period")
+
+    def test_cpv_detail_flags_out_of_period_year(self):
+        cpv = self._cpv(2015)
+        response = self.client.get(
+            reverse("collectionpropertyvalue-detail", kwargs={"pk": cpv.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "outside the collection validity period")
+
+
 class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "add_collection"
     url_name = "collection-new-version"
@@ -3469,7 +3529,7 @@ class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
         # Using get_or_create for Property to avoid issues if tests are run multiple times
         # and the "Connection rate" property might already exist from a previous run.
         cls.connection_rate_property, _ = Property.objects.get_or_create(
-            name="Connection rate", defaults={"unit": "%"}
+            name="Connection rate"
         )
         CollectionPropertyValue.objects.create(
             collection=cls.collection1,
@@ -3514,8 +3574,10 @@ class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
         }
 
         self.client.force_login(self.member)
-        response = self.client.get(self.list_url, query_params)
+        response = self.client.get(self.list_url, query_params, follow=True)
         self.assertEqual(response.status_code, 200)
+        redirect_url = response.redirect_chain[0][0]
+        self.assertNotIn("csrfmiddlewaretoken", redirect_url)
 
         self.assertEqual(
             response.context["filter"].data["catchment"], str(self.catchment.pk)
@@ -3526,6 +3588,66 @@ class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
         self.assertEqual(
             response.context["filter"].qs.first().catchment, self.catchment
         )
+
+
+class CollectionFilterChipTestCase(ViewWithPermissionsTestCase):
+    """Range-slider values must render as readable, removable filter chips."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        Collection.objects.create(
+            name="Chip Collection",
+            publication_status="published",
+        )
+        cls.list_url = reverse("collection-list")
+
+    def get(self, params):
+        return self.client.get(self.list_url, {"scope": "published", **params})
+
+    def test_slider_chip_shows_readable_range(self):
+        response = self.get(
+            {
+                "connection_rate_min": "10",
+                "connection_rate_max": "50",
+                "connection_rate_is_null": "false",
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Connection rate: 10 – 50 %")
+        self.assertNotContains(response, "Connection rate: slice(")
+
+    def test_slider_chip_marks_included_unknowns(self):
+        response = self.get(
+            {
+                "connection_rate_min": "10",
+                "connection_rate_max": "50",
+                "connection_rate_is_null": "true",
+            }
+        )
+        self.assertContains(response, "Connection rate: 10 – 50 % (incl. unknown)")
+
+    def test_full_range_slider_including_unknowns_shows_no_chip(self):
+        # min_bin_size has no data in this test, so the slider spans its
+        # default 0-2000 range; including unknowns makes it a no-op filter.
+        response = self.get(
+            {
+                "min_bin_size_min": "0",
+                "min_bin_size_max": "2000",
+                "min_bin_size_is_null": "true",
+            }
+        )
+        self.assertNotContains(response, "filter-chip")
+
+    def test_full_range_slider_excluding_unknowns_keeps_chip(self):
+        response = self.get(
+            {
+                "min_bin_size_min": "0",
+                "min_bin_size_max": "2000",
+                "min_bin_size_is_null": "false",
+            }
+        )
+        self.assertContains(response, "Smallest available bin size (L): 0 – 2000 L")
 
 
 class CollectionAddPropertyValueAnchoringTestCase(ViewWithPermissionsTestCase):
@@ -5150,11 +5272,10 @@ class GenericMapTemplateTests(TestCase):
 class WasteAtlasPopulationViewSetTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        RegionProperty.objects.create(name="Atlas population filler 1", unit="cap")
-        RegionProperty.objects.create(name="Atlas population filler 2", unit="cap")
+        RegionProperty.objects.create(name="Atlas population filler 1")
+        RegionProperty.objects.create(name="Atlas population filler 2")
         cls.population_attribute = RegionProperty.objects.create(
             name="Population [atlas population filter test]",
-            unit="cap",
         )
         cls.collection_system = CollectionSystem.objects.create(
             name="Atlas population filter system"

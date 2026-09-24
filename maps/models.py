@@ -315,10 +315,16 @@ class GeoPolygon(models.Model):
 class Region(NamedUserCreatedObject):
     country = models.CharField(max_length=56, null=False)
     type = models.CharField(max_length=14, choices=TYPES, default="custom")
+    name_en = models.CharField(max_length=113, blank=True, null=True)
     borders = models.ForeignKey(GeoPolygon, on_delete=models.PROTECT, null=True)
     composed_of = models.ManyToManyField(
         "self", symmetrical=False, related_name="composing_regions", blank=True
     )
+
+    @property
+    def display_name(self):
+        """The name to present in the UI: English where known, else the source name."""
+        return self.name_en or self.name
 
     @property
     def geom(self):
@@ -530,6 +536,11 @@ class NutsRegion(Region):
 
         return pedigree
 
+    @property
+    def display_name(self):
+        """English where known, else the Latin transcription, else the source name."""
+        return self.name_en or self.name_latn or self.nuts_name or self.name
+
     def save(self, *args, **kwargs):
         """Set type to 'nuts' and default the vintage to the current one."""
         self.type = "nuts"
@@ -538,7 +549,7 @@ class NutsRegion(Region):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.nuts_name} ({self.nuts_id})"
+        return f"{self.display_name} ({self.nuts_id})"
 
     class Meta:
         ordering = ["name"]
@@ -559,13 +570,18 @@ class LauRegion(Region):
         NutsRegion, related_name="lau_children", on_delete=models.PROTECT, null=True
     )
 
+    @property
+    def display_name(self):
+        """English where known, else the LAU source name."""
+        return self.name_en or self.lau_name or self.name
+
     def save(self, *args, **kwargs):
         """Automatically set type to 'lau' for LAU regions."""
         self.type = "lau"
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.lau_name} ({self.lau_id})"
+        return f"{self.display_name} ({self.lau_id})"
 
 
 class CatchmentQueryset(UserCreatedObjectQuerySet, TreeQuerySet):
@@ -1087,13 +1103,22 @@ class RegionProperty(PropertyBase):
     Maps-owned quantitative property definition that will replace ``Attribute``.
     """
 
-    unit = models.CharField(max_length=127)
+    allowed_units = models.ManyToManyField(
+        Unit,
+        blank=True,
+        help_text="Units that are acceptable for this property.",
+    )
 
     class Meta(PropertyBase.Meta):
         verbose_name_plural = "region properties"
 
     def __str__(self):
-        return f"{self.name} [{self.unit}]"
+        if not self.pk:
+            return self.name
+        unit_labels = ", ".join(u.name for u in self.allowed_units.all())
+        if unit_labels:
+            return f"{self.name} [{unit_labels}]"
+        return self.name
 
 
 class CategoricalAttribute(NamedUserCreatedObject):
@@ -1128,7 +1153,7 @@ class RegionAttributeValue(NumericMeasurementMixin, NamedUserCreatedObject):
         if property_obj is None:
             return None
 
-        unit = Unit.resolve_legacy_label(property_obj.unit, owner=property_obj.owner)
+        unit = property_obj.allowed_units.first()
         if unit is not None:
             self.unit = unit
         return self.unit

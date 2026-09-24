@@ -41,6 +41,9 @@ let map;
 let regionLayer;
 let catchmentLayer;
 let featuresLayer;
+// Bumped per loadLayers call; companion fetchers check it before rendering so
+// an out-of-order response from a superseded load cannot overwrite the map.
+let mapLoadGeneration = 0;
 let regionLayerStyle;
 let catchmentLayerStyle;
 let featuresLayerStyle;
@@ -459,13 +462,14 @@ function buildUrl(base, params) {
     return url.toString();
 }
 
-async function fetchRegionGeometry(params) {
+async function fetchRegionGeometry(params, isCurrent = () => true) {
     validateParams(params, ['id']);
     const url = buildUrl(mapConfig.regionLayerGeometriesUrl, { id: params.id });
     const cacheKey = normalizeUrl(url);
 
     try {
         const { data } = await fetchWithVersionValidation(url, cacheKey);
+        if (!isCurrent()) return;
         renderRegion(data);
     } catch (error) {
         console.error('Error fetching region geometry:', error);
@@ -473,13 +477,14 @@ async function fetchRegionGeometry(params) {
     }
 }
 
-async function fetchCatchmentGeometry(params) {
+async function fetchCatchmentGeometry(params, isCurrent = () => true) {
     validateParams(params, ['id']);
     const url = buildUrl(mapConfig.catchmentLayerGeometriesUrl, { id: params.id });
     const cacheKey = normalizeUrl(url);
 
     try {
         const { data } = await fetchWithVersionValidation(url, cacheKey);
+        if (!isCurrent()) return;
         renderCatchment(data);
     } catch (error) {
         console.error('Error fetching catchment geometry:', error);
@@ -537,7 +542,7 @@ async function fetchFeatureDetails(feature) {
     }
 }
 
-async function fetchFeaturesLayerSummary(params) {
+async function fetchFeaturesLayerSummary(params, isCurrent = () => true) {
     const url = mapConfig.featuresLayerSummariesUrl + '?' + transformSearchParams(params).toString();
     try {
         const response = await fetch(url);
@@ -546,6 +551,7 @@ async function fetchFeaturesLayerSummary(params) {
         }
 
         const summaries = await response.json();
+        if (!isCurrent()) return;
         renderSummaries(summaries);
 
     } catch (error) {
@@ -610,6 +616,47 @@ function createFeatureLayerBindings(layer) {
 }
 
 
+function resetFeaturesLayer() {
+    removeExistingLayer(featuresLayer);
+    featuresLayer = null;
+}
+
+/**
+ * Render a batch of features while the stream is still running.
+ * Lazily creates the features layer using the same geometry-type dispatch
+ * as renderFeatures, then appends each batch with addData.
+ * @param {Array} features - Array of GeoJSON feature objects.
+ * @returns {boolean} true when the batch was rendered incrementally,
+ * false when the caller should fall back to renderFeatures.
+ */
+function addFeatureBatch(features) {
+    if (!features || features.length === 0) {
+        return false;
+    }
+
+    if (!featuresLayer) {
+        const geometryType = features[0].geometry.type;
+        if (geometryType === "Polygon" || geometryType === "MultiPolygon") {
+            featuresLayer = L.geoJson(null, {
+                style: featuresLayerStyle,
+                pane: 'featuresPane',
+            });
+        } else if (geometryType === "Point") {
+            featuresLayer = L.geoJson(null, {
+                pointToLayer: (feature, latlng) => L.circleMarker(latlng, featuresLayerStyle),
+                pane: 'featuresPane',
+            });
+        } else {
+            return false;
+        }
+        createFeatureLayerBindings(featuresLayer);
+        featuresLayer.addTo(map);
+    }
+
+    featuresLayer.addData(features);
+    return true;
+}
+
 function renderFeatures(geoJson) {
 
     if (!geoJson || !geoJson.features || geoJson.features.length === 0) {
@@ -617,7 +664,7 @@ function renderFeatures(geoJson) {
         return;
     }
 
-    removeExistingLayer(featuresLayer);
+    resetFeaturesLayer();
 
     const geometryType = geoJson.features[0].geometry.type;
     if (geometryType === "Polygon" || geometryType === "MultiPolygon") {
@@ -950,12 +997,88 @@ async function clickedFeature(event) {
     // This is a hook for implementing behaviour when a feature is clicked.
 }
 
+// Query parameters that describe navigation or display state rather than a
+// constraint on the dataset. They do not count as meaningful filters for the
+// unfiltered-load guard on maps flagged as large.
+const NON_CONSTRAINING_FILTER_PARAMETERS = new Set([
+    'csrfmiddlewaretoken',
+    'page',
+    'scope',
+    'mode',
+    'tab',
+    'ordering',
+    'sort',
+    'map_config_id',
+    'load_region',
+    'load_catchment',
+    'load_features',
+    'show_composed_of',
+]);
+
+function rangeSliderDefaultValues() {
+    const defaults = new Map();
+    if (typeof document === 'undefined' || !document.querySelectorAll) {
+        return defaults;
+    }
+    document.querySelectorAll('.numeric-slider-range').forEach(slider => {
+        const bounds = {
+            min: slider.dataset.range_min,
+            max: slider.dataset.range_max,
+            is_null: 'true',
+        };
+        for (const [suffix, value] of Object.entries(bounds)) {
+            const input = document.getElementById(`${slider.id}_${suffix}`);
+            if (input && input.name) {
+                defaults.set(input.name, value);
+            }
+        }
+    });
+    return defaults;
+}
+
+function isDefaultRangeSliderValue(value, defaultValue) {
+    if (defaultValue === undefined) return false;
+    if (defaultValue === 'true') return value === 'true';
+    return Number(value) === Number(defaultValue);
+}
+
+function hasConstrainingFilterParameters(params) {
+    if (!params) {
+        return false;
+    }
+    const searchParams = params instanceof URLSearchParams
+        ? params
+        : new URLSearchParams(params);
+    const sliderDefaults = rangeSliderDefaultValues();
+    for (const [key, value] of searchParams.entries()) {
+        if (
+            !NON_CONSTRAINING_FILTER_PARAMETERS.has(key) &&
+            value !== '' &&
+            !isDefaultRangeSliderValue(value, sliderDefaults.get(key))
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function clickedFilterButton() {
     let params;
     try {
         params = parseFilterParameters();
     } catch (error) {
         console.warn('Filter parameters could not be parsed:', error);
+    }
+    if (mapConfig.guardUnfilteredLoad && !hasConstrainingFilterParameters(params)) {
+        const proceed = window.confirm(
+            'No filter parameters are selected. ' +
+            'Loading the complete dataset can take a while. Load everything anyway?'
+        );
+        if (!proceed) {
+            showMapOverlay();
+            return;
+        }
+        mapConfig.guardUnfilteredLoad = false;
     }
     prepareMapRefresh();
     mapConfig.loadFeatures = true;
@@ -1053,6 +1176,8 @@ function loadLayers(params) {
     // Use passed params if provided, otherwise get from form/URL
     let filterParameters = params || getFeaturesLayerFilterParameters();
     const promises = [];
+    const generation = ++mapLoadGeneration;
+    const isCurrent = () => generation === mapLoadGeneration;
 
     if (mapConfig.showComposedOf && mapConfig.composedOfRegionId) {
         mapConfig.loadFeatures = true;
@@ -1065,7 +1190,7 @@ function loadLayers(params) {
 
     const region_id = filterParameters.get('region') || (mapConfig.loadRegion ? mapConfig.regionId : null);
     if (region_id) {
-        promises.push(fetchRegionGeometry({ id: region_id }));
+        promises.push(fetchRegionGeometry({ id: region_id }, isCurrent));
     } else {
         // Remove region layer if filter was cleared
         removeExistingLayer(regionLayer);
@@ -1074,7 +1199,7 @@ function loadLayers(params) {
 
     const catchment_id = filterParameters.get('catchment') || (mapConfig.loadCatchment ? mapConfig.catchmentId : null);
     if (catchment_id) {
-        promises.push(fetchCatchmentGeometry({ id: catchment_id }));
+        promises.push(fetchCatchmentGeometry({ id: catchment_id }, isCurrent));
     } else {
         // Remove catchment layer if filter was cleared
         removeExistingLayer(catchmentLayer);
@@ -1084,9 +1209,10 @@ function loadLayers(params) {
     if (mapConfig.loadFeatures === true) {
         promises.push(fetchFeatureGeometries(filterParameters));
         if (mapConfig.loadFeaturesLayerSummary === true && mapConfig.featuresLayerSummariesUrl) {
-            promises.push(fetchFeaturesLayerSummary(filterParameters));
+            promises.push(fetchFeaturesLayerSummary(filterParameters, isCurrent));
         }
     } else {
+        mapConfig.guardUnfilteredLoad = true;
         try {
             showMapOverlay();
         } catch (error) {
@@ -1096,10 +1222,24 @@ function loadLayers(params) {
 
     if (promises.length > 0) {
         Promise.all(promises)
-            .then(() => {
+            .then((results) => {
+                // A newer load owns the filter lock and bounds now; only
+                // release this load's spin() reference (Leaflet.Spin
+                // refcounts) so the newer load's spinner stays balanced.
+                if (!isCurrent() || results.some((result) => result && result.superseded)) {
+                    hideLoadingIndicator();
+                    return;
+                }
                 return refreshMap(promises);
             })
-            .catch(error => console.error('Error loading layers or refreshing map:', error));
+            .catch(error => {
+                console.error('Error loading layers or refreshing map:', error);
+                if (isCurrent()) {
+                    cleanup();
+                } else {
+                    hideLoadingIndicator();
+                }
+            });
     } else {
         console.warn('No layers to load.');
         cleanup();

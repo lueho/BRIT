@@ -616,7 +616,7 @@ class CollectionFilterTestCase(TestCase):
 
         # Add specific waste collected properties
         prop_spec_waste_collected = Property.objects.create(
-            name="specific waste collected", unit="kg/(cap.*a)"
+            name="specific waste collected"
         )
         CollectionPropertyValue.objects.create(
             property=prop_spec_waste_collected,

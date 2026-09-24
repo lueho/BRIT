@@ -280,12 +280,6 @@
                         </a>
                       {% endif %}
                     {% endblock list_card_footer_create_link %}
-                    {% if dashboard_url %}
-                      <a class="btn btn-outline-secondary w-100 mb-2"
-                         href="{{ dashboard_url }}">
-                        <i class="fas fa-table-cells-large"></i> Open Explorer
-                      </a>
-                    {% endif %}
                     {# Export actions placeholder – override per list to add export buttons #}
                     {% block list_card_export_actions %}
                     {% endblock list_card_export_actions %}

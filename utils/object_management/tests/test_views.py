@@ -1,17 +1,25 @@
+import inspect
 from datetime import timedelta
+from typing import get_type_hints
 from unittest.mock import patch
 from urllib.parse import urlencode
 
 from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
-from django.core.exceptions import PermissionDenied
-from django.db import connection
+from django.core.exceptions import (
+    FieldDoesNotExist,
+    FieldError,
+    ObjectDoesNotExist,
+    PermissionDenied,
+    ValidationError,
+)
+from django.db import DatabaseError, connection
 from django.db.models.signals import post_save, pre_save
 from django.http import HttpResponse, HttpResponseRedirect
 from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django_filters import CharFilter, FilterSet
 from django_filters.views import FilterView
@@ -39,10 +47,17 @@ from utils.object_management.models import (
     annotate_owner_review_feedback,
     populate_owner_review_feedback,
 )
-from utils.object_management.permissions import get_object_policy
+from utils.object_management.permissions import (
+    UserCreatedObjectPermission,
+    get_object_policy,
+)
 from utils.object_management.views import (
+    BaseReviewActionView,
     ReviewDashboardView,
+    ReviewItemReference,
+    SubmitForReviewView,
     UserCreatedObjectCreateView,
+    WithdrawFromReviewView,
 )
 from utils.properties.models import Property, Unit
 
@@ -553,6 +568,328 @@ class ReviewDetailAccessTests(TestCase):
     # Dashboard behavior is covered in ReviewWorkflowViewTests.
 
 
+class ReviewPipelineTypeHintTests(TestCase):
+    """The review dashboard's filtering/collection pipeline is type-annotated.
+
+    ``typing.get_type_hints`` resolves string annotations; a bad forward
+    reference would raise, so this also guards against stale annotations.
+    """
+
+    def test_review_item_filter_is_fully_annotated(self):
+        from utils.object_management.review_filtering import ReviewItemFilter
+
+        for method_name in (
+            "__init__",
+            "filter",
+            "_apply_search",
+            "_apply_model_type_filter",
+            "_apply_owner_filter",
+            "_apply_date_filter",
+            "_apply_ordering",
+            "_apply_default_sort",
+        ):
+            with self.subTest(method=method_name):
+                method = getattr(ReviewItemFilter, method_name)
+                hints = get_type_hints(method)
+                self.assertIn("return", hints)
+                self.assertTrue(
+                    all(
+                        name in hints
+                        for name in inspect.signature(method).parameters
+                        if name != "self"
+                    )
+                )
+
+    def test_review_dashboard_pipeline_methods_are_annotated(self):
+        for method_name in (
+            "get_available_models",
+            "_get_review_references",
+            "_hydrate_review_references",
+            "collect_review_items",
+            "has_review_items",
+            "get_queryset",
+            "_apply_database_review_filters",
+            "_apply_requested_ordering",
+        ):
+            with self.subTest(method=method_name):
+                hints = get_type_hints(getattr(ReviewDashboardView, method_name))
+                self.assertIn("return", hints)
+
+    def test_review_item_reference_is_a_typed_namedtuple(self):
+        hints = get_type_hints(ReviewItemReference)
+        self.assertEqual(list(hints), ["model", "pk", "name", "submitted_at"])
+        self.assertTrue(issubclass(ReviewItemReference, tuple))
+
+
+class ReviewExceptionHandlingTests(TestCase):
+    """Review views must only swallow expected, recoverable exceptions.
+
+    Broad ``except Exception`` handlers hide programming errors. These tests
+    pin down which failures remain recoverable and assert that unexpected
+    errors propagate instead of being silently swallowed.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="exc-owner")
+        cls.staff = User.objects.create_user(username="exc-staff", is_staff=True)
+        cls.moderator = User.objects.create_user(username="exc-moderator")
+        cls.collection_ct_id = ContentType.objects.get_for_model(Collection).id
+        cls.source_ct_id = ContentType.objects.get_for_model(Source).id
+        permission, _ = Permission.objects.get_or_create(
+            codename="can_moderate_source",
+            content_type=ContentType.objects.get_for_model(Source),
+            defaults={"name": "Can moderate sources"},
+        )
+        cls.moderator.user_permissions.add(permission)
+        with mute_signals(post_save, pre_save):
+            cls.private_collection = Collection.objects.create(
+                name="Exception Probe Private",
+                owner=cls.owner,
+                publication_status=UserCreatedObject.STATUS_PRIVATE,
+            )
+            cls.review_collection = Collection.objects.create(
+                name="Exception Probe Review",
+                owner=cls.owner,
+                publication_status=UserCreatedObject.STATUS_REVIEW,
+            )
+        cls.review_source = Source.objects.create(
+            owner=cls.owner,
+            title="Exception Probe Source",
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+        )
+
+    def _dashboard_view(self):
+        view = ReviewDashboardView()
+        request = RequestFactory().get(reverse("object_management:review_dashboard"))
+        request.user = self.staff
+        view.request = request
+        return view
+
+    def _submit_url(self):
+        return reverse(
+            "object_management:submit_for_review",
+            kwargs={
+                "content_type_id": self.collection_ct_id,
+                "object_id": self.private_collection.id,
+            },
+        )
+
+    # --- ReviewDashboardView.get_available_models ---
+
+    def test_available_models_skips_model_on_expected_query_errors(self):
+        view = self._dashboard_view()
+        for exc in (FieldDoesNotExist("no field"), AttributeError("no attr")):
+            with (
+                self.subTest(exception=exc),
+                patch.object(
+                    ReviewDashboardView,
+                    "_in_review_queryset_for_model",
+                    side_effect=exc,
+                ),
+            ):
+                self.assertEqual(view.get_available_models(), [])
+
+    def test_available_models_propagates_unexpected_errors(self):
+        view = self._dashboard_view()
+        with patch.object(
+            ReviewDashboardView,
+            "_in_review_queryset_for_model",
+            side_effect=RuntimeError("boom"),
+        ):
+            with self.assertRaises(RuntimeError):
+                view.get_available_models()
+
+    # --- ReviewDashboardView._get_review_references ---
+
+    def test_review_references_propagates_unexpected_errors(self):
+        view = self._dashboard_view()
+        with patch.object(
+            ReviewDashboardView,
+            "_in_review_queryset_for_model",
+            side_effect=RuntimeError("boom"),
+        ):
+            with self.assertRaises(RuntimeError):
+                view._get_review_references([Collection])
+
+    # --- ReviewDashboardView.has_review_items ---
+
+    def test_has_review_items_propagates_unexpected_errors(self):
+        view = self._dashboard_view()
+        with patch.object(
+            ReviewDashboardView,
+            "_in_review_queryset_for_model",
+            side_effect=RuntimeError("boom"),
+        ):
+            with self.assertRaises(RuntimeError):
+                view.has_review_items()
+
+    # --- BaseReviewActionView._is_review_detail_url ---
+
+    def test_is_review_detail_url_recovers_no_reverse_match(self):
+        view = BaseReviewActionView()
+        with patch(
+            "utils.object_management.views.reverse", side_effect=NoReverseMatch()
+        ):
+            self.assertFalse(
+                view._is_review_detail_url("/review/1/", self.private_collection)
+            )
+
+    def test_is_review_detail_url_propagates_unexpected_errors(self):
+        view = BaseReviewActionView()
+        with patch(
+            "utils.object_management.views.reverse", side_effect=RuntimeError("boom")
+        ):
+            with self.assertRaises(RuntimeError):
+                view._is_review_detail_url("/review/1/", self.private_collection)
+
+    # --- BaseReviewActionView.has_action_permission ---
+
+    def test_action_permission_recovers_missing_related_object(self):
+        view = SubmitForReviewView()
+        request = RequestFactory().post("/")
+        request.user = self.owner
+        with patch.object(
+            UserCreatedObjectPermission,
+            "has_submit_permission",
+            side_effect=ObjectDoesNotExist("dangling owner"),
+        ):
+            self.assertFalse(
+                view.has_action_permission(request, self.private_collection)
+            )
+
+    def test_action_permission_propagates_unexpected_errors(self):
+        view = SubmitForReviewView()
+        request = RequestFactory().post("/")
+        request.user = self.owner
+        with patch.object(
+            UserCreatedObjectPermission,
+            "has_submit_permission",
+            side_effect=RuntimeError("boom"),
+        ):
+            with self.assertRaises(RuntimeError):
+                view.has_action_permission(request, self.private_collection)
+
+    # --- BaseReviewActionView.test_func ---
+
+    def test_test_func_propagates_unexpected_errors(self):
+        view = SubmitForReviewView()
+        with patch.object(
+            SubmitForReviewView, "get_object", side_effect=RuntimeError("boom")
+        ):
+            with self.assertRaises(RuntimeError):
+                view.test_func()
+
+    # --- BaseReviewActionView.handle_review_action_post ---
+
+    def test_submit_post_reports_validation_errors(self):
+        self.client.force_login(self.owner)
+        with patch.object(
+            Collection,
+            "submit_for_review",
+            side_effect=ValidationError("invalid transition"),
+        ):
+            response = self.client.post(self._submit_url())
+        self.assertEqual(response.status_code, 302)
+        messages = [str(message) for message in get_messages(response.wsgi_request)]
+        self.assertEqual(messages, ["invalid transition"])
+
+    def test_submit_post_propagates_unexpected_errors(self):
+        self.client.force_login(self.owner)
+        with patch.object(
+            Collection, "submit_for_review", side_effect=RuntimeError("boom")
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(self._submit_url())
+
+    def test_submit_post_survives_audit_log_db_failure(self):
+        self.client.force_login(self.owner)
+        with patch("utils.object_management.views.ReviewAction") as review_action:
+            review_action.objects.create.side_effect = DatabaseError("boom")
+            response = self.client.post(self._submit_url())
+        self.assertEqual(response.status_code, 302)
+
+    def test_submit_post_propagates_unexpected_audit_log_errors(self):
+        self.client.force_login(self.owner)
+        with patch("utils.object_management.views.ReviewAction") as review_action:
+            review_action.objects.create.side_effect = RuntimeError("boom")
+            with self.assertRaises(RuntimeError):
+                self.client.post(self._submit_url())
+
+    def test_submit_post_propagates_unexpected_message_errors(self):
+        self.client.force_login(self.owner)
+        with patch(
+            "utils.object_management.views.messages.success",
+            side_effect=RuntimeError("boom"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(self._submit_url())
+
+    # --- BaseReviewActionView.post_action_hook ---
+
+    def test_submit_post_propagates_unexpected_cascade_errors(self):
+        self.client.force_login(self.owner)
+        with patch.object(
+            Collection, "cascade_review_action", side_effect=RuntimeError("boom")
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(self._submit_url())
+
+    # --- WithdrawFromReviewView.get_success_url ---
+
+    def test_withdraw_success_url_propagates_unexpected_errors(self):
+        view = WithdrawFromReviewView()
+        view.request = RequestFactory().post("/", {"next": "/review/1/"})
+        view.object = self.review_collection
+        with patch(
+            "utils.object_management.views.reverse", side_effect=RuntimeError("boom")
+        ):
+            with self.assertRaises(RuntimeError):
+                view.get_success_url()
+
+    # --- BaseReviewActionModalView.get_context_data ---
+
+    def test_approve_modal_propagates_unexpected_cascade_count_errors(self):
+        self.client.force_login(self.moderator)
+        url = reverse(
+            "object_management:approve_item_modal",
+            kwargs={
+                "content_type_id": self.source_ct_id,
+                "object_id": self.review_source.id,
+            },
+        )
+        with patch.object(
+            Source, "affected_author_count", side_effect=RuntimeError("boom")
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.get(url)
+
+    # --- ReviewItemDetailView.get_context_data ---
+
+    def _review_detail_url(self):
+        return reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": self.collection_ct_id,
+                "object_id": self.review_collection.id,
+            },
+        )
+
+    def test_review_detail_survives_action_log_db_failure(self):
+        self.client.force_login(self.owner)
+        with patch("utils.object_management.views.ReviewAction") as review_action:
+            review_action.objects.filter.side_effect = DatabaseError("boom")
+            response = self.client.get(self._review_detail_url())
+        self.assertEqual(response.status_code, 200)
+
+    def test_review_detail_propagates_unexpected_action_log_errors(self):
+        self.client.force_login(self.owner)
+        with patch("utils.object_management.views.ReviewAction") as review_action:
+            review_action.objects.filter.side_effect = RuntimeError("boom")
+            with self.assertRaises(RuntimeError):
+                self.client.get(self._review_detail_url())
+
+
 class MockFilterSet(FilterSet):
     name = CharFilter(
         field_name="name", lookup_expr="icontains", initial="Initial name"
@@ -569,7 +906,7 @@ class MockFilterView(FilterDefaultsMixin, FilterView):
 
 class TestPropertyCreateView(UserCreatedObjectCreateView):
     model = Property
-    fields = ["name", "unit"]
+    fields = ["name"]
     permission_required = "properties.add_property"
 
 
@@ -1334,7 +1671,7 @@ class CollectionPropertyValueReviewDashboardTest(TestCase):
         cls.owner_user = User.objects.create_user(username="owner", password="test123")
 
         cls.unit = Unit.objects.create(name="kg")
-        cls.property = Property.objects.create(name="Test Property", unit="kg")
+        cls.property = Property.objects.create(name="Test Property")
 
         with mute_signals(post_save, pre_save):
             cls.collection = Collection.objects.create(
@@ -1982,7 +2319,7 @@ class ReviewDashboardViewTests(TestCase):
             patch.object(
                 view,
                 "_in_review_queryset_for_model",
-                side_effect=RuntimeError("boom"),
+                side_effect=FieldError("boom"),
             ),
             self.assertLogs("utils.object_management.views", level="WARNING"),
         ):

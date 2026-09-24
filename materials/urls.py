@@ -196,6 +196,66 @@ urlpatterns = [
         views.SampleSeriesCreateDuplicateView.as_view(),
         name="sampleseries-duplicate",
     ),
+    path(
+        "sample_groups/",
+        views.SampleGroupPublishedListView.as_view(),
+        name="samplegroup-list",
+    ),
+    path(
+        "sample_groups/autocomplete/",
+        views.SampleGroupAutoCompleteView.as_view(),
+        name="samplegroup-autocomplete",
+    ),
+    path(
+        "sample_groups/autocomplete/editable/",
+        views.EditableSampleGroupAutoCompleteView.as_view(),
+        name="samplegroup-autocomplete-editable",
+    ),
+    path(
+        "sample_groups/user/",
+        views.SampleGroupPrivateListView.as_view(),
+        name="samplegroup-list-owned",
+    ),
+    path(
+        "sample_groups/review/",
+        views.SampleGroupReviewListView.as_view(),
+        name="samplegroup-list-review",
+    ),
+    path(
+        "sample_groups/create/",
+        views.SampleGroupCreateView.as_view(),
+        name="samplegroup-create",
+    ),
+    path(
+        "sample_groups/create/modal/",
+        views.SampleGroupModalCreateView.as_view(),
+        name="samplegroup-create-modal",
+    ),
+    path(
+        "sample_groups/<int:pk>/",
+        views.SampleGroupDetailView.as_view(),
+        name="samplegroup-detail",
+    ),
+    path(
+        "sample_groups/<int:pk>/modal/",
+        views.SampleGroupModalDetailView.as_view(),
+        name="samplegroup-detail-modal",
+    ),
+    path(
+        "sample_groups/<int:pk>/update/",
+        views.SampleGroupUpdateView.as_view(),
+        name="samplegroup-update",
+    ),
+    path(
+        "sample_groups/<int:pk>/update/modal/",
+        views.SampleGroupModalUpdateView.as_view(),
+        name="samplegroup-update-modal",
+    ),
+    path(
+        "sample_groups/<int:pk>/delete/modal/",
+        views.SampleGroupModalDeleteView.as_view(),
+        name="samplegroup-delete-modal",
+    ),
     path("samples/", views.SamplePublishedListView.as_view(), name="sample-list"),
     path(
         "samples/gallery/",
@@ -226,6 +286,11 @@ urlpatterns = [
         "samples/autocomplete/user/",
         views.UserOwnedSampleAutoCompleteView.as_view(),
         name="sample-autocomplete-user",
+    ),
+    path(
+        "samples/autocomplete/editable/",
+        views.EditableSampleAutoCompleteView.as_view(),
+        name="sample-autocomplete-editable",
     ),
     path(
         "samples/featured/",
@@ -546,6 +611,11 @@ urlpatterns = [
         "component_measurements/<int:pk>/update/modal/",
         views.ComponentMeasurementModalUpdateView.as_view(),
         name="componentmeasurement-update-modal",
+    ),
+    path(
+        "component_measurements/<int:pk>/delete/modal/",
+        views.ComponentMeasurementModalDeleteView.as_view(),
+        name="componentmeasurement-delete-modal",
     ),
     path(
         "compositions/create/",

@@ -876,3 +876,19 @@ class BreadcrumbRailGlobalStylingAssetTests(SimpleTestCase):
         match = re.search(r"\.atlas-shell\s*\{([^}]*)\}", css)
         self.assertIsNotNone(match, ".atlas-shell rule not found in waste_atlas.css")
         self.assertNotIn("margin-top", match.group(1))
+
+
+class NarrativeSpacingAssetTests(SimpleTestCase):
+    def test_about_body_spacing_rules(self):
+        import re
+
+        css = (
+            Path(settings.BASE_DIR) / "brit/static/css/sample_detail_v2.css"
+        ).read_text(encoding="utf-8")
+        match = re.search(r"\.sdv2-about-body\s*\{([^}]*)\}", css)
+        self.assertIsNotNone(match)
+        self.assertIn("white-space: normal;", match.group(1))
+        self.assertNotIn("pre-wrap", match.group(1))
+        match = re.search(r"\.sdv2-about-body\s*>\s*p:last-child\s*\{([^}]*)\}", css)
+        self.assertIsNotNone(match)
+        self.assertIn("margin-bottom: 0;", match.group(1))

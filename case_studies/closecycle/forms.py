@@ -9,7 +9,7 @@ class ShowcaseModelForm(SimpleModelForm):
     region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",
-            label_field="name",
+            label_field="display_name",
         ),
         label="Region",
     )

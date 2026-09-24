@@ -399,7 +399,9 @@ class NutsRegionSummarySerializerTestCase(TestCase):
     def setUpTestData(cls):
         density_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
+        )
+        density_property.allowed_units.add(
+            Unit.objects.create(name="1/km²", symbol="1/km²")
         )
         region = NutsRegion.objects.create(nuts_id="TE57", name_latn="Test NUTS")
         RegionAttributeValue.objects.create(
@@ -415,7 +417,7 @@ class NutsRegionSummarySerializerTestCase(TestCase):
             date=datetime.date(2019, 1, 1),
         )
         CategoricalAttribute.objects.get_or_create(name="Urban rural remoteness")
-        RegionProperty.objects.create(name="Population", unit="")
+        RegionProperty.objects.create(name="Population")
 
     def setUp(self):
         self.region = NutsRegion.objects.get(nuts_id="TE57")
@@ -427,6 +429,16 @@ class NutsRegionSummarySerializerTestCase(TestCase):
         data = NutsRegionSummarySerializer(self.region).data
         self.assertIn("nuts_id", data)
         self.assertIn("name", data)
+
+    def test_name_prefers_english_when_held(self):
+        self.region.name_en = "Test NUTS English"
+        self.region.save()
+        data = NutsRegionSummarySerializer(self.region).data
+        self.assertEqual(data["name"], "Test NUTS English")
+
+    def test_name_falls_back_to_latin_name(self):
+        data = NutsRegionSummarySerializer(self.region).data
+        self.assertEqual(data["name"], "Test NUTS")
 
     def test_population_method_field_returns_value_as_integer(self):
         RegionAttributeValue.objects.create(

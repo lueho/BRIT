@@ -171,6 +171,14 @@
               {{ object.timestep }}
             </li>
           {% endif %}
+          {% if related_groups %}
+            <li>
+              <span class="sdv2-meta-label">Groups</span>
+              {% for group in related_groups %}
+                <a href="{% url 'samplegroup-detail' group.pk %}">{{ group.name }}</a>{% if not forloop.last %}, {% endif %}
+              {% endfor %}
+            </li>
+          {% endif %}
           {% if object.datetime %}
             <li>
               <span class="sdv2-meta-label">Sampled</span>
@@ -587,12 +595,24 @@
                                 {% if edit_mode_enabled %}
                                   <td class="sdv2-num">
                                     {% object_policy measurement as mp %}
-                                    {% if mp.can_edit %}
-                                      <a href="{% url 'componentmeasurement-update' measurement.pk %}"
-                                         title="Edit measurement">
-                                        <i class="fas fa-pen-to-square"></i>
-                                      </a>
-                                    {% endif %}
+                                    <span class="sdv2-row-tools">
+                                      {% if mp.can_edit %}
+                                        <a class="sdv2-btn sdv2-btn-edit sdv2-btn-icon sdv2-btn-sm"
+                                           href="{% url 'componentmeasurement-update' measurement.pk %}"
+                                           title="Edit measurement">
+                                          <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+                                          <span class="visually-hidden">Edit</span>
+                                        </a>
+                                      {% endif %}
+                                      {% if mp.can_delete %}
+                                        <a class="sdv2-btn sdv2-btn-danger sdv2-btn-icon sdv2-btn-sm modal-link"
+                                           href="{% url 'componentmeasurement-delete-modal' measurement.pk %}?next={{ request|path_without_return_params|urlencode }}"
+                                           title="Delete measurement">
+                                          <i class="fas fa-trash" aria-hidden="true"></i>
+                                          <span class="visually-hidden">Delete</span>
+                                        </a>
+                                      {% endif %}
+                                    </span>
                                   </td>
                                 {% endif %}
                               </tr>

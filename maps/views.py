@@ -6,7 +6,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
-from django.db.models import Q, Subquery
+from django.db.models import Q, Subquery, Value
+from django.db.models.functions import Coalesce, NullIf
 from django.forms import formset_factory
 from django.http import Http404, JsonResponse, StreamingHttpResponse
 from django.urls import NoReverseMatch, reverse, reverse_lazy
@@ -1324,8 +1325,22 @@ class CatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+# The picker label is annotated under an alias because Django assigns
+# annotations onto model instances, which fails on the read-only
+# ``display_name`` property when a form validates a selected value.
+DISPLAY_LABEL_ALIAS = "display_label"
+
+
+def expose_display_name(results):
+    for item in results:
+        item["display_name"] = item.pop(DISPLAY_LABEL_ALIAS, None)
+    return results
+
+
 class RegionAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Region
+    search_lookups = ["name__icontains", "name_en__icontains"]
+    value_fields = ["id", DISPLAY_LABEL_ALIAS, "name"]
 
     def hook_queryset(self, queryset):
         """Offer each territory once even while several NUTS vintages are held.
@@ -1333,7 +1348,13 @@ class RegionAutocompleteView(UserCreatedObjectAutocompleteView):
         A NUTS region of another vintage is the same territory under another
         code, and the two are indistinguishable in a picker.
         """
-        queryset = super().hook_queryset(queryset)
+        queryset = (
+            super()
+            .hook_queryset(queryset)
+            .annotate(
+                **{DISPLAY_LABEL_ALIAS: Coalesce(NullIf("name_en", Value("")), "name")}
+            )
+        )
         vintage = NutsVintage.default()
         if vintage is None:
             return queryset
@@ -1341,18 +1362,45 @@ class RegionAutocompleteView(UserCreatedObjectAutocompleteView):
             Q(nutsregion__isnull=False) & ~Q(nutsregion__version=vintage)
         )
 
+    def hook_prepare_results(self, results):
+        return expose_display_name(results)
+
 
 class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
     model = NutsRegion
     # Lookups that cannot take a search term (an id, an integer level) make
     # django-tomselect drop the whole search and list everything instead.
-    search_lookups = ["name__icontains", "name_latn__icontains", "nuts_id__icontains"]
-    value_fields = ["id", "name_latn", "levl_code", "parent_id", "nuts_id"]
+    search_lookups = [
+        "name__icontains",
+        "name_latn__icontains",
+        "name_en__icontains",
+        "nuts_id__icontains",
+    ]
+    value_fields = [
+        "id",
+        DISPLAY_LABEL_ALIAS,
+        "name_latn",
+        "levl_code",
+        "parent_id",
+        "nuts_id",
+    ]
 
     def hook_queryset(self, queryset):
         """Offer each territory once, from the vintage the map is showing."""
         queryset = super().hook_queryset(queryset)
-        return queryset.in_vintage(NutsVintage.from_request(self.request))
+        return queryset.in_vintage(NutsVintage.from_request(self.request)).annotate(
+            **{
+                DISPLAY_LABEL_ALIAS: Coalesce(
+                    NullIf("name_en", Value("")),
+                    NullIf("name_latn", Value("")),
+                    NullIf("nuts_name", Value("")),
+                    "name",
+                )
+            }
+        )
+
+    def hook_prepare_results(self, results):
+        return expose_display_name(results)
 
     def apply_filters(self, queryset):
         # Check for ancestor filtering (nuts_id prefix matching)
@@ -1403,8 +1451,12 @@ class NutsRegionLevel3AutocompleteView(NutsRegionAutocompleteView):
 
 class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Region
-    search_lookups = ["name__icontains", "lauregion__lau_id__contains"]
-    value_fields = ["name", "lauregion__lau_id", "lauregion__lau_name"]
+    search_lookups = [
+        "name__icontains",
+        "name_en__icontains",
+        "lauregion__lau_id__contains",
+    ]
+    value_fields = ["name", "name_en", "lauregion__lau_id", "lauregion__lau_name"]
 
     def hook_queryset(self, queryset):
         """
@@ -1415,12 +1467,16 @@ class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):
     def hook_prepare_results(self, results):
         """
         Customize the display label to include the LAU ID code, similar to
-        LauRegion.__str__ method: f"{self.lau_name} ({self.lau_id})"
+        LauRegion.__str__ method: f"{self.display_name} ({self.lau_id})"
         """
         for item in results:
             # Get the LAU ID from the related LauRegion object
             lau_id = item.get("lauregion__lau_id")
-            lau_name = item.get("lauregion__lau_name")
+            lau_name = (
+                item.get("name_en")
+                or item.get("lauregion__lau_name")
+                or item.get("name")
+            )
             item["text"] = f"{lau_name} ({lau_id})"
         return results
 

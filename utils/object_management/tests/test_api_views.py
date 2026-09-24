@@ -597,7 +597,7 @@ class ReviewContextCPVEnrichmentTests(TestCase):
             name="tonnes", symbol="t", publication_status="published"
         )
         cls.prop = Property.objects.create(
-            name="total waste collected", unit="t", publication_status="published"
+            name="total waste collected", publication_status="published"
         )
         cls.prop.allowed_units.add(cls.unit)
 

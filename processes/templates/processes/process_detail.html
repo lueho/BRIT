@@ -239,7 +239,7 @@
                           {% if param.nominal_value is not None %}
                             {{ param.get_nominal_value_display }}
                           {% elif param.value_min is not None or param.value_max is not None %}
-                            {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
+                            {{ param.get_value_range_display }}
                           {% else %}
                             -
                           {% endif %}
@@ -263,7 +263,7 @@
                           {% if param.nominal_value is not None %}
                             {{ param.get_nominal_value_display }}
                           {% elif param.value_min is not None or param.value_max is not None %}
-                            {{ param.get_value_min_display|default:"-" }} – {{ param.get_value_max_display|default:"-" }}
+                            {{ param.get_value_range_display }}
                           {% else %}
                             -
                           {% endif %}

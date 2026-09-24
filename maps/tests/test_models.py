@@ -232,7 +232,6 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         region = Region.objects.create(name="Test Region")
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
         )
         value = RegionAttributeValue.objects.create(
             region=region,
@@ -242,7 +241,7 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         )
 
         self.assertEqual(value.measurement_name, region_property.name)
-        self.assertEqual(value.measurement_unit_label, region_property.unit)
+        self.assertIsNone(value.measurement_unit_label)
         self.assertEqual(value.display_average, value.value)
         self.assertEqual(value.display_standard_deviation, value.standard_deviation)
 
@@ -250,12 +249,12 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         region = Region.objects.create(name="Test Region")
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
         )
         unit = Unit.objects.create(
             name="People per square kilometre",
             symbol="1/km²",
         )
+        region_property.allowed_units.add(unit)
 
         value = RegionAttributeValue.objects.create(
             region=region,
@@ -266,10 +265,10 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         self.assertEqual(value.unit, unit)
         self.assertEqual(value.measurement_unit_label, unit.name)
 
-    def test_save_leaves_unit_empty_when_property_unit_cannot_be_resolved(self):
+    def test_save_leaves_unit_empty_when_property_has_no_allowed_units(self):
         value = RegionAttributeValue.objects.create(
             region=Region.objects.create(name="Test Region"),
-            property=RegionProperty.objects.create(name="Area", unit="km²"),
+            property=RegionProperty.objects.create(name="Area"),
             value=123.321,
         )
 
@@ -279,7 +278,9 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         region = Region.objects.create(name="Test Region")
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
+        )
+        region_property.allowed_units.add(
+            Unit.objects.create(name="inhabitants", symbol="cap")
         )
         unit = Unit.objects.create(name="1/km²", symbol="1/km²")
         value = RegionAttributeValue.objects.create(
@@ -303,10 +304,21 @@ class RegionPropertyBaseContractTestCase(TestCase):
     def test_region_property_uses_shared_property_base_contract(self):
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
         )
 
         self.assertIsInstance(region_property, PropertyBase)
+
+    def test_str_of_unsaved_region_property_returns_name(self):
+        region_property = RegionProperty(name="Population density")
+
+        self.assertEqual(str(region_property), "Population density")
+
+    def test_str_lists_allowed_units(self):
+        region_property = RegionProperty.objects.create(name="Population density")
+        unit = Unit.objects.create(name="1/km²", symbol="1/km²")
+        region_property.allowed_units.add(unit)
+
+        self.assertEqual(str(region_property), "Population density [1/km²]")
 
 
 class RegionAttributeTextValueCategoricalAttributeTestCase(TestCase):
@@ -540,3 +552,51 @@ class NutsRegionTestCase(TestCase):
         for key, value in pedigree.items():
             self.assertIsInstance(value, QuerySet)
             self.assertEqual(set(pedigree[key]), set(expected[key]))
+
+
+class RegionEnglishNameTestCase(TestCase):
+    """display_name prefers an English name where one is held (#60)."""
+
+    def test_nuts_region_display_name_prefers_english(self):
+        region = NutsRegion.objects.create(
+            nuts_id="DE2",
+            levl_code=1,
+            name_latn="Bayern",
+            nuts_name="Bayern",
+            name_en="Bavaria",
+        )
+        self.assertEqual(region.display_name, "Bavaria")
+        self.assertEqual(str(region), "Bavaria (DE2)")
+
+    def test_nuts_region_display_name_falls_back_to_latin_transcription(self):
+        """Latin script beats native script for an English-language UI."""
+        region = NutsRegion.objects.create(
+            nuts_id="EL3",
+            levl_code=1,
+            name_latn="Attiki",
+            nuts_name="Αττική",
+        )
+        self.assertEqual(region.display_name, "Attiki")
+        self.assertEqual(str(region), "Attiki (EL3)")
+
+    def test_lau_region_display_name_prefers_english(self):
+        region = LauRegion.objects.create(
+            lau_id="123", lau_name="München", name_en="Munich"
+        )
+        self.assertEqual(region.display_name, "Munich")
+        self.assertEqual(str(region), "Munich (123)")
+
+    def test_lau_region_display_name_falls_back_to_lau_name(self):
+        region = LauRegion.objects.create(lau_id="234", lau_name="Freising")
+        self.assertEqual(region.display_name, "Freising")
+        self.assertEqual(str(region), "Freising (234)")
+
+    def test_custom_region_display_name_prefers_english(self):
+        region = Region.objects.create(
+            name="Meine Region", country="DE", name_en="My Region"
+        )
+        self.assertEqual(region.display_name, "My Region")
+
+    def test_custom_region_display_name_falls_back_to_name(self):
+        region = Region.objects.create(name="Meine Region", country="DE")
+        self.assertEqual(region.display_name, "Meine Region")

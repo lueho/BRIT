@@ -5,14 +5,35 @@ for lightweight references, preserving Python's case-insensitive name ordering.
 The form-only ReviewDashboardFilterSet does not filter the real review queue.
 """
 
+from __future__ import annotations
+
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Protocol, TypeVar
 
 from django.contrib.contenttypes.models import ContentType
+from django.http import QueryDict
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+# Ordering helpers preserve the element type of the incoming list: they sort
+# hydrated model instances and lightweight ReviewItemReference records alike.
+ReviewItemT = TypeVar("ReviewItemT")
+
+
+class ReviewItem(Protocol):
+    """Structural type for objects in the review queue.
+
+    Satisfied by ``UserCreatedObject`` subclasses and by the dashboard's
+    lightweight ``ReviewItemReference`` records. Individual attributes may be
+    absent on some models, so all access happens via ``getattr`` fallbacks.
+    """
+
+    pk: int
+    name: str | None
+    owner_id: int | None
+    submitted_at: datetime | None
 
 
 class ReviewItemFilter:
@@ -26,7 +47,7 @@ class ReviewItemFilter:
         filtered_items = filter_obj.filter()
     """
 
-    def __init__(self, items: list[Any], params: dict):
+    def __init__(self, items: list[ReviewItem], params: QueryDict) -> None:
         """Initialize filter with items and filter parameters.
 
         Args:
@@ -36,7 +57,7 @@ class ReviewItemFilter:
         self.items = items
         self.params = params
 
-    def filter(self) -> list[Any]:
+    def filter(self) -> list[ReviewItem]:
         """Apply all filters and return filtered, sorted list."""
         items = self.items
 
@@ -71,7 +92,7 @@ class ReviewItemFilter:
 
         return items
 
-    def _apply_search(self, items: list[Any], search: str) -> list[Any]:
+    def _apply_search(self, items: list[ReviewItem], search: str) -> list[ReviewItem]:
         """Filter items by case-insensitive name search."""
         search_lower = search.lower()
         return [
@@ -81,8 +102,8 @@ class ReviewItemFilter:
         ]
 
     def _apply_model_type_filter(
-        self, items: list[Any], model_type_ids: list[str]
-    ) -> list[Any]:
+        self, items: list[ReviewItem], model_type_ids: list[str]
+    ) -> list[ReviewItem]:
         """Filter items by ContentType IDs."""
         try:
             # Convert to integers, skipping non-numeric values
@@ -99,7 +120,9 @@ class ReviewItemFilter:
             logger.warning(f"Invalid model_type filter values: {e}")
             return items
 
-    def _apply_owner_filter(self, items: list[Any], owner_id: str) -> list[Any]:
+    def _apply_owner_filter(
+        self, items: list[ReviewItem], owner_id: str
+    ) -> list[ReviewItem]:
         """Filter items by owner ID."""
         if not owner_id.isdigit():
             logger.warning(f"Invalid owner_id filter value: {owner_id}")
@@ -111,8 +134,8 @@ class ReviewItemFilter:
         ]
 
     def _apply_date_filter(
-        self, items: list[Any], date_str: str, is_after: bool
-    ) -> list[Any]:
+        self, items: list[ReviewItem], date_str: str, is_after: bool
+    ) -> list[ReviewItem]:
         """Filter items by submission date (before or after)."""
         try:
             filter_date = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -135,7 +158,9 @@ class ReviewItemFilter:
             logger.warning(f"Invalid date filter value '{date_str}': {e}")
             return items
 
-    def _apply_ordering(self, items: list[Any], ordering: str) -> list[Any]:
+    def _apply_ordering(
+        self, items: list[ReviewItemT], ordering: str
+    ) -> list[ReviewItemT]:
         """Sort items by the specified field and direction."""
         reverse = ordering.startswith("-")
         field = ordering.lstrip("-")
@@ -157,7 +182,7 @@ class ReviewItemFilter:
 
         return items
 
-    def _apply_default_sort(self, items: list[Any]) -> list[Any]:
+    def _apply_default_sort(self, items: list[ReviewItemT]) -> list[ReviewItemT]:
         """Apply default sorting (newest first by submitted_at)."""
         items_copy = list(items)  # Don't modify original
         items_copy.sort(

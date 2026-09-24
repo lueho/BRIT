@@ -56,6 +56,7 @@ class ImportRegionSerializer(serializers.Serializer):
     cntr_code = serializers.CharField(max_length=2)
     name_latn = serializers.CharField(max_length=70, required=False, allow_blank=True)
     nuts_name = serializers.CharField(max_length=106, required=False, allow_blank=True)
+    name_en = serializers.CharField(max_length=113, required=False, allow_blank=True)
     mount_type = serializers.IntegerField(required=False, allow_null=True)
     urbn_type = serializers.IntegerField(required=False, allow_null=True)
     coast_type = serializers.IntegerField(required=False, allow_null=True)

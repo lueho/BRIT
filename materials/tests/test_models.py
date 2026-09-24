@@ -26,8 +26,11 @@ from materials.models import (
     MeasurementValueQualifier,
     Sample,
     SampleExternalRecord,
+    SampleGroup,
+    SampleGroupKind,
     SampleSeries,
 )
+from utils.object_management.models import get_default_owner
 from utils.properties.models import Unit
 from utils.tests.test_utils import CanonicalRelationTestMixin
 
@@ -116,6 +119,20 @@ class MaterialComponentTestCase(TestCase):
         self.assertIsInstance(default, MaterialComponent)
         self.assertEqual(default.name, "Fresh Matter (FM)")
 
+    @override_settings(DEFAULT_MATERIALCOMPONENT_NAME="Missing Default Component")
+    def test_default_material_component_is_created_when_missing(self):
+        default = MaterialComponent.objects.default()
+
+        self.assertIsInstance(default, MaterialComponent)
+        self.assertEqual(default.name, "Missing Default Component")
+        self.assertEqual(default.owner, get_default_owner())
+
+    def test_default_material_component_is_not_duplicated(self):
+        first = MaterialComponent.objects.default()
+        second = MaterialComponent.objects.default()
+
+        self.assertEqual(first.pk, second.pk)
+
     def test_get_other_material_component_manager_function(self):
         default = MaterialComponent.objects.other()
         self.assertIsInstance(default, MaterialComponent)
@@ -197,10 +214,10 @@ class MaterialPropertyCanonicalTestCase(CanonicalRelationTestMixin, TestCase):
     comparable_attr = "comparable_property"
 
     def test_canonical_property_defaults_to_self(self):
-        self._test_canonical_defaults_to_self(MaterialProperty, unit="%")
+        self._test_canonical_defaults_to_self(MaterialProperty)
 
     def test_canonical_property_follows_comparable_property(self):
-        self._test_canonical_follows_comparable(MaterialProperty, unit="%")
+        self._test_canonical_follows_comparable(MaterialProperty)
 
 
 class MaterialTestCase(TestCase):
@@ -503,6 +520,25 @@ class SampleSeriesTestCase(TestCase):
             series_with_sample.publication_status, SampleSeries.STATUS_PUBLISHED
         )
 
+    def test_duplicate_with_new_material_applies_it_to_copied_samples(self):
+        creator = User.objects.create(username="dup_material_creator")
+        other_material = Material.objects.create(name="Duplicate Target Material")
+        duplicate = self.sample_series.duplicate(creator, material=other_material)
+        self.assertEqual(duplicate.material, other_material)
+        self.assertTrue(duplicate.samples.exists())
+        self.assertFalse(duplicate.samples.exclude(material=other_material).exists())
+
+    def test_save_with_changed_material_updates_linked_samples(self):
+        other_material = Material.objects.create(name="Changed Series Material")
+        self.assertTrue(self.sample_series.samples.exists())
+        self.sample_series.material = other_material
+        self.sample_series.save()
+        self.assertFalse(
+            self.sample_series.samples.exclude(material=other_material).exists()
+        )
+        for sample in self.sample_series.samples.all():
+            sample.clean()
+
     def test_duplicate_is_atomic(self):
         """SampleSeries.duplicate must run inside transaction.atomic."""
         creator = User.objects.create(username=f"dup_atomic_{uuid4().hex[:8]}")
@@ -512,6 +548,104 @@ class SampleSeriesTestCase(TestCase):
             duplicate.temporal_distributions.all().order_by("id"),
             self.sample_series.temporal_distributions.all().order_by("id"),
         )
+
+
+class SampleGroupTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create(username="group-owner")
+        cls.material_a = Material.objects.create(
+            name="Group Material A", owner=cls.owner
+        )
+        cls.material_b = Material.objects.create(
+            name="Group Material B", owner=cls.owner
+        )
+        with mute_signals(signals.post_save):
+            cls.series = SampleSeries.objects.create(
+                material=cls.material_a, owner=cls.owner
+            )
+
+    def test_group_contains_samples_of_different_materials_and_series(self):
+        group = SampleGroup.objects.create(name="Study A", owner=self.owner)
+        sample_a = Sample.objects.create(
+            name="Series sample",
+            material=self.material_a,
+            series=self.series,
+            owner=self.owner,
+        )
+        sample_b = Sample.objects.create(
+            name="Other material sample",
+            material=self.material_b,
+            owner=self.owner,
+        )
+        sample_a.sample_groups.add(group)
+        sample_b.sample_groups.add(group)
+
+        self.assertCountEqual(group.samples.all(), [sample_a, sample_b])
+        self.assertEqual(sample_a.series, self.series)
+
+    def test_sample_can_belong_to_multiple_groups(self):
+        group1 = SampleGroup.objects.create(name="Group 1", owner=self.owner)
+        group2 = SampleGroup.objects.create(name="Group 2", owner=self.owner)
+        sample = Sample.objects.create(
+            name="Multi-group sample", material=self.material_a, owner=self.owner
+        )
+        sample.sample_groups.add(group1, group2)
+
+        self.assertCountEqual(sample.sample_groups.all(), [group1, group2])
+
+    def test_default_kind_is_study_and_sources_m2m_works(self):
+        group = SampleGroup.objects.create(name="Defaults", owner=self.owner)
+        self.assertEqual(group.kind, SampleGroupKind.STUDY)
+
+        with mute_signals(signals.post_save):
+            source = Source.objects.create(title="Group source", owner=self.owner)
+        group.sources.add(source)
+
+        self.assertIn(source, group.sources.all())
+
+    def test_duplicate_copies_group_memberships_by_default(self):
+        group = SampleGroup.objects.create(name="Copied group", owner=self.owner)
+        sample = Sample.objects.create(
+            name="Original", material=self.material_a, owner=self.owner
+        )
+        sample.sample_groups.add(group)
+
+        duplicate = sample.duplicate(self.owner)
+
+        self.assertCountEqual(duplicate.sample_groups.all(), [group])
+        self.assertCountEqual(sample.sample_groups.all(), [group])
+
+    def test_duplicate_applies_supplied_group_memberships(self):
+        group1 = SampleGroup.objects.create(name="Group 1", owner=self.owner)
+        group2 = SampleGroup.objects.create(name="Group 2", owner=self.owner)
+        sample = Sample.objects.create(
+            name="Original", material=self.material_a, owner=self.owner
+        )
+        sample.sample_groups.add(group1)
+
+        duplicate = sample.duplicate(
+            self.owner, sample_groups=SampleGroup.objects.filter(pk=group2.pk)
+        )
+
+        self.assertCountEqual(duplicate.sample_groups.all(), [group2])
+
+    def test_deleting_group_removes_membership_only(self):
+        group = SampleGroup.objects.create(name="Doomed", owner=self.owner)
+        sample = Sample.objects.create(
+            name="Surviving sample",
+            material=self.material_a,
+            series=self.series,
+            owner=self.owner,
+        )
+        sample.sample_groups.add(group)
+
+        group.delete()
+
+        sample.refresh_from_db()
+        self.assertEqual(sample.series, self.series)
+        self.assertEqual(sample.sample_groups.count(), 0)
+        self.assertTrue(SampleSeries.objects.filter(pk=self.series.pk).exists())
 
 
 class MaterialPropertyValueTestCase(TestCase):
@@ -538,7 +672,7 @@ class MaterialPropertyValueTestCase(TestCase):
         self.assertEqual(duplicate.standard_deviation, value.standard_deviation)
 
     def test_display_standard_deviation_is_none_when_missing(self):
-        prop = MaterialProperty.objects.create(name="Nitrogen", unit="g/kg")
+        prop = MaterialProperty.objects.create(name="Nitrogen")
         unit = Unit.objects.create(name="mg/kg")
         value = MaterialPropertyValue.objects.create(
             property=prop,
@@ -550,7 +684,7 @@ class MaterialPropertyValueTestCase(TestCase):
         self.assertIsNone(value.display_standard_deviation)
 
     def test_shared_numeric_measurement_properties_are_available(self):
-        prop = MaterialProperty.objects.create(name="Nitrogen", unit="g/kg")
+        prop = MaterialProperty.objects.create(name="Nitrogen")
         unit = Unit.objects.create(name="mg/kg")
         value = MaterialPropertyValue.objects.create(
             property=prop,
@@ -567,7 +701,7 @@ class MaterialPropertyValueTestCase(TestCase):
     def test_related_sample_prefers_direct_sample_fk(self):
         material = Material.objects.create(name="Digestate")
         sample = Sample.objects.create(name="Owned Sample", material=material)
-        prop = MaterialProperty.objects.create(name="Nitrogen", unit="g/kg")
+        prop = MaterialProperty.objects.create(name="Nitrogen")
         unit = Unit.objects.create(name="mg/kg")
         value = MaterialPropertyValue.objects.create(
             sample=sample,
@@ -586,12 +720,10 @@ class MaterialPropertyValueCleanTestCase(TestCase):
     def setUp(self):
         self.allowed_unit = Unit.objects.create(name="g/kg test")
         self.other_unit = Unit.objects.create(name="mg/kg test")
-        self.prop_with_allowed = MaterialProperty.objects.create(
-            name="Nitrogen test", unit="g/kg test"
-        )
+        self.prop_with_allowed = MaterialProperty.objects.create(name="Nitrogen test")
         self.prop_with_allowed.allowed_units.add(self.allowed_unit)
         self.prop_no_allowed = MaterialProperty.objects.create(
-            name="Free property test", unit="%"
+            name="Free property test"
         )
 
     def test_clean_raises_when_unit_not_in_allowed_units(self):
@@ -677,6 +809,37 @@ class ComponentMeasurementTestCase(TestCase):
                 unit=unit,
                 average=Decimal("1"),
             ).full_clean()
+
+    def test_clean_rejects_negative_average(self):
+        material = Material.objects.create(name="Digestate")
+        sample = Sample.objects.create(name="Sample", material=material)
+        group = MaterialComponentGroup.objects.create(name="Chemical elements")
+        component = MaterialComponent.objects.create(name="Carbon")
+        unit, _ = Unit.objects.get_or_create(name="%", defaults={"symbol": "%"})
+        measurement = ComponentMeasurement(
+            sample=sample,
+            group=group,
+            component=component,
+            unit=unit,
+            average=Decimal("-0.5"),
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            measurement.full_clean()
+        self.assertIn("average", ctx.exception.message_dict)
+
+    def test_clean_accepts_zero_average(self):
+        material = Material.objects.create(name="Digestate")
+        sample = Sample.objects.create(name="Sample", material=material)
+        group = MaterialComponentGroup.objects.create(name="Chemical elements")
+        component = MaterialComponent.objects.create(name="Carbon")
+        unit, _ = Unit.objects.get_or_create(name="%", defaults={"symbol": "%"})
+        ComponentMeasurement(
+            sample=sample,
+            group=group,
+            component=component,
+            unit=unit,
+            average=Decimal("0"),
+        ).full_clean()
 
 
 @override_settings(TIME_ZONE="Europe/Berlin", USE_TZ=True)
@@ -783,7 +946,7 @@ class SampleTestCase(TestCase):
                 material=material, series=series, timestep=Timestep.objects.default()
             )
 
-        prop = MaterialProperty.objects.create(name="Test Property", unit="Test Unit")
+        prop = MaterialProperty.objects.create(name="Test Property")
         MaterialPropertyValue.objects.create(
             property=prop, average=Decimal("12.3"), standard_deviation=Decimal("0.321")
         )
@@ -929,6 +1092,22 @@ class SampleTestCase(TestCase):
         sample = Sample(material=material, standalone=True, series=None)
         # Should not raise
         sample.clean()
+
+    def test_clean_raises_when_material_differs_from_series_material(self):
+        series = SampleSeries.objects.get(name="Test Series")
+        other_material = Material.objects.create(name="Other Material")
+        sample = Sample(material=other_material, standalone=False, series=series)
+        with self.assertRaises(ValidationError) as ctx:
+            sample.clean()
+        self.assertIn("material", ctx.exception.message_dict)
+
+    def test_clean_raises_for_standalone_sample_with_mismatched_series(self):
+        series = SampleSeries.objects.get(name="Test Series")
+        other_material = Material.objects.create(name="Other Material")
+        sample = Sample(material=other_material, standalone=True, series=series)
+        with self.assertRaises(ValidationError) as ctx:
+            sample.clean()
+        self.assertIn("material", ctx.exception.message_dict)
 
 
 class CompositionTestCase(TestCase):

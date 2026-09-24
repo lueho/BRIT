@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
 from django.test import TestCase
 from factory.django import mute_signals
@@ -32,6 +33,30 @@ class OrganizationAuthorTestCase(TestCase):
         source = Source.objects.create(title="Report", year=2024, abbreviation="tmp")
         SourceAuthor.objects.create(source=source, author=author, position=1)
         self.assertEqual(source.generate_abbreviation(), "EEA 2024")
+
+
+class AuthorValidationTestCase(TestCase):
+    def test_person_surname_requires_a_letter(self):
+        author = Author(first_names="", last_names="30.379")
+        with self.assertRaises(ValidationError) as ctx:
+            author.full_clean()
+        self.assertIn("last_names", ctx.exception.message_dict)
+
+    def test_person_surname_of_digits_only_is_rejected(self):
+        author = Author(first_names="", last_names="70")
+        with self.assertRaises(ValidationError) as ctx:
+            author.full_clean()
+        self.assertIn("last_names", ctx.exception.message_dict)
+
+    def test_organization_name_requires_a_letter(self):
+        author = Author(author_type="organization", organization_name="70")
+        with self.assertRaises(ValidationError) as ctx:
+            author.full_clean()
+        self.assertIn("organization_name", ctx.exception.message_dict)
+
+    def test_valid_person_and_organization_pass(self):
+        Author(first_names="Ada", last_names="Lovelace").full_clean()
+        Author(author_type="organization", organization_name="3M Company").full_clean()
 
 
 class LicenceModelTest(TestCase):

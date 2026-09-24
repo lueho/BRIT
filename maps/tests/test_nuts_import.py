@@ -118,6 +118,58 @@ class NutsImportApiTestCase(TestCase):
             "Germany",
         )
 
+    def test_an_english_name_is_imported(self):
+        response = self.post(
+            self.payload(
+                [
+                    region("DE", 0, "Deutschland", DE_GEOMETRY),
+                    region(
+                        "DE2", 1, "Oberbayern", DE1_GEOMETRY, name_en="Upper Bavaria"
+                    ),
+                ]
+            )
+        )
+        self.assertEqual(response.status_code, 201, response.json())
+        imported = NutsRegion.objects.get(nuts_id="DE2", version__year=2024)
+        self.assertEqual(imported.name_en, "Upper Bavaria")
+
+    def test_an_english_name_is_updated(self):
+        self.post(
+            self.payload(
+                [region("DE", 0, "Deutschland", DE_GEOMETRY, name_en="Germany")]
+            )
+        )
+        response = self.post(
+            self.payload(
+                [region("DE", 0, "Deutschland", DE_GEOMETRY, name_en="Germany!")]
+            )
+        )
+        self.assertEqual(response.json()["updated"], 1)
+        self.assertEqual(
+            NutsRegion.objects.get(nuts_id="DE", version__year=2024).name_en,
+            "Germany!",
+        )
+
+    def test_an_omitted_english_name_keeps_what_brit_holds(self):
+        self.post(
+            self.payload(
+                [region("DE", 0, "Deutschland", DE_GEOMETRY, name_en="Germany")]
+            )
+        )
+        self.post(self.payload([region("DE", 0, "Deutschland", DE_GEOMETRY)]))
+        self.assertEqual(
+            NutsRegion.objects.get(nuts_id="DE", version__year=2024).name_en,
+            "Germany",
+        )
+
+    def test_the_schema_documents_name_en(self):
+        response = self.client.get(reverse("nuts:import-schema"))
+        self.assertEqual(response.status_code, 200)
+        region_properties = response.json()["properties"]["regions"]["items"][
+            "properties"
+        ]
+        self.assertIn("name_en", region_properties)
+
     def test_children_are_linked_to_the_parent_of_their_own_vintage(self):
         self.post(self.payload([region("DE", 0, "Deutschland", DE_GEOMETRY)]))
         self.post(self.payload([region("DE1", 1, "Baden-Württemberg", DE1_GEOMETRY)]))

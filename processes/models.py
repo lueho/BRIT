@@ -474,6 +474,15 @@ class ProcessOperatingParameter(models.Model):
     def get_nominal_value_display(self):
         return format_decimal_for_display(self.nominal_value)
 
+    def get_value_range_display(self):
+        if self.value_min is not None and self.value_max is not None:
+            return f"{self.get_value_min_display()} – {self.get_value_max_display()}"
+        if self.value_min is not None:
+            return f"at least {self.get_value_min_display()}"
+        if self.value_max is not None:
+            return f"at most {self.get_value_max_display()}"
+        return ""
+
     def clean(self):
         super().clean()
         errors = {}

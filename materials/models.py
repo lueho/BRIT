@@ -200,7 +200,9 @@ class MaterialComponentManager(BaseMaterialTypeManager):
 
     def default(self):
         name = getattr(settings, "DEFAULT_MATERIALCOMPONENT_NAME", "Fresh Matter (FM)")
-        return self.get_queryset().get(name=name, owner=get_default_owner())
+        return self.get_queryset().get_or_create(name=name, owner=get_default_owner())[
+            0
+        ]
 
     def other(self):
         name = getattr(settings, "DEFAULT_OTHER_MATERIAL_NAME", "Other")
@@ -357,8 +359,9 @@ class AnalyticalMethod(NamedUserCreatedObject):
 class SampleSeries(NamedUserCreatedObject):
     """
     Sample series are used to add concrete experimental data to the abstract semantic definition of materials. A sample
-    series consists of several samples that are taken from a comparable source at different times. That way a temporal
-    distribution of material properties and compositions over time can be described.
+    series is a strictly temporal series: it consists of several samples of the same material taken from a comparable
+    source at defined timesteps. That way a temporal distribution of material properties and compositions over time
+    can be described. For non-temporal groupings of samples across materials, see SampleGroup.
     """
 
     class Meta(NamedUserCreatedObject.Meta):
@@ -467,9 +470,9 @@ class SampleSeries(NamedUserCreatedObject):
                 )
 
                 for sample in self.samples.all():
-                    sample_duplicate = sample.duplicate(creator)
-                    sample_duplicate.series = duplicate
-                    sample_duplicate.save()
+                    sample.duplicate(
+                        creator, series=duplicate, material=duplicate.material
+                    )
 
                 duplicate.temporal_distributions.set(self.temporal_distributions.all())
             finally:
@@ -478,6 +481,19 @@ class SampleSeries(NamedUserCreatedObject):
                 )
 
             return duplicate
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            stale_ids = list(
+                self.samples.select_for_update()
+                .exclude(material_id=self.material_id)
+                .values_list("pk", flat=True)
+            )
+            if stale_ids:
+                Sample.objects.filter(pk__in=stale_ids).update(
+                    material_id=self.material_id
+                )
 
     def clean(self):
         super().clean()
@@ -508,6 +524,37 @@ class SampleSeries(NamedUserCreatedObject):
 def add_default_temporal_distribution(sender, instance, created, **kwargs):
     if created:
         instance.add_temporal_distribution(TemporalDistribution.objects.default())
+
+
+class SampleGroupKind(models.TextChoices):
+    STUDY = "study", "Study"
+    EXPERIMENT = "experiment", "Experiment"
+    SAMPLING_CAMPAIGN = "sampling_campaign", "Sampling campaign"
+    ANALYSIS = "analysis", "Analysis"
+    OTHER = "other", "Other"
+
+
+class SampleGroup(NamedUserCreatedObject):
+    """
+    A non-temporal grouping of samples. Sample groups relate samples of
+    potentially different materials to each other through a shared study,
+    experiment, sampling campaign, or analysis, without implying the temporal
+    order that a SampleSeries represents.
+    """
+
+    class Meta(NamedUserCreatedObject.Meta):
+        verbose_name_plural = "sample groups"
+
+    kind = models.CharField(
+        max_length=32,
+        choices=SampleGroupKind.choices,
+        default=SampleGroupKind.STUDY,
+    )
+    sources = models.ManyToManyField(
+        Source,
+        blank=True,
+        related_name="sample_groups",
+    )
 
 
 class MaterialProperty(PropertyBase):
@@ -758,8 +805,9 @@ class MaterialPropertyValue(
 
 class Sample(NamedUserCreatedObject):
     """
-    Representation of a single sample that was taken at a specific location and time. Equivalent samples are associated
-    with a SampleSeries to temporal distribution of properties and composition.
+    Representation of a single sample that was taken at a specific location and time. Equivalent samples of the same
+    material are associated with a SampleSeries to describe a temporal distribution of properties and composition.
+    Samples can additionally belong to any number of non-temporal SampleGroups.
     """
 
     image = models.ImageField(upload_to="materials_sample/", blank=True, null=True)
@@ -833,11 +881,12 @@ class Sample(NamedUserCreatedObject):
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
-        help_text="If this sample belongs to a sample series or campaign, select it here.",
+        help_text="Temporal series for samples of the same material at defined timesteps.",
     )
     standalone = models.BooleanField(
         default=False,
-        help_text="True if this sample is not part of a sample series.",
+        help_text="True if this sample is not part of a temporal sample series. "
+        "Standalone samples may still belong to sample groups.",
     )
     timestep = models.ForeignKey(
         Timestep,
@@ -848,6 +897,15 @@ class Sample(NamedUserCreatedObject):
         help_text="If the sample represents a specific time step in a series, select it here.",
     )
     sources = models.ManyToManyField(Source)
+    sample_groups = models.ManyToManyField(
+        SampleGroup,
+        related_name="samples",
+        blank=True,
+        help_text=(
+            "Studies, experiments, campaigns, or analyses that relate this sample "
+            "to other samples without implying a temporal series."
+        ),
+    )
 
     @property
     def _sampling_datetime(self):
@@ -963,15 +1021,22 @@ class Sample(NamedUserCreatedObject):
 
     def clean(self):
         super().clean()
+        errors = {}
         if not self.standalone and self.series_id is None:
-            raise ValidationError(
-                {
-                    "series": (
-                        "A series is required when the sample is not standalone. "
-                        "Either assign a series or mark the sample as standalone."
-                    )
-                }
+            errors["series"] = (
+                "A series is required when the sample is not standalone. "
+                "Either assign a series or mark the sample as standalone."
             )
+        if (
+            self.series_id is not None
+            and self.material_id
+            and self.material_id != self.series.material_id
+        ):
+            errors["material"] = (
+                "The sample material must match the material of its series."
+            )
+        if errors:
+            raise ValidationError(errors)
 
     def approve(self, user=None):
         """
@@ -1025,6 +1090,10 @@ class Sample(NamedUserCreatedObject):
                 )
             finally:
                 post_save.connect(add_default_composition, sender=Sample)
+
+            duplicate.sample_groups.set(
+                kwargs.get("sample_groups", self.sample_groups.all())
+            )
 
             for composition in self.compositions.all():
                 duplicate_composition = composition.duplicate(creator)
@@ -1270,13 +1339,16 @@ class ComponentMeasurement(
 
     def clean(self):
         super().clean()
+        errors = {}
+        if self.average is not None and self.average < 0:
+            errors["average"] = "Component measurement averages cannot be negative."
         if self.unit_id and not self.unit.is_weight_fraction:
-            raise ValidationError(
-                {
-                    "unit": "Component measurements must use a weight-fraction unit "
-                    "(e.g. %, g/kg, mg/kg)."
-                }
+            errors["unit"] = (
+                "Component measurements must use a weight-fraction unit "
+                "(e.g. %, g/kg, mg/kg)."
             )
+        if errors:
+            raise ValidationError(errors)
 
     def duplicate(self, creator, sample=None):
         duplicate = ComponentMeasurement.objects.create(

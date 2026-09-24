@@ -67,7 +67,7 @@ class GeoDataSetModelForm(
     region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",
-            label_field="name",
+            label_field="display_name",
         ),
         label="Region",
     )
@@ -286,7 +286,7 @@ class RegionAttributeValueModelForm(NumericMeasurementFieldsFormMixin, SimpleMod
     region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",
-            label_field="name",
+            label_field="display_name",
         ),
         label="Region",
     )
@@ -340,14 +340,14 @@ class CatchmentModelForm(SimpleModelForm):
     region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",
-            label_field="name",
+            label_field="display_name",
         ),
         label="Region",
     )
     parent_region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",
-            label_field="name",
+            label_field="display_name",
         ),
         label="Parent region",
         required=False,
@@ -368,7 +368,7 @@ class CatchmentCreateDrawCustomForm(SimpleModelForm):
     parent_region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",
-            label_field="name",
+            label_field="display_name",
         ),
         label="Parent region",
         required=False,
@@ -392,6 +392,7 @@ class CatchmentCreateMergeLauForm(SimpleModelForm):
     parent_region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",
+            label_field="display_name",
         ),
         label="Parent region",
         required=True,

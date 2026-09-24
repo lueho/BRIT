@@ -427,7 +427,7 @@ def _get_nuts_hierarchy(region):
     node = nuts_node
     while node is not None:
         if node.levl_code is not None:
-            hierarchy[node.levl_code] = (node.nuts_id, node.nuts_name or node.name)
+            hierarchy[node.levl_code] = (node.nuts_id, node.display_name)
         try:
             node = node.parent
         except Exception:

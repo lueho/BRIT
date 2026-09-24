@@ -13,8 +13,10 @@ from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.core.cache import caches
 from django.core.management import call_command
+from django.db import connection
 from django.middleware.common import CommonMiddleware
 from django.test import RequestFactory, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import serializers
@@ -513,7 +515,6 @@ class RegionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     def test_detail_view_renders_region_attribute_values(self):
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
         )
         unit = Unit.objects.create(name="people/km²", symbol="1/km²")
         RegionAttributeValue.objects.create(
@@ -635,7 +636,6 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     def test_detail_view_renders_value_level_region_attribute_unit(self):
         region_property = RegionProperty.objects.create(
             name="Population density",
-            unit="1/km²",
         )
         unit = Unit.objects.create(name="people/km²", symbol="1/km²")
         RegionAttributeValue.objects.create(
@@ -1455,7 +1455,7 @@ class RegionAttributeValueCRUDViewsTestCase(
                 owner=cls.owner_user, name="Test Region", publication_status="published"
             ),
             "property": RegionProperty.objects.create(
-                name="Test Property", unit="Test Unit", publication_status="published"
+                name="Test Property", publication_status="published"
             ),
         }
 
@@ -1509,6 +1509,130 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(200, response.status_code)
         ids = [region["id"] for region in json.loads(response.content)["results"]]
         self.assertListEqual([lau.id for lau in LauRegion.objects.all()], ids)
+
+    def test_english_name_is_the_label_when_held(self):
+        lau = LauRegion.objects.get(lau_id="123")
+        lau.name_en = "English Region Name"
+        lau.save()
+        response = self.client.get(self.url, data={"q": "123"})
+        item = next(
+            r for r in json.loads(response.content)["results"] if r["id"] == lau.pk
+        )
+        self.assertEqual(item["text"], "English Region Name (123)")
+
+    def test_search_finds_regions_by_english_name(self):
+        lau = LauRegion.objects.get(lau_id="123")
+        lau.name_en = "Unique English Moniker"
+        lau.save()
+        response = self.client.get(self.url, data={"q": "Moniker"})
+        ids = [r["id"] for r in json.loads(response.content)["results"]]
+        self.assertIn(lau.pk, ids)
+
+    def test_label_falls_back_to_name_without_english_or_lau_name(self):
+        lau = LauRegion.objects.get(lau_id="123")
+        lau.lau_name = ""
+        lau.save()
+        response = self.client.get(self.url, data={"q": "123"})
+        item = next(
+            r for r in json.loads(response.content)["results"] if r["id"] == lau.pk
+        )
+        self.assertEqual(item["text"], "Test Region 1 (123)")
+
+
+class RegionAutocompleteEnglishNameTestCase(ViewWithPermissionsTestCase):
+    url = reverse("region-autocomplete")
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.english = Region.objects.create(
+            name="Bayern", name_en="Bavaria", publication_status="published"
+        )
+        cls.native_only = Region.objects.create(
+            name="Freising", name_en="", publication_status="published"
+        )
+
+    def test_search_finds_regions_by_english_name(self):
+        response = self.client.get(self.url, data={"q": "Bavaria"})
+        ids = [r["id"] for r in response.json()["results"]]
+        self.assertIn(self.english.pk, ids)
+
+    def test_english_name_is_served_as_display_label(self):
+        response = self.client.get(self.url, data={"q": "Bayern"})
+        item = next(r for r in response.json()["results"] if r["id"] == self.english.pk)
+        self.assertEqual(item["display_name"], "Bavaria")
+
+    def test_display_label_falls_back_to_name(self):
+        response = self.client.get(self.url, data={"q": "Freising"})
+        item = next(
+            r for r in response.json()["results"] if r["id"] == self.native_only.pk
+        )
+        self.assertEqual(item["display_name"], "Freising")
+
+
+class NutsRegionEnglishNameTestCase(ViewWithPermissionsTestCase):
+    url = reverse("nutsregion-autocomplete")
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.region = NutsRegion.objects.create(
+            name="Bayern",
+            name_latn="Bayern",
+            nuts_name="Bayern",
+            name_en="Bavaria",
+            nuts_id="DE2",
+            levl_code=1,
+            publication_status="published",
+        )
+        cls.without_english = NutsRegion.objects.create(
+            name="Freising",
+            name_latn="Freising",
+            nuts_name="Freising",
+            nuts_id="DE21",
+            levl_code=2,
+            parent=cls.region,
+            publication_status="published",
+        )
+        cls.blank_latin = NutsRegion.objects.create(
+            name="Attiki",
+            name_latn="",
+            nuts_name="Αττική",
+            nuts_id="EL3",
+            levl_code=1,
+            publication_status="published",
+        )
+
+    def test_english_name_is_served_as_display_label(self):
+        response = self.client.get(self.url, data={"q": "DE2"})
+        item = next(r for r in response.json()["results"] if r["id"] == self.region.pk)
+        self.assertEqual(item["display_name"], "Bavaria")
+
+    def test_display_label_falls_back_to_latin_name(self):
+        response = self.client.get(self.url, data={"q": "DE21"})
+        item = next(
+            r for r in response.json()["results"] if r["id"] == self.without_english.pk
+        )
+        self.assertEqual(item["display_name"], "Freising")
+
+    def test_display_label_skips_blank_latin_name(self):
+        response = self.client.get(self.url, data={"q": "EL3"})
+        item = next(
+            r for r in response.json()["results"] if r["id"] == self.blank_latin.pk
+        )
+        self.assertEqual(item["display_name"], "Αττική")
+
+    def test_search_finds_regions_by_english_name(self):
+        response = self.client.get(self.url, data={"q": "Bavaria"})
+        ids = [r["id"] for r in response.json()["results"]]
+        self.assertIn(self.region.pk, ids)
+
+    def test_region_detail_shows_english_name(self):
+        response = self.client.get(
+            reverse("region-detail", kwargs={"pk": self.region.region_ptr_id})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bavaria")
 
 
 class NutsRegionAutocompleteFilterParsingTestCase(ViewWithPermissionsTestCase):
@@ -2046,6 +2170,33 @@ class StreamingGeoJSONTests(TestCase):
             cache_status = response.get("X-Cache-Status", "")
             self.assertEqual(cache_status, "STREAM")
 
+    def test_streaming_yields_batched_chunks(self):
+        """Streaming should emit a few large chunks, not one chunk per feature.
+
+        Per-feature yields force the browser through one reader.read() cycle
+        per feature (~139 B chunks for point features), which dominates
+        end-to-end load time. Batched chunks keep streaming semantics while
+        cutting chunk count by orders of magnitude.
+        """
+        with patch("maps.mixins.STREAMING_THRESHOLD", 100):
+            response = self.client.get(self.regions_geojson_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Cache-Status"], "STREAM")
+        chunks = list(response.streaming_content)
+        # 150 features: per-feature streaming produces 2N+2 chunks.
+        # Batched streaming should produce a handful.
+        self.assertLess(len(chunks), len(self.regions))
+
+    def test_streaming_batched_output_is_identical_json(self):
+        """Batched streaming must produce the same FeatureCollection payload."""
+        with patch("maps.mixins.STREAMING_THRESHOLD", 100):
+            response = self.client.get(self.regions_geojson_url)
+        content = b"".join(response.streaming_content).decode("utf-8")
+        data = json.loads(content)
+        self.assertEqual(data["type"], "FeatureCollection")
+        self.assertEqual(len(data["features"]), Region.objects.count())
+
     def test_large_unbounded_cache_miss_is_rejected(self):
         with patch(
             "maps.mixins.CachedGeoJSONMixin.max_unbounded_geojson_features", 100
@@ -2167,6 +2318,66 @@ class GeoJSONHeadTests(TestCase):
         self.assertEqual(len(get.data["features"]), 2)
         self.assert_metadata_equal(response, get)
         self.assertIsNotNone(self.cache.get("head-test-data"))
+
+    def test_cold_head_uses_single_stats_query(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.request("head")
+        self.assertEqual(response.status_code, 200)
+        count_queries = [
+            q for q in queries.captured_queries if "COUNT(" in q["sql"].upper()
+        ]
+        self.assertEqual(len(count_queries), 1)
+
+    def test_cold_get_uses_single_stats_query(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.request("get")
+        self.assertEqual(response.status_code, 200)
+        count_queries = [
+            q for q in queries.captured_queries if "COUNT(" in q["sql"].upper()
+        ]
+        self.assertEqual(len(count_queries), 1)
+
+    def test_cached_head_reads_meta_count_without_payload(self):
+        self.request("get")
+        with patch.object(self.cache, "get", wraps=self.cache.get) as cache_get:
+            head = self.request("head")
+        self.assertEqual(head["X-Cache-Status"], "HIT")
+        self.assertEqual(head["X-Total-Count"], "2")
+        keys = [call.args[0] for call in cache_get.call_args_list]
+        self.assertIn("head-test-data:count", keys)
+        self.assertNotIn("head-test-data", keys)
+
+    def test_cached_head_heals_missing_count_meta(self):
+        self.request("get")
+        self.cache.delete("head-test-data:count")
+        head = self.request("head")
+        self.assertEqual(head["X-Cache-Status"], "HIT")
+        self.assertEqual(head["X-Total-Count"], "2")
+        self.assertEqual(self.cache.get("head-test-data:count"), 2)
+        with patch.object(self.cache, "get", wraps=self.cache.get) as cache_get:
+            self.request("head")
+        keys = [call.args[0] for call in cache_get.call_args_list]
+        self.assertNotIn("head-test-data", keys)
+
+    def test_orphaned_count_meta_reports_miss(self):
+        self.request("get")
+        self.cache.delete("head-test-data")
+        self.assertEqual(self.cache.get("head-test-data:count"), 2)
+        head = self.request("head")
+        self.assertEqual(head["X-Cache-Status"], "MISS")
+        self.assertEqual(head["X-Total-Count"], "2")
+        self.assertIsNone(self.cache.get("head-test-data:count"))
+
+    def test_healed_count_meta_inherits_payload_ttl(self):
+        self.request("get")
+        self.cache.delete("head-test-data:count")
+        self.cache.ttl = Mock(return_value=60)
+        self.addCleanup(delattr, self.cache, "ttl")
+        with patch.object(self.cache, "set", wraps=self.cache.set) as cache_set:
+            head = self.request("head")
+        self.assertEqual(head["X-Cache-Status"], "HIT")
+        self.cache.ttl.assert_called_once_with("head-test-data")
+        cache_set.assert_called_once_with("head-test-data:count", 2, timeout=60)
 
     def test_cached_head_has_no_response_payload(self):
         self.request("get")
