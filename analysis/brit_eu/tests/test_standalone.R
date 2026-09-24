@@ -1,4 +1,5 @@
 # Start python3 tests/http_fixture.py before this integration test.
+options(brit_eu.autorun = FALSE)
 source("BRIT_Datenanalyse.R")
 
 expect_error <- function(expr, pattern) {

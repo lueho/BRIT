@@ -370,20 +370,28 @@ def _column_slug(label):
 def _set_measurement_columns(representation, base_column, values):
     """Write ``(value, unit_label)`` pairs under ``base_column``.
 
-    A single measurement keeps the plain column; measurements in different
-    units for the same column each get a unit-suffixed column so none is lost.
+    Repeated measurements in the same unit keep only the last one, under the
+    plain column. Measurements in different units each get a unit-suffixed
+    column so none is lost; suffixes are made unique when unit labels collide.
     """
-    columns = (
-        [(base_column, values[0])]
-        if len(values) == 1
-        else [
-            (f"{base_column}_{_column_slug(unit)}", (value, unit))
-            for value, unit in values
-        ]
-    )
-    for column, (value, unit) in columns:
+    by_unit = {}
+    for value, unit in values:
+        by_unit[unit or ""] = value
+    if len(by_unit) == 1:
+        ((unit, value),) = by_unit.items()
+        representation[base_column] = value
+        representation[f"{base_column}_unit"] = unit
+        return
+    used = set()
+    for unit, value in by_unit.items():
+        column = candidate = f"{base_column}_{_column_slug(unit)}"
+        counter = 2
+        while column in used:
+            column = f"{candidate}_{counter}"
+            counter += 1
+        used.add(column)
         representation[column] = value
-        representation[f"{column}_unit"] = unit if unit else ""
+        representation[f"{column}_unit"] = unit
 
 
 def _get_nuts_hierarchy(region):

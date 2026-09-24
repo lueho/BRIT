@@ -205,4 +205,6 @@ brit_eu_main <- function(username = NULL, password = NULL) {
   invisible(data)
 }
 
-if (sys.nframe() == 0L) brit_eu_main()
+# Startet automatisch unter Rscript und beim RStudio-"Source". Zum reinen Laden der
+# Funktionen (z. B. in Tests) vorher options(brit_eu.autorun = FALSE) setzen.
+if (isTRUE(getOption("brit_eu.autorun", TRUE))) brit_eu_main()
