@@ -1,9 +1,0 @@
-data/raw/
-data/processed/
-results/
-renv/library/
-renv/staging/
-.Rhistory
-.RData
-
-/data/reference/
