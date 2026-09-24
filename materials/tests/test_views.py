@@ -981,6 +981,25 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 
         self.assertRedirects(response, next_url)
 
+    def test_post_ignores_external_next_url(self):
+        self.client.force_login(self.member)
+        sample = self.value.sample
+        value = MaterialPropertyValue.objects.create(
+            owner=self.member,
+            sample=sample,
+            property=self.value.property,
+            average=Decimal("42.0"),
+            standard_deviation=Decimal("0.1"),
+        )
+
+        response = self.client.post(
+            f"{reverse(self.url_name, kwargs={'pk': value.pk})}?next=https://evil.example/"
+        )
+
+        self.assertRedirects(
+            response, reverse("sample-detail", kwargs={"pk": sample.pk})
+        )
+
     def test_post_success_and_http_302_redirect_for_fk_only_members(self):
         self.client.force_login(self.member)
         sample = Sample.objects.get(name="Test Sample")
@@ -1209,6 +1228,27 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         )
 
         self.assertRedirects(response, next_url)
+
+    def test_update_view_ignores_external_next_url(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            f"{reverse('materialpropertyvalue-update', kwargs={'pk': self.value.pk})}?next=https://evil.example/",
+            data={
+                "property": self.property.pk,
+                "basis_component": self.alt_basis.pk,
+                "unit": self.unit.pk,
+                "analytical_method": "",
+                "sources": [],
+                "average": "14.25",
+                "standard_deviation": "0.75",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
 
 
 class MaterialPropertyValueCreateAndDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -1651,6 +1691,30 @@ class ComponentMeasurementCreateAndDetailViewTestCase(ViewWithPermissionsTestCas
 
         self.assertRedirects(response, next_url)
 
+    def test_create_view_ignores_external_next_url(self):
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            f"{reverse('componentmeasurement-create')}?sample={self.sample.pk}&next=https://evil.example/",
+            data={
+                "group": self.group.pk,
+                "component": self.component.pk,
+                "basis_component": "",
+                "analytical_method": "",
+                "sources": [],
+                "unit": self.unit.pk,
+                "average": "18.25",
+                "standard_deviation": "0.75",
+                "sample_size": "3",
+                "comment": "Created from dedicated route",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
+
     def test_create_view_allows_missing_standard_deviation(self):
         self.client.force_login(self.member)
 
@@ -1803,6 +1867,27 @@ class ComponentMeasurementModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         )
 
         self.assertRedirects(response, next_url)
+
+    def test_post_ignores_external_next_url(self):
+        self.client.force_login(self.member)
+        measurement = ComponentMeasurement.objects.create(
+            owner=self.member,
+            sample=self.sample,
+            group=self.group,
+            component=self.component,
+            unit=self.unit,
+            average=Decimal("42.0"),
+            standard_deviation=Decimal("0.1"),
+        )
+
+        response = self.client.post(
+            f"{reverse(self.url_name, kwargs={'pk': measurement.pk})}?next=https://evil.example/"
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
 
     def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
@@ -3427,6 +3512,21 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertRedirects(response, next_url)
 
+    def test_post_ignores_external_next_url(self):
+        self.client.force_login(self.sample.owner)
+        data = {
+            "property": MaterialProperty.objects.get(name="Test Property").pk,
+            "average": 123.321,
+            "standard_deviation": 0.1337,
+        }
+        response = self.client.post(
+            f"{reverse('sample-add-property', kwargs={'pk': self.sample.pk})}?next=https://evil.example/",
+            data,
+        )
+        self.assertRedirects(
+            response, reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
     def test_post_creates_value_and_adds_it_to_sample(self):
         self.client.force_login(self.sample.owner)
         data = {
@@ -3907,6 +4007,33 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
         self.assertRedirects(response, next_url)
 
+    def test_update_view_ignores_external_next_url(self):
+        self.client.force_login(self.owner_user)
+        sample = self.related_objects["unpublished_sample"]
+
+        response = self.client.post(
+            f"{self.get_update_url(self.unpublished_object.pk)}?next=https://evil.example/",
+            self.related_objects_post_data(),
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": sample.pk}),
+        )
+
+    def test_delete_view_ignores_external_next_url(self):
+        self.client.force_login(self.owner_user)
+        sample = self.related_objects["unpublished_sample"]
+
+        response = self.client.post(
+            f"{self.get_delete_url(self.unpublished_object.pk)}?next=https://evil.example/"
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": sample.pk}),
+        )
+
     def test_modal_create_view_rejects_sample_user_cannot_manage(self):
         self.client.force_login(self.user_with_add_perm)
         data = self.create_object_data.copy()
@@ -4180,6 +4307,17 @@ class ComponentOrderUpViewTestCase(ViewWithPermissionsTestCase):
 
         self.assertRedirects(response, next_url)
 
+    def test_get_ignores_external_next_url(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            f"{reverse('composition-order-up', kwargs={'pk': self.composition.pk})}?next=https://evil.example/"
+        )
+
+        self.assertRedirects(
+            response, reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
     def test_get_success_and_http_302_redirect_for_owner_with_derived_displays(self):
         self.client.force_login(self.member)
         response = self.client.get(
@@ -4281,6 +4419,17 @@ class ComponentOrderDownViewTestCase(ViewWithPermissionsTestCase):
         )
 
         self.assertRedirects(response, next_url)
+
+    def test_get_ignores_external_next_url(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            f"{reverse('composition-order-down', kwargs={'pk': self.composition.pk})}?next=https://evil.example/"
+        )
+
+        self.assertRedirects(
+            response, reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
 
 
 class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
@@ -4444,6 +4593,24 @@ class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
         )
 
         self.assertRedirects(response, next_url)
+
+    def test_order_down_ignores_external_next_url(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "derived-composition-order-down",
+                kwargs={
+                    "sample_pk": self.sample.pk,
+                    "group_pk": self.organic_group.pk,
+                },
+            )
+            + "?next=https://evil.example/"
+        )
+
+        self.assertRedirects(
+            response, reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
 
 
 # ----------- Materials/Components/Groups Relations --------------------------------------------------------------------
@@ -4653,6 +4820,21 @@ class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
             data,
         )
         self.assertRedirects(response, next_url)
+
+    def test_post_ignores_external_next_url(self):
+        self.client.force_login(self.member)
+        data = {
+            "sample": self.sample.pk,
+            "group": self.component_group.pk,
+            "fractions_of": MaterialComponent.objects.default().pk,
+        }
+        response = self.client.post(
+            f"{reverse('sample-add-composition', kwargs={'pk': self.sample.pk})}?next=https://evil.example/",
+            data,
+        )
+        self.assertRedirects(
+            response, reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
 
     def test_post_creates_composition_for_sample(self):
         self.client.force_login(self.member)

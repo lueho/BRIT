@@ -72,6 +72,7 @@ from utils.object_management.review_hooks import (
     get_breadcrumb_module,
     get_review_search_fields,
 )
+from utils.views import get_safe_next_url
 
 from ..forms import (
     DynamicTableInlineFormSetHelper,
@@ -2911,14 +2912,10 @@ class UserCreatedObjectModalDeleteView(
         return context
 
     def get_success_url(self):
-        # Respect explicit 'next' parameter from POST or GET first
-        try:
-            next_url = self.request.POST.get("next") or self.request.GET.get("next")
-            if next_url:
-                return next_url
-        except (AttributeError, KeyError) as e:
-            logger.debug(f"Could not get 'next' URL from request: {e}")
-            pass
+        # Respect a safe 'next' parameter from POST or GET first
+        next_url = get_safe_next_url(self.request)
+        if next_url:
+            return next_url
 
         if self.success_url:
             return self.success_url
