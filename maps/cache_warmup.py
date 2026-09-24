@@ -32,6 +32,13 @@ DEFAULT_NUTS_LEVELS = (0, 1, 2)
 # so warming the heaviest geometries covers the expensive cases cheaply.
 DEFAULT_REGIONS_LIMIT = 50
 
+# Regions with more points than this are skipped during warmup: serializing
+# them materializes the full coordinate tree in the worker process and OOMs a
+# Basic (512 MB) dyno — observed R15 at ~1.1 GB on the ~1M-point
+# "Waste Atlas Background" region, which then crash-loops the dyno via the
+# worker_ready re-warm. Oversized regions stay request-cached instead.
+REGION_GEOJSON_WARMUP_MAX_POINTS = 100_000
+
 
 def warm_nuts_geojson_cache(nuts_levels=None, limit=None):
     """Warm the NUTS region GeoJSON cache.
@@ -68,13 +75,17 @@ def warm_nuts_geojson_cache(nuts_levels=None, limit=None):
     return {"status": "success", "features_count": warmed}
 
 
-def warm_region_geojson_cache(limit=None):
+def warm_region_geojson_cache(limit=None, max_points=None):
     """Warm the Region GeoJSON cache for the largest geometries.
 
     Region GeoJSON is requested per ``id`` (``region_geojson:id:<id>``), so
     the heavy overview regions are serialized fresh on every cold cache.
     Pre-warming the largest geometries turns those crawler hits into cache
     hits and avoids the multi-second responses that trigger H27 warnings.
+
+    Regions above ``max_points`` vertices are skipped: their serialized
+    payload does not fit into the worker's memory quota (see
+    ``REGION_GEOJSON_WARMUP_MAX_POINTS``).
     """
     cache_alias = getattr(settings, "GEOJSON_CACHE", "default")
     geojson_cache = caches[cache_alias]
@@ -84,6 +95,8 @@ def warm_region_geojson_cache(limit=None):
     timeout = settings.CACHES.get(cache_alias, {}).get("TIMEOUT", 3600)
     if limit is None:
         limit = DEFAULT_REGIONS_LIMIT
+    if max_points is None:
+        max_points = REGION_GEOJSON_WARMUP_MAX_POINTS
 
     queryset = (
         Region.objects.select_related("borders")
@@ -93,7 +106,17 @@ def warm_region_geojson_cache(limit=None):
     )
 
     warmed = 0
+    skipped = []
     for region in queryset:
+        if (region.num_points or 0) > max_points:
+            skipped.append(
+                {
+                    "id": region.id,
+                    "name": region.name,
+                    "num_points": region.num_points,
+                }
+            )
+            continue
         cache_key = get_region_cache_key(region_id=region.id)
         serializer = RegionGeoFeatureModelSerializer([region], many=True)
         set_geojson_cache_payload(
@@ -101,5 +124,12 @@ def warm_region_geojson_cache(limit=None):
         )
         warmed += 1
 
+    if skipped:
+        logger.warning(
+            "Skipped %d oversized regions during GeoJSON warmup (>%d points): %s",
+            len(skipped),
+            max_points,
+            skipped,
+        )
     logger.info("Region GeoJSON cache warmed: %d entries", warmed)
-    return {"status": "success", "features_count": warmed}
+    return {"status": "success", "features_count": warmed, "skipped": skipped}

@@ -8,6 +8,7 @@ from django.test import SimpleTestCase, TestCase
 
 from maps.models import NutsRegion, NutsVintage, Region
 from maps.tasks import (
+    STARTUP_WARMUP_FLAG_CACHE_KEY,
     warm_all_geojson_caches,
     warm_base_geojson_caches,
     warm_geojson_caches_on_worker_ready,
@@ -142,8 +143,26 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
 
         self.assertEqual(result["roadside_trees"]["features_count"], 1)
 
+
+class WorkerReadyWarmupTaskTests(TestCase):
+    def setUp(self):
+        self.geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
+        self.geojson_cache.delete(STARTUP_WARMUP_FLAG_CACHE_KEY)
+
+    def tearDown(self):
+        self.geojson_cache.delete(STARTUP_WARMUP_FLAG_CACHE_KEY)
+
     @patch("maps.tasks.warm_all_geojson_caches")
     def test_worker_ready_queues_full_geojson_warmup(self, mock_warm_all):
+        warm_geojson_caches_on_worker_ready()
+
+        mock_warm_all.apply_async.assert_called_once_with(countdown=30)
+
+    @patch("maps.tasks.warm_all_geojson_caches")
+    def test_worker_ready_does_not_requeue_within_cooldown(self, mock_warm_all):
+        """A crash restart re-fires worker_ready; the flag must suppress
+        re-queueing so a failing warmup cannot crash-loop the dyno."""
+        warm_geojson_caches_on_worker_ready()
         warm_geojson_caches_on_worker_ready()
 
         mock_warm_all.apply_async.assert_called_once_with(countdown=30)
@@ -198,6 +217,19 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
             self.geojson_cache.get(get_region_cache_key(region_id=self.region.id))
         )
         self.assertNotIn("regions", result)
+
+    def test_skips_regions_over_point_budget(self):
+        """Serializing a multi-hundred-thousand-point geometry OOMs the
+        worker dyno; oversized regions must be skipped, not warmed."""
+        with patch("maps.cache_warmup.REGION_GEOJSON_WARMUP_MAX_POINTS", 4):
+            result = warm_base_geojson_caches.run(nuts_levels=None, regions_limit=10)
+
+        self.assertIsNone(
+            self.geojson_cache.get(get_region_cache_key(region_id=self.region.id))
+        )
+        self.assertEqual(result["regions"]["status"], "success")
+        self.assertEqual(result["regions"]["features_count"], 0)
+        self.assertEqual(result["regions"]["skipped"][0]["id"], self.region.id)
 
     def test_nuts_limit_slices_per_level_queryset(self):
         NutsRegion.objects.create(
