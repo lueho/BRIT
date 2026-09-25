@@ -24,6 +24,12 @@ from utils.tests.testrunner import serial_test
 
 
 class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
+    def test_daily_warmup_queues_separate_tasks(self):
+        self.assertEqual(
+            settings.CELERY_BEAT_SCHEDULE["warm-geojson-caches"]["kwargs"],
+            {"queue_subtasks": True},
+        )
+
     @patch("maps.utils.import_module")
     def test_compute_collection_dataset_version_uses_sources_collection_adapter(
         self, mock_import_module
@@ -92,6 +98,38 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
         tree_warmer.apply.assert_called_once_with()
         collection_warmer.apply.assert_called_once_with()
 
+    @patch("maps.tasks.warm_base_geojson_caches")
+    @patch("maps.tasks.get_source_domain_geojson_cache_warmers")
+    def test_queued_warmup_runs_each_domain_in_separate_tasks(
+        self, mock_get_warmers, mock_base_task
+    ):
+        tree_warmer = Mock()
+        collection_warmer = Mock()
+        mock_base_task.apply_async.return_value.id = "base-task"
+        tree_warmer.apply_async.return_value.id = "tree-task"
+        collection_warmer.apply_async.return_value.id = "collection-task"
+        mock_get_warmers.return_value = (
+            ("roadside_trees", tree_warmer),
+            ("waste_collection", collection_warmer),
+        )
+
+        result = warm_all_geojson_caches.run(
+            nuts_levels=[0], regions_limit=5, nuts_limit=10, queue_subtasks=True
+        )
+
+        mock_base_task.apply_async.assert_called_once_with(
+            kwargs={"nuts_levels": [0], "regions_limit": 5, "nuts_limit": 10}
+        )
+        tree_warmer.apply_async.assert_called_once_with()
+        collection_warmer.apply_async.assert_called_once_with()
+        tree_warmer.apply.assert_not_called()
+        collection_warmer.apply.assert_not_called()
+        self.assertEqual(result["maps"], {"status": "queued", "task_id": "base-task"})
+        self.assertEqual(
+            result["waste_collection"],
+            {"status": "queued", "task_id": "collection-task"},
+        )
+
     @patch("maps.tasks._warm_base_geojson_caches")
     @patch("maps.tasks.get_source_domain_geojson_cache_warmers")
     def test_warm_all_geojson_caches_includes_base_caches(
@@ -159,7 +197,9 @@ class WorkerReadyWarmupTaskTests(TestCase):
     def test_worker_ready_queues_full_geojson_warmup(self, mock_warm_all):
         warm_geojson_caches_on_worker_ready()
 
-        mock_warm_all.apply_async.assert_called_once_with(countdown=30)
+        mock_warm_all.apply_async.assert_called_once_with(
+            kwargs={"queue_subtasks": True}, countdown=30
+        )
 
     @patch("maps.tasks.warm_all_geojson_caches")
     def test_worker_ready_does_not_requeue_within_cooldown(self, mock_warm_all):
@@ -168,7 +208,9 @@ class WorkerReadyWarmupTaskTests(TestCase):
         warm_geojson_caches_on_worker_ready()
         warm_geojson_caches_on_worker_ready()
 
-        mock_warm_all.apply_async.assert_called_once_with(countdown=30)
+        mock_warm_all.apply_async.assert_called_once_with(
+            kwargs={"queue_subtasks": True}, countdown=30
+        )
 
     @patch("maps.tasks.warm_all_geojson_caches")
     def test_worker_ready_requeues_for_a_new_release(self, mock_warm_all):

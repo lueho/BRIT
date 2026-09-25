@@ -121,7 +121,7 @@ class Command(BaseCommand):
             }
             if run_async:
                 self.stdout.write("Warming all GeoJSON caches (async via Celery)...")
-                warm_all_geojson_caches.delay(**task_kwargs)
+                warm_all_geojson_caches.delay(queue_subtasks=True, **task_kwargs)
                 self.stdout.write(
                     self.style.SUCCESS("Tasks queued. Check Celery logs for progress.")
                 )

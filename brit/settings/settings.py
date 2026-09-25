@@ -337,6 +337,7 @@ CELERY_BEAT_SCHEDULE = {
     "warm-geojson-caches": {
         "task": "warm_all_geojson_caches",
         "schedule": crontab(hour=3, minute=0),
+        "kwargs": {"queue_subtasks": True},
     },
 }
 

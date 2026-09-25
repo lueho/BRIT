@@ -72,7 +72,7 @@ def warm_base_geojson_caches(
 
 @shared_task(bind=True, name="warm_all_geojson_caches")
 def warm_all_geojson_caches(
-    self, nuts_levels=None, regions_limit=None, nuts_limit=None
+    self, nuts_levels=None, regions_limit=None, nuts_limit=None, queue_subtasks=False
 ):
     """
     Warm all GeoJSON caches. Called periodically or after major data changes.
@@ -81,34 +81,43 @@ def warm_all_geojson_caches(
     defaults for the base caches; ``None`` means "use the default" (not
     "skip") — use ``warm_base_geojson_caches`` for selective warming.
 
-    Sub-warmers are invoked synchronously via ``apply()``. Their results are
-    read from the returned ``EagerResult`` attributes instead of ``.get()``,
-    because Celery forbids blocking ``result.get()`` calls inside a running
-    task.
+    Scheduled and startup runs queue each warmer as a separate task so the
+    worker can recycle its child process between large serializations.
+    Synchronous CLI runs keep their completed results. Celery forbids
+    blocking ``result.get()`` inside a running task.
     """
     results = {}
+    base_kwargs = {
+        "nuts_levels": (
+            list(DEFAULT_NUTS_LEVELS) if nuts_levels is None else nuts_levels
+        ),
+        "regions_limit": (
+            DEFAULT_REGIONS_LIMIT if regions_limit is None else regions_limit
+        ),
+        "nuts_limit": nuts_limit,
+    }
 
     try:
-        results["maps"] = _warm_base_geojson_caches(
-            nuts_levels=(
-                list(DEFAULT_NUTS_LEVELS) if nuts_levels is None else nuts_levels
-            ),
-            regions_limit=(
-                DEFAULT_REGIONS_LIMIT if regions_limit is None else regions_limit
-            ),
-            nuts_limit=nuts_limit,
-        )
+        if queue_subtasks:
+            queued = warm_base_geojson_caches.apply_async(kwargs=base_kwargs)
+            results["maps"] = {"status": "queued", "task_id": queued.id}
+        else:
+            results["maps"] = _warm_base_geojson_caches(**base_kwargs)
     except Exception as e:
         logger.exception("Failed to warm base GeoJSON caches: %s", e)
         results["maps"] = {"status": "error", "error": str(e)}
 
     for slug, warmer in get_source_domain_geojson_cache_warmers():
         try:
-            eager = warmer.apply()
-            if eager.successful():
-                results[slug] = eager.result
+            if queue_subtasks:
+                queued = warmer.apply_async()
+                results[slug] = {"status": "queued", "task_id": queued.id}
             else:
-                results[slug] = {"status": "error", "error": str(eager.result)}
+                eager = warmer.apply()
+                if eager.successful():
+                    results[slug] = eager.result
+                else:
+                    results[slug] = {"status": "error", "error": str(eager.result)}
         except Exception as e:
             logger.exception("Failed to warm %s cache: %s", slug, e)
             results[slug] = {"status": "error", "error": str(e)}
@@ -138,7 +147,9 @@ def warm_geojson_caches_on_worker_ready(sender=None, **kwargs):
         logger.info("Startup GeoJSON warmup already queued recently; skipping.")
         return
     try:
-        warm_all_geojson_caches.apply_async(countdown=30)
+        warm_all_geojson_caches.apply_async(
+            kwargs={"queue_subtasks": True}, countdown=30
+        )
     except Exception:
         geojson_cache.delete(flag_key)
         raise

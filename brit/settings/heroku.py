@@ -37,6 +37,9 @@ MIDDLEWARE.insert(0, "brit.middleware.CanonicalHostRedirectMiddleware")
 # must be disabled for TLS connections.
 CELERY_BROKER_USE_SSL = _redis_ssl_settings(REDIS_URL, ssl.CERT_NONE)
 CELERY_REDIS_BACKEND_USE_SSL = _redis_ssl_settings(REDIS_URL, ssl.CERT_NONE)
+# Large cache warmers run as separate tasks. Replace a pool child after each
+# task so a previous serialization's memory cannot accumulate in the next.
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 1
 
 # Security settings
 SECURE_SSL_REDIRECT = True
