@@ -113,6 +113,35 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(len(data["features"]), 1)
         self.assertEqual(data["features"][0]["id"], other_tree.pk)
 
+    def test_geojson_catchment_without_region_returns_200_empty(self):
+        borderless = Catchment.objects.create(
+            name="No region", publication_status="published"
+        )
+
+        response = self.client.get(
+            reverse("api-hamburg-roadside-trees-geojson"),
+            {"catchment": borderless.pk},
+            REMOTE_ADDR="10.9.8.8",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Total-Count"], "0")
+
+    def test_geojson_catchment_without_borders_returns_200_empty(self):
+        region = Region.objects.create(name="No borders", country="DE")
+        catchment = Catchment.objects.create(
+            name="No borders", region=region, publication_status="published"
+        )
+
+        response = self.client.get(
+            reverse("api-hamburg-roadside-trees-geojson"),
+            {"catchment": catchment.pk},
+            REMOTE_ADDR="10.9.8.9",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Total-Count"], "0")
+
     def test_geojson_head_preserves_bbox_metadata(self):
         outside = HamburgRoadsideTrees.objects.create(geom=Point(20, 20, srid=4326))
         url = reverse("api-hamburg-roadside-trees-geojson")
