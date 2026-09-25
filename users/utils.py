@@ -8,10 +8,12 @@ def ensure_initial_data(stdout=None):
     """
     Ensures all required initial data for the users app exists.
     Idempotent: safe to run multiple times.
-    Creates the 'registered' group, the admin user (from ADMIN_USERNAME).
+    Creates the 'registered' and 'analysis_api' groups and the admin user
+    (from ADMIN_USERNAME).
     """
-    # 1. Create group for registered users
+    # 1. Create group for registered users and the extended analysis API group
     registered, _ = Group.objects.get_or_create(name="registered")
+    Group.objects.get_or_create(name="analysis_api")
 
     # 2. Create superuser (admin)
     admin_username = os.environ["ADMIN_USERNAME"]
@@ -37,7 +39,8 @@ def ensure_initial_data(stdout=None):
 
     if stdout:
         print(
-            f"Ensured group 'registered', and superuser '{admin_username}' exist.",
+            f"Ensured groups 'registered', 'analysis_api', and superuser "
+            f"'{admin_username}' exist.",
             file=stdout,
         )
 

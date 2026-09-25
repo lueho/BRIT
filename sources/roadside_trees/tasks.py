@@ -13,6 +13,10 @@ from sources.roadside_trees.viewsets import HamburgRoadsideTreeViewSet
 
 logger = logging.getLogger(__name__)
 
+# The production table has over 230,000 rows. Materializing all serialized
+# features in a Basic worker exceeds its 512 MB quota and kills the process.
+MAX_AUTO_WARMUP_FEATURES = 50_000
+
 
 @app.task(bind=True, name="warm_roadside_tree_geojson_cache")
 def warm_roadside_tree_geojson_cache(self):
@@ -22,9 +26,15 @@ def warm_roadside_tree_geojson_cache(self):
         # Capture the dataset version before serializing: if the externally
         # managed table changes mid-task, the worst case is a fresh payload
         # under an orphaned old key, never stale geometry under a current key.
-        dataset_version = HamburgRoadsideTreeViewSet().get_dataset_stats(None)[
-            "version"
-        ]
+        stats = HamburgRoadsideTreeViewSet().get_dataset_stats(None)
+        if stats["count"] > MAX_AUTO_WARMUP_FEATURES:
+            logger.warning(
+                "Skipped Roadside Trees GeoJSON warmup: %d features exceed %d",
+                stats["count"],
+                MAX_AUTO_WARMUP_FEATURES,
+            )
+            return {"status": "skipped", "features_count": stats["count"]}
+        dataset_version = stats["version"]
         qs = HamburgRoadsideTrees.objects.only("id", "geom").order_by()
         serializer = HamburgRoadsideTreeGeometrySerializer(qs, many=True)
         data = serializer.data

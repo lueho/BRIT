@@ -53,7 +53,10 @@ class WarmGeojsonCacheCommandTests(TestCase):
         call_command("warm_geojson_cache", run_async=True, stdout=out)
 
         mock_warm_all.delay.assert_called_once_with(
-            nuts_levels=[0, 1, 2], nuts_limit=None, regions_limit=50
+            nuts_levels=[0, 1, 2],
+            nuts_limit=None,
+            regions_limit=50,
+            queue_subtasks=True,
         )
         mock_warm_base.delay.assert_not_called()
         self.assertIn("queued", out.getvalue().lower())
@@ -71,7 +74,7 @@ class WarmGeojsonCacheCommandTests(TestCase):
         )
 
         mock_warm_all.delay.assert_called_once_with(
-            nuts_levels=[0], nuts_limit=10, regions_limit=10
+            nuts_levels=[0], nuts_limit=10, regions_limit=10, queue_subtasks=True
         )
 
     @patch("maps.tasks.warm_all_geojson_caches")
@@ -81,7 +84,10 @@ class WarmGeojsonCacheCommandTests(TestCase):
         call_command("warm_geojson_cache", regions_limit=5, run_async=True, stdout=out)
 
         mock_warm_all.delay.assert_called_once_with(
-            nuts_levels=[0, 1, 2], nuts_limit=None, regions_limit=5
+            nuts_levels=[0, 1, 2],
+            nuts_limit=None,
+            regions_limit=5,
+            queue_subtasks=True,
         )
 
     @patch("maps.tasks.warm_base_geojson_caches")

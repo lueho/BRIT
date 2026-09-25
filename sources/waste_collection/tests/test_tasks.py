@@ -5,7 +5,16 @@ from unittest.mock import ANY, Mock, PropertyMock, call, patch
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
 
-from sources.waste_collection.models import WasteFlyer
+from sources.waste_collection.models import (
+    Catchment,
+    Collection,
+    CollectionFrequency,
+    CollectionSystem,
+    Collector,
+    FeeSystem,
+    WasteCategory,
+    WasteFlyer,
+)
 from sources.waste_collection.tasks import (
     cleanup_orphaned_waste_flyers,
     warm_collection_geojson_cache,
@@ -55,7 +64,11 @@ class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
         selected_qs.annotate.return_value = annotated_qs
         mock_serializer.return_value.data = {"features": [1, 2, 3]}
 
-        result = warm_collection_geojson_cache.run()
+        with patch(
+            "sources.waste_collection.tasks.exclude_published_predecessors",
+            side_effect=lambda queryset: queryset,
+        ):
+            result = warm_collection_geojson_cache.run()
 
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["features_count"], 3)
@@ -106,7 +119,11 @@ class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
         order.attach_mock(mock_build_cache_key, "build_collection_cache_key")
         order.attach_mock(data_access, "data")
 
-        result = warm_collection_geojson_cache.run()
+        with patch(
+            "sources.waste_collection.tasks.exclude_published_predecessors",
+            side_effect=lambda queryset: queryset,
+        ):
+            result = warm_collection_geojson_cache.run()
 
         self.assertEqual(result["status"], "success")
         self.assertEqual(
@@ -115,4 +132,39 @@ class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
                 call.build_collection_cache_key(scope="published"),
                 call.data(),
             ],
+        )
+
+
+class WasteCollectionGeoJSONWarmTaskQuerysetTestCase(TestCase):
+    @patch("sources.waste_collection.tasks.get_geojson_cache")
+    def test_warmup_excludes_published_predecessors(self, mock_get_cache):
+        owner = get_user_model().objects.create(username="geojson_warmup_owner")
+        catchment = Catchment.objects.create(name="Warmup catchment")
+        collector = Collector.objects.create(name="Warmup collector")
+        fee_system = FeeSystem.objects.create(name="Warmup fee system")
+        frequency = CollectionFrequency.objects.create(name="Warmup frequency")
+        collection_system = CollectionSystem.objects.create(name="Warmup system")
+        waste_category = WasteCategory.objects.create(name="Warmup category")
+        fields = {
+            "owner": owner,
+            "catchment": catchment,
+            "collector": collector,
+            "fee_system": fee_system,
+            "frequency": frequency,
+            "collection_system": collection_system,
+            "waste_category": waste_category,
+            "publication_status": "published",
+        }
+        predecessor = Collection.objects.create(name="Old version", **fields)
+        successor = Collection.objects.create(name="Current version", **fields)
+        successor.predecessors.add(predecessor)
+
+        result = warm_collection_geojson_cache.run()
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["features_count"], 1)
+        payload = mock_get_cache.return_value.set.call_args_list[0].args[1]
+        self.assertEqual(
+            [feature["properties"]["id"] for feature in payload["features"]],
+            [successor.pk],
         )
