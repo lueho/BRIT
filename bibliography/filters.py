@@ -130,7 +130,6 @@ class SourceFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             config=TomSelectConfig(
                 url="author-autocomplete",
                 label_field="label",
-                filter_by=("scope", "name"),
             ),
         ),
     )
@@ -140,7 +139,6 @@ class SourceFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="licence-autocomplete",
-                filter_by=("scope", "name"),
             ),
         ),
     )
@@ -150,12 +148,20 @@ class SourceFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
         self.filters["title"].queryset = self.scoped_choice_queryset(
             Source.objects.all()
         )
-        self.filters["author"].queryset = self.scoped_choice_queryset(
+        # Authors and licences have their own publication status, so a private
+        # source may cite a published author. Restrict by visibility only.
+        self.filters["author"].queryset = self.visible_choice_queryset(
             Author.objects.all()
         )
-        self.filters["licence"].queryset = self.scoped_choice_queryset(
+        self.filters["licence"].queryset = self.visible_choice_queryset(
             Licence.objects.all()
         )
+
+    def visible_choice_queryset(self, queryset):
+        user = getattr(getattr(self, "request", None), "user", None)
+        if user is not None:
+            queryset = filter_queryset_for_user(queryset, user)
+        return queryset
 
     class Meta:
         model = Source

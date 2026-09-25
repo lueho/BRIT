@@ -276,6 +276,17 @@ class SourceFilterScopeTestCase(TestCase):
                 citation_key="OWNPRIV",
                 owner=cls.owner,
                 publication_status="private",
+                licence=cls.licence,
+            )
+            SourceAuthor.objects.create(
+                source=cls.own_private_source, author=cls.author, position=1
+            )
+            cls.own_private_other_source = Source.objects.create(
+                type="misc",
+                title="Own Private Unrelated",
+                citation_key="OWNPRIV2",
+                owner=cls.owner,
+                publication_status="private",
             )
             cls.other_private_source = Source.objects.create(
                 type="misc",
@@ -311,23 +322,45 @@ class SourceFilterScopeTestCase(TestCase):
         self.assertIn(self.author, choices)
         self.assertNotIn(self.other_private_author, choices)
 
-    def test_licence_choices_are_scoped(self):
-        fs = self.filterset({"scope": "published"})
-        choices = fs.filters["licence"].queryset
-        self.assertIn(self.licence, choices)
-        self.assertNotIn(
-            Licence.objects.create(
-                name="Hidden Licence",
-                owner=self.other,
-                publication_status="private",
-            ),
-            choices,
+    def test_author_choices_include_published_authors_in_private_scope(self):
+        fs = self.filterset({"scope": "private"})
+        choices = fs.filters["author"].queryset
+        self.assertIn(self.author, choices)
+        self.assertNotIn(self.other_private_author, choices)
+
+    def test_published_author_narrows_private_source_list(self):
+        fs = self.filterset({"scope": "private", "author": self.author.pk})
+        self.assertTrue(fs.is_valid(), fs.errors)
+        qs = fs.qs
+        self.assertIn(self.own_private_source, qs)
+        self.assertNotIn(self.own_private_other_source, qs)
+
+    def test_licence_choices_exclude_foreign_private_objects(self):
+        hidden = Licence.objects.create(
+            name="Hidden Licence",
+            owner=self.other,
+            publication_status="private",
+        )
+        for scope in ("published", "private"):
+            choices = self.filterset({"scope": scope}).filters["licence"].queryset
+            self.assertIn(self.licence, choices)
+            self.assertNotIn(hidden, choices)
+
+    def test_published_licence_narrows_private_source_list(self):
+        fs = self.filterset({"scope": "private", "licence": self.licence.pk})
+        self.assertTrue(fs.is_valid(), fs.errors)
+        qs = fs.qs
+        self.assertIn(self.own_private_source, qs)
+        self.assertNotIn(self.own_private_other_source, qs)
+
+    def test_title_widget_sends_scope_to_autocomplete(self):
+        fs = SourceFilter(queryset=Source.objects.none())
+        self.assertEqual(
+            fs.filters["title"].field.widget.filter_by,
+            ("scope", "name"),
         )
 
-    def test_widgets_send_scope_to_autocomplete(self):
+    def test_related_widgets_do_not_send_scope_to_autocomplete(self):
         fs = SourceFilter(queryset=Source.objects.none())
-        for name in ("title", "author", "licence"):
-            self.assertEqual(
-                fs.filters[name].field.widget.filter_by,
-                ("scope", "name"),
-            )
+        for name in ("author", "licence"):
+            self.assertFalse(fs.filters[name].field.widget.filter_by)
