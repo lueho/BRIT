@@ -4,7 +4,7 @@ import time
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import connection, transaction
-from django.db.models import Exists, F, OuterRef, Prefetch, Q
+from django.db.models import F, Prefetch, Q
 from django.urls import reverse
 from django.utils import timezone
 from django_filters import rest_framework as rf_filters
@@ -26,6 +26,7 @@ from sources.waste_collection.filters import (
     CollectionExtendedFilterSet,
     CollectionFilterSet,
 )
+from sources.waste_collection.geojson import exclude_published_predecessors
 from sources.waste_collection.importers import CollectionImporter
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
@@ -234,13 +235,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         if params.get("valid_on") or has_id_filter:
             return queryset
 
-        published_successors = Collection.objects.filter(
-            publication_status=Collection.STATUS_PUBLISHED,
-            predecessors=OuterRef("pk"),
-        )
-        return queryset.annotate(
-            has_visible_successor=Exists(published_successors)
-        ).filter(has_visible_successor=False)
+        return exclude_published_predecessors(queryset)
 
     def get_serializer_class(self):
         """Use detailed serializer for retrieve so the UI receives ownership and status fields.
