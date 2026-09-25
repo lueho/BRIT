@@ -3,7 +3,10 @@ from django_filters import CharFilter, FilterSet, ModelChoiceFilter
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
-from utils.filters import UserCreatedObjectScopedFilterSet
+from utils.filters import (
+    FreeTextSearchFilterMixin,
+    UserCreatedObjectScopedFilterSet,
+)
 from utils.object_management.permissions import (
     apply_scope_filter,
     filter_queryset_for_user,
@@ -80,15 +83,36 @@ class SourceModelFilterSet(FilterSet):
         fields = ("authors", "title", "type", "year")
 
 
-class SourceFilter(UserCreatedObjectScopedFilterSet):
+class SourceFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
+    search_placeholder = "Search by title, author, journal, DOI, ..."
+    search_fields = (
+        "title",
+        "citation_key",
+        "journal",
+        "publisher",
+        "doi",
+        "url",
+        "authors__last_names",
+        "authors__first_names",
+        "authors__organization_name",
+    )
+
+    q = CharFilter(
+        method="filter_q",
+        label="Search",
+        help_text="Search titles, citation keys, authors, journals, DOIs, or URLs.",
+    )
+
     title = ModelChoiceFilter(
-        queryset=Source.objects.all(),
+        queryset=Source.objects.none(),
         label="Title",
         method="filter_by_source",
+        help_text="Select a specific source.",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="source-autocomplete",
                 label_field="text",
+                filter_by=("scope", "name"),
             ),
         ),
     )
@@ -99,26 +123,40 @@ class SourceFilter(UserCreatedObjectScopedFilterSet):
         return queryset
 
     author = ModelChoiceFilter(
-        queryset=Author.objects.all(),
+        queryset=Author.objects.none(),
         field_name="authors",
         label="Author",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="author-autocomplete",
                 label_field="label",
+                filter_by=("scope", "name"),
             ),
         ),
     )
     licence = ModelChoiceFilter(
-        queryset=Licence.objects.all(),
+        queryset=Licence.objects.none(),
         label="Licence",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="licence-autocomplete",
+                filter_by=("scope", "name"),
             ),
         ),
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.filters["title"].queryset = self.scoped_choice_queryset(
+            Source.objects.all()
+        )
+        self.filters["author"].queryset = self.scoped_choice_queryset(
+            Author.objects.all()
+        )
+        self.filters["licence"].queryset = self.scoped_choice_queryset(
+            Licence.objects.all()
+        )
+
     class Meta:
         model = Source
-        fields = ("scope", "title", "author", "type", "year", "licence")
+        fields = ("q", "scope", "title", "author", "type", "year", "licence")
