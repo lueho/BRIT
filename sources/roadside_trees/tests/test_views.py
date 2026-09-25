@@ -113,6 +113,42 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(len(data["features"]), 1)
         self.assertEqual(data["features"][0]["id"], other_tree.pk)
 
+    def test_geojson_with_range_filters_returns_200(self):
+        # Range filters add .distinct() to the queryset; the dataset version
+        # aggregate must still resolve table-level xmin in that case.
+        self.tree.gattung_deutsch = "Linde"
+        self.tree.save()
+        response = self.client.get(
+            reverse("api-hamburg-roadside-trees-geojson"),
+            {
+                "gattung_deutsch": "Linde",
+                "plantation_year_min": "1720.00",
+                "plantation_year_max": "2021.00",
+                "plantation_year_is_null": "true",
+                "stem_circumference_min": "0.00",
+                "stem_circumference_max": "1984.00",
+                "stem_circumference_is_null": "true",
+            },
+            REMOTE_ADDR="10.9.8.6",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Total-Count"], "1")
+
+    def test_geojson_version_with_range_filters_returns_200(self):
+        response = self.client.get(
+            reverse("api-hamburg-roadside-trees-version"),
+            {
+                "plantation_year_min": "1720.00",
+                "plantation_year_max": "2021.00",
+                "plantation_year_is_null": "true",
+            },
+            REMOTE_ADDR="10.9.8.7",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("version", response.json())
+
     def test_geojson_head_preserves_bbox_metadata(self):
         outside = HamburgRoadsideTrees.objects.create(geom=Point(20, 20, srid=4326))
         url = reverse("api-hamburg-roadside-trees-geojson")
