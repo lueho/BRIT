@@ -2,7 +2,9 @@ import json
 from unittest.mock import patch
 
 from django.contrib.gis.geos import Point
+from django.db import connection
 from django.test import override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from maps.models import (
@@ -112,6 +114,57 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
         data = json.loads(response.content)
         self.assertEqual(len(data["features"]), 1)
         self.assertEqual(data["features"][0]["id"], other_tree.pk)
+
+    def test_geojson_with_range_filters_returns_200(self):
+        # Range filters add .distinct() to the queryset; the dataset version
+        # aggregate must still resolve table-level xmin in that case.
+        self.tree.gattung_deutsch = "Linde"
+        self.tree.save()
+        response = self.client.get(
+            reverse("api-hamburg-roadside-trees-geojson"),
+            {
+                "gattung_deutsch": "Linde",
+                "plantation_year_min": "1720.00",
+                "plantation_year_max": "2021.00",
+                "plantation_year_is_null": "true",
+                "stem_circumference_min": "0.00",
+                "stem_circumference_max": "1984.00",
+                "stem_circumference_is_null": "true",
+            },
+            REMOTE_ADDR="10.9.8.6",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Total-Count"], "1")
+
+    def test_geojson_version_with_range_filters_returns_200(self):
+        response = self.client.get(
+            reverse("api-hamburg-roadside-trees-version"),
+            {
+                "plantation_year_min": "1720.00",
+                "plantation_year_max": "2021.00",
+                "plantation_year_is_null": "true",
+            },
+            REMOTE_ADDR="10.9.8.7",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("version", response.json())
+
+    def test_version_xmin_aggregate_is_scoped_to_filtered_trees(self):
+        url = reverse("api-hamburg-roadside-trees-version")
+        for params in (
+            {"id": self.tree.pk},
+            {"id": self.tree.pk, "plantation_year_min": "1720.00"},
+        ):
+            with self.subTest(params=params):
+                with CaptureQueriesContext(connection) as ctx:
+                    response = self.client.get(url, params, REMOTE_ADDR="10.9.8.10")
+                self.assertEqual(response.status_code, 200)
+                xmin_queries = [q["sql"] for q in ctx if "xmin" in q["sql"]]
+                self.assertEqual(len(xmin_queries), 1)
+                self.assertIn("WHERE", xmin_queries[0])
+                self.assertIn(str(self.tree.pk), xmin_queries[0])
 
     def test_geojson_catchment_without_region_returns_200_empty(self):
         borderless = Catchment.objects.create(
