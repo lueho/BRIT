@@ -90,7 +90,17 @@ class SupportingFileDownloadTests:
             response["Content-Disposition"], f'attachment; filename="{filename}"'
         )
 
-    def assert_unavailable(self, response, status=404):
+    def assert_unavailable(self, status=404):
+        """Request the download URL and assert the friendly unavailable response.
+
+        Django logs every 5xx response via ``django.request``; capture that
+        expected log so intentional failures stay out of the test output.
+        """
+        if status >= 500:
+            with self.assertLogs("django.request", level="ERROR"):
+                response = self.client.get(self.download_url)
+        else:
+            response = self.client.get(self.download_url)
         self.assertEqual(response.status_code, status)
         self.assertFalse(response.streaming)
         self.assertTemplateUsed(response, "processes/file_unavailable.html")
@@ -182,11 +192,11 @@ class SupportingFileDownloadTests:
         setattr(self.file_object, self.field_name, "")
         self.file_object.save(update_fields=[self.field_name])
         with patch.object(self.storage, "open") as storage_open:
-            self.assert_unavailable(self.client.get(self.download_url))
+            self.assert_unavailable()
             storage_open.assert_not_called()
 
     def test_missing_storage_key_returns_friendly_404(self):
-        self.assert_unavailable(self.client.get(self.download_url))
+        self.assert_unavailable()
 
     def test_provider_missing_key_returns_friendly_404(self):
         for code in ("NoSuchKey", "NotFound", "404"):
@@ -198,7 +208,7 @@ class SupportingFileDownloadTests:
                 self.subTest(code=code),
                 patch.object(self.storage, "open", side_effect=error),
             ):
-                self.assert_unavailable(self.client.get(self.download_url))
+                self.assert_unavailable()
 
     def test_provider_http_404_returns_friendly_404(self):
         error = ClientError(
@@ -209,7 +219,7 @@ class SupportingFileDownloadTests:
             "HeadObject",
         )
         with patch.object(self.storage, "open", side_effect=error):
-            self.assert_unavailable(self.client.get(self.download_url))
+            self.assert_unavailable()
 
     def test_storage_permission_and_unavailability_errors_return_friendly_503(self):
         errors = (
@@ -238,7 +248,7 @@ class SupportingFileDownloadTests:
                 self.subTest(error=type(error).__name__),
                 patch.object(self.storage, "open", side_effect=error),
             ):
-                self.assert_unavailable(self.client.get(self.download_url), status=503)
+                self.assert_unavailable(status=503)
 
     def test_lazy_read_failures_are_handled_before_response_and_stream_is_closed(self):
         for error, status in (
@@ -263,9 +273,7 @@ class SupportingFileDownloadTests:
                 patch.object(self.storage, "open", return_value=stream),
                 patch.object(stream, "read", side_effect=error),
             ):
-                self.assert_unavailable(
-                    self.client.get(self.download_url), status=status
-                )
+                self.assert_unavailable(status=status)
                 self.assertTrue(stream.closed)
 
     def test_lazy_seek_failure_is_handled_before_response_and_stream_is_closed(self):
@@ -276,7 +284,7 @@ class SupportingFileDownloadTests:
                 stream, "seek", side_effect=OSError("secret-provider-details")
             ),
         ):
-            self.assert_unavailable(self.client.get(self.download_url), status=503)
+            self.assert_unavailable(status=503)
             self.assertTrue(stream.closed)
 
     def test_initial_probe_is_bounded_and_stream_is_rewound(self):
@@ -302,8 +310,11 @@ class SupportingFileDownloadTests:
         self.assert_download(response, filename="original report.pdf")
 
     def test_unexpected_programming_errors_are_not_hidden(self):
-        with patch.object(
-            self.storage, "open", side_effect=ValueError("programming failure")
+        with (
+            patch.object(
+                self.storage, "open", side_effect=ValueError("programming failure")
+            ),
+            self.assertLogs("django.request", level="ERROR"),
         ):
             with self.assertRaisesMessage(ValueError, "programming failure"):
                 self.client.get(self.download_url)
@@ -361,13 +372,13 @@ class ProcessInfoResourceDocumentDownloadTests(SupportingFileDownloadTests, Test
         self.resource.process = other_process
         self.resource.save(update_fields=["process"])
         with patch.object(self.storage, "open") as storage_open:
-            self.assert_unavailable(self.client.get(self.download_url))
+            self.assert_unavailable()
             storage_open.assert_not_called()
 
     def test_missing_resource_returns_friendly_404(self):
         self.resource.delete()
         with patch.object(self.storage, "open") as storage_open:
-            self.assert_unavailable(self.client.get(self.download_url))
+            self.assert_unavailable()
             storage_open.assert_not_called()
 
     def test_non_document_resource_is_not_downloaded(self):
@@ -375,7 +386,7 @@ class ProcessInfoResourceDocumentDownloadTests(SupportingFileDownloadTests, Test
         self.resource.url = "https://example.com/reference"
         self.resource.save(update_fields=["resource_type", "url"])
         with patch.object(self.storage, "open") as storage_open:
-            self.assert_unavailable(self.client.get(self.download_url))
+            self.assert_unavailable()
             storage_open.assert_not_called()
 
     def test_document_target_url_is_protected_without_storage_url_lookup(self):

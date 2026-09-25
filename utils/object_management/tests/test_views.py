@@ -796,31 +796,44 @@ class ReviewExceptionHandlingTests(TestCase):
 
     def test_submit_post_propagates_unexpected_errors(self):
         self.client.force_login(self.owner)
-        with patch.object(
-            Collection, "submit_for_review", side_effect=RuntimeError("boom")
+        with (
+            patch.object(
+                Collection, "submit_for_review", side_effect=RuntimeError("boom")
+            ),
+            self.assertLogs("django.request", level="ERROR"),
         ):
             with self.assertRaises(RuntimeError):
                 self.client.post(self._submit_url())
 
     def test_submit_post_survives_audit_log_db_failure(self):
         self.client.force_login(self.owner)
-        with patch("utils.object_management.views.ReviewAction") as review_action:
+        with (
+            patch("utils.object_management.views.ReviewAction") as review_action,
+            self.assertLogs("utils.object_management.views", level="WARNING") as logs,
+        ):
             review_action.objects.create.side_effect = DatabaseError("boom")
             response = self.client.post(self._submit_url())
         self.assertEqual(response.status_code, 302)
+        self.assertIn("Failed to create ReviewAction", "\n".join(logs.output))
 
     def test_submit_post_propagates_unexpected_audit_log_errors(self):
         self.client.force_login(self.owner)
-        with patch("utils.object_management.views.ReviewAction") as review_action:
+        with (
+            patch("utils.object_management.views.ReviewAction") as review_action,
+            self.assertLogs("django.request", level="ERROR"),
+        ):
             review_action.objects.create.side_effect = RuntimeError("boom")
             with self.assertRaises(RuntimeError):
                 self.client.post(self._submit_url())
 
     def test_submit_post_propagates_unexpected_message_errors(self):
         self.client.force_login(self.owner)
-        with patch(
-            "utils.object_management.views.messages.success",
-            side_effect=RuntimeError("boom"),
+        with (
+            patch(
+                "utils.object_management.views.messages.success",
+                side_effect=RuntimeError("boom"),
+            ),
+            self.assertLogs("django.request", level="ERROR"),
         ):
             with self.assertRaises(RuntimeError):
                 self.client.post(self._submit_url())
@@ -829,8 +842,11 @@ class ReviewExceptionHandlingTests(TestCase):
 
     def test_submit_post_propagates_unexpected_cascade_errors(self):
         self.client.force_login(self.owner)
-        with patch.object(
-            Collection, "cascade_review_action", side_effect=RuntimeError("boom")
+        with (
+            patch.object(
+                Collection, "cascade_review_action", side_effect=RuntimeError("boom")
+            ),
+            self.assertLogs("django.request", level="ERROR"),
         ):
             with self.assertRaises(RuntimeError):
                 self.client.post(self._submit_url())
@@ -858,8 +874,11 @@ class ReviewExceptionHandlingTests(TestCase):
                 "object_id": self.review_source.id,
             },
         )
-        with patch.object(
-            Source, "affected_author_count", side_effect=RuntimeError("boom")
+        with (
+            patch.object(
+                Source, "affected_author_count", side_effect=RuntimeError("boom")
+            ),
+            self.assertLogs("django.request", level="ERROR"),
         ):
             with self.assertRaises(RuntimeError):
                 self.client.get(url)
@@ -884,7 +903,10 @@ class ReviewExceptionHandlingTests(TestCase):
 
     def test_review_detail_propagates_unexpected_action_log_errors(self):
         self.client.force_login(self.owner)
-        with patch("utils.object_management.views.ReviewAction") as review_action:
+        with (
+            patch("utils.object_management.views.ReviewAction") as review_action,
+            self.assertLogs("django.request", level="ERROR"),
+        ):
             review_action.objects.filter.side_effect = RuntimeError("boom")
             with self.assertRaises(RuntimeError):
                 self.client.get(self._review_detail_url())
