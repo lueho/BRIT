@@ -121,7 +121,10 @@ class HamburgRoadsideTreesFilterSet(BaseCrispyFilterSet):
 
     @staticmethod
     def catchment_filter(qs, __, value):
-        return qs.filter(geom__within=value.region.borders.geom)
+        geom = value.geom
+        if geom is None:
+            return qs.none()
+        return qs.filter(geom__within=geom)
 
     @staticmethod
     def filter_genus(qs, _, value):
