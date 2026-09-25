@@ -774,6 +774,72 @@ class SourceAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(len(returned_ids), len(set(returned_ids)))
         self.assertIn(target_source.pk, returned_ids)
 
+    def test_scope_filter_published_excludes_private_sources_for_staff(self):
+        """The source filter widgets send ``f=scope__name=<scope>``. Under the
+        published scope, private sources must not be suggested — even to staff,
+        who otherwise bypass object visibility checks."""
+        private_source = Source.objects.create(
+            owner=self.outsider,
+            title="Hidden Draft Title",
+            publication_status="private",
+        )
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse("source-autocomplete"),
+            {"q": "Hidden Draft", "f": "scope__name=published"},
+        )
+        self.assertEqual(response.status_code, 200)
+        returned_ids = [r["id"] for r in response.json()["results"]]
+        self.assertNotIn(private_source.pk, returned_ids)
+
+    def test_scope_filter_private_returns_only_own_sources(self):
+        own_source = Source.objects.create(
+            owner=self.member,
+            title="Own Draft Note",
+            publication_status="private",
+        )
+        foreign_source = Source.objects.create(
+            owner=self.outsider,
+            title="Foreign Draft Note",
+            publication_status="private",
+        )
+        published_source = Source.objects.create(
+            owner=self.outsider,
+            title="Draft Published Elsewhere",
+            publication_status="published",
+        )
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("source-autocomplete"),
+            {"q": "Draft", "f": "scope__name=private"},
+        )
+        self.assertEqual(response.status_code, 200)
+        returned_ids = [r["id"] for r in response.json()["results"]]
+        self.assertIn(own_source.pk, returned_ids)
+        self.assertNotIn(foreign_source.pk, returned_ids)
+        self.assertNotIn(published_source.pk, returned_ids)
+
+    def test_scope_filter_review_hides_other_users_review_items(self):
+        own_review = Source.objects.create(
+            owner=self.member,
+            title="Review Item Mine",
+            publication_status="review",
+        )
+        foreign_review = Source.objects.create(
+            owner=self.outsider,
+            title="Review Item Theirs",
+            publication_status="review",
+        )
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("source-autocomplete"),
+            {"q": "Review Item", "f": "scope__name=review"},
+        )
+        self.assertEqual(response.status_code, 200)
+        returned_ids = [r["id"] for r in response.json()["results"]]
+        self.assertIn(own_review.pk, returned_ids)
+        self.assertNotIn(foreign_review.pk, returned_ids)
+
 
 class SourceListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ["change_source"]
