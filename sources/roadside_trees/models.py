@@ -1,8 +1,6 @@
 from django.contrib.gis.db.models import PointField
 from django.db import models
 
-from sources.urban_green_spaces.models import HamburgGreenAreas
-
 
 class HamburgRoadsideTrees(models.Model):
     geom = PointField(blank=True, null=True)
@@ -41,4 +39,4 @@ class HamburgRoadsideTrees(models.Model):
         ]
 
 
-__all__ = ["HamburgGreenAreas", "HamburgRoadsideTrees"]
+__all__ = ["HamburgRoadsideTrees"]
