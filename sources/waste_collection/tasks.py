@@ -17,6 +17,7 @@ from sources.waste_collection.geojson import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
     Collection,
     WasteCollectionGeometrySerializer,
+    exclude_published_predecessors,
 )
 from sources.waste_collection.models import WasteFlyer
 
@@ -26,7 +27,9 @@ logger = logging.getLogger(__name__)
 @app.task(bind=True, name="warm_collection_geojson_cache")
 def warm_collection_geojson_cache(self):
     qs = (
-        Collection.objects.filter(publication_status="published")
+        exclude_published_predecessors(
+            Collection.objects.filter(publication_status="published")
+        )
         .select_related(
             "catchment",
             "catchment__region",
