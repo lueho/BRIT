@@ -261,6 +261,20 @@ class CachedGeoJSONMixin:
         base = f"{cnt}:{self._version_timestamp(agg)}:{min_id}:{max_id}"
         return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
 
+    @staticmethod
+    def _xmin_queryset(queryset):
+        """Filtered queryset on which the ``xmin`` system column resolves.
+
+        ``xmin`` only exists on the base table. A distinct queryset is wrapped
+        in a subquery by ``aggregate()``, so its rows are re-selected from the
+        base table by primary key instead.
+        """
+        if not queryset.query.distinct:
+            return queryset
+        return queryset.model._default_manager.filter(
+            pk__in=queryset.order_by().values("pk")
+        )
+
     def get_dataset_stats(self, request):
         """Return ``{"count": int, "version": str}`` from aggregate queries.
 
@@ -281,10 +295,7 @@ class CachedGeoJSONMixin:
             agg = queryset.aggregate(
                 cnt=Count("pk"), min_id=Min("pk"), max_id=Max("pk")
             )
-            # xmin is a system column of the base table; it must be aggregated
-            # unfiltered because filtered querysets may be wrapped in a
-            # subquery (e.g. by .distinct()) where the name does not resolve.
-            agg["max_xmin"] = model._default_manager.aggregate(
+            agg["max_xmin"] = self._xmin_queryset(queryset).aggregate(
                 max_xmin=Max(
                     RawSQL("xmin::text::bigint", [], output_field=BigIntegerField())
                 )

@@ -2,7 +2,9 @@ import json
 from unittest.mock import patch
 
 from django.contrib.gis.geos import Point
+from django.db import connection
 from django.test import override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from maps.models import (
@@ -148,6 +150,21 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("version", response.json())
+
+    def test_version_xmin_aggregate_is_scoped_to_filtered_trees(self):
+        url = reverse("api-hamburg-roadside-trees-version")
+        for params in (
+            {"id": self.tree.pk},
+            {"id": self.tree.pk, "plantation_year_min": "1720.00"},
+        ):
+            with self.subTest(params=params):
+                with CaptureQueriesContext(connection) as ctx:
+                    response = self.client.get(url, params, REMOTE_ADDR="10.9.8.10")
+                self.assertEqual(response.status_code, 200)
+                xmin_queries = [q["sql"] for q in ctx if "xmin" in q["sql"]]
+                self.assertEqual(len(xmin_queries), 1)
+                self.assertIn("WHERE", xmin_queries[0])
+                self.assertIn(str(self.tree.pk), xmin_queries[0])
 
     def test_geojson_catchment_without_region_returns_200_empty(self):
         borderless = Catchment.objects.create(
