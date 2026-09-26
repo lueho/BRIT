@@ -81,9 +81,6 @@ SECURE_CSP_REPORT_ONLY = {
     "style-src": [
         CSP.SELF,
         AWS_S3_ORIGIN,
-        "https://cdn.jsdelivr.net",
-        "https://cdnjs.cloudflare.com",
-        "https://fonts.googleapis.com",
     ],
     "script-src": [
         CSP.SELF,
@@ -103,8 +100,6 @@ SECURE_CSP_REPORT_ONLY = {
     "font-src": [
         CSP.SELF,
         AWS_S3_ORIGIN,
-        "https://cdnjs.cloudflare.com",
-        "https://fonts.gstatic.com",
     ],
     "img-src": [CSP.SELF, AWS_S3_ORIGIN, "data:"],
     "base-uri": [CSP.SELF],

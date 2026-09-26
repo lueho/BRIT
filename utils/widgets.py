@@ -58,13 +58,9 @@ class RangeSliderWidget(SuffixedMultiWidget):
     default_include_null = True
 
     class Media:
-        css = {
-            "all": (
-                "https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.8.1/nouislider.min.css",
-            )
-        }
+        css = {"all": ("lib/nouislider/nouislider.min.css",)}
         js = (
-            "https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.8.1/nouislider.min.js",
+            "lib/nouislider/nouislider.min.js",
             "js/range_slider.min.js",
         )
 
@@ -187,13 +183,9 @@ class NullableRangeSliderWidget(RangeSliderWidget):
     suffixes = ["min", "max", "is_null"]
 
     class Media:
-        css = {
-            "all": (
-                "https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.8.1/nouislider.min.css",
-            )
-        }
+        css = {"all": ("lib/nouislider/nouislider.min.css",)}
         js = (
-            "https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.8.1/nouislider.min.js",
+            "lib/nouislider/nouislider.min.js",
             "js/range_slider.min.js",
             "js/nullable_range_slider.min.js",
         )
