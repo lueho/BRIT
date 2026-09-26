@@ -505,7 +505,8 @@
                               </td>
                               <td>
                                 <a href="{% url 'materialcomponent-detail-modal' share.component %}"
-                                   class="modal-link">{{ share.component_name }}</a>
+                                   class="modal-link">{{ share.component_name }}</a>{% if share.inferred %}<sup class="text-muted ms-1"
+                                    title="Inferred: measured in another analytical group of this sample">*</sup>{% endif %}
                               </td>
                               <td class="sdv2-num sdv2-share">{{ share.as_percentage }}</td>
                             </tr>

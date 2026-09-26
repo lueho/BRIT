@@ -95,6 +95,19 @@ class BaseMaterial(NamedUserCreatedObject):
             "Canonical component this raw term should be compared as. Only used for components."
         ),
     )
+    complement_component = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        related_name="complements",
+        null=True,
+        blank=True,
+        limit_choices_to={"type": "component"},
+        help_text=(
+            "Component that makes up the remainder to 100% on this component's "
+            "basis (e.g. Organic Matter complements Total Ash on Dry Matter). "
+            "Only used for components."
+        ),
+    )
     is_aggregate = models.BooleanField(
         default=False,
         help_text=(
