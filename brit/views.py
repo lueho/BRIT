@@ -1,7 +1,8 @@
 import time
+from pathlib import Path
 
 from django.core.cache import cache
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.clickjacking import xframe_options_exempt
@@ -23,6 +24,21 @@ class AboutView(BreadcrumbContextMixin, TemplateView):
 class LearningView(BreadcrumbContextMixin, TemplateView):
     template_name = "learning.html"
     breadcrumb_page_title = "Learning"
+
+
+class RAnalysisView(BreadcrumbContextMixin, TemplateView):
+    template_name = "r_analysis.html"
+    breadcrumb_page_title = "R Analysis"
+
+
+def download_r_analysis_client(request):
+    client = Path(__file__).resolve().parent / "static/rscripts/BRIT_Datenanalyse.R"
+    return FileResponse(
+        client.open("rb"),
+        as_attachment=True,
+        filename="BRIT_Datenanalyse.R",
+        content_type="text/plain; charset=utf-8",
+    )
 
 
 class PrivacyPolicyView(BreadcrumbContextMixin, TemplateView):

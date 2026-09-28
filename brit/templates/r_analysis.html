@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block meta %}
+  <meta name="description"
+        content="Download the BRIT-EU R client and analysis code, with instructions for live BRIT data and historical case studies.">
+{% endblock meta %}
+
+{% block content %}
+  <div class="row mb-4">
+    <div class="col-12 col-xl-9">
+      <h1 class="h2">Analyze BRIT data in R</h1>
+      <p class="lead mb-0">
+        Download a ready-to-run R file for current waste collection data, or the BRIT-EU
+        code archive for the project's historical case studies.
+      </p>
+    </div>
+  </div>
+
+  <div class="row row-cols-1 row-cols-lg-2 g-4 mb-4">
+    <div class="col">
+      <section class="card shadow h-100" aria-labelledby="live-r-heading">
+        <div class="card-header bg-body-tertiary py-3">
+          <h2 class="h5 mb-0" id="live-r-heading">Current BRIT data</h2>
+        </div>
+        <div class="card-body d-flex flex-column">
+          <p>
+            The single R file signs in to BRIT, downloads the collections visible to your
+            account through the extended API, and saves CSV, RDS and provenance files.
+            Its example summary can be changed for your own analysis.
+          </p>
+          <p class="mb-3">
+            You need R 4.3.3 or newer, internet access and a BRIT account with staff
+            rights or membership in the <code>analysis_api</code> group. Ask
+            <a href="mailto:info@bioresource-tools.net">the BRIT team</a> for access
+            if your account does not have it.
+          </p>
+          <a class="btn btn-primary mt-auto align-self-start"
+             href="{% url 'r-analysis-client-download' %}"
+             download="BRIT_Datenanalyse.R">
+            <i class="fas fa-download me-2" aria-hidden="true"></i>Download BRIT_Datenanalyse.R
+          </a>
+        </div>
+      </section>
+    </div>
+    <div class="col">
+      <section class="card shadow h-100" aria-labelledby="historical-r-heading">
+        <div class="card-header bg-body-tertiary py-3">
+          <h2 class="h5 mb-0" id="historical-r-heading">BRIT-EU case studies</h2>
+        </div>
+        <div class="card-body d-flex flex-column">
+          <p>
+            The archive contains the original case-study R scripts, the fixed package
+            dependency list, a data manifest and detailed instructions. You can inspect
+            and adapt the analyses locally.
+          </p>
+          <p class="mb-3">
+            This public archive contains <strong>code only</strong>. The historical input data
+            are not included while their release and licensing are being resolved.
+            The historical results cannot yet be reproduced from this download alone.
+          </p>
+          <a class="btn btn-outline-primary mt-auto align-self-start"
+             href="https://flexibi-dst.s3.amazonaws.com/media/rscripts/brit_eu.zip">
+            <i class="fas fa-download me-2" aria-hidden="true"></i>Download BRIT-EU R code (ZIP)
+          </a>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-7">
+      <section class="card shadow h-100" aria-labelledby="live-steps-heading">
+        <div class="card-header bg-body-tertiary py-3">
+          <h2 class="h5 mb-0" id="live-steps-heading">Run the live-data file</h2>
+        </div>
+        <div class="card-body">
+          <ol class="mb-3">
+            <li>Save <code>BRIT_Datenanalyse.R</code> to a folder on your computer.</li>
+            <li>Open it in RStudio and select <strong>Source</strong>, or run <code>Rscript BRIT_Datenanalyse.R</code> in that folder.</li>
+            <li>Enter your BRIT username and password when prompted. The password is not saved in the script or results.</li>
+            <li>Find the CSV, RDS and provenance files in the new <code>BRIT_Ergebnisse</code> folder.</li>
+          </ol>
+          <p class="mb-0">
+            The first run installs four required R packages in your user library. To change
+            the dataset, edit <code>FILTER</code> near the top of the file; to change the
+            analysis, edit the example at the end. The default
+            <code>scope = "all"</code> includes every collection visible to your account,
+            possibly including private records. Treat exported data according to your access rights.
+          </p>
+        </div>
+      </section>
+    </div>
+    <div class="col-12 col-xl-5">
+      <section class="card shadow h-100" aria-labelledby="historical-steps-heading">
+        <div class="card-header bg-body-tertiary py-3">
+          <h2 class="h5 mb-0" id="historical-steps-heading">Use the historical code</h2>
+        </div>
+        <div class="card-body">
+          <p>
+            Extract the ZIP and read <code>brit_eu/README.md</code>. Once the separately
+            released input files are available, place them as documented in the manifest.
+            In the <code>brit_eu</code> folder, run:
+          </p>
+          <pre class="bg-body-tertiary border rounded p-3"><code>Rscript --vanilla setup.R
+Rscript run.R</code></pre>
+          <p class="mb-0">
+            The locked package versions support R 4.3.3. These fixed inputs are distinct
+            from the changing BRIT API. Downloading live collections does not recreate
+            the project's historical fact sheets.
+          </p>
+        </div>
+      </section>
+    </div>
+  </div>
+{% endblock content %}

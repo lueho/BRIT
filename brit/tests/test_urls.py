@@ -1,3 +1,4 @@
+from django.contrib.staticfiles import finders
 from django.test import SimpleTestCase, TestCase
 from django.urls import Resolver404, resolve
 
@@ -38,6 +39,35 @@ class RobotsTxtTests(SimpleTestCase):
         ):
             with self.subTest(path=path):
                 self.assertIn(f"Disallow: {path}", content)
+
+
+class RAnalysisPageTests(TestCase):
+    def test_public_page_links_downloads_and_explains_access(self):
+        response = self.client.get("/r-analysis/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "/r-analysis/BRIT_Datenanalyse.R")
+        self.assertContains(
+            response, "https://flexibi-dst.s3.amazonaws.com/media/rscripts/brit_eu.zip"
+        )
+        self.assertContains(response, "analysis_api")
+        self.assertContains(response, "historical input data")
+
+    def test_standalone_r_client_is_available_as_static_file(self):
+        self.assertIsNotNone(finders.find("rscripts/BRIT_Datenanalyse.R"))
+
+    def test_standalone_r_client_downloads_as_file(self):
+        response = self.client.get("/r-analysis/BRIT_Datenanalyse.R")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("attachment", response["Content-Disposition"])
+        self.assertIn("BRIT_Datenanalyse.R", response["Content-Disposition"])
+        self.assertIn(b"BRIT_URL", b"".join(response.streaming_content))
+
+    def test_sidebar_links_to_page(self):
+        response = self.client.get("/r-analysis/")
+
+        self.assertContains(response, 'href="/r-analysis/"')
 
 
 class DynamicRedirectRoutingTests(TestCase):
