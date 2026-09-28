@@ -5212,6 +5212,98 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         self.assertNotIn(self.private_catchment.id, ids)
         self.assertNotIn(self.review_catchment.id, ids)
 
+    def test_explicit_published_scope_is_public_even_for_staff(self):
+        staff = User.objects.create_user("scope_staff", is_staff=True)
+        self.client.force_login(staff)
+        for key in ("collection_system", "catchment_geojson", "collection_orga_level"):
+            ids = self._catchment_ids(self._get(key, scope="published"))
+            self.assertIn(self.published_catchment.id, ids, key)
+            self.assertNotIn(self.private_catchment.id, ids, key)
+            self.assertNotIn(self.review_catchment.id, ids, key)
+
+    def test_mine_scope_only_shows_own_collections(self):
+        other = User.objects.create_user("other_scope_user")
+        other_collection = Collection.objects.create(
+            name="Other private collection",
+            owner=other,
+            catchment=CollectionCatchment.objects.create(
+                name="Other catchment",
+                region=self._region_with_borders("Other region"),
+            ),
+            waste_category=self.bio_category,
+            collection_system=self.d2d,
+            valid_from=date(2024, 1, 1),
+            publication_status="private",
+        )
+        self.client.force_login(self.user)
+        for key in ("collection_system", "catchment_geojson", "collection_orga_level"):
+            ids = self._catchment_ids(self._get(key, scope="mine"))
+            self.assertIn(self.published_catchment.id, ids, key)
+            self.assertIn(self.private_catchment.id, ids, key)
+            self.assertIn(self.review_catchment.id, ids, key)
+            self.assertNotIn(other_collection.catchment_id, ids, key)
+
+        other_collection.publication_status = "published"
+        other_collection.save(update_fields=["publication_status"])
+        ids = self._catchment_ids(self._get("collection_system", scope="mine"))
+        self.assertNotIn(other_collection.catchment_id, ids)
+
+    def test_review_scope_requires_moderation_permission(self):
+        self.client.force_login(self.user)
+        for key in ("collection_system", "catchment_geojson"):
+            ids = self._catchment_ids(self._get(key, scope="review"))
+            self.assertNotIn(self.review_catchment.id, ids, key)
+
+        moderator = User.objects.create_user("scope_moderator")
+        moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
+        )
+        self.client.force_login(moderator)
+        for key in ("collection_system", "catchment_geojson"):
+            ids = self._catchment_ids(self._get(key, scope="review"))
+            self.assertIn(self.review_catchment.id, ids, key)
+            self.assertNotIn(self.private_catchment.id, ids, key)
+            self.assertNotIn(self.published_catchment.id, ids, key)
+
+    def test_all_scope_is_staff_only(self):
+        declined = Collection.objects.create(
+            name="Declined collection",
+            owner=self.user,
+            catchment=CollectionCatchment.objects.create(
+                name="Declined catchment",
+                region=self._region_with_borders("Declined region"),
+            ),
+            waste_category=self.bio_category,
+            collection_system=self.d2d,
+            valid_from=date(2024, 1, 1),
+            publication_status="declined",
+        )
+        self.client.force_login(self.user)
+        for key in ("collection_system", "catchment_geojson"):
+            ids = self._catchment_ids(self._get(key, scope="all"))
+            self.assertNotIn(self.private_catchment.id, ids, key)
+            self.assertNotIn(declined.catchment_id, ids, key)
+        self.assertIn(
+            declined.catchment_id,
+            self._catchment_ids(self._get("collection_system", scope="mine")),
+        )
+        staff = User.objects.create_user("scope_all_staff", is_staff=True)
+        self.client.force_login(staff)
+        ids = self._catchment_ids(self._get("collection_system", scope="all"))
+        self.assertIn(self.private_catchment.id, ids)
+        self.assertIn(self.review_catchment.id, ids)
+        self.assertIn(declined.catchment_id, ids)
+
+    def test_mine_scope_does_not_leak_to_anonymous_or_invalid_scope(self):
+        for scope in ("mine", "review", "all", "unexpected"):
+            for key in ("collection_system", "catchment_geojson"):
+                ids = self._catchment_ids(self._get(key, scope=scope))
+                self.assertNotIn(self.private_catchment.id, ids, (scope, key))
+                self.assertNotIn(self.review_catchment.id, ids, (scope, key))
+
     # --- Historical-year archived visibility ---
 
     HISTORICAL_ENDPOINTS = (

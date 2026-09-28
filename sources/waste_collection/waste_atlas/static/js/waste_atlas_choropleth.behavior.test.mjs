@@ -316,6 +316,12 @@ test("selector scope uses the option ISO country and clears a missing NUTS level
   assert.equal("nutsLevel" in config, false);
   assert.match(selection.queryString(2024, null, region), /country=DE/);
   assert.doesNotMatch(selection.queryString(2024, null, region), /germany-schleswig/);
+  assert.equal(new URLSearchParams(selection.queryString(2024, null, region, 'mine')).get('scope'), 'mine');
+  assert.equal(new URLSearchParams(selection.queryString(2024, 2023, region, 'review')).get('scope'), 'review');
+  assert.equal(
+    new URL(atlas.selectorNavigationTarget('/change/', 2024, 2023, region, 'all'), 'https://example.org').searchParams.get('scope'),
+    'all',
+  );
 });
 
 test("collection activation opens the detail URL behind the displayed feature", () => {

@@ -4591,6 +4591,46 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertIsNotNone(match, "no atlas-config JSON found in response")
         return json.loads(match.group(1))
 
+    def test_scope_controls_and_map_config_follow_permissions(self):
+        url = reverse("waste-atlas-germany-collection-system-map")
+        response = self.client.get(url, {"scope": "mine"})
+        self.assertContains(response, 'id="sel-scope"')
+        self.assertContains(response, 'value="mine" selected')
+        self.assertNotContains(response, 'value="all"')
+        self.assertNotContains(response, 'value="review"')
+        self.assertEqual(self._map_config(response)["scope"], "mine")
+
+        response = self.client.get(url, {"scope": "all"})
+        self.assertEqual(self._map_config(response)["scope"], "published")
+
+        moderator = User.objects.create_user("atlas-moderator")
+        moderator.groups.add(Group.objects.get(name="waste_atlas"))
+        moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
+        )
+        self.client.force_login(moderator)
+        response = self.client.get(url, {"scope": "review"})
+        self.assertContains(response, 'value="review" selected')
+        self.assertNotContains(response, 'value="all"')
+        self.assertEqual(self._map_config(response)["scope"], "review")
+
+        staff = User.objects.create_user("atlas-staff", is_staff=True)
+        staff.groups.add(Group.objects.get(name="waste_atlas"))
+        self.client.force_login(staff)
+        response = self.client.get(url, {"scope": "all"})
+        self.assertContains(response, 'value="all" selected')
+        self.assertEqual(self._map_config(response)["scope"], "all")
+
+    def test_change_map_scope_is_preserved_in_config_and_toggle(self):
+        url = reverse("waste-atlas-change-map", args=["DE", "collection_system"])
+        response = self.client.get(url, {"scope": "mine"})
+        self.assertEqual(self._map_config(response)["scope"], "mine")
+        self.assertContains(response, 'id="sel-scope"')
+        self.assertIn("scope=mine", response.context["map_toggle_url"])
+
     # ---- registry / structural --------------------------------------------
 
     def test_every_map_page_route_resolves(self):

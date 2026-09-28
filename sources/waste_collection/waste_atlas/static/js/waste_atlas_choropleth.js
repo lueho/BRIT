@@ -256,7 +256,8 @@ var WasteAtlasChoropleth = (function () {
     var params = [
       'theme=' + encodeURIComponent(cfg.conflictTheme),
       'country=' + encodeURIComponent(country || cfg.country || 'DE'),
-      'year=' + encodeURIComponent(year || cfg.year)
+      'year=' + encodeURIComponent(year || cfg.year),
+      'scope=' + encodeURIComponent(cfg.scope || 'published')
     ];
     if (cfg.nutsPrefix) {
       params.push('nuts_prefix=' + encodeURIComponent(cfg.nutsPrefix));
@@ -467,6 +468,7 @@ var WasteAtlasChoropleth = (function () {
 
   function _fetchAll(cfg) {
     var base = '/waste_collection/api/waste-atlas/';
+    var scopeSuffix = '&scope=' + encodeURIComponent(cfg.scope || 'published');
     var nutsSuffix = cfg.nutsPrefix ? '&nuts_prefix=' + encodeURIComponent(cfg.nutsPrefix) : '';
     var collectionYear = cfg.collectionYear || cfg.year;
     var collectionYearSuffix = cfg.collectionYear ? '&collection_year=' + encodeURIComponent(cfg.collectionYear) : '';
@@ -476,18 +478,18 @@ var WasteAtlasChoropleth = (function () {
       : '';
     var catchUrl = cfg.changeMode
       ? _changeCatchmentUrl(catchmentDataUrl) + '?country=' + cfg.country
-      + '&from_year=' + cfg.fromYear + '&to_year=' + cfg.year + nutsSuffix
+      + '&from_year=' + cfg.fromYear + '&to_year=' + cfg.year + nutsSuffix + scopeSuffix
       : catchmentDataUrl + '?country=' + cfg.country + '&year=' + collectionYear
-      + nutsSuffix + collectionDetailSuffix;
+      + nutsSuffix + collectionDetailSuffix + scopeSuffix;
     var nuts0Url = '/maps/api/nuts_region/geojson/?levl_code=0&cntr_code=' + cfg.country;
     var nutsLevel = cfg.nutsLevel || 1;
     var nutsRegionUrl = '/maps/api/nuts_region/geojson/?levl_code=' + nutsLevel + '&cntr_code=' + cfg.country;
-    var dataUrl = cfg.dataUrl + '?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix + collectionYearSuffix;
+    var dataUrl = cfg.dataUrl + '?country=' + cfg.country + '&year=' + cfg.year + nutsSuffix + collectionYearSuffix + scopeSuffix;
     var outlineUrl = cfg.outlineGeoJsonUrl
-      ? cfg.outlineGeoJsonUrl + '?country=' + cfg.country + '&year=' + collectionYear + nutsSuffix
+      ? cfg.outlineGeoJsonUrl + '?country=' + cfg.country + '&year=' + collectionYear + nutsSuffix + scopeSuffix
       : null;
     var fromDataUrl = cfg.changeMode
-      ? cfg.dataUrl + '?country=' + cfg.country + '&year=' + cfg.fromYear + nutsSuffix
+      ? cfg.dataUrl + '?country=' + cfg.country + '&year=' + cfg.fromYear + nutsSuffix + scopeSuffix
       : null;
     var requests = [
       _fetchJSON(catchUrl),
@@ -786,12 +788,12 @@ var WasteAtlasChoropleth = (function () {
     return window.location.pathname.replace(/\/$/, '') === path.replace(/\/$/, '');
   }
 
-  function _selectorNavigationTarget(url, year, fromYear, region) {
+  function _selectorNavigationTarget(url, year, fromYear, region, scope) {
     if (!url || _isCurrentPath(url)) return null;
-    return url + '?' + _selectorQueryString(year, fromYear, region);
+    return url + '?' + _selectorQueryString(year, fromYear, region, scope);
   }
 
-  function _selectorQueryString(year, fromYear, region) {
+  function _selectorQueryString(year, fromYear, region, scope) {
     var params = fromYear
       ? 'from_year=' + encodeURIComponent(fromYear) + '&to_year=' + encodeURIComponent(year)
       : 'year=' + encodeURIComponent(year);
@@ -801,13 +803,14 @@ var WasteAtlasChoropleth = (function () {
     if (country) params += '&country=' + encodeURIComponent(country);
     if (nutsPrefix) params += '&nuts_prefix=' + encodeURIComponent(nutsPrefix);
     if (nutsLevel) params += '&nuts_level=' + encodeURIComponent(nutsLevel);
+    if (scope) params += '&scope=' + encodeURIComponent(scope);
     return params;
   }
 
-  function _replaceSelectorUrl(url, year, fromYear, region) {
+  function _replaceSelectorUrl(url, year, fromYear, region, scope) {
     if (!window.history || !window.history.replaceState) return;
     var path = url || window.location.pathname;
-    window.history.replaceState(null, '', path + '?' + _selectorQueryString(year, fromYear, region));
+    window.history.replaceState(null, '', path + '?' + _selectorQueryString(year, fromYear, region, scope));
   }
 
   function _debounce(fn, delay) {
@@ -835,6 +838,7 @@ var WasteAtlasChoropleth = (function () {
     var themeSearchInput = document.getElementById('sel-theme-search');
     var themeSelect = document.getElementById('sel-theme');
     var yearSelect = document.getElementById('sel-year');
+    var scopeSelect = document.getElementById('sel-scope');
     var fromYearSelect = document.getElementById('sel-from-year');
     var toYearSelect = document.getElementById('sel-to-year');
     var btnLoad = document.getElementById('btn-load');
@@ -976,7 +980,7 @@ var WasteAtlasChoropleth = (function () {
       var params = options.useChangeUrls
         ? 'year=' + encodeURIComponent(year)
         : 'from_year=' + encodeURIComponent(fromYear || previousChangeYear(year)) + '&to_year=' + encodeURIComponent(year);
-      btnToggleChange.href = url + '?' + params;
+      btnToggleChange.href = url + '?' + params + '&scope=' + encodeURIComponent(scopeSelect ? scopeSelect.value : 'published');
       btnToggleChange.classList.remove('d-none');
     }
 
@@ -1017,7 +1021,7 @@ var WasteAtlasChoropleth = (function () {
       var year = selectedYear();
       var fromYear = selectedFromYear();
       var country = selectedRegion();
-      var navigationTarget = _selectorNavigationTarget(url, year, fromYear, country);
+      var navigationTarget = _selectorNavigationTarget(url, year, fromYear, country, scopeSelect && scopeSelect.value);
       if (navigationTarget && !disableNavigation) {
         window.location.href = navigationTarget;
         return;
@@ -1036,6 +1040,7 @@ var WasteAtlasChoropleth = (function () {
     if (themeSearchInput) themeSearchInput.addEventListener('input', ensureVisibleSelection);
     themeSelect.addEventListener('change', ensureVisibleSelection);
     if (yearSelect) yearSelect.addEventListener('change', autoReloadYear);
+    if (scopeSelect) scopeSelect.addEventListener('change', autoReloadYear);
     if (fromYearSelect) fromYearSelect.addEventListener('change', autoReloadYear);
     if (toYearSelect) toYearSelect.addEventListener('change', autoReloadYear);
     if (form) {
@@ -3704,7 +3709,9 @@ var WasteAtlasChoropleth = (function () {
     }
 
     function load(country, year, preserveScope, fromYear, replaceUrl, selectorUrl) {
-      if (replaceUrl) _replaceSelectorUrl(selectorUrl, year, fromYear, country);
+      var scopeSelect = document.getElementById('sel-scope');
+      var scope = scopeSelect ? scopeSelect.value : cfg.scope || 'published';
+      if (replaceUrl) _replaceSelectorUrl(selectorUrl, year, fromYear, country, scope);
       _show(loadingEl);
       if (btnSVG) btnSVG.disabled = true;
       if (btnPNG) btnPNG.disabled = true;
@@ -3712,6 +3719,7 @@ var WasteAtlasChoropleth = (function () {
       var isConfiguredMultiRegion = cfg.nutsPrefix && cfg.nutsPrefix.indexOf(',') !== -1
         && country === cfg.country;
       var loadCfg = _configForSelection(cfg, country, year, preserveScope || isConfiguredMultiRegion);
+      loadCfg.scope = scope;
       if (fromYear) loadCfg.fromYear = fromYear;
       if (loadCfg.changeMode) {
         // ACPV overlays/outlines are not meaningful for two-year diffs.

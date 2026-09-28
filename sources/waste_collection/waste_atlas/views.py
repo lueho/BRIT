@@ -21,6 +21,7 @@ from .map_selection import (
 )
 from .models import WasteAtlasMapConfiguration
 from .pages import MAP_PAGES, MAP_SET_LABELS
+from .viewsets import _effective_scope
 
 WASTE_ATLAS_GROUP_NAME = "waste_atlas"
 
@@ -235,6 +236,13 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
         selected_map_set = self.get_selected_map_set()
         ctx["country"] = self.get_country()
         ctx["year"] = self.request.GET.get("year", page["year"])
+        ctx["atlas_scope"] = _effective_scope(
+            self.request.user, self.request.GET.get("scope", "published")
+        )[0]
+        ctx["can_review_collections"] = (
+            self.request.user.is_staff
+            or self.request.user.has_perm("waste_collection.can_moderate_collection")
+        )
         ctx["nuts_prefix"] = self.get_nuts_prefix()
         ctx["nuts_level"] = self.get_nuts_level()
         ctx["map_title"] = page["title"]
@@ -290,7 +298,7 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
             selected_theme_option["change_url"] if selected_theme_option else ""
         )
         ctx["map_toggle_url"] = (
-            f"{change_url}?from_year={_previous_selection_year(ctx['year'])}&to_year={ctx['year']}"
+            f"{change_url}?{urlencode({'from_year': _previous_selection_year(ctx['year']), 'to_year': ctx['year'], 'scope': ctx['atlas_scope']})}"
             if change_url
             else ""
         )
@@ -335,7 +343,9 @@ class AtlasChangeMapView(AtlasMapView):
         ctx["map_title"] = f"{self.page['title']} — changes"
         ctx["breadcrumb_object_label"] = ctx["map_title"]
         ctx["is_change_map"] = True
-        ctx["map_toggle_url"] = reverse(self.page["name"])
+        ctx["map_toggle_url"] = (
+            f"{reverse(self.page['name'])}?{urlencode({'year': ctx['year'], 'scope': ctx['atlas_scope']})}"
+        )
         ctx["map_toggle_label"] = "View current map"
         return ctx
 
