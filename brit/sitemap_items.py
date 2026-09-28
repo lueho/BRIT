@@ -9,6 +9,7 @@ BASE_SITEMAP_ITEMS = [
     "/home/",
     "/about/",
     "/learning/",
+    "/r-analysis/",
     "/maps/list/",
     "/maps/dashboard/",
     "/maps/attributes/",

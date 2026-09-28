@@ -79,6 +79,13 @@
         </div>
         <span class="sb-nav-link-text">Learning</span>
       </a>
+      <a class="nav-link {% if '/r-analysis/' in request.path %}active{% endif %}"
+         href="{% url 'r-analysis' %}">
+        <div class="sb-nav-link-icon">
+          <i class="fas fa-chart-line"></i>
+        </div>
+        <span class="sb-nav-link-text">R Analysis</span>
+      </a>
       <a class="nav-link {% if '/about/' in request.path %}active{% endif %}"
          href="{% url 'about' %}">
         <div class="sb-nav-link-icon">
