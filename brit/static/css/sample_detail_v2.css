@@ -717,7 +717,11 @@
   color: var(--sdv2-text);
   font-size: 14.5px;
   line-height: 1.6;
-  white-space: pre-wrap;
+  white-space: normal;
+}
+
+.sdv2-about-body > p:last-child {
+  margin-bottom: 0;
 }
 
 .sdv2-about .sdv2-section-title {
