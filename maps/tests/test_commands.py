@@ -7,6 +7,8 @@ from django.core.cache import caches
 from django.core.management import call_command
 from django.test import TestCase
 
+from utils.tests.testrunner import serial_test
+
 from ..models import (
     NutsRegion,
     NutsVintage,
@@ -133,6 +135,7 @@ class WarmGeojsonCacheCommandTests(TestCase):
         )
 
 
+@serial_test
 class WarmGeojsonCacheRegionsTests(TestCase):
     def setUp(self):
         self.geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
@@ -176,6 +179,7 @@ class WarmGeojsonCacheRegionsTests(TestCase):
         )
 
 
+@serial_test
 class WarmGeojsonCacheNutsTests(TestCase):
     """Warmed NUTS entries must land where the viewset looks for them."""
 
