@@ -267,7 +267,8 @@ class CachedGeoJSONMixin:
 
         ``xmin`` only exists on the base table. A distinct queryset is wrapped
         in a subquery by ``aggregate()``, so its rows are re-selected from the
-        base table by primary key instead.
+        base table by primary key instead. All version inputs are aggregated
+        on the returned queryset in one statement, so they share a snapshot.
         """
         if not queryset.query.distinct:
             return queryset
@@ -292,14 +293,14 @@ class CachedGeoJSONMixin:
         if "lastmodified_at" in field_names:
             agg = queryset.aggregate(**self._version_aggregates())
         else:
-            agg = queryset.aggregate(
-                cnt=Count("pk"), min_id=Min("pk"), max_id=Max("pk")
-            )
-            agg["max_xmin"] = self._xmin_queryset(queryset).aggregate(
+            agg = self._xmin_queryset(queryset).aggregate(
+                cnt=Count("pk"),
+                min_id=Min("pk"),
+                max_id=Max("pk"),
                 max_xmin=Max(
                     RawSQL("xmin::text::bigint", [], output_field=BigIntegerField())
-                )
-            )["max_xmin"]
+                ),
+            )
         stats = {"count": agg.get("cnt") or 0, "version": self._version_token(agg)}
         # Memoize per request: get_cache_key() implementations that embed the
         # dataset version and the geojson() stats path share one aggregate.

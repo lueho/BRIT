@@ -263,6 +263,32 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
             [5.0, 5.0],
         )
 
+    def test_range_filtered_geojson_cache_invalidates_after_matched_tree_change(self):
+        url = reverse("api-hamburg-roadside-trees-geojson")
+        params = {
+            "plantation_year_min": "1720.00",
+            "plantation_year_max": "2021.00",
+            "plantation_year_is_null": "true",
+        }
+
+        first = self.client.get(url, params, REMOTE_ADDR="10.9.8.11")
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first["X-Total-Count"], "1")
+        cached = self.client.get(url, params, REMOTE_ADDR="10.9.8.11")
+        self.assertEqual(cached["X-Cache-Status"], "HIT")
+        self.assertEqual(cached["X-Data-Version"], first["X-Data-Version"])
+
+        self.tree.geom = Point(5, 5, srid=4326)
+        self.tree.save()
+
+        second = self.client.get(url, params, REMOTE_ADDR="10.9.8.11")
+        self.assertEqual(second["X-Cache-Status"], "MISS")
+        self.assertNotEqual(second["X-Data-Version"], first["X-Data-Version"])
+        self.assertEqual(
+            list(json.loads(second.content)["features"][0]["geometry"]["coordinates"]),
+            [5.0, 5.0],
+        )
+
     @override_settings(
         GEOJSON_CACHE="geojson",
         CACHES={
