@@ -24,6 +24,7 @@ from django.db.models import (
 from django.db.models.functions import Coalesce
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
@@ -113,25 +114,48 @@ _STAFF_VISIBLE = (
     UserCreatedObject.STATUS_REVIEW,
     UserCreatedObject.STATUS_PRIVATE,
 )
+_ALL_STATUSES = (*_STAFF_VISIBLE, UserCreatedObject.STATUS_DECLINED)
 
 
 def _is_staff(user):
-    return user is not None and hasattr(user, "is_staff") and user.is_staff
+    return user is not None and user.is_staff
+
+
+def _effective_scope(user=None, scope=None):
+    if isinstance(user, Request):
+        if scope is None:
+            scope = user.query_params.get("scope")
+        user = user.user
+    if scope == "mine" and user is not None and user.is_authenticated:
+        return "mine", user
+    if scope == "review" and (
+        _is_staff(user)
+        or (
+            user is not None
+            and user.has_perm("waste_collection.can_moderate_collection")
+        )
+    ):
+        return "review", user
+    if scope == "all" and _is_staff(user):
+        return "all", user
+    if scope is not None:
+        return "published", user
+    return ("staff" if _is_staff(user) else "published"), user
 
 
 def _visible_statuses(user=None):
-    """Publication statuses visible to *user* in the year-scoped atlas maps."""
-    return _STAFF_VISIBLE if _is_staff(user) else _PUBLIC_VISIBLE
+    scope, _user = _effective_scope(user)
+    if scope == "all" or scope == "mine":
+        return _ALL_STATUSES
+    if scope == "staff":
+        return _STAFF_VISIBLE
+    if scope == "review":
+        return (UserCreatedObject.STATUS_REVIEW,)
+    return _PUBLIC_VISIBLE
 
 
 def _collection_qs(user=None):
-    """Base Collection queryset respecting publication scoping.
-
-    Staff users additionally see review and private collections so they can
-    monitor data-collection progress.  Everyone sees published and archived
-    (previously published) collections so historical maps stay available.
-    """
-    return Collection.objects.filter(publication_status__in=_visible_statuses(user))
+    return Collection.objects.filter(_publication_q(user))
 
 
 def _publication_q(user=None, prefix=""):
@@ -140,8 +164,53 @@ def _publication_q(user=None, prefix=""):
     *prefix* is the ORM lookup prefix ending with ``__`` when non-empty,
     e.g. ``"collections__"`` for reverse-FK through catchments.
     """
-    field = f"{prefix}publication_status"
-    return Q(**{f"{field}__in": _visible_statuses(user)})
+    scope, owner = _effective_scope(user)
+    if scope == "mine":
+        return Q(**{f"{prefix}owner": owner})
+    return Q(**{f"{prefix}publication_status__in": _visible_statuses(user)})
+
+
+def _revision_q(user=None):
+    scope, owner = _effective_scope(user)
+    if scope == "mine":
+        return Q(publication_status__in=_PUBLIC_VISIBLE) | Q(owner=owner)
+    if scope == "review":
+        return Q(
+            publication_status__in=(*_PUBLIC_VISIBLE, UserCreatedObject.STATUS_REVIEW)
+        )
+    return Q(publication_status__in=_visible_statuses(user))
+
+
+def _property_value_q(user=None):
+    scope, owner = _effective_scope(user)
+    if scope == "mine":
+        return Q(collection__owner=owner) & (
+            Q(publication_status__in=_PUBLIC_VISIBLE) | Q(owner=owner)
+        )
+    if scope == "review":
+        return Q(
+            collection__publication_status__in=(
+                *_PUBLIC_VISIBLE,
+                UserCreatedObject.STATUS_REVIEW,
+            ),
+            publication_status__in=(*_PUBLIC_VISIBLE, UserCreatedObject.STATUS_REVIEW),
+        )
+    return Q(publication_status__in=_visible_statuses(user))
+
+
+def _map_property_value_q(user=None):
+    return _property_value_q(user)
+
+
+def _map_aggregated_property_value_q(user=None):
+    scope, owner = _effective_scope(user)
+    if scope == "mine":
+        return Q(publication_status__in=_PUBLIC_VISIBLE) | Q(owner=owner)
+    if scope == "review":
+        return Q(
+            publication_status__in=(*_PUBLIC_VISIBLE, UserCreatedObject.STATUS_REVIEW)
+        )
+    return Q(publication_status__in=_visible_statuses(user))
 
 
 # Material IDs for food waste classification (Karte 4)
@@ -365,10 +434,7 @@ def _with_catchment_revision(queryset, year, user=None):
     """
     revisions = (
         CatchmentRevision.objects.valid_on(_atlas_reference_date(year))
-        .filter(
-            catchment_id=OuterRef("pk"),
-            publication_status__in=_visible_statuses(user),
-        )
+        .filter(_revision_q(user), catchment_id=OuterRef("pk"))
         .order_by(F("effective_from").desc(nulls_last=True), "-pk")
     )
     return queryset.annotate(
@@ -414,10 +480,7 @@ def _revision_snapshots(catchment_ids, year, user=None):
     catchment_ids = set(catchment_ids)
     revisions = (
         CatchmentRevision.objects.valid_on(_atlas_reference_date(year))
-        .filter(
-            catchment_id__in=catchment_ids,
-            publication_status__in=_visible_statuses(user),
-        )
+        .filter(_revision_q(user), catchment_id__in=catchment_ids)
         .select_related("catchment")
         .order_by("catchment_id", F("effective_from").desc(nulls_last=True), "-pk")
     )
@@ -497,8 +560,11 @@ def _change_overlay_cache_key(from_ids, from_year, to_ids, to_year, user=None):
         )
     )
     digest = hashlib.sha1(fingerprint.encode("utf-8")).hexdigest()[:16]
-    scope = "staff" if _is_staff(user) else "public"
-    return f"waste_atlas_change_overlay:{from_year}:{to_year}:{scope}:{digest}"
+    scope, owner = _effective_scope(user)
+    identity = owner.pk if scope == "mine" else ""
+    return (
+        f"waste_atlas_change_overlay:{from_year}:{to_year}:{scope}:{identity}:{digest}"
+    )
 
 
 def _polygonal_part(geom):
@@ -816,7 +882,7 @@ def _collection_version_chains(collection_ids):
     return chains
 
 
-def _latest_connection_rate_values(collection_ids):
+def _latest_connection_rate_values(collection_ids, user=None):
     version_chains = _collection_version_chains(collection_ids)
     if not version_chains:
         return {}
@@ -826,6 +892,7 @@ def _latest_connection_rate_values(collection_ids):
         all_chain_ids.update(chain_ids)
 
     cpv_rows = CollectionPropertyValue.objects.filter(
+        _map_property_value_q(user),
         collection_id__in=all_chain_ids,
         property_id=CONNECTION_RATE_PROPERTY_ID,
         average__isnull=False,
@@ -877,13 +944,14 @@ def _latest_property_values(
         "property__name": property_name,
         "unit__name": unit_name,
         "average__isnull": False,
-        "publication_status__in": _visible_statuses(user),
     }
     if year is not None:
         filters["year"] = year
 
     values_by_collection_id = {}
-    for row in CollectionPropertyValue.objects.filter(**filters).values(
+    for row in CollectionPropertyValue.objects.filter(
+        _property_value_q(user), **filters
+    ).values(
         "id",
         "collection_id",
         "average",
@@ -957,7 +1025,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
         """Return distinct catchments matching the country/year filter."""
         country, year = _parse_country_year(self.request)
         nuts_prefixes = _parse_nuts_prefixes(self.request)
-        user = self.request.user
+        user = self.request
         qs = (
             CollectionCatchment.objects.filter(
                 _country_filter_q("", country),
@@ -993,7 +1061,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
         def catchment_ids(year):
             qs = CollectionCatchment.objects.filter(
                 _country_filter_q("", country),
-                _publication_q(request.user, prefix="collections__"),
+                _publication_q(request, prefix="collections__"),
                 collections__valid_from__year=year,
             ).distinct()
             return _apply_nuts_prefix_filter(qs, nuts_prefixes).values_list(
@@ -1017,7 +1085,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
 
         def catchment_ids(year):
             return (
-                _active_collector_scope(country, year, nuts_prefixes, user=request.user)
+                _active_collector_scope(country, year, nuts_prefixes, user=request)
                 .values_list("catchment_id", flat=True)
                 .distinct()
             )
@@ -1063,12 +1131,10 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
             return rejection_response
 
         payload, _hit = get_or_set_cache(
-            _change_overlay_cache_key(
-                from_ids, from_year, to_ids, to_year, request.user
-            ),
+            _change_overlay_cache_key(from_ids, from_year, to_ids, to_year, request),
             lambda: _build_change_geometry(
-                _revision_snapshots(from_ids, from_year, request.user),
-                _revision_snapshots(to_ids, to_year, request.user),
+                _revision_snapshots(from_ids, from_year, request),
+                _revision_snapshots(to_ids, to_year, request),
             ),
             timeout=_CHANGE_OVERLAY_CACHE_TIMEOUT,
         )
@@ -1076,7 +1142,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
 
     def _geojson_response(self, request, queryset):
         _country, year = _parse_country_year(request)
-        queryset = _with_catchment_revision(queryset, year, request.user)
+        queryset = _with_catchment_revision(queryset, year, request)
         rejection_response = get_unbounded_geojson_rejection_response(
             request,
             queryset.count(),
@@ -1121,7 +1187,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
                 year,
                 _COLLECTION_DETAIL_CATEGORIES[category],
                 nuts_prefixes,
-                user=request.user,
+                user=request,
             )
             collection_ids.extend(
                 row["collection_id"]
@@ -1131,7 +1197,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
         return queryset.prefetch_related(
             Prefetch(
                 "collections",
-                queryset=_collection_qs(request.user)
+                queryset=_collection_qs(request)
                 .filter(id__in=collection_ids)
                 .select_related("waste_category", "collection_system")
                 .order_by("waste_category__name", "id"),
@@ -1145,7 +1211,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         collector_scope = _active_collector_scope(
-            country, year, nuts_prefixes, user=request.user
+            country, year, nuts_prefixes, user=request
         )
         queryset = (
             CollectionCatchment.objects.filter(
@@ -1154,7 +1220,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
             .distinct()
             .select_related("region", "region__borders")
         )
-        queryset = _with_catchment_revision(queryset, year, request.user)
+        queryset = _with_catchment_revision(queryset, year, request)
         rejection_response = get_unbounded_geojson_rejection_response(
             request,
             queryset.count(),
@@ -1200,7 +1266,7 @@ class OrgaLevelViewSet(WasteAtlasViewSet):
         nuts_prefixes = _parse_nuts_prefixes(request)
 
         qs = (
-            _active_collector_scope(country, year, nuts_prefixes, user=request.user)
+            _active_collector_scope(country, year, nuts_prefixes, user=request)
             .distinct()
             .annotate(orga_level=_catchment_orga_level_case())
             .values("catchment_id", "orga_level")
@@ -1229,7 +1295,7 @@ class CollectionOrgaLevelViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
 
-        qs = _collection_qs(request.user).filter(
+        qs = _collection_qs(request).filter(
             _country_filter_q("catchment__", country),
             catchment__isnull=False,
             valid_from__year=year,
@@ -1280,7 +1346,7 @@ class CollectionSystemViewSet(WasteAtlasViewSet):
                 year,
                 ["Biowaste", "Food waste"],
                 nuts_prefixes,
-                user=request.user,
+                user=request,
             ).items()
         ]
         serializer = CatchmentCollectionSystemSerializer(data, many=True)
@@ -1300,7 +1366,7 @@ class BiowasteCollectionSystemViewSet(WasteAtlasViewSet):
                 year,
                 ["Biowaste", "Food waste"],
                 nuts_prefixes,
-                user=request.user,
+                user=request,
             ).items()
         ]
         serializer = CatchmentCollectionSystemSerializer(data, many=True)
@@ -1320,7 +1386,7 @@ class ResidualCollectionSystemViewSet(WasteAtlasViewSet):
                 year,
                 ["Residual waste"],
                 nuts_prefixes,
-                user=request.user,
+                user=request,
             ).items()
         ]
         serializer = CatchmentCollectionSystemSerializer(data, many=True)
@@ -1338,14 +1404,14 @@ class CombinedCollectionSystemViewSet(WasteAtlasViewSet):
             year,
             ["Biowaste", "Food waste"],
             nuts_prefixes,
-            user=request.user,
+            user=request,
         )
         residual = _select_primary_collections(
             country,
             year,
             ["Residual waste"],
             nuts_prefixes,
-            user=request.user,
+            user=request,
         )
         data = [
             {
@@ -1373,7 +1439,7 @@ class CataloniaSystemAccessControlViewSet(WasteAtlasViewSet):
             ["Biowaste", "Food waste"],
             nuts_prefixes,
             extra_fields=("access_control_bp", "access_control_pap"),
-            user=request.user,
+            user=request,
         )
         residual = _select_primary_collections(
             country,
@@ -1381,7 +1447,7 @@ class CataloniaSystemAccessControlViewSet(WasteAtlasViewSet):
             ["Residual waste"],
             nuts_prefixes,
             extra_fields=("access_control_bp", "access_control_pap"),
-            user=request.user,
+            user=request,
         )
         data = []
         for cid in set(bio) | set(residual):
@@ -1421,7 +1487,7 @@ class AccessControlViewSet(WasteAtlasViewSet):
             ["Biowaste", "Food waste"],
             nuts_prefixes,
             extra_fields=("access_control_bp", "access_control_pap"),
-            user=request.user,
+            user=request,
         )
 
         data = []
@@ -1475,7 +1541,7 @@ class BinConfigurationViewSet(WasteAtlasViewSet):
             ["Biowaste", "Food waste"],
             nuts_prefixes,
             extra_fields=("bin_configuration__name",),
-            user=request.user,
+            user=request,
         )
 
         data = []
@@ -1512,7 +1578,7 @@ class GreenWasteCollectionSystemCountViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         qs = _filter_by_waste_categories(
-            _collection_qs(request.user).filter(
+            _collection_qs(request).filter(
                 _country_filter_q("catchment__", country),
                 valid_from__year=year,
             ),
@@ -1713,7 +1779,7 @@ class ResidualFrequencyTypeViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_frequency_type(
-            country, year, ["Residual waste"], nuts_prefixes, user=request.user
+            country, year, ["Residual waste"], nuts_prefixes, user=request
         )
         serializer = CatchmentFrequencyTypeSerializer(data, many=True)
         return Response(serializer.data)
@@ -1740,7 +1806,7 @@ class CombinedFrequencyTypeViewSet(WasteAtlasViewSet):
                 year,
                 ["Biowaste", "Food waste"],
                 nuts_prefixes,
-                user=request.user,
+                user=request,
             )
         }
         res = {
@@ -1750,7 +1816,7 @@ class CombinedFrequencyTypeViewSet(WasteAtlasViewSet):
                 year,
                 ["Residual waste"],
                 nuts_prefixes,
-                user=request.user,
+                user=request,
             )
         }
         all_ids = set(bio) | set(res)
@@ -1786,7 +1852,7 @@ class BiowasteFrequencyTypeViewSet(WasteAtlasViewSet):
             year,
             ["Biowaste", "Food waste"],
             nuts_prefixes,
-            user=request.user,
+            user=request,
         )
         serializer = CatchmentFrequencyTypeSerializer(data, many=True)
         return Response(serializer.data)
@@ -1807,7 +1873,7 @@ class ResidualCollectionCountViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_collection_count(
-            country, year, ["Residual waste"], nuts_prefixes, user=request.user
+            country, year, ["Residual waste"], nuts_prefixes, user=request
         )
         serializer = CatchmentCollectionCountSerializer(data, many=True)
         return Response(serializer.data)
@@ -1835,7 +1901,7 @@ class BiowasteCollectionCountViewSet(WasteAtlasViewSet):
             ["Biowaste", "Food waste"],
             nuts_prefixes,
             include_missing_primary=True,
-            user=request.user,
+            user=request,
         )
         serializer = CatchmentCollectionCountSerializer(door_to_door, many=True)
         return Response(serializer.data)
@@ -1863,7 +1929,7 @@ class CombinedCollectionCountViewSet(WasteAtlasViewSet):
                 ["Biowaste", "Food waste"],
                 nuts_prefixes,
                 include_missing_primary=True,
-                user=request.user,
+                user=request,
             )
         }
         res = {
@@ -1873,7 +1939,7 @@ class CombinedCollectionCountViewSet(WasteAtlasViewSet):
                 year,
                 ["Residual waste"],
                 nuts_prefixes,
-                user=request.user,
+                user=request,
             )
         }
         all_ids = set(bio) | set(res)
@@ -1905,7 +1971,7 @@ class CollectionCountRatioViewSet(WasteAtlasViewSet):
                 ["Biowaste", "Food waste"],
                 nuts_prefixes,
                 include_missing_primary=True,
-                user=request.user,
+                user=request,
             )
         }
         res = {
@@ -1915,7 +1981,7 @@ class CollectionCountRatioViewSet(WasteAtlasViewSet):
                 year,
                 ["Residual waste"],
                 nuts_prefixes,
-                user=request.user,
+                user=request,
             )
         }
         all_ids = set(bio) | set(res)
@@ -1965,6 +2031,7 @@ class CollectionPointCountViewSet(WasteAtlasViewSet):
         collection_ids = [row["collection_id"] for row in best.values()]
         cpv_qs = (
             CollectionPropertyValue.objects.filter(
+                _map_property_value_q(user),
                 collection_id__in=collection_ids,
                 property__name=COLLECTION_POINT_COUNT_PROPERTY_NAME,
                 unit__name="No unit",
@@ -1988,7 +2055,7 @@ class CollectionPointCountViewSet(WasteAtlasViewSet):
     def list(self, request):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
-        data = self._get_data(country, year, nuts_prefixes, user=request.user)
+        data = self._get_data(country, year, nuts_prefixes, user=request)
         serializer = CatchmentCollectionPointCountSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -2010,13 +2077,13 @@ class CollectionPointCountRatioViewSet(WasteAtlasViewSet):
         bio = {
             r["catchment_id"]: r
             for r in BiowasteCollectionPointCountViewSet()._get_data(
-                country, year, nuts_prefixes, user=request.user
+                country, year, nuts_prefixes, user=request
             )
         }
         res = {
             r["catchment_id"]: r
             for r in ResidualCollectionPointCountViewSet()._get_data(
-                country, year, nuts_prefixes, user=request.user
+                country, year, nuts_prefixes, user=request
             )
         }
         all_ids = set(bio) | set(res)
@@ -2106,7 +2173,7 @@ class ResidualFeeSystemViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_fee_system(
-            country, year, ["Residual waste"], nuts_prefixes, user=request.user
+            country, year, ["Residual waste"], nuts_prefixes, user=request
         )
         serializer = CatchmentFeeSystemSerializer(data, many=True)
         return Response(serializer.data)
@@ -2131,7 +2198,7 @@ class BiowasteFeeSystemViewSet(WasteAtlasViewSet):
             year,
             ["Biowaste", "Food waste"],
             nuts_prefixes,
-            user=request.user,
+            user=request,
             non_door_to_door_as_collection_system=True,
         )
         serializer = CatchmentFeeSystemSerializer(data, many=True)
@@ -2159,7 +2226,7 @@ class CombinedFeeSystemViewSet(WasteAtlasViewSet):
                 year,
                 ["Biowaste", "Food waste"],
                 nuts_prefixes,
-                user=request.user,
+                user=request,
                 non_door_to_door_as_collection_system=True,
             )
         }
@@ -2170,7 +2237,7 @@ class CombinedFeeSystemViewSet(WasteAtlasViewSet):
                 year,
                 ["Residual waste"],
                 nuts_prefixes,
-                user=request.user,
+                user=request,
             )
         }
         all_ids = set(bio) | set(res)
@@ -2248,6 +2315,7 @@ def _get_collection_amount(
         col_to_cid,
         catchment_ids,
         include_metadata=True,
+        user=user,
     )
 
     # ------------------------------------------------------------------
@@ -2295,6 +2363,7 @@ def _amounts_for_year(
     catchment_ids,
     *,
     include_metadata=False,
+    user=None,
 ):
     """Specific waste collected for *year*, with total/population fallback.
 
@@ -2306,6 +2375,7 @@ def _amounts_for_year(
     """
     cfg = get_derived_property_config()
     cpv_qs = CollectionPropertyValue.objects.filter(
+        _map_property_value_q(user),
         collection_id__in=all_collection_ids,
         property_id=cfg.specific_property_id,
         year=year,
@@ -2326,6 +2396,7 @@ def _amounts_for_year(
             col_id for col_id, cid in col_to_cid.items() if cid in missing_cid_set
         }
         agg_qs = AggregatedCollectionPropertyValue.objects.filter(
+            _map_aggregated_property_value_q(user),
             collections__id__in=missing_cols,
             property_id=cfg.specific_property_id,
             year=year,
@@ -2355,6 +2426,7 @@ def _amounts_for_year(
         col_id for col_id, cid in col_to_cid.items() if cid in missing_cid_set
     }
     total_qs = CollectionPropertyValue.objects.filter(
+        _map_property_value_q(user),
         collection_id__in=missing_cols,
         property_id=cfg.total_property_id,
         year=year,
@@ -2516,6 +2588,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
     # 1) Aggregated specific waste amount per catchment.
     agg_specific_by_catchment: dict[int, list[float]] = {}
     agg_specific_qs = AggregatedCollectionPropertyValue.objects.filter(
+        _map_aggregated_property_value_q(user),
         collections__id__in=all_collection_ids,
         property_id=cfg.specific_property_id,
         year=year,
@@ -2541,6 +2614,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
         }
         cpv_specific_by_catchment: dict[int, list[float]] = {}
         cpv_specific_qs = CollectionPropertyValue.objects.filter(
+            _map_property_value_q(user),
             collection_id__in=missing_cols,
             property_id=cfg.specific_property_id,
             year=year,
@@ -2565,6 +2639,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
 
         total_by_catchment: dict[int, float] = {}
         total_qs = CollectionPropertyValue.objects.filter(
+            _map_property_value_q(user),
             collection_id__in=missing_cols,
             property_id=cfg.total_property_id,
             year=year,
@@ -2586,6 +2661,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
             }
             agg_total_by_catchment: dict[int, list[float]] = {}
             agg_total_qs = AggregatedCollectionPropertyValue.objects.filter(
+                _map_aggregated_property_value_q(user),
                 collections__id__in=still_missing_cols,
                 property_id=cfg.total_property_id,
                 year=year,
@@ -2655,7 +2731,7 @@ class ResidualCollectionAmountViewSet(WasteAtlasViewSet):
             nuts_prefixes,
             include_value_source=True,
             include_acpv_group_key=True,
-            user=request.user,
+            user=request,
         )
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
@@ -2670,7 +2746,7 @@ class ResidualCollectionAmountViewSet(WasteAtlasViewSet):
                 year,
                 ["Residual waste"],
                 nuts_prefixes,
-                user=request.user,
+                user=request,
             )
         )
 
@@ -2696,7 +2772,7 @@ class BiowasteCollectionAmountViewSet(WasteAtlasViewSet):
             nuts_prefixes,
             include_value_source=True,
             include_acpv_group_key=True,
-            user=request.user,
+            user=request,
         )
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
@@ -2711,7 +2787,7 @@ class BiowasteCollectionAmountViewSet(WasteAtlasViewSet):
                 year,
                 ["Biowaste", "Food waste"],
                 nuts_prefixes,
-                user=request.user,
+                user=request,
             )
         )
 
@@ -2731,7 +2807,7 @@ class GreenWasteCollectionAmountViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_green_waste_collection_amount(
-            country, year, nuts_prefixes, user=request.user
+            country, year, nuts_prefixes, user=request
         )
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
@@ -2864,7 +2940,7 @@ class BiowasteMinBinSizeViewSet(WasteAtlasViewSet):
             ["Biowaste", "Food waste"],
             nuts_prefixes,
             include_missing_primary=True,
-            user=request.user,
+            user=request,
         )
         serializer = CatchmentMinBinSizeSerializer(data, many=True)
         return Response(serializer.data)
@@ -2885,7 +2961,7 @@ class ResidualMinBinSizeViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_min_bin_size(
-            country, year, ["Residual waste"], nuts_prefixes, user=request.user
+            country, year, ["Residual waste"], nuts_prefixes, user=request
         )
         serializer = CatchmentMinBinSizeSerializer(data, many=True)
         return Response(serializer.data)
@@ -2905,7 +2981,7 @@ class MinBinSizeRatioViewSet(WasteAtlasViewSet):
                 ["Biowaste", "Food waste"],
                 nuts_prefixes,
                 include_missing_primary=True,
-                user=request.user,
+                user=request,
             )
         }
         res = {
@@ -2915,7 +2991,7 @@ class MinBinSizeRatioViewSet(WasteAtlasViewSet):
                 year,
                 ["Residual waste"],
                 nuts_prefixes,
-                user=request.user,
+                user=request,
             )
         }
         all_ids = set(bio) | set(res)
@@ -2964,7 +3040,7 @@ class BiowasteRequiredBinCapacityViewSet(WasteAtlasViewSet):
             ["Biowaste", "Food waste"],
             nuts_prefixes,
             include_missing_primary=True,
-            user=request.user,
+            user=request,
         )
         serializer = CatchmentRequiredBinCapacitySerializer(data, many=True)
         return Response(serializer.data)
@@ -2985,7 +3061,7 @@ class ResidualRequiredBinCapacityViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_required_bin_capacity(
-            country, year, ["Residual waste"], nuts_prefixes, user=request.user
+            country, year, ["Residual waste"], nuts_prefixes, user=request
         )
         serializer = CatchmentRequiredBinCapacitySerializer(data, many=True)
         return Response(serializer.data)
@@ -3053,7 +3129,7 @@ class OrganicCollectionAmountViewSet(WasteAtlasViewSet):
         """Return a JSON array of {catchment_id, amount}."""
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
-        data = _get_organic_amount_rows(country, year, nuts_prefixes, user=request.user)
+        data = _get_organic_amount_rows(country, year, nuts_prefixes, user=request)
         serializer = CatchmentCollectionAmountSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -3075,13 +3151,13 @@ class OrganicWasteRatioViewSet(WasteAtlasViewSet):
         organic_map = {
             row["catchment_id"]: row
             for row in _get_organic_amount_rows(
-                country, year, nuts_prefixes, user=request.user
+                country, year, nuts_prefixes, user=request
             )
         }
         res_map = {
             r["catchment_id"]: r["amount"]
             for r in _get_collection_amount(
-                country, year, ["Residual waste"], nuts_prefixes, user=request.user
+                country, year, ["Residual waste"], nuts_prefixes, user=request
             )
         }
         all_ids = set(organic_map) | set(res_map)
@@ -3129,7 +3205,7 @@ class WasteRatioViewSet(WasteAtlasViewSet):
                 ["Biowaste", "Food waste"],
                 nuts_prefixes,
                 include_value_source=True,
-                user=request.user,
+                user=request,
             )
         }
         res = {
@@ -3140,7 +3216,7 @@ class WasteRatioViewSet(WasteAtlasViewSet):
                 ["Residual waste"],
                 nuts_prefixes,
                 include_value_source=True,
-                user=request.user,
+                user=request,
             )
         }
         all_ids = set(bio) | set(res)
@@ -3193,7 +3269,7 @@ class CollectionSupportViewSet(WasteAtlasViewSet):
             year,
             ["Biowaste", "Food waste"],
             nuts_prefixes,
-            user=request.user,
+            user=request,
         )
 
         collection_ids = [
@@ -3275,7 +3351,7 @@ class RegularPlasticCollectionSupportViewSet(WasteAtlasViewSet):
             year,
             ["Biowaste", "Food waste"],
             nuts_prefixes,
-            user=request.user,
+            user=request,
         )
 
         collection_ids = [
@@ -3349,7 +3425,7 @@ class PaperBagsStatusViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_material_status(
-            country, year, _PAPER_BAGS_MATERIAL_ID, nuts_prefixes, user=request.user
+            country, year, _PAPER_BAGS_MATERIAL_ID, nuts_prefixes, user=request
         )
         serializer = CatchmentMaterialStatusSerializer(data, many=True)
         return Response(serializer.data)
@@ -3373,7 +3449,7 @@ class PlasticBagsStatusViewSet(WasteAtlasViewSet):
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
         data = _get_material_status(
-            country, year, _PLASTIC_BAGS_MATERIAL_ID, nuts_prefixes, user=request.user
+            country, year, _PLASTIC_BAGS_MATERIAL_ID, nuts_prefixes, user=request
         )
         serializer = CatchmentMaterialStatusSerializer(data, many=True)
         return Response(serializer.data)
@@ -3404,7 +3480,7 @@ class RegularPlasticBagsStatusViewSet(WasteAtlasViewSet):
             year,
             _REGULAR_PLASTIC_BAGS_MATERIAL_ID,
             nuts_prefixes,
-            user=request.user,
+            user=request,
         )
         serializer = CatchmentMaterialStatusSerializer(data, many=True)
         return Response(serializer.data)
@@ -3438,7 +3514,7 @@ class FoodWasteCategoryViewSet(WasteAtlasViewSet):
             year,
             ["Biowaste", "Food waste"],
             nuts_prefixes,
-            user=request.user,
+            user=request,
         )
 
         # Step 2: batch-fetch allowed material IDs (11-14) for selected collections
@@ -3493,7 +3569,7 @@ class TargetWasteCategoryViewSet(WasteAtlasViewSet):
             ["Biowaste", "Food waste"],
             nuts_prefixes,
             extra_fields=("waste_category__name",),
-            user=request.user,
+            user=request,
         )
 
         data = []
@@ -3543,11 +3619,11 @@ class ConnectionRateViewSet(WasteAtlasViewSet):
             year,
             ["Biowaste", "Food waste"],
             nuts_prefixes,
-            user=request.user,
+            user=request,
         )
 
         collection_ids = [row["collection_id"] for row in best.values()]
-        rate_lookup = _latest_connection_rate_values(collection_ids)
+        rate_lookup = _latest_connection_rate_values(collection_ids, user=request)
 
         data = []
         for cid, row in best.items():
@@ -3586,7 +3662,7 @@ class ParticipationPolicyViewSet(WasteAtlasViewSet):
             ["Biowaste", "Food waste"],
             nuts_prefixes,
             extra_fields=("participation_policy",),
-            user=request.user,
+            user=request,
         ).items():
             value = (
                 "no_bio_collection"
@@ -3618,7 +3694,7 @@ class CatchmentPopulationViewSet(WasteAtlasViewSet):
         """Return a JSON array of {catchment_id, population, population_density}."""
         country, year = _parse_country_year(request)
         nuts_prefixes = _parse_nuts_prefixes(request)
-        user = request.user
+        user = request
         population_attribute_id = _resolved_population_attribute_id()
 
         qs = (
@@ -3701,7 +3777,7 @@ class BiowasteImpurityViewSet(WasteAtlasViewSet):
             collection_year,
             ["Biowaste", "Food waste"],
             nuts_prefixes,
-            user=request.user,
+            user=request,
         )
 
         collection_ids = [row["collection_id"] for row in best.values()]
@@ -3710,7 +3786,7 @@ class BiowasteImpurityViewSet(WasteAtlasViewSet):
             property_name=BIOWASTE_IMPURITY_RATE_PROPERTY_NAME,
             unit_name=PERCENTAGE_UNIT_NAME,
             year=year,
-            user=request.user,
+            user=request,
         )
         rate_lookup = {
             collection_id: value["average"]
@@ -3753,7 +3829,7 @@ class ResidualWasteCompositionViewSet(WasteAtlasViewSet):
             year,
             ["Residual waste"],
             nuts_prefixes,
-            user=request.user,
+            user=request,
         )
         collection_ids = [row["collection_id"] for row in best.values()]
 
@@ -3761,21 +3837,21 @@ class ResidualWasteCompositionViewSet(WasteAtlasViewSet):
             collection_ids,
             property_name=BIOWASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME,
             unit_name=PERCENTAGE_UNIT_NAME,
-            user=request.user,
+            user=request,
         )
         biowaste_amounts = _latest_property_values(
             collection_ids,
             property_name=BIOWASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME,
             unit_name=SPECIFIC_AMOUNT_UNIT_NAME,
             year=year,
-            user=request.user,
+            user=request,
         )
         food_waste_amounts = _latest_property_values(
             collection_ids,
             property_name=FOOD_WASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME,
             unit_name=SPECIFIC_AMOUNT_UNIT_NAME,
             year=year,
-            user=request.user,
+            user=request,
         )
 
         data = []
@@ -3840,12 +3916,13 @@ class WeeklyBpAccessDaysViewSet(WasteAtlasViewSet):
             year,
             ["Biowaste", "Food waste"],
             nuts_prefixes,
-            user=request.user,
+            user=request,
         )
 
         collection_ids = [row["collection_id"] for row in best.values()]
         cpv_qs = (
             CollectionPropertyValue.objects.filter(
+                _map_property_value_q(request),
                 collection_id__in=collection_ids,
                 property__name=WEEKLY_BP_ACCESS_DAYS_PROPERTY_NAME,
                 year=year,
@@ -3972,7 +4049,7 @@ class CollectionConflictViewSet(WasteAtlasViewSet):
                 year,
                 nuts_prefixes,
                 ["Biowaste", "Food waste"],
-                user=request.user,
+                user=request,
             )
         else:
             conflicts = []

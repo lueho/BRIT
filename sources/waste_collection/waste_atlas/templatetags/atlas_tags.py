@@ -153,6 +153,7 @@ def atlas_js_config(context, config_key):
     # Runtime context from the view
     config["country"] = context.get("country", "DE")
     config["year"] = int(context.get("year", 2024))
+    config["scope"] = context.get("atlas_scope", "published")
 
     config.pop("nutsPrefix", None)
     nuts_prefix = context.get("nuts_prefix")

@@ -2628,6 +2628,7 @@ class CollectionPointCountViewSetTests(APITestCase):
             unit=cls.unit,
             year=2024,
             average=5,
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=cls.bring_point_collection,
@@ -2635,6 +2636,7 @@ class CollectionPointCountViewSetTests(APITestCase):
             unit=cls.unit,
             year=2024,
             average=11,
+            publication_status="published",
         )
 
     @classmethod
@@ -2710,6 +2712,7 @@ class ConnectionRateViewSetTests(APITestCase):
             unit=cls.unit,
             year=2021,
             average=40,
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=cls.previous_collection,
@@ -2717,6 +2720,7 @@ class ConnectionRateViewSetTests(APITestCase):
             unit=cls.unit,
             year=2023,
             average=86,
+            publication_status="published",
         )
 
     def test_uses_latest_connection_rate_from_collection_version_chain(self):
@@ -2757,6 +2761,7 @@ class ConnectionRateViewSetTests(APITestCase):
             unit=self.unit,
             year=2024,
             average=52,
+            publication_status="published",
         )
 
         response = self.client.get(self.endpoint, {"country": "DE", "year": 2024})
@@ -2833,6 +2838,7 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
                 unit=cls.unit,
                 year=2024,
                 average=80,
+                publication_status="published",
             )
             Collection.objects.create(
                 name=f"Primary Selection Bring Point {index}",
@@ -3901,6 +3907,7 @@ class OrganicAmountViewSetTests(APITestCase):
             unit=cls.specific_unit,
             year=2024,
             average=100.0,
+            publication_status="published",
         )
 
         green_col_both = Collection.objects.create(
@@ -3935,6 +3942,7 @@ class OrganicAmountViewSetTests(APITestCase):
             unit=cls.specific_unit,
             year=2024,
             average=200.0,
+            publication_status="published",
         )
 
         bio_col_bio_only = Collection.objects.create(
@@ -3951,6 +3959,7 @@ class OrganicAmountViewSetTests(APITestCase):
             unit=cls.specific_unit,
             year=2024,
             average=60.0,
+            publication_status="published",
         )
 
         green_col_green_only = Collection.objects.create(
@@ -3967,6 +3976,7 @@ class OrganicAmountViewSetTests(APITestCase):
             unit=cls.specific_unit,
             year=2024,
             average=50.0,
+            publication_status="published",
         )
 
         residual_col_only = Collection.objects.create(
@@ -3983,6 +3993,7 @@ class OrganicAmountViewSetTests(APITestCase):
             unit=cls.specific_unit,
             year=2024,
             average=150.0,
+            publication_status="published",
         )
 
         for waste_category in (cls.bio_category, cls.green_category):
@@ -4007,6 +4018,24 @@ class OrganicAmountViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         by_catchment = {r["catchment_id"]: r for r in response.data}
         self.assertAlmostEqual(by_catchment[self.catchment_both.id]["amount"], 180.0)
+
+    def test_organic_amount_excludes_private_measurements(self):
+        CollectionPropertyValue.objects.filter(
+            collection__catchment=self.catchment_bio_only,
+            property=self.specific_property,
+        ).update(publication_status="private")
+        AggregatedCollectionPropertyValue.objects.filter(
+            name="Organic green ACPV both"
+        ).update(publication_status="private")
+
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/organic-collection-amount/",
+            {"country": "DE", "year": 2024, "scope": "published"},
+        )
+        self.assertEqual(response.status_code, 200)
+        by_catchment = {r["catchment_id"]: r for r in response.data}
+        self.assertIsNone(by_catchment[self.catchment_bio_only.id]["amount"])
+        self.assertEqual(by_catchment[self.catchment_both.id]["amount"], 100.0)
 
     def test_organic_amount_bio_only_catchment(self):
         """Karte 27 includes catchments with only bio waste."""
@@ -4258,6 +4287,7 @@ class SouthTyrolCollectionPointTests(APITestCase):
             unit=cls.unit,
             year=2024,
             average=10.5,
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=cls.residual_collection,
@@ -4265,6 +4295,7 @@ class SouthTyrolCollectionPointTests(APITestCase):
             unit=cls.unit,
             year=2024,
             average=5,
+            publication_status="published",
         )
 
         # Create biowaste-only collection for catchment_bio_only
@@ -4282,6 +4313,7 @@ class SouthTyrolCollectionPointTests(APITestCase):
             unit=cls.unit,
             year=2024,
             average=8,
+            publication_status="published",
         )
 
     def test_biowaste_collection_point_count_endpoint(self):
@@ -4348,6 +4380,7 @@ class SouthTyrolCollectionPointTests(APITestCase):
             unit=self.unit,
             year=2025,
             average=0,
+            publication_status="published",
         )
 
         response = self.client.get(
@@ -4569,6 +4602,7 @@ class CollectionPointCountNoDataAndDtDTests(APITestCase):
             unit=cls.unit,
             year=2024,
             average=7,
+            publication_status="published",
         )
 
     def test_biowaste_dtd_no_cpv_returns_null_count_and_dtd_flag(self):
@@ -4798,6 +4832,7 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
             unit=cls.days_unit,
             year=2024,
             average=5.0,
+            publication_status="published",
         )
 
         # Catchment B: mixed with CPV → has_bring_point=True, value present
@@ -4818,6 +4853,7 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
             unit=cls.days_unit,
             year=2024,
             average=3.0,
+            publication_status="published",
         )
 
         # Catchment C: DtD → has_bring_point=False, value null
@@ -5211,6 +5247,219 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         self.assertIn(self.published_catchment.id, ids)
         self.assertNotIn(self.private_catchment.id, ids)
         self.assertNotIn(self.review_catchment.id, ids)
+
+    def test_explicit_published_scope_is_public_even_for_staff(self):
+        staff = User.objects.create_user("scope_staff", is_staff=True)
+        self.client.force_login(staff)
+        for key in ("collection_system", "catchment_geojson", "collection_orga_level"):
+            ids = self._catchment_ids(self._get(key, scope="published"))
+            self.assertIn(self.published_catchment.id, ids, key)
+            self.assertNotIn(self.private_catchment.id, ids, key)
+            self.assertNotIn(self.review_catchment.id, ids, key)
+
+    def test_mine_scope_only_shows_own_collections(self):
+        other = User.objects.create_user("other_scope_user")
+        other_collection = Collection.objects.create(
+            name="Other private collection",
+            owner=other,
+            catchment=CollectionCatchment.objects.create(
+                name="Other catchment",
+                region=self._region_with_borders("Other region"),
+            ),
+            waste_category=self.bio_category,
+            collection_system=self.d2d,
+            valid_from=date(2024, 1, 1),
+            publication_status="private",
+        )
+        self.client.force_login(self.user)
+        for key in ("collection_system", "catchment_geojson", "collection_orga_level"):
+            ids = self._catchment_ids(self._get(key, scope="mine"))
+            self.assertIn(self.published_catchment.id, ids, key)
+            self.assertIn(self.private_catchment.id, ids, key)
+            self.assertIn(self.review_catchment.id, ids, key)
+            self.assertNotIn(other_collection.catchment_id, ids, key)
+
+        other_collection.publication_status = "published"
+        other_collection.save(update_fields=["publication_status"])
+        ids = self._catchment_ids(self._get("collection_system", scope="mine"))
+        self.assertNotIn(other_collection.catchment_id, ids)
+
+    def test_review_scope_requires_moderation_permission(self):
+        self.client.force_login(self.user)
+        for key in ("collection_system", "catchment_geojson"):
+            ids = self._catchment_ids(self._get(key, scope="review"))
+            self.assertNotIn(self.review_catchment.id, ids, key)
+
+        moderator = User.objects.create_user("scope_moderator")
+        moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
+        )
+        self.client.force_login(moderator)
+        for key in ("collection_system", "catchment_geojson"):
+            ids = self._catchment_ids(self._get(key, scope="review"))
+            self.assertIn(self.review_catchment.id, ids, key)
+            self.assertNotIn(self.private_catchment.id, ids, key)
+            self.assertNotIn(self.published_catchment.id, ids, key)
+
+    def test_all_scope_is_staff_only(self):
+        declined = Collection.objects.create(
+            name="Declined collection",
+            owner=self.user,
+            catchment=CollectionCatchment.objects.create(
+                name="Declined catchment",
+                region=self._region_with_borders("Declined region"),
+            ),
+            waste_category=self.bio_category,
+            collection_system=self.d2d,
+            valid_from=date(2024, 1, 1),
+            publication_status="declined",
+        )
+        self.client.force_login(self.user)
+        for key in ("collection_system", "catchment_geojson"):
+            ids = self._catchment_ids(self._get(key, scope="all"))
+            self.assertNotIn(self.private_catchment.id, ids, key)
+            self.assertNotIn(declined.catchment_id, ids, key)
+        self.assertIn(
+            declined.catchment_id,
+            self._catchment_ids(self._get("collection_system", scope="mine")),
+        )
+        staff = User.objects.create_user("scope_all_staff", is_staff=True)
+        self.client.force_login(staff)
+        ids = self._catchment_ids(self._get("collection_system", scope="all"))
+        self.assertIn(self.private_catchment.id, ids)
+        self.assertIn(self.review_catchment.id, ids)
+        self.assertIn(declined.catchment_id, ids)
+
+    def test_mine_scope_does_not_leak_to_anonymous_or_invalid_scope(self):
+        for scope in ("mine", "review", "all", "unexpected"):
+            for key in ("collection_system", "catchment_geojson"):
+                ids = self._catchment_ids(self._get(key, scope=scope))
+                self.assertNotIn(self.private_catchment.id, ids, (scope, key))
+                self.assertNotIn(self.review_catchment.id, ids, (scope, key))
+
+    def test_mine_measurements_exclude_another_owners_private_value(self):
+        prop, _ = Property.objects.get_or_create(name="biowaste impurity rate")
+        unit, _ = Unit.objects.get_or_create(name="%")
+        CollectionPropertyValue.objects.create(
+            collection=self.private_collection,
+            property=prop,
+            unit=unit,
+            year=2024,
+            average=8.5,
+            owner=self.user,
+            publication_status="private",
+        )
+        CollectionPropertyValue.objects.create(
+            collection=self.private_collection,
+            property=prop,
+            unit=unit,
+            year=2024,
+            average=99,
+            owner=User.objects.create_user("other_measurement_owner"),
+            publication_status="private",
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/biowaste-impurity/",
+            {"country": "DE", "year": 2024, "scope": "mine"},
+        )
+        self.assertEqual(response.status_code, 200)
+        row = next(
+            r for r in response.data if r["catchment_id"] == self.private_catchment.id
+        )
+        self.assertEqual(row["impurity_rate"], 8.5)
+
+        point_property, _ = Property.objects.get_or_create(
+            name="number of collection points"
+        )
+        point_unit, _ = Unit.objects.get_or_create(name="No unit")
+        CollectionPropertyValue.objects.create(
+            collection=self.private_collection,
+            property=point_property,
+            unit=point_unit,
+            year=2024,
+            average=99,
+            owner=User.objects.get(username="other_measurement_owner"),
+            publication_status="private",
+        )
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/collection-point-count/",
+            {"country": "DE", "year": 2024, "scope": "mine"},
+        )
+        self.assertEqual(response.status_code, 200)
+        row = next(
+            r for r in response.data if r["catchment_id"] == self.private_catchment.id
+        )
+        self.assertIsNone(row["collection_point_count"])
+
+    def test_published_scope_excludes_private_measurements(self):
+        prop, _ = Property.objects.get_or_create(name="number of collection points")
+        unit, _ = Unit.objects.get_or_create(name="No unit")
+        CollectionPropertyValue.objects.create(
+            collection=self.published_collection,
+            property=prop,
+            unit=unit,
+            year=2024,
+            average=99,
+            owner=self.user,
+            publication_status="private",
+        )
+        for scope in (None, "published"):
+            params = {"country": "DE", "year": 2024}
+            if scope:
+                params["scope"] = scope
+            response = self.client.get(
+                "/waste_collection/api/waste-atlas/collection-point-count/", params
+            )
+            self.assertEqual(response.status_code, 200)
+            row = next(
+                r
+                for r in response.data
+                if r["catchment_id"] == self.published_catchment.id
+            )
+            self.assertIsNone(row["collection_point_count"])
+
+    def test_review_measurements_use_public_predecessor_not_private_value(self):
+        prop, _ = Property.objects.get_or_create(name="biowaste impurity rate")
+        unit, _ = Unit.objects.get_or_create(name="%")
+        self.review_collection.predecessors.add(self.published_collection)
+        CollectionPropertyValue.objects.create(
+            collection=self.published_collection,
+            property=prop,
+            unit=unit,
+            year=2024,
+            average=8.5,
+            publication_status="published",
+        )
+        CollectionPropertyValue.objects.create(
+            collection=self.review_collection,
+            property=prop,
+            unit=unit,
+            year=2024,
+            average=99,
+            owner=User.objects.create_user("private_review_measurement_owner"),
+            publication_status="private",
+        )
+        moderator = User.objects.create_user("measurement_moderator")
+        moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
+        )
+        self.client.force_login(moderator)
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/biowaste-impurity/",
+            {"country": "DE", "year": 2024, "scope": "review"},
+        )
+        self.assertEqual(response.status_code, 200)
+        row = next(
+            r for r in response.data if r["catchment_id"] == self.review_catchment.id
+        )
+        self.assertEqual(row["impurity_rate"], 8.5)
 
     # --- Historical-year archived visibility ---
 
