@@ -199,9 +199,7 @@ def _property_value_q(user=None):
 
 
 def _map_property_value_q(user=None):
-    if _effective_scope(user)[0] in ("mine", "review"):
-        return _property_value_q(user)
-    return Q()
+    return _property_value_q(user)
 
 
 def _map_aggregated_property_value_q(user=None):
@@ -212,7 +210,7 @@ def _map_aggregated_property_value_q(user=None):
         return Q(
             publication_status__in=(*_PUBLIC_VISIBLE, UserCreatedObject.STATUS_REVIEW)
         )
-    return Q()
+    return Q(publication_status__in=_visible_statuses(user))
 
 
 # Material IDs for food waste classification (Karte 4)
