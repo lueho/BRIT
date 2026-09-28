@@ -150,7 +150,7 @@ brit_eu_save <- function(data, output_dir, filters) {
   stem <- file.path(output_dir, paste0("BRIT-Sammlungen-", format(Sys.time(), "%Y%m%dT%H%M%SZ", tz = "UTC")))
   if (file.exists(paste0(stem, ".rds"))) stem <- paste0(stem, "-", sample.int(999999L, 1L))
   files <- list(csv = paste0(stem, ".csv"), rds = paste0(stem, ".rds"),
-                metadata = paste0(stem, ".json"))
+                metadata = paste0(stem, ".json"), summary = paste0(stem, "-Zusammenfassung.csv"))
   saveRDS(data, files$rds, version = 3)
   utils::write.csv(data, files$csv, row.names = FALSE, na = "", fileEncoding = "UTF-8")
   metadata <- list(release = "BRIT-Live-API", abgerufen = attr(data, "brit_provenance"),
@@ -202,8 +202,8 @@ brit_eu_main <- function(username = NULL, password = NULL) {
     names(summary)[3] <- "Sammlungen"
     summary <- summary[summary$Sammlungen > 0L, , drop = FALSE]
     print(summary)
-    utils::write.csv(summary, file.path(ERGEBNISORDNER, "Zusammenfassung.csv"),
-                     row.names = FALSE, fileEncoding = "UTF-8")
+    utils::write.csv(summary, files$summary, row.names = FALSE, fileEncoding = "UTF-8")
+    message("Beispielauswertung: ", normalizePath(files$summary))
   }
   invisible(data)
 }
