@@ -4631,6 +4631,22 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, 'id="sel-scope"')
         self.assertIn("scope=mine", response.context["map_toggle_url"])
 
+    def test_change_map_overview_offers_review_scope_to_moderators(self):
+        moderator = User.objects.create_user("change-overview-moderator")
+        moderator.groups.add(Group.objects.get(name="waste_atlas"))
+        moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
+        )
+        self.client.force_login(moderator)
+        response = self.client.get(
+            reverse("waste-atlas-change-map-overview"), {"scope": "review"}
+        )
+        self.assertContains(response, 'value="review" selected')
+        self.assertNotContains(response, 'value="all"')
+
     # ---- registry / structural --------------------------------------------
 
     def test_every_map_page_route_resolves(self):

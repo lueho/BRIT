@@ -5304,6 +5304,100 @@ class WasteAtlasPublicationScopingTests(APITestCase):
                 self.assertNotIn(self.private_catchment.id, ids, (scope, key))
                 self.assertNotIn(self.review_catchment.id, ids, (scope, key))
 
+    def test_mine_measurements_exclude_another_owners_private_value(self):
+        prop, _ = Property.objects.get_or_create(name="biowaste impurity rate")
+        unit, _ = Unit.objects.get_or_create(name="%")
+        CollectionPropertyValue.objects.create(
+            collection=self.private_collection,
+            property=prop,
+            unit=unit,
+            year=2024,
+            average=8.5,
+            owner=self.user,
+            publication_status="private",
+        )
+        CollectionPropertyValue.objects.create(
+            collection=self.private_collection,
+            property=prop,
+            unit=unit,
+            year=2024,
+            average=99,
+            owner=User.objects.create_user("other_measurement_owner"),
+            publication_status="private",
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/biowaste-impurity/",
+            {"country": "DE", "year": 2024, "scope": "mine"},
+        )
+        self.assertEqual(response.status_code, 200)
+        row = next(
+            r for r in response.data if r["catchment_id"] == self.private_catchment.id
+        )
+        self.assertEqual(row["impurity_rate"], 8.5)
+
+        point_property, _ = Property.objects.get_or_create(
+            name="number of collection points"
+        )
+        point_unit, _ = Unit.objects.get_or_create(name="No unit")
+        CollectionPropertyValue.objects.create(
+            collection=self.private_collection,
+            property=point_property,
+            unit=point_unit,
+            year=2024,
+            average=99,
+            owner=User.objects.get(username="other_measurement_owner"),
+            publication_status="private",
+        )
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/collection-point-count/",
+            {"country": "DE", "year": 2024, "scope": "mine"},
+        )
+        self.assertEqual(response.status_code, 200)
+        row = next(
+            r for r in response.data if r["catchment_id"] == self.private_catchment.id
+        )
+        self.assertIsNone(row["collection_point_count"])
+
+    def test_review_measurements_use_public_predecessor_not_private_value(self):
+        prop, _ = Property.objects.get_or_create(name="biowaste impurity rate")
+        unit, _ = Unit.objects.get_or_create(name="%")
+        self.review_collection.predecessors.add(self.published_collection)
+        CollectionPropertyValue.objects.create(
+            collection=self.published_collection,
+            property=prop,
+            unit=unit,
+            year=2024,
+            average=8.5,
+            publication_status="published",
+        )
+        CollectionPropertyValue.objects.create(
+            collection=self.review_collection,
+            property=prop,
+            unit=unit,
+            year=2024,
+            average=99,
+            owner=User.objects.create_user("private_review_measurement_owner"),
+            publication_status="private",
+        )
+        moderator = User.objects.create_user("measurement_moderator")
+        moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
+        )
+        self.client.force_login(moderator)
+        response = self.client.get(
+            "/waste_collection/api/waste-atlas/biowaste-impurity/",
+            {"country": "DE", "year": 2024, "scope": "review"},
+        )
+        self.assertEqual(response.status_code, 200)
+        row = next(
+            r for r in response.data if r["catchment_id"] == self.review_catchment.id
+        )
+        self.assertEqual(row["impurity_rate"], 8.5)
+
     # --- Historical-year archived visibility ---
 
     HISTORICAL_ENDPOINTS = (

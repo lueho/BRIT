@@ -184,10 +184,35 @@ def _revision_q(user=None):
 def _property_value_q(user=None):
     scope, owner = _effective_scope(user)
     if scope == "mine":
-        return Q(collection__owner=owner)
+        return Q(collection__owner=owner) & (
+            Q(publication_status__in=_PUBLIC_VISIBLE) | Q(owner=owner)
+        )
     if scope == "review":
-        return Q(collection__publication_status=UserCreatedObject.STATUS_REVIEW)
+        return Q(
+            collection__publication_status__in=(
+                *_PUBLIC_VISIBLE,
+                UserCreatedObject.STATUS_REVIEW,
+            ),
+            publication_status__in=(*_PUBLIC_VISIBLE, UserCreatedObject.STATUS_REVIEW),
+        )
     return Q(publication_status__in=_visible_statuses(user))
+
+
+def _map_property_value_q(user=None):
+    if _effective_scope(user)[0] in ("mine", "review"):
+        return _property_value_q(user)
+    return Q()
+
+
+def _map_aggregated_property_value_q(user=None):
+    scope, owner = _effective_scope(user)
+    if scope == "mine":
+        return Q(publication_status__in=_PUBLIC_VISIBLE) | Q(owner=owner)
+    if scope == "review":
+        return Q(
+            publication_status__in=(*_PUBLIC_VISIBLE, UserCreatedObject.STATUS_REVIEW)
+        )
+    return Q()
 
 
 # Material IDs for food waste classification (Karte 4)
@@ -859,7 +884,7 @@ def _collection_version_chains(collection_ids):
     return chains
 
 
-def _latest_connection_rate_values(collection_ids):
+def _latest_connection_rate_values(collection_ids, user=None):
     version_chains = _collection_version_chains(collection_ids)
     if not version_chains:
         return {}
@@ -869,6 +894,7 @@ def _latest_connection_rate_values(collection_ids):
         all_chain_ids.update(chain_ids)
 
     cpv_rows = CollectionPropertyValue.objects.filter(
+        _map_property_value_q(user),
         collection_id__in=all_chain_ids,
         property_id=CONNECTION_RATE_PROPERTY_ID,
         average__isnull=False,
@@ -2007,6 +2033,7 @@ class CollectionPointCountViewSet(WasteAtlasViewSet):
         collection_ids = [row["collection_id"] for row in best.values()]
         cpv_qs = (
             CollectionPropertyValue.objects.filter(
+                _map_property_value_q(user),
                 collection_id__in=collection_ids,
                 property__name=COLLECTION_POINT_COUNT_PROPERTY_NAME,
                 unit__name="No unit",
@@ -2290,6 +2317,7 @@ def _get_collection_amount(
         col_to_cid,
         catchment_ids,
         include_metadata=True,
+        user=user,
     )
 
     # ------------------------------------------------------------------
@@ -2337,6 +2365,7 @@ def _amounts_for_year(
     catchment_ids,
     *,
     include_metadata=False,
+    user=None,
 ):
     """Specific waste collected for *year*, with total/population fallback.
 
@@ -2348,6 +2377,7 @@ def _amounts_for_year(
     """
     cfg = get_derived_property_config()
     cpv_qs = CollectionPropertyValue.objects.filter(
+        _map_property_value_q(user),
         collection_id__in=all_collection_ids,
         property_id=cfg.specific_property_id,
         year=year,
@@ -2368,6 +2398,7 @@ def _amounts_for_year(
             col_id for col_id, cid in col_to_cid.items() if cid in missing_cid_set
         }
         agg_qs = AggregatedCollectionPropertyValue.objects.filter(
+            _map_aggregated_property_value_q(user),
             collections__id__in=missing_cols,
             property_id=cfg.specific_property_id,
             year=year,
@@ -2397,6 +2428,7 @@ def _amounts_for_year(
         col_id for col_id, cid in col_to_cid.items() if cid in missing_cid_set
     }
     total_qs = CollectionPropertyValue.objects.filter(
+        _map_property_value_q(user),
         collection_id__in=missing_cols,
         property_id=cfg.total_property_id,
         year=year,
@@ -2558,6 +2590,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
     # 1) Aggregated specific waste amount per catchment.
     agg_specific_by_catchment: dict[int, list[float]] = {}
     agg_specific_qs = AggregatedCollectionPropertyValue.objects.filter(
+        _map_aggregated_property_value_q(user),
         collections__id__in=all_collection_ids,
         property_id=cfg.specific_property_id,
         year=year,
@@ -2583,6 +2616,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
         }
         cpv_specific_by_catchment: dict[int, list[float]] = {}
         cpv_specific_qs = CollectionPropertyValue.objects.filter(
+            _map_property_value_q(user),
             collection_id__in=missing_cols,
             property_id=cfg.specific_property_id,
             year=year,
@@ -2607,6 +2641,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
 
         total_by_catchment: dict[int, float] = {}
         total_qs = CollectionPropertyValue.objects.filter(
+            _map_property_value_q(user),
             collection_id__in=missing_cols,
             property_id=cfg.total_property_id,
             year=year,
@@ -2628,6 +2663,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
             }
             agg_total_by_catchment: dict[int, list[float]] = {}
             agg_total_qs = AggregatedCollectionPropertyValue.objects.filter(
+                _map_aggregated_property_value_q(user),
                 collections__id__in=still_missing_cols,
                 property_id=cfg.total_property_id,
                 year=year,
@@ -3589,7 +3625,7 @@ class ConnectionRateViewSet(WasteAtlasViewSet):
         )
 
         collection_ids = [row["collection_id"] for row in best.values()]
-        rate_lookup = _latest_connection_rate_values(collection_ids)
+        rate_lookup = _latest_connection_rate_values(collection_ids, user=request)
 
         data = []
         for cid, row in best.items():
@@ -3888,6 +3924,7 @@ class WeeklyBpAccessDaysViewSet(WasteAtlasViewSet):
         collection_ids = [row["collection_id"] for row in best.values()]
         cpv_qs = (
             CollectionPropertyValue.objects.filter(
+                _map_property_value_q(request),
                 collection_id__in=collection_ids,
                 property__name=WEEKLY_BP_ACCESS_DAYS_PROPERTY_NAME,
                 year=year,

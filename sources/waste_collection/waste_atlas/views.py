@@ -382,6 +382,13 @@ class WasteAtlasChangeMapOverviewView(
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        ctx["atlas_scope"] = _effective_scope(
+            self.request.user, self.request.GET.get("scope", "published")
+        )[0]
+        ctx["can_review_collections"] = (
+            self.request.user.is_staff
+            or self.request.user.has_perm("waste_collection.can_moderate_collection")
+        )
         selection_ctx = build_map_selection_context(reverse)
         years = list(selection_ctx["map_selection_years"])
         ctx.update(selection_ctx)
