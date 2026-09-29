@@ -21,12 +21,14 @@
                     </a>
                 {% endif %}
             {% endwith %}
-            <a class="btn btn-sm btn-outline-secondary"
-               href="{{ object.collection.get_absolute_url }}"
-               title="Collection">
-                <i class="fas fa-arrow-left"></i>
-                <span class="d-none d-md-inline">Collection</span>
-            </a>
+            {% if back_collection %}
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="{{ back_collection.get_absolute_url }}"
+                   title="Collection">
+                    <i class="fas fa-arrow-left"></i>
+                    <span class="d-none d-md-inline">Collection</span>
+                </a>
+            {% endif %}
             {% if object.list_url %}
                 <a class="btn btn-sm btn-outline-secondary"
                    href="{{ object.list_url }}"

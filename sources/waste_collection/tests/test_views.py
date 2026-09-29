@@ -918,6 +918,41 @@ class CollectionPropertyValueCRUDViewsTestCase(
             {predecessor.pk, self.related_objects["collection"].pk},
         )
 
+    def test_detail_collection_button_skips_archived_collection_for_anonymous(self):
+        collection = self.related_objects["collection"]
+        collection.publication_status = "archived"
+        collection.save()
+        successor = Collection.objects.create(
+            owner=self.owner_user,
+            name="CPV successor",
+            publication_status="published",
+            valid_from=date(2024, 1, 1),
+        )
+        successor.predecessors.add(collection)
+
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["back_collection"], successor)
+        self.assertContains(response, successor.get_absolute_url())
+        self.assertNotContains(response, collection.get_absolute_url())
+
+    def test_detail_collection_button_keeps_own_collection_when_visible(self):
+        successor = Collection.objects.create(
+            owner=self.owner_user,
+            name="CPV visible successor",
+            publication_status="published",
+            valid_from=date(2024, 1, 1),
+        )
+        successor.predecessors.add(self.related_objects["collection"])
+
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["back_collection"], self.related_objects["collection"]
+        )
+
     def test_detail_context_hides_related_collections_when_visibility_filter_errors(
         self,
     ):

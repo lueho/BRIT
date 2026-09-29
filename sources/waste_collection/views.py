@@ -792,8 +792,15 @@ class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["visible_related_collections"] = _visible_collection_chain_for_user(
-            getattr(self.object, "collection", None), self.request.user
+        collection = getattr(self.object, "collection", None)
+        visible_collections = _visible_collection_chain_for_user(
+            collection, self.request.user
+        )
+        context["visible_related_collections"] = visible_collections
+        context["back_collection"] = (
+            collection
+            if collection in visible_collections
+            else next(iter(visible_collections), None)
         )
         return context
 
