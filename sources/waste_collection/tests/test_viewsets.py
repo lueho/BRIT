@@ -50,6 +50,7 @@ from sources.waste_collection.models import (
     WasteFlyer,
 )
 from sources.waste_collection.viewsets import CollectionViewSet
+from sources.waste_collection.waste_atlas import params as atlas_params
 from sources.waste_collection.waste_atlas import viewsets as atlas_viewsets
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.properties.models import Property, Unit
@@ -2114,7 +2115,7 @@ class CollectionMutationApiTestCase(APITestCase):
 class GreenWasteCollectionSystemCountViewSetTests(APITestCase):
     """Tests for Green Waste collection-system count atlas endpoint."""
 
-    endpoint = "/waste_collection/api/waste-atlas/green-waste-collection-system-count/"
+    endpoint = "/waste_collection/waste-atlas/api/green-waste-collection-system-count/"
 
     @classmethod
     def setUpTestData(cls):
@@ -2212,7 +2213,7 @@ class CollectionConflictViewSetTests(APITestCase):
     the others are hidden by the theme's triage/aggregation.
     """
 
-    endpoint = "/waste_collection/api/waste-atlas/collection-conflicts/"
+    endpoint = "/waste_collection/waste-atlas/api/collection-conflicts/"
 
     @classmethod
     def setUpTestData(cls):
@@ -2271,6 +2272,9 @@ class CollectionConflictViewSetTests(APITestCase):
         cls._collection(
             cls.catchment_other_year, cls.bio_category, cls.bring_point, 2022
         )
+
+    def setUp(self):
+        self.client.force_login(User.objects.create_user("maintainer", is_staff=True))
 
     @classmethod
     def _collection(cls, catchment, waste_category, collection_system, year):
@@ -2356,7 +2360,7 @@ class CollectionConflictViewSetTests(APITestCase):
 
 
 class WasteAtlasThrottleTests(APITestCase):
-    endpoint = "/waste_collection/api/waste-atlas/green-waste-collection-system-count/"
+    endpoint = "/waste_collection/waste-atlas/api/green-waste-collection-system-count/"
 
     def setUp(self):
         self.client.defaults["REMOTE_ADDR"] = f"waste-atlas-throttle-test-{uuid4()}"
@@ -2502,11 +2506,11 @@ class CataloniaCollectionSystemViewSetTests(APITestCase):
 
     def test_stream_specific_collection_system_endpoints(self):
         bio_response = self.client.get(
-            "/waste_collection/api/waste-atlas/biowaste-collection-system/",
+            "/waste_collection/waste-atlas/api/biowaste-collection-system/",
             {"country": "ES", "year": 2024},
         )
         residual_response = self.client.get(
-            "/waste_collection/api/waste-atlas/residual-collection-system/",
+            "/waste_collection/waste-atlas/api/residual-collection-system/",
             {"country": "ES", "year": 2024},
         )
 
@@ -2529,7 +2533,7 @@ class CataloniaCollectionSystemViewSetTests(APITestCase):
 
     def test_combined_collection_system_endpoint(self):
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/combined-collection-system/",
+            "/waste_collection/waste-atlas/api/combined-collection-system/",
             {"country": "ES", "year": 2024},
         )
 
@@ -2554,7 +2558,7 @@ class CataloniaCollectionSystemViewSetTests(APITestCase):
 
     def test_catalonia_system_access_control_endpoint(self):
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/catalonia-system-access-control/",
+            "/waste_collection/waste-atlas/api/catalonia-system-access-control/",
             {"country": "ES", "year": 2024},
         )
 
@@ -2577,7 +2581,7 @@ class CataloniaCollectionSystemViewSetTests(APITestCase):
 
     def test_access_control_endpoint_uses_concise_labels(self):
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/access-control/",
+            "/waste_collection/waste-atlas/api/access-control/",
             {"country": "ES", "year": 2024},
         )
 
@@ -2602,7 +2606,7 @@ class CataloniaCollectionSystemViewSetTests(APITestCase):
 
 
 class CollectionPointCountViewSetTests(APITestCase):
-    endpoint = "/waste_collection/api/waste-atlas/collection-point-count/"
+    endpoint = "/waste_collection/waste-atlas/api/collection-point-count/"
 
     @classmethod
     def setUpTestData(cls):
@@ -2667,7 +2671,7 @@ class CollectionPointCountViewSetTests(APITestCase):
 
 
 class ConnectionRateViewSetTests(APITestCase):
-    endpoint = "/waste_collection/api/waste-atlas/connection-rate/"
+    endpoint = "/waste_collection/waste-atlas/api/connection-rate/"
 
     @classmethod
     def setUpTestData(cls):
@@ -2775,7 +2779,7 @@ class ConnectionRateViewSetTests(APITestCase):
 
     def test_participation_policy_endpoint_returns_selected_collection_value(self):
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/participation-policy/",
+            "/waste_collection/waste-atlas/api/participation-policy/",
             {"country": "DE", "year": 2024},
         )
 
@@ -2864,10 +2868,10 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
 
     def test_primary_selection_is_consistent_across_map_endpoints(self):
         endpoints = {
-            "collection_system": "/waste_collection/api/waste-atlas/collection-system/",
-            "paper_bags": "/waste_collection/api/waste-atlas/paper-bags/",
-            "connection_rate": "/waste_collection/api/waste-atlas/connection-rate/",
-            "participation_policy": "/waste_collection/api/waste-atlas/participation-policy/",
+            "collection_system": "/waste_collection/waste-atlas/api/collection-system/",
+            "paper_bags": "/waste_collection/waste-atlas/api/paper-bags/",
+            "connection_rate": "/waste_collection/waste-atlas/api/connection-rate/",
+            "participation_policy": "/waste_collection/waste-atlas/api/participation-policy/",
         }
         responses = {
             name: self.client.get(endpoint, {"country": "DE", "year": 2024})
@@ -2923,7 +2927,7 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
     def test_primary_selection_query_count_is_bounded(self):
         with self.assertNumQueries(3):
             response = self.client.get(
-                "/waste_collection/api/waste-atlas/paper-bags/",
+                "/waste_collection/waste-atlas/api/paper-bags/",
                 {"country": "DE", "year": 2024},
             )
 
@@ -2932,7 +2936,7 @@ class WasteAtlasPrimarySelectionTests(APITestCase):
 
 
 class TargetWasteCategoryViewSetTests(APITestCase):
-    endpoint = "/waste_collection/api/waste-atlas/target-waste-category/"
+    endpoint = "/waste_collection/waste-atlas/api/target-waste-category/"
 
     @classmethod
     def setUpTestData(cls):
@@ -2994,7 +2998,7 @@ class TargetWasteCategoryViewSetTests(APITestCase):
 
 
 class BiowasteFeeSystemViewSetTests(APITestCase):
-    endpoint = "/waste_collection/api/waste-atlas/biowaste-fee-system/"
+    endpoint = "/waste_collection/waste-atlas/api/biowaste-fee-system/"
 
     @classmethod
     def setUpTestData(cls):
@@ -3048,7 +3052,7 @@ class BiowasteFeeSystemViewSetTests(APITestCase):
 
     def test_combined_map_keeps_the_bring_point_residual_fee(self):
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/combined-fee-system/",
+            "/waste_collection/waste-atlas/api/combined-fee-system/",
             {"country": "DE", "year": 2024},
         )
 
@@ -3068,7 +3072,7 @@ class BiowasteFeeSystemViewSetTests(APITestCase):
 class BinConfigurationViewSetTests(APITestCase):
     """Tests for bin-configuration atlas endpoint."""
 
-    endpoint = "/waste_collection/api/waste-atlas/bin-configuration/"
+    endpoint = "/waste_collection/waste-atlas/api/bin-configuration/"
 
     @classmethod
     def setUpTestData(cls):
@@ -3257,7 +3261,7 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
 
     def test_collection_system_endpoint_respects_nuts_prefix(self):
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/collection-system/",
+            "/waste_collection/waste-atlas/api/collection-system/",
             {
                 "country": "BE",
                 "year": 2022,
@@ -3272,7 +3276,7 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
 
     def test_catchment_geojson_endpoint_respects_nuts_prefix(self):
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/catchment/geojson/",
+            "/waste_collection/waste-atlas/api/catchment/geojson/",
             {
                 "country": "BE",
                 "year": 2022,
@@ -3290,7 +3294,7 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
 
     def test_combined_frequency_endpoint_respects_nuts_prefix_for_residual_branch(self):
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/combined-frequency-type/",
+            "/waste_collection/waste-atlas/api/combined-frequency-type/",
             {
                 "country": "BE",
                 "year": 2022,
@@ -3319,7 +3323,7 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
 class GreenWasteCollectionAmountViewSetTests(APITestCase):
     """Tests for Green Waste collection amount atlas endpoint."""
 
-    endpoint = "/waste_collection/api/waste-atlas/green-waste-collection-amount/"
+    endpoint = "/waste_collection/waste-atlas/api/green-waste-collection-amount/"
 
     @classmethod
     def setUpTestData(cls):
@@ -3624,7 +3628,7 @@ class BinSizeViewSetTests(APITestCase):
     def test_biowaste_min_bin_size_returns_d2d_collections(self):
         """Karte 23 returns min_bin_size for D2D biowaste catchments."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/biowaste-min-bin-size/",
+            "/waste_collection/waste-atlas/api/biowaste-min-bin-size/",
             {"country": "DE", "year": 2024},
         )
         self.assertEqual(response.status_code, 200)
@@ -3639,7 +3643,7 @@ class BinSizeViewSetTests(APITestCase):
     def test_biowaste_min_bin_size_marks_non_d2d(self):
         """Karte 23 marks bring-point and other non-D2D collections."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/biowaste-min-bin-size/",
+            "/waste_collection/waste-atlas/api/biowaste-min-bin-size/",
             {"country": "DE", "year": 2024},
         )
         by_catchment = {r["catchment_id"]: r for r in response.data}
@@ -3649,7 +3653,7 @@ class BinSizeViewSetTests(APITestCase):
     def test_residual_min_bin_size_returns_d2d_collections(self):
         """Karte 24 returns min_bin_size for D2D residual catchments."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/residual-min-bin-size/",
+            "/waste_collection/waste-atlas/api/residual-min-bin-size/",
             {"country": "DE", "year": 2024},
         )
         self.assertEqual(response.status_code, 200)
@@ -3662,7 +3666,7 @@ class BinSizeViewSetTests(APITestCase):
     def test_biowaste_required_bin_capacity_returns_value_and_reference(self):
         """Karte 25 returns required_bin_capacity and reference for biowaste D2D."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/biowaste-required-bin-capacity/",
+            "/waste_collection/waste-atlas/api/biowaste-required-bin-capacity/",
             {"country": "DE", "year": 2024},
         )
         self.assertEqual(response.status_code, 200)
@@ -3676,7 +3680,7 @@ class BinSizeViewSetTests(APITestCase):
     def test_biowaste_required_bin_capacity_null_when_not_set(self):
         """Karte 25 returns null capacity for catchments without the field set."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/biowaste-required-bin-capacity/",
+            "/waste_collection/waste-atlas/api/biowaste-required-bin-capacity/",
             {"country": "DE", "year": 2024},
         )
         by_catchment = {r["catchment_id"]: r for r in response.data}
@@ -3688,7 +3692,7 @@ class BinSizeViewSetTests(APITestCase):
     def test_biowaste_required_bin_capacity_marks_non_d2d(self):
         """Karte 25 marks non-D2D biowaste catchments separately from no data."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/biowaste-required-bin-capacity/",
+            "/waste_collection/waste-atlas/api/biowaste-required-bin-capacity/",
             {"country": "DE", "year": 2024},
         )
         by_catchment = {r["catchment_id"]: r for r in response.data}
@@ -3700,7 +3704,7 @@ class BinSizeViewSetTests(APITestCase):
     def test_residual_required_bin_capacity_returns_value_and_reference(self):
         """Karte 26 returns required_bin_capacity and reference for residual D2D."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/residual-required-bin-capacity/",
+            "/waste_collection/waste-atlas/api/residual-required-bin-capacity/",
             {"country": "DE", "year": 2024},
         )
         self.assertEqual(response.status_code, 200)
@@ -3794,7 +3798,7 @@ class AtlasRatioViewSetTests(APITestCase):
 
     def test_collection_count_ratio_endpoint(self):
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/collection-count-ratio/",
+            "/waste_collection/waste-atlas/api/collection-count-ratio/",
             {"country": "DE", "year": 2024},
         )
 
@@ -3812,7 +3816,7 @@ class AtlasRatioViewSetTests(APITestCase):
 
     def test_min_bin_size_ratio_endpoint(self):
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/min-bin-size-ratio/",
+            "/waste_collection/waste-atlas/api/min-bin-size-ratio/",
             {"country": "DE", "year": 2024},
         )
 
@@ -4012,7 +4016,7 @@ class OrganicAmountViewSetTests(APITestCase):
     def test_organic_amount_sums_bio_and_green(self):
         """Karte 27 returns the sum of bio + green waste amounts per catchment."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/organic-collection-amount/",
+            "/waste_collection/waste-atlas/api/organic-collection-amount/",
             {"country": "DE", "year": 2024},
         )
         self.assertEqual(response.status_code, 200)
@@ -4029,7 +4033,7 @@ class OrganicAmountViewSetTests(APITestCase):
         ).update(publication_status="private")
 
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/organic-collection-amount/",
+            "/waste_collection/waste-atlas/api/organic-collection-amount/",
             {"country": "DE", "year": 2024, "scope": "published"},
         )
         self.assertEqual(response.status_code, 200)
@@ -4040,7 +4044,7 @@ class OrganicAmountViewSetTests(APITestCase):
     def test_organic_amount_bio_only_catchment(self):
         """Karte 27 includes catchments with only bio waste."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/organic-collection-amount/",
+            "/waste_collection/waste-atlas/api/organic-collection-amount/",
             {"country": "DE", "year": 2024},
         )
         by_catchment = {r["catchment_id"]: r for r in response.data}
@@ -4049,7 +4053,7 @@ class OrganicAmountViewSetTests(APITestCase):
     def test_organic_amount_green_only_catchment(self):
         """Karte 27 includes catchments with only green waste."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/organic-collection-amount/",
+            "/waste_collection/waste-atlas/api/organic-collection-amount/",
             {"country": "DE", "year": 2024},
         )
         by_catchment = {r["catchment_id"]: r for r in response.data}
@@ -4060,7 +4064,7 @@ class OrganicAmountViewSetTests(APITestCase):
     def test_organic_amount_marks_residual_only_as_no_collection(self):
         """Karte 27 marks catchments without organic streams as no collection."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/organic-collection-amount/",
+            "/waste_collection/waste-atlas/api/organic-collection-amount/",
             {"country": "DE", "year": 2024},
         )
         by_catchment = {r["catchment_id"]: r for r in response.data}
@@ -4071,7 +4075,7 @@ class OrganicAmountViewSetTests(APITestCase):
     def test_organic_amount_marks_no_separate_collection(self):
         """Karte 27 distinguishes no organic collection from missing data."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/organic-collection-amount/",
+            "/waste_collection/waste-atlas/api/organic-collection-amount/",
             {"country": "DE", "year": 2024},
         )
 
@@ -4082,7 +4086,7 @@ class OrganicAmountViewSetTests(APITestCase):
 
     def test_organic_ratio_marks_no_separate_collection(self):
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/organic-waste-ratio/",
+            "/waste_collection/waste-atlas/api/organic-waste-ratio/",
             {"country": "DE", "year": 2024},
         )
 
@@ -4094,7 +4098,7 @@ class OrganicAmountViewSetTests(APITestCase):
     def test_organic_ratio_computed_correctly(self):
         """Karte 28 computes organic / (organic + residual) for catchments with both."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/organic-waste-ratio/",
+            "/waste_collection/waste-atlas/api/organic-waste-ratio/",
             {"country": "DE", "year": 2024},
         )
         self.assertEqual(response.status_code, 200)
@@ -4107,7 +4111,7 @@ class OrganicAmountViewSetTests(APITestCase):
     def test_organic_ratio_null_when_only_organic(self):
         """Karte 28 returns null ratio for catchments without residual data."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/organic-waste-ratio/",
+            "/waste_collection/waste-atlas/api/organic-waste-ratio/",
             {"country": "DE", "year": 2024},
         )
         by_catchment = {r["catchment_id"]: r for r in response.data}
@@ -4116,7 +4120,7 @@ class OrganicAmountViewSetTests(APITestCase):
     def test_organic_ratio_includes_residual_only_catchment(self):
         """Karte 28 includes residual-only catchments (null ratio)."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/organic-waste-ratio/",
+            "/waste_collection/waste-atlas/api/organic-waste-ratio/",
             {"country": "DE", "year": 2024},
         )
         by_catchment = {r["catchment_id"]: r for r in response.data}
@@ -4220,7 +4224,7 @@ class WasteRatioMixedNumericTypesTests(APITestCase):
 
     def test_waste_ratio_combines_fallback_and_direct_amounts(self):
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/waste-ratio/",
+            "/waste_collection/waste-atlas/api/waste-ratio/",
             {"country": "DE", "year": 2024},
         )
 
@@ -4319,7 +4323,7 @@ class SouthTyrolCollectionPointTests(APITestCase):
     def test_biowaste_collection_point_count_endpoint(self):
         """BiowasteCollectionPointCountViewSet returns bio-specific collection point counts."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/biowaste-collection-point-count/",
+            "/waste_collection/waste-atlas/api/biowaste-collection-point-count/",
             {"country": "IT", "year": 2024},
         )
 
@@ -4336,7 +4340,7 @@ class SouthTyrolCollectionPointTests(APITestCase):
     def test_residual_collection_point_count_endpoint(self):
         """ResidualCollectionPointCountViewSet returns residual-specific collection point counts."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/residual-collection-point-count/",
+            "/waste_collection/waste-atlas/api/residual-collection-point-count/",
             {"country": "IT", "year": 2024},
         )
 
@@ -4350,7 +4354,7 @@ class SouthTyrolCollectionPointTests(APITestCase):
     def test_collection_point_count_ratio_endpoint(self):
         """CollectionPointCountRatioViewSet computes bio/residual collection point ratio."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/collection-point-count-ratio/",
+            "/waste_collection/waste-atlas/api/collection-point-count-ratio/",
             {"country": "IT", "year": 2024},
         )
 
@@ -4384,7 +4388,7 @@ class SouthTyrolCollectionPointTests(APITestCase):
         )
 
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/collection-point-count-ratio/",
+            "/waste_collection/waste-atlas/api/collection-point-count-ratio/",
             {"country": "IT", "year": 2025},
         )
 
@@ -4479,7 +4483,7 @@ class FalsyZeroRatioGuardTests(APITestCase):
         rather than computing the ratio and guarding against division by zero.
         """
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/collection-count-ratio/",
+            "/waste_collection/waste-atlas/api/collection-count-ratio/",
             {"country": "DE", "year": 2024},
         )
 
@@ -4499,7 +4503,7 @@ class FalsyZeroRatioGuardTests(APITestCase):
         rather than computing the ratio and guarding against division by zero.
         """
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/min-bin-size-ratio/",
+            "/waste_collection/waste-atlas/api/min-bin-size-ratio/",
             {"country": "DE", "year": 2024},
         )
 
@@ -4608,7 +4612,7 @@ class CollectionPointCountNoDataAndDtDTests(APITestCase):
     def test_biowaste_dtd_no_cpv_returns_null_count_and_dtd_flag(self):
         """BiowasteCollectionPointCountViewSet: DtD catchment with no CPV has null count, is_door_to_door=True."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/biowaste-collection-point-count/",
+            "/waste_collection/waste-atlas/api/biowaste-collection-point-count/",
             {"country": "AT", "year": 2024},
         )
         self.assertEqual(response.status_code, 200)
@@ -4620,7 +4624,7 @@ class CollectionPointCountNoDataAndDtDTests(APITestCase):
     def test_biowaste_bp_no_cpv_returns_null_count_and_no_dtd_flag(self):
         """BiowasteCollectionPointCountViewSet: bring-point catchment with no CPV has null count, is_door_to_door=False."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/biowaste-collection-point-count/",
+            "/waste_collection/waste-atlas/api/biowaste-collection-point-count/",
             {"country": "AT", "year": 2024},
         )
         self.assertEqual(response.status_code, 200)
@@ -4632,7 +4636,7 @@ class CollectionPointCountNoDataAndDtDTests(APITestCase):
     def test_residual_no_cpv_catchment_excluded(self):
         """ResidualCollectionPointCountViewSet: catchments with only biowaste collections are excluded."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/residual-collection-point-count/",
+            "/waste_collection/waste-atlas/api/residual-collection-point-count/",
             {"country": "AT", "year": 2024},
         )
         self.assertEqual(response.status_code, 200)
@@ -4644,7 +4648,7 @@ class CollectionPointCountNoDataAndDtDTests(APITestCase):
     def test_ratio_endpoint_bio_dtd_no_count_with_residual_count(self):
         """Ratio endpoint: bio DtD (no count) + residual with count → bio_is_door_to_door=True, bio_count=null, ratio=null."""
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/collection-point-count-ratio/",
+            "/waste_collection/waste-atlas/api/collection-point-count-ratio/",
             {"country": "AT", "year": 2024},
         )
         self.assertEqual(response.status_code, 200)
@@ -4659,7 +4663,7 @@ class CollectionPointCountNoDataAndDtDTests(APITestCase):
 class BiowasteImpurityViewSetTests(APITestCase):
     """Tests for BiowasteImpurityViewSet."""
 
-    endpoint = "/waste_collection/api/waste-atlas/biowaste-impurity/"
+    endpoint = "/waste_collection/waste-atlas/api/biowaste-impurity/"
 
     @classmethod
     def setUpTestData(cls):
@@ -4795,7 +4799,7 @@ class BiowasteImpurityViewSetTests(APITestCase):
 class WeeklyBpAccessDaysViewSetTests(APITestCase):
     """Tests for WeeklyBpAccessDaysViewSet."""
 
-    endpoint = "/waste_collection/api/waste-atlas/weekly-bp-access-days/"
+    endpoint = "/waste_collection/waste-atlas/api/weekly-bp-access-days/"
 
     @classmethod
     def setUpTestData(cls):
@@ -4931,12 +4935,12 @@ class WasteAtlasPublicationScopingTests(APITestCase):
     """Non-published collections must never appear in waste atlas API responses."""
 
     ENDPOINTS = {
-        "collection_system": "/waste_collection/api/waste-atlas/collection-system/",
-        "catchment_geojson": "/waste_collection/api/waste-atlas/catchment/geojson/",
-        "collector_orga_level": "/waste_collection/api/waste-atlas/collector-orga-level/",
-        "collection_orga_level": "/waste_collection/api/waste-atlas/collection-orga-level/",
-        "participation_policy": "/waste_collection/api/waste-atlas/participation-policy/",
-        "conflicts": "/waste_collection/api/waste-atlas/collection-conflicts/",
+        "collection_system": "/waste_collection/waste-atlas/api/collection-system/",
+        "catchment_geojson": "/waste_collection/waste-atlas/api/catchment/geojson/",
+        "collector_orga_level": "/waste_collection/waste-atlas/api/collector-orga-level/",
+        "collection_orga_level": "/waste_collection/waste-atlas/api/collection-orga-level/",
+        "participation_policy": "/waste_collection/waste-atlas/api/participation-policy/",
+        "conflicts": "/waste_collection/waste-atlas/api/collection-conflicts/",
     }
 
     @classmethod
@@ -5200,7 +5204,10 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         self.assertNotIn(self.review_catchment.id, ids)
 
     def test_conflicts_excludes_non_published(self):
-        response = self._get("conflicts", theme="collection_system")
+        self.client.force_login(
+            User.objects.create_user("pubscope-staff", is_staff=True)
+        )
+        response = self._get("conflicts", theme="collection_system", scope="published")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = self._catchment_ids(response)
         self.assertNotIn(self.private_catchment.id, ids)
@@ -5363,7 +5370,7 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         )
         self.client.force_login(self.user)
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/biowaste-impurity/",
+            "/waste_collection/waste-atlas/api/biowaste-impurity/",
             {"country": "DE", "year": 2024, "scope": "mine"},
         )
         self.assertEqual(response.status_code, 200)
@@ -5386,7 +5393,7 @@ class WasteAtlasPublicationScopingTests(APITestCase):
             publication_status="private",
         )
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/collection-point-count/",
+            "/waste_collection/waste-atlas/api/collection-point-count/",
             {"country": "DE", "year": 2024, "scope": "mine"},
         )
         self.assertEqual(response.status_code, 200)
@@ -5412,7 +5419,7 @@ class WasteAtlasPublicationScopingTests(APITestCase):
             if scope:
                 params["scope"] = scope
             response = self.client.get(
-                "/waste_collection/api/waste-atlas/collection-point-count/", params
+                "/waste_collection/waste-atlas/api/collection-point-count/", params
             )
             self.assertEqual(response.status_code, 200)
             row = next(
@@ -5452,7 +5459,7 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         )
         self.client.force_login(moderator)
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/biowaste-impurity/",
+            "/waste_collection/waste-atlas/api/biowaste-impurity/",
             {"country": "DE", "year": 2024, "scope": "review"},
         )
         self.assertEqual(response.status_code, 200)
@@ -5622,7 +5629,7 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
 
     def _feature(self, action, year):
         response = self.client.get(
-            f"/waste_collection/api/waste-atlas/catchment/{action}/",
+            f"/waste_collection/waste-atlas/api/catchment/{action}/",
             {"country": "DE", "year": year},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -5655,7 +5662,7 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
 
     def _change_features(self, action="collection-change-geojson"):
         response = self.client.get(
-            f"/waste_collection/api/waste-atlas/catchment/{action}/",
+            f"/waste_collection/waste-atlas/api/catchment/{action}/",
             {"country": "DE", "from_year": 2022, "to_year": 2024},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -5664,7 +5671,7 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
     def test_change_geometry_rejects_large_unbounded_requests(self):
         with patch("maps.mixins.MAX_UNBOUNDED_GEOJSON_FEATURES", 0):
             response = self.client.get(
-                "/waste_collection/api/waste-atlas/catchment/"
+                "/waste_collection/waste-atlas/api/catchment/"
                 "collection-change-geojson/",
                 {"from_year": 2022, "to_year": 2024},
             )
@@ -5674,7 +5681,7 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
     def test_collector_change_geometry_rejects_large_unbounded_requests(self):
         with patch("maps.mixins.MAX_UNBOUNDED_GEOJSON_FEATURES", 0):
             response = self.client.get(
-                "/waste_collection/api/waste-atlas/catchment/collector-change-geojson/",
+                "/waste_collection/waste-atlas/api/catchment/collector-change-geojson/",
                 {"from_year": 2022, "to_year": 2024},
             )
 
@@ -5752,7 +5759,7 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
         )
 
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/catchment/collection-geojson/",
+            "/waste_collection/waste-atlas/api/catchment/collection-geojson/",
             {"country": "DE", "year": 2024},
         )
         revision_only = next(
@@ -5788,7 +5795,7 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
         for action in ("collection-geojson", "collector-geojson"):
             with self.subTest(action=action):
                 response = self.client.get(
-                    f"/waste_collection/api/waste-atlas/catchment/{action}/",
+                    f"/waste_collection/waste-atlas/api/catchment/{action}/",
                     {"country": "DE", "year": 2024},
                 )
 
@@ -5836,7 +5843,12 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
                 # The subnet throttle only buckets anonymous clients, so the
                 # shared atlas scope must stay for authenticated ones.
                 self.assertIn(GeoJSONAnonThrottle, throttles)
-                self.assertIn(ScopedRateThrottle, throttles)
+                self.assertTrue(
+                    any(
+                        issubclass(throttle, ScopedRateThrottle)
+                        for throttle in throttles
+                    )
+                )
 
 
 class WasteAtlasChangeOverlayPrecisionTests(APITestCase):
@@ -5895,7 +5907,7 @@ class WasteAtlasChangeOverlayPrecisionTests(APITestCase):
     def _features(self):
         caches[getattr(settings, "GEOJSON_CACHE", "default")].clear()
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/catchment/collection-change-geojson/",
+            "/waste_collection/waste-atlas/api/catchment/collection-change-geojson/",
             {"country": "DE", "from_year": 2022, "to_year": 2024},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -5978,7 +5990,7 @@ class WasteAtlasChangeOverlayBorderNoiseTests(APITestCase):
     def _features(self):
         caches[getattr(settings, "GEOJSON_CACHE", "default")].clear()
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/catchment/collection-change-geojson/",
+            "/waste_collection/waste-atlas/api/catchment/collection-change-geojson/",
             {"country": "DE", "from_year": 2022, "to_year": 2024},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -6067,7 +6079,7 @@ class WasteAtlasChangeOverlappingCatchmentTests(APITestCase):
     def _transferred(self):
         caches[getattr(settings, "GEOJSON_CACHE", "default")].clear()
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/catchment/collection-change-geojson/",
+            "/waste_collection/waste-atlas/api/catchment/collection-change-geojson/",
             {"country": "DE", "from_year": 2022, "to_year": 2024},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -6167,7 +6179,7 @@ class WasteAtlasChangeYearParsingTests(APITestCase):
     def test_out_of_range_years_are_clamped_to_the_atlas_range(self):
         self.assertEqual(
             self._years({"from_year": 1900, "to_year": 3000}),
-            (atlas_viewsets.MIN_ATLAS_YEAR, atlas_viewsets.MAX_ATLAS_YEAR),
+            (atlas_params.MIN_ATLAS_YEAR, atlas_params.MAX_ATLAS_YEAR),
         )
 
     def test_supported_years_pass_through(self):

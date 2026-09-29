@@ -5,6 +5,8 @@ from django.conf import settings
 from django.core.cache import cache
 from django.http import Http404, HttpResponse, HttpResponsePermanentRedirect
 
+from .client_ip import get_client_ip
+
 logger = logging.getLogger(__name__)
 
 
@@ -59,6 +61,12 @@ class AnonymousRateLimitMiddleware:
     """
 
     EXEMPT_PATHS = frozenset({"/health/"})
+    # One atlas map load fans out into several data requests (atlas data and
+    # NUTS boundaries); both endpoints are limited by their own DRF throttles.
+    EXEMPT_PATH_PREFIXES = (
+        "/waste_collection/waste-atlas/api/",
+        "/maps/api/nuts_region/geojson/",
+    )
     WINDOW_SECONDS = 60
 
     def __init__(self, get_response):
@@ -69,11 +77,12 @@ class AnonymousRateLimitMiddleware:
         if (
             not limit
             or request.path in self.EXEMPT_PATHS
+            or request.path.startswith(self.EXEMPT_PATH_PREFIXES)
             or self._is_authenticated(request)
         ):
             return self.get_response(request)
 
-        client_ip = self._client_ip(request)
+        client_ip = get_client_ip(request)
         retry_after = self._limited(client_ip, "min", self.WINDOW_SECONDS, limit)
         burst = getattr(settings, "ANONYMOUS_RATE_LIMIT_BURST", 0)
         if not retry_after and burst:
@@ -117,26 +126,6 @@ class AnonymousRateLimitMiddleware:
             return TokenAuthentication().authenticate(request) is not None
         except Exception:
             return False
-
-    @staticmethod
-    def _client_ip(request):
-        """Client identity for rate limiting.
-
-        Cloudflare-fronted traffic: Cloudflare overwrites any
-        client-supplied ``CF-Connecting-IP`` with the real client IP, so it
-        is trusted when ``CF-RAY`` is also present — required anyway, since
-        the rightmost XFF entry on that path is a shared CF edge IP.
-        Direct traffic: Heroku's router appends the observed peer IP on the
-        right of ``X-Forwarded-For``, so the LAST entry is the only one the
-        client cannot control; earlier entries can be forged per request.
-        """
-        cf_ip = request.META.get("HTTP_CF_CONNECTING_IP", "")
-        if cf_ip and request.META.get("HTTP_CF_RAY"):
-            return cf_ip.strip()
-        forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-        if forwarded:
-            return forwarded.split(",")[-1].strip()
-        return request.META.get("REMOTE_ADDR", "")
 
 
 class ExceptionLoggingMiddleware:

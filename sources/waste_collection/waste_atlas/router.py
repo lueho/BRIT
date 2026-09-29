@@ -1,4 +1,4 @@
-from rest_framework import routers
+from rest_framework import permissions, routers
 
 from .viewsets import (
     AccessControlViewSet,
@@ -53,7 +53,18 @@ from .viewsets import (
     WeeklyBpAccessDaysViewSet,
 )
 
-router = routers.DefaultRouter()
+
+class PublicAPIRootView(routers.APIRootView):
+    """Public entry point listing the atlas data endpoints."""
+
+    permission_classes = [permissions.AllowAny]
+
+
+class AtlasRouter(routers.DefaultRouter):
+    APIRootView = PublicAPIRootView
+
+
+router = AtlasRouter()
 router.register("catchment", CatchmentViewSet, basename="api-waste-atlas-catchment")
 router.register(
     "population",

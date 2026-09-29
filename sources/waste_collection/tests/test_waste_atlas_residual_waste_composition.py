@@ -25,7 +25,7 @@ from utils.properties.models import Property, Unit
 
 
 class ResidualWasteCompositionViewSetTests(APITestCase):
-    endpoint = "/waste_collection/api/waste-atlas/residual-waste-composition/"
+    endpoint = "/waste_collection/waste-atlas/api/residual-waste-composition/"
 
     @classmethod
     def setUpTestData(cls):
@@ -260,7 +260,7 @@ class RheinlandPfalzResidualWasteCompositionMapTests(TestCase):
                 config = MAP_CONFIGS[theme]
                 self.assertEqual(
                     config["dataUrl"],
-                    "/waste_collection/api/waste-atlas/residual-waste-composition/",
+                    "/waste_collection/waste-atlas/api/residual-waste-composition/",
                 )
                 self.assertEqual(config["dataField"], "_classified")
                 self.assertEqual(config["numericField"], theme)

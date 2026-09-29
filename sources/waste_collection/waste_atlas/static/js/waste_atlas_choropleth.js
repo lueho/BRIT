@@ -10,7 +10,7 @@
  *     year:         2022,
  *     title:        'Map title',
  *     subtitle:     '',                   // optional
- *     dataUrl:      '/waste_collection/api/waste-atlas/orga-level/',
+ *     dataUrl:      '/waste_collection/waste-atlas/api/orga-level/',
  *     dataField:    'orga_level',         // field in the data JSON to classify on
  *     categories:   [                     // ordered; first match wins
  *       { value: 'nuts', label: 'Landkreise', color: '#93d163' },
@@ -463,11 +463,11 @@ var WasteAtlasChoropleth = (function () {
     if (catchmentDataUrl.indexOf('geojson') !== -1) {
       return catchmentDataUrl.replace('geojson', 'collection-change-geojson');
     }
-    return '/waste_collection/api/waste-atlas/catchment/collection-change-geojson/';
+    return '/waste_collection/waste-atlas/api/catchment/collection-change-geojson/';
   }
 
   function _fetchAll(cfg) {
-    var base = '/waste_collection/api/waste-atlas/';
+    var base = '/waste_collection/waste-atlas/api/';
     var scopeSuffix = '&scope=' + encodeURIComponent(cfg.scope || 'published');
     var nutsSuffix = cfg.nutsPrefix ? '&nuts_prefix=' + encodeURIComponent(cfg.nutsPrefix) : '';
     var collectionYear = cfg.collectionYear || cfg.year;
@@ -3777,9 +3777,13 @@ var WasteAtlasChoropleth = (function () {
           _hide(loadingEl);
           console.error('Waste Atlas load error:', err);
           var container = document.getElementById(cfg.containerId);
-          container.innerHTML = '<div class="alert alert-danger m-3">'
-            + '<strong>Error loading map data:</strong> ' + err.message
-            + '</div>';
+          var alertEl = document.createElement('div');
+          alertEl.className = 'alert alert-danger m-3';
+          var strongEl = document.createElement('strong');
+          strongEl.textContent = 'Error loading map data:';
+          alertEl.appendChild(strongEl);
+          alertEl.appendChild(document.createTextNode(' ' + err.message));
+          container.replaceChildren(alertEl);
         });
     }
 
@@ -3969,6 +3973,22 @@ var WasteAtlasChoropleth = (function () {
       });
     }
     if (scrim) scrim.addEventListener('click', function () { setTreeOpen(false); });
+
+    var copyButton = document.getElementById('btn-copy-permalink');
+    var copyField = copyButton && document.getElementById(copyButton.getAttribute('data-copy-target'));
+    if (copyField) {
+      copyField.addEventListener('focus', function () { copyField.select(); });
+      copyButton.addEventListener('click', function () {
+        copyField.select();
+        var label = copyButton.innerHTML;
+        var done = function () {
+          copyButton.textContent = 'Copied';
+          setTimeout(function () { copyButton.innerHTML = label; }, 2000);
+        };
+        if (navigator.clipboard) navigator.clipboard.writeText(copyField.value).then(done);
+        else if (document.execCommand('copy')) done();
+      });
+    }
 
     var filter = document.getElementById('atlas-tree-filter');
     if (filter && tree) {

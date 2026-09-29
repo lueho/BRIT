@@ -9,6 +9,7 @@ from ..legend import (
 )
 from ..map_configs import MAP_CONFIGS
 from ..models import WasteAtlasRenderingSettings
+from ..viewsets import is_maintainer
 
 register = template.Library()
 
@@ -20,6 +21,8 @@ _EXPORT_LEGEND_LAYOUT_KEYS = frozenset(
     (*EXPORT_LEGEND_OVERRIDE_KEYS, *LEGACY_EXPORT_LEGEND_KEYS)
 )
 _STAFF_EDITABLE_TEXT_KEYS = frozenset({"exportLegendTitle"})
+# Keys only emitted for maintainers (staff and collection moderators).
+_MAINTAINER_ONLY_KEYS = frozenset({"conflictUrl"})
 # Legend entries may name an atlas-wide fill instead of a literal colour.
 _SHARED_COLOR_REFS = {
     "no_collection": "no_collection_color",
@@ -28,7 +31,9 @@ _SHARED_COLOR_REFS = {
 _CATEGORY_KEYS = ("categories", "quartileSpecialCases")
 # Stored keys whose emitted value is not the raw ``MAP_CONFIGS`` value because the
 # tag resolves or strips them at render time.
-RENDER_TIME_RESOLVED_KEYS = _EXPORT_LEGEND_LAYOUT_KEYS | _STAFF_EDITABLE_TEXT_KEYS
+RENDER_TIME_RESOLVED_KEYS = (
+    _EXPORT_LEGEND_LAYOUT_KEYS | _STAFF_EDITABLE_TEXT_KEYS | _MAINTAINER_ONLY_KEYS
+)
 
 
 def _resolved_entries(entries, settings):
@@ -149,6 +154,12 @@ def atlas_js_config(context, config_key):
     config.setdefault("legendPlacement", defaults["legend"]["placement"])
     config.setdefault("legendWidth", defaults["legend"]["width"])
     config.setdefault("legendFontSize", defaults["legend"]["fontSize"])
+
+    # The conflict aid is a maintainer tool; its endpoint refuses everyone else.
+    request = context.get("request")
+    if not is_maintainer(getattr(request, "user", None)):
+        for key in _MAINTAINER_ONLY_KEYS:
+            config.pop(key, None)
 
     # Runtime context from the view
     config["country"] = context.get("country", "DE")

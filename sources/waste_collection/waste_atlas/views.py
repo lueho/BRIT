@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_exempt
-from django.views.generic import FormView, ListView, TemplateView
+from django.views.generic import FormView, ListView, RedirectView, TemplateView
 
 from .forms import WasteAtlasMapConfigurationForm
 from .map_selection import (
@@ -21,9 +21,14 @@ from .map_selection import (
 )
 from .models import WasteAtlasMapConfiguration
 from .pages import MAP_PAGES, MAP_SET_LABELS
-from .viewsets import _effective_scope
-
-WASTE_ATLAS_GROUP_NAME = "waste_atlas"
+from .params import (
+    parse_atlas_year,
+    parse_country,
+    parse_nuts_level,
+    parse_nuts_prefix,
+    parse_year,
+)
+from .viewsets import _effective_scope, is_maintainer
 
 
 class AtlasShellTreeMixin:
@@ -44,6 +49,14 @@ class AtlasShellTreeMixin:
         return ctx
 
 
+def resolve_map_page(map_set, theme):
+    """Return the ``MAP_PAGES`` entry for a map set and theme, or raise 404."""
+    for page in MAP_PAGES:
+        if page["selector_set"] == map_set and page["theme"] == theme:
+            return page
+    raise Http404(f"No waste atlas map for {map_set}/{theme}")
+
+
 def _previous_selection_year(year):
     year = str(year)
     if year in MAP_SELECTION_YEARS:
@@ -53,14 +66,6 @@ def _previous_selection_year(year):
         return str(int(year) - 1)
     except ValueError:
         return year
-
-
-class WasteAtlasGroupMixin(LoginRequiredMixin, UserPassesTestMixin):
-    """Restrict access to members of the ``waste_atlas`` group."""
-
-    def test_func(self):
-        """Return True if the user belongs to the waste_atlas group."""
-        return self.request.user.groups.filter(name=WASTE_ATLAS_GROUP_NAME).exists()
 
 
 class WasteAtlasStaffMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -192,7 +197,7 @@ class WasteAtlasMapConfigurationUpdateView(
 
 
 @method_decorator(never_cache, name="dispatch")
-class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
+class AtlasMapView(TemplateView):
     """Generic choropleth map page driven by a ``MAP_PAGES`` entry.
 
     The page entry (see ``pages.py``) provides the URL, title, region scope,
@@ -207,19 +212,23 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
     def get_template_names(self):
         return [self.page.get("template", self.template_name)]
 
-    def _get_param(self, key, default):
+    def _get_param(self, key, default, parse):
         if self.page["lock"]:
             return default
-        return self.request.GET.get(key, default)
+        return parse(self.request.GET.get(key), default)
 
     def get_country(self):
-        return self._get_param("country", self.page["country"])
+        return self._get_param("country", self.page["country"], parse_country)
 
     def get_nuts_prefix(self):
-        return self._get_param("nuts_prefix", self.page.get("nuts_prefix", ""))
+        return self._get_param(
+            "nuts_prefix", self.page.get("nuts_prefix", ""), parse_nuts_prefix
+        )
 
     def get_nuts_level(self):
-        return self._get_param("nuts_level", self.page.get("nuts_level", ""))
+        return self._get_param(
+            "nuts_level", self.page.get("nuts_level", ""), parse_nuts_level
+        )
 
     def get_selected_map_set(self):
         if self.page["selector_set"]:
@@ -235,14 +244,11 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
         page = self.page
         selected_map_set = self.get_selected_map_set()
         ctx["country"] = self.get_country()
-        ctx["year"] = self.request.GET.get("year", page["year"])
+        ctx["year"] = str(parse_year(self.request.GET.get("year"), page["year"]))
         ctx["atlas_scope"] = _effective_scope(
             self.request.user, self.request.GET.get("scope", "published")
         )[0]
-        ctx["can_review_collections"] = (
-            self.request.user.is_staff
-            or self.request.user.has_perm("waste_collection.can_moderate_collection")
-        )
+        ctx["can_review_collections"] = is_maintainer(self.request.user)
         ctx["nuts_prefix"] = self.get_nuts_prefix()
         ctx["nuts_level"] = self.get_nuts_level()
         ctx["map_title"] = page["title"]
@@ -303,7 +309,20 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
             else ""
         )
         ctx["map_toggle_label"] = "View changes for this map"
+        ctx["atlas_permalink_url"] = self.get_permalink_url(
+            selected_map_set, ctx["year"]
+        )
         return ctx
+
+    def get_permalink_url(self, map_set, year):
+        """Absolute permanent link for region-set maps of an offered year."""
+        if not self.page["selector_set"] or year not in MAP_SELECTION_YEARS:
+            return ""
+        return self.request.build_absolute_uri(
+            reverse(
+                "waste-atlas-permalink", args=[map_set, self.page["theme"], int(year)]
+            )
+        )
 
 
 class AtlasChangeMapView(AtlasMapView):
@@ -320,14 +339,7 @@ class AtlasChangeMapView(AtlasMapView):
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        self.page = self._resolve_page(kwargs["map_set"], kwargs["theme"])
-
-    @staticmethod
-    def _resolve_page(map_set, theme):
-        for page in MAP_PAGES:
-            if page["selector_set"] == map_set and page["theme"] == theme:
-                return page
-        raise Http404(f"No waste atlas map for {map_set}/{theme}")
+        self.page = resolve_map_page(kwargs["map_set"], kwargs["theme"])
 
     def get_template_names(self):
         return [self.template_name]
@@ -335,8 +347,10 @@ class AtlasChangeMapView(AtlasMapView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["map_overview_url"] = "waste-atlas-change-map-overview"
-        ctx["from_year"] = self.request.GET.get("from_year", "2024")
-        ctx["to_year"] = self.request.GET.get("to_year", "2024")
+        ctx["from_year"] = str(
+            parse_atlas_year(self.request.GET.get("from_year"), 2024)
+        )
+        ctx["to_year"] = str(parse_atlas_year(self.request.GET.get("to_year"), 2024))
         ctx["year"] = ctx["to_year"]
         ctx["default_from_year"] = ctx["from_year"]
         ctx["default_to_year"] = ctx["to_year"]
@@ -347,10 +361,29 @@ class AtlasChangeMapView(AtlasMapView):
             f"{reverse(self.page['name'])}?{urlencode({'year': ctx['year'], 'scope': ctx['atlas_scope']})}"
         )
         ctx["map_toggle_label"] = "View current map"
+        ctx["atlas_permalink_url"] = ""
         return ctx
 
 
-class WasteAtlasOverviewView(WasteAtlasGroupMixin, TemplateView):
+class AtlasPermalinkView(RedirectView):
+    """Resolve a citable map permalink to the map's current page.
+
+    Permalinks name a map by region set, theme and year instead of by page
+    path, so they keep working when page paths or the mount point change. They
+    always resolve to the published scope and show the data as published when
+    opened.
+    """
+
+    permanent = False
+
+    def get_redirect_url(self, *args, map_set, theme, year, **kwargs):
+        if str(year) not in MAP_SELECTION_YEARS:
+            raise Http404(f"No waste atlas map for year {year}")
+        page = resolve_map_page(map_set.upper(), theme)
+        return f"{reverse(page['name'])}?{urlencode({'year': year})}"
+
+
+class WasteAtlasOverviewView(TemplateView):
     """Overview page linking to all waste atlas maps."""
 
     template_name = "waste_atlas/overview.html"
@@ -373,9 +406,7 @@ class WasteAtlasOverviewView(WasteAtlasGroupMixin, TemplateView):
         return ctx
 
 
-class WasteAtlasChangeMapOverviewView(
-    WasteAtlasGroupMixin, AtlasShellTreeMixin, TemplateView
-):
+class WasteAtlasChangeMapOverviewView(AtlasShellTreeMixin, TemplateView):
     """Overview page for change maps — compare two versions of a waste atlas map."""
 
     template_name = "waste_atlas/change_map_overview.html"
@@ -385,24 +416,22 @@ class WasteAtlasChangeMapOverviewView(
         ctx["atlas_scope"] = _effective_scope(
             self.request.user, self.request.GET.get("scope", "published")
         )[0]
-        ctx["can_review_collections"] = (
-            self.request.user.is_staff
-            or self.request.user.has_perm("waste_collection.can_moderate_collection")
-        )
+        ctx["can_review_collections"] = is_maintainer(self.request.user)
         selection_ctx = build_map_selection_context(reverse)
         years = list(selection_ctx["map_selection_years"])
         ctx.update(selection_ctx)
-        ctx["default_from_year"] = self.request.GET.get(
-            "from_year", years[-1] if years else "2024"
+        default_year = years[-1] if years else "2024"
+        ctx["default_from_year"] = str(
+            parse_atlas_year(self.request.GET.get("from_year"), default_year)
         )
-        ctx["default_to_year"] = self.request.GET.get(
-            "to_year", years[-1] if years else "2024"
+        ctx["default_to_year"] = str(
+            parse_atlas_year(self.request.GET.get("to_year"), default_year)
         )
         return ctx
 
 
 class WasteAtlasDataConflictsOverviewView(
-    WasteAtlasGroupMixin, AtlasShellTreeMixin, TemplateView
+    WasteAtlasStaffMixin, AtlasShellTreeMixin, TemplateView
 ):
     """Overview page listing maps with the maintainer conflict-overlay aid.
 
@@ -436,9 +465,7 @@ class EuropeDataCoverageContextMixin:
         return ctx
 
 
-class EuropeDataCoverageMapView(
-    WasteAtlasGroupMixin, EuropeDataCoverageContextMixin, TemplateView
-):
+class EuropeDataCoverageMapView(EuropeDataCoverageContextMixin, TemplateView):
     """Map 0 — Waste collection data coverage in Europe."""
 
 
@@ -451,7 +478,7 @@ class EuropeDataCoverageMapIframeView(EuropeDataCoverageContextMixin, TemplateVi
     iframe_mode = True
 
 
-class EuropeBiowasteCollectionAmountMapView(WasteAtlasGroupMixin, TemplateView):
+class EuropeBiowasteCollectionAmountMapView(TemplateView):
     template_name = "waste_atlas/karte41_europe_biowaste_collection_amount.html"
 
     def get_context_data(self, **kwargs):

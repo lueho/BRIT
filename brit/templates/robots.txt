@@ -25,6 +25,8 @@ Disallow: /*?*return_to=
 Disallow: /*?*load_features=
 Disallow: /*?*page=
 Disallow: /*?*scope=
+# Atlas permalinks only redirect to maps that are already linked elsewhere
+Disallow: /*/waste-atlas/p/
 # Interactive geodataset views and per-feature pages are crawl bait
 Disallow: /maps/geodatasets/*/map/
 Disallow: /maps/geodatasets/*/table/
@@ -54,6 +56,7 @@ Allow: /about/
 Allow: /learning/
 Disallow: /*/api/
 Disallow: /*geojson/
+Disallow: /*/waste-atlas/p/
 Disallow: /*?*back=
 Disallow: /*?*next=
 Disallow: /*?*return_to=

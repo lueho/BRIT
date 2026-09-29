@@ -1,13 +1,15 @@
-<div class="atlas-selector-field">
-  <label for="sel-scope">Collection scope</label>
-  <select id="sel-scope">
-    <option value="published" {% if atlas_scope == "published" %}selected{% endif %}>Published</option>
-    <option value="mine" {% if atlas_scope == "mine" %}selected{% endif %}>Mine</option>
-    {% if can_review_collections %}
-      <option value="review" {% if atlas_scope == "review" %}selected{% endif %}>Review</option>
-    {% endif %}
-    {% if request.user.is_staff %}
-      <option value="all" {% if atlas_scope == "all" %}selected{% endif %}>All</option>
-    {% endif %}
-  </select>
-</div>
+{% if request.user.is_authenticated %}
+  <div class="atlas-selector-field">
+    <label for="sel-scope">Collection scope</label>
+    <select id="sel-scope">
+      <option value="published" {% if atlas_scope == "published" %}selected{% endif %}>Published</option>
+      <option value="mine" {% if atlas_scope == "mine" %}selected{% endif %}>Mine</option>
+      {% if can_review_collections %}
+        <option value="review" {% if atlas_scope == "review" %}selected{% endif %}>Review</option>
+      {% endif %}
+      {% if request.user.is_staff %}
+        <option value="all" {% if atlas_scope == "all" %}selected{% endif %}>All</option>
+      {% endif %}
+    </select>
+  </div>
+{% endif %}

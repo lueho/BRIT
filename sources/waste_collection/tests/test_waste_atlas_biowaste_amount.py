@@ -31,17 +31,17 @@ from utils.properties.models import Property, Unit
     WASTE_COLLECTION_POPULATION_ATTRIBUTE_NAME="Population [bio-atlas-test]",
 )
 class BiowasteCollectionAmountViewSetTests(APITestCase):
-    endpoint = "/waste_collection/api/waste-atlas/biowaste-collection-amount/"
+    endpoint = "/waste_collection/waste-atlas/api/biowaste-collection-amount/"
     outline_endpoint = (
-        "/waste_collection/api/waste-atlas/biowaste-collection-amount/"
+        "/waste_collection/waste-atlas/api/biowaste-collection-amount/"
         "acpv-outline-geojson/"
     )
-    residual_endpoint = "/waste_collection/api/waste-atlas/residual-collection-amount/"
+    residual_endpoint = "/waste_collection/waste-atlas/api/residual-collection-amount/"
     residual_outline_endpoint = (
-        "/waste_collection/api/waste-atlas/residual-collection-amount/"
+        "/waste_collection/waste-atlas/api/residual-collection-amount/"
         "acpv-outline-geojson/"
     )
-    ratio_endpoint = "/waste_collection/api/waste-atlas/waste-ratio/"
+    ratio_endpoint = "/waste_collection/waste-atlas/api/waste-ratio/"
 
     @classmethod
     def setUpTestData(cls):

@@ -49,6 +49,38 @@ class AnonymousRateLimitMiddlewareTests(SimpleTestCase):
         self.assertEqual(response.status_code, 429)
         self.assertEqual(response["Retry-After"], "60")
 
+    def test_waste_atlas_data_api_is_exempt(self):
+        """A map load fans out into several API calls; the atlas API has its
+        own scoped throttle, so the site-wide anonymous cap must not apply."""
+        path = "/waste_collection/waste-atlas/api/collection-system/"
+        for _ in range(LIMIT * 3):
+            self.assertEqual(self.middleware(self.request(path)).status_code, 200)
+
+        self.assertEqual(self.middleware(self.request()).status_code, 200)
+
+    def test_nuts_boundary_geojson_used_by_atlas_maps_is_exempt(self):
+        """Every atlas map load fetches NUTS boundaries; that endpoint has its
+        own subnet-aware GeoJSON throttle."""
+        path = "/maps/api/nuts_region/geojson/"
+        for _ in range(LIMIT * 3):
+            self.assertEqual(self.middleware(self.request(path)).status_code, 200)
+
+        self.assertEqual(self.middleware(self.request()).status_code, 200)
+
+    def test_other_map_api_paths_are_still_limited(self):
+        path = "/maps/api/catchment/"
+        for _ in range(LIMIT):
+            self.middleware(self.request(path))
+
+        self.assertEqual(self.middleware(self.request(path)).status_code, 429)
+
+    def test_waste_atlas_pages_are_still_limited(self):
+        path = "/waste_collection/waste-atlas/map/"
+        for _ in range(LIMIT):
+            self.middleware(self.request(path))
+
+        self.assertEqual(self.middleware(self.request(path)).status_code, 429)
+
     def test_different_ips_have_separate_buckets(self):
         for _ in range(LIMIT):
             self.middleware(self.request(HTTP_X_FORWARDED_FOR="1.2.3.4"))

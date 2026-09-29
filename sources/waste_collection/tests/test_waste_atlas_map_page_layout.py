@@ -9,7 +9,7 @@ share the right-hand panel, using the same ``sidebar-tabs`` pattern as
 
 from pathlib import Path
 
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import User
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
@@ -25,13 +25,10 @@ class MapPageChromeTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        group, _ = Group.objects.get_or_create(name="waste_atlas")
         cls.user = User.objects.create_user(username="layout-user", password="secret")
-        cls.user.groups.add(group)
         cls.staff = User.objects.create_user(
             username="layout-staff", password="secret", is_staff=True
         )
-        cls.staff.groups.add(group)
 
     def setUp(self):
         self.client.force_login(self.user)
