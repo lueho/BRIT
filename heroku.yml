@@ -7,8 +7,7 @@ build:
 release:
   image: web
   command:
-    - python manage.py migrate --noinput
-    - python manage.py collectstatic --noinput
+    - sh -c 'python manage.py migrate --noinput && python manage.py collectstatic --noinput'
 run:
   web: gunicorn $DJANGO_WSGI --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
   worker:

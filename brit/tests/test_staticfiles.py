@@ -1,5 +1,10 @@
 import json
+import os
+import subprocess
+import tempfile
+from pathlib import Path
 
+import yaml
 from django.test import SimpleTestCase
 from storages.backends.s3boto3 import S3ManifestStaticStorage
 
@@ -49,3 +54,38 @@ class StaticStorageCacheBustingTests(SimpleTestCase):
                 "hash": storage.manifest_hash,
             },
         )
+
+
+class StaticAssetReleaseTests(SimpleTestCase):
+    def test_release_runs_migrations_then_collectstatic(self):
+        manifest = yaml.safe_load(
+            (Path(__file__).resolve().parents[2] / "heroku.yml").read_text()
+        )
+        commands = manifest["release"]["command"]
+        self.assertEqual(len(commands), 1)
+
+        with tempfile.TemporaryDirectory() as directory:
+            executable = Path(directory) / "python"
+            executable.write_text(
+                '#!/bin/sh\nprintf "%s\\n" "$*" >> "$RELEASE_TEST_LOG"\n'
+            )
+            executable.chmod(0o755)
+            log = Path(directory) / "calls.log"
+            result = subprocess.run(
+                commands[0],
+                shell=True,
+                env={
+                    **os.environ,
+                    "PATH": f"{directory}:{os.environ['PATH']}",
+                    "RELEASE_TEST_LOG": str(log),
+                },
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                log.read_text().splitlines(),
+                ["manage.py migrate --noinput", "manage.py collectstatic --noinput"],
+            )
