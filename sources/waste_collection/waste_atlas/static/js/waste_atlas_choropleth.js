@@ -3721,7 +3721,7 @@ var WasteAtlasChoropleth = (function () {
       var loadCfg = _configForSelection(cfg, country, year, preserveScope || isConfiguredMultiRegion);
       loadCfg.scope = scope;
       if (fromYear) loadCfg.fromYear = fromYear;
-      _syncPermalink(loadCfg);
+      _syncPermalink(_loadedSelection(country, loadCfg));
       if (loadCfg.changeMode) {
         // ACPV overlays/outlines are not meaningful for two-year diffs.
         delete loadCfg.outlineGeoJsonUrl;
@@ -3973,6 +3973,19 @@ var WasteAtlasChoropleth = (function () {
     return target.base + year + '/';
   }
 
+  /**
+   * Region and year a load shows. A selector option names its region exactly
+   * as the permalink does; ``loadCfg`` drops a NUTS level without a prefix.
+   */
+  function _loadedSelection(region, loadCfg) {
+    if (!region || typeof region !== 'object') return loadCfg;
+    return Object.assign({}, loadCfg, {
+      country: _regionCountry(region),
+      nutsPrefix: _regionNutsPrefix(region),
+      nutsLevel: _regionNutsLevel(region)
+    });
+  }
+
   /** Keep the rendered permalink in step with an in-place reload. */
   function _syncPermalink(loaded) {
     var group = document.getElementById('atlas-permalink-group');
@@ -4113,6 +4126,7 @@ var WasteAtlasChoropleth = (function () {
     },
     permalink: {
       urlFor: _permalinkUrlFor,
+      loadedSelection: _loadedSelection,
       copy: _copyPermalink
     },
     selection: {

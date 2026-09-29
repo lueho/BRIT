@@ -75,3 +75,29 @@ test("copy uses the clipboard when it is allowed", async () => {
   assert.equal(await permalink.copy(field, clipboard, () => false), true);
   assert.equal(written, field.value);
 });
+
+test("an in-place year change on a country-level map keeps its permalink", () => {
+  const germany = {
+    base: "https://example.test/waste_collection/waste-atlas/p/DE/collection_system/",
+    country: "DE",
+    nutsPrefix: "",
+    nutsLevel: "1",
+    years: "2020,2021,2022,2023,2024",
+  };
+  const { selection } = sandbox.WasteAtlasChoropleth;
+  const region = { country: "DE", nutsPrefix: "", nutsLevel: "1" };
+  const loadCfg = selection.configForSelection({ country: "DE", nutsLevel: 1 }, region, 2023, true);
+
+  assert.equal(
+    permalink.urlFor(germany, permalink.loadedSelection(region, loadCfg)),
+    `${germany.base}2023/`,
+  );
+});
+
+test("the initial load names the region of the page configuration", () => {
+  const loadCfg = { country: "DE", nutsPrefix: "DE1", nutsLevel: 1, year: 2024 };
+  assert.equal(
+    permalink.urlFor(target, permalink.loadedSelection("DE", loadCfg)),
+    `${target.base}2024/`,
+  );
+});
