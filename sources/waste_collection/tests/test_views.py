@@ -937,6 +937,17 @@ class CollectionPropertyValueCRUDViewsTestCase(
         self.assertContains(response, successor.get_absolute_url())
         self.assertNotContains(response, collection.get_absolute_url())
 
+    def test_detail_hides_collection_links_when_no_chain_version_is_visible(self):
+        collection = self.related_objects["collection"]
+        collection.publication_status = "archived"
+        collection.save()
+
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["back_collection"])
+        self.assertNotContains(response, collection.get_absolute_url())
+
     def test_detail_collection_button_keeps_own_collection_when_visible(self):
         successor = Collection.objects.create(
             owner=self.owner_user,
@@ -4293,6 +4304,18 @@ class CollectionPropertyValueReviewDetailRelatedCollectionsTestCase(TestCase):
             {collection.pk for collection in related_collections},
             {self.root_collection.pk, self.successor_collection.pk},
         )
+
+    def test_review_detail_context_includes_back_collection(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={"content_type_id": self.ct_id, "object_id": self.cpv.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["back_collection"], self.successor_collection)
 
 
 class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):
