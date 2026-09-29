@@ -229,3 +229,22 @@ class WasteAtlasDiscoverabilityTests(TestCase):
 
         self.assertIn("Disallow: /*/waste-atlas/p/", content)
         self.assertIn("Disallow: /*/api/", content)
+
+
+class WasteAtlasNutsPrefixInputTests(APITestCase):
+    def test_malformed_or_oversized_prefix_lists_are_rejected(self):
+        oversized = ",".join(f"DE{i}" for i in range(17))
+        for prefix in (oversized, "DE1;DROP", "X" * 9, "DE1,,DE2", '"><x>'):
+            with self.subTest(prefix=prefix[:20]):
+                response = self.client.get(
+                    f"{API}collection-system/",
+                    {"country": "DE", "year": 2024, "nuts_prefix": prefix},
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_valid_prefix_lists_are_accepted(self):
+        response = self.client.get(
+            f"{API}collection-system/",
+            {"country": "BE", "year": 2024, "nuts_prefix": "BE1,BE2"},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

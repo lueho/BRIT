@@ -3721,6 +3721,7 @@ var WasteAtlasChoropleth = (function () {
       var loadCfg = _configForSelection(cfg, country, year, preserveScope || isConfiguredMultiRegion);
       loadCfg.scope = scope;
       if (fromYear) loadCfg.fromYear = fromYear;
+      _syncPermalink(loadCfg);
       if (loadCfg.changeMode) {
         // ACPV overlays/outlines are not meaningful for two-year diffs.
         delete loadCfg.outlineGeoJsonUrl;
@@ -3956,6 +3957,62 @@ var WasteAtlasChoropleth = (function () {
     return { applyFilters: applyFilters };
   }
 
+  /**
+   * Permalink URL for a loaded selection, or '' when the selection is not the
+   * map the permalink names (another region, a year without a permalink, or a
+   * change map). ``target`` holds the permalink group's data attributes.
+   */
+  function _permalinkUrlFor(target, loaded) {
+    if (!target || !target.base || loaded.changeMode) return '';
+    var year = String(loaded.year);
+    var years = String(target.years || '').split(',');
+    var sameRegion = String(loaded.country || '') === String(target.country || '')
+      && String(loaded.nutsPrefix || '') === String(target.nutsPrefix || '')
+      && String(loaded.nutsLevel || '') === String(target.nutsLevel || '');
+    if (!sameRegion || years.indexOf(year) === -1) return '';
+    return target.base + year + '/';
+  }
+
+  /** Keep the rendered permalink in step with an in-place reload. */
+  function _syncPermalink(loaded) {
+    var group = document.getElementById('atlas-permalink-group');
+    var field = document.getElementById('atlas-permalink');
+    if (!group || !field) return;
+    var url = _permalinkUrlFor({
+      base: group.getAttribute('data-permalink-base'),
+      country: group.getAttribute('data-permalink-country'),
+      nutsPrefix: group.getAttribute('data-permalink-nuts-prefix'),
+      nutsLevel: group.getAttribute('data-permalink-nuts-level'),
+      years: group.getAttribute('data-permalink-years')
+    }, loaded);
+    field.value = url;
+    group.hidden = !url;
+  }
+
+  /**
+   * Copy the field's text. Falls back to copying the selected field when the
+   * Clipboard API is missing or rejects (e.g. denied permission); resolves
+   * whether anything was copied so the caller can report failure.
+   */
+  function _copyPermalink(field, clipboard, execCopy) {
+    field.select();
+    function fallback() {
+      try {
+        return !!execCopy();
+      } catch (err) {
+        return false;
+      }
+    }
+    if (!clipboard || !clipboard.writeText) return Promise.resolve(fallback());
+    return clipboard.writeText(field.value).then(
+      function () { return true; },
+      function () {
+        field.select();
+        return fallback();
+      }
+    );
+  }
+
   function initShell() {
     var shell = document.getElementById('atlas-shell');
     if (!shell) return null;
@@ -3977,16 +4034,15 @@ var WasteAtlasChoropleth = (function () {
     var copyButton = document.getElementById('btn-copy-permalink');
     var copyField = copyButton && document.getElementById(copyButton.getAttribute('data-copy-target'));
     if (copyField) {
+      var copyLabel = copyButton.innerHTML;
       copyField.addEventListener('focus', function () { copyField.select(); });
       copyButton.addEventListener('click', function () {
-        copyField.select();
-        var label = copyButton.innerHTML;
-        var done = function () {
-          copyButton.textContent = 'Copied';
-          setTimeout(function () { copyButton.innerHTML = label; }, 2000);
-        };
-        if (navigator.clipboard) navigator.clipboard.writeText(copyField.value).then(done);
-        else if (document.execCommand('copy')) done();
+        _copyPermalink(copyField, navigator.clipboard, function () {
+          return document.execCommand('copy');
+        }).then(function (copied) {
+          copyButton.textContent = copied ? 'Copied' : 'Press Ctrl+C to copy';
+          setTimeout(function () { copyButton.innerHTML = copyLabel; }, 2000);
+        });
       });
     }
 
@@ -4054,6 +4110,10 @@ var WasteAtlasChoropleth = (function () {
     quartiles: {
       apply: _applyQuartiles,
       categories: _computeQuartileCategories
+    },
+    permalink: {
+      urlFor: _permalinkUrlFor,
+      copy: _copyPermalink
     },
     selection: {
       configForSelection: _configForSelection,

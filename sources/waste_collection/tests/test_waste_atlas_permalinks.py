@@ -65,3 +65,35 @@ class WasteAtlasPermalinkTests(TestCase):
         ):
             with self.subTest(url=url):
                 self.assertNotContains(self.client.get(url), PERMALINK_PREFIX)
+
+
+class WasteAtlasPermalinkRegionTests(TestCase):
+    """A permalink must reproduce the region the page actually shows."""
+
+    def test_unlocked_page_showing_another_region_offers_no_permalink(self):
+        url = reverse("waste-atlas-sweden-collection-system-map")
+        for query in (
+            {"country": "DE"},
+            {"nuts_prefix": "SE1"},
+            {"nuts_level": "2"},
+        ):
+            with self.subTest(query=query):
+                response = self.client.get(url, {"year": "2023", **query})
+                self.assertEqual(response.context["atlas_permalink_url"], "")
+                self.assertNotContains(response, PERMALINK_PREFIX)
+
+    def test_unlocked_page_with_its_own_region_keeps_its_permalink(self):
+        url = reverse("waste-atlas-sweden-collection-system-map")
+        response = self.client.get(url, {"year": "2023", "country": "SE"})
+        self.assertContains(response, f"{PERMALINK_PREFIX}SE/collection_system/2023/")
+
+    def test_permalink_exposes_its_region_for_in_place_reloads(self):
+        response = self.client.get(reverse("waste-atlas-bw-collection-system-map"))
+        content = response.content.decode()
+        self.assertIn(
+            f'data-permalink-base="http://testserver{PERMALINK_PREFIX}DE-BW/collection_system/"',
+            content,
+        )
+        self.assertIn('data-permalink-country="DE"', content)
+        self.assertIn('data-permalink-nuts-prefix="DE1"', content)
+        self.assertIn('data-permalink-years="2020,2021,2022,2023,2024"', content)

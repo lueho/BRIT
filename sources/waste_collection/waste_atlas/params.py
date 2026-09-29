@@ -17,7 +17,8 @@ MAX_PLAUSIBLE_YEAR = 2100
 MAX_NUTS_LEVEL = 3
 
 _COUNTRY = re.compile(r"[A-Za-z]{2}")
-_NUTS_PREFIXES = re.compile(r"[A-Za-z0-9]{1,8}(,[A-Za-z0-9]{1,8}){0,15}")
+_NUTS_PREFIX = re.compile(r"[A-Za-z0-9]{1,8}")
+MAX_NUTS_PREFIXES = 16
 
 
 def parse_year(raw, default):
@@ -57,5 +58,28 @@ def parse_country(raw, default):
     return raw if raw is not None and _COUNTRY.fullmatch(raw) else default
 
 
+def parse_nuts_prefix_list(raw):
+    """Return the prefixes of a comma-separated NUTS list; raise on bad input.
+
+    Each prefix becomes several database filters, so the list is bounded and
+    every entry must look like a NUTS code.
+    """
+    if not raw:
+        return []
+    prefixes = [part.strip() for part in raw.split(",")]
+    if len(prefixes) > MAX_NUTS_PREFIXES or not all(
+        _NUTS_PREFIX.fullmatch(prefix) for prefix in prefixes
+    ):
+        raise ValueError(
+            f"nuts_prefix must be up to {MAX_NUTS_PREFIXES} comma-separated "
+            "alphanumeric NUTS codes of at most 8 characters"
+        )
+    return prefixes
+
+
 def parse_nuts_prefix(raw, default=""):
-    return raw if raw is not None and _NUTS_PREFIXES.fullmatch(raw) else default
+    try:
+        prefixes = parse_nuts_prefix_list(raw)
+    except ValueError:
+        return default
+    return ",".join(prefixes) if prefixes else default

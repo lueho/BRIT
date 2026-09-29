@@ -24,6 +24,7 @@ from django.db.models import (
 from django.db.models.functions import Coalesce
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -53,7 +54,7 @@ from sources.waste_collection.models import (
 )
 from utils.object_management.models import UserCreatedObject
 
-from .params import parse_atlas_year, parse_year
+from .params import parse_atlas_year, parse_nuts_prefix_list, parse_year
 from .serializers import (
     CatchmentAccessControlSerializer,
     CatchmentBinConfigurationSerializer,
@@ -375,10 +376,13 @@ def _parse_nuts_prefixes(request):
 
     The parameter accepts a comma-separated list of NUTS prefixes, e.g.
     ``nuts_prefix=BE1,BE2`` to restrict results to Brussels and Flanders.
-    Returns an empty list when the parameter is absent.
+    Returns an empty list when the parameter is absent; malformed or oversized
+    lists are rejected with HTTP 400.
     """
-    raw = request.query_params.get("nuts_prefix", "")
-    return [p.strip() for p in raw.split(",") if p.strip()]
+    try:
+        return parse_nuts_prefix_list(request.query_params.get("nuts_prefix", ""))
+    except ValueError as exc:
+        raise ValidationError({"nuts_prefix": str(exc)}) from exc
 
 
 def _country_filter_q(catchment_path, country):

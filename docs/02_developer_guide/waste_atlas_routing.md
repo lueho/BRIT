@@ -35,7 +35,13 @@ published (and archived) collections to anonymous visitors. Restricted:
 The data API is limited by its own scoped throttle (`waste_atlas`, keyed on the
 proxy-vouched client IP) and is exempt from the site-wide anonymous limit in
 `AnonymousRateLimitMiddleware`, because one map load issues several requests.
-Query parameters are validated in `waste_atlas/params.py`.
+Query parameters are validated in `waste_atlas/params.py`; the API rejects a
+malformed or oversized `nuts_prefix` list (more than 16 codes) with HTTP 400.
+
+The client IP (`brit/client_ip.py`) is the rightmost `X-Forwarded-For` entry,
+which Heroku's router appends. `CF-Connecting-IP` is trusted only when that
+peer is a Cloudflare edge (`CLOUDFLARE_TRUSTED_PROXY_RANGES`, defaulting to
+Cloudflare's published ranges); from any other peer the header is ignored.
 
 ## Permalinks
 
@@ -47,4 +53,7 @@ permalink keeps working; only `resolve_map_page` needs to keep resolving
 `(map_set, theme)`.
 
 A permalink shows the data as published when it is opened; it is not a frozen
-snapshot. Map pages of region sets show their permalink in the Options tab.
+snapshot. Map pages of region sets show their permalink in the Options tab,
+only while they show their registered region (unlocked pages can render another
+region from the query string). The link follows in-place year reloads and is
+hidden for selections it cannot name. Change maps have no permalink.

@@ -142,8 +142,15 @@
                   <i class="fas fa-download" aria-hidden="true"></i> Export map…
                 </button>
               </div>
-              {% if atlas_permalink_url %}
-                <div class="atlas-side-group">
+              {% if atlas_permalink_base %}
+                <div class="atlas-side-group"
+                     id="atlas-permalink-group"
+                     data-permalink-base="{{ atlas_permalink_base }}"
+                     data-permalink-country="{{ atlas_permalink_country }}"
+                     data-permalink-nuts-prefix="{{ atlas_permalink_nuts_prefix }}"
+                     data-permalink-nuts-level="{{ atlas_permalink_nuts_level }}"
+                     data-permalink-years="{{ atlas_permalink_years }}"
+                     {% if not atlas_permalink_url %}hidden{% endif %}>
                   <h3 class="atlas-side-group-title">Permanent link</h3>
                   <p class="atlas-selector-help">
                     Stable address of this map and year for citations. It shows the data as published when opened.

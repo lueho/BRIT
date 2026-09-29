@@ -309,20 +309,45 @@ class AtlasMapView(TemplateView):
             else ""
         )
         ctx["map_toggle_label"] = "View changes for this map"
-        ctx["atlas_permalink_url"] = self.get_permalink_url(
-            selected_map_set, ctx["year"]
-        )
+        ctx.update(self.get_permalink_context(ctx["year"]))
         return ctx
 
-    def get_permalink_url(self, map_set, year):
-        """Absolute permanent link for region-set maps of an offered year."""
-        if not self.page["selector_set"] or year not in MAP_SELECTION_YEARS:
-            return ""
-        return self.request.build_absolute_uri(
-            reverse(
-                "waste-atlas-permalink", args=[map_set, self.page["theme"], int(year)]
-            )
+    def shows_registered_region(self):
+        """Whether the rendered region is the one the page is registered for.
+
+        Unlocked pages accept region overrides in the query string, but a
+        permalink only names the page's own region, so it must not stand in
+        for another one.
+        """
+        page = self.page
+        return (
+            self.get_country() == page["country"]
+            and self.get_nuts_prefix() == page.get("nuts_prefix", "")
+            and str(self.get_nuts_level()) == str(page.get("nuts_level", ""))
         )
+
+    def get_permalink_context(self, year):
+        """Permanent link of a region-set map, plus what the renderer needs to
+        keep it in step with in-place year reloads."""
+        page = self.page
+        if not page["selector_set"] or not self.shows_registered_region():
+            return {"atlas_permalink_url": ""}
+        # The year is the last path segment; reverse with a placeholder year
+        # and drop it to get the stable per-map base.
+        placeholder = reverse(
+            "waste-atlas-permalink", args=[page["selector_set"], page["theme"], 0]
+        )
+        base = self.request.build_absolute_uri(placeholder.removesuffix("0/"))
+        return {
+            "atlas_permalink_url": f"{base}{year}/"
+            if year in MAP_SELECTION_YEARS
+            else "",
+            "atlas_permalink_base": base,
+            "atlas_permalink_country": page["country"],
+            "atlas_permalink_nuts_prefix": page.get("nuts_prefix", ""),
+            "atlas_permalink_nuts_level": page.get("nuts_level", ""),
+            "atlas_permalink_years": ",".join(MAP_SELECTION_YEARS),
+        }
 
 
 class AtlasChangeMapView(AtlasMapView):
@@ -361,8 +386,11 @@ class AtlasChangeMapView(AtlasMapView):
             f"{reverse(self.page['name'])}?{urlencode({'year': ctx['year'], 'scope': ctx['atlas_scope']})}"
         )
         ctx["map_toggle_label"] = "View current map"
-        ctx["atlas_permalink_url"] = ""
         return ctx
+
+    def get_permalink_context(self, year):
+        """Change maps compare two years; a permalink names a single year."""
+        return {"atlas_permalink_url": ""}
 
 
 class AtlasPermalinkView(RedirectView):
