@@ -261,8 +261,23 @@ class CachedGeoJSONMixin:
         base = f"{cnt}:{self._version_timestamp(agg)}:{min_id}:{max_id}"
         return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
 
+    @staticmethod
+    def _xmin_queryset(queryset):
+        """Filtered queryset on which the ``xmin`` system column resolves.
+
+        ``xmin`` only exists on the base table. A distinct queryset is wrapped
+        in a subquery by ``aggregate()``, so its rows are re-selected from the
+        base table by primary key instead. All version inputs are aggregated
+        on the returned queryset in one statement, so they share a snapshot.
+        """
+        if not queryset.query.distinct:
+            return queryset
+        return queryset.model._default_manager.filter(
+            pk__in=queryset.order_by().values("pk")
+        )
+
     def get_dataset_stats(self, request):
-        """Return ``{"count": int, "version": str}`` from one aggregate query.
+        """Return ``{"count": int, "version": str}`` from aggregate queries.
 
         Models with lastmodified_at use count, max modification time, and ID
         range as version inputs. Models without it add the newest row
@@ -276,21 +291,16 @@ class CachedGeoJSONMixin:
         model = queryset.model
         field_names = [f.name for f in model._meta.get_fields()]
         if "lastmodified_at" in field_names:
-            aggregates = self._version_aggregates()
+            agg = queryset.aggregate(**self._version_aggregates())
         else:
-            aggregates = {
-                "cnt": Count("pk"),
-                "min_id": Min("pk"),
-                "max_id": Max("pk"),
-                "max_xmin": Max(
-                    RawSQL(
-                        "xmin::text::bigint",
-                        [],
-                        output_field=BigIntegerField(),
-                    )
+            agg = self._xmin_queryset(queryset).aggregate(
+                cnt=Count("pk"),
+                min_id=Min("pk"),
+                max_id=Max("pk"),
+                max_xmin=Max(
+                    RawSQL("xmin::text::bigint", [], output_field=BigIntegerField())
                 ),
-            }
-        agg = queryset.aggregate(**aggregates)
+            )
         stats = {"count": agg.get("cnt") or 0, "version": self._version_token(agg)}
         # Memoize per request: get_cache_key() implementations that embed the
         # dataset version and the geojson() stats path share one aggregate.
