@@ -330,7 +330,7 @@ class AtlasMapView(TemplateView):
         """Permanent link of a region-set map, plus what the renderer needs to
         keep it in step with in-place year reloads."""
         page = self.page
-        if not page["selector_set"] or not self.shows_registered_region():
+        if not page["selector_set"]:
             return {"atlas_permalink_url": ""}
         # The year is the last path segment; reverse with a placeholder year
         # and drop it to get the stable per-map base.
@@ -340,7 +340,7 @@ class AtlasMapView(TemplateView):
         base = self.request.build_absolute_uri(placeholder.removesuffix("0/"))
         return {
             "atlas_permalink_url": f"{base}{year}/"
-            if year in MAP_SELECTION_YEARS
+            if year in MAP_SELECTION_YEARS and self.shows_registered_region()
             else "",
             "atlas_permalink_base": base,
             "atlas_permalink_country": page["country"],

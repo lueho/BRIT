@@ -80,7 +80,22 @@ class WasteAtlasPermalinkRegionTests(TestCase):
             with self.subTest(query=query):
                 response = self.client.get(url, {"year": "2023", **query})
                 self.assertEqual(response.context["atlas_permalink_url"], "")
-                self.assertNotContains(response, PERMALINK_PREFIX)
+                self.assertNotContains(
+                    response, f"{PERMALINK_PREFIX}SE/collection_system/2023/"
+                )
+
+    def test_page_showing_another_region_can_restore_its_permalink(self):
+        response = self.client.get(
+            reverse("waste-atlas-sweden-collection-system-map"),
+            {"year": "2023", "country": "DE"},
+        )
+        content = response.content.decode()
+        self.assertIn(
+            f'data-permalink-base="http://testserver{PERMALINK_PREFIX}SE/collection_system/"',
+            content,
+        )
+        self.assertIn('data-permalink-country="SE"', content)
+        self.assertIn('value=""', content)
 
     def test_unlocked_page_with_its_own_region_keeps_its_permalink(self):
         url = reverse("waste-atlas-sweden-collection-system-map")
