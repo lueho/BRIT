@@ -3,7 +3,7 @@ import re
 from copy import deepcopy
 from urllib.parse import parse_qs, urlencode, urlsplit
 
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
@@ -26,9 +26,6 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             username="atlas-config-user",
             password="secret",
         )
-        atlas_group, _ = Group.objects.get_or_create(name="waste_atlas")
-        cls.staff.groups.add(atlas_group)
-        cls.regular_user.groups.add(atlas_group)
 
     def _configuration(self):
         return WasteAtlasMapConfiguration.objects.get(key="collection_system")
@@ -579,8 +576,6 @@ class WasteAtlasExportFileNameTestCase(TestCase):
             username="atlas-export-user",
             password="secret",
         )
-        atlas_group, _ = Group.objects.get_or_create(name="waste_atlas")
-        cls.user.groups.add(atlas_group)
 
     # (route name, expected fileBase) covering generic, country, sub-national,
     # multi-token selector sets and a theme only seeded for one region.

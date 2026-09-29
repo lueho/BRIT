@@ -8,7 +8,7 @@ window changed nor offered any manual sizing.
 import re
 from pathlib import Path
 
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
 
 WASTE_ATLAS_DIR = Path(__file__).resolve().parents[1] / "waste_atlas"
@@ -224,8 +224,6 @@ class WasteAtlasZoomControlMarkupTests(TestCase):
         cls.user = User.objects.create_user(
             username="responsive-atlas-user", password="secret"
         )
-        waste_atlas_group, _ = Group.objects.get_or_create(name="waste_atlas")
-        cls.user.groups.add(waste_atlas_group)
 
     def _render_generic(self, config_key="orga_level"):
         from sources.waste_collection.waste_atlas.views import AtlasMapView

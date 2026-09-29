@@ -10,7 +10,7 @@
  *     year:         2022,
  *     title:        'Map title',
  *     subtitle:     '',                   // optional
- *     dataUrl:      '/waste_collection/api/waste-atlas/orga-level/',
+ *     dataUrl:      '/waste_collection/waste-atlas/api/orga-level/',
  *     dataField:    'orga_level',         // field in the data JSON to classify on
  *     categories:   [                     // ordered; first match wins
  *       { value: 'nuts', label: 'Landkreise', color: '#93d163' },
@@ -463,11 +463,11 @@ var WasteAtlasChoropleth = (function () {
     if (catchmentDataUrl.indexOf('geojson') !== -1) {
       return catchmentDataUrl.replace('geojson', 'collection-change-geojson');
     }
-    return '/waste_collection/api/waste-atlas/catchment/collection-change-geojson/';
+    return '/waste_collection/waste-atlas/api/catchment/collection-change-geojson/';
   }
 
   function _fetchAll(cfg) {
-    var base = '/waste_collection/api/waste-atlas/';
+    var base = '/waste_collection/waste-atlas/api/';
     var scopeSuffix = '&scope=' + encodeURIComponent(cfg.scope || 'published');
     var nutsSuffix = cfg.nutsPrefix ? '&nuts_prefix=' + encodeURIComponent(cfg.nutsPrefix) : '';
     var collectionYear = cfg.collectionYear || cfg.year;
@@ -3721,6 +3721,7 @@ var WasteAtlasChoropleth = (function () {
       var loadCfg = _configForSelection(cfg, country, year, preserveScope || isConfiguredMultiRegion);
       loadCfg.scope = scope;
       if (fromYear) loadCfg.fromYear = fromYear;
+      _syncPermalink(_loadedSelection(country, loadCfg));
       if (loadCfg.changeMode) {
         // ACPV overlays/outlines are not meaningful for two-year diffs.
         delete loadCfg.outlineGeoJsonUrl;
@@ -3777,9 +3778,13 @@ var WasteAtlasChoropleth = (function () {
           _hide(loadingEl);
           console.error('Waste Atlas load error:', err);
           var container = document.getElementById(cfg.containerId);
-          container.innerHTML = '<div class="alert alert-danger m-3">'
-            + '<strong>Error loading map data:</strong> ' + err.message
-            + '</div>';
+          var alertEl = document.createElement('div');
+          alertEl.className = 'alert alert-danger m-3';
+          var strongEl = document.createElement('strong');
+          strongEl.textContent = 'Error loading map data:';
+          alertEl.appendChild(strongEl);
+          alertEl.appendChild(document.createTextNode(' ' + err.message));
+          container.replaceChildren(alertEl);
         });
     }
 
@@ -3952,6 +3957,75 @@ var WasteAtlasChoropleth = (function () {
     return { applyFilters: applyFilters };
   }
 
+  /**
+   * Permalink URL for a loaded selection, or '' when the selection is not the
+   * map the permalink names (another region, a year without a permalink, or a
+   * change map). ``target`` holds the permalink group's data attributes.
+   */
+  function _permalinkUrlFor(target, loaded) {
+    if (!target || !target.base || loaded.changeMode) return '';
+    var year = String(loaded.year);
+    var years = String(target.years || '').split(',');
+    var sameRegion = String(loaded.country || '') === String(target.country || '')
+      && String(loaded.nutsPrefix || '') === String(target.nutsPrefix || '')
+      && String(loaded.nutsLevel || '') === String(target.nutsLevel || '');
+    if (!sameRegion || years.indexOf(year) === -1) return '';
+    return target.base + year + '/';
+  }
+
+  /**
+   * Region and year a load shows. A selector option names its region exactly
+   * as the permalink does; ``loadCfg`` drops a NUTS level without a prefix.
+   */
+  function _loadedSelection(region, loadCfg) {
+    if (!region || typeof region !== 'object') return loadCfg;
+    return Object.assign({}, loadCfg, {
+      country: _regionCountry(region),
+      nutsPrefix: _regionNutsPrefix(region),
+      nutsLevel: _regionNutsLevel(region)
+    });
+  }
+
+  /** Keep the rendered permalink in step with an in-place reload. */
+  function _syncPermalink(loaded) {
+    var group = document.getElementById('atlas-permalink-group');
+    var field = document.getElementById('atlas-permalink');
+    if (!group || !field) return;
+    var url = _permalinkUrlFor({
+      base: group.getAttribute('data-permalink-base'),
+      country: group.getAttribute('data-permalink-country'),
+      nutsPrefix: group.getAttribute('data-permalink-nuts-prefix'),
+      nutsLevel: group.getAttribute('data-permalink-nuts-level'),
+      years: group.getAttribute('data-permalink-years')
+    }, loaded);
+    field.value = url;
+    group.hidden = !url;
+  }
+
+  /**
+   * Copy the field's text. Falls back to copying the selected field when the
+   * Clipboard API is missing or rejects (e.g. denied permission); resolves
+   * whether anything was copied so the caller can report failure.
+   */
+  function _copyPermalink(field, clipboard, execCopy) {
+    field.select();
+    function fallback() {
+      try {
+        return !!execCopy();
+      } catch (err) {
+        return false;
+      }
+    }
+    if (!clipboard || !clipboard.writeText) return Promise.resolve(fallback());
+    return clipboard.writeText(field.value).then(
+      function () { return true; },
+      function () {
+        field.select();
+        return fallback();
+      }
+    );
+  }
+
   function initShell() {
     var shell = document.getElementById('atlas-shell');
     if (!shell) return null;
@@ -3969,6 +4043,21 @@ var WasteAtlasChoropleth = (function () {
       });
     }
     if (scrim) scrim.addEventListener('click', function () { setTreeOpen(false); });
+
+    var copyButton = document.getElementById('btn-copy-permalink');
+    var copyField = copyButton && document.getElementById(copyButton.getAttribute('data-copy-target'));
+    if (copyField) {
+      var copyLabel = copyButton.innerHTML;
+      copyField.addEventListener('focus', function () { copyField.select(); });
+      copyButton.addEventListener('click', function () {
+        _copyPermalink(copyField, navigator.clipboard, function () {
+          return document.execCommand('copy');
+        }).then(function (copied) {
+          copyButton.textContent = copied ? 'Copied' : 'Press Ctrl+C to copy';
+          setTimeout(function () { copyButton.innerHTML = copyLabel; }, 2000);
+        });
+      });
+    }
 
     var filter = document.getElementById('atlas-tree-filter');
     if (filter && tree) {
@@ -4034,6 +4123,11 @@ var WasteAtlasChoropleth = (function () {
     quartiles: {
       apply: _applyQuartiles,
       categories: _computeQuartileCategories
+    },
+    permalink: {
+      urlFor: _permalinkUrlFor,
+      loadedSelection: _loadedSelection,
+      copy: _copyPermalink
     },
     selection: {
       configForSelection: _configForSelection,

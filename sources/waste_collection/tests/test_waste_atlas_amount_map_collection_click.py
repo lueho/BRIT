@@ -24,7 +24,7 @@ from sources.waste_collection.waste_atlas.map_selection import (
     collection_detail_categories_for_theme,
 )
 
-CATCHMENT_GEOJSON_URL = "/waste_collection/api/waste-atlas/catchment/geojson/"
+CATCHMENT_GEOJSON_URL = "/waste_collection/waste-atlas/api/catchment/geojson/"
 
 
 class AmountThemeCollectionDetailCategoryTests(SimpleTestCase):

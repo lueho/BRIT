@@ -110,11 +110,16 @@ class SourceDomainHubRoutingTestCase(SimpleTestCase):
     def test_registry_exposes_plugin_declared_legacy_redirect_mounts(self):
         redirects = get_source_domain_legacy_redirects()
 
-        self.assertEqual(len(redirects), 2)
+        self.assertEqual(len(redirects), 3)
         self.assertEqual(redirects[0].mount_path, "case_studies/hamburg/")
         self.assertEqual(redirects[0].urlconf, "sources.roadside_trees.legacy_urls")
         self.assertEqual(redirects[1].mount_path, "case_studies/hamburg/")
         self.assertEqual(redirects[1].urlconf, "sources.urban_green_spaces.legacy_urls")
+        self.assertEqual(redirects[2].mount_path, "waste_collection/api/waste-atlas/")
+        self.assertEqual(
+            redirects[2].urlconf,
+            "sources.waste_collection.waste_atlas.legacy_urls",
+        )
 
     def test_registry_exposes_plugin_declared_map_mounts(self):
         map_mounts = get_source_domain_map_mounts()

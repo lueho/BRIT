@@ -654,7 +654,7 @@ class WasteAtlasMapConfigStructureTests(TestCase):
         from sources.waste_collection.waste_atlas.router import router
 
         registered = {
-            f"/waste_collection/api/waste-atlas/{prefix}/"
+            f"/waste_collection/waste-atlas/api/{prefix}/"
             for prefix, _viewset, _basename in router.registry
         }
         for config in MAP_CONFIGS.values():

@@ -72,6 +72,13 @@
         <span class="sb-nav-link-text">Bibliography</span>
       </a>
       <div class="sb-sidenav-menu-heading">Sites</div>
+      <a class="nav-link {% if '/waste-atlas/' in request.path %}active{% endif %}"
+         href="{% url 'waste-atlas-overview' %}">
+        <div class="sb-nav-link-icon">
+          <i class="fas fa-map-marked-alt"></i>
+        </div>
+        <span class="sb-nav-link-text">Waste Atlas</span>
+      </a>
       <a class="nav-link {% if '/learning/' in request.path %}active{% endif %}"
          href="{% url 'learning' %}">
         <div class="sb-nav-link-icon">

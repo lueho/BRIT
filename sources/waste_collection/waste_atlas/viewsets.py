@@ -24,6 +24,7 @@ from django.db.models import (
 from django.db.models.functions import Coalesce
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -38,7 +39,7 @@ from maps.models import (
     RegionProperty,
 )
 from maps.population.services import population_values_by_region
-from maps.throttling import GeoJSONAnonThrottle
+from maps.throttling import GeoJSONAnonThrottle, TrustedClientIPMixin
 from maps.utils import get_or_set_cache
 from sources.waste_collection.derived_values import (
     convert_total_to_specific,
@@ -53,7 +54,7 @@ from sources.waste_collection.models import (
 )
 from utils.object_management.models import UserCreatedObject
 
-from .map_selection import MAP_SELECTION_YEARS
+from .params import parse_atlas_year, parse_nuts_prefix_list, parse_year
 from .serializers import (
     CatchmentAccessControlSerializer,
     CatchmentBinConfigurationSerializer,
@@ -91,11 +92,6 @@ from .serializers import (
     geometry_simplify_tolerance,
 )
 
-# Atlas maps only exist for the selectable years, so requests are clamped to
-# them instead of being trusted with arbitrary integers.
-MIN_ATLAS_YEAR = min(int(year) for year in MAP_SELECTION_YEARS)
-MAX_ATLAS_YEAR = max(int(year) for year in MAP_SELECTION_YEARS)
-
 _PUBLISHED = UserCreatedObject.STATUS_PUBLISHED
 _ARCHIVED = UserCreatedObject.STATUS_ARCHIVED
 # Archived collections were necessarily published before being archived
@@ -119,6 +115,15 @@ _ALL_STATUSES = (*_STAFF_VISIBLE, UserCreatedObject.STATUS_DECLINED)
 
 def _is_staff(user):
     return user is not None and user.is_staff
+
+
+def is_maintainer(user):
+    """Whether ``user`` may see review-stage data and maintainer aids."""
+    return bool(
+        user is not None
+        and user.is_authenticated
+        and (user.is_staff or user.has_perm("waste_collection.can_moderate_collection"))
+    )
 
 
 def _effective_scope(user=None, scope=None):
@@ -257,15 +262,26 @@ POPULATION_ATTRIBUTE_ID = 3
 POPULATION_DENSITY_ATTRIBUTE_ID = 2
 
 
+class AtlasScopedRateThrottle(TrustedClientIPMixin, ScopedRateThrottle):
+    """Atlas throttle keyed on the client IP the proxy chain vouches for."""
+
+
+class IsMaintainer(permissions.BasePermission):
+    """Staff and collection moderators, who curate the data behind the maps."""
+
+    def has_permission(self, request, view):
+        return is_maintainer(request.user)
+
+
 class WasteAtlasViewSet(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [AtlasScopedRateThrottle]
     throttle_scope = "waste_atlas"
 
 
-class WasteAtlasReadOnlyModelViewSet(viewsets.ReadOnlyModelViewSet):
+class WasteAtlasGenericViewSet(viewsets.GenericViewSet):
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [AtlasScopedRateThrottle]
     throttle_scope = "waste_atlas"
 
 
@@ -352,12 +368,7 @@ def _resolved_population_density_attribute_id():
 def _parse_country_year(request):
     """Extract and validate country/year query params with defaults."""
     country = request.query_params.get("country", "DE")
-    year = request.query_params.get("year", "2024")
-    try:
-        year = int(year)
-    except (TypeError, ValueError):
-        year = 2024
-    return country, year
+    return country, parse_year(request.query_params.get("year"), 2024)
 
 
 def _parse_nuts_prefixes(request):
@@ -365,10 +376,13 @@ def _parse_nuts_prefixes(request):
 
     The parameter accepts a comma-separated list of NUTS prefixes, e.g.
     ``nuts_prefix=BE1,BE2`` to restrict results to Brussels and Flanders.
-    Returns an empty list when the parameter is absent.
+    Returns an empty list when the parameter is absent; malformed or oversized
+    lists are rejected with HTTP 400.
     """
-    raw = request.query_params.get("nuts_prefix", "")
-    return [p.strip() for p in raw.split(",") if p.strip()]
+    try:
+        return parse_nuts_prefix_list(request.query_params.get("nuts_prefix", ""))
+    except ValueError as exc:
+        raise ValidationError({"nuts_prefix": str(exc)}) from exc
 
 
 def _country_filter_q(catchment_path, country):
@@ -458,14 +472,10 @@ def _parse_change_years(request):
     one recomputing and storing a full overlay.
     """
 
-    def year(param, default):
-        try:
-            requested = int(request.query_params.get(param, default))
-        except (TypeError, ValueError):
-            return default
-        return min(max(requested, MIN_ATLAS_YEAR), MAX_ATLAS_YEAR)
-
-    return year("from_year", 2023), year("to_year", 2024)
+    return (
+        parse_atlas_year(request.query_params.get("from_year"), 2023),
+        parse_atlas_year(request.query_params.get("to_year"), 2024),
+    )
 
 
 def _revision_snapshots(catchment_ids, year, user=None):
@@ -1005,7 +1015,7 @@ def _active_collector_scope(country, year, nuts_prefixes, user=None):
     return _apply_nuts_prefix_filter(qs, nuts_prefixes, catchment_path="catchment__")
 
 
-class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
+class CatchmentViewSet(WasteAtlasGenericViewSet):
     """Read-only viewset returning GeoJSON for catchments that have waste collections.
 
     Supports query parameters:
@@ -1015,7 +1025,7 @@ class CatchmentViewSet(WasteAtlasReadOnlyModelViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/catchment/geojson/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/catchment/geojson/?country=DE&year=2022
     """
 
     serializer_class = CatchmentGeometrySerializer
@@ -1255,7 +1265,7 @@ class OrgaLevelViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/collector-orga-level/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/collector-orga-level/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -1329,7 +1339,7 @@ class CollectionSystemViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/collection-system/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/collection-system/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -1568,7 +1578,7 @@ class GreenWasteCollectionSystemCountViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/green-waste-collection-system-count/?country=DE&year=2024
+        GET /waste_collection/waste-atlas/api/green-waste-collection-system-count/?country=DE&year=2024
     """
 
     permission_classes = [permissions.AllowAny]
@@ -1769,7 +1779,7 @@ class ResidualFrequencyTypeViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/residual-frequency-type/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/residual-frequency-type/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -1790,7 +1800,7 @@ class CombinedFrequencyTypeViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/combined-frequency-type/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/combined-frequency-type/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -1838,7 +1848,7 @@ class BiowasteFrequencyTypeViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/biowaste-frequency-type/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/biowaste-frequency-type/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -1863,7 +1873,7 @@ class ResidualCollectionCountViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/residual-collection-count/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/residual-collection-count/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -1886,7 +1896,7 @@ class BiowasteCollectionCountViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/biowaste-collection-count/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/biowaste-collection-count/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -1912,7 +1922,7 @@ class CombinedCollectionCountViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/combined-collection-count/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/combined-collection-count/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -2163,7 +2173,7 @@ class ResidualFeeSystemViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/residual-fee-system/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/residual-fee-system/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -2184,7 +2194,7 @@ class BiowasteFeeSystemViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/biowaste-fee-system/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/biowaste-fee-system/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -2210,7 +2220,7 @@ class CombinedFeeSystemViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/combined-fee-system/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/combined-fee-system/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -2715,7 +2725,7 @@ class ResidualCollectionAmountViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/residual-collection-amount/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/residual-collection-amount/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -2756,7 +2766,7 @@ class BiowasteCollectionAmountViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/biowaste-collection-amount/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/biowaste-collection-amount/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -2797,7 +2807,7 @@ class GreenWasteCollectionAmountViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/green-waste-collection-amount/?country=DE&year=2024
+        GET /waste_collection/waste-atlas/api/green-waste-collection-amount/?country=DE&year=2024
     """
 
     permission_classes = [permissions.AllowAny]
@@ -2925,7 +2935,7 @@ class BiowasteMinBinSizeViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/biowaste-min-bin-size/?country=DE&year=2024
+        GET /waste_collection/waste-atlas/api/biowaste-min-bin-size/?country=DE&year=2024
     """
 
     permission_classes = [permissions.AllowAny]
@@ -2951,7 +2961,7 @@ class ResidualMinBinSizeViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/residual-min-bin-size/?country=DE&year=2024
+        GET /waste_collection/waste-atlas/api/residual-min-bin-size/?country=DE&year=2024
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3025,7 +3035,7 @@ class BiowasteRequiredBinCapacityViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/biowaste-required-bin-capacity/?country=DE&year=2024
+        GET /waste_collection/waste-atlas/api/biowaste-required-bin-capacity/?country=DE&year=2024
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3051,7 +3061,7 @@ class ResidualRequiredBinCapacityViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/residual-required-bin-capacity/?country=DE&year=2024
+        GET /waste_collection/waste-atlas/api/residual-required-bin-capacity/?country=DE&year=2024
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3120,7 +3130,7 @@ class OrganicCollectionAmountViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/organic-collection-amount/?country=DE&year=2024
+        GET /waste_collection/waste-atlas/api/organic-collection-amount/?country=DE&year=2024
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3139,7 +3149,7 @@ class OrganicWasteRatioViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/organic-waste-ratio/?country=DE&year=2024
+        GET /waste_collection/waste-atlas/api/organic-waste-ratio/?country=DE&year=2024
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3188,7 +3198,7 @@ class WasteRatioViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/waste-ratio/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/waste-ratio/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3254,7 +3264,7 @@ class CollectionSupportViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/collection-support/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/collection-support/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3336,7 +3346,7 @@ class RegularPlasticCollectionSupportViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/regular-plastic-collection-support/?country=DK&year=2023
+        GET /waste_collection/waste-atlas/api/regular-plastic-collection-support/?country=DK&year=2023
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3415,7 +3425,7 @@ class PaperBagsStatusViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/paper-bags/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/paper-bags/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3439,7 +3449,7 @@ class PlasticBagsStatusViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/plastic-bags/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/plastic-bags/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3466,7 +3476,7 @@ class RegularPlasticBagsStatusViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/regular-plastic-bags/?country=DK&year=2023
+        GET /waste_collection/waste-atlas/api/regular-plastic-bags/?country=DK&year=2023
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3499,7 +3509,7 @@ class FoodWasteCategoryViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/food-waste-category/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/food-waste-category/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3604,7 +3614,7 @@ class ConnectionRateViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/connection-rate/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/connection-rate/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3685,7 +3695,7 @@ class CatchmentPopulationViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/population/?country=DE&year=2022
+        GET /waste_collection/waste-atlas/api/population/?country=DE&year=2022
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3761,7 +3771,7 @@ class BiowasteImpurityViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/biowaste-impurity/?country=ES&year=2024
+        GET /waste_collection/waste-atlas/api/biowaste-impurity/?country=ES&year=2024
     """
 
     permission_classes = [permissions.AllowAny]
@@ -3769,7 +3779,7 @@ class BiowasteImpurityViewSet(WasteAtlasViewSet):
     def list(self, request):
         """Return a JSON array of {catchment_id, impurity_rate, no_collection}."""
         country, year = _parse_country_year(request)
-        collection_year = int(request.query_params.get("collection_year", year))
+        collection_year = parse_year(request.query_params.get("collection_year"), year)
         nuts_prefixes = _parse_nuts_prefixes(request)
 
         best = _select_primary_collections(
@@ -3901,7 +3911,7 @@ class WeeklyBpAccessDaysViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/weekly-bp-access-days/?country=ES&year=2024
+        GET /waste_collection/waste-atlas/api/weekly-bp-access-days/?country=ES&year=2024
     """
 
     permission_classes = [permissions.AllowAny]
@@ -4031,10 +4041,10 @@ class CollectionConflictViewSet(WasteAtlasViewSet):
 
     Example::
 
-        GET /waste_collection/api/waste-atlas/collection-conflicts/?theme=collection_system&country=DE&year=2024
+        GET /waste_collection/waste-atlas/api/collection-conflicts/?theme=collection_system&country=DE&year=2024
     """
 
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [IsMaintainer]
 
     def list(self, request):
         """Return catchments with conflicting theme values."""

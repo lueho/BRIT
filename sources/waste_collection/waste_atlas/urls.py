@@ -6,6 +6,7 @@ from .router import router
 from .views import (
     AtlasChangeMapView,
     AtlasMapView,
+    AtlasPermalinkView,
     EuropeBiowasteCollectionAmountMapView,
     EuropeDataCoverageMapIframeView,
     EuropeDataCoverageMapView,
@@ -17,7 +18,12 @@ from .views import (
 )
 
 urlpatterns = [
-    path("", include(router.urls)),
+    path(
+        "",
+        RedirectView.as_view(pattern_name="waste-atlas-overview", query_string=True),
+        name="waste-atlas-root",
+    ),
+    path("api/", include(router.urls)),
     path(
         "map/",
         WasteAtlasOverviewView.as_view(),
@@ -42,6 +48,11 @@ urlpatterns = [
         "map/configurations/<slug:key>/",
         WasteAtlasMapConfigurationUpdateView.as_view(),
         name="waste-atlas-map-configuration-update",
+    ),
+    path(
+        "p/<str:map_set>/<str:theme>/<int:year>/",
+        AtlasPermalinkView.as_view(),
+        name="waste-atlas-permalink",
     ),
     path(
         "map/changes/<str:map_set>/<str:theme>/",

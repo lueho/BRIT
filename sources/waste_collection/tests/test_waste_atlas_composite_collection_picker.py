@@ -8,7 +8,7 @@ to be unclickable; they now hand the reader both collections to choose from.
 from datetime import date
 from pathlib import Path
 
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import User
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.urls import reverse
 from rest_framework import status
@@ -30,7 +30,7 @@ WASTE_ATLAS_DIR = Path(__file__).resolve().parents[1] / "waste_atlas"
 CHOROPLETH_SCRIPT = WASTE_ATLAS_DIR / "static" / "js" / "waste_atlas_choropleth.js"
 ATLAS_STYLESHEET = WASTE_ATLAS_DIR / "static" / "css" / "waste_atlas.css"
 
-CATCHMENT_GEOJSON_URL = "/waste_collection/api/waste-atlas/catchment/geojson/"
+CATCHMENT_GEOJSON_URL = "/waste_collection/waste-atlas/api/catchment/geojson/"
 
 
 class CompositeCollectionDetailCategoryTests(SimpleTestCase):
@@ -206,8 +206,6 @@ class CompositeMapPageTests(TestCase):
         cls.user = User.objects.create_user(
             username="composite-page-user", password="secret"
         )
-        group, _ = Group.objects.get_or_create(name="waste_atlas")
-        cls.user.groups.add(group)
 
     def _render(self, theme, config_key):
         from sources.waste_collection.waste_atlas.views import AtlasMapView

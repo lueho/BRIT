@@ -26,7 +26,7 @@ from sources.waste_collection.waste_atlas.map_selection import (
 )
 from sources.waste_collection.waste_atlas.pages import MAP_PAGES
 
-CATCHMENT_GEOJSON_URL = "/waste_collection/api/waste-atlas/catchment/geojson/"
+CATCHMENT_GEOJSON_URL = "/waste_collection/waste-atlas/api/catchment/geojson/"
 
 # Themes whose value describes a region or a collector, not a collection.
 THEMES_WITHOUT_A_COLLECTION = {

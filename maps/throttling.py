@@ -20,6 +20,8 @@ import ipaddress
 from django.conf import settings
 from rest_framework.throttling import AnonRateThrottle
 
+from brit.client_ip import get_client_ip
+
 DEFAULT_IPV4_PREFIX = 24
 DEFAULT_IPV6_PREFIX = 64
 
@@ -58,7 +60,19 @@ def get_subnet_ident(ip: str | None) -> str:
     return str(network)
 
 
-class GeoJSONAnonThrottle(AnonRateThrottle):
+class TrustedClientIPMixin:
+    """Identify clients by the proxy-vouched IP, not a forgeable header prefix.
+
+    DRF's default ``get_ident`` keys on the whole ``X-Forwarded-For`` header
+    (or its client-controlled left-most entry), so a client could pick a new
+    throttle bucket per request by varying it.
+    """
+
+    def get_ident(self, request):
+        return get_client_ip(request) or super().get_ident(request)
+
+
+class GeoJSONAnonThrottle(TrustedClientIPMixin, AnonRateThrottle):
     """Subnet-aware anonymous rate limit for GeoJSON endpoints."""
 
     scope = "geojson_anon"

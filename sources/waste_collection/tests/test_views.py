@@ -10,7 +10,7 @@ from unittest.mock import patch
 from urllib.parse import urlencode
 
 from celery import chord
-from django.contrib.auth.models import AnonymousUser, Group, Permission, User
+from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.core.exceptions import ValidationError
@@ -4575,8 +4575,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(username="atlas-user", password="secret")
-        waste_atlas_group, _ = Group.objects.get_or_create(name="waste_atlas")
-        cls.user.groups.add(waste_atlas_group)
 
     def setUp(self):
         self.client.force_login(self.user)
@@ -4604,7 +4602,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(self._map_config(response)["scope"], "published")
 
         moderator = User.objects.create_user("atlas-moderator")
-        moderator.groups.add(Group.objects.get(name="waste_atlas"))
         moderator.user_permissions.add(
             Permission.objects.get(
                 content_type=ContentType.objects.get_for_model(Collection),
@@ -4618,7 +4615,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(self._map_config(response)["scope"], "review")
 
         staff = User.objects.create_user("atlas-staff", is_staff=True)
-        staff.groups.add(Group.objects.get(name="waste_atlas"))
         self.client.force_login(staff)
         response = self.client.get(url, {"scope": "all"})
         self.assertContains(response, 'value="all" selected')
@@ -4633,7 +4629,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
     def test_change_map_overview_offers_review_scope_to_moderators(self):
         moderator = User.objects.create_user("change-overview-moderator")
-        moderator.groups.add(Group.objects.get(name="waste_atlas"))
         moderator.user_permissions.add(
             Permission.objects.get(
                 content_type=ContentType.objects.get_for_model(Collection),
@@ -4782,7 +4777,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
                     {
                         "country": "XX",
                         "nuts_prefix": "ZZZZ",
-                        "nuts_level": "9",
+                        "nuts_level": "2",
                     },
                 )
                 self.assertEqual(response.status_code, 200)
@@ -4796,7 +4791,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 else:
                     self.assertEqual(cfg["country"], "XX")
                     self.assertEqual(cfg["nutsPrefix"], "ZZZZ")
-                    self.assertEqual(cfg["nutsLevel"], 9)
+                    self.assertEqual(cfg["nutsLevel"], 2)
 
     def test_runtime_scope_overrides_stored_scope_values(self):
         """For unlocked pages, query params override stored country/year/nuts."""
@@ -4997,12 +4992,21 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
     # ---- data conflicts overview tests ------------------------------------
 
-    def test_data_conflicts_overview_renders_for_waste_atlas_group(self):
+    def _login_staff(self):
+        self.client.force_login(
+            User.objects.create_user(
+                username="conflicts-staff", password="secret", is_staff=True
+            )
+        )
+
+    def test_data_conflicts_overview_renders_for_staff(self):
+        self._login_staff()
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
 
         self.assertEqual(response.status_code, 200)
 
     def test_data_conflicts_overview_links_back_to_map_overview(self):
+        self._login_staff()
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
 
         self.assertEqual(response.status_code, 200)
@@ -5017,7 +5021,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 302)
 
-    def test_data_conflicts_overview_denies_users_without_waste_atlas_group(self):
+    def test_data_conflicts_overview_denies_non_staff_users(self):
         non_atlas_user = User.objects.create_user(
             username="non-atlas-user-conflicts", password="secret"
         )
@@ -5028,11 +5032,10 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
     # ---- access control ----------------------------------------------------
 
-    def test_atlas_pages_require_membership_of_the_waste_atlas_group(self):
+    def test_public_atlas_pages_are_open_to_everyone(self):
         routes = [
             reverse("waste-atlas-overview"),
             reverse("waste-atlas-change-map-overview"),
-            reverse("waste-atlas-data-conflicts-overview"),
             reverse("waste-atlas-europe-data-coverage-map"),
             reverse("waste-atlas-europe-biowaste-collection-amount-map"),
             reverse("waste-atlas-germany-collection-system-map"),
@@ -5045,14 +5048,10 @@ class WasteAtlasMapViewsTestCase(TestCase):
         for url in routes:
             with self.subTest(url=url, user="anonymous"):
                 self.client.logout()
-                self.assertEqual(self.client.get(url).status_code, 302)
+                self.assertEqual(self.client.get(url).status_code, 200)
 
             with self.subTest(url=url, user="outsider"):
                 self.client.force_login(outsider)
-                self.assertEqual(self.client.get(url).status_code, 403)
-
-            with self.subTest(url=url, user="member"):
-                self.client.force_login(self.user)
                 self.assertEqual(self.client.get(url).status_code, 200)
 
     def test_europe_coverage_iframe_is_public(self):
@@ -5074,7 +5073,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
         staff = User.objects.create_user(
             username="atlas-staff", password="secret", is_staff=True
         )
-        staff.groups.add(Group.objects.get(name="waste_atlas"))
         self.client.force_login(staff)
 
         response = self.client.get(reverse("waste-atlas-overview"))
@@ -5128,7 +5126,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/orga-level/?country=SE&year=2024"
+            "/waste_collection/waste-atlas/api/orga-level/?country=SE&year=2024"
         )
 
         self.assertEqual(response.status_code, 200)
@@ -5138,7 +5136,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
 
         response = self.client.get(
-            "/waste_collection/api/waste-atlas/collection-orga-level/?country=SE&year=2024"
+            "/waste_collection/waste-atlas/api/collection-orga-level/?country=SE&year=2024"
         )
 
         self.assertEqual(response.status_code, 200)
@@ -5167,6 +5165,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         """The data-conflicts overview surfaces every map whose config opts
         into the maintainer conflict-overlay aid (currently the
         collection_system theme across all regional map sets)."""
+        self._login_staff()
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
 
         self.assertEqual(response.status_code, 200)
@@ -5225,8 +5224,6 @@ class GenericMapTemplateTests(TestCase):
         cls.user = User.objects.create_user(
             username="generic-atlas-user", password="secret"
         )
-        waste_atlas_group, _ = Group.objects.get_or_create(name="waste_atlas")
-        cls.user.groups.add(waste_atlas_group)
 
     def _render_generic(self, config_key, query=None):
         from sources.waste_collection.waste_atlas.views import AtlasMapView
@@ -5400,7 +5397,7 @@ class WasteAtlasPopulationViewSetTests(TestCase):
         ):
             clear_derived_value_config_cache()
             response = self.client.get(
-                "/waste_collection/api/waste-atlas/population/",
+                "/waste_collection/waste-atlas/api/population/",
                 {
                     "country": "BE",
                     "year": "2024",

@@ -1,6 +1,7 @@
 from sources.contracts import (
     SourceDomainDatasetRuntimeCompatibility,
     SourceDomainExplorerCard,
+    SourceDomainLegacyRedirects,
     SourceDomainPlugin,
     SourceDomainPublicMount,
 )
@@ -15,6 +16,7 @@ plugin = SourceDomainPlugin(
         "exports",
         "forms",
         "html_views",
+        "legacy_redirects",
         "signals",
         "tasks",
         "templates",
@@ -23,6 +25,10 @@ plugin = SourceDomainPlugin(
     public_mount=SourceDomainPublicMount(
         mount_path="waste_collection/",
         urlconf="sources.waste_collection.urls",
+    ),
+    legacy_redirects=SourceDomainLegacyRedirects(
+        mount_path="waste_collection/api/waste-atlas/",
+        urlconf="sources.waste_collection.waste_atlas.legacy_urls",
     ),
     dataset_runtime_compatibilities=(
         SourceDomainDatasetRuntimeCompatibility(
@@ -66,6 +72,7 @@ plugin = SourceDomainPlugin(
         "/waste_collection/collections/autocomplete/",
         "/waste_collection/collections/map/",
         "/waste_collection/collections/export/",
+        "/waste_collection/waste-atlas/map/",
     ),
     geojson_cache_warmer="sources.waste_collection.tasks.warm_collection_geojson_cache",
     explorer_card=SourceDomainExplorerCard(
