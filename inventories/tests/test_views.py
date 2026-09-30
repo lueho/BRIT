@@ -19,8 +19,11 @@ from utils.tests.testcases import AbstractTestCases
 
 from ..models import (
     InventoryAlgorithm,
+    InventoryAlgorithmParameter,
+    InventoryAlgorithmParameterValue,
     RunningTask,
     Scenario,
+    ScenarioInventoryConfiguration,
     ScenarioStatus,
 )
 from ..views import (
@@ -569,3 +572,195 @@ class ScenarioDetailRunAuthorizationTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'name="run"')
+
+
+# ----------- Missing-object lookups must return 404, not 500 ----------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ScenarioConfigurationObjectLookupTests(TestCase):
+    """User-controlled ids in the scenario configuration and result-map views
+    must produce 404 instead of an unhandled DoesNotExist/ValueError (500)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner", password="pass")
+        change_perm = Permission.objects.get(codename="change_scenario")
+        cls.owner.user_permissions.add(change_perm)
+        cls.region = Region.objects.create(name="R", publication_status="published")
+        cls.catchment = Catchment.objects.create(
+            name="C",
+            region=cls.region,
+            parent_region=cls.region,
+            publication_status="published",
+        )
+        cls.scenario = Scenario.objects.create(
+            name="S", owner=cls.owner, region=cls.region, catchment=cls.catchment
+        )
+        cls.material = Material.objects.create(name="M", owner=cls.owner)
+        cls.feedstock = SampleSeries.objects.create(
+            name="F", owner=cls.owner, material=cls.material
+        )
+        cls.geodataset = GeoDataset.objects.create(
+            name="G", owner=cls.owner, region=cls.region
+        )
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="A", geodataset=cls.geodataset
+        )
+        cls.algorithm.feedstocks.add(cls.material)
+        cls.parameter = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="P", short_name="p"
+        )
+        cls.parameter.inventory_algorithm.add(cls.algorithm)
+        cls.value = InventoryAlgorithmParameterValue.objects.create(
+            name="V", parameter=cls.parameter, value=1.0
+        )
+
+    def setUp(self):
+        self.client.force_login(self.owner)
+
+    def add_url(self):
+        return reverse("scenario-add-configuration", kwargs={"pk": self.scenario.pk})
+
+    def update_url(self):
+        return reverse(
+            "scenario-update-config",
+            kwargs={
+                "scenario_pk": self.scenario.pk,
+                "feedstock_pk": self.feedstock.pk,
+                "algorithm_pk": self.algorithm.pk,
+            },
+        )
+
+    def remove_url(self):
+        return reverse(
+            "scenario-remove-algorithm",
+            kwargs={
+                "scenario_pk": self.scenario.pk,
+                "feedstock_pk": self.feedstock.pk,
+                "algorithm_pk": self.algorithm.pk,
+            },
+        )
+
+    def result_map_url(self, scenario_pk=None, algorithm_pk=None, feedstock_pk=None):
+        return reverse(
+            "scenario-result-map",
+            kwargs={
+                "pk": scenario_pk or self.scenario.pk,
+                "algorithm_pk": algorithm_pk or self.algorithm.pk,
+                "feedstock_pk": feedstock_pk or self.feedstock.pk,
+            },
+        )
+
+    # --- ScenarioAddInventoryAlgorithmView ---
+
+    def test_add_view_post_unknown_feedstock_returns_404(self):
+        response = self.client.post(
+            self.add_url(),
+            {"feedstock": 999999, "inventory_algorithm": self.algorithm.pk},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_add_view_post_unknown_algorithm_returns_404(self):
+        response = self.client.post(
+            self.add_url(),
+            {"feedstock": self.feedstock.pk, "inventory_algorithm": 999999},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_add_view_post_malformed_feedstock_returns_404(self):
+        response = self.client.post(
+            self.add_url(),
+            {"feedstock": "not-a-number", "inventory_algorithm": self.algorithm.pk},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_add_view_post_unknown_parameter_value_returns_404(self):
+        response = self.client.post(
+            self.add_url(),
+            {
+                "feedstock": self.feedstock.pk,
+                "inventory_algorithm": self.algorithm.pk,
+                f"parameter_{self.parameter.pk}": 999999,
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+
+    # --- ScenarioAlgorithmConfigurationUpdateView ---
+
+    def test_update_view_get_unknown_algorithm_returns_404(self):
+        url = reverse(
+            "scenario-update-config",
+            kwargs={
+                "scenario_pk": self.scenario.pk,
+                "feedstock_pk": self.feedstock.pk,
+                "algorithm_pk": 999999,
+            },
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_update_view_post_unknown_feedstock_returns_404_without_mutation(self):
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=self.feedstock,
+            geodataset=self.geodataset,
+            inventory_algorithm=self.algorithm,
+            inventory_parameter=self.parameter,
+            inventory_value=self.value,
+        )
+        response = self.client.post(
+            self.update_url(),
+            {"feedstock": 999999, "inventory_algorithm": self.algorithm.pk},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario,
+                feedstock=self.feedstock,
+                inventory_algorithm=self.algorithm,
+            ).exists(),
+            "existing configuration must survive a failed update POST",
+        )
+
+    def test_update_view_post_unknown_parameter_value_returns_404(self):
+        response = self.client.post(
+            self.update_url(),
+            {
+                "feedstock": self.feedstock.pk,
+                "inventory_algorithm": self.algorithm.pk,
+                f"parameter_{self.parameter.pk}": 999999,
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+
+    # --- ScenarioRemoveInventoryAlgorithmView ---
+
+    def test_remove_view_unknown_algorithm_returns_404(self):
+        url = reverse(
+            "scenario-remove-algorithm",
+            kwargs={
+                "scenario_pk": self.scenario.pk,
+                "feedstock_pk": self.feedstock.pk,
+                "algorithm_pk": 999999,
+            },
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    # --- ScenarioResultDetailMapView ---
+
+    def test_result_map_unknown_scenario_returns_404(self):
+        self.client.logout()
+        response = self.client.get(self.result_map_url(scenario_pk=999999))
+        self.assertEqual(response.status_code, 404)
+
+    def test_result_map_unknown_algorithm_returns_404(self):
+        self.client.logout()
+        response = self.client.get(self.result_map_url(algorithm_pk=999999))
+        self.assertEqual(response.status_code, 404)
+
+    def test_result_map_missing_layer_returns_404(self):
+        self.client.logout()
+        response = self.client.get(self.result_map_url())
+        self.assertEqual(response.status_code, 404)
