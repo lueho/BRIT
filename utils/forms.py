@@ -592,9 +592,9 @@ class SourcesFieldMixin:
         # Add submitted sources (from POST data, honouring formset prefixes)
         sources_key = self.add_prefix("sources")
         if data and sources_key in data:
-            submitted_ids = data.getlist(sources_key)
-            if submitted_ids:
-                source_ids.update(int(sid) for sid in submitted_ids if sid)
+            source_ids.update(
+                int(sid) for sid in data.getlist(sources_key) if str(sid).isdigit()
+            )
 
         # Set queryset to include all relevant sources (permission check in clean())
         if source_ids:
