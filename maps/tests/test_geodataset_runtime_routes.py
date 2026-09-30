@@ -587,6 +587,51 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(data["features"][0]["id"], 2)
         self.assertEqual(data["features"][0]["properties"]["nuts_id"], "DE-B")
 
+    def test_local_relation_map_config_lists_visible_popup_fields(self):
+        response = self.client.get(
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(
+            response.context["map_config"]["featuresPopupFields"],
+            [{"column": "nuts_id", "label": "NUTS ID", "isFeatureId": False}],
+        )
+
+    def test_local_relation_map_config_marks_visible_primary_key_popup_field(self):
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=self.dataset,
+            column_name="feature_id",
+            display_label="Feature ID",
+            is_visible=True,
+        )
+
+        response = self.client.get(
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertIn(
+            {"column": "feature_id", "label": "Feature ID", "isFeatureId": True},
+            response.context["map_config"]["featuresPopupFields"],
+        )
+
+    def test_local_relation_map_config_prefers_popup_flagged_columns(self):
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=self.dataset,
+            column_name="name",
+            display_label="Name",
+            is_visible=True,
+            is_popup=True,
+        )
+
+        response = self.client.get(
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(
+            response.context["map_config"]["featuresPopupFields"],
+            [{"column": "name", "label": "Name", "isFeatureId": False}],
+        )
+
     def test_local_relation_map_route_uses_dataset_scoped_geojson_url(self):
         response = self.client.get(
             reverse("geodataset-map", kwargs={"pk": self.dataset.pk}),

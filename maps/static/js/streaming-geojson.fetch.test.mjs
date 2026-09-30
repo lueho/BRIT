@@ -268,3 +268,24 @@ test("a failure inside the first batch still removes the attached layer", async 
   await assert.rejects(load, /Invalid GeoJSON/);
   assert.equal(calls.resets, 2, "layer reset after the first-batch failure");
 });
+
+test("a rejected unbounded request reports the feature count and asks for a filter", async () => {
+  const response = {
+    ok: false,
+    status: 400,
+    statusText: "Bad Request",
+    headers: {
+      get(name) {
+        return { "X-Cache-Status": "REJECT", "X-Total-Count": "63394" }[name] ?? null;
+      },
+    },
+  };
+  const { sandbox, calls } = makeSandbox({ "/geom?": { response } });
+
+  await sandbox.fetchFeatureGeometriesWithProgress({}).catch(() => {});
+  await settle();
+
+  assert.equal(calls.errors.length, 1);
+  assert.match(calls.errors[0].message, /63,?394/);
+  assert.match(calls.errors[0].message, /filter/i);
+});
