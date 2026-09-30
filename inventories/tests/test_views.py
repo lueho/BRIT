@@ -496,6 +496,25 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
         mock_add.assert_called_once()
 
 
+class ScenarioResultDetailMapView404Tests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        region = Region.objects.create(name="MapR", publication_status="published")
+        cls.scenario = Scenario.objects.create(name="MapS", region=region)
+
+    def test_missing_related_object_returns_404(self):
+        url = reverse(
+            "scenario-result-map",
+            kwargs={
+                "pk": self.scenario.pk,
+                "algorithm_pk": 999999,
+                "feedstock_pk": 999999,
+            },
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+
 class ScenarioDetailViewRunTestCase(TestCase):
     def setUp(self):
         self.owner = User.objects.create(username="scenario-run-owner")
