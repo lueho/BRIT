@@ -453,6 +453,46 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(data["features"][0]["properties"]["nuts_id"], "DE-A")
         self.assertNotIn("hidden_code", data["features"][0]["properties"])
 
+    def _geojson_data_version(self):
+        response = self.client.get(
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self._streaming_json(response)
+        return response["X-Data-Version"]
+
+    def test_local_relation_data_version_changes_when_visible_value_changes(self):
+        before = self._geojson_data_version()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE public.{self.relation_name} SET nuts_id = 'DE-C' "
+                "WHERE feature_id = 1"
+            )
+
+        self.assertNotEqual(self._geojson_data_version(), before)
+
+    def test_local_relation_data_version_changes_when_geometry_changes(self):
+        before = self._geojson_data_version()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE public.{self.relation_name} "
+                "SET geom = ST_Transform(ST_SetSRID(ST_Point(12, 55), 4326), 3857) "
+                "WHERE feature_id = 1"
+            )
+
+        self.assertNotEqual(self._geojson_data_version(), before)
+
+    def test_local_relation_data_version_changes_when_column_policy_changes(self):
+        before = self._geojson_data_version()
+        GeoDatasetColumnPolicy.objects.filter(
+            dataset=self.dataset, column_name="hidden_code"
+        ).update(is_visible=True)
+
+        self.assertNotEqual(self._geojson_data_version(), before)
+
+    def test_local_relation_data_version_is_stable_without_changes(self):
+        self.assertEqual(self._geojson_data_version(), self._geojson_data_version())
+
     def test_local_relation_geojson_route_streams_past_table_cap(self):
         with connection.cursor() as cursor:
             cursor.execute(

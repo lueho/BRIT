@@ -226,20 +226,25 @@ class LocalRelationDatasetRuntimeAdapter:
             query_params=query_params,
             pk=pk,
         )
-        primary_key_column = connection.ops.quote_name(
-            self.runtime_configuration.primary_key_column
+        selected_columns = self._get_selected_columns()
+        row_sql = ", ".join(
+            connection.ops.quote_name(column)
+            for column in [
+                *selected_columns,
+                self.runtime_configuration.geometry_column,
+            ]
         )
         sql = (
-            f"SELECT COUNT(*), MIN({primary_key_column}), MAX({primary_key_column}) "
+            f"SELECT COUNT(*), SUM(hashtextextended(ROW({row_sql})::text, 0)) "
             f"FROM {self.relation_identifier}"
             f"{' WHERE ' + ' AND '.join(where_sql) if where_sql else ''}"
         )
         with connection.cursor() as cursor:
             cursor.execute(sql, params)
-            count, min_pk, max_pk = cursor.fetchone()
+            count, content_hash = cursor.fetchone()
         base = (
-            f"local-relation-stream-v1:{self.dataset.pk}:{self.relation_identifier}:"
-            f"{count}:{min_pk}:{max_pk}"
+            f"local-relation-stream-v2:{self.dataset.pk}:{self.relation_identifier}:"
+            f"{','.join(selected_columns)}:{count}:{content_hash}"
         )
         return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
 
