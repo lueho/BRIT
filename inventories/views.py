@@ -511,7 +511,9 @@ class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
         scenario = self.object
         if scenario.status == ScenarioStatus.Status.RUNNING:
             context = {"scenario": scenario, "task_list": {"tasks": []}}
-            for task in RunningTask.objects.filter(scenario=scenario):
+            for task in RunningTask.objects.filter(
+                scenario=scenario, algorithm__isnull=False
+            ).select_related("algorithm"):
                 context["task_list"]["tasks"].append(
                     {
                         "task_id": task.uuid,

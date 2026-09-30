@@ -37,12 +37,16 @@ def start_inventory_run(scenario_id):
     """
     with transaction.atomic():
         scenario_status = _lock_scenario_status(scenario_id)
-        if scenario_status.status == ScenarioStatus.Status.RUNNING:
-            running_tasks = list(
-                RunningTask.objects.select_for_update().filter(scenario_id=scenario_id)
-            )
-            if not running_tasks or _has_active_running_tasks(running_tasks):
-                return False
+        running_tasks = list(
+            RunningTask.objects.select_for_update().filter(scenario_id=scenario_id)
+        )
+        if _has_active_running_tasks(running_tasks):
+            return False
+        if (
+            scenario_status.status == ScenarioStatus.Status.RUNNING
+            and not running_tasks
+        ):
+            return False
         _set_running(scenario_status)
         transaction.on_commit(partial(run_inventory.delay, scenario_id))
     return True
@@ -56,7 +60,8 @@ def mark_inventory_failed(scenario_id, algorithm_id=None, failure_message=""):
             .filter(scenario_id=scenario_id)
             .first()
         )
-        RunningTask.objects.filter(scenario_id=scenario_id).delete()
+        # RunningTask rows are kept: sibling algorithms of a failed chord may still
+        # be executing and must keep blocking new runs until they are ready.
         if scenario_status is None or scenario_status.status not in {
             ScenarioStatus.Status.RUNNING,
             ScenarioStatus.Status.FAILED,
@@ -106,19 +111,28 @@ def run_inventory(scenario_id):
 
             callback = finalize_inventory.s(scenario_id, layer_keys)
             callback.on_error(mark_inventory_failed.si(scenario_id))
+            callback_id = callback.freeze().id
             task_chord = chord(signatures, callback)
 
             # Track task ids before dispatch so progress is visible from anywhere
-            # and concurrent triggers see this run as active.
+            # and concurrent triggers see this run as active until the callback
+            # has finalized it. The callback row has no algorithm.
             RunningTask.objects.bulk_create(
-                RunningTask(
-                    scenario_id=scenario_id,
-                    uuid=signature.id,
-                    algorithm=execution["algorithm"],
-                )
-                for signature, execution in zip(signatures, execution_plan, strict=True)
+                [
+                    *(
+                        RunningTask(
+                            scenario_id=scenario_id,
+                            uuid=signature.id,
+                            algorithm=execution["algorithm"],
+                        )
+                        for signature, execution in zip(
+                            signatures, execution_plan, strict=True
+                        )
+                    ),
+                    RunningTask(scenario_id=scenario_id, uuid=callback_id),
+                ]
             )
-            transaction.on_commit(task_chord.delay)
+            transaction.on_commit(partial(task_chord.apply_async, task_id=callback_id))
     except Exception as error:
         mark_inventory_failed.run(
             scenario_id,

@@ -18,7 +18,7 @@ from ..tasks import (
 
 
 class InventoryTaskFailureTests(TestCase):
-    def test_mark_inventory_failed_sets_failed_and_clears_running_tasks(self):
+    def test_mark_inventory_failed_sets_failed_and_keeps_running_tasks(self):
         scenario = Scenario.objects.create(
             name="Failed Scenario",
             region=Region.objects.create(name="Failure Region"),
@@ -46,10 +46,10 @@ class InventoryTaskFailureTests(TestCase):
             scenario.scenariostatus.failure_message,
             "calculation failed",
         )
-        self.assertFalse(RunningTask.objects.filter(scenario=scenario).exists())
+        self.assertTrue(RunningTask.objects.filter(scenario=scenario).exists())
 
     @patch("inventories.tasks.InventoryAlgorithm.execute")
-    def test_algorithm_failure_records_algorithm_and_cleans_running_tasks(
+    def test_algorithm_failure_records_algorithm_and_keeps_running_tasks(
         self,
         execute_algorithm,
     ):
@@ -91,7 +91,7 @@ class InventoryTaskFailureTests(TestCase):
             scenario.scenariostatus.failure_message,
             "calculation failed",
         )
-        self.assertFalse(RunningTask.objects.filter(scenario=scenario).exists())
+        self.assertTrue(RunningTask.objects.filter(scenario=scenario).exists())
 
     @patch("inventories.tasks.Layer.objects.create_or_replace")
     @patch("inventories.tasks.InventoryAlgorithm.execute")
@@ -140,7 +140,7 @@ class InventoryTaskFailureTests(TestCase):
             scenario.scenariostatus.failure_message,
             "result persistence failed",
         )
-        self.assertFalse(RunningTask.objects.filter(scenario=scenario).exists())
+        self.assertTrue(RunningTask.objects.filter(scenario=scenario).exists())
 
 
 class InventoryRunSerializationTests(TestCase):
@@ -253,6 +253,7 @@ class InventoryRunSerializationTests(TestCase):
             patch("inventories.tasks.finalize_inventory") as finalize_task,
         ):
             callback = Mock()
+            callback.freeze.return_value.id = str(uuid4())
             finalize_task.s.return_value = callback
             run_inventory.run(self.scenario.pk)
 
@@ -278,19 +279,20 @@ class InventoryRunSerializationTests(TestCase):
             run_inventory.run(self.scenario.pk)
 
         signatures = chord_factory.call_args.args[0]
-        self.assertEqual(
+        callback_id = chord_factory.call_args.args[1].id
+        self.assertCountEqual(
             [
-                str(uuid)
-                for uuid in RunningTask.objects.filter(
+                (str(uuid), algorithm_id)
+                for uuid, algorithm_id in RunningTask.objects.filter(
                     scenario=self.scenario
-                ).values_list("uuid", flat=True)
+                ).values_list("uuid", "algorithm_id")
             ],
-            [signatures[0].id],
+            [(signatures[0].id, self.algorithm.pk), (callback_id, None)],
         )
-        task_chord.delay.assert_not_called()
+        task_chord.apply_async.assert_not_called()
         self.assertEqual(len(callbacks), 1)
         callbacks[0]()
-        task_chord.delay.assert_called_once_with()
+        task_chord.apply_async.assert_called_once_with(task_id=callback_id)
 
     @patch("inventories.tasks.AsyncResult")
     @patch("inventories.tasks.chord")
@@ -327,8 +329,11 @@ class InventoryRunSerializationTests(TestCase):
             run_inventory.run(self.scenario.pk)
 
         chord_factory.assert_called_once()
-        running_tasks = RunningTask.objects.filter(scenario=self.scenario)
+        running_tasks = RunningTask.objects.filter(
+            scenario=self.scenario, algorithm__isnull=False
+        )
         self.assertEqual(running_tasks.count(), 1)
+        self.assertFalse(RunningTask.objects.filter(pk=stale_task.pk).exists())
         self.assertNotEqual(running_tasks.get().uuid, stale_task.uuid)
 
     @patch("inventories.tasks.run_inventory")
@@ -361,6 +366,22 @@ class InventoryRunSerializationTests(TestCase):
         async_result.return_value.state = "STARTED"
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
         self.create_running_task()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            started = start_inventory_run(self.scenario.pk)
+
+        self.assertFalse(started)
+        run_inventory_task.delay.assert_not_called()
+
+    @patch("inventories.tasks.AsyncResult")
+    @patch("inventories.tasks.run_inventory")
+    def test_start_inventory_run_rejects_failed_run_with_active_siblings(
+        self, run_inventory_task, async_result
+    ):
+        async_result.return_value.state = "STARTED"
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        self.create_running_task()
+        mark_inventory_failed.run(self.scenario.pk, self.algorithm.pk, "failed")
 
         with self.captureOnCommitCallbacks(execute=True):
             started = start_inventory_run(self.scenario.pk)

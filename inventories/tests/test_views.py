@@ -526,3 +526,24 @@ class ScenarioDetailViewRunTestCase(TestCase):
             )
 
         run_inventory_task.delay.assert_not_called()
+
+    def test_progress_page_lists_only_algorithm_tasks(self):
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Progress Algorithm",
+            geodataset=GeoDataset.objects.create(
+                name="Progress Dataset", region=self.scenario.region
+            ),
+        )
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        RunningTask.objects.create(
+            scenario=self.scenario, algorithm=algorithm, uuid=uuid4()
+        )
+        RunningTask.objects.create(scenario=self.scenario, uuid=uuid4())
+
+        response = self.client.get(reverse("scenario-result", args=[self.scenario.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [task["algorithm_name"] for task in response.context["task_list"]["tasks"]],
+            ["Progress Algorithm"],
+        )
