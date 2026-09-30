@@ -556,7 +556,7 @@ class WasteFlyerCheckUrlView(SourceCheckUrlView):
     permission_required = "waste_collection.change_wasteflyer"
 
     def get(self, request, *args, **kwargs):
-        self.object = self.model.objects.get(pk=kwargs.get("pk"))
+        self.object = get_object_or_404(self.model, pk=kwargs.get("pk"))
         policy = get_object_policy(request.user, self.object, request=request)
         if not (
             policy.get("is_owner")
@@ -1176,13 +1176,19 @@ class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     def get_initial(self):
         initial = super().get_initial()
         if "region_id" in self.request.GET:
-            region_id = self.request.GET.get("region_id")
-            catchment = CollectionCatchment.objects.get(id=region_id)
-            initial["catchment"] = catchment
+            try:
+                initial["catchment"] = CollectionCatchment.objects.get(
+                    id=self.request.GET.get("region_id")
+                )
+            except (CollectionCatchment.DoesNotExist, ValueError):
+                pass
         if "collector" in self.request.GET:
-            initial["collector"] = Collector.objects.get(
-                id=self.request.GET.get("collector")
-            )
+            try:
+                initial["collector"] = Collector.objects.get(
+                    id=self.request.GET.get("collector")
+                )
+            except (Collector.DoesNotExist, ValueError):
+                pass
         initial["valid_from"] = date.today()
         return initial
 
@@ -1825,7 +1831,7 @@ class CollectionCatchmentAddAggregatedPropertyView(
 ):
     def get_initial(self):
         initial = super().get_initial()
-        catchment = CollectionCatchment.objects.get(pk=self.kwargs.get("pk"))
+        catchment = get_object_or_404(CollectionCatchment, pk=self.kwargs.get("pk"))
         initial["collections"] = catchment.downstream_collections
         return initial
 

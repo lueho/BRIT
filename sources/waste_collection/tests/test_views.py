@@ -544,6 +544,15 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         self.assertEqual(response.status_code, 200)
         mock_task.delay.assert_called_once_with(self.published_object.pk)
 
+    @patch("sources.waste_collection.views.check_wasteflyer_url")
+    def test_check_url_view_returns_404_for_missing_wasteflyer(self, mock_task):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(
+            reverse("wasteflyer-check-url", kwargs={"pk": 999999999})
+        )
+        self.assertEqual(response.status_code, 404)
+        mock_task.delay.assert_not_called()
+
 
 # ----------- Collection Frequency CRUD --------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -2024,6 +2033,39 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         )
         self.assertEqual(WasteFlyer.objects.count(), 2)
 
+    def test_create_view_ignores_missing_region_id_and_collector(self):
+        self.client.force_login(self.user_with_add_perm)
+        response = self.client.get(
+            f"{self.get_create_url()}?region_id=999999999&collector=999999999"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("catchment", response.context["form"].initial)
+        self.assertNotIn("collector", response.context["form"].initial)
+
+    def test_create_view_ignores_non_numeric_region_id_and_collector(self):
+        self.client.force_login(self.user_with_add_perm)
+        response = self.client.get(
+            f"{self.get_create_url()}?region_id=abc&collector=xyz"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("catchment", response.context["form"].initial)
+        self.assertNotIn("collector", response.context["form"].initial)
+
+    def test_create_view_prefills_valid_region_id_and_collector(self):
+        catchment = CollectionCatchment.objects.create(
+            name="Prefill catchment", publication_status="published"
+        )
+        collector = Collector.objects.create(
+            name="Prefill collector", publication_status="published"
+        )
+        self.client.force_login(self.user_with_add_perm)
+        response = self.client.get(
+            f"{self.get_create_url()}?region_id={catchment.pk}&collector={collector.pk}"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["form"].initial["catchment"], catchment)
+        self.assertEqual(response.context["form"].initial["collector"], collector)
+
 
 class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "add_collection"
@@ -2960,6 +3002,11 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
             expected["collections"].order_by("id"),
             initial["collections"].order_by("id"),
         )
+
+    def test_get_http_404_for_missing_catchment(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse(self.url_name, kwargs={"pk": 999999999}))
+        self.assertEqual(response.status_code, 404)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(
