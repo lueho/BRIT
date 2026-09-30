@@ -349,13 +349,13 @@ function clearMap() {
     });
 }
 
-function refreshMap(promises, timeLimit = 120000) {
+function refreshMap(promises, filterParameters, timeLimit = 120000) {
     let promiseIsPending = true;
     Promise.all(promises)
         .then(() => {
             promiseIsPending = false;
             orderLayers();
-            adjustMapBounds();
+            adjustMapBounds(filterParameters);
         })
         .catch(error => {
             promiseIsPending = false;
@@ -734,12 +734,12 @@ function addFeatureBatch(features) {
 
 function renderFeatures(geoJson) {
 
+    resetFeaturesLayer();
+
     if (!geoJson || !geoJson.features || geoJson.features.length === 0) {
         console.warn('The provided GeoJSON object is empty or does not contain any features.');
         return;
     }
-
-    resetFeaturesLayer();
 
     const geometryType = geoJson.features[0].geometry.type;
     featuresLayer = createFeaturesLayer(geoJson, geometryType);
@@ -752,16 +752,21 @@ function renderFeatures(geoJson) {
     featuresLayer.addTo(map);
 }
 
-function adjustMapBounds() {
+function adjustMapBounds(filterParameters) {
     const layerPriorities = [
         { key: 'region', layer: regionLayer },
         { key: 'catchment', layer: catchmentLayer },
         { key: 'features', layer: featuresLayer }
     ];
 
-    const preferredIndex = layerPriorities.findIndex(item => item.key === mapConfig.adjustBoundsToLayer);
+    let preferredKey = mapConfig.adjustBoundsToLayer;
+    if (featuresLayer && hasConstrainingFilterParameters(filterParameters)) {
+        preferredKey = 'features';
+    }
+
+    const preferredIndex = layerPriorities.findIndex(item => item.key === preferredKey);
     if (preferredIndex === -1) {
-        console.warn(`Invalid preferred layer: ${mapConfig.adjustBoundsToLayer}`);
+        console.warn(`Invalid preferred layer: ${preferredKey}`);
         return false;
     }
 
@@ -1299,7 +1304,7 @@ function loadLayers(params) {
                     hideLoadingIndicator();
                     return;
                 }
-                return refreshMap(promises);
+                return refreshMap(promises, filterParameters);
             })
             .catch(error => {
                 console.error('Error loading layers or refreshing map:', error);
