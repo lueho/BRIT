@@ -8,3 +8,7 @@ class BlockedRunningScenario(Exception):
 
 class IllegalComponentShare(Exception):
     """Creating ComponentGroupShares is only valid with the Composition API"""
+
+
+class InvalidParameterValue(Exception):
+    """The posted parameter value is not valid for the given parameter."""

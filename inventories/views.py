@@ -5,7 +5,14 @@ from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db import transaction
-from django.http import Http404, HttpResponse, HttpResponseForbidden, JsonResponse
+from django.db.models import Q
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseForbidden,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, TemplateView, View
@@ -20,7 +27,10 @@ from maps.models import GeoDataset
 from maps.serializers import BaseResultMapSerializer
 from maps.views import GeoDataSetAutocompleteView, MapMixin
 from materials.models import Material, SampleSeries
-from utils.object_management.permissions import get_object_policy
+from utils.object_management.permissions import (
+    filter_queryset_for_user,
+    get_object_policy,
+)
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -34,6 +44,7 @@ from utils.object_management.views import (
 from utils.views import BreadcrumbContextMixin
 
 from .evaluations import ScenarioResult
+from .exceptions import InvalidParameterValue
 from .filters import ScenarioFilterSet
 from .forms import (
     ScenarioInventoryConfigurationAddForm,
@@ -192,6 +203,75 @@ class ScenarioAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Scenario
 
 
+CUSTOM_PARAMETER_VALUE = "custom"
+
+
+def create_custom_parameter_value(request, parameter):
+    """Creates a user-provided value for a parameter from POSTed custom inputs."""
+    if parameter.inventoryalgorithmparametervalue_set.exclude(
+        type=InventoryAlgorithmParameterValue.ValueType.NUMERIC
+    ).exists():
+        raise InvalidParameterValue(
+            f"Parameter '{parameter}' uses categorical presets and does not "
+            "accept custom values."
+        )
+    prefix = f"parameter_{parameter.pk}_custom"
+    try:
+        value = float(request.POST.get(f"{prefix}_value"))
+    except (TypeError, ValueError):
+        raise InvalidParameterValue(
+            f"A numeric value is required for parameter '{parameter}'."
+        ) from None
+    raw_std = request.POST.get(f"{prefix}_standard_deviation")
+    try:
+        standard_deviation = float(raw_std) if raw_std not in (None, "") else None
+    except ValueError:
+        raise InvalidParameterValue(
+            f"The standard deviation for parameter '{parameter}' must be numeric."
+        ) from None
+    source = request.POST.get(f"{prefix}_source", "").strip() or "User assumption"
+    return InventoryAlgorithmParameterValue.objects.create(
+        name="",
+        parameter=parameter,
+        value=value,
+        standard_deviation=standard_deviation,
+        source=source,
+        default=False,
+        is_custom=True,
+    )
+
+
+def resolve_parameter_values(request, algorithm, scenario):
+    """
+    Maps the algorithm's parameters to the values posted in the configuration form.
+    Each parameter may either reference a curated preset, a custom value already
+    configured in the given scenario, or the sentinel 'custom', in which case a
+    user-provided InventoryAlgorithmParameterValue is created.
+    """
+    values = {}
+    for parameter in algorithm.inventoryalgorithmparameter_set.all():
+        posted = request.POST.get(f"parameter_{parameter.pk}")
+        if not posted:
+            continue
+        if posted == CUSTOM_PARAMETER_VALUE:
+            value = create_custom_parameter_value(request, parameter)
+        else:
+            value = _get_posted_object_or_404(InventoryAlgorithmParameterValue, posted)
+            scenario_customs = ScenarioInventoryConfiguration.objects.filter(
+                scenario=scenario, inventory_parameter=parameter
+            ).values("inventory_value_id")
+            if not InventoryAlgorithmParameterValue.objects.filter(
+                Q(is_custom=False) | Q(id__in=scenario_customs),
+                id=value.pk,
+                parameter=parameter,
+            ).exists():
+                raise InvalidParameterValue(
+                    f"Invalid value for parameter '{parameter}'."
+                )
+        values[parameter] = [value]
+    return values
+
+
 @login_required
 def get_evaluation_status(request, task_id=None):
     task_result = AsyncResult(task_id)
@@ -225,20 +305,12 @@ class ScenarioAddInventoryAlgorithmView(
         algorithm = _get_posted_object_or_404(
             InventoryAlgorithm, request.POST.get("inventory_algorithm")
         )
-        parameters = algorithm.inventoryalgorithmparameter_set.all()
-        values = {}
-        for parameter in parameters:
-            values[parameter] = []
-            parameter_id = "parameter_" + str(parameter.pk)
-            if parameter_id in request.POST:
-                value_id = request.POST.get(parameter_id)
-                values[parameter].append(
-                    _get_posted_object_or_404(
-                        InventoryAlgorithmParameterValue, value_id
-                    )
-                )
         try:
-            scenario.add_inventory_algorithm(feedstock, algorithm, values)
+            with transaction.atomic():
+                values = resolve_parameter_values(request, algorithm, scenario)
+                scenario.add_inventory_algorithm(feedstock, algorithm, values)
+        except InvalidParameterValue as exc:
+            return HttpResponseBadRequest(str(exc))
         except FeedstockNotImplemented:
             raise Http404 from None
         return redirect("scenario-detail", pk=scenario.pk)
@@ -293,24 +365,15 @@ class ScenarioAlgorithmConfigurationUpdateView(
         new_algorithm = _get_posted_object_or_404(
             InventoryAlgorithm, request.POST.get("inventory_algorithm")
         )
-        parameters = new_algorithm.inventoryalgorithmparameter_set.all()
-        values = {}
-        for parameter in parameters:
-            values[parameter] = []
-            parameter_id = "parameter_" + str(parameter.pk)
-            if parameter_id in request.POST:
-                value_id = request.POST.get(parameter_id)
-                values[parameter].append(
-                    _get_posted_object_or_404(
-                        InventoryAlgorithmParameterValue, value_id
-                    )
-                )
         try:
             with transaction.atomic():
+                values = resolve_parameter_values(request, new_algorithm, scenario)
                 scenario.remove_inventory_algorithm(
                     current_algorithm, current_feedstock
                 )
                 scenario.add_inventory_algorithm(feedstock, new_algorithm, values)
+        except InvalidParameterValue as exc:
+            return HttpResponseBadRequest(str(exc))
         except FeedstockNotImplemented:
             raise Http404 from None
         return redirect("scenario-detail", pk=scenario.pk)
@@ -473,7 +536,22 @@ class InventoryAlgorithmParametersAPIView(APIView):
             inventory_algorithm=algorithm
         ).prefetch_related("inventoryalgorithmparametervalue_set")
 
-        serializer = InventoryAlgorithmParameterSerializer(parameters, many=True)
+        scenario_id = request.query_params.get("scenario")
+        if not (
+            scenario_id
+            and scenario_id.isascii()
+            and scenario_id.isdigit()
+            and filter_queryset_for_user(Scenario.objects.all(), request.user)
+            .filter(pk=scenario_id)
+            .exists()
+        ):
+            scenario_id = None
+
+        serializer = InventoryAlgorithmParameterSerializer(
+            parameters,
+            many=True,
+            context={"scenario_id": scenario_id},
+        )
         return Response(serializer.data)
 
 

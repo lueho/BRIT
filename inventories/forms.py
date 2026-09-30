@@ -1,5 +1,7 @@
 from django.forms import HiddenInput
+from django.utils.html import escape
 from django_tomselect.forms import TomSelectConfig, TomSelectModelChoiceField
+from django_tomselect.widgets import TomSelectModelWidget
 
 from distributions.models import TemporalDistribution
 from maps.models import GeoDataset
@@ -41,6 +43,31 @@ class ScenarioModalModelForm(ModalModelFormMixin, ScenarioModelForm):
     pass
 
 
+class InitialInstanceTomSelectModelWidget(TomSelectModelWidget):
+    """Keeps a known initial instance selected when the dependent autocomplete
+    source cannot resolve it without the client-side filter values."""
+
+    initial_instance = None
+
+    def get_context(self, name, value, attrs=None):
+        context = super().get_context(name, value, attrs)
+        instance = self.initial_instance
+        if (
+            instance is not None
+            and not context["widget"]["selected_options"]
+            and str(value) == str(instance.pk)
+        ):
+            label = getattr(instance, self.label_field or "name", str(instance))
+            context["widget"]["selected_options"] = [
+                {"value": str(instance.pk), "label": escape(str(label))}
+            ]
+        return context
+
+
+class InitialInstanceTomSelectModelChoiceField(TomSelectModelChoiceField):
+    widget_class = InitialInstanceTomSelectModelWidget
+
+
 class ScenarioInventoryConfigurationForm(SimpleModelForm):
     feedstock = TomSelectModelChoiceField(
         config=TomSelectConfig(
@@ -49,7 +76,7 @@ class ScenarioInventoryConfigurationForm(SimpleModelForm):
         ),
         label="Feedstock",
     )
-    geodataset = TomSelectModelChoiceField(
+    geodataset = InitialInstanceTomSelectModelChoiceField(
         config=TomSelectConfig(
             url="scenario-geodataset-autocomplete",
             label_field="name",
@@ -66,7 +93,7 @@ class ScenarioInventoryConfigurationForm(SimpleModelForm):
         ),
         label="Geodataset",
     )
-    inventory_algorithm = TomSelectModelChoiceField(
+    inventory_algorithm = InitialInstanceTomSelectModelChoiceField(
         config=TomSelectConfig(
             url="scenario-inventoryalgorithm-autocomplete",
             label_field="name",
@@ -129,9 +156,11 @@ class ScenarioInventoryConfigurationUpdateForm(ScenarioInventoryConfigurationFor
             feedstock=feedstock
         )
         self.fields["geodataset"].initial = geodataset
+        self.fields["geodataset"].widget.initial_instance = geodataset
         self.fields[
             "inventory_algorithm"
         ].queryset = scenario.available_inventory_algorithms(
             feedstock=feedstock, geodataset=geodataset
         )
         self.fields["inventory_algorithm"].initial = algorithm
+        self.fields["inventory_algorithm"].widget.initial_instance = algorithm

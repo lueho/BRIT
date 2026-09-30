@@ -49,10 +49,11 @@ class InventoryAlgorithmParameterValueAdmin(admin.ModelAdmin):
         "value",
         "standard_deviation",
         "default",
+        "is_custom",
         "source",
     )
     search_fields = ("name", "source")
-    list_filter = ("default",)
+    list_filter = ("default", "is_custom")
     ordering = ("parameter", "name")
 
 

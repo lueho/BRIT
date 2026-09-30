@@ -22,6 +22,12 @@
         const form = document.getElementById("configForm");
         const initialParameters = JSON.parse(document.getElementById("data").textContent);
 
+        function escapeHtml(text) {
+            const div = document.createElement("div");
+            div.textContent = text == null ? "" : String(text);
+            return div.innerHTML.replace(/"/g, "&quot;");
+        }
+
         function renderParameterFields(parameters, preselectedValues = null) {
             if (!parameters || parameters.length === 0) {
                 document.getElementById("parameterFormContainer").innerHTML = "";
@@ -31,22 +37,52 @@
             let html = "<h3>Parameters for this algorithm:</h3>";
             for (const param of parameters) {
                 const preselected = preselectedValues ? preselectedValues[param.short_name] : null;
+                const allowsCustom = param.values.length === 0 || param.values.every(v => v.type === 1);
                 html += `
                     <div id="div_id_parameter_${param.id}" class="form-group">
-                        <label class="requiredField" for="id_parameter_${param.id}">${param.descriptive_name}</label>
+                        <label class="requiredField" for="id_parameter_${param.id}">${escapeHtml(param.descriptive_name)}</label>
                         <div>
                             <select id="id_parameter_${param.id}" class="select form-control" name="parameter_${param.id}">
                                 <option value="">---------</option>
                                 ${param.values.map(v => {
                                     const isSelected = preselected ? v.id == preselected : v.default;
-                                    return `<option value="${v.id}"${isSelected ? ' selected' : ''}>${v.name || v.value}</option>`;
+                                    return `<option value="${v.id}"${isSelected ? ' selected' : ''}>${escapeHtml(v.name || v.value)}${v.source ? ` (${escapeHtml(v.source)})` : ''}</option>`;
                                 }).join('')}
+                                ${allowsCustom ? '<option value="custom">Custom value (own assumption)</option>' : ''}
                             </select>
                         </div>
                     </div>
+                    ${allowsCustom ? `
+                    <div id="div_id_parameter_${param.id}_custom" class="form-group" style="display: none; margin-left: 1.5rem;">
+                        <label for="id_parameter_${param.id}_custom_value">Own value${param.unit ? ` (${escapeHtml(param.unit)})` : ''}</label>
+                        <input type="number" step="any" id="id_parameter_${param.id}_custom_value" class="form-control" name="parameter_${param.id}_custom_value">
+                        <label for="id_parameter_${param.id}_custom_standard_deviation">Standard deviation (optional)</label>
+                        <input type="number" step="any" id="id_parameter_${param.id}_custom_standard_deviation" class="form-control" name="parameter_${param.id}_custom_standard_deviation">
+                        <label for="id_parameter_${param.id}_custom_source">Source or basis of assumption (optional)</label>
+                        <input type="text" maxlength="200" id="id_parameter_${param.id}_custom_source" class="form-control" name="parameter_${param.id}_custom_source">
+                    </div>` : ''}
                 `;
             }
             document.getElementById("parameterFormContainer").innerHTML = html;
+            for (const param of parameters) {
+                const select = document.getElementById(`id_parameter_${param.id}`);
+                if (select) {
+                    select.addEventListener("change", () => toggleCustomInputs(param.id));
+                    toggleCustomInputs(param.id);
+                }
+            }
+        }
+
+        function toggleCustomInputs(parameterId) {
+            const select = document.getElementById(`id_parameter_${parameterId}`);
+            const container = document.getElementById(`div_id_parameter_${parameterId}_custom`);
+            const valueInput = document.getElementById(`id_parameter_${parameterId}_custom_value`);
+            if (!select || !container || !valueInput) {
+                return;
+            }
+            const isCustom = select.value === "custom";
+            container.style.display = isCustom ? "" : "none";
+            valueInput.required = isCustom;
         }
 
         async function loadInventoryAlgorithmParameters(preselectedValues = null) {
@@ -56,7 +92,7 @@
                 return;
             }
 
-            const url = `/inventories/api/inventory-algorithms/${algorithmId}/parameters/`;
+            const url = `/inventories/api/inventory-algorithms/${algorithmId}/parameters/?scenario={{ scenario.pk }}`;
             try {
                 const response = await fetch(url);
                 if (response.ok) {
@@ -88,3 +124,7 @@
     </script>
 
 {% endblock javascript %}
+
+{% block form_media %}
+    {{ form.media }}
+{% endblock form_media %}
