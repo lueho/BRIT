@@ -340,45 +340,6 @@ class Scenario(NamedUserCreatedObject):
                 update_fields.extend(["failed_algorithm", "failure_message"])
             self.scenariostatus.save(update_fields=update_fields)
 
-    def try_start_run(self):
-        """Atomically transition the scenario to RUNNING for a new evaluation.
-
-        Returns ``True`` when this call acquired the run (status set to
-        RUNNING) so the caller should dispatch the evaluation, and ``False``
-        when an evaluation is already in flight, so the caller can avoid
-        launching a duplicate run. A stale RUNNING state whose recorded tasks
-        have all finished is recovered and treated as startable.
-        """
-        with transaction.atomic():
-            scenario_status = (
-                ScenarioStatus.objects.select_for_update()
-                .filter(scenario_id=self.pk)
-                .first()
-            )
-            if scenario_status is None:
-                return False
-
-            if scenario_status.status == ScenarioStatus.Status.RUNNING:
-                running_tasks = list(
-                    RunningTask.objects.select_for_update().filter(scenario_id=self.pk)
-                )
-                if not running_tasks:
-                    return False
-                if any(
-                    AsyncResult(str(task.uuid)).state not in READY_STATES
-                    for task in running_tasks
-                ):
-                    return False
-                RunningTask.objects.filter(scenario_id=self.pk).delete()
-
-            scenario_status.status = ScenarioStatus.Status.RUNNING
-            scenario_status.failed_algorithm = None
-            scenario_status.failure_message = ""
-            scenario_status.save(
-                update_fields=["status", "failed_algorithm", "failure_message"]
-            )
-            return True
-
     def available_feedstocks(self):
         """
         Returns all materials that can be included in this scenario.
@@ -561,24 +522,8 @@ class Scenario(NamedUserCreatedObject):
             config_entry.delete()
 
     def delete_result_layers(self):
-        for layer in self.layer_set.all():
+        for layer in self.layer_set(manager="all_objects").all():
             layer.delete()
-
-    def delete_obsolete_result_layers(self):
-        """Delete result layers no longer produced by the current configuration.
-
-        Layers for combinations still in the execution plan are replaced in
-        place by ``Layer.objects.create_or_replace`` during evaluation and are
-        therefore preserved. This removes only leftovers from algorithm or
-        feedstock combinations that were dropped from the configuration.
-        """
-        current_pairs = {
-            (execution["algorithm"].id, execution["kwargs"]["feedstock_id"])
-            for execution in self.inventory_execution_plan()
-        }
-        for layer in self.layer_set.all():
-            if (layer.algorithm_id, layer.feedstock_id) not in current_pairs:
-                layer.delete()
 
     def delete_configuration(self):
         """

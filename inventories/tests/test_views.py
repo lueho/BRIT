@@ -493,45 +493,6 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
         mock_add.assert_called_once()
 
 
-class ScenarioRunConcurrencyTests(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="runowner", password="pass")
-        cls.owner.user_permissions.add(
-            Permission.objects.get(codename="change_scenario")
-        )
-        region = Region.objects.create(name="RunR", publication_status="published")
-        catchment = Catchment.objects.create(
-            name="RunC",
-            region=region,
-            parent_region=region,
-            publication_status="published",
-        )
-        cls.scenario = Scenario.objects.create(
-            name="RunS", owner=cls.owner, region=region, catchment=catchment
-        )
-
-    @patch("inventories.views.run_inventory.delay")
-    def test_post_dispatches_run_when_not_running(self, delay):
-        self.client.force_login(self.owner)
-        url = reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
-        response = self.client.post(url)
-        self.assertEqual(response.status_code, 302)
-        delay.assert_called_once_with(self.scenario.pk)
-
-    @patch("inventories.models.AsyncResult")
-    @patch("inventories.views.run_inventory.delay")
-    def test_post_does_not_dispatch_when_already_running(self, delay, async_result):
-        async_result.return_value.state = "PENDING"
-        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
-        RunningTask.objects.create(scenario=self.scenario, uuid=uuid4())
-        self.client.force_login(self.owner)
-        url = reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
-        response = self.client.post(url)
-        self.assertEqual(response.status_code, 302)
-        delay.assert_not_called()
-
-
 class ScenarioResultDetailMapView404Tests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -549,6 +510,65 @@ class ScenarioResultDetailMapView404Tests(TestCase):
         )
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
+
+
+class ScenarioDetailViewRunTestCase(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create(username="scenario-run-owner")
+        self.owner.user_permissions.add(
+            Permission.objects.get(codename="change_scenario")
+        )
+        self.scenario = Scenario.objects.create(
+            name="Run Scenario",
+            owner=self.owner,
+            region=Region.objects.create(name="Run Region"),
+        )
+        self.client.force_login(self.owner)
+
+    @patch("inventories.views.start_inventory_run")
+    def test_post_starts_run_through_serialized_entry_point(self, start_run):
+        response = self.client.post(
+            reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("scenario-result", args=[self.scenario.pk]),
+            fetch_redirect_response=False,
+        )
+        start_run.assert_called_once_with(self.scenario.pk)
+
+    @patch("inventories.tasks.run_inventory")
+    def test_post_does_not_enqueue_second_run_while_running(self, run_inventory_task):
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+            )
+
+        run_inventory_task.delay.assert_not_called()
+
+    def test_progress_page_lists_only_algorithm_tasks(self):
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Progress Algorithm",
+            geodataset=GeoDataset.objects.create(
+                name="Progress Dataset", region=self.scenario.region
+            ),
+        )
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        RunningTask.objects.create(
+            scenario=self.scenario, algorithm=algorithm, uuid=uuid4()
+        )
+        RunningTask.objects.create(scenario=self.scenario, uuid=uuid4())
+
+        response = self.client.get(reverse("scenario-result", args=[self.scenario.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [task["algorithm_name"] for task in response.context["task_list"]["tasks"]],
+            ["Progress Algorithm"],
+        )
 
 
 class ScenarioDetailRunAuthorizationTests(TestCase):
@@ -580,28 +600,28 @@ class ScenarioDetailRunAuthorizationTests(TestCase):
     def detail_url(self, scenario):
         return reverse("scenario-detail", kwargs={"pk": scenario.pk})
 
-    @patch("inventories.views.run_inventory")
+    @patch("inventories.views.start_inventory_run")
     def test_anonymous_cannot_run_published_scenario(self, mock_run):
         response = self.client.post(self.detail_url(self.published_scenario))
 
         self.assertEqual(response.status_code, 403)
-        mock_run.delay.assert_not_called()
+        mock_run.assert_not_called()
         self.published_scenario.scenariostatus.refresh_from_db()
         self.assertEqual(
             self.published_scenario.scenariostatus.status,
             ScenarioStatus.Status.CHANGED,
         )
 
-    @patch("inventories.views.run_inventory")
+    @patch("inventories.views.start_inventory_run")
     def test_non_owner_cannot_run_published_scenario(self, mock_run):
         self.client.force_login(self.other_user)
 
         response = self.client.post(self.detail_url(self.published_scenario))
 
         self.assertEqual(response.status_code, 403)
-        mock_run.delay.assert_not_called()
+        mock_run.assert_not_called()
 
-    @patch("inventories.views.run_inventory")
+    @patch("inventories.views.start_inventory_run")
     def test_owner_can_run_private_scenario(self, mock_run):
         self.client.force_login(self.owner)
 
@@ -612,7 +632,7 @@ class ScenarioDetailRunAuthorizationTests(TestCase):
             reverse("scenario-result", kwargs={"pk": self.private_scenario.pk}),
             fetch_redirect_response=False,
         )
-        mock_run.delay.assert_called_once_with(self.private_scenario.pk)
+        mock_run.assert_called_once_with(self.private_scenario.pk)
 
     def test_anonymous_can_view_published_scenario_without_run_form(self):
         response = self.client.get(self.detail_url(self.published_scenario))

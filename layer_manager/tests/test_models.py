@@ -1,6 +1,8 @@
+from importlib import import_module
+
 from django.apps import apps
 from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Point, Polygon
-from django.db import connection
+from django.db import IntegrityError, connection, transaction
 from django.db.models.query import QuerySet
 from django.test import TestCase
 
@@ -148,6 +150,68 @@ class LayerTestCase(TestCase):
         )
         del apps.all_models["layer_manager"][table_name]
 
+    def test_staged_layer_replaces_live_layer_only_when_published(self):
+        algorithm = InventoryAlgorithm.objects.get(function_name="avg_area_yield")
+        geom = HamburgGreenAreas.objects.first().geom
+
+        def results(value):
+            return {
+                "aggregated_values": [
+                    {"name": "Total production", "value": value, "unit": "kg"}
+                ],
+                "features": [{"geom": geom, "yield": value}],
+            }
+
+        layer_kwargs = {
+            "name": "layer",
+            "scenario": self.scenario,
+            "feedstock": self.feedstock_sample_series,
+            "algorithm": algorithm,
+        }
+        live_layer, _ = Layer.objects.create_or_replace(
+            results=results(1.0), **layer_kwargs
+        )
+        staged_layer, _ = Layer.objects.create_or_replace(
+            results=results(2.0), staged=True, **layer_kwargs
+        )
+
+        self.assertNotEqual(staged_layer.table_name, live_layer.table_name)
+        self.assertEqual(list(self.scenario.layer_set.all()), [live_layer])
+        self.assertEqual(
+            list(
+                live_layer.get_feature_collection().objects.values_list(
+                    "yield", flat=True
+                )
+            ),
+            [1.0],
+        )
+
+        staged_layer.publish()
+
+        self.assertEqual(list(self.scenario.layer_set.all()), [staged_layer])
+        self.assertEqual(
+            list(
+                staged_layer.get_feature_collection().objects.values_list(
+                    "yield", flat=True
+                )
+            ),
+            [2.0],
+        )
+        self.assertEqual(
+            list(staged_layer.layeraggregatedvalue_set.values_list("value", flat=True)),
+            [2.0],
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT to_regclass('{live_layer.table_name}')")
+            self.assertIsNone(cursor.fetchone()[0])
+
+        next_layer, _ = Layer.objects.create_or_replace(
+            results=results(3.0), staged=True, **layer_kwargs
+        )
+        self.assertEqual(next_layer.table_name, live_layer.table_name)
+        next_layer.publish()
+        self.assertEqual(list(self.scenario.layer_set.all()), [next_layer])
+
     def test_get_feature_collection(self):
         results = {
             "avg_area_yield": {
@@ -279,6 +343,78 @@ class LayerTestCase(TestCase):
 
         kwargs["fields"] = field_definitions
         self.assertTrue(layer.is_defined_by(**kwargs))
+
+
+class LayerFieldUniquenessTestCase(TestCase):
+    def test_field_name_and_data_type_pair_is_unique(self):
+        LayerField.objects.create(field_name="value", data_type="float")
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            LayerField.objects.create(field_name="value", data_type="float")
+
+    def test_same_field_name_with_other_data_type_is_allowed(self):
+        LayerField.objects.create(field_name="value", data_type="float")
+        LayerField.objects.create(field_name="value", data_type="int")
+        self.assertEqual(LayerField.objects.filter(field_name="value").count(), 2)
+
+
+class MergeDuplicateLayerFieldsMigrationTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        region = Region.objects.create(name="Test Region")
+        catchment = Catchment.objects.create(name="Test Catchment", region=region)
+        scenario = Scenario.objects.create(
+            name="Test Scenario", region=region, catchment=catchment
+        )
+        geodataset = GeoDataset.objects.create(name="Test Geodataset", region=region)
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Average Point Yield",
+            function_name="avg_point_yield",
+            geodataset=geodataset,
+        )
+        feedstock = SampleSeries.objects.create(
+            material=Material.objects.create(name="Test Feedstock"),
+            name="Feedstock Test Series",
+        )
+        cls.layer_kwargs = {
+            "geom_type": "Point",
+            "scenario": scenario,
+            "algorithm": algorithm,
+            "feedstock": feedstock,
+        }
+
+    def setUp(self):
+        constraint = next(
+            c
+            for c in LayerField._meta.constraints
+            if c.name == "unique_layer_field_name_data_type"
+        )
+        with connection.schema_editor() as schema_editor:
+            schema_editor.remove_constraint(LayerField, constraint)
+
+    def test_duplicates_are_merged_into_the_oldest_field(self):
+        keeper = LayerField.objects.create(field_name="value", data_type="float")
+        duplicate = LayerField.objects.create(field_name="value", data_type="float")
+        other = LayerField.objects.create(field_name="value", data_type="int")
+        first = Layer.objects.create(name="first", table_name="t1", **self.layer_kwargs)
+        second = Layer.objects.create(
+            name="second", table_name="t2", **self.layer_kwargs
+        )
+        both = Layer.objects.create(name="both", table_name="t3", **self.layer_kwargs)
+        first.layer_fields.add(keeper, other)
+        second.layer_fields.add(duplicate)
+        both.layer_fields.add(keeper, duplicate)
+
+        migration = import_module(
+            "layer_manager.migrations.0002_unique_layer_field_name_data_type"
+        )
+        migration.merge_duplicate_layer_fields(apps, "default")
+
+        self.assertQuerySetEqual(
+            LayerField.objects.order_by("id"), [keeper, other], ordered=True
+        )
+        self.assertSetEqual(set(first.layer_fields.all()), {keeper, other})
+        self.assertSetEqual(set(second.layer_fields.all()), {keeper})
+        self.assertSetEqual(set(both.layer_fields.all()), {keeper})
 
 
 class LayerAggregatedDistributionTestCase(TestCase):

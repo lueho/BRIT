@@ -1531,10 +1531,15 @@ class CatchmentRegionGeometryAPI(APIView):
     @staticmethod
     def get(request, *args, **kwargs):
         if "pk" in request.query_params:
-            # select_related needed for geometry serialization
-            catchment = Catchment.objects.select_related(
-                "region", "region__borders"
-            ).get(pk=request.query_params.get("pk"))
+            try:
+                # select_related needed for geometry serialization
+                catchment = Catchment.objects.select_related(
+                    "region", "region__borders"
+                ).get(pk=request.query_params.get("pk"))
+            except (Catchment.DoesNotExist, ValueError, TypeError) as err:
+                raise NotFound(
+                    "A catchment with the provided id does not exist."
+                ) from err
             regions = Region.objects.select_related("borders").filter(
                 catchment=catchment
             )
@@ -1551,7 +1556,12 @@ class CatchmentRegionSummaryAPIView(APIView):
     @staticmethod
     def get(request, *args, **kwargs):
         if "pk" in request.query_params:
-            catchment = Catchment.objects.get(pk=request.query_params.get("pk"))
+            try:
+                catchment = Catchment.objects.get(pk=request.query_params.get("pk"))
+            except (Catchment.DoesNotExist, ValueError, TypeError) as err:
+                raise NotFound(
+                    "A catchment with the provided id does not exist."
+                ) from err
             try:
                 region = catchment.region.nutsregion
                 serializer = NutsRegionSummarySerializer(

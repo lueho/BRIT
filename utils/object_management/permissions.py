@@ -822,13 +822,13 @@ def build_scope_filter_params(scope: str | None, user):
     """Return list-valued filter kwargs for export endpoints.
 
     These parameters are merged into URL-query-like payloads consumed by
-    filtersets in async export tasks.
+    filtersets in async export tasks. The ``private`` scope contributes no
+    parameters: owner and editor-grant visibility is enforced by
+    ``apply_scope_filter`` on the task's base queryset.
     """
 
     if scope == "private":
-        if not user or not getattr(user, "is_authenticated", False):
-            return {"owner": []}
-        return {"owner": [getattr(user, "pk", None)]}
+        return {}
 
     if scope == "review":
         from .models import UserCreatedObject
