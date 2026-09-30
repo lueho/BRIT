@@ -60,7 +60,7 @@
       {{ object.region.display_name }}
     </p>
   {% endif %}
-  {% with sources=object.sources.all %}
+  {% with sources=visible_sources %}
     {% if sources %}
       <div class="card-text mt-3">
         <strong>Sources:</strong>

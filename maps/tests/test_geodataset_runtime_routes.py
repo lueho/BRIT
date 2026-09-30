@@ -94,6 +94,25 @@ class GeoDataSetRuntimeRouteTestCase(TestCase):
         )
         self.assertContains(response, "Runtime source")
 
+    def test_dataset_detail_hides_private_sources_from_anonymous(self):
+        private_source = Source.objects.create(
+            title="Private runtime source",
+            publication_status="private",
+        )
+        self.dataset.sources.add(private_source)
+
+        response = self.client.get(
+            reverse("geodataset-detail", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Runtime source")
+        self.assertNotContains(response, "Private runtime source")
+        self.assertNotContains(
+            response,
+            reverse("source-detail-modal", kwargs={"pk": private_source.pk}),
+        )
+
     def test_dataset_table_route_renders_visible_columns(self):
         response = self.client.get(
             reverse("geodataset-table", kwargs={"pk": self.dataset.pk})
