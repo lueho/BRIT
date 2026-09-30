@@ -35,7 +35,14 @@ class LayerField(models.Model):
             return models.CharField(blank=True, null=True, max_length=200)
 
 
+ALTERNATE_TABLE_SUFFIX = "_alt"
+
+
 class LayerManager(models.Manager):
+    """Default manager; staged layers of unfinished runs are hidden."""
+
+    include_staged = False
+
     supported_geometry_types = [
         "Point",
         "MultiPoint",
@@ -45,7 +52,25 @@ class LayerManager(models.Manager):
         "MultiPolygon",
     ]
 
-    def create_or_replace(self, **kwargs):
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.include_staged:
+            return queryset
+        return queryset.filter(staged=False)
+
+    def _staged_table_name(self, table_name):
+        """Returns the name not used by the live layer, so both tables can coexist."""
+        alternate_name = table_name + ALTERNATE_TABLE_SUFFIX
+        if self.model.objects.filter(table_name=table_name).exists():
+            return alternate_name
+        return table_name
+
+    def create_or_replace(self, staged=False, **kwargs):
+        """Creates or refills the result layer of a scenario, algorithm and feedstock.
+
+        With ``staged=True`` the result is written to a hidden staged layer that
+        replaces the live layer only when :meth:`Layer.publish` is called.
+        """
         results = kwargs.pop("results")
 
         if "features" not in results or len(results["features"]) == 0:
@@ -81,8 +106,12 @@ class LayerManager(models.Manager):
                 + "_feedstock_"
                 + str(kwargs["feedstock"].id)
             )
+            if staged:
+                kwargs["table_name"] = self._staged_table_name(kwargs["table_name"])
+            kwargs["staged"] = staged
 
-            layer, created = super().get_or_create(
+            layers = self.model.all_objects
+            layer, created = layers.get_or_create(
                 table_name=kwargs["table_name"], defaults=kwargs
             )
 
@@ -96,7 +125,7 @@ class LayerManager(models.Manager):
                     feature_collection.objects.all().delete()
                 else:
                     layer.delete()
-                    layer = super().create(**kwargs)
+                    layer = layers.create(**kwargs)
                     layer.add_layer_fields(fields)
                     feature_collection = layer.update_or_create_feature_collection()
                     layer.create_feature_table()
@@ -112,6 +141,10 @@ class LayerManager(models.Manager):
             layer.add_aggregated_distributions(results["aggregated_distributions"])
 
         return layer, feature_collection
+
+
+class AllLayersManager(LayerManager):
+    include_staged = True
 
 
 class Layer(models.Model):
@@ -130,8 +163,10 @@ class Layer(models.Model):
     feedstock = models.ForeignKey(SampleSeries, on_delete=models.CASCADE)
     algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE)
     layer_fields = models.ManyToManyField(LayerField)
+    staged = models.BooleanField(default=False)
 
     objects = LayerManager()
+    all_objects = AllLayersManager()
 
     class Meta:
         constraints = [
@@ -262,6 +297,17 @@ class Layer(models.Model):
 
         with connection.schema_editor() as schema_editor:
             schema_editor.delete_model(feature_collection)
+
+    def publish(self):
+        """Replaces the live layer of the same scenario, algorithm and feedstock."""
+        for layer in Layer.objects.filter(
+            scenario_id=self.scenario_id,
+            algorithm_id=self.algorithm_id,
+            feedstock_id=self.feedstock_id,
+        ).exclude(pk=self.pk):
+            layer.delete()
+        self.staged = False
+        self.save(update_fields=["staged"])
 
     def delete_aggregated_values(self):
         LayerAggregatedValue.objects.filter(layer=self).delete()

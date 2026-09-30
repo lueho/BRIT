@@ -148,6 +148,68 @@ class LayerTestCase(TestCase):
         )
         del apps.all_models["layer_manager"][table_name]
 
+    def test_staged_layer_replaces_live_layer_only_when_published(self):
+        algorithm = InventoryAlgorithm.objects.get(function_name="avg_area_yield")
+        geom = HamburgGreenAreas.objects.first().geom
+
+        def results(value):
+            return {
+                "aggregated_values": [
+                    {"name": "Total production", "value": value, "unit": "kg"}
+                ],
+                "features": [{"geom": geom, "yield": value}],
+            }
+
+        layer_kwargs = {
+            "name": "layer",
+            "scenario": self.scenario,
+            "feedstock": self.feedstock_sample_series,
+            "algorithm": algorithm,
+        }
+        live_layer, _ = Layer.objects.create_or_replace(
+            results=results(1.0), **layer_kwargs
+        )
+        staged_layer, _ = Layer.objects.create_or_replace(
+            results=results(2.0), staged=True, **layer_kwargs
+        )
+
+        self.assertNotEqual(staged_layer.table_name, live_layer.table_name)
+        self.assertEqual(list(self.scenario.layer_set.all()), [live_layer])
+        self.assertEqual(
+            list(
+                live_layer.get_feature_collection().objects.values_list(
+                    "yield", flat=True
+                )
+            ),
+            [1.0],
+        )
+
+        staged_layer.publish()
+
+        self.assertEqual(list(self.scenario.layer_set.all()), [staged_layer])
+        self.assertEqual(
+            list(
+                staged_layer.get_feature_collection().objects.values_list(
+                    "yield", flat=True
+                )
+            ),
+            [2.0],
+        )
+        self.assertEqual(
+            list(staged_layer.layeraggregatedvalue_set.values_list("value", flat=True)),
+            [2.0],
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT to_regclass('{live_layer.table_name}')")
+            self.assertIsNone(cursor.fetchone()[0])
+
+        next_layer, _ = Layer.objects.create_or_replace(
+            results=results(3.0), staged=True, **layer_kwargs
+        )
+        self.assertEqual(next_layer.table_name, live_layer.table_name)
+        next_layer.publish()
+        self.assertEqual(list(self.scenario.layer_set.all()), [next_layer])
+
     def test_get_feature_collection(self):
         results = {
             "avg_area_yield": {

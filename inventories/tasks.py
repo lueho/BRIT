@@ -92,6 +92,9 @@ def run_inventory(scenario_id):
             RunningTask.objects.filter(
                 id__in=[task.id for task in running_tasks]
             ).delete()
+            # No task of an earlier run is active, so its staged results are orphaned.
+            for layer in Layer.all_objects.filter(scenario_id=scenario_id, staged=True):
+                layer.delete()
             _set_running(scenario_status)
 
             scenario = Scenario.objects.get(id=scenario_id)
@@ -156,7 +159,7 @@ def run_inventory_algorithm(self, algorithm_id, **kwargs):
             "algorithm": algorithm,
             "results": results,
         }
-        Layer.objects.create_or_replace(**layer_values)
+        Layer.objects.create_or_replace(staged=True, **layer_values)
     except Exception as error:
         mark_inventory_failed.run(
             scenario_id,
@@ -175,8 +178,18 @@ def finalize_inventory(results, scenario_id, layer_keys=None):
     with transaction.atomic():
         scenario_status = _lock_scenario_status(scenario_id)
         RunningTask.objects.filter(scenario_id=scenario_id).delete()
-        if layer_keys is not None:
-            current_layers = {tuple(key) for key in layer_keys}
+        current_layers = (
+            None if layer_keys is None else {tuple(key) for key in layer_keys}
+        )
+        for layer in Layer.all_objects.filter(scenario_id=scenario_id, staged=True):
+            if (
+                current_layers is None
+                or (layer.algorithm_id, layer.feedstock_id) in current_layers
+            ):
+                layer.publish()
+            else:
+                layer.delete()
+        if current_layers is not None:
             for layer in Layer.objects.filter(scenario_id=scenario_id):
                 if (layer.algorithm_id, layer.feedstock_id) not in current_layers:
                     layer.delete()

@@ -169,17 +169,19 @@ class InventoryRunSerializationTests(TestCase):
             material=Material.objects.create(name="Serialization Material"),
         )
 
-    def create_layer(self, algorithm):
-        return Layer.objects.create(
+    def create_layer(self, algorithm, staged=False):
+        return Layer.all_objects.create(
             name=algorithm.function_name,
             geom_type="Polygon",
             table_name=(
                 f"result_of_scenario_{self.scenario.pk}"
                 f"_algorithm_{algorithm.pk}_feedstock_{self.feedstock.pk}"
+                f"{'_alt' if staged else ''}"
             ),
             scenario=self.scenario,
             feedstock=self.feedstock,
             algorithm=algorithm,
+            staged=staged,
         )
 
     def execution_plan(self):
@@ -436,3 +438,73 @@ class InventoryRunSerializationTests(TestCase):
             )
 
         delete_layer.assert_not_called()
+
+    @patch("inventories.tasks.Layer.objects.create_or_replace")
+    @patch("inventories.tasks.InventoryAlgorithm.execute")
+    def test_run_inventory_algorithm_stages_its_result(
+        self, execute_algorithm, create_result_layer
+    ):
+        execute_algorithm.return_value = {"features": []}
+
+        run_inventory_algorithm.run(
+            self.algorithm.pk,
+            scenario_id=self.scenario.pk,
+            feedstock_id=self.feedstock.pk,
+        )
+
+        self.assertTrue(create_result_layer.call_args.kwargs["staged"])
+
+    @patch("inventories.tasks.chord")
+    @patch("inventories.tasks.Layer.delete", autospec=True)
+    def test_run_inventory_discards_leftover_staged_layers(
+        self, delete_layer, chord_factory
+    ):
+        chord_factory.return_value = Mock()
+        live_layer = self.create_layer(self.algorithm)
+        leftover_layer = self.create_layer(self.algorithm, staged=True)
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        with patch.object(
+            Scenario, "inventory_execution_plan", return_value=self.execution_plan()
+        ):
+            run_inventory.run(self.scenario.pk)
+
+        delete_layer.assert_called_once_with(leftover_layer)
+        self.assertTrue(Layer.objects.filter(pk=live_layer.pk).exists())
+
+    @patch("inventories.tasks.Layer.delete", autospec=True)
+    def test_finalize_inventory_publishes_staged_layers(self, delete_layer):
+        previous_layer = self.create_layer(self.algorithm)
+        staged_layer = self.create_layer(self.algorithm, staged=True)
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        finalize_inventory.run(
+            [True],
+            self.scenario.pk,
+            [[self.algorithm.pk, self.feedstock.pk]],
+        )
+
+        delete_layer.assert_called_once_with(previous_layer)
+        staged_layer.refresh_from_db()
+        self.assertFalse(staged_layer.staged)
+        self.assertIn(staged_layer, self.scenario.layer_set.all())
+
+    @patch("inventories.tasks.Layer.delete", autospec=True)
+    def test_failed_finalize_keeps_previous_results_and_hides_staged(
+        self, delete_layer
+    ):
+        previous_layer = self.create_layer(self.algorithm)
+        staged_layer = self.create_layer(self.algorithm, staged=True)
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        with self.assertRaises(RuntimeError):
+            finalize_inventory.run(
+                [True, False],
+                self.scenario.pk,
+                [[self.algorithm.pk, self.feedstock.pk]],
+            )
+
+        delete_layer.assert_not_called()
+        staged_layer.refresh_from_db()
+        self.assertTrue(staged_layer.staged)
+        self.assertEqual(list(self.scenario.layer_set.all()), [previous_layer])
