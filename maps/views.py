@@ -20,7 +20,10 @@ from maps.mixins import (
     GEOJSON_CONTROL_QUERY_PARAMS,
     get_unbounded_geojson_rejection_response,
 )
-from maps.runtime_adapters import get_dataset_runtime_adapter
+from maps.runtime_adapters import (
+    MAX_LOCAL_RELATION_FILTER_SEARCH_LENGTH,
+    get_dataset_runtime_adapter,
+)
 from maps.serializers import (
     LauRegionOptionSerializer,
     LauRegionSummarySerializer,
@@ -971,8 +974,9 @@ class GeoDataSetRuntimeFilterOptionsView(
         adapter = self.get_runtime_adapter()
         if not getattr(adapter, "uses_local_relation", False):
             raise Http404("Dataset does not use a local relation runtime.")
+        query = request.GET.get("q", "").strip()
         values = adapter.search_filter_values(
-            kwargs["column"], request.GET.get("q", "").strip()
+            kwargs["column"], query[:MAX_LOCAL_RELATION_FILTER_SEARCH_LENGTH]
         )
         return JsonResponse(
             {"results": [{"value": str(value), "text": str(value)} for value in values]}

@@ -77,6 +77,7 @@ class LocalRelationTypedFilterTestCase(TestCase):
                     surveyed_at timestamp with time zone,
                     is_active boolean,
                     hidden_code varchar(20),
+                    height_m_max integer,
                     geom geometry(Point, 3857)
                 )
                 """
@@ -85,13 +86,13 @@ class LocalRelationTypedFilterTestCase(TestCase):
                 f"""
                 INSERT INTO public.{self.relation_name} VALUES
                     (1, 'Oak A', 'tree', 10, 4.50, '2024-01-15',
-                     '2024-01-15T08:00:00+00:00', true, 'a',
+                     '2024-01-15T08:00:00+00:00', true, 'a', 7,
                      ST_Transform(ST_SetSRID(ST_Point(10, 53), 4326), 3857)),
                     (2, 'Beech B', 'tree', 20, 12.00, '2024-06-01',
-                     '2024-06-01T23:30:00+00:00', false, 'b',
+                     '2024-06-01T23:30:00+00:00', false, 'b', 7,
                      ST_Transform(ST_SetSRID(ST_Point(11, 54), 4326), 3857)),
                     (3, 'Hedge C', 'shrub', 20, 1.25, '2025-03-10',
-                     '2025-03-10T12:00:00+00:00', true, 'c',
+                     '2025-03-10T12:00:00+00:00', true, 'c', 99,
                      ST_Transform(ST_SetSRID(ST_Point(12, 55), 4326), 3857))
                 """
             )
@@ -159,6 +160,27 @@ class LocalRelationTypedFilterTestCase(TestCase):
     def test_boolean_filter(self):
         self.assertEqual(self.count("is_active=true"), 2)
         self.assertEqual(self.count("is_active=false"), 1)
+
+    def test_exact_timestamp_filter_accepts_full_timestamp(self):
+        self.assertEqual(self.count("surveyed_at=2024-06-01T23:30:00%2B00:00"), 1)
+
+    def test_range_suffix_colliding_with_column_filters_that_column(self):
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=self.dataset,
+            column_name="height_m_max",
+            is_visible=True,
+            is_filterable=True,
+        )
+
+        specs = self.adapter().get_filter_specs()
+        response = self.client.get(
+            reverse("geodataset-table", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(self.count("height_m_max=7"), 2)
+        self.assertEqual(specs["height_m"].kind, "choice")
+        self.assertNotIn("height_m_min", self.adapter().get_filter_query_param_names())
+        self.assertContains(response, 'name="height_m_max"', count=1)
 
     def test_range_params_ignored_for_text_and_unfilterable_columns(self):
         self.assertEqual(self.count("name_min=Z&hidden_code=a"), 3)
@@ -257,6 +279,17 @@ class LocalRelationTypedFilterTestCase(TestCase):
         response = self.client.get(self.url("name"), {"q": "%"})
 
         self.assertEqual(response.json(), {"results": []})
+
+    def test_long_search_terms_are_truncated(self):
+        response = self.client.get(self.url("name"), {"q": "Oak" + "x" * 500})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"results": []})
+        with patch.object(
+            type(self.adapter()), "search_filter_values", return_value=[]
+        ) as search:
+            self.client.get(self.url("name"), {"q": "y" * 500})
+        self.assertEqual(len(search.call_args.args[1]), 100)
 
     def test_rejects_unfilterable_column(self):
         response = self.client.get(self.url("hidden_code"), {"q": "a"})

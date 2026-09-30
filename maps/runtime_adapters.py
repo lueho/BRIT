@@ -34,6 +34,9 @@ DATE_DATA_TYPES = {"date"}
 TIMESTAMP_DATA_TYPES = {"timestamp without time zone", "timestamp with time zone"}
 BOOLEAN_DATA_TYPES = {"boolean"}
 BOOLEAN_FILTER_VALUES = {"true": True, "false": False}
+RANGE_FILTER_VALUE_TYPES = {"integer", "decimal", "date", "timestamp"}
+RANGE_FILTER_SUFFIXES = (("_min", ">="), ("_max", "<="))
+MAX_LOCAL_RELATION_FILTER_SEARCH_LENGTH = 100
 
 
 @dataclass(frozen=True)
@@ -73,8 +76,10 @@ def parse_filter_value(column_name, value_type, value):
             if not parsed.is_finite():
                 raise InvalidOperation
             return parsed
-        if value_type in {"date", "timestamp"}:
+        if value_type == "date":
             return datetime.date.fromisoformat(value)
+        if value_type == "timestamp":
+            return datetime.datetime.fromisoformat(value)
         if value_type == "boolean":
             return BOOLEAN_FILTER_VALUES[value.lower()]
     except (ValueError, InvalidOperation, KeyError) as err:
@@ -215,17 +220,23 @@ class LocalRelationDatasetRuntimeAdapter:
 
     def get_filter_specs(self):
         self._validate_configured_columns()
+        value_types = self._get_filter_value_types()
         return {
-            column_name: self._build_filter_spec(column_name, value_type)
-            for column_name, value_type in self._get_filter_value_types().items()
+            column_name: self._build_filter_spec(
+                column_name,
+                value_type,
+                supports_range=bool(
+                    self._get_range_param_names(column_name, value_types)
+                ),
+            )
+            for column_name, value_type in value_types.items()
         }
 
     def get_filter_query_param_names(self):
-        names = set()
-        for column_name, value_type in self._get_filter_value_types().items():
-            names.add(column_name)
-            if value_type in {"integer", "decimal", "date", "timestamp"}:
-                names.update({f"{column_name}_min", f"{column_name}_max"})
+        value_types = self._get_filter_value_types()
+        names = set(value_types)
+        for column_name in value_types:
+            names.update(self._get_range_param_names(column_name, value_types))
         return names
 
     def search_filter_values(self, column_name, query):
@@ -458,15 +469,24 @@ class LocalRelationDatasetRuntimeAdapter:
             if column["column_name"] in filterable_columns
         }
 
-    def _build_filter_spec(self, column_name, value_type):
+    @staticmethod
+    def _get_range_param_names(column_name, value_types):
+        if value_types.get(column_name) not in RANGE_FILTER_VALUE_TYPES:
+            return set()
+        names = {column_name + suffix for suffix, _ in RANGE_FILTER_SUFFIXES}
+        if names & value_types.keys():
+            return set()
+        return names
+
+    def _build_filter_spec(self, column_name, value_type, supports_range):
         if value_type == "boolean":
             return LocalRelationFilterSpec(column_name, "boolean", value_type)
-        if value_type in {"date", "timestamp"}:
+        if supports_range and value_type in {"date", "timestamp"}:
             minimum, maximum = self._get_filter_value_bounds(column_name, value_type)
             return LocalRelationFilterSpec(
                 column_name, "date_range", value_type, minimum=minimum, maximum=maximum
             )
-        if value_type == "decimal":
+        if supports_range and value_type == "decimal":
             minimum, maximum = self._get_filter_value_bounds(column_name, value_type)
             return LocalRelationFilterSpec(
                 column_name, "range", value_type, minimum=minimum, maximum=maximum
@@ -476,7 +496,7 @@ class LocalRelationDatasetRuntimeAdapter:
             return LocalRelationFilterSpec(
                 column_name, "choice", value_type, options=tuple(options)
             )
-        if value_type == "integer":
+        if supports_range and value_type == "integer":
             minimum, maximum = self._get_filter_value_bounds(column_name, value_type)
             return LocalRelationFilterSpec(
                 column_name, "range", value_type, minimum=minimum, maximum=maximum
@@ -513,7 +533,8 @@ class LocalRelationDatasetRuntimeAdapter:
         params = []
         if not query_params:
             return where_sql, params
-        for column, value_type in sorted(self._get_filter_value_types().items()):
+        value_types = self._get_filter_value_types()
+        for column, value_type in sorted(value_types.items()):
             self._validate_identifier(column)
             quoted_column = connection.ops.quote_name(column)
             values = [
@@ -525,15 +546,17 @@ class LocalRelationDatasetRuntimeAdapter:
                     f"{quoted_column} IN ({', '.join(['%s'] * len(values))})"
                 )
                 params.extend(values)
-            if value_type not in {"integer", "decimal", "date", "timestamp"}:
+            if not self._get_range_param_names(column, value_types):
                 continue
-            compared_column = (
-                f"{quoted_column}::date" if value_type == "timestamp" else quoted_column
-            )
-            for suffix, operator in (("_min", ">="), ("_max", "<=")):
+            compared_column = quoted_column
+            range_value_type = value_type
+            if value_type == "timestamp":
+                compared_column = f"{quoted_column}::date"
+                range_value_type = "date"
+            for suffix, operator in RANGE_FILTER_SUFFIXES:
                 for value in _get_query_param_values(query_params, column + suffix):
                     where_sql.append(f"{compared_column} {operator} %s")
-                    params.append(parse_filter_value(column, value_type, value))
+                    params.append(parse_filter_value(column, range_value_type, value))
         return where_sql, params
 
     def _get_selected_columns(self):
