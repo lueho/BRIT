@@ -149,6 +149,13 @@ class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
+        if (
+            not request.user.is_authenticated
+            or not get_object_policy(request.user, scenario, request=request)[
+                "can_edit"
+            ]
+        ):
+            return HttpResponseForbidden()
         if scenario.try_start_run():
             run_inventory.delay(scenario.id)
         return redirect("scenario-result", scenario.id)
