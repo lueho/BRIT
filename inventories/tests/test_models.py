@@ -548,13 +548,36 @@ class ScenarioTestCase(TestCase):
         self.scenario.scenariostatus.refresh_from_db()
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.RUNNING)
 
-    def test_try_start_inventory_rejects_when_already_running(self):
+    @patch("inventories.models.AsyncResult")
+    def test_try_start_inventory_rejects_when_run_is_active(self, mock_async_result):
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        RunningTask.objects.create(scenario=self.scenario, uuid=uuid4())
+        mock_async_result.return_value.state = "STARTED"
 
         self.assertFalse(self.scenario.try_start_inventory())
 
         self.scenario.scenariostatus.refresh_from_db()
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.RUNNING)
+
+    def test_try_start_inventory_reclaims_orphaned_running(self):
+        # RUNNING with no recorded tasks is an orphan left by a crashed run;
+        # a retry must be able to reclaim it rather than being blocked forever.
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        self.assertTrue(self.scenario.try_start_inventory())
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.RUNNING)
+
+    @patch("inventories.models.AsyncResult")
+    def test_try_start_inventory_reclaims_when_tasks_finished(self, mock_async_result):
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        RunningTask.objects.create(scenario=self.scenario, uuid=uuid4())
+        mock_async_result.return_value.state = "SUCCESS"
+
+        self.assertTrue(self.scenario.try_start_inventory())
+
+        self.assertFalse(RunningTask.objects.filter(scenario=self.scenario).exists())
 
     def test_try_start_inventory_clears_previous_failure(self):
         algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")

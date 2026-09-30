@@ -344,15 +344,17 @@ class Scenario(NamedUserCreatedObject):
         """Atomically claim this scenario for an inventory evaluation.
 
         Acquires a row lock on the scenario status and transitions it to
-        ``RUNNING`` only if it is not already running. Returns ``True`` when
-        the caller acquired the run (and the status was moved to ``RUNNING``)
-        and ``False`` when an evaluation is already in progress. Serialising
-        the check-and-set through ``select_for_update`` prevents concurrent or
+        ``RUNNING``. Returns ``True`` when the caller acquired the run and
+        ``False`` when an evaluation is genuinely in progress. Serialising the
+        check-and-set through ``select_for_update`` prevents concurrent or
         duplicate triggers from starting parallel runs that would clobber each
         other's result layers and task bookkeeping.
 
-        A scenario left in ``RUNNING`` by a crashed run is recovered on the
-        next edit via the ``block_running_scenario`` guard.
+        A ``RUNNING`` status only counts as in progress while at least one
+        recorded task is still unfinished. A status left ``RUNNING`` by a
+        crashed run (no unfinished tasks remain) is treated as orphaned and
+        reclaimed here so the evaluation can be retried, mirroring the stale
+        task recovery in ``block_running_scenario``.
         """
         with transaction.atomic():
             scenario_status = (
@@ -363,7 +365,16 @@ class Scenario(NamedUserCreatedObject):
             if scenario_status is None:
                 return False
             if scenario_status.status == ScenarioStatus.Status.RUNNING:
-                return False
+                running_tasks = list(
+                    RunningTask.objects.select_for_update().filter(scenario_id=self.pk)
+                )
+                has_active_task = any(
+                    AsyncResult(str(task.uuid)).state not in READY_STATES
+                    for task in running_tasks
+                )
+                if has_active_task:
+                    return False
+                RunningTask.objects.filter(scenario_id=self.pk).delete()
             scenario_status.status = ScenarioStatus.Status.RUNNING
             scenario_status.failed_algorithm = None
             scenario_status.failure_message = ""
