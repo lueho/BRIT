@@ -217,6 +217,50 @@ class LayerTestCase(TestCase):
 
         self.assertEqual(features[1][0], 12.5)
 
+    def test_create_or_replace_clears_stale_aggregates_on_reuse(self):
+        component = MaterialComponent.objects.default()
+        timestep = Timestep.objects.default()
+        distribution = TemporalDistribution.objects.default()
+        results = {
+            "aggregated_values": [
+                {"name": "Total production", "value": 10000, "unit": "kg"}
+            ],
+            "aggregated_distributions": [
+                {
+                    "name": "Seasonal production per component",
+                    "distribution": distribution.id,
+                    "sets": [
+                        {
+                            "timestep": timestep.id,
+                            "shares": [{"component": component.id, "average": 1.0}],
+                        }
+                    ],
+                }
+            ],
+            "features": [
+                {"geom": area.geom, "yield": 12.5}
+                for area in HamburgGreenAreas.objects.all()
+            ],
+        }
+        algorithm = InventoryAlgorithm.objects.get(function_name="avg_area_yield")
+        create_kwargs = {
+            "name": "reused layer",
+            "scenario": self.scenario,
+            "feedstock": self.feedstock_sample_series,
+            "algorithm": algorithm,
+            "results": results,
+        }
+
+        layer, _ = Layer.objects.create_or_replace(**create_kwargs)
+        table_name = layer.table_name
+        del apps.all_models["layer_manager"][table_name]
+
+        layer, _ = Layer.objects.create_or_replace(**create_kwargs)
+        del apps.all_models["layer_manager"][table_name]
+
+        self.assertEqual(layer.layeraggregatedvalue_set.count(), 1)
+        self.assertEqual(layer.layeraggregateddistribution_set.count(), 1)
+
     def test_is_defined_by(self):
         kwargs = {
             "table_name": "test_table",

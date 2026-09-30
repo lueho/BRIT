@@ -102,6 +102,7 @@ class LayerManager(models.Manager):
                     layer.create_feature_table()
 
                 layer.delete_aggregated_values()
+                layer.delete_aggregated_distributions()
 
             for feature in features:
                 feature_collection.objects.create(**feature)
@@ -265,6 +266,9 @@ class Layer(models.Model):
 
     def delete_aggregated_values(self):
         LayerAggregatedValue.objects.filter(layer=self).delete()
+
+    def delete_aggregated_distributions(self):
+        LayerAggregatedDistribution.objects.filter(layer=self).delete()
 
     def get_feature_collection(self):
         """
