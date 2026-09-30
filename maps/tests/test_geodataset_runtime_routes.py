@@ -81,6 +81,19 @@ class GeoDataSetRuntimeRouteTestCase(TestCase):
         self.assertContains(response, self.dataset.get_map_url())
         self.assertContains(response, 'aria-label="View toggle"')
 
+    def test_dataset_detail_renders_source_modal_links(self):
+        response = self.client.get(
+            reverse("geodataset-detail", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sources:")
+        self.assertContains(
+            response,
+            reverse("source-detail-modal", kwargs={"pk": self.source.pk}),
+        )
+        self.assertContains(response, "Runtime source")
+
     def test_dataset_table_route_renders_visible_columns(self):
         response = self.client.get(
             reverse("geodataset-table", kwargs={"pk": self.dataset.pk})
