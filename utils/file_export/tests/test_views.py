@@ -76,13 +76,13 @@ class FilteredListFileExportViewTests(TestCase):
         self.assertNotIn("list_type", result)
 
     def test_get_filter_params_private(self):
-        """Ensure that for private lists, the 'owner' filter is set to the current user's pk."""
+        """Private lists add no scope params; the export task scopes owner + editor grants."""
         params = {"page": ["1"], "list_type": ["private"], "some_filter": ["value"]}
         request = self._make_request()
         view_instance = DummyExportView()
         result = view_instance.get_filter_params(request, params.copy())
         self.assertNotIn("page", result)
-        self.assertEqual(result.get("owner"), [self.user.pk])
+        self.assertNotIn("owner", result)
         self.assertNotIn("publication_status", result)
         self.assertEqual(result.get("some_filter"), ["value"])
         self.assertNotIn("list_type", result)
@@ -100,7 +100,7 @@ class FilteredListFileExportViewTests(TestCase):
         result = view_instance.get_filter_params(request, params.copy())
 
         self.assertNotIn("scope", result)
-        self.assertEqual(result.get("owner"), [self.user.pk])
+        self.assertNotIn("owner", result)
         self.assertEqual(result.get("some_filter"), ["value"])
 
     def test_get_filter_params_defaults_to_published_when_no_list_type(self):
@@ -133,7 +133,7 @@ class FilteredListFileExportViewTests(TestCase):
         request = self._make_request(f"/dummy-url?{query_string}")
         with patch.object(DummyTask, "delay", wraps=DummyTask.delay) as mock_delay:
             response = DummyExportView.as_view()(request)
-            expected_filter_params = {"some_filter": ["value"], "owner": [self.user.pk]}
+            expected_filter_params = {"some_filter": ["value"]}
             mock_delay.assert_called_once()
             called_args, _ = mock_delay.call_args
             self.assertEqual(called_args[0], "csv")
