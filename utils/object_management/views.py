@@ -293,6 +293,21 @@ def get_tomselect_filter_pairs(view, *, use_excludes=False):
     return parsed
 
 
+def _tomselect_lookup_name(raw_lookup):
+    """Return the lookup portion of a TomSelect filter expression's left side.
+
+    The widget sends ``<dependent_field>__<lookup>=<value>`` (and constant
+    filters as ``__const__<lookup>=<value>``), so the parsed left side still
+    carries the dependent-field prefix that must be stripped to match a bare
+    lookup name.
+    """
+    if raw_lookup.startswith("__const__"):
+        return raw_lookup[len("__const__") :]
+    if "__" in raw_lookup:
+        return raw_lookup.split("__", 1)[1]
+    return raw_lookup
+
+
 def get_tomselect_filter_value(view, *, use_excludes=False, lookup=None):
     """Return first matching TomSelect filter value for a view.
 
@@ -302,7 +317,11 @@ def get_tomselect_filter_value(view, *, use_excludes=False, lookup=None):
     for candidate_lookup, candidate_value in get_tomselect_filter_pairs(
         view, use_excludes=use_excludes
     ):
-        if lookup is None or candidate_lookup == lookup:
+        if (
+            lookup is None
+            or candidate_lookup == lookup
+            or _tomselect_lookup_name(candidate_lookup) == lookup
+        ):
             return candidate_value or None
     return None
 

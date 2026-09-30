@@ -224,11 +224,13 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
         cls.target_material = Material.objects.create(name="Autocomplete Target")
         cls.region = Region.objects.create(name="AC Region")
         cls.scenario = Scenario.objects.create(name="AC Scenario", region=cls.region)
-        cls.geodataset = GeoDataset.objects.create(name="AC Dataset", region=cls.region)
-        algorithm = InventoryAlgorithm.objects.create(
+        cls.geodataset = GeoDataset.objects.create(
+            name="AC Dataset", region=cls.region, publication_status="published"
+        )
+        cls.algorithm = InventoryAlgorithm.objects.create(
             name="AC Algorithm", geodataset=cls.geodataset
         )
-        algorithm.feedstocks.add(cls.target_material)
+        cls.algorithm.feedstocks.add(cls.target_material)
         cls.series = SampleSeries.objects.create(
             name="AC Series", material=cls.target_material
         )
@@ -247,6 +249,36 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
 
         result_qs = view.apply_filters(GeoDataset.objects.all())
         self.assertIn(self.geodataset, result_qs)
+
+    def test_widget_wire_format_returns_geodataset(self):
+        """The widget sends '<source>__<lookup>=<value>' params; the lookup name
+        must be extracted so the geodataset dropdown is not always empty."""
+        response = self.client.get(
+            reverse("scenario-geodataset-autocomplete"),
+            {
+                "f": f"'feedstock__feedstock_id={self.series.id}'",
+                "e": f"'scenario__scenario_id={self.scenario.id}'",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(self.geodataset.id, ids)
+
+    def test_widget_wire_format_returns_inventory_algorithm(self):
+        """Same wire format applies to the algorithm dropdown
+        (geodataset via filter_by, feedstock via exclude_by)."""
+        response = self.client.get(
+            reverse("scenario-inventoryalgorithm-autocomplete"),
+            {
+                "f": f"'geodataset__geodataset_id={self.geodataset.id}'",
+                "e": f"'feedstock__feedstock_id={self.series.id}'",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(self.algorithm.id, ids)
 
 
 class ScenarioResultCRUDViewsTestCase(
