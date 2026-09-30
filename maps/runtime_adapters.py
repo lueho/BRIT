@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 
 from django.core.exceptions import ImproperlyConfigured
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection
 from django.http import Http404
 
@@ -280,7 +281,8 @@ class LocalRelationDatasetRuntimeAdapter:
                     "id": record.pk,
                     "geometry": record.geometry,
                     "properties": record.properties,
-                }
+                },
+                cls=DjangoJSONEncoder,
             )
         yield "]}"
 

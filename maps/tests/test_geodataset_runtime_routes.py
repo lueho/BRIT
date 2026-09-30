@@ -453,6 +453,42 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(data["features"][0]["properties"]["nuts_id"], "DE-A")
         self.assertNotIn("hidden_code", data["features"][0]["properties"])
 
+    def test_local_relation_geojson_route_serializes_decimal_and_datetime_values(
+        self,
+    ):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                ALTER TABLE public.{self.relation_name}
+                    ADD COLUMN height_m numeric(6, 2),
+                    ADD COLUMN surveyed_at timestamp with time zone
+                """
+            )
+            cursor.execute(
+                f"""
+                UPDATE public.{self.relation_name}
+                SET height_m = 12.50, surveyed_at = '2025-06-01T08:30:00+00:00'
+                WHERE feature_id = 1
+                """
+            )
+        for column_name in ("height_m", "surveyed_at"):
+            GeoDatasetColumnPolicy.objects.create(
+                dataset=self.dataset,
+                column_name=column_name,
+                display_label=column_name,
+                is_visible=True,
+            )
+
+        response = self.client.get(
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk}),
+            {"id": 1},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        properties = self._streaming_json(response)["features"][0]["properties"]
+        self.assertEqual(properties["height_m"], "12.50")
+        self.assertEqual(properties["surveyed_at"], "2025-06-01T08:30:00Z")
+
     def test_local_relation_geojson_route_streams_past_table_cap(self):
         with connection.cursor() as cursor:
             cursor.execute(
