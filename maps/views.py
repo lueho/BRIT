@@ -781,7 +781,7 @@ class GeoDataSetRuntimeMapView(
         }
         if is_local_relation:
             filter_form = build_local_relation_filter_form(
-                self.get_visible_column_policies(),
+                adapter.get_filterable_column_policies(),
                 data=self.request.GET or None,
                 filter_options=adapter.get_filter_options(),
             )
@@ -817,7 +817,7 @@ class GeoDataSetRuntimeTableView(
         is_local_relation = getattr(adapter, "uses_local_relation", False)
         column_policies = self.get_visible_column_policies()
         filter_form = build_local_relation_filter_form(
-            column_policies,
+            adapter.get_filterable_column_policies(),
             data=self.request.GET or None,
             filter_options=adapter.get_filter_options() if is_local_relation else None,
         )

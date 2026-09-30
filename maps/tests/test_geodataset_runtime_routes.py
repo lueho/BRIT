@@ -368,6 +368,40 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
             f"{self.dataset.get_map_url()}?nuts_id=DE-B",
         )
 
+    def test_local_relation_filterable_only_column_gets_filter_field(self):
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=self.dataset,
+            column_name="name",
+            display_label="Name",
+            is_visible=False,
+            is_filterable=True,
+        )
+
+        map_response = self.client.get(
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(map_response.status_code, 200)
+        self.assertIn("name", map_response.context["filter"].form.fields)
+        self.assertContains(map_response, 'list="id_name_options"')
+        self.assertContains(map_response, '<option value="Local feature A">')
+
+        table_response = self.client.get(
+            reverse("geodataset-table", kwargs={"pk": self.dataset.pk}),
+            {"name": "Local feature B"},
+        )
+
+        self.assertEqual(table_response.status_code, 200)
+        self.assertIn("name", table_response.context["filter"].form.fields)
+        self.assertEqual(table_response.context["result_count"], 1)
+        table_values = [
+            value
+            for row in table_response.context["table_rows"]
+            for value in row["values"]
+        ]
+        self.assertNotIn("Local feature A", table_values)
+        self.assertNotIn("Local feature B", table_values)
+
     def test_local_relation_table_route_keeps_display_cap(self):
         with connection.cursor() as cursor:
             cursor.execute(

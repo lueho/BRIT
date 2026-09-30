@@ -49,6 +49,13 @@ class DatasetRuntimeAdapter:
             self.dataset.column_policies.filter(is_visible=True).order_by("column_name")
         )
 
+    def get_filterable_column_policies(self):
+        return list(
+            self.dataset.column_policies.filter(is_filterable=True).order_by(
+                "column_name"
+            )
+        )
+
     @staticmethod
     def get_policy_label(policy):
         return policy.display_label or policy.column_name.replace("_", " ").title()
@@ -146,6 +153,13 @@ class LocalRelationDatasetRuntimeAdapter:
         return set(
             self.dataset.column_policies.filter(is_filterable=True).values_list(
                 "column_name", flat=True
+            )
+        )
+
+    def get_filterable_column_policies(self):
+        return list(
+            self.dataset.column_policies.filter(is_filterable=True).order_by(
+                "column_name"
             )
         )
 
