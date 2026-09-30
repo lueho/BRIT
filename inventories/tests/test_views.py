@@ -491,3 +491,38 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
             reverse("scenario-detail", kwargs={"pk": self.scenario_a.pk}),
         )
         mock_add.assert_called_once()
+
+
+class ScenarioDetailViewRunTestCase(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create(username="scenario-run-owner")
+        self.scenario = Scenario.objects.create(
+            name="Run Scenario",
+            owner=self.owner,
+            region=Region.objects.create(name="Run Region"),
+        )
+        self.client.force_login(self.owner)
+
+    @patch("inventories.views.start_inventory_run")
+    def test_post_starts_run_through_serialized_entry_point(self, start_run):
+        response = self.client.post(
+            reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("scenario-result", args=[self.scenario.pk]),
+            fetch_redirect_response=False,
+        )
+        start_run.assert_called_once_with(self.scenario.pk)
+
+    @patch("inventories.tasks.run_inventory")
+    def test_post_does_not_enqueue_second_run_while_running(self, run_inventory_task):
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+            )
+
+        run_inventory_task.delay.assert_not_called()

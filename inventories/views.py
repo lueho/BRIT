@@ -49,7 +49,7 @@ from .models import (
     ScenarioInventoryConfiguration,
     ScenarioStatus,
 )
-from .tasks import run_inventory
+from .tasks import start_inventory_run
 
 
 class InventoriesExplorerView(BreadcrumbContextMixin, TemplateView):
@@ -148,10 +148,8 @@ class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
-        scenario = self.object
-        scenario.set_status(ScenarioStatus.Status.RUNNING)
-        run_inventory.delay(scenario.id)
-        return redirect("scenario-result", scenario.id)
+        start_inventory_run(self.object.id)
+        return redirect("scenario-result", self.object.id)
 
 
 class ScenarioUpdateView(UserCreatedObjectUpdateView):
