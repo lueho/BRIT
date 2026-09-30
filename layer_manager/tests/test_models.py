@@ -299,9 +299,9 @@ class MergeDuplicateLayerFieldsMigrationTestCase(TestCase):
         both.layer_fields.add(keeper, duplicate)
 
         migration = import_module(
-            "layer_manager.migrations.0002_merge_duplicate_layer_fields"
+            "layer_manager.migrations.0002_unique_layer_field_name_data_type"
         )
-        migration.merge_duplicate_layer_fields(apps, None)
+        migration.merge_duplicate_layer_fields(apps, "default")
 
         self.assertQuerySetEqual(
             LayerField.objects.order_by("id"), [keeper, other], ordered=True
