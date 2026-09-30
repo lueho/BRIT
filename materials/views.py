@@ -1125,14 +1125,42 @@ class SampleSeriesModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SampleSeriesCreateDuplicateView(UserCreatedObjectUpdateView):
+class DuplicateFormContextMixin:
+    """Present a duplicate form as creating a new private copy, not an edit."""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        title = f"Duplicate {self.object._meta.verbose_name}"
+        context.update(
+            {
+                "object": None,
+                "form_title": title,
+                "submit_button_text": "Save private copy",
+                "form_notice": "Saving creates a new private copy owned by you; "
+                "the original is not changed.",
+                "breadcrumb_action_label": "Duplicate",
+                "breadcrumb_page_title": title,
+            }
+        )
+        return context
+
+
+class SampleSeriesCreateDuplicateView(
+    DuplicateFormContextMixin, UserCreatedObjectUpdateView
+):
     model = SampleSeries
     form_class = SampleSeriesModelForm
     object = None
+    object_policy_action = "duplicate"
+    template_name = "materials/sampleseries_duplicate_form.html"
 
     def form_valid(self, form):
         self.object = self.object.duplicate(
-            creator=self.request.user, **form.cleaned_data
+            creator=self.request.user,
+            samples=filter_queryset_for_user(
+                self.object.samples.all(), self.request.user
+            ),
+            **form.cleaned_data,
         )
         return HttpResponseRedirect(self.get_success_url())
 
@@ -1658,7 +1686,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
                     sample_policy["can_manage_samples"],
                     sample_policy["can_add_property"],
                     sample_policy["can_edit"],
-                    sample_policy["can_duplicate"],
+                    sample_policy["can_new_version"],
                     sample_policy["can_delete"],
                     sample_policy["can_submit_review"],
                     sample_policy["can_view_review_feedback"],
@@ -2100,10 +2128,11 @@ class SampleModalAddPropertyView(
     sample_url_kwarg = "pk"
 
 
-class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
+class SampleCreateDuplicateView(DuplicateFormContextMixin, UserCreatedObjectUpdateView):
     model = Sample
     form_class = SampleModelForm
     object = None
+    object_policy_action = "duplicate"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()

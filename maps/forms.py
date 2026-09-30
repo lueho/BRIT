@@ -8,12 +8,21 @@ from django.forms import (
     ChoiceField,
     DateField,
     DateInput,
+    Form,
     ModelChoiceField,
     MultipleChoiceField,
+    MultiValueField,
     Textarea,
     ValidationError,
 )
-from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
+from django.forms.widgets import (
+    CheckboxSelectMultiple,
+    MultiWidget,
+    RadioSelect,
+    Select,
+    SelectMultiple,
+    TextInput,
+)
 from django.urls import reverse
 from django_tomselect.forms import (
     TomSelectConfig,
@@ -566,3 +575,121 @@ class NutsAndLauCatchmentQueryForm(SimpleForm):
             Field("level_4", data_lvl=4),
         )
         return helper
+
+
+class LocalRelationFilterMedia:
+    css = {
+        "all": ["django_tomselect/vendor/tom-select/css/tom-select.bootstrap5.min.css"]
+    }
+    js = ["django_tomselect/js/django-tomselect.min.js", "js/geodataset_filters.min.js"]
+
+
+class LocalRelationRangeWidget(MultiWidget):
+    template_name = "maps/widgets/range_input.html"
+
+    def __init__(self, input_type="number", minimum=None, maximum=None, step=None):
+        base_attrs = {"type": input_type, "class": "form-control"}
+        if step is not None:
+            base_attrs["step"] = step
+        if minimum is not None:
+            base_attrs["min"] = str(minimum)
+        if maximum is not None:
+            base_attrs["max"] = str(maximum)
+        super().__init__(
+            {
+                "min": TextInput(
+                    attrs={**base_attrs, "placeholder": "Min", "aria-label": "Minimum"}
+                ),
+                "max": TextInput(
+                    attrs={**base_attrs, "placeholder": "Max", "aria-label": "Maximum"}
+                ),
+            }
+        )
+
+    def decompress(self, value):
+        return value or [None, None]
+
+
+class LocalRelationRangeField(MultiValueField):
+    def __init__(self, **kwargs):
+        super().__init__(
+            fields=(CharField(required=False), CharField(required=False)),
+            require_all_fields=False,
+            required=False,
+            **kwargs,
+        )
+
+    def compress(self, data_list):
+        return data_list
+
+
+def build_local_relation_filter_field(spec, label, data, options_url):
+    if spec is None:
+        return CharField(label=label, required=False)
+    if spec.kind == "boolean":
+        return ChoiceField(
+            label=label,
+            required=False,
+            choices=[("", "Any"), ("true", "Yes"), ("false", "No")],
+            widget=Select(attrs={"class": "form-select"}),
+        )
+    if spec.is_range:
+        is_date = spec.kind == "date_range"
+        help_text = ""
+        if spec.minimum is not None and spec.maximum is not None:
+            help_text = f"Values range from {spec.minimum} to {spec.maximum}."
+        return LocalRelationRangeField(
+            label=label,
+            help_text=help_text,
+            widget=LocalRelationRangeWidget(
+                input_type="date" if is_date else "number",
+                minimum=spec.minimum,
+                maximum=spec.maximum,
+                step=None
+                if is_date
+                else ("1" if spec.value_type == "integer" else "any"),
+            ),
+        )
+    if spec.kind == "autocomplete":
+        selected = data.getlist(spec.column_name) if data is not None else []
+        return MultipleChoiceField(
+            label=label,
+            required=False,
+            choices=[(value, value) for value in selected],
+            widget=SelectMultiple(
+                attrs={
+                    "data-geodataset-filter": "autocomplete",
+                    "data-autocomplete-url": options_url(spec.column_name),
+                    "data-placeholder": "Type to search",
+                }
+            ),
+        )
+    return MultipleChoiceField(
+        label=label,
+        required=False,
+        choices=[(str(option), str(option)) for option in spec.options],
+        widget=SelectMultiple(
+            attrs={"data-geodataset-filter": "choice", "data-placeholder": "Any"}
+        ),
+    )
+
+
+def build_local_relation_filter_form(
+    column_policies, data=None, filter_specs=None, options_url=None
+):
+    fields = {}
+    for policy in column_policies:
+        if not policy.is_filterable:
+            continue
+        label = policy.display_label or policy.column_name.replace("_", " ").title()
+        spec = (filter_specs or {}).get(policy.column_name)
+        fields[policy.column_name] = build_local_relation_filter_field(
+            spec, label, data, options_url
+        )
+    if filter_specs:
+        fields["Media"] = LocalRelationFilterMedia
+    form_class = type("LocalRelationFilterForm", (Form,), fields)
+    form = form_class(data=data)
+    form.helper = FormHelper()
+    form.helper.form_tag = False
+    return form

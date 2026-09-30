@@ -266,6 +266,32 @@ class ExportTaskTestCase(TestCase):
         "utils.file_export.generic_tasks.utils.file_export.storages.write_file_for_download"
     )
     @patch("utils.file_export.generic_tasks.get_export_spec")
+    def test_unknown_format_fails_before_serialization(self, mock_get_spec, mock_write):
+        """An unsupported format must fail early with a clear error."""
+        serializer = MagicMock()
+        spec = TaskExportSpec(
+            model=User,
+            filterset=DummyFilterSet,
+            serializer=serializer,
+            renderers={"csv": MagicMock()},
+        )
+        mock_get_spec.return_value = spec
+
+        with self.assertRaisesMessage(ValueError, "Unsupported export format"):
+            self._run_task(
+                "auth.User",
+                "bogus",
+                {},
+                {"user_id": self.owner.pk, "list_type": "public"},
+            )
+
+        serializer.assert_not_called()
+        mock_write.assert_not_called()
+
+    @patch(
+        "utils.file_export.generic_tasks.utils.file_export.storages.write_file_for_download"
+    )
+    @patch("utils.file_export.generic_tasks.get_export_spec")
     def test_batch_progress_reporting(self, mock_get_spec, mock_write):
         """Verify progress is reported for each batch when total > BATCH_SIZE."""
         users_needed = BATCH_SIZE + 10

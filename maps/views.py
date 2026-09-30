@@ -1,10 +1,8 @@
 from types import SimpleNamespace
 
-from crispy_forms.helper import FormHelper
-from django import forms
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import BadRequest, ImproperlyConfigured
 from django.db import transaction
 from django.db.models import Q, Subquery, Value
 from django.db.models.functions import Coalesce, NullIf
@@ -22,7 +20,10 @@ from maps.mixins import (
     GEOJSON_CONTROL_QUERY_PARAMS,
     get_unbounded_geojson_rejection_response,
 )
-from maps.runtime_adapters import get_dataset_runtime_adapter
+from maps.runtime_adapters import (
+    MAX_LOCAL_RELATION_FILTER_SEARCH_LENGTH,
+    get_dataset_runtime_adapter,
+)
 from maps.serializers import (
     LauRegionOptionSerializer,
     LauRegionSummarySerializer,
@@ -76,6 +77,7 @@ from .forms import (
     RegionMergeForm,
     RegionMergeFormSet,
     RegionModelForm,
+    build_local_relation_filter_form,
 )
 from .models import (
     Attribute,
@@ -94,30 +96,6 @@ from .models import (
 )
 from .signals import clear_geojson_cache_pattern
 from .validation import RegionCompositionError, validate_region_composition
-
-
-def build_local_relation_filter_form(column_policies, data=None, filter_options=None):
-    filter_options = filter_options or {}
-    fields = {}
-    for policy in column_policies:
-        if not policy.is_filterable:
-            continue
-        field = forms.CharField(
-            label=policy.display_label or policy.column_name.replace("_", " ").title(),
-            required=False,
-        )
-        options = filter_options.get(policy.column_name)
-        if options:
-            field.widget.attrs["list"] = f"id_{policy.column_name}_options"
-            field.widget.attrs["autocomplete"] = "off"
-        fields[policy.column_name] = field
-    form_class = type("LocalRelationFilterForm", (forms.Form,), fields)
-    form = form_class(data=data)
-    form.filter_options = filter_options
-    form.helper = FormHelper()
-    form.helper.form_tag = False
-    return form
-
 
 # Query parameters that are navigation/control hints rather than dataset
 # filters. Their mere presence must not force the features layer to load
@@ -533,6 +511,13 @@ class GeoDataSetDetailView(MapMixin, UserCreatedObjectDetailView):
             .prefetch_related("sources", "column_policies")
         )
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["visible_sources"] = filter_queryset_for_user(
+            self.object.sources.all(), self.request.user
+        )
+        return context
+
     def get_map_title(self):
         return self.object.name
 
@@ -597,6 +582,12 @@ class GeoDataSetRuntimePermissionMixin:
             return f"{url}?{query_string}"
         return url
 
+    def get_filter_options_url(self, column_name):
+        return reverse(
+            "geodataset-filter-options",
+            kwargs={"pk": self.get_dataset().pk, "column": column_name},
+        )
+
     def get_features_geometries_url(self):
         adapter = self.get_runtime_adapter()
         if getattr(adapter, "uses_local_relation", False):
@@ -649,6 +640,27 @@ class GeoDataSetRuntimePermissionMixin:
         if not self.apply_user_visibility_filter:
             return queryset
         return filter_queryset_for_user(queryset, self.request.user)
+
+    def post_process_map_config(self, map_config):
+        map_config = super().post_process_map_config(map_config)
+        adapter = self.get_runtime_adapter()
+        if map_config and getattr(adapter, "uses_local_relation", False):
+            visible_policies = self.get_visible_column_policies()
+            popup_policies = [
+                policy for policy in visible_policies if policy.is_popup
+            ] or visible_policies
+            primary_key_column = (
+                self.get_dataset().runtime_configuration.primary_key_column
+            )
+            map_config["featuresPopupFields"] = [
+                {
+                    "column": policy.column_name,
+                    "label": self.get_policy_label(policy),
+                    "isFeatureId": policy.column_name == primary_key_column,
+                }
+                for policy in popup_policies
+            ]
+        return map_config
 
     def get_visible_column_policies(self):
         return self.get_runtime_adapter().get_visible_column_policies()
@@ -783,7 +795,8 @@ class GeoDataSetRuntimeMapView(
             filter_form = build_local_relation_filter_form(
                 adapter.get_filterable_column_policies(),
                 data=self.request.GET or None,
-                filter_options=adapter.get_filter_options(),
+                filter_specs=adapter.get_filter_specs(),
+                options_url=self.get_filter_options_url,
             )
             context_update["filter"] = SimpleNamespace(form=filter_form)
         context.update(context_update)
@@ -819,7 +832,8 @@ class GeoDataSetRuntimeTableView(
         filter_form = build_local_relation_filter_form(
             adapter.get_filterable_column_policies(),
             data=self.request.GET or None,
-            filter_options=adapter.get_filter_options() if is_local_relation else None,
+            filter_specs=adapter.get_filter_specs() if is_local_relation else None,
+            options_url=self.get_filter_options_url,
         )
         context_update = {
             "dataset": dataset,
@@ -959,7 +973,7 @@ class GeoDataSetRuntimeFeatureGeoJSONView(
         rejection_response = get_unbounded_geojson_rejection_response(
             request,
             count,
-            bounded_query_params={"id", *adapter.get_filterable_column_names()},
+            bounded_query_params={"id", *adapter.get_filter_query_param_names()},
         )
         if rejection_response is not None:
             return rejection_response
@@ -979,6 +993,22 @@ class GeoDataSetRuntimeFeatureGeoJSONView(
             "X-Total-Count, X-Cache-Status, X-Data-Version"
         )
         return response
+
+
+class GeoDataSetRuntimeFilterOptionsView(
+    GeoDataSetRuntimePermissionMixin, UserPassesTestMixin, View
+):
+    def get(self, request, *args, **kwargs):
+        adapter = self.get_runtime_adapter()
+        if not getattr(adapter, "uses_local_relation", False):
+            raise Http404("Dataset does not use a local relation runtime.")
+        query = request.GET.get("q", "").strip()
+        if len(query) > MAX_LOCAL_RELATION_FILTER_SEARCH_LENGTH:
+            raise BadRequest("Search term is too long.")
+        values = adapter.search_filter_values(kwargs["column"], query)
+        return JsonResponse(
+            {"results": [{"value": str(value), "text": str(value)} for value in values]}
+        )
 
 
 class GeoDataSetPublishedFilteredMapView(FilteredMapMixin, PublishedObjectFilterView):
@@ -1501,10 +1531,15 @@ class CatchmentRegionGeometryAPI(APIView):
     @staticmethod
     def get(request, *args, **kwargs):
         if "pk" in request.query_params:
-            # select_related needed for geometry serialization
-            catchment = Catchment.objects.select_related(
-                "region", "region__borders"
-            ).get(pk=request.query_params.get("pk"))
+            try:
+                # select_related needed for geometry serialization
+                catchment = Catchment.objects.select_related(
+                    "region", "region__borders"
+                ).get(pk=request.query_params.get("pk"))
+            except (Catchment.DoesNotExist, ValueError, TypeError) as err:
+                raise NotFound(
+                    "A catchment with the provided id does not exist."
+                ) from err
             regions = Region.objects.select_related("borders").filter(
                 catchment=catchment
             )
@@ -1521,7 +1556,12 @@ class CatchmentRegionSummaryAPIView(APIView):
     @staticmethod
     def get(request, *args, **kwargs):
         if "pk" in request.query_params:
-            catchment = Catchment.objects.get(pk=request.query_params.get("pk"))
+            try:
+                catchment = Catchment.objects.get(pk=request.query_params.get("pk"))
+            except (Catchment.DoesNotExist, ValueError, TypeError) as err:
+                raise NotFound(
+                    "A catchment with the provided id does not exist."
+                ) from err
             try:
                 region = catchment.region.nutsregion
                 serializer = NutsRegionSummarySerializer(

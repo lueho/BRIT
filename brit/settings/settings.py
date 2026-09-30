@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "sources.urban_green_spaces.apps.UrbanGreenSpacesConfig",
     "sources.greenhouses.apps.GreenhousesConfig",
     "sources.waste_collection.apps.WasteCollectionConfig",
+    "sources.sotasen.apps.SotasenConfig",
     "layer_manager.apps.LayerManagerConfig",
     "sources.waste_collection.waste_atlas.apps.WasteAtlasConfig",
     "case_studies.closecycle.apps.ClosecycleConfig",

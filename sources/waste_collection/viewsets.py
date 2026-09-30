@@ -1,6 +1,7 @@
 import logging
 import time
 
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import connection, transaction
@@ -1105,19 +1106,25 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             )
 
         requested_collection_ids = sorted(collection.pk for collection in collections)
-        existing_acpv = None
-        for candidate in AggregatedCollectionPropertyValue.objects.filter(
-            owner=actor,
-            property=prop,
-            unit=unit,
-            year=data["year"],
-        ).prefetch_related("collections"):
-            candidate_ids = sorted(candidate.collections.values_list("pk", flat=True))
-            if candidate_ids == requested_collection_ids:
-                existing_acpv = candidate
-                break
 
         with transaction.atomic():
+            # The dedup key spans the collections M2M, so no unique constraint
+            # can enforce it; serialize find-or-create per owner instead.
+            get_user_model().objects.select_for_update().filter(pk=actor.pk).exists()
+            existing_acpv = None
+            for candidate in AggregatedCollectionPropertyValue.objects.filter(
+                owner=actor,
+                property=prop,
+                unit=unit,
+                year=data["year"],
+            ).prefetch_related("collections"):
+                candidate_ids = sorted(
+                    collection.pk for collection in candidate.collections.all()
+                )
+                if candidate_ids == requested_collection_ids:
+                    existing_acpv = candidate
+                    break
+
             if existing_acpv is None:
                 acpv = AggregatedCollectionPropertyValue.objects.create(
                     name=f"Aggregated {prop.name} {data['year']}",

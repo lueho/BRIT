@@ -1,0 +1,1 @@
+<div class="input-group input-group-sm">{% for widget in widget.subwidgets %}{% include widget.template_name %}{% if forloop.first %}<span class="input-group-text">–</span>{% endif %}{% endfor %}</div>

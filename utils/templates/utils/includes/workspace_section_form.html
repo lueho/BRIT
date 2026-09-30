@@ -8,7 +8,9 @@
   <noscript><p class="alert alert-warning">JavaScript is required to search for entries and add new rows. Only existing selections are shown. You can still edit and save other fields.</p></noscript>
   <fieldset data-workspace-fields>
     <legend class="fs-5" tabindex="-1" data-workspace-form-title>{% if section %}Edit {{ section.label }}{% else %}Start with the essentials{% endif %}</legend>
-    {% if object.publication_status == 'published' %}
+    {% if form_notice %}
+      <p class="small text-muted">{{ form_notice }}</p>
+    {% elif object.publication_status == 'published' %}
       <p class="alert alert-warning">This {{ object_label|default:object|default:'record' }} is published. Saving updates the published {{ object_label|default:object|default:'record' }} immediately; it does not create a private draft.</p>
     {% elif object %}
       <p class="small text-muted">Save this section without changing publication status. Review and publication are separate actions.</p>

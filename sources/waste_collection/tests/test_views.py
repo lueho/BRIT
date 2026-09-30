@@ -6,13 +6,14 @@ import time
 from collections import namedtuple
 from datetime import date, timedelta
 from io import BytesIO
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from urllib.parse import urlencode
 
 from celery import chord
 from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import MultiPolygon, Polygon
+from django.contrib.sessions.backends.db import SessionStore
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.db.models import signals
@@ -83,6 +84,7 @@ from sources.waste_collection.waste_atlas.pages import MAP_PAGES
 from sources.waste_collection.waste_atlas.templatetags.atlas_tags import (
     RENDER_TIME_RESOLVED_KEYS,
 )
+from utils.file_export.generic_tasks import export_user_created_object_to_file
 from utils.object_management.models import ObjectEditorGrant, ReviewAction
 from utils.properties.models import Property, Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
@@ -544,6 +546,15 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         self.assertEqual(response.status_code, 200)
         mock_task.delay.assert_called_once_with(self.published_object.pk)
 
+    @patch("sources.waste_collection.views.check_wasteflyer_url")
+    def test_check_url_view_returns_404_for_missing_wasteflyer(self, mock_task):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(
+            reverse("wasteflyer-check-url", kwargs={"pk": 999999999})
+        )
+        self.assertEqual(response.status_code, 404)
+        mock_task.delay.assert_not_called()
+
 
 # ----------- Collection Frequency CRUD --------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -918,6 +929,52 @@ class CollectionPropertyValueCRUDViewsTestCase(
             {predecessor.pk, self.related_objects["collection"].pk},
         )
 
+    def test_detail_collection_button_skips_archived_collection_for_anonymous(self):
+        collection = self.related_objects["collection"]
+        collection.publication_status = "archived"
+        collection.save()
+        successor = Collection.objects.create(
+            owner=self.owner_user,
+            name="CPV successor",
+            publication_status="published",
+            valid_from=date(2024, 1, 1),
+        )
+        successor.predecessors.add(collection)
+
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["back_collection"], successor)
+        self.assertContains(response, successor.get_absolute_url())
+        self.assertNotContains(response, collection.get_absolute_url())
+
+    def test_detail_hides_collection_links_when_no_chain_version_is_visible(self):
+        collection = self.related_objects["collection"]
+        collection.publication_status = "archived"
+        collection.save()
+
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["back_collection"])
+        self.assertNotContains(response, collection.get_absolute_url())
+
+    def test_detail_collection_button_keeps_own_collection_when_visible(self):
+        successor = Collection.objects.create(
+            owner=self.owner_user,
+            name="CPV visible successor",
+            publication_status="published",
+            valid_from=date(2024, 1, 1),
+        )
+        successor.predecessors.add(self.related_objects["collection"])
+
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["back_collection"], self.related_objects["collection"]
+        )
+
     def test_detail_context_hides_related_collections_when_visibility_filter_errors(
         self,
     ):
@@ -1276,6 +1333,31 @@ class CollectionListQueryTestCase(TestCase):
         expected.extend([self.owned_private.pk, self.shared_private.pk])
         self.assertEqual(actual, expected)
         self.assertNotIn(self.hidden_private.pk, actual)
+
+    @patch("utils.file_export.storages.get_file_export_storage")
+    @patch("utils.file_export.storages.write_file_for_download", return_value="url")
+    @patch("utils.file_export.generic_tasks.export_user_created_object_to_file.delay")
+    def test_private_export_includes_owned_and_shared_not_unrelated_records(
+        self, mock_delay, mock_write, mock_storage
+    ):
+        mock_storage.return_value.size.return_value = 0
+        mock_delay.return_value = MagicMock(task_id="export-task-id")
+        request = RequestFactory().get(
+            "/collections/export/", {"format": "csv", "list_type": "private"}
+        )
+        request.user = self.owner
+        request.session = SessionStore()
+
+        response = views.CollectionListFileExportView.as_view()(request)
+
+        self.assertEqual(json.loads(response.content)["row_count"], 27)
+        model_label, file_format, filter_params, context = mock_delay.call_args.args
+        task_self = MagicMock()
+        task_self.request.id = "export-task-id"
+        export_user_created_object_to_file.run.__func__(
+            task_self, model_label, file_format, filter_params, context
+        )
+        self.assertEqual(len(mock_write.call_args.args[1]), 27)
 
     def test_filtered_pages_preserve_order_and_total(self):
         actual = []
@@ -1977,6 +2059,39 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             self.unpublished_object.flyers.all(),
         )
         self.assertEqual(WasteFlyer.objects.count(), 2)
+
+    def test_create_view_ignores_missing_region_id_and_collector(self):
+        self.client.force_login(self.user_with_add_perm)
+        response = self.client.get(
+            f"{self.get_create_url()}?region_id=999999999&collector=999999999"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("catchment", response.context["form"].initial)
+        self.assertNotIn("collector", response.context["form"].initial)
+
+    def test_create_view_ignores_non_numeric_region_id_and_collector(self):
+        self.client.force_login(self.user_with_add_perm)
+        response = self.client.get(
+            f"{self.get_create_url()}?region_id=abc&collector=xyz"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("catchment", response.context["form"].initial)
+        self.assertNotIn("collector", response.context["form"].initial)
+
+    def test_create_view_prefills_valid_region_id_and_collector(self):
+        catchment = CollectionCatchment.objects.create(
+            name="Prefill catchment", publication_status="published"
+        )
+        collector = Collector.objects.create(
+            name="Prefill collector", publication_status="published"
+        )
+        self.client.force_login(self.user_with_add_perm)
+        response = self.client.get(
+            f"{self.get_create_url()}?region_id={catchment.pk}&collector={collector.pk}"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["form"].initial["catchment"], catchment)
+        self.assertEqual(response.context["form"].initial["collector"], collector)
 
 
 class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
@@ -2914,6 +3029,11 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
             expected["collections"].order_by("id"),
             initial["collections"].order_by("id"),
         )
+
+    def test_get_http_404_for_missing_catchment(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse(self.url_name, kwargs={"pk": 999999999}))
+        self.assertEqual(response.status_code, 404)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(
@@ -4258,6 +4378,18 @@ class CollectionPropertyValueReviewDetailRelatedCollectionsTestCase(TestCase):
             {collection.pk for collection in related_collections},
             {self.root_collection.pk, self.successor_collection.pk},
         )
+
+    def test_review_detail_context_includes_back_collection(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={"content_type_id": self.ct_id, "object_id": self.cpv.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["back_collection"], self.successor_collection)
 
 
 class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):
