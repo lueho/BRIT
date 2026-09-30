@@ -85,6 +85,16 @@
     /* Use !important to override _typography.scss styles */
 }
 
+.feature-popup {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.feature-popup th,
+.feature-popup td {
+    overflow-wrap: anywhere;
+}
+
 .map-error {
     position: absolute;
     top: 0.75rem;

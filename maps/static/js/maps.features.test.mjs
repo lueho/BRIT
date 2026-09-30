@@ -186,6 +186,7 @@ test("features get popups listing configured fields and a detail link", () => {
   );
 
   const element = popupContent();
+  assert.strictEqual(element.className, "feature-popup");
   const text = collectText(element);
   assert.ok(text.includes("Name"));
   assert.ok(text.includes("<b>Farm</b>"), "values are set as text, not HTML");

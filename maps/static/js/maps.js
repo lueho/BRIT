@@ -661,11 +661,12 @@ function bindFeaturePopup(feature, layer) {
     if (!Array.isArray(fields) || fields.length === 0) {
         return;
     }
-    layer.bindPopup(() => buildFeaturePopupContent(feature, fields));
+    layer.bindPopup(() => buildFeaturePopupContent(feature, fields), { maxWidth: 360 });
 }
 
 function buildFeaturePopupContent(feature, fields) {
     const container = document.createElement('div');
+    container.className = 'feature-popup';
     const table = document.createElement('table');
     table.className = 'table table-sm mb-2';
     const body = document.createElement('tbody');
