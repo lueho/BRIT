@@ -10,7 +10,7 @@ from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import DateRangeField, RangeOperators
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
-from django.db import models, transaction
+from django.db import IntegrityError, models, transaction
 from django.db.models import F, Func, Q
 from django.db.models.signals import m2m_changed, post_delete, post_save, pre_save
 from django.dispatch import receiver
@@ -166,27 +166,37 @@ def get_default_layer_style(layer_type):
 
     style_name = default_style_names.get(layer_type, "Default Style")
 
-    style, created = MapLayerStyle.objects.get_or_create(
-        name=style_name,
-        defaults={
-            "stroke": True,
-            "color": "#000000",
-            "weight": 3,
-            "opacity": 1.0,
-            "fill": True,
-            "fill_color": "#FFFFFF",
-            "fill_opacity": 0.2,
-            "dash_array": "",
-            "dash_offset": "",
-            "line_cap": "round",
-            "line_join": "round",
-            "fill_rule": "evenodd",
-            "class_name": "",
-            "radius": 10.0,
-            "bubbling_mouse_events": True,
-        },
-    )
-    return style
+    defaults = {
+        "stroke": True,
+        "color": "#000000",
+        "weight": 3,
+        "opacity": 1.0,
+        "fill": True,
+        "fill_color": "#FFFFFF",
+        "fill_opacity": 0.2,
+        "dash_array": "",
+        "dash_offset": "",
+        "line_cap": "round",
+        "line_join": "round",
+        "fill_rule": "evenodd",
+        "class_name": "",
+        "radius": 10.0,
+        "bubbling_mouse_events": True,
+    }
+
+    # ``MapLayerStyle.name`` is not unique, so ``get_or_create(name=...)`` raises
+    # ``MultipleObjectsReturned`` once more than one default style with the same
+    # name exists. Resolve deterministically to the first matching style and
+    # tolerate concurrent creation instead of letting callers crash.
+    existing = MapLayerStyle.objects.filter(name=style_name).order_by("pk").first()
+    if existing is not None:
+        return existing
+
+    try:
+        with transaction.atomic():
+            return MapLayerStyle.objects.create(name=style_name, **defaults)
+    except IntegrityError:
+        return MapLayerStyle.objects.filter(name=style_name).order_by("pk").first()
 
 
 class MapLayerConfiguration(NamedUserCreatedObject):

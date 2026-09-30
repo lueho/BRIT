@@ -540,6 +540,36 @@ class ScenarioTestCase(TestCase):
             any("inventories_runningtask" in query for query in locking_queries)
         )
 
+    def test_try_start_inventory_claims_when_not_running(self):
+        self.scenario.set_status(ScenarioStatus.Status.CHANGED)
+
+        self.assertTrue(self.scenario.try_start_inventory())
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.RUNNING)
+
+    def test_try_start_inventory_rejects_when_already_running(self):
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        self.assertFalse(self.scenario.try_start_inventory())
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.RUNNING)
+
+    def test_try_start_inventory_clears_previous_failure(self):
+        algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
+        self.scenario.set_status(ScenarioStatus.Status.FAILED)
+        self.scenario.scenariostatus.failed_algorithm = algorithm
+        self.scenario.scenariostatus.failure_message = "boom"
+        self.scenario.scenariostatus.save()
+
+        self.assertTrue(self.scenario.try_start_inventory())
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.RUNNING)
+        self.assertIsNone(self.scenario.scenariostatus.failed_algorithm)
+        self.assertEqual(self.scenario.scenariostatus.failure_message, "")
+
     @patch("inventories.models.AsyncResult")
     def test_running_scenario_save_recovers_after_failed_tasks(self, mock_async_result):
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)

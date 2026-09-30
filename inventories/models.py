@@ -340,6 +340,38 @@ class Scenario(NamedUserCreatedObject):
                 update_fields.extend(["failed_algorithm", "failure_message"])
             self.scenariostatus.save(update_fields=update_fields)
 
+    def try_start_inventory(self):
+        """Atomically claim this scenario for an inventory evaluation.
+
+        Acquires a row lock on the scenario status and transitions it to
+        ``RUNNING`` only if it is not already running. Returns ``True`` when
+        the caller acquired the run (and the status was moved to ``RUNNING``)
+        and ``False`` when an evaluation is already in progress. Serialising
+        the check-and-set through ``select_for_update`` prevents concurrent or
+        duplicate triggers from starting parallel runs that would clobber each
+        other's result layers and task bookkeeping.
+
+        A scenario left in ``RUNNING`` by a crashed run is recovered on the
+        next edit via the ``block_running_scenario`` guard.
+        """
+        with transaction.atomic():
+            scenario_status = (
+                ScenarioStatus.objects.select_for_update()
+                .filter(scenario_id=self.pk)
+                .first()
+            )
+            if scenario_status is None:
+                return False
+            if scenario_status.status == ScenarioStatus.Status.RUNNING:
+                return False
+            scenario_status.status = ScenarioStatus.Status.RUNNING
+            scenario_status.failed_algorithm = None
+            scenario_status.failure_message = ""
+            scenario_status.save(
+                update_fields=["status", "failed_algorithm", "failure_message"]
+            )
+            return True
+
     def available_feedstocks(self):
         """
         Returns all materials that can be included in this scenario.

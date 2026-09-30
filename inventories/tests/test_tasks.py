@@ -42,6 +42,21 @@ class InventoryTaskFailureTests(TestCase):
         self.assertFalse(RunningTask.objects.filter(scenario=scenario).exists())
 
     @patch("inventories.tasks.chord")
+    def test_run_inventory_aborts_when_scenario_already_running(self, chord_factory):
+        region = Region.objects.create(name="Concurrent Run Region")
+        scenario = Scenario.objects.create(
+            name="Concurrent Run Scenario",
+            region=region,
+        )
+        scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        result = run_inventory.run(scenario.pk)
+
+        self.assertIsNone(result)
+        chord_factory.assert_not_called()
+        self.assertFalse(RunningTask.objects.filter(scenario=scenario).exists())
+
+    @patch("inventories.tasks.chord")
     @patch("inventories.tasks.mark_inventory_failed")
     @patch("inventories.tasks.finalize_inventory")
     @patch("inventories.tasks.Scenario")

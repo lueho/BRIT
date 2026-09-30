@@ -37,7 +37,11 @@ def mark_inventory_failed(scenario_id, algorithm_id=None, failure_message=""):
 def run_inventory(scenario_id):
     scenario = Scenario.objects.get(id=scenario_id)
 
-    scenario.set_status(ScenarioStatus.Status.RUNNING)
+    # Atomically claim the run. If the scenario is already being evaluated,
+    # abort instead of starting a parallel run that would delete and rebuild
+    # the same result layers and create duplicate RunningTask bookkeeping.
+    if not scenario.try_start_inventory():
+        return None
 
     try:
         scenario.delete_result_layers()

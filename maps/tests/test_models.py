@@ -600,3 +600,46 @@ class RegionEnglishNameTestCase(TestCase):
     def test_custom_region_display_name_falls_back_to_name(self):
         region = Region.objects.create(name="Meine Region", country="DE")
         self.assertEqual(region.display_name, "Meine Region")
+
+
+class GetDefaultLayerStyleTests(TestCase):
+    def test_creates_default_style_when_missing(self):
+        from ..models import MapLayerStyle, get_default_layer_style
+
+        style = get_default_layer_style("region")
+
+        self.assertEqual(style.name, "Default Region Layer Style")
+        self.assertEqual(
+            MapLayerStyle.objects.filter(name="Default Region Layer Style").count(),
+            1,
+        )
+
+    def test_returns_existing_style_without_creating_duplicate(self):
+        from ..models import MapLayerStyle, get_default_layer_style
+
+        first = get_default_layer_style("catchment")
+        second = get_default_layer_style("catchment")
+
+        self.assertEqual(first.pk, second.pk)
+        self.assertEqual(
+            MapLayerStyle.objects.filter(name="Default Catchment Layer Style").count(),
+            1,
+        )
+
+    def test_returns_first_style_when_duplicates_already_exist(self):
+        from ..models import MapLayerStyle, get_default_layer_style
+
+        MapLayerStyle.objects.create(name="Default Features Layer Style")
+        MapLayerStyle.objects.create(name="Default Features Layer Style")
+
+        qs = MapLayerStyle.objects.filter(name="Default Features Layer Style")
+        count_before = qs.count()
+        expected_pk = qs.order_by("pk").first().pk
+
+        # With duplicates present, get_or_create would raise
+        # MultipleObjectsReturned; the helper must resolve deterministically to
+        # the lowest-pk match without creating another duplicate.
+        style = get_default_layer_style("features")
+
+        self.assertEqual(style.pk, expected_pk)
+        self.assertEqual(qs.count(), count_before)

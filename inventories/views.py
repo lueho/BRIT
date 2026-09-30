@@ -5,7 +5,7 @@ from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import Http404, HttpResponse, HttpResponseForbidden, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, TemplateView, View
 from django.views.generic.base import TemplateResponseMixin
@@ -50,6 +50,23 @@ from .models import (
     ScenarioStatus,
 )
 from .tasks import run_inventory
+
+
+def user_can_run_scenario(user, scenario, request=None):
+    """Return whether ``user`` may trigger an evaluation for ``scenario``.
+
+    Running an evaluation is a state-changing, compute-heavy operation, so it
+    is restricted to the scenario owner, granted editors, staff, and
+    moderators. Unlike read access it must NOT be granted merely because the
+    scenario is published.
+    """
+    policy = get_object_policy(user, scenario, request=request)
+    return bool(
+        policy["is_owner"]
+        or policy["is_editor"]
+        or policy["is_staff"]
+        or policy["is_moderator"]
+    )
 
 
 class InventoriesExplorerView(BreadcrumbContextMixin, TemplateView):
@@ -144,12 +161,16 @@ class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
         context = self.get_context_data(object=self.object)
         context["config"] = self.config
         context["allow_edit"] = self.allow_edit
+        context["can_run"] = user_can_run_scenario(
+            request.user, self.object, request=request
+        )
         return self.render_to_response(context)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
-        scenario.set_status(ScenarioStatus.Status.RUNNING)
+        if not user_can_run_scenario(request.user, scenario, request=request):
+            return HttpResponseForbidden()
         run_inventory.delay(scenario.id)
         return redirect("scenario-result", scenario.id)
 
@@ -475,6 +496,18 @@ class ResultMapAPI(APIView):
         except Layer.DoesNotExist:
             return Response({"error": "Layer not found"}, status=404)
 
+        scenario = layer.scenario
+        policy = get_object_policy(request.user, scenario, request=request)
+        if not (
+            policy["is_published"]
+            or policy["is_owner"]
+            or policy["is_editor"]
+            or policy["is_staff"]
+            or policy["is_moderator"]
+        ):
+            # Do not disclose the existence of layers the user cannot access.
+            return Response({"error": "Layer not found"}, status=404)
+
         feature_collection = layer.get_feature_collection()
         features = feature_collection.objects.all()
 
@@ -542,19 +575,34 @@ class ScenarioEvaluationProgressView(DetailView):
     model = Scenario
 
 
-class ScenarioResultDetailMapView(MapMixin, DetailView):
+class ScenarioResultDetailMapView(
+    LoginRequiredMixin, UserPassesTestMixin, MapMixin, DetailView
+):
     """View of an individual result map in large size"""
 
     model = Layer
     context_object_name = "layer"
     template_name = "result_detail_map.html"
 
+    def test_func(self):
+        scenario = get_object_or_404(Scenario, id=self.kwargs.get("pk"))
+        policy = get_object_policy(self.request.user, scenario, request=self.request)
+        return bool(
+            policy["is_published"]
+            or policy["is_owner"]
+            or policy["is_editor"]
+            or policy["is_staff"]
+            or policy["is_moderator"]
+        )
+
     def get_object(self, **kwargs):
-        scenario = Scenario.objects.get(id=self.kwargs.get("pk"))
-        algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get("algorithm_pk"))
-        feedstock = SampleSeries.objects.get(id=self.kwargs.get("feedstock_pk"))
-        return Layer.objects.get(
-            scenario=scenario, algorithm=algorithm, feedstock=feedstock
+        scenario = get_object_or_404(Scenario, id=self.kwargs.get("pk"))
+        algorithm = get_object_or_404(
+            InventoryAlgorithm, id=self.kwargs.get("algorithm_pk")
+        )
+        feedstock = get_object_or_404(SampleSeries, id=self.kwargs.get("feedstock_pk"))
+        return get_object_or_404(
+            Layer, scenario=scenario, algorithm=algorithm, feedstock=feedstock
         )
 
     def get_region_feature_id(self):

@@ -5,14 +5,16 @@
         {# status = CHANGED #}
         {% if object.status == 1 %}
             <p>This scenario is not evaluated, yet.</p>
-            <div class="text-center">
-                <form method="post">
-                    {% csrf_token %}
-                    <button type="submit" name="run" class="btn btn-primary">
-                        Start evaluation
-                    </button>
-                </form>
-            </div>
+            {% if can_run %}
+                <div class="text-center">
+                    <form method="post">
+                        {% csrf_token %}
+                        <button type="submit" name="run" class="btn btn-primary">
+                            Start evaluation
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
             {# status = RUNNING #}
         {% elif object.status == 2 %}
             <p>The evaluation is still running.</p>
@@ -36,14 +38,16 @@
             {% if object.scenariostatus.failed_algorithm %}
                 <p>Failed algorithm: {{ object.scenariostatus.failed_algorithm }}</p>
             {% endif %}
-            <div class="text-center">
-                <form method="post">
-                    {% csrf_token %}
-                    <button type="submit" name="run" class="btn btn-primary">
-                        Retry evaluation
-                    </button>
-                </form>
-            </div>
+            {% if can_run %}
+                <div class="text-center">
+                    <form method="post">
+                        {% csrf_token %}
+                        <button type="submit" name="run" class="btn btn-primary">
+                            Retry evaluation
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
         {% endif %}
     </div>
     <div class="card-footer"></div>
