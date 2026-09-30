@@ -82,7 +82,7 @@
                   </a>
                 </li>
               {% endif %}
-              {% if sample_policy.can_duplicate %}
+              {% if sample_policy.can_new_version or sample_policy.can_edit %}
                 <li>
                   <a class="dropdown-item"
                      href="{% url 'sample-duplicate' object.id %}">
