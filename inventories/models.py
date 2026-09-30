@@ -171,7 +171,7 @@ class InventoryAlgorithm(models.Model):
             if parameter not in values.keys():
                 values[parameter] = []
             for value in InventoryAlgorithmParameterValue.objects.filter(
-                parameter=parameter, default=True
+                parameter=parameter, default=True, is_custom=False
             ):
                 values[parameter].append(value)
         return values
@@ -226,6 +226,9 @@ class InventoryAlgorithmParameterValue(models.Model):
         max_length=200, blank=True, null=True
     )  # TODO: connect to bibliography
     default = models.BooleanField(default=False)
+    is_custom = models.BooleanField(
+        "User-provided assumption, not a curated preset", default=False
+    )
 
     def __str__(self):
         if self.type == 1:
@@ -241,7 +244,7 @@ def auto_default(sender, instance, **kwargs):
     Makes sure that defaults are always set correctly, even if the user provides incoherent input.
     """
     # If there is no default, yet, make the new instance default
-    if not instance.default:
+    if not instance.default and not instance.is_custom:
         if not instance.parameter.inventoryalgorithmparametervalue_set.exclude(
             id=instance.id
         ).filter(default=True):

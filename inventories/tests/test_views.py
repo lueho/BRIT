@@ -19,8 +19,11 @@ from utils.tests.testcases import AbstractTestCases
 
 from ..models import (
     InventoryAlgorithm,
+    InventoryAlgorithmParameter,
+    InventoryAlgorithmParameterValue,
     RunningTask,
     Scenario,
+    ScenarioInventoryConfiguration,
     ScenarioStatus,
 )
 from ..views import (
@@ -221,11 +224,13 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
         cls.target_material = Material.objects.create(name="Autocomplete Target")
         cls.region = Region.objects.create(name="AC Region")
         cls.scenario = Scenario.objects.create(name="AC Scenario", region=cls.region)
-        cls.geodataset = GeoDataset.objects.create(name="AC Dataset", region=cls.region)
-        algorithm = InventoryAlgorithm.objects.create(
+        cls.geodataset = GeoDataset.objects.create(
+            name="AC Dataset", region=cls.region, publication_status="published"
+        )
+        cls.algorithm = InventoryAlgorithm.objects.create(
             name="AC Algorithm", geodataset=cls.geodataset
         )
-        algorithm.feedstocks.add(cls.target_material)
+        cls.algorithm.feedstocks.add(cls.target_material)
         cls.series = SampleSeries.objects.create(
             name="AC Series", material=cls.target_material
         )
@@ -244,6 +249,36 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
 
         result_qs = view.apply_filters(GeoDataset.objects.all())
         self.assertIn(self.geodataset, result_qs)
+
+    def test_widget_wire_format_returns_geodataset(self):
+        """The widget sends '<source>__<lookup>=<value>' params; the lookup name
+        must be extracted so the geodataset dropdown is not always empty."""
+        response = self.client.get(
+            reverse("scenario-geodataset-autocomplete"),
+            {
+                "f": f"'feedstock__feedstock_id={self.series.id}'",
+                "e": f"'scenario__scenario_id={self.scenario.id}'",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(self.geodataset.id, ids)
+
+    def test_widget_wire_format_returns_inventory_algorithm(self):
+        """Same wire format applies to the algorithm dropdown
+        (geodataset via filter_by, feedstock via exclude_by)."""
+        response = self.client.get(
+            reverse("scenario-inventoryalgorithm-autocomplete"),
+            {
+                "f": f"'geodataset__geodataset_id={self.geodataset.id}'",
+                "e": f"'feedstock__feedstock_id={self.series.id}'",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(self.algorithm.id, ids)
 
 
 class ScenarioResultCRUDViewsTestCase(
@@ -491,3 +526,266 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
             reverse("scenario-detail", kwargs={"pk": self.scenario_a.pk}),
         )
         mock_add.assert_called_once()
+
+
+# ----------- Custom parameter values (user assumptions) --------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ScenarioCustomParameterValueTests(TestCase):
+    """Users pick a preset parameter value or provide their own assumption."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner", password="pass")
+        change_perm = Permission.objects.get(codename="change_scenario")
+        cls.owner.user_permissions.add(change_perm)
+
+        region = Region.objects.create(name="R", publication_status="published")
+        catchment = Catchment.objects.create(
+            name="C",
+            region=region,
+            parent_region=region,
+            publication_status="published",
+        )
+        cls.scenario = Scenario.objects.create(
+            name="S", owner=cls.owner, region=region, catchment=catchment
+        )
+        cls.other_scenario = Scenario.objects.create(
+            name="S2", owner=cls.owner, region=region, catchment=catchment
+        )
+        material = Material.objects.create(name="M", owner=cls.owner)
+        cls.feedstock = SampleSeries.objects.create(
+            name="F", owner=cls.owner, material=material
+        )
+        cls.geodataset = GeoDataset.objects.create(
+            name="G", owner=cls.owner, region=region
+        )
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="A", geodataset=cls.geodataset
+        )
+        cls.algorithm.feedstocks.add(material)
+
+        cls.parameter = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="Yield", short_name="yield", is_required=True
+        )
+        cls.parameter.inventory_algorithm.add(cls.algorithm)
+        cls.preset = InventoryAlgorithmParameterValue.objects.create(
+            name="Preset",
+            parameter=cls.parameter,
+            value=1.0,
+            source="Literature",
+            default=True,
+        )
+
+    def _post_data(self, **overrides):
+        data = {
+            "scenario": self.scenario.pk,
+            "feedstock": self.feedstock.pk,
+            "inventory_algorithm": self.algorithm.pk,
+            f"parameter_{self.parameter.pk}": str(self.preset.pk),
+        }
+        data.update(overrides)
+        return data
+
+    def _add_url(self, scenario=None):
+        return reverse(
+            "scenario-add-configuration",
+            kwargs={"pk": (scenario or self.scenario).pk},
+        )
+
+    def test_post_preset_value_uses_existing_value(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(self._add_url(), self._post_data())
+        self.assertEqual(response.status_code, 302)
+        config = ScenarioInventoryConfiguration.objects.get(scenario=self.scenario)
+        self.assertEqual(config.inventory_value, self.preset)
+
+    def test_post_custom_value_creates_assumption_value(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self._add_url(),
+            self._post_data(
+                **{
+                    f"parameter_{self.parameter.pk}": "custom",
+                    f"parameter_{self.parameter.pk}_custom_value": "3.5",
+                    f"parameter_{self.parameter.pk}_custom_standard_deviation": "0.2",
+                    f"parameter_{self.parameter.pk}_custom_source": "My estimate",
+                }
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        value = InventoryAlgorithmParameterValue.objects.get(
+            parameter=self.parameter, is_custom=True
+        )
+        self.assertEqual(value.value, 3.5)
+        self.assertEqual(value.standard_deviation, 0.2)
+        self.assertEqual(value.source, "My estimate")
+        self.assertFalse(value.default)
+        config = ScenarioInventoryConfiguration.objects.get(scenario=self.scenario)
+        self.assertEqual(config.inventory_value, value)
+
+    def test_post_custom_value_defaults_source(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self._add_url(),
+            self._post_data(
+                **{
+                    f"parameter_{self.parameter.pk}": "custom",
+                    f"parameter_{self.parameter.pk}_custom_value": "7.0",
+                }
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        value = InventoryAlgorithmParameterValue.objects.get(
+            parameter=self.parameter, is_custom=True
+        )
+        self.assertEqual(value.source, "User assumption")
+        self.assertIsNone(value.standard_deviation)
+
+    def test_post_custom_value_invalid_returns_400(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self._add_url(),
+            self._post_data(
+                **{
+                    f"parameter_{self.parameter.pk}": "custom",
+                    f"parameter_{self.parameter.pk}_custom_value": "not-a-number",
+                }
+            ),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario
+            ).exists()
+        )
+        self.assertFalse(
+            InventoryAlgorithmParameterValue.objects.filter(is_custom=True).exists()
+        )
+
+    def test_post_custom_value_rejected_for_selection_parameter(self):
+        selection_parameter = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="Method", short_name="method"
+        )
+        selection_parameter.inventory_algorithm.add(self.algorithm)
+        InventoryAlgorithmParameterValue.objects.create(
+            name="Option A",
+            parameter=selection_parameter,
+            value=1.0,
+            type=InventoryAlgorithmParameterValue.ValueType.SELECTION,
+            default=True,
+        )
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self._add_url(),
+            self._post_data(
+                **{
+                    f"parameter_{selection_parameter.pk}": "custom",
+                    f"parameter_{selection_parameter.pk}_custom_value": "5.0",
+                }
+            ),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            InventoryAlgorithmParameterValue.objects.filter(
+                parameter=selection_parameter, is_custom=True
+            ).exists()
+        )
+
+    def test_update_view_accepts_custom_value(self):
+        self.scenario.add_inventory_algorithm(
+            self.feedstock, self.algorithm, {self.parameter: [self.preset]}
+        )
+        self.client.force_login(self.owner)
+        url = reverse(
+            "scenario-update-config",
+            kwargs={
+                "scenario_pk": self.scenario.pk,
+                "feedstock_pk": self.feedstock.pk,
+                "algorithm_pk": self.algorithm.pk,
+            },
+        )
+        response = self.client.post(
+            url,
+            self._post_data(
+                **{
+                    f"parameter_{self.parameter.pk}": "custom",
+                    f"parameter_{self.parameter.pk}_custom_value": "8.25",
+                    f"parameter_{self.parameter.pk}_custom_source": "Site visit",
+                }
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        config = ScenarioInventoryConfiguration.objects.get(scenario=self.scenario)
+        self.assertEqual(config.inventory_value.value, 8.25)
+        self.assertTrue(config.inventory_value.is_custom)
+        self.assertEqual(config.inventory_value.source, "Site visit")
+
+    def test_custom_values_do_not_become_algorithm_defaults(self):
+        custom = InventoryAlgorithmParameterValue.objects.create(
+            name="",
+            parameter=self.parameter,
+            value=9.9,
+            is_custom=True,
+            default=False,
+        )
+        defaults = self.algorithm.default_values()[self.parameter]
+        self.assertNotIn(custom, defaults)
+        self.assertIn(self.preset, defaults)
+
+    def test_parameters_api_returns_source_and_hides_custom_values(self):
+        custom = InventoryAlgorithmParameterValue.objects.create(
+            name="",
+            parameter=self.parameter,
+            value=9.9,
+            is_custom=True,
+            default=False,
+        )
+        self.client.force_login(self.owner)
+        url = reverse(
+            "api-inventoryalgorithm-parameters",
+            kwargs={"algorithm_pk": self.algorithm.pk},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        target = next(p for p in response.json() if p["id"] == self.parameter.pk)
+        value_ids = [v["id"] for v in target["values"]]
+        self.assertIn(self.preset.id, value_ids)
+        self.assertNotIn(custom.id, value_ids)
+        preset_payload = next(v for v in target["values"] if v["id"] == self.preset.id)
+        self.assertEqual(preset_payload["source"], "Literature")
+        self.assertIn("type", preset_payload)
+        self.assertIn("is_custom", preset_payload)
+
+    def test_parameters_api_includes_custom_values_configured_in_scenario(self):
+        custom = InventoryAlgorithmParameterValue.objects.create(
+            name="",
+            parameter=self.parameter,
+            value=9.9,
+            is_custom=True,
+            default=False,
+        )
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=self.feedstock,
+            geodataset=self.geodataset,
+            inventory_algorithm=self.algorithm,
+            inventory_parameter=self.parameter,
+            inventory_value=custom,
+        )
+        self.client.force_login(self.owner)
+        url = reverse(
+            "api-inventoryalgorithm-parameters",
+            kwargs={"algorithm_pk": self.algorithm.pk},
+        )
+
+        response = self.client.get(url, {"scenario": self.scenario.pk})
+        target = next(p for p in response.json() if p["id"] == self.parameter.pk)
+        value_ids = [v["id"] for v in target["values"]]
+        self.assertIn(custom.id, value_ids)
+
+        response = self.client.get(url, {"scenario": self.other_scenario.pk})
+        target = next(p for p in response.json() if p["id"] == self.parameter.pk)
+        value_ids = [v["id"] for v in target["values"]]
+        self.assertNotIn(custom.id, value_ids)
