@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView
 
@@ -108,5 +109,5 @@ class PropertyUnitOptionsView(OwnedObjectModelSelectOptionsView):
         return self.object_list.first()
 
     def get_queryset(self):
-        obj = self.model.objects.get(id=self.kwargs.get("pk"))
+        obj = get_object_or_404(self.model, id=self.kwargs.get("pk"))
         return obj.allowed_units.all()
