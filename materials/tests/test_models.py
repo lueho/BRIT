@@ -19,6 +19,7 @@ from materials.models import (
     ComponentMeasurement,
     Composition,
     Material,
+    MaterialCategory,
     MaterialComponent,
     MaterialComponentGroup,
     MaterialProperty,
@@ -29,6 +30,7 @@ from materials.models import (
     SampleGroup,
     SampleGroupKind,
     SampleSeries,
+    get_or_create_sample_substrate_category,
 )
 from utils.object_management.models import get_default_owner
 from utils.properties.models import Unit
@@ -321,6 +323,60 @@ class BaseMaterialUniquenessTestCase(TestCase):
                     name=name.lower(),
                     publication_status=Material.STATUS_PUBLISHED,
                 )
+
+
+@override_settings(SAMPLE_SUBSTRATE_CATEGORY_NAME="Substrate test category")
+class SampleSubstrateCategoryTestCase(TestCase):
+    def test_creates_published_category_once(self):
+        category, created = get_or_create_sample_substrate_category()
+        again, created_again = get_or_create_sample_substrate_category()
+
+        self.assertTrue(created)
+        self.assertFalse(created_again)
+        self.assertEqual(again, category)
+        self.assertEqual(category.publication_status, "published")
+        self.assertEqual(
+            MaterialCategory.objects.filter(name="Substrate test category").count(),
+            1,
+        )
+
+    def test_keeps_existing_category_when_homonym_is_added(self):
+        published = MaterialCategory.objects.create(
+            name="Substrate test category", publication_status="published"
+        )
+        MaterialCategory.objects.create(
+            name="Substrate test category",
+            owner=User.objects.create(username="homonym-owner"),
+        )
+
+        category, created = get_or_create_sample_substrate_category()
+
+        self.assertFalse(created)
+        self.assertEqual(category, published)
+
+    def test_keeps_existing_category_when_homonym_is_published(self):
+        original = MaterialCategory.objects.create(name="Substrate test category")
+        MaterialCategory.objects.create(
+            name="Substrate test category", publication_status="published"
+        )
+
+        category, created = get_or_create_sample_substrate_category()
+
+        self.assertFalse(created)
+        self.assertEqual(category, original)
+
+    def test_tolerates_existing_duplicates(self):
+        first = MaterialCategory.objects.create(
+            name="Substrate test category", publication_status="published"
+        )
+        MaterialCategory.objects.create(
+            name="Substrate test category", publication_status="published"
+        )
+
+        category, created = get_or_create_sample_substrate_category()
+
+        self.assertFalse(created)
+        self.assertEqual(category, first)
 
 
 class SampleSeriesTestCase(TestCase):
