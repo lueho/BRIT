@@ -496,6 +496,9 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
 class ScenarioDetailViewRunTestCase(TestCase):
     def setUp(self):
         self.owner = User.objects.create(username="scenario-run-owner")
+        self.owner.user_permissions.add(
+            Permission.objects.get(codename="change_scenario")
+        )
         self.scenario = Scenario.objects.create(
             name="Run Scenario",
             owner=self.owner,
@@ -547,3 +550,81 @@ class ScenarioDetailViewRunTestCase(TestCase):
             [task["algorithm_name"] for task in response.context["task_list"]["tasks"]],
             ["Progress Algorithm"],
         )
+
+
+class ScenarioDetailRunAuthorizationTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner", password="pass")
+        cls.owner.user_permissions.add(
+            Permission.objects.get(codename="change_scenario")
+        )
+        cls.other_user = User.objects.create_user(username="other", password="pass")
+        region = Region.objects.create(name="R", publication_status="published")
+        catchment = Catchment.objects.create(
+            name="C",
+            region=region,
+            parent_region=region,
+            publication_status="published",
+        )
+        cls.private_scenario = Scenario.objects.create(
+            name="Private", owner=cls.owner, region=region, catchment=catchment
+        )
+        cls.published_scenario = Scenario.objects.create(
+            name="Published",
+            owner=cls.owner,
+            region=region,
+            catchment=catchment,
+            publication_status="published",
+        )
+
+    def detail_url(self, scenario):
+        return reverse("scenario-detail", kwargs={"pk": scenario.pk})
+
+    @patch("inventories.views.start_inventory_run")
+    def test_anonymous_cannot_run_published_scenario(self, mock_run):
+        response = self.client.post(self.detail_url(self.published_scenario))
+
+        self.assertEqual(response.status_code, 403)
+        mock_run.assert_not_called()
+        self.published_scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(
+            self.published_scenario.scenariostatus.status,
+            ScenarioStatus.Status.CHANGED,
+        )
+
+    @patch("inventories.views.start_inventory_run")
+    def test_non_owner_cannot_run_published_scenario(self, mock_run):
+        self.client.force_login(self.other_user)
+
+        response = self.client.post(self.detail_url(self.published_scenario))
+
+        self.assertEqual(response.status_code, 403)
+        mock_run.assert_not_called()
+
+    @patch("inventories.views.start_inventory_run")
+    def test_owner_can_run_private_scenario(self, mock_run):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(self.detail_url(self.private_scenario))
+
+        self.assertRedirects(
+            response,
+            reverse("scenario-result", kwargs={"pk": self.private_scenario.pk}),
+            fetch_redirect_response=False,
+        )
+        mock_run.assert_called_once_with(self.private_scenario.pk)
+
+    def test_anonymous_can_view_published_scenario_without_run_form(self):
+        response = self.client.get(self.detail_url(self.published_scenario))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="run"')
+
+    def test_owner_sees_run_form_on_private_scenario(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(self.detail_url(self.private_scenario))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="run"')

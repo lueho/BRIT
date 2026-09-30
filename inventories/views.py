@@ -148,8 +148,16 @@ class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
-        start_inventory_run(self.object.id)
-        return redirect("scenario-result", self.object.id)
+        scenario = self.object
+        if (
+            not request.user.is_authenticated
+            or not get_object_policy(request.user, scenario, request=request)[
+                "can_edit"
+            ]
+        ):
+            return HttpResponseForbidden()
+        start_inventory_run(scenario.id)
+        return redirect("scenario-result", scenario.id)
 
 
 class ScenarioUpdateView(UserCreatedObjectUpdateView):
