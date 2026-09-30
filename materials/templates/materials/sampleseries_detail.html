@@ -43,7 +43,7 @@
 {% endblock hero_media %}
 
 {% block rail_dropdown_extra %}
-    {% if policy.can_duplicate %}
+    {% if policy.can_new_version or policy.can_edit %}
         <li>
             <a class="dropdown-item" href="{% url 'sampleseries-duplicate' object.pk %}">
                 <i class="fas fa-fw fa-copy me-2" aria-hidden="true"></i>Duplicate series

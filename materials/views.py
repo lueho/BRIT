@@ -1129,6 +1129,7 @@ class SampleSeriesCreateDuplicateView(UserCreatedObjectUpdateView):
     model = SampleSeries
     form_class = SampleSeriesModelForm
     object = None
+    object_policy_action = "duplicate"
 
     def form_valid(self, form):
         self.object = self.object.duplicate(
@@ -1658,7 +1659,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
                     sample_policy["can_manage_samples"],
                     sample_policy["can_add_property"],
                     sample_policy["can_edit"],
-                    sample_policy["can_duplicate"],
+                    sample_policy["can_new_version"],
                     sample_policy["can_delete"],
                     sample_policy["can_submit_review"],
                     sample_policy["can_view_review_feedback"],
@@ -2104,6 +2105,7 @@ class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
     model = Sample
     form_class = SampleModelForm
     object = None
+    object_policy_action = "duplicate"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()

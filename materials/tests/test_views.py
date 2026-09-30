@@ -2145,6 +2145,38 @@ class SampleSeriesCreateDuplicateViewTestCase(
         self.assertEqual(original.name, original_name)
         self.assertEqual(original.material, original_material)
 
+    def test_user_with_add_permission_can_duplicate_published_series(self):
+        self.client.force_login(self.user_with_add_perm)
+        url = reverse(self.view_update_name, kwargs={"pk": self.published_object.pk})
+        self.assertEqual(self.client.get(url).status_code, 200)
+        response = self.client.post(
+            url,
+            {
+                "name": "Own Version Of Series",
+                "material": self.published_object.material.pk,
+            },
+        )
+        duplicate = SampleSeries.objects.get(name="Own Version Of Series")
+        self.assertEqual(duplicate.owner, self.user_with_add_perm)
+        self.assertEqual(duplicate.publication_status, "private")
+        self.assertRedirects(
+            response, duplicate.get_absolute_url(), fetch_redirect_response=False
+        )
+        self.published_object.refresh_from_db()
+        self.assertEqual(self.published_object.name, "Test Series")
+
+    def test_user_with_add_permission_cannot_duplicate_archived_series(self):
+        self.published_object.publication_status = "archived"
+        self.published_object.save()
+        self.client.force_login(self.user_with_add_perm)
+        url = reverse(self.view_update_name, kwargs={"pk": self.published_object.pk})
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_user_with_add_permission_cannot_duplicate_foreign_private_series(self):
+        self.client.force_login(self.user_with_add_perm)
+        url = reverse(self.view_update_name, kwargs={"pk": self.unpublished_object.pk})
+        self.assertEqual(self.client.get(url).status_code, 403)
+
 
 # ----------- Back URL Navigation Tests ----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -3995,6 +4027,79 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         self.client.post(url, data)
         duplicate = Sample.objects.get(name="Test Sample Duplicate")
         self.assertCountEqual(duplicate.sample_groups.all(), [group])
+
+    def _create_published_sample(self):
+        Material.objects.filter(pk=self.material.pk).update(
+            publication_status="published"
+        )
+        SampleSeries.objects.filter(pk=self.series.pk).update(
+            publication_status="published"
+        )
+        TemporalDistribution.objects.filter(name="Test Distribution").update(
+            publication_status="published"
+        )
+        Timestep.objects.filter(distribution__name="Test Distribution").update(
+            publication_status="published"
+        )
+        return Sample.objects.create(
+            name="Published Sample",
+            material=self.material,
+            series=self.series,
+            timestep=Timestep.objects.get(name="Test Timestep 1"),
+            owner=self.owner,
+            publication_status="published",
+        )
+
+    def test_member_with_add_permission_can_duplicate_published_sample(self):
+        published = self._create_published_sample()
+        self.client.force_login(self.member)
+        url = reverse("sample-duplicate", kwargs={"pk": published.pk})
+        self.assertEqual(self.client.get(url).status_code, 200)
+        data = {
+            "name": "Own Version Of Sample",
+            "material": self.material.pk,
+            "series": self.series.pk,
+            "timestep": Timestep.objects.get(name="Test Timestep 2").pk,
+        }
+        response = self.client.post(url, data)
+        duplicate = Sample.objects.get(name="Own Version Of Sample")
+        self.assertEqual(duplicate.owner, self.member)
+        self.assertEqual(duplicate.publication_status, "private")
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": duplicate.pk}),
+            fetch_redirect_response=False,
+        )
+        published.refresh_from_db()
+        self.assertEqual(published.name, "Published Sample")
+
+    def test_outsider_without_add_permission_cannot_duplicate_published_sample(self):
+        published = self._create_published_sample()
+        self.client.force_login(self.outsider)
+        response = self.client.get(
+            reverse("sample-duplicate", kwargs={"pk": published.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_member_cannot_duplicate_archived_sample(self):
+        archived = self._create_published_sample()
+        archived.publication_status = "archived"
+        archived.save()
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("sample-duplicate", kwargs={"pk": archived.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_published_sample_detail_offers_duplicate_link_to_member(self):
+        published = self._create_published_sample()
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": published.pk}) + "?experience=v2"
+        )
+        self.assertContains(
+            response, reverse("sample-duplicate", kwargs={"pk": published.pk})
+        )
 
 
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------
