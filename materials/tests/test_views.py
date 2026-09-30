@@ -2199,6 +2199,8 @@ class SampleSeriesCreateDuplicateViewTestCase(
         self.assertEqual(response.context["form_title"], "Duplicate sample series")
         self.assertEqual(response.context["breadcrumb_action_label"], "Duplicate")
         self.assertNotContains(response, "Update sample series")
+        self.assertContains(response, 'value="Save private copy"')
+        self.assertContains(response, "creates a new private copy")
 
     def test_user_with_add_permission_cannot_duplicate_archived_series(self):
         self.published_object.publication_status = "archived"

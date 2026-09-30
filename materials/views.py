@@ -1152,6 +1152,7 @@ class SampleSeriesCreateDuplicateView(
     form_class = SampleSeriesModelForm
     object = None
     object_policy_action = "duplicate"
+    template_name = "materials/sampleseries_duplicate_form.html"
 
     def form_valid(self, form):
         self.object = self.object.duplicate(
