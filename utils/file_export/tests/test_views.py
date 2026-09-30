@@ -127,6 +127,15 @@ class FilteredListFileExportViewTests(TestCase):
             called_args, _ = mock_delay.call_args
             self.assertEqual(called_args[0], "xlsx")
 
+    def test_get_rejects_unknown_format(self):
+        """An unsupported format returns HTTP 400 without dispatching a task."""
+        request = self._make_request("/dummy-url?format=bogus&list_type=public")
+        with patch.object(DummyTask, "delay", wraps=DummyTask.delay) as mock_delay:
+            response = DummyExportView.as_view()(request)
+        self.assertEqual(response.status_code, 400)
+        mock_delay.assert_not_called()
+        self.assertNotIn(SESSION_KEY, request.session)
+
     def test_get_method_calls_task_function(self):
         params = {"page": ["1"], "list_type": ["private"], "some_filter": ["value"]}
         query_string = "&".join([f"{key}={value[0]}" for key, value in params.items()])
@@ -249,10 +258,19 @@ class GenericUserCreatedObjectExportViewTests(TestCase):
         request.user = self.user
         request.session = SessionStore()
 
+        spec = SimpleNamespace(
+            model=User, renderers={"csv": object(), "xlsx": object()}
+        )
         # The view imports the task inside get() from .generic_tasks
-        with patch(
-            "utils.file_export.generic_tasks.export_user_created_object_to_file"
-        ) as mock_task:
+        with (
+            patch(
+                "utils.file_export.export_registry.get_export_spec",
+                return_value=spec,
+            ),
+            patch(
+                "utils.file_export.generic_tasks.export_user_created_object_to_file"
+            ) as mock_task,
+        ):
             mock_task.delay.return_value = MagicMock(task_id="generic-task-id")
             response = LabelView.as_view()(request)
             self.assertEqual(response.status_code, 200)
@@ -276,7 +294,9 @@ class GenericUserCreatedObjectExportViewTests(TestCase):
         request.user = self.user
         request.session = SessionStore()
 
-        spec = SimpleNamespace(model=User, filterset=DummyFilterSet)
+        spec = SimpleNamespace(
+            model=User, filterset=DummyFilterSet, renderers={"csv": object()}
+        )
         with (
             patch(
                 "utils.file_export.export_registry.get_export_spec",
@@ -294,6 +314,33 @@ class GenericUserCreatedObjectExportViewTests(TestCase):
         self.assertEqual(data["task_id"], "generic-task-id")
         self.assertEqual(data["row_count"], User.objects.count())
         self.assertFalse(data["large_export"])
+
+    def test_rejects_format_without_registered_renderer(self):
+        class LabelView(GenericUserCreatedObjectExportView):
+            model_label = "auth.User"
+            include_row_count_estimate = True
+
+        request = self.factory.get("/dummy/?format=xlsx&list_type=public")
+        request.user = self.user
+        request.session = SessionStore()
+
+        spec = SimpleNamespace(model=User, renderers={"csv": object()})
+        with (
+            patch(
+                "utils.file_export.export_registry.get_export_spec",
+                return_value=spec,
+            ),
+            patch(
+                "utils.file_export.generic_tasks.export_user_created_object_to_file"
+            ) as mock_task,
+            patch.object(LabelView, "get_export_row_count_estimate") as mock_count,
+        ):
+            response = LabelView.as_view()(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(json.loads(response.content)["supported_formats"], ["csv"])
+        mock_task.delay.assert_not_called()
+        mock_count.assert_not_called()
 
 
 class ExportModalViewTests(TestCase):

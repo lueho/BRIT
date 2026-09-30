@@ -94,6 +94,20 @@ class FilteredListFileExportView(LoginRequiredMixin, View):
     """
 
     task_function = None
+    export_formats = ("csv", "xlsx")
+
+    def get_export_formats(self):
+        """Return the file formats this view can export."""
+        return self.export_formats
+
+    def unsupported_format_response(self):
+        return JsonResponse(
+            {
+                "error": "Unsupported export format.",
+                "supported_formats": sorted(self.get_export_formats()),
+            },
+            status=400,
+        )
 
     def get_filter_params(self, request, params):
         """
@@ -148,6 +162,8 @@ class FilteredListFileExportView(LoginRequiredMixin, View):
         """
         params = dict(request.GET)
         file_format = params.pop("format", ["csv"])[0]
+        if file_format not in self.get_export_formats():
+            return self.unsupported_format_response()
 
         filter_params = self.get_filter_params(request, params.copy())
         export_context = self.get_export_context(request, params.copy())
@@ -167,6 +183,13 @@ class GenericUserCreatedObjectExportView(FilteredListFileExportView):
     model_label = None  # e.g. 'waste_collection.Collection'
     include_row_count_estimate = False
     large_export_row_count = 10000
+
+    def get_export_formats(self):
+        from .export_registry import get_export_spec
+
+        if not self.model_label:
+            raise NotImplementedError("Subclasses must set model_label")
+        return tuple(get_export_spec(self.model_label).renderers)
 
     def get_export_row_count_estimate(self, filter_params, export_context):
         from .export_registry import get_export_spec
@@ -199,6 +222,8 @@ class GenericUserCreatedObjectExportView(FilteredListFileExportView):
     def get(self, request, *args, **kwargs):
         params = dict(request.GET)
         file_format = params.pop("format", ["csv"])[0]
+        if file_format not in self.get_export_formats():
+            return self.unsupported_format_response()
 
         filter_params = self.get_filter_params(request, params.copy())
         export_context = self.get_export_context(request, params.copy())
