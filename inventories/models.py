@@ -525,7 +525,7 @@ class Scenario(NamedUserCreatedObject):
             config_entry.delete()
 
     def delete_result_layers(self):
-        for layer in self.layer_set.all():
+        for layer in self.layer_set(manager="all_objects").all():
             layer.delete()
 
     def delete_configuration(self):

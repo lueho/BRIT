@@ -7,6 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
@@ -680,7 +681,7 @@ class SourceCheckUrlView(LoginRequiredMixin, View):
     model = Source
 
     def get(self, request, *args, **kwargs):
-        self.object = self.model.objects.get(pk=kwargs.get("pk"))
+        self.object = get_object_or_404(self.model, pk=kwargs.get("pk"))
         policy = get_object_policy(request.user, self.object, request=request)
         if not (
             policy.get("is_owner")

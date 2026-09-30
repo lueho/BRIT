@@ -85,6 +85,26 @@
     /* Use !important to override _typography.scss styles */
 }
 
+.feature-popup {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.feature-popup th,
+.feature-popup td {
+    overflow-wrap: anywhere;
+}
+
+.map-error {
+    position: absolute;
+    top: 0.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    max-width: 80%;
+    margin: 0;
+}
+
 #summary-container {
     margin-bottom: 2em;
 }

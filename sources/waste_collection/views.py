@@ -154,6 +154,22 @@ def _visible_collection_chain_for_user(collection, user):
     return list(related_qs)
 
 
+def _cpv_collection_chain_context(cpv, user):
+    """Return the visible collection chain and back-link target for a CPV."""
+
+    collection = getattr(cpv, "collection", None)
+    visible_collections = _visible_collection_chain_for_user(collection, user)
+    back_collection = (
+        collection
+        if collection in visible_collections
+        else next(iter(visible_collections), None)
+    )
+    return {
+        "visible_related_collections": visible_collections,
+        "back_collection": back_collection,
+    }
+
+
 def _frequency_display_context(frequency):
     if not frequency:
         return None
@@ -540,7 +556,7 @@ class WasteFlyerCheckUrlView(SourceCheckUrlView):
     permission_required = "waste_collection.change_wasteflyer"
 
     def get(self, request, *args, **kwargs):
-        self.object = self.model.objects.get(pk=kwargs.get("pk"))
+        self.object = get_object_or_404(self.model, pk=kwargs.get("pk"))
         policy = get_object_policy(request.user, self.object, request=request)
         if not (
             policy.get("is_owner")
@@ -792,9 +808,7 @@ class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["visible_related_collections"] = _visible_collection_chain_for_user(
-            getattr(self.object, "collection", None), self.request.user
-        )
+        context.update(_cpv_collection_chain_context(self.object, self.request.user))
         return context
 
 
@@ -825,11 +839,7 @@ class CollectionPropertyValueReviewItemDetailView(ReviewItemDetailView):
 
     def get_review_specific_context(self, context):
         """Add the visible collection chain to CPV review pages."""
-        return {
-            "visible_related_collections": _visible_collection_chain_for_user(
-                getattr(self.object, "collection", None), self.request.user
-            )
-        }
+        return _cpv_collection_chain_context(self.object, self.request.user)
 
 
 class CollectionPropertyValueUpdateView(
@@ -1166,13 +1176,19 @@ class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     def get_initial(self):
         initial = super().get_initial()
         if "region_id" in self.request.GET:
-            region_id = self.request.GET.get("region_id")
-            catchment = CollectionCatchment.objects.get(id=region_id)
-            initial["catchment"] = catchment
+            try:
+                initial["catchment"] = CollectionCatchment.objects.get(
+                    id=self.request.GET.get("region_id")
+                )
+            except (CollectionCatchment.DoesNotExist, ValueError):
+                pass
         if "collector" in self.request.GET:
-            initial["collector"] = Collector.objects.get(
-                id=self.request.GET.get("collector")
-            )
+            try:
+                initial["collector"] = Collector.objects.get(
+                    id=self.request.GET.get("collector")
+                )
+            except (Collector.DoesNotExist, ValueError):
+                pass
         initial["valid_from"] = date.today()
         return initial
 
@@ -1815,7 +1831,7 @@ class CollectionCatchmentAddAggregatedPropertyView(
 ):
     def get_initial(self):
         initial = super().get_initial()
-        catchment = CollectionCatchment.objects.get(pk=self.kwargs.get("pk"))
+        catchment = get_object_or_404(CollectionCatchment, pk=self.kwargs.get("pk"))
         initial["collections"] = catchment.downstream_collections
         return initial
 

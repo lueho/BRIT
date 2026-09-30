@@ -789,3 +789,140 @@ class ScenarioCustomParameterValueTests(TestCase):
         target = next(p for p in response.json() if p["id"] == self.parameter.pk)
         value_ids = [v["id"] for v in target["values"]]
         self.assertNotIn(custom.id, value_ids)
+
+
+class ScenarioDetailViewRunTestCase(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create(username="scenario-run-owner")
+        self.owner.user_permissions.add(
+            Permission.objects.get(codename="change_scenario")
+        )
+        self.scenario = Scenario.objects.create(
+            name="Run Scenario",
+            owner=self.owner,
+            region=Region.objects.create(name="Run Region"),
+        )
+        self.client.force_login(self.owner)
+
+    @patch("inventories.views.start_inventory_run")
+    def test_post_starts_run_through_serialized_entry_point(self, start_run):
+        response = self.client.post(
+            reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("scenario-result", args=[self.scenario.pk]),
+            fetch_redirect_response=False,
+        )
+        start_run.assert_called_once_with(self.scenario.pk)
+
+    @patch("inventories.tasks.run_inventory")
+    def test_post_does_not_enqueue_second_run_while_running(self, run_inventory_task):
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+            )
+
+        run_inventory_task.delay.assert_not_called()
+
+    def test_progress_page_lists_only_algorithm_tasks(self):
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Progress Algorithm",
+            geodataset=GeoDataset.objects.create(
+                name="Progress Dataset", region=self.scenario.region
+            ),
+        )
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        RunningTask.objects.create(
+            scenario=self.scenario, algorithm=algorithm, uuid=uuid4()
+        )
+        RunningTask.objects.create(scenario=self.scenario, uuid=uuid4())
+
+        response = self.client.get(reverse("scenario-result", args=[self.scenario.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [task["algorithm_name"] for task in response.context["task_list"]["tasks"]],
+            ["Progress Algorithm"],
+        )
+
+
+class ScenarioDetailRunAuthorizationTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner", password="pass")
+        cls.owner.user_permissions.add(
+            Permission.objects.get(codename="change_scenario")
+        )
+        cls.other_user = User.objects.create_user(username="other", password="pass")
+        region = Region.objects.create(name="R", publication_status="published")
+        catchment = Catchment.objects.create(
+            name="C",
+            region=region,
+            parent_region=region,
+            publication_status="published",
+        )
+        cls.private_scenario = Scenario.objects.create(
+            name="Private", owner=cls.owner, region=region, catchment=catchment
+        )
+        cls.published_scenario = Scenario.objects.create(
+            name="Published",
+            owner=cls.owner,
+            region=region,
+            catchment=catchment,
+            publication_status="published",
+        )
+
+    def detail_url(self, scenario):
+        return reverse("scenario-detail", kwargs={"pk": scenario.pk})
+
+    @patch("inventories.views.start_inventory_run")
+    def test_anonymous_cannot_run_published_scenario(self, mock_run):
+        response = self.client.post(self.detail_url(self.published_scenario))
+
+        self.assertEqual(response.status_code, 403)
+        mock_run.assert_not_called()
+        self.published_scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(
+            self.published_scenario.scenariostatus.status,
+            ScenarioStatus.Status.CHANGED,
+        )
+
+    @patch("inventories.views.start_inventory_run")
+    def test_non_owner_cannot_run_published_scenario(self, mock_run):
+        self.client.force_login(self.other_user)
+
+        response = self.client.post(self.detail_url(self.published_scenario))
+
+        self.assertEqual(response.status_code, 403)
+        mock_run.assert_not_called()
+
+    @patch("inventories.views.start_inventory_run")
+    def test_owner_can_run_private_scenario(self, mock_run):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(self.detail_url(self.private_scenario))
+
+        self.assertRedirects(
+            response,
+            reverse("scenario-result", kwargs={"pk": self.private_scenario.pk}),
+            fetch_redirect_response=False,
+        )
+        mock_run.assert_called_once_with(self.private_scenario.pk)
+
+    def test_anonymous_can_view_published_scenario_without_run_form(self):
+        response = self.client.get(self.detail_url(self.published_scenario))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="run"')
+
+    def test_owner_sees_run_form_on_private_scenario(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.get(self.detail_url(self.private_scenario))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="run"')

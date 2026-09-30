@@ -60,6 +60,24 @@
       {{ object.region.display_name }}
     </p>
   {% endif %}
+  {% with sources=visible_sources %}
+    {% if sources %}
+      <div class="card-text mt-3">
+        <strong>Sources:</strong>
+        <ul class="list-unstyled mb-0">
+          {% for source in sources %}
+            <li>
+              <a href="{% url 'source-detail-modal' source.pk %}"
+                 class="modal-link text-break">{{ source }}</a>
+              {% if source.title and source.citation_key %}
+                <span class="small text-muted">{{ source.title }}</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  {% endwith %}
 {% endblock detail_body %}
 
 {% block options_secondary_actions %}

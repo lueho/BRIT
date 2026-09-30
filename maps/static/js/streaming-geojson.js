@@ -64,6 +64,16 @@ class StreamingGeoJSONLoader {
                     error.retryAfter = waitTime;
                     throw error;
                 }
+                if (response.headers.get('X-Cache-Status') === 'REJECT') {
+                    const total = parseInt(response.headers.get('X-Total-Count') || '0', 10);
+                    const error = new Error(
+                        `This selection contains ${total.toLocaleString('en-US')} features, ` +
+                        'which is too many to show on the map at once. ' +
+                        'Please apply a filter to narrow it down.'
+                    );
+                    error.isRejected = true;
+                    throw error;
+                }
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
@@ -349,6 +359,7 @@ const SUPERSEDED_FEATURE_LOAD = Object.freeze({ superseded: true });
 
 async function fetchFeatureGeometriesWithProgress(params) {
     hideMapOverlay();
+    if (typeof hideMapError === 'function') hideMapError();
 
     const generation = ++featureLoadGeneration;
     const isCurrent = () => generation === featureLoadGeneration;

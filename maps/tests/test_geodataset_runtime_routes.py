@@ -81,6 +81,38 @@ class GeoDataSetRuntimeRouteTestCase(TestCase):
         self.assertContains(response, self.dataset.get_map_url())
         self.assertContains(response, 'aria-label="View toggle"')
 
+    def test_dataset_detail_renders_source_modal_links(self):
+        response = self.client.get(
+            reverse("geodataset-detail", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sources:")
+        self.assertContains(
+            response,
+            reverse("source-detail-modal", kwargs={"pk": self.source.pk}),
+        )
+        self.assertContains(response, "Runtime source")
+
+    def test_dataset_detail_hides_private_sources_from_anonymous(self):
+        private_source = Source.objects.create(
+            title="Private runtime source",
+            publication_status="private",
+        )
+        self.dataset.sources.add(private_source)
+
+        response = self.client.get(
+            reverse("geodataset-detail", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Runtime source")
+        self.assertNotContains(response, "Private runtime source")
+        self.assertNotContains(
+            response,
+            reverse("source-detail-modal", kwargs={"pk": private_source.pk}),
+        )
+
     def test_dataset_table_route_renders_visible_columns(self):
         response = self.client.get(
             reverse("geodataset-table", kwargs={"pk": self.dataset.pk})
@@ -337,14 +369,19 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "NUTS ID")
         self.assertContains(response, "Name")
-        self.assertContains(response, 'list="id_nuts_id_options"')
-        self.assertContains(response, 'list="id_name_options"')
-        self.assertContains(response, '<datalist id="id_nuts_id_options">')
-        self.assertContains(response, '<option value="DE-A">')
-        self.assertContains(response, '<option value="DE-B">')
-        self.assertContains(response, '<datalist id="id_name_options">')
-        self.assertContains(response, '<option value="Local feature A">')
-        self.assertContains(response, '<option value="Local feature B">')
+        self.assertContains(response, 'data-geodataset-filter="choice"', count=2)
+        self.assertContains(response, '<option value="DE-A">DE-A</option>', html=True)
+        self.assertContains(response, '<option value="DE-B">DE-B</option>', html=True)
+        self.assertContains(
+            response,
+            '<option value="Local feature A">Local feature A</option>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            '<option value="Local feature B">Local feature B</option>',
+            html=True,
+        )
 
     def test_local_relation_table_route_applies_filterable_column(self):
         response = self.client.get(
@@ -362,7 +399,7 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(response.context["result_count"], 1)
         self.assertEqual(response.context["displayed_result_count"], 1)
         self.assertContains(response, "Showing 1 of 1 matching features")
-        self.assertEqual(response.context["filter"].form["nuts_id"].value(), "DE-B")
+        self.assertEqual(response.context["filter"].form["nuts_id"].value(), ["DE-B"])
         self.assertEqual(
             response.context["map_url"],
             f"{self.dataset.get_map_url()}?nuts_id=DE-B",
@@ -453,6 +490,107 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(data["features"][0]["properties"]["nuts_id"], "DE-A")
         self.assertNotIn("hidden_code", data["features"][0]["properties"])
 
+    def _add_visible_decimal_and_datetime_columns(self):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                ALTER TABLE public.{self.relation_name}
+                    ADD COLUMN height_m numeric(6, 2),
+                    ADD COLUMN surveyed_at timestamp with time zone
+                """
+            )
+            cursor.execute(
+                f"""
+                UPDATE public.{self.relation_name}
+                SET height_m = 12.50, surveyed_at = '2025-06-01T08:30:00+00:00'
+                WHERE feature_id = 1
+                """
+            )
+        for column_name in ("height_m", "surveyed_at"):
+            GeoDatasetColumnPolicy.objects.create(
+                dataset=self.dataset,
+                column_name=column_name,
+                display_label=column_name,
+                is_visible=True,
+            )
+
+    def test_local_relation_geojson_route_serializes_decimal_and_datetime_values(
+        self,
+    ):
+        self._add_visible_decimal_and_datetime_columns()
+
+        response = self.client.get(
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk}),
+            {"id": 1},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        properties = self._streaming_json(response)["features"][0]["properties"]
+        self.assertEqual(properties["height_m"], "12.50")
+        self.assertEqual(properties["surveyed_at"], "2025-06-01T08:30:00Z")
+
+    def _geojson_data_version(self):
+        response = self.client.get(
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self._streaming_json(response)
+        return response["X-Data-Version"]
+
+    def test_local_relation_data_version_changes_when_visible_value_changes(self):
+        before = self._geojson_data_version()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE public.{self.relation_name} SET nuts_id = 'DE-C' "
+                "WHERE feature_id = 1"
+            )
+
+        self.assertNotEqual(self._geojson_data_version(), before)
+
+    def test_local_relation_data_version_changes_when_geometry_changes(self):
+        before = self._geojson_data_version()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE public.{self.relation_name} "
+                "SET geom = ST_Transform(ST_SetSRID(ST_Point(12, 55), 4326), 3857) "
+                "WHERE feature_id = 1"
+            )
+
+        self.assertNotEqual(self._geojson_data_version(), before)
+
+    def test_local_relation_data_version_changes_when_decimal_value_changes(self):
+        self._add_visible_decimal_and_datetime_columns()
+        before = self._geojson_data_version()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE public.{self.relation_name} SET height_m = 13.00 "
+                "WHERE feature_id = 1"
+            )
+
+        self.assertNotEqual(self._geojson_data_version(), before)
+
+    def test_local_relation_data_version_changes_when_timestamp_value_changes(self):
+        self._add_visible_decimal_and_datetime_columns()
+        before = self._geojson_data_version()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE public.{self.relation_name} "
+                "SET surveyed_at = '2025-06-01T08:30:01+00:00' WHERE feature_id = 1"
+            )
+
+        self.assertNotEqual(self._geojson_data_version(), before)
+
+    def test_local_relation_data_version_changes_when_column_policy_changes(self):
+        before = self._geojson_data_version()
+        GeoDatasetColumnPolicy.objects.filter(
+            dataset=self.dataset, column_name="hidden_code"
+        ).update(is_visible=True)
+
+        self.assertNotEqual(self._geojson_data_version(), before)
+
+    def test_local_relation_data_version_is_stable_without_changes(self):
+        self.assertEqual(self._geojson_data_version(), self._geojson_data_version())
+
     def test_local_relation_geojson_route_streams_past_table_cap(self):
         with connection.cursor() as cursor:
             cursor.execute(
@@ -542,6 +680,51 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(data["features"][0]["id"], 2)
         self.assertEqual(data["features"][0]["properties"]["nuts_id"], "DE-B")
 
+    def test_local_relation_map_config_lists_visible_popup_fields(self):
+        response = self.client.get(
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(
+            response.context["map_config"]["featuresPopupFields"],
+            [{"column": "nuts_id", "label": "NUTS ID", "isFeatureId": False}],
+        )
+
+    def test_local_relation_map_config_marks_visible_primary_key_popup_field(self):
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=self.dataset,
+            column_name="feature_id",
+            display_label="Feature ID",
+            is_visible=True,
+        )
+
+        response = self.client.get(
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertIn(
+            {"column": "feature_id", "label": "Feature ID", "isFeatureId": True},
+            response.context["map_config"]["featuresPopupFields"],
+        )
+
+    def test_local_relation_map_config_prefers_popup_flagged_columns(self):
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=self.dataset,
+            column_name="name",
+            display_label="Name",
+            is_visible=True,
+            is_popup=True,
+        )
+
+        response = self.client.get(
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(
+            response.context["map_config"]["featuresPopupFields"],
+            [{"column": "name", "label": "Name", "isFeatureId": False}],
+        )
+
     def test_local_relation_map_route_uses_dataset_scoped_geojson_url(self):
         response = self.client.get(
             reverse("geodataset-map", kwargs={"pk": self.dataset.pk}),
@@ -556,8 +739,7 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertIn("nuts_id", response.context["filter"].form.fields)
         self.assertNotIn("hidden_code", response.context["filter"].form.fields)
         self.assertContains(response, 'name="nuts_id"')
-        self.assertContains(response, 'list="id_nuts_id_options"')
-        self.assertContains(response, '<datalist id="id_nuts_id_options">')
+        self.assertContains(response, 'data-geodataset-filter="choice"')
         self.assertContains(
             response, reverse("geodataset-table", kwargs={"pk": self.dataset.pk})
         )

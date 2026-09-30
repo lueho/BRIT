@@ -163,6 +163,12 @@ class PropertyUnitOptionsViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
+    def test_get_http_404_for_nonexistent_property(self):
+        response = self.client.get(
+            reverse("property-unit-options", kwargs={"pk": 999999})
+        )
+        self.assertEqual(response.status_code, 404)
+
     def test_response_options_contains_only_allowed_options(self):
         self.client.force_login(self.member)
         response = self.client.get(

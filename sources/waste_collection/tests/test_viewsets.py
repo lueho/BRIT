@@ -1521,6 +1521,80 @@ class CollectionMutationApiTestCase(APITestCase):
             1,
         )
 
+    def _login_aggregated_property_value_author(self):
+        permission, _ = Permission.objects.get_or_create(
+            content_type=ContentType.objects.get_for_model(
+                AggregatedCollectionPropertyValue
+            ),
+            codename="add_aggregatedcollectionpropertyvalue",
+            defaults={"name": "Can add aggregated collection property value"},
+        )
+        self.other_user.user_permissions.add(permission)
+        self.client.force_login(self.other_user)
+
+    def _aggregated_property_value_payload(self):
+        return {
+            "collections": [self.predecessor.pk],
+            "property_id": self.property.pk,
+            "unit_name": self.unit.name,
+            "year": 2025,
+            "average": 42.0,
+            "submit_for_review": False,
+        }
+
+    def test_aggregated_property_value_create_reuses_existing_value(self):
+        self._login_aggregated_property_value_author()
+        url = reverse("api-waste-collection-aggregated-property-value-create")
+
+        first = self.client.post(
+            url, self._aggregated_property_value_payload(), format="json"
+        )
+        second = self.client.post(
+            url, self._aggregated_property_value_payload(), format="json"
+        )
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(first.data["created"])
+        self.assertEqual(second.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(second.data["created"])
+        self.assertEqual(second.data["id"], first.data["id"])
+        self.assertEqual(
+            AggregatedCollectionPropertyValue.objects.filter(
+                owner=self.other_user, property=self.property, unit=self.unit, year=2025
+            ).count(),
+            1,
+        )
+
+    def test_aggregated_property_value_create_locks_owner_before_lookup(self):
+        self._login_aggregated_property_value_author()
+        acpv_table = AggregatedCollectionPropertyValue._meta.db_table
+        user_table = User._meta.db_table
+
+        with CaptureQueriesContext(connection) as captured:
+            response = self.client.post(
+                reverse("api-waste-collection-aggregated-property-value-create"),
+                self._aggregated_property_value_payload(),
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        sqls = [query["sql"] for query in captured.captured_queries]
+        lock_index = next(
+            (
+                index
+                for index, sql in enumerate(sqls)
+                if f'FROM "{user_table}"' in sql and "FOR UPDATE" in sql
+            ),
+            None,
+        )
+        lookup_index = next(
+            index
+            for index, sql in enumerate(sqls)
+            if sql.startswith("SELECT") and f'FROM "{acpv_table}"' in sql
+        )
+        self.assertIsNotNone(lock_index)
+        self.assertLess(lock_index, lookup_index)
+
     def test_property_value_create_denies_non_owner_on_private_collection(self):
         self.client.force_login(self.other_user)
 
