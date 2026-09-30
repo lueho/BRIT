@@ -1190,6 +1190,55 @@ class CatchmentRegionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("summaries", response.data)
 
+    def test_nonexistent_pk_returns_404(self):
+        response = self.client.get(
+            reverse("data.catchment_region_summaries"),
+            {"pk": Catchment.objects.order_by("-pk").first().pk + 1},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_malformed_pk_returns_404(self):
+        response = self.client.get(
+            reverse("data.catchment_region_summaries"),
+            {"pk": "abc"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+
+class CatchmentRegionGeometryAPITestCase(ViewWithPermissionsTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.region = Region.objects.create(name="Geometry Region")
+        cls.catchment = Catchment.objects.create(region=cls.region)
+
+    def test_existing_pk_returns_geojson(self):
+        response = self.client.get(
+            reverse("data.catchment_region_geometries"),
+            {"pk": self.catchment.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("geoJson", response.json())
+
+    def test_no_pk_returns_empty_response(self):
+        response = self.client.get(reverse("data.catchment_region_geometries"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {})
+
+    def test_nonexistent_pk_returns_404(self):
+        response = self.client.get(
+            reverse("data.catchment_region_geometries"),
+            {"pk": Catchment.objects.order_by("-pk").first().pk + 1},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_malformed_pk_returns_404(self):
+        response = self.client.get(
+            reverse("data.catchment_region_geometries"),
+            {"pk": "abc"},
+        )
+        self.assertEqual(response.status_code, 404)
+
 
 class NutsRegionPedigreeAPITestCase(ViewWithPermissionsTestCase):
     @classmethod

@@ -19,6 +19,14 @@ class LayerField(models.Model):
     field_name = models.CharField(max_length=63)
     data_type = models.CharField(max_length=10)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["field_name", "data_type"],
+                name="unique_layer_field_name_data_type",
+            )
+        ]
+
     def data_type_object(self):
         if self.data_type == "float":
             return models.FloatField()
