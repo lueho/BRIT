@@ -14,6 +14,12 @@
     <script nonce="{{ csp_nonce }}">
         const form = document.getElementById("configForm");
 
+        function escapeHtml(text) {
+            const div = document.createElement("div");
+            div.textContent = text == null ? "" : String(text);
+            return div.innerHTML.replace(/"/g, "&quot;");
+        }
+
         function renderParameterFields(parameters) {
             if (!parameters || parameters.length === 0) {
                 document.getElementById("parameterFormContainer").innerHTML = "";
@@ -25,18 +31,18 @@
                 const allowsCustom = param.values.length === 0 || param.values.every(v => v.type === 1);
                 html += `
                     <div id="div_id_parameter_${param.id}" class="form-group">
-                        <label class="requiredField" for="id_parameter_${param.id}">${param.descriptive_name}</label>
+                        <label class="requiredField" for="id_parameter_${param.id}">${escapeHtml(param.descriptive_name)}</label>
                         <div>
                             <select id="id_parameter_${param.id}" class="select form-control" name="parameter_${param.id}">
                                 <option value="">---------</option>
-                                ${param.values.map(v => `<option value="${v.id}"${v.default ? ' selected' : ''}>${v.name || v.value}${v.source ? ` (${v.source})` : ''}</option>`).join('')}
+                                ${param.values.map(v => `<option value="${v.id}"${v.default ? ' selected' : ''}>${escapeHtml(v.name || v.value)}${v.source ? ` (${escapeHtml(v.source)})` : ''}</option>`).join('')}
                                 ${allowsCustom ? '<option value="custom">Custom value (own assumption)</option>' : ''}
                             </select>
                         </div>
                     </div>
                     ${allowsCustom ? `
                     <div id="div_id_parameter_${param.id}_custom" class="form-group" style="display: none; margin-left: 1.5rem;">
-                        <label for="id_parameter_${param.id}_custom_value">Own value${param.unit ? ` (${param.unit})` : ''}</label>
+                        <label for="id_parameter_${param.id}_custom_value">Own value${param.unit ? ` (${escapeHtml(param.unit)})` : ''}</label>
                         <input type="number" step="any" id="id_parameter_${param.id}_custom_value" class="form-control" name="parameter_${param.id}_custom_value">
                         <label for="id_parameter_${param.id}_custom_standard_deviation">Standard deviation (optional)</label>
                         <input type="number" step="any" id="id_parameter_${param.id}_custom_standard_deviation" class="form-control" name="parameter_${param.id}_custom_standard_deviation">

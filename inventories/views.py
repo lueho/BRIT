@@ -4,6 +4,8 @@ import json
 from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.db import transaction
+from django.db.models import Q
 from django.http import (
     Http404,
     HttpResponse,
@@ -25,7 +27,10 @@ from maps.models import GeoDataset
 from maps.serializers import BaseResultMapSerializer
 from maps.views import GeoDataSetAutocompleteView, MapMixin
 from materials.models import Material, SampleSeries
-from utils.object_management.permissions import get_object_policy
+from utils.object_management.permissions import (
+    filter_queryset_for_user,
+    get_object_policy,
+)
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -222,11 +227,12 @@ def create_custom_parameter_value(request, parameter):
     )
 
 
-def resolve_parameter_values(request, algorithm):
+def resolve_parameter_values(request, algorithm, scenario):
     """
     Maps the algorithm's parameters to the values posted in the configuration form.
-    Each parameter may either reference an existing preset value or the sentinel
-    'custom', in which case a user-provided InventoryAlgorithmParameterValue is created.
+    Each parameter may either reference a curated preset, a custom value already
+    configured in the given scenario, or the sentinel 'custom', in which case a
+    user-provided InventoryAlgorithmParameterValue is created.
     """
     values = {}
     for parameter in algorithm.inventoryalgorithmparameter_set.all():
@@ -236,9 +242,14 @@ def resolve_parameter_values(request, algorithm):
         if posted == CUSTOM_PARAMETER_VALUE:
             value = create_custom_parameter_value(request, parameter)
         else:
+            scenario_customs = ScenarioInventoryConfiguration.objects.filter(
+                scenario=scenario, inventory_parameter=parameter
+            ).values("inventory_value_id")
             try:
                 value = InventoryAlgorithmParameterValue.objects.get(
-                    id=posted, parameter=parameter
+                    Q(is_custom=False) | Q(id__in=scenario_customs),
+                    id=posted,
+                    parameter=parameter,
                 )
             except (InventoryAlgorithmParameterValue.DoesNotExist, ValueError):
                 raise InvalidParameterValue(
@@ -282,10 +293,11 @@ class ScenarioAddInventoryAlgorithmView(
         algorithm_id = request.POST.get("inventory_algorithm")
         algorithm = InventoryAlgorithm.objects.get(id=algorithm_id)
         try:
-            values = resolve_parameter_values(request, algorithm)
+            with transaction.atomic():
+                values = resolve_parameter_values(request, algorithm, scenario)
+                scenario.add_inventory_algorithm(feedstock, algorithm, values)
         except InvalidParameterValue as exc:
             return HttpResponseBadRequest(str(exc))
-        scenario.add_inventory_algorithm(feedstock, algorithm, values)
         return redirect("scenario-detail", pk=scenario.pk)
 
     def get_object(self, **kwargs):
@@ -333,16 +345,19 @@ class ScenarioAlgorithmConfigurationUpdateView(
             id=self.kwargs.get("algorithm_pk")
         )
         current_feedstock = SampleSeries.objects.get(id=self.kwargs.get("feedstock_pk"))
-        scenario.remove_inventory_algorithm(current_algorithm, current_feedstock)
         feedstock = SampleSeries.objects.get(id=request.POST.get("feedstock"))
         new_algorithm = InventoryAlgorithm.objects.get(
             id=request.POST.get("inventory_algorithm")
         )
         try:
-            values = resolve_parameter_values(request, new_algorithm)
+            with transaction.atomic():
+                values = resolve_parameter_values(request, new_algorithm, scenario)
+                scenario.remove_inventory_algorithm(
+                    current_algorithm, current_feedstock
+                )
+                scenario.add_inventory_algorithm(feedstock, new_algorithm, values)
         except InvalidParameterValue as exc:
             return HttpResponseBadRequest(str(exc))
-        scenario.add_inventory_algorithm(feedstock, new_algorithm, values)
         return redirect("scenario-detail", pk=scenario.pk)
 
     def get_object(self, **kwargs):
@@ -502,10 +517,20 @@ class InventoryAlgorithmParametersAPIView(APIView):
             inventory_algorithm=algorithm
         ).prefetch_related("inventoryalgorithmparametervalue_set")
 
+        scenario_id = request.query_params.get("scenario")
+        if not (
+            scenario_id
+            and scenario_id.isdigit()
+            and filter_queryset_for_user(Scenario.objects.all(), request.user)
+            .filter(pk=scenario_id)
+            .exists()
+        ):
+            scenario_id = None
+
         serializer = InventoryAlgorithmParameterSerializer(
             parameters,
             many=True,
-            context={"scenario_id": request.query_params.get("scenario")},
+            context={"scenario_id": scenario_id},
         )
         return Response(serializer.data)
 

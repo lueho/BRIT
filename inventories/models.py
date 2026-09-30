@@ -243,8 +243,12 @@ def auto_default(sender, instance, **kwargs):
     """
     Makes sure that defaults are always set correctly, even if the user provides incoherent input.
     """
+    # User-provided assumptions are never defaults.
+    if instance.is_custom:
+        instance.default = False
+        return
     # If there is no default, yet, make the new instance default
-    if not instance.default and not instance.is_custom:
+    if not instance.default:
         if not instance.parameter.inventoryalgorithmparametervalue_set.exclude(
             id=instance.id
         ).filter(default=True):

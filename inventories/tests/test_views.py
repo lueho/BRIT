@@ -790,6 +790,125 @@ class ScenarioCustomParameterValueTests(TestCase):
         value_ids = [v["id"] for v in target["values"]]
         self.assertNotIn(custom.id, value_ids)
 
+    def _update_url(self):
+        return reverse(
+            "scenario-update-config",
+            kwargs={
+                "scenario_pk": self.scenario.pk,
+                "feedstock_pk": self.feedstock.pk,
+                "algorithm_pk": self.algorithm.pk,
+            },
+        )
+
+    def _other_users_custom_value(self):
+        stranger = User.objects.create_user(username="stranger", password="pass")
+        foreign_scenario = Scenario.objects.create(
+            name="Foreign",
+            owner=stranger,
+            region=self.scenario.region,
+            catchment=self.scenario.catchment,
+        )
+        custom = InventoryAlgorithmParameterValue.objects.create(
+            name="",
+            parameter=self.parameter,
+            value=42.0,
+            source="Private note",
+            is_custom=True,
+        )
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=foreign_scenario,
+            feedstock=self.feedstock,
+            geodataset=self.geodataset,
+            inventory_algorithm=self.algorithm,
+            inventory_parameter=self.parameter,
+            inventory_value=custom,
+        )
+        return foreign_scenario, custom
+
+    def test_update_view_invalid_custom_value_keeps_existing_configuration(self):
+        self.scenario.add_inventory_algorithm(
+            self.feedstock, self.algorithm, {self.parameter: [self.preset]}
+        )
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self._update_url(),
+            self._post_data(
+                **{
+                    f"parameter_{self.parameter.pk}": "custom",
+                    f"parameter_{self.parameter.pk}_custom_value": "not-a-number",
+                }
+            ),
+        )
+        self.assertEqual(response.status_code, 400)
+        config = ScenarioInventoryConfiguration.objects.get(scenario=self.scenario)
+        self.assertEqual(config.inventory_value, self.preset)
+        self.assertFalse(
+            InventoryAlgorithmParameterValue.objects.filter(is_custom=True).exists()
+        )
+
+    def test_update_view_keeps_previously_configured_custom_value(self):
+        custom = InventoryAlgorithmParameterValue.objects.create(
+            name="", parameter=self.parameter, value=9.9, is_custom=True
+        )
+        self.scenario.add_inventory_algorithm(
+            self.feedstock, self.algorithm, {self.parameter: [custom]}
+        )
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self._update_url(),
+            self._post_data(**{f"parameter_{self.parameter.pk}": str(custom.pk)}),
+        )
+        self.assertEqual(response.status_code, 302)
+        config = ScenarioInventoryConfiguration.objects.get(scenario=self.scenario)
+        self.assertEqual(config.inventory_value, custom)
+
+    def test_post_rejects_custom_value_of_other_scenario(self):
+        _, foreign_custom = self._other_users_custom_value()
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self._add_url(),
+            self._post_data(
+                **{f"parameter_{self.parameter.pk}": str(foreign_custom.pk)}
+            ),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario
+            ).exists()
+        )
+
+    def test_parameters_api_hides_custom_values_of_inaccessible_scenario(self):
+        foreign_scenario, foreign_custom = self._other_users_custom_value()
+        url = reverse(
+            "api-inventoryalgorithm-parameters",
+            kwargs={"algorithm_pk": self.algorithm.pk},
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(url, {"scenario": foreign_scenario.pk})
+        self.assertEqual(response.status_code, 200)
+        target = next(p for p in response.json() if p["id"] == self.parameter.pk)
+        self.assertNotIn(foreign_custom.id, [v["id"] for v in target["values"]])
+
+    def test_parameters_api_ignores_malformed_scenario_parameter(self):
+        url = reverse(
+            "api-inventoryalgorithm-parameters",
+            kwargs={"algorithm_pk": self.algorithm.pk},
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(url, {"scenario": "not-a-pk"})
+        self.assertEqual(response.status_code, 200)
+
+    def test_custom_value_is_never_default(self):
+        custom = InventoryAlgorithmParameterValue.objects.create(
+            name="", parameter=self.parameter, value=3.5, is_custom=True, default=True
+        )
+        custom.refresh_from_db()
+        self.preset.refresh_from_db()
+        self.assertFalse(custom.default)
+        self.assertTrue(self.preset.default)
+        self.assertIn(self.preset, self.algorithm.default_values()[self.parameter])
+
 
 class ScenarioDetailViewRunTestCase(TestCase):
     def setUp(self):
