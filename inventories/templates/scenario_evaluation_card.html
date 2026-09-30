@@ -5,7 +5,7 @@
         {# status = CHANGED #}
         {% if object.status == 1 %}
             <p>This scenario is not evaluated, yet.</p>
-            {% if policy.can_edit %}
+            {% if can_run %}
                 <div class="text-center">
                     <form method="post">
                         {% csrf_token %}
@@ -38,7 +38,7 @@
             {% if object.scenariostatus.failed_algorithm %}
                 <p>Failed algorithm: {{ object.scenariostatus.failed_algorithm }}</p>
             {% endif %}
-            {% if policy.can_edit %}
+            {% if can_run %}
                 <div class="text-center">
                     <form method="post">
                         {% csrf_token %}

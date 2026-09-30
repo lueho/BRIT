@@ -528,6 +528,143 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
         mock_add.assert_called_once()
 
 
+# ----------- Scenario run authorization + result map access ----------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ScenarioRunPermissionGateTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="run_owner", password="pass")
+        cls.other = User.objects.create_user(username="run_other", password="pass")
+        region = Region.objects.create(
+            name="Run Region", publication_status="published"
+        )
+        catchment = Catchment.objects.create(
+            name="Run Catchment",
+            region=region,
+            parent_region=region,
+            publication_status="published",
+        )
+        cls.published_scenario = Scenario.objects.create(
+            name="Pub Scenario",
+            owner=cls.owner,
+            region=region,
+            catchment=catchment,
+            publication_status="published",
+        )
+        cls.private_scenario = Scenario.objects.create(
+            name="Priv Scenario",
+            owner=cls.owner,
+            region=region,
+            catchment=catchment,
+        )
+
+    @patch("inventories.views.start_inventory_run")
+    def test_owner_can_trigger_run(self, mock_run):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("scenario-detail", kwargs={"pk": self.private_scenario.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        mock_run.assert_called_once_with(self.private_scenario.id)
+
+    @patch("inventories.views.start_inventory_run")
+    def test_anonymous_cannot_trigger_run_on_published_scenario(self, mock_run):
+        response = self.client.post(
+            reverse("scenario-detail", kwargs={"pk": self.published_scenario.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+        mock_run.assert_not_called()
+
+    @patch("inventories.views.start_inventory_run")
+    def test_other_user_cannot_trigger_run_on_published_scenario(self, mock_run):
+        self.client.force_login(self.other)
+        response = self.client.post(
+            reverse("scenario-detail", kwargs={"pk": self.published_scenario.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+        mock_run.assert_not_called()
+
+
+class ScenarioResultDetailMapViewAccessTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="map_owner", password="pass")
+        cls.other = User.objects.create_user(username="map_other", password="pass")
+        region = Region.objects.create(name="Map Region")
+        cls.private_scenario = Scenario.objects.create(
+            name="Map Private Scenario",
+            owner=cls.owner,
+            region=region,
+        )
+
+    def test_non_owner_denied_private_scenario_result_map(self):
+        self.client.force_login(self.other)
+        url = reverse(
+            "scenario-result-map",
+            kwargs={
+                "pk": self.private_scenario.pk,
+                "algorithm_pk": 999,
+                "feedstock_pk": 999,
+            },
+        )
+        response = self.client.get(url)
+        # A user who cannot read the private scenario is denied. The view
+        # returns 404 (rather than 403/redirect) so it does not disclose the
+        # existence of the scenario's result layers.
+        self.assertEqual(response.status_code, 404)
+
+    def test_anonymous_denied_private_scenario_result_map(self):
+        self.client.logout()
+        url = reverse(
+            "scenario-result-map",
+            kwargs={
+                "pk": self.private_scenario.pk,
+                "algorithm_pk": 999,
+                "feedstock_pk": 999,
+            },
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_missing_scenario_returns_404(self):
+        self.client.force_login(self.owner)
+        url = reverse(
+            "scenario-result-map",
+            kwargs={"pk": 999999, "algorithm_pk": 999, "feedstock_pk": 999},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+
+class ResultMapAPIAccessTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="api_owner", password="pass")
+        cls.other = User.objects.create_user(username="api_other", password="pass")
+        region = Region.objects.create(name="API Region")
+        cls.private_scenario = Scenario.objects.create(
+            name="API Private Scenario",
+            owner=cls.owner,
+            region=region,
+        )
+
+    @patch("inventories.views.Layer")
+    def test_unauthorized_user_cannot_read_private_result_layer(self, layer_model):
+        layer = Mock()
+        layer.scenario = self.private_scenario
+        layer_model.objects.select_related.return_value.get.return_value = layer
+        layer_model.DoesNotExist = Exception
+
+        self.client.force_login(self.other)
+        url = reverse("data-result-layer", kwargs={"layer_name": "result_table_1"})
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 404)
+        layer.get_feature_collection.assert_not_called()
+
+
 class ScenarioDetailViewRunTestCase(TestCase):
     def setUp(self):
         self.owner = User.objects.create(username="scenario-run-owner")

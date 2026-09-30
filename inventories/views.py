@@ -54,6 +54,23 @@ from .models import (
 from .tasks import start_inventory_run
 
 
+def user_can_run_scenario(user, scenario, request=None):
+    """Return whether ``user`` may trigger an evaluation for ``scenario``.
+
+    Running an evaluation is a state-changing, compute-heavy operation, so it
+    is restricted to the scenario owner, granted editors, staff, and
+    moderators. Unlike read access it must NOT be granted merely because the
+    scenario is published.
+    """
+    policy = get_object_policy(user, scenario, request=request)
+    return bool(
+        policy["is_owner"]
+        or policy["is_editor"]
+        or policy["is_staff"]
+        or policy["is_moderator"]
+    )
+
+
 def _get_posted_object_or_404(model, pk):
     """Fetch an object by an id taken from request data.
 
@@ -159,17 +176,15 @@ class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
         context = self.get_context_data(object=self.object)
         context["config"] = self.config
         context["allow_edit"] = self.allow_edit
+        context["can_run"] = user_can_run_scenario(
+            request.user, self.object, request=request
+        )
         return self.render_to_response(context)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
-        if (
-            not request.user.is_authenticated
-            or not get_object_policy(request.user, scenario, request=request)[
-                "can_edit"
-            ]
-        ):
+        if not user_can_run_scenario(request.user, scenario, request=request):
             return HttpResponseForbidden()
         start_inventory_run(scenario.id)
         return redirect("scenario-result", scenario.id)
@@ -511,6 +526,18 @@ class ResultMapAPI(APIView):
         except Layer.DoesNotExist:
             return Response({"error": "Layer not found"}, status=404)
 
+        scenario = layer.scenario
+        policy = get_object_policy(request.user, scenario, request=request)
+        if not (
+            policy["is_published"]
+            or policy["is_owner"]
+            or policy["is_editor"]
+            or policy["is_staff"]
+            or policy["is_moderator"]
+        ):
+            # Do not disclose the existence of layers the user cannot access.
+            return Response({"error": "Layer not found"}, status=404)
+
         feature_collection = layer.get_feature_collection()
         features = feature_collection.objects.all()
 
@@ -580,12 +607,29 @@ class ScenarioEvaluationProgressView(DetailView):
     model = Scenario
 
 
-class ScenarioResultDetailMapView(MapMixin, DetailView):
+class ScenarioResultDetailMapView(UserPassesTestMixin, MapMixin, DetailView):
     """View of an individual result map in large size"""
 
     model = Layer
     context_object_name = "layer"
     template_name = "result_detail_map.html"
+
+    def handle_no_permission(self):
+        # Return 404 rather than a login redirect/403 so the existence of a
+        # non-public scenario's result layers is not disclosed to callers who
+        # cannot read the scenario.
+        raise Http404
+
+    def test_func(self):
+        scenario = get_object_or_404(Scenario, id=self.kwargs.get("pk"))
+        policy = get_object_policy(self.request.user, scenario, request=self.request)
+        return bool(
+            policy["is_published"]
+            or policy["is_owner"]
+            or policy["is_editor"]
+            or policy["is_staff"]
+            or policy["is_moderator"]
+        )
 
     def get_object(self, **kwargs):
         scenario = get_object_or_404(Scenario, id=self.kwargs.get("pk"))
