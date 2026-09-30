@@ -4,6 +4,7 @@ import json
 from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
@@ -41,6 +42,7 @@ from .forms import (
     SeasonalDistributionModelForm,
 )
 from .models import (
+    FeedstockNotImplemented,
     InventoryAlgorithm,
     InventoryAlgorithmParameter,
     InventoryAlgorithmParameterValue,
@@ -50,6 +52,19 @@ from .models import (
     ScenarioStatus,
 )
 from .tasks import start_inventory_run
+
+
+def _get_posted_object_or_404(model, pk):
+    """Fetch an object by an id taken from request data.
+
+    ``get_object_or_404`` only translates ``DoesNotExist``; ids arriving as
+    POST strings can also fail with ``ValueError``/``TypeError`` before the
+    query reaches the database, so catch those too.
+    """
+    try:
+        return model.objects.get(pk=pk)
+    except (model.DoesNotExist, ValueError, TypeError):
+        raise Http404 from None
 
 
 class InventoriesExplorerView(BreadcrumbContextMixin, TemplateView):
@@ -198,18 +213,18 @@ class ScenarioAddInventoryAlgorithmView(
     object = None
 
     def test_func(self):
-        try:
-            scenario = Scenario.objects.get(id=self.kwargs.get("pk"))
-        except Scenario.DoesNotExist:
-            return False
+        scenario = get_object_or_404(Scenario, id=self.kwargs.get("pk"))
         policy = get_object_policy(self.request.user, scenario, request=self.request)
         return policy["can_edit"]
 
     def post(self, request, *args, **kwargs):
         scenario = get_object_or_404(Scenario, id=self.kwargs.get("pk"))
-        feedstock = get_object_or_404(SampleSeries, id=request.POST.get("feedstock"))
-        algorithm_id = request.POST.get("inventory_algorithm")
-        algorithm = get_object_or_404(InventoryAlgorithm, id=algorithm_id)
+        feedstock = _get_posted_object_or_404(
+            SampleSeries, request.POST.get("feedstock")
+        )
+        algorithm = _get_posted_object_or_404(
+            InventoryAlgorithm, request.POST.get("inventory_algorithm")
+        )
         parameters = algorithm.inventoryalgorithmparameter_set.all()
         values = {}
         for parameter in parameters:
@@ -218,9 +233,14 @@ class ScenarioAddInventoryAlgorithmView(
             if parameter_id in request.POST:
                 value_id = request.POST.get(parameter_id)
                 values[parameter].append(
-                    get_object_or_404(InventoryAlgorithmParameterValue, id=value_id)
+                    _get_posted_object_or_404(
+                        InventoryAlgorithmParameterValue, value_id
+                    )
                 )
-        scenario.add_inventory_algorithm(feedstock, algorithm, values)
+        try:
+            scenario.add_inventory_algorithm(feedstock, algorithm, values)
+        except FeedstockNotImplemented:
+            raise Http404 from None
         return redirect("scenario-detail", pk=scenario.pk)
 
     def get_object(self, **kwargs):
@@ -255,10 +275,7 @@ class ScenarioAlgorithmConfigurationUpdateView(
     object = None
 
     def test_func(self):
-        try:
-            scenario = Scenario.objects.get(id=self.kwargs.get("scenario_pk"))
-        except Scenario.DoesNotExist:
-            return False
+        scenario = get_object_or_404(Scenario, id=self.kwargs.get("scenario_pk"))
         policy = get_object_policy(self.request.user, scenario, request=self.request)
         return policy["can_edit"]
 
@@ -270,10 +287,11 @@ class ScenarioAlgorithmConfigurationUpdateView(
         current_feedstock = get_object_or_404(
             SampleSeries, id=self.kwargs.get("feedstock_pk")
         )
-        scenario.remove_inventory_algorithm(current_algorithm, current_feedstock)
-        feedstock = get_object_or_404(SampleSeries, id=request.POST.get("feedstock"))
-        new_algorithm = get_object_or_404(
-            InventoryAlgorithm, id=request.POST.get("inventory_algorithm")
+        feedstock = _get_posted_object_or_404(
+            SampleSeries, request.POST.get("feedstock")
+        )
+        new_algorithm = _get_posted_object_or_404(
+            InventoryAlgorithm, request.POST.get("inventory_algorithm")
         )
         parameters = new_algorithm.inventoryalgorithmparameter_set.all()
         values = {}
@@ -283,9 +301,18 @@ class ScenarioAlgorithmConfigurationUpdateView(
             if parameter_id in request.POST:
                 value_id = request.POST.get(parameter_id)
                 values[parameter].append(
-                    get_object_or_404(InventoryAlgorithmParameterValue, id=value_id)
+                    _get_posted_object_or_404(
+                        InventoryAlgorithmParameterValue, value_id
+                    )
                 )
-        scenario.add_inventory_algorithm(feedstock, new_algorithm, values)
+        try:
+            with transaction.atomic():
+                scenario.remove_inventory_algorithm(
+                    current_algorithm, current_feedstock
+                )
+                scenario.add_inventory_algorithm(feedstock, new_algorithm, values)
+        except FeedstockNotImplemented:
+            raise Http404 from None
         return redirect("scenario-detail", pk=scenario.pk)
 
     def get_object(self, **kwargs):
@@ -319,10 +346,7 @@ class ScenarioRemoveInventoryAlgorithmView(
     feedstock = None
 
     def test_func(self):
-        try:
-            self.scenario = Scenario.objects.get(id=self.kwargs.get("scenario_pk"))
-        except Scenario.DoesNotExist:
-            return False
+        self.scenario = get_object_or_404(Scenario, id=self.kwargs.get("scenario_pk"))
         policy = get_object_policy(
             self.request.user, self.scenario, request=self.request
         )
