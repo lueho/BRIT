@@ -22,11 +22,11 @@ from sources.waste_collection.models import (
     Collector,
     WasteCategory,
 )
+from utils.tests.testrunner import serial_test
 
 
+@serial_test
 class CollectionImporterConcurrencyTests(TransactionTestCase):
-    serialized_rollback = True
-
     def setUp(self):
         default_owner, _ = User.objects.get_or_create(
             username=settings.DEFAULT_OBJECT_OWNER_USERNAME
