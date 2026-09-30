@@ -7,6 +7,7 @@ from django.contrib.auth.models import AnonymousUser, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
+from django.utils.html import escapejs
 
 from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material, SampleSeries
@@ -800,6 +801,25 @@ class ScenarioCustomParameterValueTests(TestCase):
                 "algorithm_pk": self.algorithm.pk,
             },
         )
+
+    def test_update_view_renders_form_media_and_selected_options(self):
+        self.scenario.add_inventory_algorithm(
+            self.feedstock, self.algorithm, {self.parameter: [self.preset]}
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(self._update_url())
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        for js in response.context["form"].media._js:
+            self.assertIn(js, content)
+        for element_id in re.findall(r'getElementById\("([^"]+)"\)', content):
+            self.assertIn(f'id="{element_id}"', content)
+        for obj in (self.feedstock, self.geodataset, self.algorithm):
+            self.assertRegex(
+                content,
+                rf"allOptions\['{obj.pk}'\] = \{{\s*'id': '{obj.pk}',\s*"
+                rf"'name': '{re.escape(escapejs(obj.name))}'",
+            )
 
     def _other_users_custom_value(self):
         stranger = User.objects.create_user(username="stranger", password="pass")
