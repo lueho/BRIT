@@ -212,3 +212,40 @@ test("displayErrorMessage shows a visible alert that hideMapError removes", () =
   sandbox.hideMapError();
   assert.strictEqual(current.removed, true);
 });
+
+test("popup fields marked as feature ID show the feature id", () => {
+  const { sandbox, created } = makeSandbox();
+  sandbox.mapConfig.featuresPopupFields = [
+    { column: "feature_id", label: "Feature ID", isFeatureId: true },
+  ];
+  sandbox.document.createElement = fakeElement;
+  sandbox.addFeatureBatch([pointFeature(0)]);
+  let popupContent;
+
+  created[0].options.onEachFeature(
+    { type: "Feature", id: 7, properties: {} },
+    { bindPopup(content) { popupContent = content; } },
+  );
+
+  assert.ok(collectText(popupContent()).includes("7"));
+});
+
+for (const [name, fetcher] of [
+  ["region", "fetchRegionGeometry"],
+  ["catchment", "fetchCatchmentGeometry"],
+]) {
+  test(`a superseded ${name} fetch failure shows no error`, async () => {
+    const { sandbox } = makeSandbox();
+    sandbox.mapConfig.regionLayerGeometriesUrl = "/regions/";
+    sandbox.mapConfig.catchmentLayerGeometriesUrl = "/catchments/";
+    sandbox.buildUrl = (base) => base;
+    sandbox.normalizeUrl = (url) => url;
+    sandbox.fetchWithVersionValidation = () => Promise.reject(new Error("gone"));
+    const shown = [];
+    sandbox.displayErrorMessage = (error) => shown.push(error);
+
+    await sandbox[fetcher]({ id: 1 }, () => false);
+
+    assert.deepStrictEqual(shown, []);
+  });
+}

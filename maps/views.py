@@ -658,8 +658,15 @@ class GeoDataSetRuntimePermissionMixin:
             popup_policies = [
                 policy for policy in visible_policies if policy.is_popup
             ] or visible_policies
+            primary_key_column = (
+                self.get_dataset().runtime_configuration.primary_key_column
+            )
             map_config["featuresPopupFields"] = [
-                {"column": policy.column_name, "label": self.get_policy_label(policy)}
+                {
+                    "column": policy.column_name,
+                    "label": self.get_policy_label(policy),
+                    "isFeatureId": policy.column_name == primary_key_column,
+                }
                 for policy in popup_policies
             ]
         return map_config

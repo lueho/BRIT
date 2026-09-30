@@ -502,6 +502,7 @@ async function fetchRegionGeometry(params, isCurrent = () => true) {
         if (!isCurrent()) return;
         renderRegion(data);
     } catch (error) {
+        if (!isCurrent()) return;
         console.error('Error fetching region geometry:', error);
         displayErrorMessage(error);
     }
@@ -517,6 +518,7 @@ async function fetchCatchmentGeometry(params, isCurrent = () => true) {
         if (!isCurrent()) return;
         renderCatchment(data);
     } catch (error) {
+        if (!isCurrent()) return;
         console.error('Error fetching catchment geometry:', error);
         displayErrorMessage(error);
     }
@@ -668,13 +670,13 @@ function buildFeaturePopupContent(feature, fields) {
     table.className = 'table table-sm mb-2';
     const body = document.createElement('tbody');
     const properties = feature.properties || {};
-    for (const { column, label } of fields) {
+    for (const { column, label, isFeatureId } of fields) {
         const row = document.createElement('tr');
         const header = document.createElement('th');
         header.setAttribute('scope', 'row');
         header.textContent = label;
         const cell = document.createElement('td');
-        const value = properties[column];
+        const value = isFeatureId ? feature.id : properties[column];
         cell.textContent = value === null || value === undefined || value === '' ? '—' : String(value);
         row.appendChild(header);
         row.appendChild(cell);
