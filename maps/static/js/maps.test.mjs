@@ -333,3 +333,95 @@ test("a superseded loadLayers call does not render its companion layers", async 
 
     assert.deepEqual(rendered, [["region", { id: 2 }], ["summary", { id: 2 }]]);
 });
+
+function fakeBounds(tag) {
+    return { tag, isValid: () => true };
+}
+
+function fakeLayer(bounds) {
+    return {
+        addTo() {},
+        on() {},
+        getBounds: () => bounds,
+    };
+}
+
+function setupBoundsScenario({ sandbox, window, mapConfig }) {
+    mapConfig.adjustBoundsToLayer = "region";
+    const fitted = [];
+    const fakeMap = { fitBounds: (b) => fitted.push(b), removeLayer() {} };
+    window.listeners["map:init"]({ detail: { map: fakeMap } });
+
+    const regionBounds = fakeBounds("region");
+    const regionLayer = fakeLayer(regionBounds);
+    sandbox.L = { geoJson: () => regionLayer };
+    sandbox.renderRegion({ type: "FeatureCollection", features: [] });
+
+    const featureBounds = fakeBounds("features");
+    const featuresLayer = fakeLayer(featureBounds);
+    sandbox.createFeaturesLayer = () => featuresLayer;
+    const geoJson = {
+        type: "FeatureCollection",
+        features: [{
+            type: "Feature",
+            geometry: { type: "Polygon", coordinates: [] },
+            properties: {},
+        }],
+    };
+    return { fitted, regionBounds, featureBounds, geoJson };
+}
+
+test("adjustMapBounds zooms to the filtered feature selection", () => {
+    const { sandbox, window, mapConfig } = setup();
+    const { fitted, featureBounds, geoJson } = setupBoundsScenario({
+        sandbox, window, mapConfig,
+    });
+    sandbox.renderFeatures(geoJson);
+
+    sandbox.adjustMapBounds(new URLSearchParams({ name: "oak" }));
+
+    assert.equal(fitted.length, 1);
+    assert.equal(fitted[0], featureBounds);
+});
+
+test("adjustMapBounds keeps the configured layer when unconstrained", () => {
+    const { sandbox, window, mapConfig } = setup();
+    const { fitted, regionBounds, geoJson } = setupBoundsScenario({
+        sandbox, window, mapConfig,
+    });
+    sandbox.renderFeatures(geoJson);
+
+    sandbox.adjustMapBounds(new URLSearchParams());
+
+    assert.equal(fitted.length, 1);
+    assert.equal(fitted[0], regionBounds);
+});
+
+test("an empty filtered result falls back instead of zooming to stale features", () => {
+    const { sandbox, window, mapConfig } = setup();
+    const { fitted, regionBounds, geoJson } = setupBoundsScenario({
+        sandbox, window, mapConfig,
+    });
+    sandbox.renderFeatures(geoJson);
+    sandbox.renderFeatures({ type: "FeatureCollection", features: [] });
+
+    sandbox.adjustMapBounds(new URLSearchParams({ name: "oak" }));
+
+    assert.equal(fitted.length, 1);
+    assert.equal(fitted[0], regionBounds);
+});
+
+test("loadLayers forwards the filter parameters to refreshMap", async () => {
+    const { sandbox, mapConfig } = setup();
+    mapConfig.loadFeatures = true;
+    let seen;
+    sandbox.refreshMap = (promises, filterParameters) => {
+        seen = filterParameters;
+    };
+    sandbox.fetchFeatureGeometries = () => Promise.resolve();
+
+    sandbox.loadLayers(new URLSearchParams({ name: "oak" }));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(seen?.get("name"), "oak");
+});
