@@ -151,7 +151,17 @@ This module is used throughout BRIT to:
 - Feature detail: `/maps/geodatasets/<pk>/features/<feature_pk>/`
 - GeoJSON: `/maps/geodatasets/<pk>/features.geojson`
 
-The local-relation runtime supports visible-column table/detail output, exact filtering on explicitly filterable columns, bounded reads, single-feature lookup by configured primary key, and GeoJSON from the configured geometry column.
+The local-relation runtime supports visible-column table/detail output, filtering on explicitly filterable columns, bounded reads, single-feature lookup by configured primary key, and GeoJSON from the configured geometry column.
+
+Filter controls follow the column's database type:
+
+- booleans: Yes/No select (`?col=true`);
+- numeric columns: min/max inputs (`?col_min=1&col_max=5`); integer columns with at most 100 distinct values use a multi-select instead;
+- dates and timestamps: date min/max inputs, compared by calendar date;
+- text with at most 100 distinct values: searchable multi-select (`?col=a&col=b`);
+- text with more distinct values: multi-select that autocompletes from `/maps/geodatasets/<pk>/filter-options/<column>/?q=...`.
+
+Invalid typed values return HTTP 400.
 
 ### Compatibility paths
 
