@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from functools import cached_property
 
@@ -25,6 +26,8 @@ from utils.object_management.models import (
 )
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import PropertyValue
+
+logger = logging.getLogger(__name__)
 
 
 class CollectionCatchment(Catchment):
@@ -880,8 +883,14 @@ class Collection(NamedUserCreatedObject):
                     action_method(user=actor)
                 else:
                     action_method()
-            except Exception:
-                continue
+            except ValidationError as exc:
+                logger.warning(
+                    "Skipped cascading %s to %s %s: %s",
+                    action_name,
+                    value.__class__.__name__,
+                    value.pk,
+                    exc,
+                )
 
     def submit_for_review(self):
         self.validate_review_readiness()
