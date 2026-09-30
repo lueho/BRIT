@@ -511,6 +511,13 @@ class GeoDataSetDetailView(MapMixin, UserCreatedObjectDetailView):
             .prefetch_related("sources", "column_policies")
         )
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["visible_sources"] = filter_queryset_for_user(
+            self.object.sources.all(), self.request.user
+        )
+        return context
+
     def get_map_title(self):
         return self.object.name
 
