@@ -280,16 +280,14 @@ class LocalRelationTypedFilterTestCase(TestCase):
 
         self.assertEqual(response.json(), {"results": []})
 
-    def test_long_search_terms_are_truncated(self):
-        response = self.client.get(self.url("name"), {"q": "Oak" + "x" * 500})
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"results": []})
+    def test_overlong_search_terms_are_rejected(self):
         with patch.object(
             type(self.adapter()), "search_filter_values", return_value=[]
         ) as search:
-            self.client.get(self.url("name"), {"q": "y" * 500})
-        self.assertEqual(len(search.call_args.args[1]), 100)
+            response = self.client.get(self.url("name"), {"q": "Oak" + "x" * 500})
+
+        self.assertEqual(response.status_code, 400)
+        search.assert_not_called()
 
     def test_rejects_unfilterable_column(self):
         response = self.client.get(self.url("hidden_code"), {"q": "a"})

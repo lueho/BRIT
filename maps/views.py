@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import BadRequest, ImproperlyConfigured
 from django.db import transaction
 from django.db.models import Q, Subquery, Value
 from django.db.models.functions import Coalesce, NullIf
@@ -975,9 +975,9 @@ class GeoDataSetRuntimeFilterOptionsView(
         if not getattr(adapter, "uses_local_relation", False):
             raise Http404("Dataset does not use a local relation runtime.")
         query = request.GET.get("q", "").strip()
-        values = adapter.search_filter_values(
-            kwargs["column"], query[:MAX_LOCAL_RELATION_FILTER_SEARCH_LENGTH]
-        )
+        if len(query) > MAX_LOCAL_RELATION_FILTER_SEARCH_LENGTH:
+            raise BadRequest("Search term is too long.")
+        values = adapter.search_filter_values(kwargs["column"], query)
         return JsonResponse(
             {"results": [{"value": str(value), "text": str(value)} for value in values]}
         )
