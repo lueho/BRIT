@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import connection, models, transaction
-from django.db.models import Case, Max, Q, When
+from django.db.models import Max, Q
 from django.db.models.functions import Lower
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
@@ -51,25 +51,16 @@ class MaterialCategory(NamedUserCreatedObject):
 
 
 def _find_sample_substrate_category(name):
-    return (
-        MaterialCategory.objects.filter(name=name)
-        .order_by(
-            Case(
-                When(publication_status=UserCreatedObject.STATUS_PUBLISHED, then=0),
-                default=1,
-            ),
-            "pk",
-        )
-        .first()
-    )
+    return MaterialCategory.objects.filter(name=name).order_by("pk").first()
 
 
 def get_or_create_sample_substrate_category():
     """Return the configured substrate category, creating it when missing.
 
-    Category names are not unique, so the lookup prefers the oldest published
-    match, and creation is serialized with a transaction-level advisory lock
-    so concurrent first requests cannot create duplicates.
+    Category names are not unique, so the lookup returns the oldest match,
+    which stays stable when homonyms are added later. Creation is serialized
+    with a transaction-level advisory lock so concurrent first requests cannot
+    create duplicates.
     """
     name = get_sample_substrate_category_name()
     category = _find_sample_substrate_category(name)

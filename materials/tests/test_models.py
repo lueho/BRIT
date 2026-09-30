@@ -340,7 +340,7 @@ class SampleSubstrateCategoryTestCase(TestCase):
             1,
         )
 
-    def test_prefers_published_category_over_private_homonym(self):
+    def test_keeps_existing_category_when_homonym_is_added(self):
         published = MaterialCategory.objects.create(
             name="Substrate test category", publication_status="published"
         )
@@ -353,6 +353,17 @@ class SampleSubstrateCategoryTestCase(TestCase):
 
         self.assertFalse(created)
         self.assertEqual(category, published)
+
+    def test_keeps_existing_category_when_homonym_is_published(self):
+        original = MaterialCategory.objects.create(name="Substrate test category")
+        MaterialCategory.objects.create(
+            name="Substrate test category", publication_status="published"
+        )
+
+        category, created = get_or_create_sample_substrate_category()
+
+        self.assertFalse(created)
+        self.assertEqual(category, original)
 
     def test_tolerates_existing_duplicates(self):
         first = MaterialCategory.objects.create(
