@@ -291,6 +291,36 @@ function hideMapOverlay() {
 
 function displayErrorMessage(error) {
     console.error(`An error occurred while fetching data: ${error}`);
+    showMapError(error && error.message ? error.message : String(error));
+}
+
+function showMapError(message) {
+    try {
+        hideMapError();
+        const alert = document.createElement('div');
+        alert.id = 'map-error';
+        alert.className = 'alert alert-warning alert-dismissible map-error';
+        alert.setAttribute('role', 'alert');
+        const text = document.createElement('span');
+        text.textContent = message;
+        const dismiss = document.createElement('button');
+        dismiss.type = 'button';
+        dismiss.className = 'btn-close';
+        dismiss.setAttribute('aria-label', 'Dismiss map error');
+        dismiss.addEventListener('click', hideMapError);
+        alert.appendChild(text);
+        alert.appendChild(dismiss);
+        map.getContainer().parentElement.appendChild(alert);
+    } catch (err) {
+        console.warn('Map error could not be shown:', err);
+    }
+}
+
+function hideMapError() {
+    const alert = document.getElementById('map-error');
+    if (alert) {
+        alert.remove();
+    }
 }
 
 function displayTimeoutError() {
@@ -609,6 +639,58 @@ function renderCatchment(geoJson) {
     catchmentLayer.addTo(map);
 }
 
+const POLYGON_GEOMETRY_TYPES = new Set(["Polygon", "MultiPolygon"]);
+const POINT_GEOMETRY_TYPES = new Set(["Point", "MultiPoint"]);
+
+function createFeaturesLayer(geoJson, geometryType) {
+    const options = { pane: 'featuresPane', onEachFeature: bindFeaturePopup };
+    if (POLYGON_GEOMETRY_TYPES.has(geometryType)) {
+        options.style = featuresLayerStyle;
+    } else if (POINT_GEOMETRY_TYPES.has(geometryType)) {
+        options.pointToLayer = (feature, latlng) => L.circleMarker(latlng, featuresLayerStyle);
+    } else {
+        return null;
+    }
+    return L.geoJson(geoJson, options);
+}
+
+function bindFeaturePopup(feature, layer) {
+    const fields = mapConfig.featuresPopupFields;
+    if (!Array.isArray(fields) || fields.length === 0) {
+        return;
+    }
+    layer.bindPopup(() => buildFeaturePopupContent(feature, fields));
+}
+
+function buildFeaturePopupContent(feature, fields) {
+    const container = document.createElement('div');
+    const table = document.createElement('table');
+    table.className = 'table table-sm mb-2';
+    const body = document.createElement('tbody');
+    const properties = feature.properties || {};
+    for (const { column, label } of fields) {
+        const row = document.createElement('tr');
+        const header = document.createElement('th');
+        header.setAttribute('scope', 'row');
+        header.textContent = label;
+        const cell = document.createElement('td');
+        const value = properties[column];
+        cell.textContent = value === null || value === undefined || value === '' ? '—' : String(value);
+        row.appendChild(header);
+        row.appendChild(cell);
+        body.appendChild(row);
+    }
+    table.appendChild(body);
+    container.appendChild(table);
+    if (mapConfig.featuresLayerDetailsUrlTemplate && feature.id !== null && feature.id !== undefined) {
+        const link = document.createElement('a');
+        link.href = `${mapConfig.featuresLayerDetailsUrlTemplate}${encodeURIComponent(feature.id)}/`;
+        link.textContent = 'Feature details';
+        container.appendChild(link);
+    }
+    return container;
+}
+
 function createFeatureLayerBindings(layer) {
     layer.on('click', async function (event) {
         await clickedFeature(event);
@@ -635,18 +717,8 @@ function addFeatureBatch(features) {
     }
 
     if (!featuresLayer) {
-        const geometryType = features[0].geometry.type;
-        if (geometryType === "Polygon" || geometryType === "MultiPolygon") {
-            featuresLayer = L.geoJson(null, {
-                style: featuresLayerStyle,
-                pane: 'featuresPane',
-            });
-        } else if (geometryType === "Point") {
-            featuresLayer = L.geoJson(null, {
-                pointToLayer: (feature, latlng) => L.circleMarker(latlng, featuresLayerStyle),
-                pane: 'featuresPane',
-            });
-        } else {
+        featuresLayer = createFeaturesLayer(null, features[0].geometry.type);
+        if (!featuresLayer) {
             return false;
         }
         createFeatureLayerBindings(featuresLayer);
@@ -667,16 +739,10 @@ function renderFeatures(geoJson) {
     resetFeaturesLayer();
 
     const geometryType = geoJson.features[0].geometry.type;
-    if (geometryType === "Polygon" || geometryType === "MultiPolygon") {
-        featuresLayer = L.geoJson(geoJson, {
-            style: featuresLayerStyle,
-            pane: 'featuresPane',
-        });
-    } else if (geometryType === "Point") {
-        featuresLayer = L.geoJson(geoJson, {
-            pointToLayer: (feature, latlng) => L.circleMarker(latlng, featuresLayerStyle),
-            pane: 'featuresPane',
-        });
+    featuresLayer = createFeaturesLayer(geoJson, geometryType);
+    if (!featuresLayer) {
+        console.warn('Unsupported feature geometry type:', geometryType);
+        return;
     }
 
     createFeatureLayerBindings(featuresLayer);

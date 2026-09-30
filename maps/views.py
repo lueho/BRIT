@@ -650,6 +650,20 @@ class GeoDataSetRuntimePermissionMixin:
             return queryset
         return filter_queryset_for_user(queryset, self.request.user)
 
+    def post_process_map_config(self, map_config):
+        map_config = super().post_process_map_config(map_config)
+        adapter = self.get_runtime_adapter()
+        if map_config and getattr(adapter, "uses_local_relation", False):
+            visible_policies = self.get_visible_column_policies()
+            popup_policies = [
+                policy for policy in visible_policies if policy.is_popup
+            ] or visible_policies
+            map_config["featuresPopupFields"] = [
+                {"column": policy.column_name, "label": self.get_policy_label(policy)}
+                for policy in popup_policies
+            ]
+        return map_config
+
     def get_visible_column_policies(self):
         return self.get_runtime_adapter().get_visible_column_policies()
 

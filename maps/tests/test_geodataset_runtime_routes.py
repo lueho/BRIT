@@ -542,6 +542,34 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(data["features"][0]["id"], 2)
         self.assertEqual(data["features"][0]["properties"]["nuts_id"], "DE-B")
 
+    def test_local_relation_map_config_lists_visible_popup_fields(self):
+        response = self.client.get(
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(
+            response.context["map_config"]["featuresPopupFields"],
+            [{"column": "nuts_id", "label": "NUTS ID"}],
+        )
+
+    def test_local_relation_map_config_prefers_popup_flagged_columns(self):
+        GeoDatasetColumnPolicy.objects.create(
+            dataset=self.dataset,
+            column_name="name",
+            display_label="Name",
+            is_visible=True,
+            is_popup=True,
+        )
+
+        response = self.client.get(
+            reverse("geodataset-map", kwargs={"pk": self.dataset.pk})
+        )
+
+        self.assertEqual(
+            response.context["map_config"]["featuresPopupFields"],
+            [{"column": "name", "label": "Name"}],
+        )
+
     def test_local_relation_map_route_uses_dataset_scoped_geojson_url(self):
         response = self.client.get(
             reverse("geodataset-map", kwargs={"pk": self.dataset.pk}),

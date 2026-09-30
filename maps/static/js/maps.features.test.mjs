@@ -112,3 +112,103 @@ test("addFeatureBatch ignores empty batches", () => {
   assert.strictEqual(sandbox.addFeatureBatch([]), false);
   assert.strictEqual(created.length, 0);
 });
+
+function fakeElement(tag) {
+  return {
+    tag,
+    children: [],
+    className: "",
+    textContent: "",
+    href: "",
+    attributes: {},
+    setAttribute(name, value) { this.attributes[name] = value; },
+    appendChild(child) { this.children.push(child); return child; },
+    addEventListener() {},
+    remove() { this.removed = true; },
+  };
+}
+
+function collectText(element) {
+  return [element.textContent, ...element.children.flatMap(collectText)].filter(Boolean);
+}
+
+test("addFeatureBatch renders MultiPoint features as point markers", () => {
+  const { sandbox, created } = makeSandbox();
+  const multiPoint = {
+    type: "Feature",
+    geometry: { type: "MultiPoint", coordinates: [[10, 53]] },
+    properties: {},
+  };
+
+  assert.strictEqual(sandbox.addFeatureBatch([multiPoint]), true);
+  assert.strictEqual(typeof created[0].options.pointToLayer, "function");
+});
+
+test("renderFeatures renders MultiPoint features as point markers", () => {
+  const { sandbox, created } = makeSandbox();
+  sandbox.renderFeatures({
+    type: "FeatureCollection",
+    features: [{
+      type: "Feature",
+      geometry: { type: "MultiPoint", coordinates: [[10, 53]] },
+      properties: {},
+    }],
+  });
+
+  assert.strictEqual(created.length, 1);
+  assert.strictEqual(typeof created[0].options.pointToLayer, "function");
+});
+
+test("features do not get popups without configured popup fields", () => {
+  const { sandbox, created } = makeSandbox();
+  sandbox.addFeatureBatch([pointFeature(0)]);
+  let bound = false;
+
+  created[0].options.onEachFeature?.(pointFeature(0), { bindPopup() { bound = true; } });
+
+  assert.strictEqual(bound, false);
+});
+
+test("features get popups listing configured fields and a detail link", () => {
+  const { sandbox, created } = makeSandbox();
+  sandbox.mapConfig.featuresPopupFields = [
+    { column: "name", label: "Name" },
+    { column: "missing", label: "Missing" },
+  ];
+  sandbox.mapConfig.featuresLayerDetailsUrlTemplate = "/maps/geodatasets/5/features/";
+  sandbox.document.createElement = fakeElement;
+  sandbox.addFeatureBatch([pointFeature(0)]);
+  let popupContent;
+
+  created[0].options.onEachFeature(
+    { type: "Feature", id: 7, properties: { name: "<b>Farm</b>" } },
+    { bindPopup(content) { popupContent = content; } },
+  );
+
+  const element = popupContent();
+  const text = collectText(element);
+  assert.ok(text.includes("Name"));
+  assert.ok(text.includes("<b>Farm</b>"), "values are set as text, not HTML");
+  assert.ok(text.includes("Missing"));
+  const link = element.children.find((child) => child.tag === "a");
+  assert.strictEqual(link.href, "/maps/geodatasets/5/features/7/");
+});
+
+test("displayErrorMessage shows a visible alert that hideMapError removes", () => {
+  const { sandbox } = makeSandbox();
+  const parent = fakeElement("div");
+  let current = null;
+  sandbox.map.getContainer = () => ({ parentElement: parent });
+  sandbox.document.createElement = fakeElement;
+  sandbox.document.getElementById = (id) => (id === "map-error" && current && !current.removed ? current : null);
+  parent.appendChild = (child) => { current = child; parent.children.push(child); return child; };
+
+  sandbox.displayErrorMessage(new Error("Too many features"));
+
+  assert.strictEqual(parent.children.length, 1);
+  assert.ok(collectText(current).includes("Too many features"));
+  assert.strictEqual(current.attributes.role, "alert");
+
+  sandbox.hideMapError();
+  assert.strictEqual(current.removed, true);
+});

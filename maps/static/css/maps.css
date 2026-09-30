@@ -85,6 +85,16 @@
     /* Use !important to override _typography.scss styles */
 }
 
+.map-error {
+    position: absolute;
+    top: 0.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    max-width: 80%;
+    margin: 0;
+}
+
 #summary-container {
     margin-bottom: 2em;
 }
