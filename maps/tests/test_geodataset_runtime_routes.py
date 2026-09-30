@@ -420,8 +420,12 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
 
         self.assertEqual(map_response.status_code, 200)
         self.assertIn("name", map_response.context["filter"].form.fields)
-        self.assertContains(map_response, 'list="id_name_options"')
-        self.assertContains(map_response, '<option value="Local feature A">')
+        self.assertContains(map_response, 'data-geodataset-filter="choice"')
+        self.assertContains(
+            map_response,
+            '<option value="Local feature A">Local feature A</option>',
+            html=True,
+        )
 
         table_response = self.client.get(
             reverse("geodataset-table", kwargs={"pk": self.dataset.pk}),
