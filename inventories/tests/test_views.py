@@ -925,8 +925,9 @@ class ScenarioCustomParameterValueTests(TestCase):
             kwargs={"algorithm_pk": self.algorithm.pk},
         )
         self.client.force_login(self.owner)
-        response = self.client.get(url, {"scenario": "not-a-pk"})
-        self.assertEqual(response.status_code, 200)
+        for malformed in ("not-a-pk", "\u00b2", "\u0663"):
+            response = self.client.get(url, {"scenario": malformed})
+            self.assertEqual(response.status_code, 200, malformed)
 
     def test_custom_value_is_never_default(self):
         custom = InventoryAlgorithmParameterValue.objects.create(

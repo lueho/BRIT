@@ -539,6 +539,7 @@ class InventoryAlgorithmParametersAPIView(APIView):
         scenario_id = request.query_params.get("scenario")
         if not (
             scenario_id
+            and scenario_id.isascii()
             and scenario_id.isdigit()
             and filter_queryset_for_user(Scenario.objects.all(), request.user)
             .filter(pk=scenario_id)
