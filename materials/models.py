@@ -3,8 +3,8 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models, transaction
-from django.db.models import Max, Q
+from django.db import connection, models, transaction
+from django.db.models import Case, Max, Q, When
 from django.db.models.functions import Lower
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
@@ -50,15 +50,46 @@ class MaterialCategory(NamedUserCreatedObject):
         verbose_name_plural = "material categories"
 
 
-def get_or_create_sample_substrate_category():
-    """Return the configured substrate category, creating it when missing."""
-    return MaterialCategory.objects.get_or_create(
-        name=get_sample_substrate_category_name(),
-        defaults={
-            "description": "Category for substrate materials used in sample filtering.",
-            "publication_status": "published",
-        },
+def _find_sample_substrate_category(name):
+    return (
+        MaterialCategory.objects.filter(name=name)
+        .order_by(
+            Case(
+                When(publication_status=UserCreatedObject.STATUS_PUBLISHED, then=0),
+                default=1,
+            ),
+            "pk",
+        )
+        .first()
     )
+
+
+def get_or_create_sample_substrate_category():
+    """Return the configured substrate category, creating it when missing.
+
+    Category names are not unique, so the lookup prefers the oldest published
+    match, and creation is serialized with a transaction-level advisory lock
+    so concurrent first requests cannot create duplicates.
+    """
+    name = get_sample_substrate_category_name()
+    category = _find_sample_substrate_category(name)
+    if category is not None:
+        return category, False
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_xact_lock(hashtext(%s))",
+                [f"materials.sample_substrate_category:{name}"],
+            )
+        category = _find_sample_substrate_category(name)
+        if category is not None:
+            return category, False
+        category = MaterialCategory.objects.create(
+            name=name,
+            description="Category for substrate materials used in sample filtering.",
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+    return category, True
 
 
 class BaseMaterial(NamedUserCreatedObject):
