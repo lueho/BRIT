@@ -40,6 +40,12 @@ def export_user_created_object_to_file(
     a progress bar based on the number of records processed.
     """
     spec = get_export_spec(model_label)
+    renderer = spec.renderers.get(file_format)
+    if renderer is None:
+        raise ValueError(
+            f"Unsupported export format {file_format!r} for {model_label}; "
+            f"expected one of {sorted(spec.renderers)}"
+        )
     qdict = QueryDict("", mutable=True)
     qdict.update(MultiValueDict(query_params))
 
@@ -89,7 +95,6 @@ def export_user_created_object_to_file(
             meta={"current": current, "total": total, "percent": percent},
         )
 
-    renderer = spec.renderers[file_format]
     file_name = f"{spec.model._meta.model_name}_{self.request.id}.{file_format}"
     url = utils.file_export.storages.write_file_for_download(file_name, data, renderer)
 
