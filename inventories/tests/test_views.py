@@ -654,6 +654,11 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
 
     # --- ScenarioAddInventoryAlgorithmView ---
 
+    def test_add_view_missing_scenario_returns_404(self):
+        url = reverse("scenario-add-configuration", kwargs={"pk": 999999})
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(self.client.post(url, {}).status_code, 404)
+
     def test_add_view_post_unknown_feedstock_returns_404(self):
         response = self.client.post(
             self.add_url(),
@@ -686,7 +691,40 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    def test_add_view_post_unavailable_feedstock_returns_404(self):
+        unavailable_material = Material.objects.create(
+            name="Unusable", owner=self.owner
+        )
+        unavailable_feedstock = SampleSeries.objects.create(
+            name="Unusable F", owner=self.owner, material=unavailable_material
+        )
+        response = self.client.post(
+            self.add_url(),
+            {
+                "feedstock": unavailable_feedstock.pk,
+                "inventory_algorithm": self.algorithm.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario
+            ).exists()
+        )
+
     # --- ScenarioAlgorithmConfigurationUpdateView ---
+
+    def test_update_view_missing_scenario_returns_404(self):
+        url = reverse(
+            "scenario-update-config",
+            kwargs={
+                "scenario_pk": 999999,
+                "feedstock_pk": self.feedstock.pk,
+                "algorithm_pk": self.algorithm.pk,
+            },
+        )
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(self.client.post(url, {}).status_code, 404)
 
     def test_update_view_get_unknown_algorithm_returns_404(self):
         url = reverse(
@@ -734,7 +772,48 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    def test_update_view_failed_add_rolls_back_removed_configuration(self):
+        """An existing but unavailable feedstock fails inside add_inventory_algorithm;
+        the atomic block must roll back the removal of the old configuration."""
+        config = ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=self.feedstock,
+            geodataset=self.geodataset,
+            inventory_algorithm=self.algorithm,
+            inventory_parameter=self.parameter,
+            inventory_value=self.value,
+        )
+        unavailable_material = Material.objects.create(
+            name="Unusable", owner=self.owner
+        )
+        unavailable_feedstock = SampleSeries.objects.create(
+            name="Unusable F", owner=self.owner, material=unavailable_material
+        )
+        response = self.client.post(
+            self.update_url(),
+            {
+                "feedstock": unavailable_feedstock.pk,
+                "inventory_algorithm": self.algorithm.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(pk=config.pk).exists(),
+            "failed update must roll back the removal of the old configuration",
+        )
+
     # --- ScenarioRemoveInventoryAlgorithmView ---
+
+    def test_remove_view_missing_scenario_returns_404(self):
+        url = reverse(
+            "scenario-remove-algorithm",
+            kwargs={
+                "scenario_pk": 999999,
+                "feedstock_pk": self.feedstock.pk,
+                "algorithm_pk": self.algorithm.pk,
+            },
+        )
+        self.assertEqual(self.client.get(url).status_code, 404)
 
     def test_remove_view_unknown_algorithm_returns_404(self):
         url = reverse(
