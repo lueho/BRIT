@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("layer_manager", "0001_initial"),
+        ("layer_manager", "0002_unique_layer_field_name_data_type"),
     ]
 
     operations = [
