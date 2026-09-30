@@ -1125,7 +1125,29 @@ class SampleSeriesModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SampleSeriesCreateDuplicateView(UserCreatedObjectUpdateView):
+class DuplicateFormContextMixin:
+    """Present a duplicate form as creating a new private copy, not an edit."""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        title = f"Duplicate {self.object._meta.verbose_name}"
+        context.update(
+            {
+                "object": None,
+                "form_title": title,
+                "submit_button_text": "Save private copy",
+                "form_notice": "Saving creates a new private copy owned by you; "
+                "the original is not changed.",
+                "breadcrumb_action_label": "Duplicate",
+                "breadcrumb_page_title": title,
+            }
+        )
+        return context
+
+
+class SampleSeriesCreateDuplicateView(
+    DuplicateFormContextMixin, UserCreatedObjectUpdateView
+):
     model = SampleSeries
     form_class = SampleSeriesModelForm
     object = None
@@ -1133,7 +1155,11 @@ class SampleSeriesCreateDuplicateView(UserCreatedObjectUpdateView):
 
     def form_valid(self, form):
         self.object = self.object.duplicate(
-            creator=self.request.user, **form.cleaned_data
+            creator=self.request.user,
+            samples=filter_queryset_for_user(
+                self.object.samples.all(), self.request.user
+            ),
+            **form.cleaned_data,
         )
         return HttpResponseRedirect(self.get_success_url())
 
@@ -2101,7 +2127,7 @@ class SampleModalAddPropertyView(
     sample_url_kwarg = "pk"
 
 
-class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
+class SampleCreateDuplicateView(DuplicateFormContextMixin, UserCreatedObjectUpdateView):
     model = Sample
     form_class = SampleModelForm
     object = None

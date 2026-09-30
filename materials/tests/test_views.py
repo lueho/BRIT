@@ -2165,6 +2165,41 @@ class SampleSeriesCreateDuplicateViewTestCase(
         self.published_object.refresh_from_db()
         self.assertEqual(self.published_object.name, "Test Series")
 
+    def test_duplicating_published_series_skips_samples_hidden_from_requester(self):
+        series = self.published_object
+        visible = Sample.objects.create(
+            name="Visible Sample",
+            material=series.material,
+            series=series,
+            owner=self.owner_user,
+            publication_status="published",
+        )
+        Sample.objects.create(
+            name="Hidden Sample",
+            material=series.material,
+            series=series,
+            owner=self.owner_user,
+            publication_status="private",
+        )
+        self.client.force_login(self.user_with_add_perm)
+        self.client.post(
+            reverse(self.view_update_name, kwargs={"pk": series.pk}),
+            {"name": "Filtered Copy", "material": series.material.pk},
+        )
+        duplicate = SampleSeries.objects.get(name="Filtered Copy")
+        copied_names = set(duplicate.samples.values_list("name", flat=True))
+        self.assertIn(f"{visible.name} (copy)", copied_names)
+        self.assertNotIn("Hidden Sample (copy)", copied_names)
+
+    def test_duplicate_form_is_presented_as_a_new_private_copy(self):
+        self.client.force_login(self.user_with_add_perm)
+        response = self.client.get(
+            reverse(self.view_update_name, kwargs={"pk": self.published_object.pk})
+        )
+        self.assertEqual(response.context["form_title"], "Duplicate sample series")
+        self.assertEqual(response.context["breadcrumb_action_label"], "Duplicate")
+        self.assertNotContains(response, "Update sample series")
+
     def test_user_with_add_permission_cannot_duplicate_archived_series(self):
         self.published_object.publication_status = "archived"
         self.published_object.save()
@@ -4072,6 +4107,20 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         )
         published.refresh_from_db()
         self.assertEqual(published.name, "Published Sample")
+
+    def test_duplicate_form_for_published_sample_does_not_claim_to_edit_it(self):
+        published = self._create_published_sample()
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("sample-duplicate", kwargs={"pk": published.pk})
+        )
+        self.assertContains(response, "Duplicate sample")
+        self.assertContains(response, "Save private copy")
+        self.assertContains(response, "creates a new private copy")
+        self.assertNotContains(response, "Only a title is required")
+        self.assertNotContains(response, "Save published changes")
+        self.assertNotContains(response, "Saving updates the published")
+        self.assertNotContains(response, "Update sample")
 
     def test_outsider_without_add_permission_cannot_duplicate_published_sample(self):
         published = self._create_published_sample()

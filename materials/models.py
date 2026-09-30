@@ -469,7 +469,7 @@ class SampleSeries(NamedUserCreatedObject):
                     material=kwargs.get("material", self.material),
                 )
 
-                for sample in self.samples.all():
+                for sample in kwargs.get("samples", self.samples.all()):
                     sample.duplicate(
                         creator, series=duplicate, material=duplicate.material
                     )
