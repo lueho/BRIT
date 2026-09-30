@@ -57,6 +57,18 @@ class GeoDataSetModelFormTestCase(TestCase):
         )
         self.assertTrue(GeoDataset.objects.filter(pk=dataset.pk).exists())
 
+    def test_non_integer_submitted_source_id_is_a_validation_error(self):
+        for malformed in ("not-a-number", "\u00b2", "9" * 5000, "9" * 30):
+            with self.subTest(malformed=malformed[:20]):
+                data = QueryDict("", mutable=True)
+                data.update({"name": "Dataset", "backend_type": "local_relation"})
+                data.setlist("sources", [malformed])
+
+                form = GeoDataSetModelForm(data=data)
+
+                self.assertFalse(form.is_valid())
+                self.assertIn("sources", form.errors)
+
 
 class RegionModelFormTestCase(TestCase):
     def test_valid_form_submission(self):

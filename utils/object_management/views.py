@@ -2196,6 +2196,9 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
                 or (policy["is_owner"] and not policy["is_published"])
             )
 
+        if self.object_policy_action == "duplicate" and policy["can_new_version"]:
+            return True
+
         if policy["can_edit"]:
             return True
 

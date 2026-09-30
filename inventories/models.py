@@ -340,49 +340,6 @@ class Scenario(NamedUserCreatedObject):
                 update_fields.extend(["failed_algorithm", "failure_message"])
             self.scenariostatus.save(update_fields=update_fields)
 
-    def try_start_inventory(self):
-        """Atomically claim this scenario for an inventory evaluation.
-
-        Acquires a row lock on the scenario status and transitions it to
-        ``RUNNING``. Returns ``True`` when the caller acquired the run and
-        ``False`` when an evaluation is genuinely in progress. Serialising the
-        check-and-set through ``select_for_update`` prevents concurrent or
-        duplicate triggers from starting parallel runs that would clobber each
-        other's result layers and task bookkeeping.
-
-        A ``RUNNING`` status only counts as in progress while at least one
-        recorded task is still unfinished. A status left ``RUNNING`` by a
-        crashed run (no unfinished tasks remain) is treated as orphaned and
-        reclaimed here so the evaluation can be retried, mirroring the stale
-        task recovery in ``block_running_scenario``.
-        """
-        with transaction.atomic():
-            scenario_status = (
-                ScenarioStatus.objects.select_for_update()
-                .filter(scenario_id=self.pk)
-                .first()
-            )
-            if scenario_status is None:
-                return False
-            if scenario_status.status == ScenarioStatus.Status.RUNNING:
-                running_tasks = list(
-                    RunningTask.objects.select_for_update().filter(scenario_id=self.pk)
-                )
-                has_active_task = any(
-                    AsyncResult(str(task.uuid)).state not in READY_STATES
-                    for task in running_tasks
-                )
-                if has_active_task:
-                    return False
-                RunningTask.objects.filter(scenario_id=self.pk).delete()
-            scenario_status.status = ScenarioStatus.Status.RUNNING
-            scenario_status.failed_algorithm = None
-            scenario_status.failure_message = ""
-            scenario_status.save(
-                update_fields=["status", "failed_algorithm", "failure_message"]
-            )
-            return True
-
     def available_feedstocks(self):
         """
         Returns all materials that can be included in this scenario.
@@ -565,7 +522,7 @@ class Scenario(NamedUserCreatedObject):
             config_entry.delete()
 
     def delete_result_layers(self):
-        for layer in self.layer_set.all():
+        for layer in self.layer_set(manager="all_objects").all():
             layer.delete()
 
     def delete_configuration(self):
