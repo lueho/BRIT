@@ -491,3 +491,58 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
             reverse("scenario-detail", kwargs={"pk": self.scenario_a.pk}),
         )
         mock_add.assert_called_once()
+
+
+class ScenarioRunConcurrencyTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="runowner", password="pass")
+        region = Region.objects.create(name="RunR", publication_status="published")
+        catchment = Catchment.objects.create(
+            name="RunC",
+            region=region,
+            parent_region=region,
+            publication_status="published",
+        )
+        cls.scenario = Scenario.objects.create(
+            name="RunS", owner=cls.owner, region=region, catchment=catchment
+        )
+
+    @patch("inventories.views.run_inventory.delay")
+    def test_post_dispatches_run_when_not_running(self, delay):
+        self.client.force_login(self.owner)
+        url = reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 302)
+        delay.assert_called_once_with(self.scenario.pk)
+
+    @patch("inventories.models.AsyncResult")
+    @patch("inventories.views.run_inventory.delay")
+    def test_post_does_not_dispatch_when_already_running(self, delay, async_result):
+        async_result.return_value.state = "PENDING"
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        RunningTask.objects.create(scenario=self.scenario, uuid=uuid4())
+        self.client.force_login(self.owner)
+        url = reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 302)
+        delay.assert_not_called()
+
+
+class ScenarioResultDetailMapView404Tests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        region = Region.objects.create(name="MapR", publication_status="published")
+        cls.scenario = Scenario.objects.create(name="MapS", region=region)
+
+    def test_missing_related_object_returns_404(self):
+        url = reverse(
+            "scenario-result-map",
+            kwargs={
+                "pk": self.scenario.pk,
+                "algorithm_pk": 999999,
+                "feedstock_pk": 999999,
+            },
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)

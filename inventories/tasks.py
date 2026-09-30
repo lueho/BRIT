@@ -40,8 +40,6 @@ def run_inventory(scenario_id):
     scenario.set_status(ScenarioStatus.Status.RUNNING)
 
     try:
-        scenario.delete_result_layers()
-
         execution_plan = scenario.inventory_execution_plan()
         signatures = []
         for execution in execution_plan:
@@ -106,4 +104,5 @@ def finalize_inventory(results, scenario_id):
     # remove finished tasks from db
     RunningTask.objects.filter(scenario=scenario_id).delete()
     scenario = Scenario.objects.get(id=scenario_id)
+    scenario.delete_obsolete_result_layers()
     scenario.set_status(ScenarioStatus.Status.FINISHED)

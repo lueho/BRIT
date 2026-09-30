@@ -74,7 +74,7 @@ class InventoryTaskFailureTests(TestCase):
         mark_inventory_failed_task,
     ):
         scenario = Mock(id=23)
-        scenario.delete_result_layers.side_effect = RuntimeError("setup failed")
+        scenario.inventory_execution_plan.side_effect = RuntimeError("setup failed")
         scenario_model.objects.get.return_value = scenario
 
         with self.assertRaisesMessage(RuntimeError, "setup failed"):
@@ -84,6 +84,45 @@ class InventoryTaskFailureTests(TestCase):
             scenario.id,
             failure_message="setup failed",
         )
+
+    @patch("inventories.tasks.chord")
+    @patch("inventories.tasks.mark_inventory_failed")
+    @patch("inventories.tasks.finalize_inventory")
+    @patch("inventories.tasks.Scenario")
+    def test_run_inventory_does_not_delete_result_layers_upfront(
+        self,
+        scenario_model,
+        finalize_inventory_task,
+        mark_inventory_failed_task,
+        chord_factory,
+    ):
+        scenario = Mock(id=31)
+        scenario.inventory_execution_plan.return_value = []
+        scenario_model.objects.get.return_value = scenario
+        finalize_inventory_task.s.return_value = Mock()
+        mark_inventory_failed_task.si.return_value = Mock()
+        chord_factory.return_value = Mock(tasks=[])
+
+        run_inventory.run(scenario.id)
+
+        scenario.delete_result_layers.assert_not_called()
+
+    @patch("inventories.tasks.RunningTask")
+    @patch("inventories.tasks.Scenario")
+    def test_finalize_inventory_prunes_obsolete_layers(
+        self,
+        scenario_model,
+        running_task_model,
+    ):
+        from ..tasks import finalize_inventory
+
+        scenario = Mock(id=41)
+        scenario_model.objects.get.return_value = scenario
+
+        finalize_inventory.run([True, True], scenario.id)
+
+        scenario.delete_obsolete_result_layers.assert_called_once_with()
+        scenario.set_status.assert_called_once_with(ScenarioStatus.Status.FINISHED)
 
     @patch("inventories.tasks.InventoryAlgorithm.execute")
     def test_algorithm_failure_records_algorithm_and_cleans_running_tasks(

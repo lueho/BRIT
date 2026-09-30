@@ -748,3 +748,78 @@ class ScenarioResultHomogenizeTimestepsTestCase(TestCase):
 
         result = ScenarioResult(self.scenario)
         self.assertEqual(result.timesteps, [])
+
+
+class ScenarioTryStartRunTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        region = Region.objects.create(name="Run Region")
+        cls.scenario = Scenario.objects.create(name="Run Scenario", region=region)
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="Run Algorithm",
+            geodataset=GeoDataset.objects.create(name="Run Dataset", region=region),
+        )
+
+    def setUp(self):
+        self.scenario.refresh_from_db()
+
+    def test_starts_run_when_not_running(self):
+        self.scenario.set_status(ScenarioStatus.Status.CHANGED)
+
+        self.assertTrue(self.scenario.try_start_run())
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.RUNNING)
+
+    @patch("inventories.models.AsyncResult")
+    def test_blocks_when_run_in_flight(self, async_result):
+        async_result.return_value.state = "PENDING"
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        RunningTask.objects.create(
+            scenario=self.scenario, algorithm=self.algorithm, uuid=uuid4()
+        )
+
+        self.assertFalse(self.scenario.try_start_run())
+        self.assertEqual(RunningTask.objects.filter(scenario=self.scenario).count(), 1)
+
+    def test_blocks_when_running_without_recorded_tasks(self):
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        self.assertFalse(self.scenario.try_start_run())
+
+    @patch("inventories.models.AsyncResult")
+    def test_recovers_stale_run(self, async_result):
+        async_result.return_value.state = "SUCCESS"
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        RunningTask.objects.create(
+            scenario=self.scenario, algorithm=self.algorithm, uuid=uuid4()
+        )
+
+        self.assertTrue(self.scenario.try_start_run())
+        self.assertFalse(RunningTask.objects.filter(scenario=self.scenario).exists())
+
+
+class ScenarioDeleteObsoleteResultLayersTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        region = Region.objects.create(name="Obsolete Region")
+        cls.scenario = Scenario.objects.create(name="Obsolete Scenario", region=region)
+
+    def test_deletes_only_layers_absent_from_execution_plan(self):
+        keep = Mock(algorithm_id=1, feedstock_id=2)
+        stale = Mock(algorithm_id=9, feedstock_id=9)
+        layer_set = Mock()
+        layer_set.all.return_value = [keep, stale]
+
+        with (
+            patch.object(Scenario, "layer_set", layer_set),
+            patch.object(
+                self.scenario,
+                "inventory_execution_plan",
+                return_value=[{"algorithm": Mock(id=1), "kwargs": {"feedstock_id": 2}}],
+            ),
+        ):
+            self.scenario.delete_obsolete_result_layers()
+
+        stale.delete.assert_called_once_with()
+        keep.delete.assert_not_called()
