@@ -1,3 +1,4 @@
+import re
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from uuid import uuid4
@@ -861,6 +862,14 @@ class ScenarioCustomParameterValueTests(TestCase):
         self.assertEqual(response.status_code, 302)
         config = ScenarioInventoryConfiguration.objects.get(scenario=self.scenario)
         self.assertEqual(config.inventory_value, custom)
+
+    def test_add_view_parameter_script_targets_rendered_elements(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(self._add_url())
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        for element_id in re.findall(r'getElementById\("([^"]+)"\)', content):
+            self.assertIn(f'id="{element_id}"', content)
 
     def test_post_rejects_custom_value_of_other_scenario(self):
         _, foreign_custom = self._other_users_custom_value()

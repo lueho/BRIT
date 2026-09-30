@@ -12,7 +12,7 @@
     {{ block.super }}
 
     <script nonce="{{ csp_nonce }}">
-        const form = document.getElementById("configForm");
+        const form = document.getElementById("parameterFormContainer").closest("form");
 
         function escapeHtml(text) {
             const div = document.createElement("div");
