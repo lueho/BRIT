@@ -38,6 +38,7 @@ from .views import (
     GeoDataSetPublishedGalleryView,
     GeoDataSetRuntimeFeatureDetailView,
     GeoDataSetRuntimeFeatureGeoJSONView,
+    GeoDataSetRuntimeFilterOptionsView,
     GeoDataSetRuntimeMapView,
     GeoDataSetRuntimeTableView,
     GeoDataSetUpdateView,
@@ -124,6 +125,11 @@ urlpatterns = [
         "geodatasets/<int:pk>/features.geojson",
         GeoDataSetRuntimeFeatureGeoJSONView.as_view(),
         name="geodataset-features-geojson",
+    ),
+    path(
+        "geodatasets/<int:pk>/filter-options/<str:column>/",
+        GeoDataSetRuntimeFilterOptionsView.as_view(),
+        name="geodataset-filter-options",
     ),
     path(
         "geodatasets/<int:pk>/update/",

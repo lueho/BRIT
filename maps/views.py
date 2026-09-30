@@ -1,7 +1,5 @@
 from types import SimpleNamespace
 
-from crispy_forms.helper import FormHelper
-from django import forms
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.core.exceptions import ImproperlyConfigured
@@ -76,6 +74,7 @@ from .forms import (
     RegionMergeForm,
     RegionMergeFormSet,
     RegionModelForm,
+    build_local_relation_filter_form,
 )
 from .models import (
     Attribute,
@@ -94,30 +93,6 @@ from .models import (
 )
 from .signals import clear_geojson_cache_pattern
 from .validation import RegionCompositionError, validate_region_composition
-
-
-def build_local_relation_filter_form(column_policies, data=None, filter_options=None):
-    filter_options = filter_options or {}
-    fields = {}
-    for policy in column_policies:
-        if not policy.is_filterable:
-            continue
-        field = forms.CharField(
-            label=policy.display_label or policy.column_name.replace("_", " ").title(),
-            required=False,
-        )
-        options = filter_options.get(policy.column_name)
-        if options:
-            field.widget.attrs["list"] = f"id_{policy.column_name}_options"
-            field.widget.attrs["autocomplete"] = "off"
-        fields[policy.column_name] = field
-    form_class = type("LocalRelationFilterForm", (forms.Form,), fields)
-    form = form_class(data=data)
-    form.filter_options = filter_options
-    form.helper = FormHelper()
-    form.helper.form_tag = False
-    return form
-
 
 # Query parameters that are navigation/control hints rather than dataset
 # filters. Their mere presence must not force the features layer to load
@@ -597,6 +572,12 @@ class GeoDataSetRuntimePermissionMixin:
             return f"{url}?{query_string}"
         return url
 
+    def get_filter_options_url(self, column_name):
+        return reverse(
+            "geodataset-filter-options",
+            kwargs={"pk": self.get_dataset().pk, "column": column_name},
+        )
+
     def get_features_geometries_url(self):
         adapter = self.get_runtime_adapter()
         if getattr(adapter, "uses_local_relation", False):
@@ -783,7 +764,8 @@ class GeoDataSetRuntimeMapView(
             filter_form = build_local_relation_filter_form(
                 self.get_visible_column_policies(),
                 data=self.request.GET or None,
-                filter_options=adapter.get_filter_options(),
+                filter_specs=adapter.get_filter_specs(),
+                options_url=self.get_filter_options_url,
             )
             context_update["filter"] = SimpleNamespace(form=filter_form)
         context.update(context_update)
@@ -819,7 +801,8 @@ class GeoDataSetRuntimeTableView(
         filter_form = build_local_relation_filter_form(
             column_policies,
             data=self.request.GET or None,
-            filter_options=adapter.get_filter_options() if is_local_relation else None,
+            filter_specs=adapter.get_filter_specs() if is_local_relation else None,
+            options_url=self.get_filter_options_url,
         )
         context_update = {
             "dataset": dataset,
@@ -959,7 +942,7 @@ class GeoDataSetRuntimeFeatureGeoJSONView(
         rejection_response = get_unbounded_geojson_rejection_response(
             request,
             count,
-            bounded_query_params={"id", *adapter.get_filterable_column_names()},
+            bounded_query_params={"id", *adapter.get_filter_query_param_names()},
         )
         if rejection_response is not None:
             return rejection_response
@@ -979,6 +962,21 @@ class GeoDataSetRuntimeFeatureGeoJSONView(
             "X-Total-Count, X-Cache-Status, X-Data-Version"
         )
         return response
+
+
+class GeoDataSetRuntimeFilterOptionsView(
+    GeoDataSetRuntimePermissionMixin, UserPassesTestMixin, View
+):
+    def get(self, request, *args, **kwargs):
+        adapter = self.get_runtime_adapter()
+        if not getattr(adapter, "uses_local_relation", False):
+            raise Http404("Dataset does not use a local relation runtime.")
+        values = adapter.search_filter_values(
+            kwargs["column"], request.GET.get("q", "").strip()
+        )
+        return JsonResponse(
+            {"results": [{"value": str(value), "text": str(value)} for value in values]}
+        )
 
 
 class GeoDataSetPublishedFilteredMapView(FilteredMapMixin, PublishedObjectFilterView):
