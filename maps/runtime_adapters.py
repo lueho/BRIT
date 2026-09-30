@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import BadRequest, ImproperlyConfigured
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection
 from django.http import Http404, QueryDict
 
@@ -387,7 +388,8 @@ class LocalRelationDatasetRuntimeAdapter:
                     "id": record.pk,
                     "geometry": record.geometry,
                     "properties": record.properties,
-                }
+                },
+                cls=DjangoJSONEncoder,
             )
         yield "]}"
 

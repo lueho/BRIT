@@ -458,6 +458,45 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
         self.assertEqual(data["features"][0]["properties"]["nuts_id"], "DE-A")
         self.assertNotIn("hidden_code", data["features"][0]["properties"])
 
+    def _add_visible_decimal_and_datetime_columns(self):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                ALTER TABLE public.{self.relation_name}
+                    ADD COLUMN height_m numeric(6, 2),
+                    ADD COLUMN surveyed_at timestamp with time zone
+                """
+            )
+            cursor.execute(
+                f"""
+                UPDATE public.{self.relation_name}
+                SET height_m = 12.50, surveyed_at = '2025-06-01T08:30:00+00:00'
+                WHERE feature_id = 1
+                """
+            )
+        for column_name in ("height_m", "surveyed_at"):
+            GeoDatasetColumnPolicy.objects.create(
+                dataset=self.dataset,
+                column_name=column_name,
+                display_label=column_name,
+                is_visible=True,
+            )
+
+    def test_local_relation_geojson_route_serializes_decimal_and_datetime_values(
+        self,
+    ):
+        self._add_visible_decimal_and_datetime_columns()
+
+        response = self.client.get(
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk}),
+            {"id": 1},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        properties = self._streaming_json(response)["features"][0]["properties"]
+        self.assertEqual(properties["height_m"], "12.50")
+        self.assertEqual(properties["surveyed_at"], "2025-06-01T08:30:00Z")
+
     def _geojson_data_version(self):
         response = self.client.get(
             reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk})
@@ -483,6 +522,28 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
                 f"UPDATE public.{self.relation_name} "
                 "SET geom = ST_Transform(ST_SetSRID(ST_Point(12, 55), 4326), 3857) "
                 "WHERE feature_id = 1"
+            )
+
+        self.assertNotEqual(self._geojson_data_version(), before)
+
+    def test_local_relation_data_version_changes_when_decimal_value_changes(self):
+        self._add_visible_decimal_and_datetime_columns()
+        before = self._geojson_data_version()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE public.{self.relation_name} SET height_m = 13.00 "
+                "WHERE feature_id = 1"
+            )
+
+        self.assertNotEqual(self._geojson_data_version(), before)
+
+    def test_local_relation_data_version_changes_when_timestamp_value_changes(self):
+        self._add_visible_decimal_and_datetime_columns()
+        before = self._geojson_data_version()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE public.{self.relation_name} "
+                "SET surveyed_at = '2025-06-01T08:30:01+00:00' WHERE feature_id = 1"
             )
 
         self.assertNotEqual(self._geojson_data_version(), before)
