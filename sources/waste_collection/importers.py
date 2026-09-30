@@ -6,7 +6,7 @@ import re
 from datetime import timedelta
 
 from django.contrib.contenttypes.models import ContentType
-from django.db import transaction
+from django.db import connection, transaction
 
 from bibliography.models import Source
 from materials.models import Material
@@ -213,7 +213,6 @@ class CollectionImporter:
             Statistics dict.
         """
         self.dry_run = dry_run
-        self._load_lookups()
 
         stats = {
             "created": 0,
@@ -230,6 +229,13 @@ class CollectionImporter:
         }
 
         with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT pg_advisory_xact_lock(hashtext(%s))",
+                    ["waste_collection.CollectionImporter"],
+                )
+            self._lookups_loaded = False
+            self._load_lookups()
             for i, record in enumerate(records):
                 self._import_record(record, i, stats)
             if dry_run:
