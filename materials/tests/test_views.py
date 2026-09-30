@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from decimal import Decimal
+from unittest.mock import patch
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -46,7 +47,7 @@ from ..models import (
     get_sample_substrate_category_name,
 )
 from ..serializers import SampleAPISerializer, SampleModelSerializer
-from ..views import DETAIL_RELATED_LIMIT
+from ..views import DETAIL_RELATED_LIMIT, SampleSubstrateMaterialQuickCreateView
 
 User = get_user_model()
 
@@ -232,6 +233,38 @@ class SampleSubstrateMaterialQuickCreateViewTestCase(ViewWithPermissionsTestCase
         )
 
         self.assertEqual(response.status_code, 200)
+        existing.refresh_from_db()
+        self.assertIn(self.substrate_category, existing.categories.all())
+
+    def test_post_reuses_material_created_by_concurrent_request(self):
+        existing = Material.objects.create(owner=self.member, name="Wood")
+        original_lookup = SampleSubstrateMaterialQuickCreateView.get_owner_material
+        lookups = []
+
+        def lookup_missing_concurrent_insert(view, name):
+            lookups.append(name)
+            if len(lookups) == 1:
+                return None
+            return original_lookup(view, name)
+
+        self.client.force_login(self.member)
+
+        with patch.object(
+            SampleSubstrateMaterialQuickCreateView,
+            "get_owner_material",
+            lookup_missing_concurrent_insert,
+        ):
+            response = self.client.post(
+                reverse("sample-substrate-material-quick-create"),
+                data=json.dumps({"name": "Wood"}),
+                content_type="application/json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["id"], existing.pk)
+        self.assertEqual(
+            Material.objects.filter(owner=self.member, name="Wood").count(), 1
+        )
         existing.refresh_from_db()
         self.assertIn(self.substrate_category, existing.categories.all())
 

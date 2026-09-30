@@ -11,7 +11,7 @@ from django.contrib.auth.mixins import (
     UserPassesTestMixin,
 )
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.db.models.aggregates import Count
 from django.http import (
@@ -427,6 +427,12 @@ class SampleSubstrateMaterialQuickCreateView(
 
     permission_required = "materials.add_material"
 
+    def get_owner_material(self, name):
+        return Material.objects.filter(
+            owner=self.request.user,
+            name__iexact=name,
+        ).first()
+
     def post(self, request, *args, **kwargs):
         try:
             payload = json.loads(request.body.decode("utf-8") or "{}")
@@ -458,14 +464,17 @@ class SampleSubstrateMaterialQuickCreateView(
                 status=400,
             )
 
-        material = Material.objects.filter(
-            owner=request.user,
-            name__iexact=name,
-        ).first()
+        material = self.get_owner_material(name)
         created = False
         if material is None:
-            material = Material.objects.create(owner=request.user, name=name)
-            created = True
+            try:
+                with transaction.atomic():
+                    material = Material.objects.create(owner=request.user, name=name)
+                created = True
+            except IntegrityError:
+                material = self.get_owner_material(name)
+                if material is None:
+                    raise
 
         material.categories.add(substrate_category)
 
