@@ -725,6 +725,14 @@ class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(200, response.status_code)
 
+    def test_get_http_404_for_missing_source(self):
+        self.client.force_login(self.owner)
+        missing_pk = self.source.pk + 1000
+        response = self.client.get(
+            reverse("source-check-url", kwargs={"pk": missing_pk})
+        )
+        self.assertEqual(404, response.status_code)
+
 
 class SourceAutocompleteViewTestCase(ViewWithPermissionsTestCase):
     def test_owner_review_source_is_returned_when_many_author_join_duplicates_exist(
