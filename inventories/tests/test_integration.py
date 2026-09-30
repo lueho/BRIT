@@ -13,7 +13,7 @@ from inventories.models import (
     InventoryAmountShare,
     Scenario,
 )
-from inventories.tasks import run_inventory_algorithm
+from inventories.tasks import finalize_inventory, run_inventory_algorithm
 from layer_manager.models import Layer
 from maps.models import Catchment, GeoDataset, Region
 from materials.models import (
@@ -263,6 +263,7 @@ class InventoryExecutionIntegrationTests(TestCase):
         self.assertTrue(
             run_inventory_algorithm.run(algorithm.id, **execution_plan[0]["kwargs"])
         )
+        finalize_inventory.run([True], scenario.id, [[algorithm.id, feedstock.id]])
 
         return Layer.objects.get(
             scenario=scenario, feedstock=feedstock, algorithm=algorithm

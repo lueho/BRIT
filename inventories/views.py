@@ -49,7 +49,7 @@ from .models import (
     ScenarioInventoryConfiguration,
     ScenarioStatus,
 )
-from .tasks import run_inventory
+from .tasks import start_inventory_run
 
 
 class InventoriesExplorerView(BreadcrumbContextMixin, TemplateView):
@@ -156,8 +156,7 @@ class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
             ]
         ):
             return HttpResponseForbidden()
-        scenario.set_status(ScenarioStatus.Status.RUNNING)
-        run_inventory.delay(scenario.id)
+        start_inventory_run(scenario.id)
         return redirect("scenario-result", scenario.id)
 
 
@@ -520,7 +519,9 @@ class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
         scenario = self.object
         if scenario.status == ScenarioStatus.Status.RUNNING:
             context = {"scenario": scenario, "task_list": {"tasks": []}}
-            for task in RunningTask.objects.filter(scenario=scenario):
+            for task in RunningTask.objects.filter(
+                scenario=scenario, algorithm__isnull=False
+            ).select_related("algorithm"):
                 context["task_list"]["tasks"].append(
                     {
                         "task_id": task.uuid,
