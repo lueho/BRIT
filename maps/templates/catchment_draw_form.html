@@ -1,4 +1,17 @@
 {% extends 'geo_form_card.html' %}
+{% load static %}
+
+{% block extra_pre_form_content %}
+    <div id="parent-region-preview"
+         data-geojson-url="{% url 'api-region-geojson' %}"
+         data-region-field-id="id_parent_region"
+         data-map-id="id_geom-map"></div>
+{% endblock extra_pre_form_content %}
+
+{% block form_media %}
+    {{ block.super }}
+    <script src="{% static 'js/catchment_draw_form.min.js' %}"></script>
+{% endblock form_media %}
 
 {% block card_footer %}
     <a href="{% url 'catchment-create' %}">Choose a different creation method</a>
