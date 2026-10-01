@@ -220,6 +220,16 @@ class SotasenGrassToProteinTestCase(TestCase):
         with self.assertRaises(ImproperlyConfigured):
             self.run_algorithm([], adapter=adapter, geodataset_id=self.geodataset.id)
 
+    def test_catchment_without_boundary_is_rejected(self):
+        catchment = Catchment.objects.create(name="No boundary", region=self.region)
+
+        with self.assertRaisesMessage(ValueError, "catchment boundary"):
+            self.run_algorithm(
+                [make_feature(1, 10.0)],
+                geodataset_id=self.geodataset.id,
+                catchment_id=catchment.id,
+            )
+
     def test_resolves_geodataset_from_scenario_configuration(self):
         catchment = Catchment.objects.create(name="Töreboda (1473)", region=self.region)
         scenario = Scenario.objects.create(
@@ -345,3 +355,66 @@ class SotasenGrassToProteinLocalRelationTestCase(TestCase):
         self.assertAlmostEqual(
             aggregated_value(result, "Recovered protein"), 23.81616, places=6
         )
+
+    def test_different_catchments_clip_parcels_and_change_totals(self):
+        cases = [
+            (
+                "Half of first parcel",
+                "MULTIPOLYGON(((13.0 58.0, 13.05 58.0, 13.05 58.1, 13.0 58.1, 13.0 58.0)))",
+                25.13,
+                1,
+            ),
+            (
+                "Second parcel",
+                "MULTIPOLYGON(((13.2 58.0, 13.3 58.0, 13.3 58.1, 13.2 58.1, 13.2 58.0)))",
+                60.0,
+                1,
+            ),
+            (
+                "Outside dataset",
+                "MULTIPOLYGON(((14.0 58.0, 14.1 58.0, 14.1 58.1, 14.0 58.1, 14.0 58.0)))",
+                0.0,
+                0,
+            ),
+            (
+                "Touches first parcel",
+                "MULTIPOLYGON(((12.9 58.0, 13.0 58.0, 13.0 58.1, 12.9 58.1, 12.9 58.0)))",
+                0.0,
+                0,
+            ),
+        ]
+        for name, boundary, expected_area, expected_features in cases:
+            with self.subTest(catchment=name):
+                region = Region.objects.create(name=name)
+                region.geom = GEOSGeometry(boundary, srid=4326)
+                region.save(update_fields=["borders"])
+                catchment = Catchment.objects.create(
+                    name=name, region=region, parent_region=self.region
+                )
+
+                result = InventoryAlgorithms.sotasen_grass_to_protein(
+                    geodataset_id=self.dataset.id, catchment_id=catchment.id
+                )
+
+                self.assertAlmostEqual(
+                    aggregated_value(result, "Grassland area"), expected_area, places=6
+                )
+                self.assertAlmostEqual(
+                    aggregated_value(result, "Total production"),
+                    expected_area * 9.0,
+                    places=6,
+                )
+                self.assertAlmostEqual(
+                    aggregated_value(result, "Recovered protein"),
+                    expected_area * 9.0 * 0.20 * 0.12,
+                    places=6,
+                )
+                self.assertEqual(len(result["features"]), expected_features)
+                self.assertAlmostEqual(
+                    sum(feature["area_ha"] for feature in result["features"]),
+                    expected_area,
+                    places=6,
+                )
+                for feature in result["features"]:
+                    self.assertTrue(catchment.geom.covers(feature["geom"]))
+                    self.assertEqual(feature["geom"].srid, 4326)

@@ -31,7 +31,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from inventories.algorithms import InventoryAlgorithmsBase
 from inventories.models import ScenarioInventoryConfiguration
-from maps.models import GeoDataset
+from maps.models import Catchment, GeoDataset
 from maps.runtime_adapters import get_dataset_runtime_adapter
 
 SOURCE_MODULE_PATH = "sources.sotasen.inventory.algorithms"
@@ -40,6 +40,7 @@ GRASS_TO_PROTEIN_FUNCTION = "sotasen_grass_to_protein"
 LAND_USE_FIELD = "land_use"
 AREA_FIELD = "area_ha"
 GRASSLAND_LAND_USE = "Grassland"
+AREA_SRID = 6933
 
 DEFAULT_DRY_MATTER_YIELD = 9.0
 DEFAULT_CRUDE_PROTEIN_FRACTION = 0.20
@@ -79,6 +80,17 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
             dry_matter_yield, crude_protein_fraction, protein_recovery_fraction
         )
 
+        catchment_geom = None
+        catchment_id = kwargs.get("catchment_id")
+        if catchment_id is not None:
+            catchment = Catchment.objects.select_related("region__borders").get(
+                pk=catchment_id
+            )
+            catchment_geom = catchment.geom
+            if catchment_geom is None or catchment_geom.empty:
+                raise ValueError("A catchment boundary is required for evaluation.")
+            catchment_geom = catchment_geom.transform(4326, clone=True)
+
         feature_collection = adapter.get_geojson_feature_collection(
             query_params={LAND_USE_FIELD: GRASSLAND_LAND_USE}
         )
@@ -94,15 +106,27 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
             properties = feature.get("properties") or {}
             area_raw = properties.get(AREA_FIELD)
             area_ha = float(area_raw) if area_raw is not None else 0.0
-            total_area_ha += area_ha
             geometry = feature.get("geometry")
             if geometry is None:
+                if catchment_geom is None:
+                    total_area_ha += area_ha
                 continue
+            geom = GEOSGeometry(
+                geometry if isinstance(geometry, str) else json.dumps(geometry),
+                srid=4326,
+            )
+            if catchment_geom is not None:
+                clipped = geom.intersection(catchment_geom)
+                if clipped.empty or clipped.area == 0:
+                    continue
+                parcel_area = geom.transform(AREA_SRID, clone=True).area
+                clipped_area = clipped.transform(AREA_SRID, clone=True).area
+                area_ha *= clipped_area / parcel_area
+                geom = clipped
+            total_area_ha += area_ha
             result["features"].append(
                 {
-                    "geom": GEOSGeometry(
-                        geometry if isinstance(geometry, str) else json.dumps(geometry)
-                    ),
+                    "geom": geom,
                     "land_use": str(properties.get(LAND_USE_FIELD) or ""),
                     "area_ha": area_ha,
                     "dry_matter_mg_a": area_ha * dry_matter_yield,
