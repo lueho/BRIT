@@ -1,8 +1,18 @@
-from django.contrib.gis.geos import GEOSGeometry
-from django.db import connection
+from collections.abc import Mapping
+
+from django.contrib.gis.db.models.fields import GeometryField
+from django.contrib.gis.geos import (
+    GeometryCollection,
+    GEOSGeometry,
+    MultiPolygon,
+    Polygon,
+)
+from django.core.exceptions import ImproperlyConfigured
+from django.db import connection, models
 from django.db.models import QuerySet
 
-from maps.models import Catchment
+from maps.models import Catchment, GeoDataset
+from maps.runtime_adapters import get_dataset_runtime_adapter
 from utils.properties.units import get_unit_registry
 
 from .exceptions import EmptyQueryset
@@ -224,3 +234,291 @@ class InventoryAlgorithmsBase:
             feature["geom"] = GEOSGeometry(feature["geom"])
 
         return features
+
+
+GENERIC_MODULE_PATH = "inventories.algorithms"
+
+# Kwargs that wire the run to the scenario context; every other keyword argument
+# is treated as a factor in the production chain.
+RESERVED_ALGORITHM_KWARGS = frozenset(
+    ("catchment_id", "scenario_id", "feedstock_id", "geodataset_id")
+)
+
+# Equal-area projection used to measure polygon areas of model features.
+AREA_MEASUREMENT_SRID = 6933
+
+
+class InventoryAlgorithms(InventoryAlgorithmsBase):
+    """Generic, dataset-agnostic inventory algorithms.
+
+    Each function resolves the feature source from the ``geodataset_id`` kwarg
+    (``InventoryAlgorithm.execute`` injects the algorithm's configured
+    ``GeoDataset`` automatically) and supports both model-backed datasets and
+    ``local_relation`` datasets.
+
+    Every keyword argument beyond the reserved scenario context
+    (:data:`RESERVED_ALGORITHM_KWARGS`) is a factor in the production chain,
+    given either as a number or as ``{"value": ..., "standard_deviation": ...,
+    "unit": ...}``. Units are pint-aware: the chain is converted to ``Mg/a``
+    when possible, then to ``Mg``, otherwise the computed unit is reported.
+    """
+
+    @classmethod
+    def count_based_production(cls, **kwargs):
+        """production = (features intersecting the catchment) x product(factors)"""
+        geodataset = cls._resolve_geodataset(kwargs)
+        catchment_geom = cls._catchment_geometry(kwargs)
+        factors = cls._factors(kwargs)
+        geometries = cls._intersecting_geometries(geodataset, catchment_geom)
+
+        per_feature, _ = cls._production(1.0, "", factors)
+        total, unit = cls._production(float(len(geometries)), "", factors)
+        result = {
+            "aggregated_values": [
+                {"name": "Count", "value": len(geometries), "unit": ""},
+                {"name": "Total production", "value": total, "unit": unit},
+            ],
+            "aggregated_distributions": [],
+            "features": [
+                {"geom": geom, "production": per_feature} for geom in geometries
+            ],
+            "geom_type": "Point",
+        }
+        return result
+
+    @classmethod
+    def area_based_production(cls, **kwargs):
+        """production = (total clipped polygon area) x product(factors)"""
+        geodataset = cls._resolve_geodataset(kwargs)
+        catchment_geom = cls._catchment_geometry(kwargs)
+        factors = cls._factors(kwargs)
+        clipped = cls._clipped_areas(geodataset, catchment_geom)
+
+        registry = get_unit_registry()
+        total_area_m2 = sum(area for _, area in clipped)
+        total_area_ha = (
+            registry.Quantity(total_area_m2, "meter ** 2").to("hectare").magnitude
+            if registry is not None
+            else total_area_m2 / 10000
+        )
+
+        result = {
+            "aggregated_values": [
+                {"name": "Total area", "value": total_area_ha, "unit": "ha"},
+            ],
+            "aggregated_distributions": [],
+            "features": [],
+            "geom_type": "MultiPolygon",
+        }
+        total = 0.0
+        total_unit = "Mg/a"
+        for geom, area in clipped:
+            production, unit = cls._production(area, "meter ** 2", factors)
+            total_unit = unit
+            total += production
+            result["features"].append(
+                {"geom": geom, "area_ha": area / 10000, "production": production}
+            )
+        result["aggregated_values"].append(
+            {"name": "Total production", "value": total, "unit": total_unit}
+        )
+        return result
+
+    # -- generic helpers -----------------------------------------------------
+
+    @staticmethod
+    def _resolve_geodataset(kwargs):
+        geodataset_id = kwargs.get("geodataset_id")
+        if geodataset_id is None:
+            raise ImproperlyConfigured(
+                "Generic inventory algorithms require a 'geodataset_id' "
+                "keyword argument."
+            )
+        return GeoDataset.objects.get(id=geodataset_id)
+
+    @staticmethod
+    def _catchment_geometry(kwargs):
+        catchment = Catchment.objects.get(id=kwargs.get("catchment_id"))
+        geom = catchment.geom
+        if geom is None or geom.empty:
+            raise ValueError("A catchment boundary is required for evaluation.")
+        return geom.transform(4326, clone=True)
+
+    @staticmethod
+    def _factors(kwargs):
+        factors = []
+        for name, raw in kwargs.items():
+            if name in RESERVED_ALGORITHM_KWARGS:
+                continue
+            if isinstance(raw, Mapping):
+                value = raw.get("value")
+                unit = raw.get("unit") or ""
+            else:
+                value, unit = raw, ""
+            try:
+                factors.append({"name": name, "value": float(value), "unit": unit})
+            except (TypeError, ValueError):
+                raise ImproperlyConfigured(
+                    f"Parameter '{name}' is not a numeric factor."
+                ) from None
+        return factors
+
+    @staticmethod
+    def _production(base_magnitude, base_unit, factors):
+        """Multiply a base quantity by all factor values.
+
+        Returns ``(value, unit_label)``. With pint available the product is
+        converted to ``Mg/a`` first, then ``Mg``; otherwise the chain's
+        computed unit is reported. Without pint the magnitudes are multiplied
+        verbatim and reported as ``Mg/a``.
+        """
+        registry = get_unit_registry()
+        if registry is not None:
+            quantity = registry.Quantity(float(base_magnitude))
+            if base_unit:
+                quantity = registry.Quantity(float(base_magnitude), base_unit)
+            for factor in factors:
+                try:
+                    factor_quantity = registry.Quantity(factor["value"], factor["unit"])
+                except Exception:
+                    raise ImproperlyConfigured(
+                        f"Unknown unit '{factor['unit']}' for parameter "
+                        f"'{factor['name']}'."
+                    ) from None
+                if factor["unit"]:
+                    quantity *= factor_quantity
+                else:
+                    quantity *= factor["value"]
+            for target, label in (("megagram / year", "Mg/a"), ("megagram", "Mg")):
+                try:
+                    return quantity.to(target).magnitude, label
+                except Exception:
+                    continue
+            return quantity.magnitude, f"{quantity.units:~}"
+        value = float(base_magnitude)
+        for factor in factors:
+            value *= factor["value"]
+        return value, "Mg/a"
+
+    @classmethod
+    def _geometry_accessor(cls, model):
+        """Return the ORM path to the model's geometry ('geom' or e.g.
+        'borders__geom' for models that hold geometry on a related object)."""
+        for field in model._meta.get_fields():
+            if isinstance(field, GeometryField):
+                return field.name
+        for field in model._meta.get_fields():
+            if isinstance(field, models.ForeignKey) and field.related_model:
+                for related in field.related_model._meta.get_fields():
+                    if isinstance(related, GeometryField):
+                        return f"{field.name}__{related.name}"
+        raise ImproperlyConfigured(f"{model._meta.label} has no geometry field.")
+
+    @staticmethod
+    def _get_feature_geom(obj, accessor):
+        for part in accessor.split("__"):
+            obj = getattr(obj, part, None)
+            if obj is None:
+                return None
+        return obj
+
+    @classmethod
+    def _intersecting_geometries(cls, geodataset, catchment_geom):
+        """Return a list of 4326 geometries of all dataset features that
+        intersect the catchment boundary."""
+        adapter = get_dataset_runtime_adapter(geodataset)
+        if getattr(adapter, "uses_local_relation", False):
+            return cls._relation_geometries(adapter, catchment_geom)
+        model = adapter.model
+        accessor = cls._geometry_accessor(model)
+        queryset = model.objects.filter(**{f"{accessor}__intersects": catchment_geom})
+        geometries = []
+        for obj in queryset:
+            geom = cls._get_feature_geom(obj, accessor)
+            if geom is None or geom.empty:
+                continue
+            geometries.append(
+                geom if geom.srid == 4326 else geom.transform(4326, clone=True)
+            )
+        return geometries
+
+    @classmethod
+    def _clipped_areas(cls, geodataset, catchment_geom):
+        """Return ``(clipped 4326 MultiPolygon, area in m^2)`` pairs for all
+        polygon features intersecting the catchment boundary."""
+        adapter = get_dataset_runtime_adapter(geodataset)
+        if getattr(adapter, "uses_local_relation", False):
+            return cls._relation_clipped_areas(adapter, catchment_geom)
+        model = adapter.model
+        accessor = cls._geometry_accessor(model)
+        queryset = model.objects.filter(**{f"{accessor}__intersects": catchment_geom})
+        clipped = []
+        for obj in queryset:
+            geom = cls._get_feature_geom(obj, accessor)
+            if geom is None or geom.empty:
+                continue
+            geom = geom.transform(4326, clone=True)
+            parts = cls._polygon_parts(geom.intersection(catchment_geom))
+            if not parts:
+                continue
+            multi = MultiPolygon(parts, srid=4326)
+            area = multi.transform(AREA_MEASUREMENT_SRID, clone=True).area
+            clipped.append((multi, area))
+        return clipped
+
+    @classmethod
+    def _polygon_parts(cls, geom):
+        if geom is None or geom.empty:
+            return []
+        if isinstance(geom, Polygon):
+            return [geom]
+        if isinstance(geom, (MultiPolygon, GeometryCollection)):
+            return [polygon for part in geom for polygon in cls._polygon_parts(part)]
+        return []
+
+    # -- local_relation backend ----------------------------------------------
+
+    @staticmethod
+    def _relation_columns(adapter):
+        runtime_configuration = adapter.runtime_configuration
+        return (
+            adapter.relation_identifier,
+            connection.ops.quote_name(runtime_configuration.geometry_column),
+            connection.ops.quote_name(runtime_configuration.primary_key_column),
+        )
+
+    @classmethod
+    def _relation_geometries(cls, adapter, catchment_geom):
+        relation, geom_col, _pk_col = cls._relation_columns(adapter)
+        query = f"""-- noinspection SqlResolve
+            WITH mask AS (SELECT ST_GeomFromEWKT(%s) AS geom)
+            SELECT ST_AsEWKT(ST_Transform(t.{geom_col}, 4326)) AS geom
+            FROM {relation} t, mask
+            WHERE t.{geom_col} IS NOT NULL
+              AND ST_Intersects(ST_Transform(t.{geom_col}, 4326), mask.geom)
+            ORDER BY t.{_pk_col}
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, [catchment_geom.ewkt])
+            return [GEOSGeometry(row[0]) for row in cursor.fetchall()]
+
+    @classmethod
+    def _relation_clipped_areas(cls, adapter, catchment_geom):
+        relation, geom_col, pk_col = cls._relation_columns(adapter)
+        query = f"""-- noinspection SqlResolve
+            WITH mask AS (SELECT ST_GeomFromEWKT(%s) AS geom)
+            SELECT ST_AsEWKT(ST_Multi(clipped.geom)) AS geom,
+                   ST_Area(clipped.geom::geography) AS area
+            FROM (
+                SELECT t.{pk_col} AS id,
+                       ST_Intersection(mask.geom, ST_Transform(t.{geom_col}, 4326)) AS geom
+                FROM {relation} t, mask
+                WHERE t.{geom_col} IS NOT NULL
+                  AND ST_Intersects(mask.geom, ST_Transform(t.{geom_col}, 4326))
+            ) clipped
+            WHERE ST_Dimension(clipped.geom) = 2
+            ORDER BY clipped.id
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(query, [catchment_geom.ewkt])
+            return [(GEOSGeometry(row[0]), float(row[1])) for row in cursor.fetchall()]

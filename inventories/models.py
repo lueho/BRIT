@@ -86,6 +86,7 @@ class InventoryAlgorithm(models.Model):
 
     @staticmethod
     def available_modules():
+        core_modules = ["inventories.algorithms"]
         legacy_modules = sorted(InventoryAlgorithm.SOURCE_MODULE_PATH_ALIASES)
         source_modules = []
         for module in pkgutil.iter_modules(sources.__path__):
@@ -103,7 +104,7 @@ class InventoryAlgorithm(models.Model):
             if hasattr(inventory_module, "InventoryAlgorithms"):
                 source_modules.append(module_path)
 
-        return legacy_modules + sorted(source_modules)
+        return core_modules + legacy_modules + sorted(source_modules)
 
     @staticmethod
     def available_functions(module_name):
@@ -160,6 +161,7 @@ class InventoryAlgorithm(models.Model):
 
     def execute(self, **kwargs):
         module = self.import_module()
+        kwargs.setdefault("geodataset_id", self.geodataset_id)
         return getattr(module.InventoryAlgorithms, self.function_name)(**kwargs)
 
     def default_values(self):
@@ -624,6 +626,7 @@ class Scenario(NamedUserCreatedObject):
                 inventory_config[feedstock][algorithm.id]["kwargs"][parameter] = {
                     "value": value,
                     "standard_deviation": standard_deviation,
+                    "unit": entry.inventory_parameter.unit or "",
                 }
 
         return [

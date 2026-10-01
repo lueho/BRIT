@@ -217,6 +217,7 @@ class ScenarioTestCase(TestCase):
         self.assertEqual(
             InventoryAlgorithm.available_modules(),
             [
+                "inventories.algorithms",
                 "flexibi_hamburg",
                 "sources.greenhouses.inventory.algorithms",
             ],
@@ -247,7 +248,9 @@ class ScenarioTestCase(TestCase):
             result = algorithm.execute(example="value")
 
         self.assertEqual(result, {"result": "ok"})
-        execute.assert_called_once_with(example="value")
+        execute.assert_called_once_with(
+            example="value", geodataset_id=algorithm.geodataset_id
+        )
 
     def test_serialize_inventory_execution_plan_builds_sources_task_reference_shape(
         self,
