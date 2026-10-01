@@ -1400,3 +1400,12 @@ class ScenarioCatchmentSelectorTestCase(TestCase):
     def test_excludes_catchments_of_other_regions(self):
         self.client.force_login(self.owner)
         self.assertNotIn("Unrelated Catchment", self.get_selector_options())
+
+    def test_direct_relational_filter_still_targets_related_field(self):
+        response = self.client.get(
+            reverse("catchment-autocomplete"),
+            {"f": "'region__name=Selected Region'"},
+        )
+        self.assertEqual(response.status_code, 200)
+        names = {item["name"] for item in response.json()["results"]}
+        self.assertEqual(names, {"Region Catchment"})

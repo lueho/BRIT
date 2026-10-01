@@ -3069,9 +3069,7 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
                 return queryset.none()
 
             try:
-                queryset = self.filter_by_lookup(
-                    queryset, _tomselect_lookup_name(lookup), value
-                )
+                queryset = self.filter_by_lookup(queryset, lookup, value)
             except Exception as e:
                 logger.debug("Error applying filter %s=%r: %s", lookup, value, e)
                 return queryset.none()

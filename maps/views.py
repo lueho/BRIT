@@ -52,6 +52,7 @@ from utils.object_management.views import (
     UserCreatedObjectModalDetailView,
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
+    _tomselect_lookup_name,
     get_tomselect_filter_pairs,
 )
 from utils.views import BreadcrumbContextMixin
@@ -1342,7 +1343,7 @@ class CatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
     IN_REGION_LOOKUP = "in_region"
 
     def filter_by_lookup(self, queryset, lookup, value):
-        if lookup == self.IN_REGION_LOOKUP:
+        if _tomselect_lookup_name(lookup) == self.IN_REGION_LOOKUP:
             return queryset.filter(Q(region_id=value) | Q(parent_region_id=value))
         return super().filter_by_lookup(queryset, lookup, value)
 
