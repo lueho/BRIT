@@ -814,6 +814,24 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         self.assertEqual(new_object.owner, self.staff_user)
         self.assertEqual(response.status_code, 302)
 
+    def test_create_draw_custom_view_shows_parent_region_boundary_preview(self):
+        self.client.force_login(self.user_with_add_perm)
+        url = reverse("catchment-create-draw-custom")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="parent-region-preview"')
+        self.assertContains(
+            response, f'data-geojson-url="{reverse("api-region-geojson")}"'
+        )
+        self.assertContains(response, 'data-region-field-id="id_parent_region"')
+        self.assertContains(response, 'data-map-id="id_geom-map"')
+        self.assertContains(response, "js/catchment_draw_form")
+        # The leaflet widget renders the map container and publishes it under
+        # window['leafletmap' + 'id_geom-map']; both must match data-map-id
+        # for the preview to attach.
+        self.assertContains(response, 'id="id_geom-map"')
+        self.assertContains(response, "'leafletmap' + 'id_geom-map'")
+
     # -----------------------
     # CatchmentCreateMergeLauView
     # -----------------------
