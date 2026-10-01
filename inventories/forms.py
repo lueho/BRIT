@@ -5,6 +5,7 @@ from django_tomselect.widgets import TomSelectModelWidget
 
 from distributions.models import TemporalDistribution
 from maps.models import GeoDataset
+from maps.views import CatchmentAutocompleteView
 from utils.forms import ModalModelFormMixin, SimpleModelForm
 
 from .models import InventoryAlgorithm, Scenario, ScenarioInventoryConfiguration
@@ -27,7 +28,7 @@ class ScenarioModelForm(SimpleModelForm):
     catchment = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="catchment-autocomplete",
-            filter_by=("region", "region_id"),
+            filter_by=("region", CatchmentAutocompleteView.IN_REGION_LOOKUP),
             label_field="name",
         ),
         label="Catchment",

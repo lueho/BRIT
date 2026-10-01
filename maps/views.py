@@ -52,6 +52,7 @@ from utils.object_management.views import (
     UserCreatedObjectModalDetailView,
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
+    _tomselect_lookup_name,
     get_tomselect_filter_pairs,
 )
 from utils.views import BreadcrumbContextMixin
@@ -1338,6 +1339,13 @@ class CatchmentModalDeleteView(UserCreatedObjectModalDeleteView):
 class CatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Catchment
     geodataset_model_name = None
+    # Matches a region's own catchment and the catchments created inside it.
+    IN_REGION_LOOKUP = "in_region"
+
+    def filter_by_lookup(self, queryset, lookup, value):
+        if _tomselect_lookup_name(lookup) == self.IN_REGION_LOOKUP:
+            return queryset.filter(Q(region_id=value) | Q(parent_region_id=value))
+        return super().filter_by_lookup(queryset, lookup, value)
 
     def get_region(self):
         return GeoDataset.objects.get(model_name=self.geodataset_model_name).region

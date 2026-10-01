@@ -3069,9 +3069,12 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
                 return queryset.none()
 
             try:
-                queryset = queryset.filter(**{lookup: value})
+                queryset = self.filter_by_lookup(queryset, lookup, value)
             except Exception as e:
                 logger.debug("Error applying filter %s=%r: %s", lookup, value, e)
                 return queryset.none()
 
         return queryset
+
+    def filter_by_lookup(self, queryset, lookup, value):
+        return queryset.filter(**{lookup: value})

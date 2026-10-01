@@ -1346,3 +1346,66 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
         self.client.logout()
         response = self.client.get(self.result_map_url())
         self.assertEqual(response.status_code, 404)
+
+
+class ScenarioCatchmentSelectorTestCase(TestCase):
+    """The scenario form's catchment selector offers the catchments of the
+    region chosen in the region selector."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create(username="owner")
+        cls.region = Region.objects.create(
+            name="Selected Region", publication_status="published"
+        )
+        other_region = Region.objects.create(
+            name="Other Region", publication_status="published"
+        )
+        cls.region_catchment = Catchment.objects.create(
+            name="Region Catchment",
+            region=cls.region,
+            publication_status="published",
+        )
+        cls.drawn_catchment = Catchment.objects.create(
+            name="Drawn Catchment",
+            owner=cls.owner,
+            region=Region.objects.create(name="Drawn Catchment"),
+            parent_region=cls.region,
+        )
+        cls.unrelated_catchment = Catchment.objects.create(
+            name="Unrelated Catchment",
+            region=other_region,
+            parent_region=other_region,
+            publication_status="published",
+        )
+
+    def get_selector_options(self):
+        from ..forms import ScenarioModelForm
+
+        source, lookup = ScenarioModelForm.base_fields["catchment"].config.filter_by
+        response = self.client.get(
+            reverse("catchment-autocomplete"),
+            {"f": f"'{source}__{lookup}={self.region.pk}'"},
+        )
+        self.assertEqual(response.status_code, 200)
+        return {item["name"] for item in response.json()["results"]}
+
+    def test_offers_catchment_of_selected_region(self):
+        self.assertIn("Region Catchment", self.get_selector_options())
+
+    def test_offers_own_catchment_drawn_inside_selected_region(self):
+        self.client.force_login(self.owner)
+        self.assertIn("Drawn Catchment", self.get_selector_options())
+
+    def test_excludes_catchments_of_other_regions(self):
+        self.client.force_login(self.owner)
+        self.assertNotIn("Unrelated Catchment", self.get_selector_options())
+
+    def test_direct_relational_filter_still_targets_related_field(self):
+        response = self.client.get(
+            reverse("catchment-autocomplete"),
+            {"f": "'region__name=Selected Region'"},
+        )
+        self.assertEqual(response.status_code, 200)
+        names = {item["name"] for item in response.json()["results"]}
+        self.assertEqual(names, {"Region Catchment"})
