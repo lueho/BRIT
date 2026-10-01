@@ -96,15 +96,60 @@
             rows.appendChild(row);
         }
 
+        let datasetColumns = [];
+
+        function renderFeatureFilter() {
+            if (!datasetColumns.length) {
+                return "";
+            }
+            const options = datasetColumns
+                .map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`)
+                .join("");
+            return `
+                <h3>Feature filter (optional)</h3>
+                <p class="text-muted">Restrict the inventory to a subset of features —
+                    e.g. one crop of a parcels dataset.</p>
+                <div class="form-row mb-2">
+                    <select id="id_filter_column" class="select form-control" name="filter_column">
+                        <option value="">-- all features --</option>${options}
+                    </select>
+                    <select id="id_filter_value" class="select form-control" name="filter_value" disabled>
+                        <option value="">-- value --</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        function onFilterColumnChange() {
+            const columnSelect = document.getElementById("id_filter_column");
+            const valueSelect = document.getElementById("id_filter_value");
+            const column = datasetColumns.find(c => c.name === columnSelect.value);
+            if (!column) {
+                valueSelect.innerHTML = '<option value="">-- value --</option>';
+                valueSelect.disabled = true;
+                return;
+            }
+            const options = (column.values || [])
+                .map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`)
+                .join("");
+            valueSelect.innerHTML = `<option value="">-- value --</option>${options}`;
+            valueSelect.disabled = false;
+        }
+
         function renderKwargEditor() {
             const container = document.getElementById("parameterFormContainer");
             container.innerHTML = `
+                ${renderFeatureFilter()}
                 <h3>Factors</h3>
                 <p class="text-muted">Each factor is multiplied into the production chain.</p>
                 <div id="kwargRows"></div>
                 <button type="button" id="addKwarg" class="btn btn-outline-primary">Add factor</button>
             `;
             document.getElementById("addKwarg").addEventListener("click", addKwargRow);
+            const filterColumn = document.getElementById("id_filter_column");
+            if (filterColumn) {
+                filterColumn.addEventListener("change", onFilterColumnChange);
+            }
             addKwargRow();
         }
 
@@ -134,6 +179,7 @@
 
         function renderAlgorithmChoices(data) {
             const container = document.getElementById("algorithmChoiceContainer");
+            datasetColumns = data.columns || [];
             const generic = data.functions || [];
             const registered = data.algorithms || [];
             if (generic.length === 0 && registered.length === 0) {

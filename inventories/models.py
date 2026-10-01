@@ -627,6 +627,7 @@ class Scenario(NamedUserCreatedObject):
                     "value": value,
                     "standard_deviation": standard_deviation,
                     "unit": entry.inventory_parameter.unit or "",
+                    "selection": entry.inventory_value.name or "",
                 }
 
         return [

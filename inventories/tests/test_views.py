@@ -576,6 +576,52 @@ class GenericAlgorithmAddViewTestCase(TestCase):
         response = self._post(generic_function="definitely_not_a_function")
         self.assertEqual(response.status_code, 400)
 
+    def test_feature_filter_creates_selection_parameter(self):
+        response = self._post(
+            filter_column="culture_1",
+            filter_value="Tomato",
+            kwarg_name=["yield"],
+            kwarg_value=["10"],
+            kwarg_unit=["kg"],
+        )
+        self.assertEqual(response.status_code, 302)
+        algorithm = InventoryAlgorithm.objects.get(
+            geodataset=self.point_dataset,
+            function_name="count_based_production",
+        )
+        param = InventoryAlgorithmParameter.objects.get(
+            inventory_algorithm=algorithm, short_name="feature_filter"
+        )
+        value = param.inventoryalgorithmparametervalue_set.get()
+        self.assertEqual(
+            value.type, InventoryAlgorithmParameterValue.ValueType.SELECTION
+        )
+        self.assertEqual(value.name, "culture_1=Tomato")
+        plan = self.scenario.inventory_execution_plan()
+        self.assertEqual(
+            plan[0]["kwargs"]["feature_filter"]["selection"], "culture_1=Tomato"
+        )
+
+    def test_feature_filter_rejects_unknown_column(self):
+        response = self._post(
+            filter_column="not_a_column",
+            filter_value="x",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_functions_api_lists_filter_columns(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(
+                "api-geodataset-functions",
+                kwargs={"geodataset_pk": self.point_dataset.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        columns = {c["name"]: c["values"] for c in response.json()["columns"]}
+        self.assertIn("culture_1", columns)
+        self.assertNotIn("geom", columns)
+
 
 class ScenarioDownloadSummaryAuthTests(TestCase):
     @classmethod

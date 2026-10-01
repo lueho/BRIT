@@ -74,9 +74,15 @@ class CountBasedProductionModelBackendTestCase(GenericAlgorithmBase):
             region=cls.region,
             model_name="NantesGreenhouses",
         )
-        NantesGreenhouses.objects.create(geom=Point(0.5, 0.5, srid=4326))
-        NantesGreenhouses.objects.create(geom=Point(-0.5, 0.2, srid=4326))
-        NantesGreenhouses.objects.create(geom=Point(5, 5, srid=4326))
+        NantesGreenhouses.objects.create(
+            geom=Point(0.5, 0.5, srid=4326), culture_1="Tomato"
+        )
+        NantesGreenhouses.objects.create(
+            geom=Point(-0.5, 0.2, srid=4326), culture_1="Cucumber"
+        )
+        NantesGreenhouses.objects.create(
+            geom=Point(5, 5, srid=4326), culture_1="Tomato"
+        )
 
     def test_counts_features_and_applies_factor_chain(self):
         result = InventoryAlgorithms.count_based_production(
@@ -136,6 +142,34 @@ class CountBasedProductionModelBackendTestCase(GenericAlgorithmBase):
         with self.assertRaises(ImproperlyConfigured):
             InventoryAlgorithms.count_based_production(**kwargs)
 
+    def test_feature_filter_restricts_features(self):
+        """A feature_filter kwarg limits the counted features to rows whose
+        attribute matches — e.g. one crop of many in a parcels dataset."""
+        result = InventoryAlgorithms.count_based_production(
+            **self.base_kwargs(self.dataset),
+            feature_filter={"selection": "culture_1=Tomato"},
+            unit_yield={"value": 10.0, "unit": "kg / year"},
+        )
+        # Only the single in-catchment Tomato greenhouse counts.
+        self.assertEqual(aggregated_value(result, "Count")["value"], 1)
+        self.assertAlmostEqual(
+            aggregated_value(result, "Total production")["value"], 0.01
+        )
+
+    def test_feature_filter_accepts_plain_string(self):
+        result = InventoryAlgorithms.count_based_production(
+            **self.base_kwargs(self.dataset),
+            feature_filter="culture_1=Cucumber",
+        )
+        self.assertEqual(aggregated_value(result, "Count")["value"], 1)
+
+    def test_feature_filter_rejects_unknown_column(self):
+        with self.assertRaises(ImproperlyConfigured):
+            InventoryAlgorithms.count_based_production(
+                **self.base_kwargs(self.dataset),
+                feature_filter="no_such_column=x",
+            )
+
 
 class CountBasedProductionLocalRelationTestCase(GenericAlgorithmBase):
     """count_based_production on a local_relation dataset."""
@@ -162,16 +196,17 @@ class CountBasedProductionLocalRelationTestCase(GenericAlgorithmBase):
                 f"""
                 CREATE TABLE public.{self.relation_name} (
                     feature_id integer PRIMARY KEY,
+                    crop varchar(40),
                     geom geometry(Point, 4326)
                 )
                 """
             )
             cursor.execute(
                 f"""
-                INSERT INTO public.{self.relation_name} (feature_id, geom) VALUES
-                (1, ST_GeomFromText('POINT(0.5 0.5)', 4326)),
-                (2, ST_GeomFromText('POINT(-0.5 0.2)', 4326)),
-                (3, ST_GeomFromText('POINT(5 5)', 4326))
+                INSERT INTO public.{self.relation_name} (feature_id, crop, geom) VALUES
+                (1, 'Wheat', ST_GeomFromText('POINT(0.5 0.5)', 4326)),
+                (2, 'Barley', ST_GeomFromText('POINT(-0.5 0.2)', 4326)),
+                (3, 'Wheat', ST_GeomFromText('POINT(5 5)', 4326))
                 """
             )
 
@@ -188,6 +223,26 @@ class CountBasedProductionLocalRelationTestCase(GenericAlgorithmBase):
         production = aggregated_value(result, "Total production")
         self.assertAlmostEqual(production["value"], 0.02)  # 20 kg/a
         self.assertEqual(len(result["features"]), 2)
+
+    def test_feature_filter_on_local_relation(self):
+        result = InventoryAlgorithms.count_based_production(
+            **self.base_kwargs(self.dataset),
+            feature_filter={"selection": "crop=Wheat"},
+            unit_yield={"value": 10.0, "unit": "kg / year"},
+        )
+        # Only the in-catchment Wheat feature counts.
+        self.assertEqual(aggregated_value(result, "Count")["value"], 1)
+
+    def test_feature_columns_on_local_relation(self):
+        columns = InventoryAlgorithms.feature_columns(self.dataset)
+        names = {c["name"] for c in columns}
+        self.assertIn("crop", names)
+        crop_values = next(c["values"] for c in columns if c["name"] == "crop")
+        self.assertIn("Wheat", crop_values)
+        self.assertIn("Barley", crop_values)
+        # Geometry and primary key are not filterable feature columns.
+        self.assertNotIn("geom", names)
+        self.assertNotIn("feature_id", names)
 
 
 class AreaBasedProductionModelBackendTestCase(GenericAlgorithmBase):
@@ -410,6 +465,31 @@ class ExecutionPlanUnitWiringTestCase(GenericAlgorithmBase):
             )
         called_kwargs = mock_run.call_args.kwargs
         self.assertEqual(called_kwargs["geodataset_id"], self.dataset.id)
+
+    def test_execution_plan_passes_selection_name(self):
+        """Selection-typed values carry their name into the kwargs so
+        e.g. feature_filter can encode 'column=value'."""
+        filter_param = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="Feature filter", short_name="feature_filter"
+        )
+        filter_param.inventory_algorithm.add(self.algorithm)
+        filter_value = InventoryAlgorithmParameterValue.objects.create(
+            name="crop=Wheat",
+            parameter=filter_param,
+            value=1.0,
+            type=InventoryAlgorithmParameterValue.ValueType.SELECTION,
+        )
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=self.feedstock,
+            geodataset=self.dataset,
+            inventory_algorithm=self.algorithm,
+            inventory_parameter=filter_param,
+            inventory_value=filter_value,
+        )
+        plan = self.scenario.inventory_execution_plan()
+        kwargs = plan[0]["kwargs"]
+        self.assertEqual(kwargs["feature_filter"]["selection"], "crop=Wheat")
 
 
 class GeometryFamilyTestCase(GenericAlgorithmBase):

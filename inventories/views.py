@@ -414,6 +414,27 @@ class ScenarioAddInventoryAlgorithmView(
                     f"'{spec['name']}' is a reserved parameter name."
                 )
 
+        # Optional feature filter ("column=value") restricts the inventory to a
+        # subset of features — e.g. one crop out of many in a parcels dataset.
+        filter_column = request.POST.get("filter_column", "").strip()
+        filter_value = request.POST.get("filter_value", "").strip()
+        filter_spec = None
+        if filter_column or filter_value:
+            if not (filter_column and filter_value):
+                return HttpResponseBadRequest(
+                    "Both a filter column and a filter value are required."
+                )
+            valid_columns = {
+                c["name"] for c in InventoryAlgorithms.feature_columns(geodataset)
+            }
+            if filter_column not in valid_columns:
+                return HttpResponseBadRequest(
+                    f"'{filter_column}' is not a filterable column of this dataset."
+                )
+            filter_spec = f"{filter_column}={filter_value}"
+            if len(filter_spec) > 56:
+                return HttpResponseBadRequest("The feature filter is too long.")
+
         with transaction.atomic():
             algorithm, _created = InventoryAlgorithm.objects.get_or_create(
                 source_module=GENERIC_MODULE_PATH,
@@ -423,6 +444,26 @@ class ScenarioAddInventoryAlgorithmView(
             )
             algorithm.feedstocks.add(feedstock.material)
             values = {}
+            if filter_spec:
+                parameter = InventoryAlgorithmParameter.objects.filter(
+                    inventory_algorithm=algorithm, short_name="feature_filter"
+                ).first()
+                if parameter is None:
+                    parameter = InventoryAlgorithmParameter.objects.create(
+                        descriptive_name="Feature filter",
+                        short_name="feature_filter",
+                    )
+                    parameter.inventory_algorithm.add(algorithm)
+                values[parameter] = [
+                    InventoryAlgorithmParameterValue.objects.create(
+                        name=filter_spec,
+                        parameter=parameter,
+                        value=1.0,
+                        type=InventoryAlgorithmParameterValue.ValueType.SELECTION,
+                        source="User selection",
+                        is_custom=True,
+                    )
+                ]
             for spec in kwarg_specs:
                 parameter = InventoryAlgorithmParameter.objects.filter(
                     inventory_algorithm=algorithm, short_name=spec["name"]
@@ -670,6 +711,10 @@ class GeoDatasetFunctionsAPIView(LoginRequiredMixin, APIView):
                 algorithms = algorithms.filter(feedstocks=feedstock.material)
             except SampleSeries.DoesNotExist:
                 algorithms = algorithms.none()
+        try:
+            columns = InventoryAlgorithms.feature_columns(geodataset)
+        except Exception:
+            columns = []
         return Response(
             {
                 "geometry_family": InventoryAlgorithms.geometry_family(geodataset),
@@ -678,6 +723,7 @@ class GeoDatasetFunctionsAPIView(LoginRequiredMixin, APIView):
                     {"id": algorithm.pk, "name": str(algorithm)}
                     for algorithm in algorithms.order_by("name").distinct()
                 ],
+                "columns": columns,
             }
         )
 

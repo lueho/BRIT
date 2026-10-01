@@ -12,7 +12,10 @@ from django.db import connection, models
 from django.db.models import QuerySet
 
 from maps.models import Catchment, GeoDataset
-from maps.runtime_adapters import get_dataset_runtime_adapter
+from maps.runtime_adapters import (
+    IDENTIFIER_PATTERN,
+    get_dataset_runtime_adapter,
+)
 from utils.properties.units import get_unit_registry
 
 from .exceptions import EmptyQueryset
@@ -239,9 +242,16 @@ class InventoryAlgorithmsBase:
 GENERIC_MODULE_PATH = "inventories.algorithms"
 
 # Kwargs that wire the run to the scenario context; every other keyword argument
-# is treated as a factor in the production chain.
+# is treated as a factor in the production chain. ``feature_filter`` restricts
+# the features that feed the inventory (encoded as "column=value").
 RESERVED_ALGORITHM_KWARGS = frozenset(
-    ("catchment_id", "scenario_id", "feedstock_id", "geodataset_id")
+    (
+        "catchment_id",
+        "scenario_id",
+        "feedstock_id",
+        "geodataset_id",
+        "feature_filter",
+    )
 )
 
 # Equal-area projection used to measure polygon areas of model features.
@@ -291,7 +301,10 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         geodataset = cls._resolve_geodataset(kwargs)
         catchment_geom = cls._catchment_geometry(kwargs)
         factors = cls._factors(kwargs)
-        geometries = cls._intersecting_geometries(geodataset, catchment_geom)
+        feature_filter = cls._feature_filter(kwargs)
+        geometries = cls._intersecting_geometries(
+            geodataset, catchment_geom, feature_filter
+        )
 
         per_feature, _ = cls._production(1.0, "", factors)
         total, unit = cls._production(float(len(geometries)), "", factors)
@@ -314,7 +327,8 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         geodataset = cls._resolve_geodataset(kwargs)
         catchment_geom = cls._catchment_geometry(kwargs)
         factors = cls._factors(kwargs)
-        clipped = cls._clipped_areas(geodataset, catchment_geom)
+        feature_filter = cls._feature_filter(kwargs)
+        clipped = cls._clipped_areas(geodataset, catchment_geom, feature_filter)
 
         registry = get_unit_registry()
         total_area_m2 = sum(area for _, area in clipped)
@@ -422,6 +436,106 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
             value *= factor["value"]
         return value, "Mg/a"
 
+    @staticmethod
+    def _feature_filter(kwargs):
+        """Parse the optional feature filter ("column=value").
+
+        Accepts the selection-value dict produced by the execution plan
+        (``{"selection": "column=value", ...}``) or a plain string. Returns a
+        ``(column, value)`` tuple or None.
+        """
+        raw = kwargs.get("feature_filter")
+        if not raw:
+            return None
+        spec = (
+            raw.get("selection") or raw.get("value") or ""
+            if isinstance(raw, Mapping)
+            else str(raw)
+        )
+        column, sep, value = str(spec).partition("=")
+        column, value = column.strip(), value.strip()
+        if not sep or not column or not value:
+            raise ImproperlyConfigured(
+                "feature_filter must be given as 'column=value'."
+            )
+        return column, value
+
+    @classmethod
+    def feature_columns(cls, geodataset):
+        """Filterable feature attribute columns with sampled distinct values.
+
+        Returns ``[{"name": ..., "values": [...]}]`` for non-geometry,
+        non-primary-key columns — e.g. the crop column of a parcels dataset.
+        """
+        adapter = get_dataset_runtime_adapter(geodataset)
+        if getattr(adapter, "uses_local_relation", False):
+            return cls._relation_feature_columns(adapter)
+        return cls._model_feature_columns(adapter.model)
+
+    _FEATURE_COLUMN_FIELD_TYPES = (
+        models.CharField,
+        models.TextField,
+        models.IntegerField,
+        models.BooleanField,
+    )
+
+    @classmethod
+    def _model_feature_columns(cls, model):
+        columns = []
+        for field in model._meta.get_fields():
+            if (
+                not getattr(field, "concrete", False)
+                or field.is_relation
+                or field.primary_key
+                or not isinstance(field, cls._FEATURE_COLUMN_FIELD_TYPES)
+            ):
+                continue
+            values = (
+                model.objects.exclude(**{f"{field.name}__isnull": True})
+                .order_by(field.name)
+                .values_list(field.name, flat=True)
+                .distinct()[:51]
+            )
+            columns.append({"name": field.name, "values": [str(v) for v in values]})
+        return columns
+
+    @staticmethod
+    def _relation_feature_columns(adapter):
+        config = adapter.runtime_configuration
+        excluded = {
+            config.primary_key_column,
+            config.geometry_column,
+        }
+        columns = []
+        for column in adapter._get_existing_columns():
+            name = column["column_name"]
+            if name in excluded or column["udt_name"] == "geometry":
+                continue
+            values = adapter._get_distinct_filter_values(name)[:50]
+            columns.append({"name": name, "values": [str(v) for v in values]})
+        return columns
+
+    @classmethod
+    def _validate_feature_filter(cls, adapter, feature_filter):
+        """Ensure the filtered column actually exists on the dataset source."""
+        if feature_filter is None:
+            return
+        column, _value = feature_filter
+        adapter_getter = getattr(adapter, "uses_local_relation", False)
+        if adapter_getter:
+            existing = {c["column_name"] for c in adapter._get_existing_columns()}
+            if column not in existing:
+                raise ImproperlyConfigured(f"Unknown feature filter column '{column}'.")
+            if not IDENTIFIER_PATTERN.match(column):
+                raise ImproperlyConfigured(f"Invalid feature filter column '{column}'.")
+            return
+        try:
+            adapter.model._meta.get_field(column)
+        except Exception:
+            raise ImproperlyConfigured(
+                f"Unknown feature filter column '{column}'."
+            ) from None
+
     @classmethod
     def _geometry_field(cls, model):
         """Return the model's GeometryField, following a one-level FK
@@ -527,15 +641,36 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         return obj
 
     @classmethod
-    def _intersecting_geometries(cls, geodataset, catchment_geom):
+    def _apply_feature_filter(cls, queryset, adapter, feature_filter):
+        """Restrict a model queryset to the features matching the filter."""
+        cls._validate_feature_filter(adapter, feature_filter)
+        if feature_filter is None:
+            return queryset
+        column, value = feature_filter
+        return queryset.filter(**{column: value})
+
+    @staticmethod
+    def _relation_filter_sql(adapter, feature_filter):
+        """Return ``(sql_fragment, params)`` restricting a relation query to
+        features matching the filter, or ``("", [])``."""
+        if feature_filter is None:
+            return "", []
+        column, value = feature_filter
+        quoted = connection.ops.quote_name(column)
+        return f" AND t.{quoted} = %s", [value]
+
+    @classmethod
+    def _intersecting_geometries(cls, geodataset, catchment_geom, feature_filter=None):
         """Return a list of 4326 geometries of all dataset features that
         intersect the catchment boundary."""
         adapter = get_dataset_runtime_adapter(geodataset)
         if getattr(adapter, "uses_local_relation", False):
-            return cls._relation_geometries(adapter, catchment_geom)
+            cls._validate_feature_filter(adapter, feature_filter)
+            return cls._relation_geometries(adapter, catchment_geom, feature_filter)
         model = adapter.model
         accessor = cls._geometry_accessor(model)
         queryset = model.objects.filter(**{f"{accessor}__intersects": catchment_geom})
+        queryset = cls._apply_feature_filter(queryset, adapter, feature_filter)
         geometries = []
         for obj in queryset:
             geom = cls._get_feature_geom(obj, accessor)
@@ -547,15 +682,17 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         return geometries
 
     @classmethod
-    def _clipped_areas(cls, geodataset, catchment_geom):
+    def _clipped_areas(cls, geodataset, catchment_geom, feature_filter=None):
         """Return ``(clipped 4326 MultiPolygon, area in m^2)`` pairs for all
         polygon features intersecting the catchment boundary."""
         adapter = get_dataset_runtime_adapter(geodataset)
         if getattr(adapter, "uses_local_relation", False):
-            return cls._relation_clipped_areas(adapter, catchment_geom)
+            cls._validate_feature_filter(adapter, feature_filter)
+            return cls._relation_clipped_areas(adapter, catchment_geom, feature_filter)
         model = adapter.model
         accessor = cls._geometry_accessor(model)
         queryset = model.objects.filter(**{f"{accessor}__intersects": catchment_geom})
+        queryset = cls._apply_feature_filter(queryset, adapter, feature_filter)
         clipped = []
         for obj in queryset:
             geom = cls._get_feature_geom(obj, accessor)
@@ -592,23 +729,26 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         )
 
     @classmethod
-    def _relation_geometries(cls, adapter, catchment_geom):
+    def _relation_geometries(cls, adapter, catchment_geom, feature_filter=None):
         relation, geom_col, _pk_col = cls._relation_columns(adapter)
+        filter_sql, filter_params = cls._relation_filter_sql(adapter, feature_filter)
         query = f"""-- noinspection SqlResolve
             WITH mask AS (SELECT ST_GeomFromEWKT(%s) AS geom)
             SELECT ST_AsEWKT(ST_Transform(t.{geom_col}, 4326)) AS geom
             FROM {relation} t, mask
             WHERE t.{geom_col} IS NOT NULL
               AND ST_Intersects(ST_Transform(t.{geom_col}, 4326), mask.geom)
+              {filter_sql}
             ORDER BY t.{_pk_col}
         """
         with connection.cursor() as cursor:
-            cursor.execute(query, [catchment_geom.ewkt])
+            cursor.execute(query, [catchment_geom.ewkt, *filter_params])
             return [GEOSGeometry(row[0]) for row in cursor.fetchall()]
 
     @classmethod
-    def _relation_clipped_areas(cls, adapter, catchment_geom):
+    def _relation_clipped_areas(cls, adapter, catchment_geom, feature_filter=None):
         relation, geom_col, pk_col = cls._relation_columns(adapter)
+        filter_sql, filter_params = cls._relation_filter_sql(adapter, feature_filter)
         query = f"""-- noinspection SqlResolve
             WITH mask AS (SELECT ST_GeomFromEWKT(%s) AS geom)
             SELECT ST_AsEWKT(ST_Multi(clipped.geom)) AS geom,
@@ -619,10 +759,11 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
                 FROM {relation} t, mask
                 WHERE t.{geom_col} IS NOT NULL
                   AND ST_Intersects(mask.geom, ST_Transform(t.{geom_col}, 4326))
+                  {filter_sql}
             ) clipped
             WHERE ST_Dimension(clipped.geom) = 2
             ORDER BY clipped.id
         """
         with connection.cursor() as cursor:
-            cursor.execute(query, [catchment_geom.ewkt])
+            cursor.execute(query, [catchment_geom.ewkt, *filter_params])
             return [(GEOSGeometry(row[0]), float(row[1])) for row in cursor.fetchall()]
