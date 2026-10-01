@@ -4,12 +4,17 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
 from django.test import TestCase
+from django.urls import reverse
 
+from inventories.evaluations import ScenarioResult
 from inventories.models import (
     InventoryAlgorithm,
     Scenario,
     ScenarioInventoryConfiguration,
+    ScenarioStatus,
 )
+from inventories.tasks import finalize_inventory, run_inventory_algorithm
+from layer_manager.models import Layer
 from maps.models import (
     Catchment,
     GeoDataset,
@@ -18,11 +23,13 @@ from maps.models import (
     Region,
 )
 from maps.runtime_adapters import DatasetRuntimeAdapter
+from materials.models import Material, SampleSeries
 from sources.sotasen.inventory.algorithms import (
     GRASSLAND_LAND_USE,
     LAND_USE_FIELD,
     InventoryAlgorithms,
 )
+from utils.object_management.models import User
 
 POLYGON_GEOJSON = {
     "type": "Polygon",
@@ -330,6 +337,83 @@ class SotasenGrassToProteinLocalRelationTestCase(TestCase):
     def tearDown(self):
         with connection.cursor() as cursor:
             cursor.execute(f"DROP TABLE IF EXISTS public.{self.relation_name}")
+
+    def run_scenario(self, boundary):
+        region = Region.objects.create(name="Comparison catchment")
+        region.geom = GEOSGeometry(boundary, srid=4326)
+        region.save(update_fields=["borders"])
+        catchment = Catchment.objects.create(
+            name=region.name, region=region, parent_region=self.region
+        )
+        scenario = Scenario.objects.create(
+            name="Workshop variant",
+            region=self.region,
+            catchment=catchment,
+            owner=User.objects.create_user(username="workshop-variant-owner"),
+        )
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Grass-to-protein",
+            source_module="sources.sotasen.inventory.algorithms",
+            function_name="sotasen_grass_to_protein",
+            geodataset=self.dataset,
+        )
+        feedstock = SampleSeries.objects.create(
+            name="Grass", material=Material.objects.create(name="Grass")
+        )
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=scenario,
+            inventory_algorithm=algorithm,
+            geodataset=self.dataset,
+            feedstock=feedstock,
+        )
+        scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        execution = scenario.inventory_execution_plan()[0]
+        success = run_inventory_algorithm.run(algorithm.pk, **execution["kwargs"])
+        finalize_inventory.run([success], scenario.pk, [[algorithm.pk, feedstock.pk]])
+
+        scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(scenario.status, ScenarioStatus.Status.FINISHED)
+        return scenario, Layer.objects.get(scenario=scenario)
+
+    def test_scenario_stores_single_multipart_and_boundary_contact_intersections(self):
+        scenario, layer = self.run_scenario(
+            "MULTIPOLYGON("
+            "((13.0 58.0, 13.05 58.0, 13.05 58.1, 13.0 58.1, 13.0 58.0)),"
+            "((13.1 58.04, 13.11 58.04, 13.11 58.06, 13.1 58.06, 13.1 58.04)),"
+            "((13.2 58.0, 13.225 58.0, 13.225 58.1, 13.2 58.1, 13.2 58.0)),"
+            "((13.275 58.0, 13.3 58.0, 13.3 58.1, 13.275 58.1, 13.275 58.0)))"
+        )
+
+        features = list(layer.get_feature_collection().objects.order_by("area_ha"))
+        self.assertEqual(layer.geom_type, "MultiPolygon")
+        self.assertEqual([len(feature.geom) for feature in features], [1, 2])
+        self.assertAlmostEqual(
+            layer.layeraggregatedvalue_set.get(name="Grassland area").value,
+            55.13,
+            places=6,
+        )
+        for feature in features:
+            self.assertTrue(scenario.catchment.geom.covers(feature.geom))
+
+    def test_scenario_with_no_overlap_publishes_zero_results(self):
+        scenario, layer = self.run_scenario(
+            "MULTIPOLYGON(((14.0 58.0, 14.1 58.0, 14.1 58.1, 14.0 58.1, 14.0 58.0)))"
+        )
+
+        self.assertEqual(layer.get_feature_collection().objects.count(), 0)
+        self.assertEqual(
+            list(layer.layeraggregatedvalue_set.values_list("value", flat=True)),
+            [0.0] * 4,
+        )
+        result = ScenarioResult(scenario)
+        self.assertEqual(result.total_production().data, {"Total": 0.0})
+        self.assertIn("productionPerFeedstockBarChart", result.get_charts())
+        self.assertEqual(len(layer.as_dict()["aggregated_results"]), 4)
+        self.client.force_login(scenario.owner)
+        response = self.client.get(reverse("scenario-result", args=[scenario.pk]))
+        self.assertContains(response, "Grassland area: 0 ha")
+        self.assertContains(response, "Recovered protein: 0 Mg/a")
 
     def test_end_to_end_with_real_adapter(self):
         result = InventoryAlgorithms.sotasen_grass_to_protein(

@@ -78,10 +78,13 @@ class LayerManager(models.Manager):
 
         With ``staged=True`` the result is written to a hidden staged layer that
         replaces the live layer only when :meth:`Layer.publish` is called.
+        Empty feature lists require an explicit ``geom_type`` in the results.
         """
         results = kwargs.pop("results")
 
-        if "features" not in results or len(results["features"]) == 0:
+        if "features" not in results or (
+            not results["features"] and "geom_type" not in results
+        ):
             raise NoFeaturesProvided(results)
         else:
             features = results["features"]
@@ -102,7 +105,7 @@ class LayerManager(models.Manager):
             # data type could be detected. They should be omitted but this information should be logged
             # TODO: add omitted columns info to log
 
-            kwargs["geom_type"] = fields.pop("geom")
+            kwargs["geom_type"] = fields.pop("geom", results.get("geom_type"))
             if kwargs["geom_type"] not in self.supported_geometry_types:
                 raise InvalidGeometryType(kwargs["geom_type"])
 

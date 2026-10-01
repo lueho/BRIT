@@ -26,7 +26,12 @@ mapping keyed by the parameter's ``short_name``.
 import json
 from collections.abc import Mapping
 
-from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.gis.geos import (
+    GeometryCollection,
+    GEOSGeometry,
+    MultiPolygon,
+    Polygon,
+)
 from django.core.exceptions import ImproperlyConfigured
 
 from inventories.algorithms import InventoryAlgorithmsBase
@@ -100,6 +105,8 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
             "aggregated_distributions": [],
             "features": [],
         }
+        if catchment_geom is not None:
+            result["geom_type"] = "MultiPolygon"
 
         total_area_ha = 0.0
         for feature in feature_collection.get("features", []):
@@ -116,9 +123,10 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
                 srid=4326,
             )
             if catchment_geom is not None:
-                clipped = geom.intersection(catchment_geom)
-                if clipped.empty or clipped.area == 0:
+                polygons = cls._polygon_parts(geom.intersection(catchment_geom))
+                if not polygons:
                     continue
+                clipped = MultiPolygon(polygons, srid=4326)
                 parcel_area = geom.transform(AREA_SRID, clone=True).area
                 clipped_area = clipped.transform(AREA_SRID, clone=True).area
                 area_ha *= clipped_area / parcel_area
@@ -161,6 +169,16 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         ]
 
         return result
+
+    @classmethod
+    def _polygon_parts(cls, geom: GEOSGeometry) -> list[Polygon]:
+        if geom.empty:
+            return []
+        if isinstance(geom, Polygon):
+            return [geom]
+        if isinstance(geom, (MultiPolygon, GeometryCollection)):
+            return [polygon for part in geom for polygon in cls._polygon_parts(part)]
+        return []
 
     @staticmethod
     def _resolve_geodataset(kwargs):
