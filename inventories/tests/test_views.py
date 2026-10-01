@@ -802,6 +802,16 @@ class ScenarioCustomParameterValueTests(TestCase):
             },
         )
 
+    def test_update_view_heading_describes_update(self):
+        self.scenario.add_inventory_algorithm(
+            self.feedstock, self.algorithm, {self.parameter: [self.preset]}
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(self._update_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Add an algorithm")
+        self.assertContains(response, "Change the algorithm configuration")
+
     def test_update_view_renders_form_media_and_selected_options(self):
         self.scenario.add_inventory_algorithm(
             self.feedstock, self.algorithm, {self.parameter: [self.preset]}

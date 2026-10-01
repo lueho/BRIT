@@ -3,7 +3,7 @@
 {% block content %}
     {% load crispy_forms_tags %}
 
-    <h2 class="test">Add an algorithm to the scenario "{{ scenario.name }}"</h2>
+    <h2 class="test">Change the algorithm configuration of the scenario "{{ scenario.name }}"</h2>
     <form method="post" id="configForm">
         {% csrf_token %}
         {{ form|crispy }}
