@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    GeoDatasetFunctionsAPIView,
     InventoriesExplorerView,
     InventoryAlgorithmAutocompleteView,
     InventoryAlgorithmParametersAPIView,
@@ -52,6 +53,11 @@ urlpatterns = [
         "api/inventory-algorithms/<int:algorithm_pk>/parameters/",
         InventoryAlgorithmParametersAPIView.as_view(),
         name="api-inventoryalgorithm-parameters",
+    ),
+    path(
+        "api/geodatasets/<int:geodataset_pk>/functions/",
+        GeoDatasetFunctionsAPIView.as_view(),
+        name="api-geodataset-functions",
     ),
     path("scenarios/", PublishedScenarioFilterView.as_view(), name="scenario-list"),
     path(

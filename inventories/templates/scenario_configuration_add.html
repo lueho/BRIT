@@ -1,6 +1,7 @@
 {% extends "simple_form_card.html" %}
 
 {% block extra_post_form_content %}
+    <div id="algorithmChoiceContainer" class="form-group"></div>
     <div id="parameterFormContainer" class="form-group"></div>
 {% endblock extra_post_form_content %}
 
@@ -72,28 +73,128 @@
             valueInput.required = isCustom;
         }
 
-        async function loadInventoryAlgorithmParameters() {
-            const algorithmId = form.inventory_algorithm.value;
-            if (!algorithmId) {
-                document.getElementById("parameterFormContainer").innerHTML = "";
+        function addKwargRow() {
+            const rows = document.getElementById("kwargRows");
+            if (!rows) {
                 return;
             }
+            const row = document.createElement("div");
+            row.className = "kwarg-row form-row mb-2";
+            row.innerHTML = `
+                <input type="text" class="form-control" name="kwarg_name"
+                       placeholder="Factor name (e.g. area_yield)" maxlength="28"
+                       pattern="\\w{1,28}" required>
+                <input type="number" step="any" class="form-control" name="kwarg_value"
+                       placeholder="Value" required>
+                <input type="number" step="any" class="form-control" name="kwarg_standard_deviation"
+                       placeholder="Std. dev. (optional)">
+                <input type="text" class="form-control" name="kwarg_unit"
+                       placeholder="Unit (optional, e.g. kg / hectare / year)" maxlength="20">
+                <button type="button" class="btn btn-outline-danger remove-kwarg">Remove</button>
+            `;
+            row.querySelector(".remove-kwarg").addEventListener("click", () => row.remove());
+            rows.appendChild(row);
+        }
 
+        function renderKwargEditor() {
+            const container = document.getElementById("parameterFormContainer");
+            container.innerHTML = `
+                <h3>Factors</h3>
+                <p class="text-muted">Each factor is multiplied into the production chain.</p>
+                <div id="kwargRows"></div>
+                <button type="button" id="addKwarg" class="btn btn-outline-primary">Add factor</button>
+            `;
+            document.getElementById("addKwarg").addEventListener("click", addKwargRow);
+            addKwargRow();
+        }
+
+        async function loadRegisteredAlgorithmParameters(algorithmId) {
             const url = `/inventories/api/inventory-algorithms/${algorithmId}/parameters/?scenario={{ scenario.pk }}`;
             try {
                 const response = await fetch(url);
                 if (response.ok) {
-                    const parameters = await response.json();
-                    renderParameterFields(parameters);
+                    renderParameterFields(await response.json());
                 }
             } catch (err) {
                 console.error("Error loading parameters:", err);
             }
         }
 
-        const algorithmField = document.getElementById("id_inventory_algorithm");
-        if (algorithmField) {
-            algorithmField.addEventListener("change", loadInventoryAlgorithmParameters);
+        function onAlgorithmChoiceChange() {
+            const select = document.getElementById("id_algorithm_choice");
+            const value = select ? select.value : "";
+            if (value.startsWith("generic:")) {
+                renderKwargEditor();
+            } else if (value.startsWith("algo:")) {
+                loadRegisteredAlgorithmParameters(value.substring(5));
+            } else {
+                document.getElementById("parameterFormContainer").innerHTML = "";
+            }
+        }
+
+        function renderAlgorithmChoices(data) {
+            const container = document.getElementById("algorithmChoiceContainer");
+            const generic = data.functions || [];
+            const registered = data.algorithms || [];
+            if (generic.length === 0 && registered.length === 0) {
+                container.innerHTML = "";
+                return;
+            }
+            let options = '<option value="">---------</option>';
+            if (generic.length > 0) {
+                options += '<optgroup label="Generic algorithms">';
+                for (const fn of generic) {
+                    options += `<option value="generic:${escapeHtml(fn.function_name)}">${escapeHtml(fn.name)}</option>`;
+                }
+                options += "</optgroup>";
+            }
+            if (registered.length > 0) {
+                options += '<optgroup label="Dataset algorithms">';
+                for (const algo of registered) {
+                    options += `<option value="algo:${algo.id}">${escapeHtml(algo.name)}</option>`;
+                }
+                options += "</optgroup>";
+            }
+            container.innerHTML = `
+                <label class="requiredField" for="id_algorithm_choice">Inventory algorithm</label>
+                <select id="id_algorithm_choice" class="select form-control" name="algorithm_choice" required>
+                    ${options}
+                </select>
+            `;
+            document
+                .getElementById("id_algorithm_choice")
+                .addEventListener("change", onAlgorithmChoiceChange);
+            document.getElementById("parameterFormContainer").innerHTML = "";
+        }
+
+        async function loadAlgorithmChoices() {
+            const geodatasetField = document.getElementById("id_geodataset");
+            const feedstockField = document.getElementById("id_feedstock");
+            const geodatasetId = geodatasetField ? geodatasetField.value : "";
+            if (!geodatasetId) {
+                document.getElementById("algorithmChoiceContainer").innerHTML = "";
+                document.getElementById("parameterFormContainer").innerHTML = "";
+                return;
+            }
+            let url = `/inventories/api/geodatasets/${geodatasetId}/functions/`;
+            if (feedstockField && feedstockField.value) {
+                url += `?feedstock=${feedstockField.value}`;
+            }
+            try {
+                const response = await fetch(url);
+                if (response.ok) {
+                    renderAlgorithmChoices(await response.json());
+                }
+            } catch (err) {
+                console.error("Error loading algorithms:", err);
+            }
+        }
+
+        for (const fieldId of ["id_geodataset", "id_feedstock"]) {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.addEventListener("change", loadAlgorithmChoices);
+            }
         }
     </script>
 

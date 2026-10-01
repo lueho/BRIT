@@ -247,6 +247,28 @@ RESERVED_ALGORITHM_KWARGS = frozenset(
 # Equal-area projection used to measure polygon areas of model features.
 AREA_MEASUREMENT_SRID = 6933
 
+GENERIC_FUNCTION_LABELS = {
+    "count_based_production": "Count-based production",
+    "area_based_production": "Area-based production",
+}
+
+# Which generic functions a dataset's geometry family supports. Datasets whose
+# geometry cannot be classified (mixed collections, unresolvable sources)
+# offer all generic functions — the algorithms degrade gracefully.
+GEOMETRY_FAMILY_FUNCTIONS = {
+    "point": ("count_based_production",),
+    "polygon": ("area_based_production",),
+}
+
+_GEOMETRY_TYPE_FAMILIES = {
+    "POINT": "point",
+    "MULTIPOINT": "point",
+    "POLYGON": "polygon",
+    "MULTIPOLYGON": "polygon",
+    "LINESTRING": "line",
+    "MULTILINESTRING": "line",
+}
+
 
 class InventoryAlgorithms(InventoryAlgorithmsBase):
     """Generic, dataset-agnostic inventory algorithms.
@@ -401,6 +423,20 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         return value, "Mg/a"
 
     @classmethod
+    def _geometry_field(cls, model):
+        """Return the model's GeometryField, following a one-level FK
+        indirection (e.g. Region.borders -> GeoPolygon.geom)."""
+        for field in model._meta.get_fields():
+            if isinstance(field, GeometryField):
+                return field
+        for field in model._meta.get_fields():
+            if isinstance(field, models.ForeignKey) and field.related_model:
+                for related in field.related_model._meta.get_fields():
+                    if isinstance(related, GeometryField):
+                        return related
+        return None
+
+    @classmethod
     def _geometry_accessor(cls, model):
         """Return the ORM path to the model's geometry ('geom' or e.g.
         'borders__geom' for models that hold geometry on a related object)."""
@@ -413,6 +449,74 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
                     if isinstance(related, GeometryField):
                         return f"{field.name}__{related.name}"
         raise ImproperlyConfigured(f"{model._meta.label} has no geometry field.")
+
+    # -- geometry family / function discovery --------------------------------
+
+    @staticmethod
+    def _family_for_geometry_type(geom_type):
+        """Map a PostGIS type name ('POINT', 'ST_MultiPolygon', ...) to a
+        geometry family: 'point', 'polygon', 'line' or None."""
+        normalized = str(geom_type or "").upper()
+        normalized = normalized.removeprefix("ST_")
+        return _GEOMETRY_TYPE_FAMILIES.get(normalized)
+
+    @classmethod
+    def _relation_geometry_family(cls, adapter):
+        """Geometry family of a local_relation dataset, from the PostGIS
+        geometry_columns metadata, falling back to sampling actual rows."""
+        config = adapter.runtime_configuration
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT type FROM geometry_columns
+                WHERE f_table_schema = %s AND f_table_name = %s
+                  AND f_geometry_column = %s
+                """,
+                [
+                    config.schema_name,
+                    config.relation_name,
+                    config.geometry_column,
+                ],
+            )
+            types = [row[0] for row in cursor.fetchall() if row[0]]
+            if not types or any(t == "GEOMETRY" for t in types):
+                geom_col = connection.ops.quote_name(config.geometry_column)
+                cursor.execute(
+                    f"SELECT DISTINCT ST_GeometryType(t.{geom_col}) "
+                    f"FROM {adapter.relation_identifier} t "
+                    f"WHERE t.{geom_col} IS NOT NULL LIMIT 5"
+                )
+                types = [row[0] for row in cursor.fetchall() if row[0]]
+        families = {cls._family_for_geometry_type(t) for t in types}
+        families.discard(None)
+        return families.pop() if len(families) == 1 else None
+
+    @classmethod
+    def geometry_family(cls, geodataset):
+        """Return 'point', 'polygon', 'line' or None for a GeoDataset.
+
+        None means the geometry could not be classified — either the dataset
+        source cannot be resolved or the geometry column holds mixed types.
+        """
+        try:
+            adapter = get_dataset_runtime_adapter(geodataset)
+        except ImproperlyConfigured:
+            return None
+        if getattr(adapter, "uses_local_relation", False):
+            return cls._relation_geometry_family(adapter)
+        field = cls._geometry_field(adapter.model)
+        if field is None:
+            return None
+        return cls._family_for_geometry_type(field.geom_type)
+
+    @classmethod
+    def generic_functions(cls, geodataset):
+        """Return the generic function names applicable to a dataset,
+        determined by its geometry family."""
+        family = cls.geometry_family(geodataset)
+        return list(
+            GEOMETRY_FAMILY_FUNCTIONS.get(family, GENERIC_FUNCTION_LABELS.keys())
+        )
 
     @staticmethod
     def _get_feature_geom(obj, accessor):

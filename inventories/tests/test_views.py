@@ -319,6 +319,264 @@ class ScenarioResultCRUDViewsTestCase(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class GeoDatasetFunctionsAPITestCase(TestCase):
+    """The functions API tells the add-inventory form which generic
+    algorithms apply to the selected dataset's geometry."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(username="fn-user", password="pass")
+        cls.region = Region.objects.create(
+            name="FN Region", publication_status="published"
+        )
+        cls.point_dataset = GeoDataset.objects.create(
+            name="Points",
+            region=cls.region,
+            model_name="NantesGreenhouses",
+            publication_status="published",
+        )
+        cls.polygon_dataset = GeoDataset.objects.create(
+            name="Parcels",
+            region=cls.region,
+            model_name="NutsRegion",
+            publication_status="published",
+        )
+
+    def _get(self, dataset):
+        self.client.force_login(self.user)
+        return self.client.get(
+            reverse("api-geodataset-functions", kwargs={"geodataset_pk": dataset.pk})
+        )
+
+    def test_point_dataset_offers_count_based(self):
+        response = self._get(self.point_dataset)
+        self.assertEqual(response.status_code, 200)
+        names = [f["function_name"] for f in response.json()["functions"]]
+        self.assertEqual(names, ["count_based_production"])
+
+    def test_polygon_dataset_offers_area_based(self):
+        response = self._get(self.polygon_dataset)
+        self.assertEqual(response.status_code, 200)
+        names = [f["function_name"] for f in response.json()["functions"]]
+        self.assertEqual(names, ["area_based_production"])
+
+    def test_response_includes_labels(self):
+        response = self._get(self.point_dataset)
+        functions = response.json()["functions"]
+        self.assertEqual(functions[0]["name"], "Count-based production")
+
+    def test_anonymous_is_denied(self):
+        response = self.client.get(
+            reverse(
+                "api-geodataset-functions",
+                kwargs={"geodataset_pk": self.point_dataset.pk},
+            )
+        )
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_unknown_dataset_returns_404(self):
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("api-geodataset-functions", kwargs={"geodataset_pk": 999999})
+        )
+        self.assertEqual(response.status_code, 404)
+
+
+class ScenarioGeodatasetAutocompleteRegionScopeTestCase(TestCase):
+    """In the generic flow the geodataset dropdown is driven by the
+    scenario's region — a feedstock filter may optionally narrow it."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(username="ac-user", password="pass")
+        cls.region = Region.objects.create(
+            name="Scope Region", publication_status="published"
+        )
+        cls.other_region = Region.objects.create(
+            name="Other Region", publication_status="published"
+        )
+        cls.scenario = Scenario.objects.create(name="Scope Scenario", region=cls.region)
+        cls.dataset_in_region = GeoDataset.objects.create(
+            name="In-region dataset",
+            region=cls.region,
+            publication_status="published",
+        )
+        cls.dataset_other_region = GeoDataset.objects.create(
+            name="Other-region dataset",
+            region=cls.other_region,
+            publication_status="published",
+        )
+
+    def test_region_scoped_listing_without_feedstock(self):
+        """With only the scenario filter the dropdown lists all datasets in
+        the scenario's region, regardless of pre-registered algorithms."""
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("scenario-geodataset-autocomplete"),
+            {"f": f"'scenario__scenario_id={self.scenario.id}'"},
+        )
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(self.dataset_in_region.id, ids)
+        self.assertNotIn(self.dataset_other_region.id, ids)
+
+
+class GenericAlgorithmAddViewTestCase(TestCase):
+    """POSTing a generic_function + kwarg rows materializes the algorithm
+    record, its parameters and the configuration entries."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="gen-owner", password="pass")
+        change_perm = Permission.objects.get(codename="change_scenario")
+        cls.owner.user_permissions.add(change_perm)
+        cls.region = Region.objects.create(
+            name="Gen Region", publication_status="published"
+        )
+        catchment = Catchment.objects.create(
+            name="Gen Catchment",
+            region=cls.region,
+            parent_region=cls.region,
+            publication_status="published",
+        )
+        cls.scenario = Scenario.objects.create(
+            name="Gen Scenario",
+            owner=cls.owner,
+            region=cls.region,
+            catchment=catchment,
+        )
+        cls.material = Material.objects.create(name="Gen Material")
+        cls.feedstock = SampleSeries.objects.create(
+            name="Gen Series", material=cls.material
+        )
+        cls.point_dataset = GeoDataset.objects.create(
+            name="Gen Points",
+            region=cls.region,
+            model_name="NantesGreenhouses",
+            publication_status="published",
+        )
+        cls.other_region_dataset = GeoDataset.objects.create(
+            name="Foreign dataset",
+            region=Region.objects.create(
+                name="Foreign region", publication_status="published"
+            ),
+            model_name="NantesGreenhouses",
+            publication_status="published",
+        )
+
+    def _url(self):
+        return reverse("scenario-add-configuration", kwargs={"pk": self.scenario.pk})
+
+    def _post(self, **overrides):
+        data = {
+            "feedstock": self.feedstock.pk,
+            "geodataset": self.point_dataset.pk,
+            "generic_function": "count_based_production",
+        }
+        data.update(overrides)
+        self.client.force_login(self.owner)
+        return self.client.post(self._url(), data)
+
+    def test_creates_algorithm_config_and_parameters(self):
+        response = self._post(
+            kwarg_name=["point_yield", "availability"],
+            kwarg_value=["12.5", "0.8"],
+            kwarg_unit=["kg / year", ""],
+        )
+        self.assertEqual(response.status_code, 302)
+
+        algorithm = InventoryAlgorithm.objects.get(
+            geodataset=self.point_dataset,
+            function_name="count_based_production",
+        )
+        self.assertEqual(algorithm.source_module, "inventories.algorithms")
+        self.assertIn(self.material, algorithm.feedstocks.all())
+
+        configs = ScenarioInventoryConfiguration.objects.filter(
+            scenario=self.scenario, inventory_algorithm=algorithm
+        )
+        self.assertEqual(configs.count(), 2)
+        param_names = set(
+            configs.values_list("inventory_parameter__short_name", flat=True)
+        )
+        self.assertEqual(param_names, {"point_yield", "availability"})
+
+        plan = self.scenario.inventory_execution_plan()
+        kwargs = plan[0]["kwargs"]
+        self.assertEqual(kwargs["point_yield"]["value"], 12.5)
+        self.assertEqual(kwargs["point_yield"]["unit"], "kg / year")
+        self.assertEqual(kwargs["availability"]["value"], 0.8)
+
+    def test_reusing_algorithm_on_second_post(self):
+        self._post(kwarg_name=["f1"], kwarg_value=["1.0"], kwarg_unit=[""])
+        response = self._post(kwarg_name=["f1"], kwarg_value=["2.0"], kwarg_unit=["kg"])
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            InventoryAlgorithm.objects.filter(
+                geodataset=self.point_dataset,
+                function_name="count_based_production",
+            ).count(),
+            1,
+        )
+
+    def test_no_kwargs_still_configures_algorithm(self):
+        response = self._post()
+        self.assertEqual(response.status_code, 302)
+        algorithm = InventoryAlgorithm.objects.get(
+            geodataset=self.point_dataset,
+            function_name="count_based_production",
+        )
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario, inventory_algorithm=algorithm
+            ).exists()
+        )
+
+    def test_geometry_mismatch_returns_400(self):
+        response = self._post(generic_function="area_based_production")
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            InventoryAlgorithm.objects.filter(
+                geodataset=self.point_dataset,
+                function_name="area_based_production",
+            ).exists()
+        )
+
+    def test_dataset_outside_region_returns_400(self):
+        response = self._post(geodataset=self.other_region_dataset.pk)
+        self.assertIn(response.status_code, [400, 404])
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario
+            ).exists()
+        )
+
+    def test_invalid_kwarg_name_returns_400(self):
+        response = self._post(
+            kwarg_name=["not a valid name!"],
+            kwarg_value=["1.0"],
+            kwarg_unit=[""],
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_non_numeric_kwarg_value_returns_400(self):
+        response = self._post(
+            kwarg_name=["yield"],
+            kwarg_value=["banana"],
+            kwarg_unit=["kg"],
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario
+            ).exists()
+        )
+
+    def test_unknown_function_returns_400(self):
+        response = self._post(generic_function="definitely_not_a_function")
+        self.assertEqual(response.status_code, 400)
+
+
 class ScenarioDownloadSummaryAuthTests(TestCase):
     @classmethod
     def setUpTestData(cls):

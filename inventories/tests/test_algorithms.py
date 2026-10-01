@@ -412,6 +412,90 @@ class ExecutionPlanUnitWiringTestCase(GenericAlgorithmBase):
         self.assertEqual(called_kwargs["geodataset_id"], self.dataset.id)
 
 
+class GeometryFamilyTestCase(GenericAlgorithmBase):
+    """geometry_family + generic_functions drive the add-inventory form."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.point_dataset = GeoDataset.objects.create(
+            name="Point dataset", region=cls.region, model_name="NantesGreenhouses"
+        )
+        cls.polygon_dataset = GeoDataset.objects.create(
+            name="Polygon dataset", region=cls.region, model_name="NutsRegion"
+        )
+        cls.unknown_dataset = GeoDataset.objects.create(
+            name="Broken dataset", region=cls.region, model_name="NoSuchModel"
+        )
+        cls.relation_dataset = GeoDataset.objects.create(
+            name="Relation lines", region=cls.region
+        )
+        GeoDatasetRuntimeConfiguration.objects.create(
+            dataset=cls.relation_dataset,
+            backend_type="local_relation",
+            schema_name="public",
+            relation_name="generic_inv_test_lines",
+            geometry_column="geom",
+            primary_key_column="feature_id",
+        )
+
+    def setUp(self):
+        with connection.cursor() as cursor:
+            cursor.execute("DROP TABLE IF EXISTS public.generic_inv_test_lines")
+            cursor.execute(
+                """
+                CREATE TABLE public.generic_inv_test_lines (
+                    feature_id integer PRIMARY KEY,
+                    geom geometry(LineString, 4326)
+                )
+                """
+            )
+            cursor.execute(
+                "INSERT INTO public.generic_inv_test_lines (feature_id, geom) "
+                "VALUES (1, ST_GeomFromText('LINESTRING(0 0, 0.5 0.5)', 4326))"
+            )
+
+    def tearDown(self):
+        with connection.cursor() as cursor:
+            cursor.execute("DROP TABLE IF EXISTS public.generic_inv_test_lines")
+
+    def test_point_model_dataset_is_point_family(self):
+        self.assertEqual(
+            InventoryAlgorithms.geometry_family(self.point_dataset), "point"
+        )
+
+    def test_polygon_model_dataset_is_polygon_family(self):
+        self.assertEqual(
+            InventoryAlgorithms.geometry_family(self.polygon_dataset), "polygon"
+        )
+
+    def test_unresolvable_dataset_returns_none(self):
+        self.assertIsNone(InventoryAlgorithms.geometry_family(self.unknown_dataset))
+
+    def test_relation_geometry_family_from_geometry_columns(self):
+        self.assertEqual(
+            InventoryAlgorithms.geometry_family(self.relation_dataset), "line"
+        )
+
+    def test_generic_functions_for_point_dataset(self):
+        self.assertEqual(
+            InventoryAlgorithms.generic_functions(self.point_dataset),
+            ["count_based_production"],
+        )
+
+    def test_generic_functions_for_polygon_dataset(self):
+        self.assertEqual(
+            InventoryAlgorithms.generic_functions(self.polygon_dataset),
+            ["area_based_production"],
+        )
+
+    def test_generic_functions_for_line_dataset(self):
+        self.assertEqual(
+            sorted(InventoryAlgorithms.generic_functions(self.relation_dataset)),
+            ["area_based_production", "count_based_production"],
+        )
+
+
 class GenericModuleRegistrationTestCase(TestCase):
     def test_inventories_module_is_available(self):
         self.assertIn("inventories.algorithms", InventoryAlgorithm.available_modules())

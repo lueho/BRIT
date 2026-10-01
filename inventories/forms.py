@@ -8,7 +8,7 @@ from maps.models import GeoDataset
 from maps.views import CatchmentAutocompleteView
 from utils.forms import ModalModelFormMixin, SimpleModelForm
 
-from .models import InventoryAlgorithm, Scenario, ScenarioInventoryConfiguration
+from .models import Scenario, ScenarioInventoryConfiguration
 
 
 class SeasonalDistributionModelForm(SimpleModelForm):
@@ -129,13 +129,18 @@ class ScenarioInventoryConfigurationAddForm(ScenarioInventoryConfigurationForm):
         super().__init__(*args, **kwargs)
         del self.fields["inventory_parameter"]
         del self.fields["inventory_value"]
+        # The add form offers generic functions (geometry-driven) plus
+        # registered algorithms via a JS-rendered `algorithm_choice` select,
+        # not a model-bound TomSelect.
+        del self.fields["inventory_algorithm"]
         initial = kwargs.get("initial")
         self.fields["scenario"].queryset = Scenario.objects.all()
         self.fields["scenario"].initial = initial.get("scenario")
         self.fields["scenario"].widget = HiddenInput()
         self.fields["feedstock"].queryset = initial.get("feedstocks")
         self.fields["geodataset"].queryset = GeoDataset.objects.none()
-        self.fields["inventory_algorithm"].queryset = InventoryAlgorithm.objects.none()
+        # Dataset-first flow: geodataset drives the function options.
+        self.fields["feedstock"] = self.fields.pop("feedstock")
 
 
 class ScenarioInventoryConfigurationUpdateForm(ScenarioInventoryConfigurationForm):
