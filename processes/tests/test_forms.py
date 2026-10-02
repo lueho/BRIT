@@ -9,22 +9,20 @@ from materials.models import Material
 from utils.properties.models import Unit
 
 from ..forms import (
-    ProcessAuthorFormSet,
-    ProcessAuthorInlineForm,
+    ProcessAuthorSectionForm,
     ProcessCategoryModalModelForm,
     ProcessCategoryModelForm,
+    ProcessMaterialSectionForm,
     ProcessModalModelForm,
     ProcessModelForm,
-    ProcessSourceFormSet,
-    ProcessSourceInlineForm,
-    build_process_material_formset,
-    build_process_operating_parameter_formset,
+    ProcessParameterSectionForm,
+    ProcessSectionFormSet,
+    ProcessSourceSectionForm,
 )
 from ..models import (
     Process,
     ProcessAuthor,
     ProcessCategory,
-    ProcessMaterial,
     ProcessOperatingParameter,
     ProcessSource,
 )
@@ -98,8 +96,8 @@ class ProcessFormTestCase(TestCase):
         formset_class = inlineformset_factory(
             Process,
             ProcessAuthor,
-            form=ProcessAuthorInlineForm,
-            formset=ProcessAuthorFormSet,
+            form=ProcessAuthorSectionForm,
+            formset=ProcessSectionFormSet,
             extra=0,
             can_delete=True,
         )
@@ -133,8 +131,8 @@ class ProcessFormTestCase(TestCase):
         formset_class = inlineformset_factory(
             Process,
             ProcessSource,
-            form=ProcessSourceInlineForm,
-            formset=ProcessSourceFormSet,
+            form=ProcessSourceSectionForm,
+            formset=ProcessSectionFormSet,
             extra=0,
             can_delete=True,
         )
@@ -254,12 +252,11 @@ class ProcessFormTestCase(TestCase):
         )
 
 
-class ProcessMaterialFormSetTestCase(TestCase):
-    """Test ProcessMaterial inline formset."""
+class ProcessMaterialSectionFormTestCase(TestCase):
+    """Test the workspace section form for process materials."""
 
     def setUp(self):
         self.owner = get_user_model().objects.create(username="test_user")
-        self.process = Process.objects.create(name="Test Process", owner=self.owner)
         self.material = Material.objects.create(
             name="Test Material",
             owner=self.owner,
@@ -270,98 +267,65 @@ class ProcessMaterialFormSetTestCase(TestCase):
             owner=self.owner,
             publication_status="published",
         )
-        self.formset_class = build_process_material_formset()
 
-    def test_valid_formset(self):
-        """Valid formset data should be valid."""
-        formset = self.formset_class(
+    def test_valid_form(self):
+        """Valid data should be valid."""
+        form = ProcessMaterialSectionForm(
             data={
-                "process_materials-TOTAL_FORMS": "1",
-                "process_materials-INITIAL_FORMS": "0",
-                "process_materials-MIN_NUM_FORMS": "0",
-                "process_materials-MAX_NUM_FORMS": "1000",
-                "process_materials-0-material": str(self.material.pk),
-                "process_materials-0-role": ProcessMaterial.Role.INPUT,
-                "process_materials-0-order": "0",
-                "process_materials-0-quantity_value": "2.5",
-                "process_materials-0-quantity_unit": str(self.unit.pk),
-            },
-            instance=self.process,
-            prefix="process_materials",
+                "material": str(self.material.pk),
+                "quantity_value": "2.5",
+                "quantity_unit": str(self.unit.pk),
+            }
         )
 
-        self.assertTrue(formset.is_valid(), formset.errors)
+        self.assertTrue(form.is_valid(), form.errors)
 
     def test_quantity_requires_unit(self):
         """Quantity value should require a unit."""
-        formset = self.formset_class(
+        form = ProcessMaterialSectionForm(
             data={
-                "process_materials-TOTAL_FORMS": "1",
-                "process_materials-INITIAL_FORMS": "0",
-                "process_materials-MIN_NUM_FORMS": "0",
-                "process_materials-MAX_NUM_FORMS": "1000",
-                "process_materials-0-material": str(self.material.pk),
-                "process_materials-0-role": ProcessMaterial.Role.INPUT,
-                "process_materials-0-order": "0",
-                "process_materials-0-quantity_value": "2.5",
-                "process_materials-0-quantity_unit": "",
-            },
-            instance=self.process,
-            prefix="process_materials",
+                "material": str(self.material.pk),
+                "quantity_value": "2.5",
+                "quantity_unit": "",
+            }
         )
 
-        self.assertFalse(formset.is_valid())
-        self.assertIn("quantity_unit", formset.forms[0].errors)
+        self.assertFalse(form.is_valid())
+        self.assertIn("quantity_unit", form.errors)
 
 
-class ProcessOperatingParameterFormSetTestCase(TestCase):
-    """Test ProcessOperatingParameter inline formset."""
+class ProcessParameterSectionFormTestCase(TestCase):
+    """Test the workspace section form for operating parameters."""
 
     def setUp(self):
         self.owner = get_user_model().objects.create(username="test_user")
-        self.process = Process.objects.create(name="Test Process", owner=self.owner)
         self.unit = Unit.objects.create(
             name="°C",
             owner=self.owner,
             publication_status="published",
         )
-        self.formset_class = build_process_operating_parameter_formset()
 
-    def test_valid_formset(self):
-        """Valid formset data should be valid."""
-        formset = self.formset_class(
+    def test_valid_form(self):
+        """Valid data should be valid."""
+        form = ProcessParameterSectionForm(
             data={
-                "operating_parameters-TOTAL_FORMS": "1",
-                "operating_parameters-INITIAL_FORMS": "0",
-                "operating_parameters-MIN_NUM_FORMS": "0",
-                "operating_parameters-MAX_NUM_FORMS": "1000",
-                "operating_parameters-0-parameter": ProcessOperatingParameter.Parameter.TEMPERATURE,
-                "operating_parameters-0-order": "0",
-                "operating_parameters-0-nominal_value": "150",
-                "operating_parameters-0-unit": str(self.unit.pk),
-            },
-            instance=self.process,
-            prefix="operating_parameters",
+                "parameter": ProcessOperatingParameter.Parameter.TEMPERATURE,
+                "nominal_value": "150",
+                "unit": str(self.unit.pk),
+            }
         )
 
-        self.assertTrue(formset.is_valid(), formset.errors)
+        self.assertTrue(form.is_valid(), form.errors)
 
     def test_custom_parameter_with_name(self):
         """Custom parameters should allow custom names."""
-        formset = self.formset_class(
+        form = ProcessParameterSectionForm(
             data={
-                "operating_parameters-TOTAL_FORMS": "1",
-                "operating_parameters-INITIAL_FORMS": "0",
-                "operating_parameters-MIN_NUM_FORMS": "0",
-                "operating_parameters-MAX_NUM_FORMS": "1000",
-                "operating_parameters-0-parameter": ProcessOperatingParameter.Parameter.CUSTOM,
-                "operating_parameters-0-name": "Residence time at peak load",
-                "operating_parameters-0-order": "0",
-                "operating_parameters-0-nominal_value": "42",
-                "operating_parameters-0-unit": str(self.unit.pk),
-            },
-            instance=self.process,
-            prefix="operating_parameters",
+                "parameter": ProcessOperatingParameter.Parameter.CUSTOM,
+                "name": "Residence time at peak load",
+                "nominal_value": "42",
+                "unit": str(self.unit.pk),
+            }
         )
 
-        self.assertTrue(formset.is_valid(), formset.errors)
+        self.assertTrue(form.is_valid(), form.errors)
