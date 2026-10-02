@@ -54,6 +54,11 @@ from utils.modal import (
     BSModalUpdateView,
 )
 from utils.object_management.filters import ReviewDashboardFilterSet
+from utils.object_management.helpers import (
+    create_review_action,
+    create_review_action_safely,
+    invoke_cascade_handler,
+)
 from utils.object_management.models import (
     ReviewAction,
     UserCreatedObject,
@@ -1055,20 +1060,13 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
                     pass
 
             # Log review action
-            try:
-                ReviewAction.objects.create(
-                    content_type=ContentType.objects.get_for_model(
-                        self.object.__class__
-                    ),
-                    object_id=self.object.pk,
-                    user=request.user,
-                    action=self.review_action,
-                    comment=comment,
-                )
-            except DatabaseError as e:
-                logger.warning(
-                    "Failed to create ReviewAction for %s: %s", self.action_attr_name, e
-                )
+            create_review_action_safely(
+                self.object,
+                request.user,
+                self.review_action,
+                comment,
+                exceptions=DatabaseError,
+            )
 
             # Success message
             try:
@@ -1103,22 +1101,13 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
         if not obj or not action_name:
             return
 
-        cascade_handler = getattr(obj, "cascade_review_action", None)
-        if not callable(cascade_handler):
-            return
-
-        try:
-            cascade_handler(
-                action_name=action_name,
-                actor=getattr(request, "user", None),
-                previous_status=previous_status,
-            )
-        except (AttributeError, TypeError, ValidationError, DatabaseError) as exc:
-            logger.warning(
-                "Review action cascade failed for %s: %s",
-                obj,
-                exc,
-            )
+        invoke_cascade_handler(
+            obj,
+            action_name,
+            actor=getattr(request, "user", None),
+            previous_status=previous_status,
+            exceptions=(AttributeError, TypeError, ValidationError, DatabaseError),
+        )
 
     # Default POST handler for all review action views (modal and non‑modal)
     def post(self, request, *args, **kwargs):  # type: ignore[override]
@@ -1996,13 +1985,7 @@ class AddReviewCommentView(BaseReviewActionView):
             messages.error(request, "Comment cannot be empty.")
             return HttpResponseRedirect(self.get_success_url())
 
-        ReviewAction.objects.create(
-            content_type=ContentType.objects.get_for_model(obj.__class__),
-            object_id=obj.pk,
-            action=ReviewAction.ACTION_COMMENT,
-            comment=message,
-            user=request.user,
-        )
+        create_review_action(obj, request.user, ReviewAction.ACTION_COMMENT, message)
 
         messages.success(request, "Comment added.")
         return HttpResponseRedirect(self.get_success_url())

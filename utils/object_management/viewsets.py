@@ -1,12 +1,10 @@
-import logging
-
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from .helpers import create_review_action_safely, invoke_cascade_handler
 from .models import ReviewAction
 from .permissions import (
     GlobalObjectPermission,
@@ -14,8 +12,6 @@ from .permissions import (
     apply_scope_filter,
     filter_queryset_for_user,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class GlobalObjectViewSet(ModelViewSet):
@@ -108,35 +104,14 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
     ):
         comment = self._get_comment(request)
         if review_action:
-            try:
-                ReviewAction.objects.create(
-                    content_type=ContentType.objects.get_for_model(obj.__class__),
-                    object_id=obj.pk,
-                    user=request.user,
-                    action=review_action,
-                    comment=comment,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Failed to create ReviewAction for %s: %s", action_name, exc
-                )
+            create_review_action_safely(obj, request.user, review_action, comment)
 
-        cascade_handler = getattr(obj, "cascade_review_action", None)
-        if not callable(cascade_handler):
-            return
-
-        try:
-            cascade_handler(
-                action_name=action_name,
-                actor=getattr(request, "user", None),
-                previous_status=previous_status,
-            )
-        except Exception as exc:
-            logger.warning(
-                "Review action cascade failed for %s: %s",
-                obj,
-                exc,
-            )
+        invoke_cascade_handler(
+            obj,
+            action_name,
+            actor=getattr(request, "user", None),
+            previous_status=previous_status,
+        )
 
     @action(
         detail=True, methods=["post"], permission_classes=[UserCreatedObjectPermission]
