@@ -37,10 +37,11 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string, select_template
-from django.urls import NoReverseMatch, reverse
+from django.urls import NoReverseMatch, Resolver404, resolve, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.text import capfirst
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
+from django.views.generic.detail import SingleObjectMixin
 from django_filters import FilterSet
 from django_filters.views import FilterView
 from django_tomselect.autocompletes import AutocompleteModelView
@@ -2939,53 +2940,65 @@ class UserCreatedObjectModalDeleteView(
         )
         return context
 
+    def _next_url_points_to_deleted_object(self, next_url):
+        """Return True when ``next`` targets the object being deleted.
+
+        The delete modal is often launched from the object's own detail page,
+        which supplies ``?next=<detail url>``. Redirecting there after the
+        delete would land the user on a 404. The path is resolved so that alias
+        routes and the generic ``review_item_detail`` view are recognized too;
+        a URL is only treated as the deleted object's when both its identifier
+        and its model match.
+        """
+        if not self.object:
+            return False
+        try:
+            match = resolve(urlparse(next_url).path)
+        except Resolver404:
+            return False
+        object_pk = str(self.object.pk)
+        if "content_type_id" in match.kwargs:
+            content_type = ContentType.objects.get_for_model(self.object)
+            return (
+                str(match.kwargs["content_type_id"]) == str(content_type.pk)
+                and str(match.kwargs.get("object_id")) == object_pk
+            )
+        if str(match.kwargs.get("pk")) != object_pk:
+            return False
+        view_class = getattr(match.func, "view_class", None)
+        if view_class is None or not issubclass(view_class, SingleObjectMixin):
+            return True
+        view_model = view_class.model
+        if view_model is None and view_class.queryset is not None:
+            view_model = view_class.queryset.model
+        if view_model is None:
+            return True
+        return view_model._meta.concrete_model is self.object._meta.concrete_model
+
     def get_success_url(self):
         # Respect a safe 'next' parameter from POST or GET first
         next_url = get_safe_next_url(self.request)
-        if next_url:
+        if next_url and not self._next_url_points_to_deleted_object(next_url):
             return next_url
 
         if self.success_url:
             return self.success_url
 
         if self.object:
-            # Determine if this model should use scope parameters in redirect URLs
-            # by checking if it's one of the models that have scope-filtered list views
-            model_name = self.model.__name__
-            # All UserCreatedObject models now have scope filters in their filtersets
-            models_with_scope_filtering = [
-                "Scenario",
-                "Collection",
-                "WasteFlyer",
-                "Collector",
-                "CollectionCatchment",
-                "Catchment",
-            ]
-
-            if model_name in models_with_scope_filtering:
-                # Add scope parameter for models that support scope filtering
-                if self.object.publication_status == "published":
-                    url = self.model.public_list_url()
-                    return f"{url}?scope=published"
-                elif self.object.publication_status == "private":
-                    url = self.model.private_list_url()
-                    return f"{url}?scope=private"
-                elif self.object.publication_status == "review":
-                    url = self.model.review_list_url()
-                    return f"{url}?scope=review"
-                elif self.object.publication_status == "declined":
-                    url = self.model.private_list_url()
-                    return f"{url}?scope=private"
+            # Models opt into ``?scope=`` redirect parameters via the
+            # ``scope_filtered_lists`` flag on the model class.
+            status = self.object.publication_status
+            if status == "published":
+                url, scope = self.model.public_list_url(), "published"
+            elif status == "review":
+                url, scope = self.model.review_list_url(), "review"
+            elif status in ("private", "declined", "archived"):
+                url, scope = self.model.private_list_url(), "private"
             else:
-                # For models without scope filtering, use standard URLs without scope params
-                if self.object.publication_status == "published":
-                    return self.model.public_list_url()
-                elif self.object.publication_status == "private":
-                    return self.model.private_list_url()
-                elif self.object.publication_status == "review":
-                    return self.model.review_list_url()
-                elif self.object.publication_status == "declined":
-                    return self.model.private_list_url()
+                return self.model.public_list_url()
+            if getattr(self.model, "scope_filtered_lists", False):
+                return f"{url}?scope={scope}"
+            return url
 
         # Fallback to public list without scope
         return self.model.public_list_url()

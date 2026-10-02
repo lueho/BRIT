@@ -317,14 +317,8 @@ class ProcessListSerializer(ProcessVisibilityMixin, serializers.ModelSerializer)
         ]
 
 
-class ProcessDetailSerializer(ProcessVisibilityMixin, serializers.ModelSerializer):
+class ProcessDetailSerializer(ProcessListSerializer):
     """Comprehensive serializer for Process detail views."""
-
-    categories = serializers.SerializerMethodField()
-    sources = serializers.SerializerMethodField()
-    authors = serializers.SerializerMethodField()
-    owner_name = serializers.CharField(source="owner.username", read_only=True)
-    parent_name = serializers.SerializerMethodField()
 
     # Related objects
     process_materials = serializers.SerializerMethodField()
@@ -338,25 +332,11 @@ class ProcessDetailSerializer(ProcessVisibilityMixin, serializers.ModelSerialize
     input_materials = serializers.SerializerMethodField()
     output_materials = serializers.SerializerMethodField()
 
-    class Meta:
-        model = Process
+    class Meta(ProcessListSerializer.Meta):
         fields = [
-            "id",
-            "name",
-            "parent",
-            "parent_name",
-            "categories",
-            "short_description",
-            "authors",
-            "mechanism",
+            *ProcessListSerializer.Meta.fields,
             "description",
             "process_technology",
-            "image",
-            "publication_status",
-            "owner",
-            "owner_name",
-            "created_at",
-            "lastmodified_at",
             # Related objects
             "process_materials",
             "operating_parameters",
@@ -365,13 +345,6 @@ class ProcessDetailSerializer(ProcessVisibilityMixin, serializers.ModelSerialize
             # Convenience fields
             "input_materials",
             "output_materials",
-            "sources",
-        ]
-        read_only_fields = [
-            "owner",
-            "publication_status",
-            "created_at",
-            "lastmodified_at",
         ]
 
     def get_process_materials(self, obj):

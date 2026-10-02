@@ -105,6 +105,7 @@ class Process(NamedUserCreatedObject):
     """Describes a process or process technology."""
 
     url_format = "processes:{name_lower}-{action}{suffix}"
+    scope_filtered_lists = True
 
     parent = models.ForeignKey(
         "self",

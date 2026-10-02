@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 
 
 class CollectionCatchment(Catchment):
+    scope_filtered_lists = True
+
     class Meta:
         proxy = True
 
@@ -60,6 +62,8 @@ class CollectionCatchment(Catchment):
 
 
 class Collector(NamedUserCreatedObject):
+    scope_filtered_lists = True
+
     website = models.URLField(max_length=511, blank=True, null=True)
     catchment = models.ForeignKey(
         CollectionCatchment, blank=True, null=True, on_delete=models.CASCADE
@@ -132,6 +136,7 @@ class WasteFlyerManager(UserCreatedObjectManager):
 
 class WasteFlyer(Source):
     objects = WasteFlyerManager()
+    scope_filtered_lists = True
 
     class Meta:
         proxy = True
@@ -374,6 +379,8 @@ class Collection(NamedUserCreatedObject):
     Represents a waste collection system, including collection parameters,
     inline waste category/materials, and container requirements.
     """
+
+    scope_filtered_lists = True
 
     collector = models.ForeignKey(
         Collector, on_delete=models.CASCADE, blank=True, null=True
