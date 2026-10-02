@@ -3,11 +3,12 @@
 Provides RESTful API endpoints for all process-related models.
 """
 
-from django.db.models import Prefetch
+from django.db.models import Exists, OuterRef, Prefetch
 from rest_framework import filters, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from bibliography.models import Author, Licence, Source
 from utils.object_management.permissions import (
     UserCreatedObjectPermission,
     filter_queryset_for_user,
@@ -27,6 +28,49 @@ from .serializers import (
     ProcessListSerializer,
     ProcessOperatingParameterSerializer,
 )
+
+
+def _visible_process_relations(queryset, user):
+    """Prefetch nested relations through the read policy.
+
+    ``ProcessListSerializer``/``ProcessDetailSerializer`` serialize nested
+    categories, sources and the parent name. Without a filtered prefetch the
+    related managers would expose objects the user may not read. The
+    ``parent_is_visible`` annotation lets the serializer resolve the parent
+    name without a per-object policy query.
+    """
+
+    return queryset.prefetch_related(
+        Prefetch(
+            "categories",
+            queryset=filter_queryset_for_user(ProcessCategory.objects.all(), user),
+        ),
+        Prefetch(
+            "sources",
+            queryset=filter_queryset_for_user(Source.objects.all(), user)
+            .select_related("licence")
+            .prefetch_related(
+                Prefetch(
+                    "authors",
+                    queryset=filter_queryset_for_user(Author.objects.all(), user),
+                )
+            )
+            .annotate(
+                licence_is_visible=Exists(
+                    filter_queryset_for_user(
+                        Licence.objects.filter(pk=OuterRef("licence_id")),
+                        user,
+                    )
+                )
+            ),
+        ),
+    ).annotate(
+        parent_is_visible=Exists(
+            filter_queryset_for_user(
+                Process.objects.filter(pk=OuterRef("parent_id")), user
+            )
+        )
+    )
 
 
 class ProcessObjectPermission(UserCreatedObjectPermission):
@@ -59,8 +103,15 @@ class ProcessCategoryViewSet(UserCreatedObjectViewSet):
     def processes(self, request, pk=None):
         """Get all processes in this category visible to the current user."""
         category = self.get_object()
-        processes = filter_queryset_for_user(category.processes.all(), request.user)
-        serializer = ProcessListSerializer(processes, many=True)
+        processes = _visible_process_relations(
+            filter_queryset_for_user(
+                category.processes.all(), request.user
+            ).select_related("owner", "parent"),
+            request.user,
+        )
+        serializer = ProcessListSerializer(
+            processes, many=True, context=self.get_serializer_context()
+        )
         return Response(serializer.data)
 
 
@@ -78,14 +129,14 @@ class ProcessViewSet(UserCreatedObjectViewSet):
         """Optimize queries with select/prefetch related."""
         queryset = super().get_queryset()
 
-        if self.action == "list":
-            queryset = queryset.select_related("owner", "parent").prefetch_related(
-                "categories",
-                "sources",
+        if self.action in ("list", "by_mechanism"):
+            queryset = _visible_process_relations(
+                queryset.select_related("owner", "parent"), self.request.user
             )
         elif self.action == "retrieve":
-            queryset = queryset.select_related("owner", "parent").prefetch_related(
-                "categories",
+            queryset = _visible_process_relations(
+                queryset.select_related("owner", "parent"), self.request.user
+            ).prefetch_related(
                 "variants",
                 Prefetch(
                     "process_materials",
@@ -99,7 +150,6 @@ class ProcessViewSet(UserCreatedObjectViewSet):
                 ),
                 "links",
                 "info_resources",
-                "sources",
             )
 
         return queryset
@@ -114,14 +164,11 @@ class ProcessViewSet(UserCreatedObjectViewSet):
     def materials(self, request, pk=None):
         """Get all materials (inputs and outputs) for this process."""
         process = self.get_object()
+        serializer = self.get_serializer(process)
         return Response(
             {
-                "inputs": [
-                    {"id": m.id, "name": m.name} for m in process.input_materials
-                ],
-                "outputs": [
-                    {"id": m.id, "name": m.name} for m in process.output_materials
-                ],
+                "inputs": serializer.data["input_materials"],
+                "outputs": serializer.data["output_materials"],
             }
         )
 
@@ -162,14 +209,26 @@ class ProcessViewSet(UserCreatedObjectViewSet):
     def variants(self, request, pk=None):
         """Get all process variants (children) visible to the current user."""
         process = self.get_object()
-        variants = filter_queryset_for_user(process.variants.all(), request.user)
-        serializer = ProcessListSerializer(variants, many=True)
+        variants = _visible_process_relations(
+            filter_queryset_for_user(process.variants.all(), request.user),
+            request.user,
+        )
+        serializer = ProcessListSerializer(
+            variants, many=True, context=self.get_serializer_context()
+        )
         return Response(serializer.data)
 
     @action(detail=True, methods=["get"])
     def sources(self, request, pk=None):
         """Get all literature sources referenced by this process."""
         process = self.get_object()
+        ordered = list(process.sources_ordered())
+        visible_ids = set(
+            filter_queryset_for_user(
+                Source.objects.filter(pk__in=[s.pk for s in ordered]),
+                request.user,
+            ).values_list("pk", flat=True)
+        )
         sources = [
             {
                 "id": s.id,
@@ -177,27 +236,39 @@ class ProcessViewSet(UserCreatedObjectViewSet):
                 "abbreviation": s.abbreviation,
                 "type": s.type,
             }
-            for s in process.sources_ordered()
+            for s in ordered
+            if s.pk in visible_ids
         ]
         return Response(sources)
 
     @action(detail=False, methods=["get"])
     def by_category(self, request):
         """Get processes grouped by category, scoped to what the user may read."""
+        visible_processes = _visible_process_relations(
+            filter_queryset_for_user(
+                Process.objects.all(), request.user
+            ).select_related("owner", "parent"),
+            request.user,
+        )
         categories = filter_queryset_for_user(
             ProcessCategory.objects.all(), request.user
-        ).prefetch_related("processes")
+        ).prefetch_related(Prefetch("processes", queryset=visible_processes))
 
+        serializer_context = self.get_serializer_context()
         result = []
         for category in categories:
-            processes = filter_queryset_for_user(
-                category.processes.all(), request.user
-            )
-            if processes.exists():
+            processes = list(category.processes.all())
+            if processes:
                 result.append(
                     {
-                        "category": ProcessCategorySerializer(category).data,
-                        "processes": ProcessListSerializer(processes, many=True).data,
+                        "category": ProcessCategorySerializer(
+                            category, context=serializer_context
+                        ).data,
+                        "processes": ProcessListSerializer(
+                            processes,
+                            many=True,
+                            context=serializer_context,
+                        ).data,
                     }
                 )
 
@@ -208,11 +279,14 @@ class ProcessViewSet(UserCreatedObjectViewSet):
         """Get processes grouped by mechanism."""
         processes = self.get_queryset()
 
+        serializer_context = self.get_serializer_context()
         mechanisms = {}
         for process in processes:
             mechanism = process.mechanism or "Other"
             if mechanism not in mechanisms:
                 mechanisms[mechanism] = []
-            mechanisms[mechanism].append(ProcessListSerializer(process).data)
+            mechanisms[mechanism].append(
+                ProcessListSerializer(process, context=serializer_context).data
+            )
 
         return Response(mechanisms)
