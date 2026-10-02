@@ -202,10 +202,10 @@
             {% endif %}
           </div>
           <div class="sdv2-review-banner-text">
-            {% if review_timeline %}
-              Last action <strong>{{ review_timeline|last|get_item:'label'|default:'—' }}</strong>
-              by {{ review_timeline|last|get_item:'user'|default:'someone' }}
-              on {{ review_timeline|last|get_item:'created_at'|date:'Y-m-d' }}.
+            {% if latest_review_action %}
+              Last action <strong>{{ latest_review_action.get_action_display }}</strong>
+              by {{ latest_review_action.user.username|default:'someone' }}
+              on {{ latest_review_action.created_at|date:'Y-m-d' }}.
             {% else %}
               Awaiting moderator action.
             {% endif %}
