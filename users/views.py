@@ -72,7 +72,12 @@ class RegistrationView(BaseRegistrationView):
 
         if hasattr(self.request, "session"):
             self.request.session["registration_email"] = form.cleaned_data["email"]
-        return redirect(self.get_success_url(new_user))
+        success_url = self.get_success_url(new_user)
+        try:
+            to, args, kwargs = success_url
+        except ValueError:
+            return redirect(success_url)
+        return redirect(to, *args, **kwargs)
 
 
 class ResendActivationView(BaseResendActivationView):

@@ -2,11 +2,13 @@ import datetime
 import smtplib
 from unittest.mock import patch
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.sites.models import Site
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from registration.models import RegistrationProfile
+
+from users.views import RegistrationView
 
 SEND_EMAIL = "registration.models.RegistrationProfile.send_activation_email"
 
@@ -31,6 +33,23 @@ class RegistrationEmailDeliveryTests(TestCase):
         self.assertFalse(user.is_active)
         self.assertTrue(RegistrationProfile.objects.filter(user=user).exists())
         send_email.assert_called_once()
+
+    def test_tuple_success_url_redirects_with_unpacked_arguments(self):
+        class TupleSuccessRegistrationView(RegistrationView):
+            def get_success_url(self, user=None):
+                return ("registration_activate", (), {"activation_key": "abc"})
+
+        request = RequestFactory().post(
+            reverse("registration_register"), self.registration_data()
+        )
+        request.user = AnonymousUser()
+        with patch(SEND_EMAIL):
+            response = TupleSuccessRegistrationView.as_view()(request)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            reverse("registration_activate", kwargs={"activation_key": "abc"}),
+        )
 
     def test_recipient_refused_shows_email_error_and_rolls_back_user(self):
         refused = smtplib.SMTPRecipientsRefused(
