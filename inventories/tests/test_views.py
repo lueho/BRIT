@@ -769,6 +769,28 @@ class GenericAlgorithmAddViewTestCase(TestCase):
             ).exists()
         )
 
+    def test_posted_lookup_does_not_fall_back_on_empty_queryset(self):
+        """An empty visibility queryset must stay empty — falling back to
+        the unfiltered manager would re-open private-object access."""
+        from django.http import Http404
+
+        from ..views import _get_posted_object_or_404
+
+        stranger = User.objects.create_user(username="stranger", password="p")
+        private_dataset = GeoDataset.objects.create(
+            name="Private dataset",
+            owner=stranger,
+            region=self.region,
+            model_name="NantesGreenhouses",
+            publication_status="private",
+        )
+        with self.assertRaises(Http404):
+            _get_posted_object_or_404(
+                GeoDataset,
+                private_dataset.pk,
+                queryset=GeoDataset.objects.none(),
+            )
+
     def test_functions_api_hides_private_dataset(self):
         """The functions API must not leak sampled values of private
         datasets to unrelated users."""

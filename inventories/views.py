@@ -74,8 +74,9 @@ def _get_posted_object_or_404(model, pk, queryset=None):
     query reaches the database, so catch those too. ``queryset`` optionally
     restricts the lookup — e.g. to objects visible to the requesting user.
     """
+    manager = model.objects if queryset is None else queryset
     try:
-        return (queryset or model.objects).get(pk=pk)
+        return manager.get(pk=pk)
     except (model.DoesNotExist, ValueError, TypeError):
         raise Http404 from None
 
