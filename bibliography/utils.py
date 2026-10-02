@@ -103,6 +103,8 @@ def find_wayback_snapshot_for_year(url, year):
         return None
 
     return f"https://web.archive.org/web/{latest_timestamp}/{url}"
+
+
 def generate_citation_key(source):
     """Return a disambiguated citation key for the given source.
 

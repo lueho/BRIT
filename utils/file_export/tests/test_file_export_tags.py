@@ -4,8 +4,21 @@ from unittest.mock import MagicMock
 
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory, SimpleTestCase
+from django.urls import reverse
 
-from ..templatetags.file_export_tags import export_modal_button
+from ..templatetags.file_export_tags import export_link_modal, export_modal_button
+
+
+class ExportLinkModalTagTestCase(SimpleTestCase):
+    """Regression tests for the documented export_link_modal template tag."""
+
+    def test_returns_modal_url_with_export_url_param(self):
+        result = export_link_modal("export-modal")
+        self.assertTrue(result.startswith(reverse("export-modal")))
+
+    def test_extra_params_are_passed_through(self):
+        result = export_link_modal("export-modal", list_type="private")
+        self.assertIn("list_type=private", result)
 
 
 class ExportModalButtonTagTestCase(SimpleTestCase):

@@ -7,6 +7,23 @@ from django.utils.translation import gettext_lazy as _
 register = template.Library()
 
 
+@register.simple_tag
+def export_link_modal(export_url_name, **extra_params):
+    """
+    Return a link that opens the export modal using the existing modal framework.
+
+    Documented API for project templates (see docs/01_user_guide/file_export.md);
+    kept for compatibility although no bundled template calls it.
+    """
+    export_url = reverse(export_url_name)
+    if extra_params:
+        export_url = f"{export_url}?{urlencode(extra_params, doseq=True)}"
+    modal_url = reverse("export-modal")
+    params = {"export_url": export_url}
+    params.update(extra_params)
+    return f"{modal_url}?{urlencode(params, doseq=True)}"
+
+
 @register.inclusion_tag("../templates/export_modal_button.html", takes_context=True)
 def export_modal_button(
     context,
