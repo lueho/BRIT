@@ -34,10 +34,18 @@ class ScenarioModelForm(SimpleModelForm):
         label="Catchment",
         required=False,
     )
+    showcase = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="showcase-autocomplete",
+            label_field="name",
+        ),
+        label="Showcase",
+        required=False,
+    )
 
     class Meta:
         model = Scenario
-        fields = ["name", "description", "region", "catchment"]
+        fields = ["name", "description", "region", "catchment", "showcase"]
 
 
 class ScenarioModalModelForm(ModalModelFormMixin, ScenarioModelForm):

@@ -1,25 +1,21 @@
-from django.conf import settings
-
 from maps.views import GeoDataSetPublishedFilteredMapView, MapMixin
-from processes.models import Process
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
-    UserCreatedObjectCreateView,
+    UserCreatedObjectAutocompleteView,
+    UserCreatedObjectCreateWithInlinesView,
     UserCreatedObjectDetailView,
     UserCreatedObjectModalDeleteView,
-    UserCreatedObjectUpdateView,
+    UserCreatedObjectUpdateWithInlinesView,
 )
 
 from .filters import ShowcaseFilterSet
-from .forms import ShowcaseModelForm
+from .forms import (
+    ShowcaseMaterialInline,
+    ShowcaseModelForm,
+    ShowcaseProcessInline,
+)
 from .models import Showcase
-
-# Hybrid mock: Showcase name to involved process names
-SHOWCASE_PROCESS_MAP = {
-    "Municipality & farms 1": ["Anaerobic Digestion", "Composting"],
-    "Agricultural Education": ["Anaerobic Digestion", "Pyrolysis", "Composting"],
-}
 
 # ----------- Showcase CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -44,39 +40,26 @@ class ShowcasePublishedMapView(GeoDataSetPublishedFilteredMapView):
     features_layer_api_basename = "api-showcase"
 
 
-class ShowcaseCreateView(UserCreatedObjectCreateView):
+class ShowcaseCreateView(UserCreatedObjectCreateWithInlinesView):
     model = Showcase
     form_class = ShowcaseModelForm
     permission_required = "closecycle.add_showcase"
+    inlines = [ShowcaseMaterialInline, ShowcaseProcessInline]
 
 
 class ShowcaseDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Showcase
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # Only inject data in dev/test
-        if getattr(settings, "ENVIRONMENT", "dev") != "prod":
-            showcase_name = getattr(self.object, "name", None)
-            involved_processes = []
-            if showcase_name in SHOWCASE_PROCESS_MAP:
-                process_names = SHOWCASE_PROCESS_MAP[showcase_name]
-                processes = Process.objects.filter(name__in=process_names)
-                for proc in processes:
-                    involved_processes.append(
-                        {
-                            "name": proc.name,
-                            "id": proc.pk,
-                        }
-                    )
-            context["involved_processes"] = involved_processes
-        return context
 
-
-class ShowcaseUpdateView(UserCreatedObjectUpdateView):
+class ShowcaseUpdateView(UserCreatedObjectUpdateWithInlinesView):
     model = Showcase
     form_class = ShowcaseModelForm
+    inlines = [ShowcaseMaterialInline, ShowcaseProcessInline]
 
 
 class ShowcaseModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = Showcase
+
+
+class ShowcaseAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Showcase

@@ -22,6 +22,13 @@
             {{ object.country }}
         </p>
     {% endif %}
+    {% if object.catchment %}
+        <p class="card-text">
+            <strong>Catchment:</strong>
+            <br>
+            {{ object.catchment }}
+        </p>
+    {% endif %}
     {% if object.description %}
         <p class="card-text">
             <strong>Description:</strong>
@@ -30,13 +37,58 @@
         </p>
     {% endif %}
     {% block additional_details %}
-        {% if involved_processes %}
+        {% if object.process_chain %}
             <hr>
-            <h5>Involved Processes</h5>
-            <ul>
-                {% for proc in involved_processes %}
+            <h5>Processing chain</h5>
+            <ol>
+                {% for proc in object.process_chain %}
                     <li>
                         <a href="{% url 'processes:processtype-detail' proc.id %}">{{ proc.name }}</a>
+                    </li>
+                {% endfor %}
+            </ol>
+        {% endif %}
+        {% if object.showcase_materials.all %}
+            <hr>
+            <h5>Materials</h5>
+            <ul>
+                {% for link in object.showcase_materials.all %}
+                    <li>
+                        <a href="{% url 'material-detail' link.material_id %}">{{ link.material.name }}</a>
+                        ({{ link.get_role_display }})
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        {% if object.samples.all %}
+            <hr>
+            <h5>Samples</h5>
+            <ul>
+                {% for sample in object.samples.all %}
+                    <li>
+                        <a href="{% url 'sample-detail' sample.id %}">{{ sample.name }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        {% if object.sample_series.all %}
+            <hr>
+            <h5>Sample series</h5>
+            <ul>
+                {% for series in object.sample_series.all %}
+                    <li>
+                        <a href="{% url 'sampleseries-detail' series.id %}">{{ series.name }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        {% if object.scenarios.all %}
+            <hr>
+            <h5>Scenarios</h5>
+            <ul>
+                {% for scenario in object.scenarios.all %}
+                    <li>
+                        <a href="{% url 'scenario-detail' scenario.id %}">{{ scenario.name }}</a>
                     </li>
                 {% endfor %}
             </ul>

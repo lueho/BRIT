@@ -9,17 +9,62 @@ from maps.serializers import (
     PolygonSerializer,
     RegionModelSerializer,
 )
-from processes.models import Process
 
-from .models import BiogasPlantsSweden
+from .models import BiogasPlantsSweden, ShowcaseMaterial
+
+
+class ShowcaseMaterialSerializer(ModelSerializer):
+    material_id = serializers.IntegerField(source="material.id")
+    material = CharField(source="material.name")
+    role = CharField(source="get_role_display")
+
+    class Meta:
+        model = ShowcaseMaterial
+        fields = ["material_id", "material", "role", "order"]
 
 
 class ShowcaseModelSerializer(ModelSerializer):
     region = RegionModelSerializer()
+    catchment = CharField(source="catchment.name", default=None)
+    showcase_materials = ShowcaseMaterialSerializer(many=True)
+    process_chain = serializers.SerializerMethodField()
+    samples = serializers.SerializerMethodField()
+    sample_series = serializers.SerializerMethodField()
+    scenarios = serializers.SerializerMethodField()
 
     class Meta:
         model = Showcase
-        fields = ["id", "name", "region", "description"]
+        fields = [
+            "id",
+            "name",
+            "region",
+            "catchment",
+            "description",
+            "showcase_materials",
+            "process_chain",
+            "samples",
+            "sample_series",
+            "scenarios",
+        ]
+
+    def get_process_chain(self, obj):
+        return [
+            {"id": process.id, "name": process.name} for process in obj.process_chain
+        ]
+
+    def get_samples(self, obj):
+        return [{"id": sample.id, "name": sample.name} for sample in obj.samples.all()]
+
+    def get_sample_series(self, obj):
+        return [
+            {"id": series.id, "name": series.name} for series in obj.sample_series.all()
+        ]
+
+    def get_scenarios(self, obj):
+        return [
+            {"id": scenario.id, "name": scenario.name}
+            for scenario in obj.scenarios.all()
+        ]
 
 
 class ShowcaseFlatSerializer(ModelSerializer):
@@ -31,34 +76,19 @@ class ShowcaseFlatSerializer(ModelSerializer):
         fields = ["id", "name", "region", "description", "involved_processes"]
 
     def get_involved_processes(self, obj):
-        # Showcase name to involved process names (keep in sync with view)
-        SHOWCASE_PROCESS_MAP = {
-            "Municipality & farms 1": ["Anaerobic Digestion", "Composting"],
-            "Agricultural Education": [
-                "Anaerobic Digestion",
-                "Pyrolysis",
-                "Composting",
-            ],
-        }
         request = getattr(self, "request", None)
         user = getattr(request, "user", None)
         # If no request or user, treat as anonymous (no permission)
         if not (user and user.has_perm("processes.access_app_feature")):
             return []
-        showcase_name = getattr(obj, "name", None)
-        involved_processes = []
-        if showcase_name in SHOWCASE_PROCESS_MAP:
-            process_names = SHOWCASE_PROCESS_MAP[showcase_name]
-            processes = Process.objects.filter(name__in=process_names)
-            for proc in processes:
-                involved_processes.append(
-                    {
-                        "name": proc.name,
-                        "id": proc.pk,
-                        "url": f"/processes/types/{proc.pk}/",
-                    }
-                )
-        return involved_processes
+        return [
+            {
+                "name": proc.name,
+                "id": proc.pk,
+                "url": f"/processes/types/{proc.pk}/",
+            }
+            for proc in obj.process_chain
+        ]
 
 
 class ShowcaseSummaryListSerializer(ModelSerializer):

@@ -326,6 +326,15 @@ class Scenario(NamedUserCreatedObject):
     catchment = models.ForeignKey(
         Catchment, on_delete=models.CASCADE, null=True, related_name="scenarios"
     )  # TODO: make many-to-many?
+    showcase = models.ForeignKey(
+        "closecycle.Showcase",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scenarios",
+        help_text="CLOSECYCLE showcase whose inventory this scenario "
+        "evaluates within its TBN region.",
+    )
 
     # TODO: Add duplicate functionality
 

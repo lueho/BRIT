@@ -118,6 +118,7 @@ class ScenarioAdmin(admin.ModelAdmin):
         "name",
         "region_link",
         "catchment_link",
+        "showcase_link",
         "description",
         "status",
         "owner",
@@ -126,6 +127,7 @@ class ScenarioAdmin(admin.ModelAdmin):
     search_fields = ("name", "description")
     list_filter = ("publication_status",)
     ordering = ("name",)
+    autocomplete_fields = ("showcase",)
 
     @staticmethod
     def region_link(obj):
@@ -140,6 +142,13 @@ class ScenarioAdmin(admin.ModelAdmin):
             return "-"
         url = reverse("admin:maps_catchment_change", args=(obj.catchment.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.catchment.name)
+
+    @staticmethod
+    def showcase_link(obj):
+        if not obj.showcase:
+            return "-"
+        url = reverse("admin:closecycle_showcase_change", args=(obj.showcase.id,))
+        return format_html("<a href='{}'>{}</a>", url, obj.showcase.name)
 
     @staticmethod
     def status(obj):
