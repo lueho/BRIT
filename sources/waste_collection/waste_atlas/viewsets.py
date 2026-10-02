@@ -266,6 +266,34 @@ class AtlasScopedRateThrottle(TrustedClientIPMixin, ScopedRateThrottle):
     """Atlas throttle keyed on the client IP the proxy chain vouches for."""
 
 
+# Atlas actions that serve geometry payloads. They share the maps GeoJSON
+# policy: the subnet-aware anonymous limit sits on top of the per-IP atlas
+# scope so a crawler rotating through one network block is still capped.
+_GEOJSON_ACTIONS = frozenset(
+    {
+        "geojson",
+        "collection_geojson",
+        "collector_geojson",
+        "collection_change_geojson",
+        "collector_change_geojson",
+        "acpv_outline_geojson",
+    }
+)
+
+
+class GeoJSONAnonThrottleMixin:
+    """Rate limit geometry actions per client subnet, not just per IP.
+
+    The subnet throttle only buckets anonymous clients, so the scoped atlas
+    throttle must stay in the chain to keep authenticated clients limited.
+    """
+
+    def get_throttles(self):
+        if getattr(self, "action", None) in _GEOJSON_ACTIONS:
+            return [GeoJSONAnonThrottle(), *super().get_throttles()]
+        return super().get_throttles()
+
+
 class IsMaintainer(permissions.BasePermission):
     """Staff and collection moderators, who curate the data behind the maps."""
 
@@ -273,13 +301,13 @@ class IsMaintainer(permissions.BasePermission):
         return is_maintainer(request.user)
 
 
-class WasteAtlasViewSet(viewsets.ViewSet):
+class WasteAtlasViewSet(GeoJSONAnonThrottleMixin, viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
     throttle_classes = [AtlasScopedRateThrottle]
     throttle_scope = "waste_atlas"
 
 
-class WasteAtlasGenericViewSet(viewsets.GenericViewSet):
+class WasteAtlasGenericViewSet(GeoJSONAnonThrottleMixin, viewsets.GenericViewSet):
     permission_classes = [permissions.AllowAny]
     throttle_classes = [AtlasScopedRateThrottle]
     throttle_scope = "waste_atlas"
@@ -536,9 +564,6 @@ def _union_geometries(snapshots):
     return collection.unary_union
 
 
-_CHANGE_OVERLAY_ACTIONS = frozenset(
-    {"collection_change_geojson", "collector_change_geojson"}
-)
 # Bounded lifetime for cached overlays: the cache key versions revision edits,
 # but the legacy Region-geometry fallback carries no timestamp to version.
 _CHANGE_OVERLAY_CACHE_TIMEOUT = 3600
@@ -1107,19 +1132,6 @@ class CatchmentViewSet(WasteAtlasGenericViewSet):
             catchment_ids(to_year),
             to_year,
         )
-
-    def get_throttles(self):
-        """Rate limit the expensive public change overlays per client subnet.
-
-        The overlay actions do far more work per request than the plain
-        geometry endpoints, so they add the stricter subnet-aware GeoJSON
-        throttle on top of the shared atlas scope.  The added throttle only
-        buckets anonymous clients, so the scoped throttle has to stay to keep
-        authenticated clients limited.
-        """
-        if getattr(self, "action", None) in _CHANGE_OVERLAY_ACTIONS:
-            return [GeoJSONAnonThrottle(), *super().get_throttles()]
-        return super().get_throttles()
 
     @staticmethod
     def _change_geojson_response(request, from_ids, from_year, to_ids, to_year):
