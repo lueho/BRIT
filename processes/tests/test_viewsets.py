@@ -371,3 +371,110 @@ class ProcessAPIPermissionsTestCase(APITestCase):
             f"/processes/api/processes/{self.private_process.pk}/"
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class ProcessAPIRelatedVisibilityTestCase(APITestCase):
+    """Custom read actions must apply the same read policy as the HTML UI.
+
+    Anonymous users only see published related objects; authenticated users
+    additionally see their own non-published objects, matching
+    ``filter_queryset_for_user`` semantics used by the list/detail views.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        user_model = get_user_model()
+        cls.owner = user_model.objects.create_user(username="vis_owner")
+        cls.other = user_model.objects.create_user(username="vis_other")
+        cls.category = ProcessCategory.objects.create(
+            name="Shared Category",
+            owner=cls.other,
+            publication_status="published",
+        )
+        cls.published_process = Process.objects.create(
+            name="Published Member",
+            owner=cls.other,
+            publication_status="published",
+        )
+        cls.published_process.categories.add(cls.category)
+        cls.own_private_process = Process.objects.create(
+            name="My Private Member",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.own_private_process.categories.add(cls.category)
+        cls.foreign_private_process = Process.objects.create(
+            name="Foreign Private Member",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.foreign_private_process.categories.add(cls.category)
+        cls.own_private_variant = Process.objects.create(
+            name="My Private Variant",
+            parent=cls.published_process,
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.foreign_private_variant = Process.objects.create(
+            name="Foreign Private Variant",
+            parent=cls.published_process,
+            owner=cls.other,
+            publication_status="private",
+        )
+
+    def _member_names(self, response):
+        return {entry["name"] for entry in response.data}
+
+    def test_category_processes_anonymous_sees_only_published(self):
+        response = self.client.get(
+            f"/processes/api/categories/{self.category.pk}/processes/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._member_names(response), {"Published Member"})
+
+    def test_category_processes_owner_sees_own_private(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            f"/processes/api/categories/{self.category.pk}/processes/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            self._member_names(response),
+            {"Published Member", "My Private Member"},
+        )
+
+    def test_variants_anonymous_sees_only_published(self):
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/variants/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_variants_owner_sees_own_private(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/variants/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._member_names(response), {"My Private Variant"})
+
+    def test_by_category_anonymous_excludes_private(self):
+        response = self.client.get("/processes/api/processes/by_category/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {
+            process["name"]
+            for entry in response.data
+            for process in entry["processes"]
+        }
+        self.assertEqual(names, {"Published Member"})
+
+    def test_by_category_owner_includes_own_private(self):
+        self.client.force_login(self.owner)
+        response = self.client.get("/processes/api/processes/by_category/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {
+            process["name"]
+            for entry in response.data
+            for process in entry["processes"]
+        }
+        self.assertEqual(names, {"Published Member", "My Private Member"})

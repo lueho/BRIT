@@ -8,7 +8,10 @@ from rest_framework import filters, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from utils.object_management.permissions import UserCreatedObjectPermission
+from utils.object_management.permissions import (
+    UserCreatedObjectPermission,
+    filter_queryset_for_user,
+)
 from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 from .models import (
@@ -54,9 +57,9 @@ class ProcessCategoryViewSet(UserCreatedObjectViewSet):
 
     @action(detail=True, methods=["get"])
     def processes(self, request, pk=None):
-        """Get all processes in this category."""
+        """Get all processes in this category visible to the current user."""
         category = self.get_object()
-        processes = category.processes.filter(publication_status="published")
+        processes = filter_queryset_for_user(category.processes.all(), request.user)
         serializer = ProcessListSerializer(processes, many=True)
         return Response(serializer.data)
 
@@ -157,9 +160,9 @@ class ProcessViewSet(UserCreatedObjectViewSet):
 
     @action(detail=True, methods=["get"])
     def variants(self, request, pk=None):
-        """Get all process variants (children) of this process."""
+        """Get all process variants (children) visible to the current user."""
         process = self.get_object()
-        variants = process.variants.filter(publication_status="published")
+        variants = filter_queryset_for_user(process.variants.all(), request.user)
         serializer = ProcessListSerializer(variants, many=True)
         return Response(serializer.data)
 
@@ -180,14 +183,16 @@ class ProcessViewSet(UserCreatedObjectViewSet):
 
     @action(detail=False, methods=["get"])
     def by_category(self, request):
-        """Get processes grouped by category."""
-        categories = ProcessCategory.objects.filter(
-            publication_status="published"
+        """Get processes grouped by category, scoped to what the user may read."""
+        categories = filter_queryset_for_user(
+            ProcessCategory.objects.all(), request.user
         ).prefetch_related("processes")
 
         result = []
         for category in categories:
-            processes = category.processes.filter(publication_status="published")
+            processes = filter_queryset_for_user(
+                category.processes.all(), request.user
+            )
             if processes.exists():
                 result.append(
                     {
