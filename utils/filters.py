@@ -199,16 +199,22 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
         self._apply_shared_field_visibility()
 
     def _get_scope_value(self):
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_val = self.data.get("scope")
-                if scope_val:
-                    return scope_val
-            form_initial = getattr(getattr(self, "form", None), "initial", None)
-            if form_initial:
-                return form_initial.get("scope")
-        except Exception:
-            return None
+        """Return the submitted scope, or the scope filter's declared initial.
+
+        Reads ``self.data`` and the filter's ``extra`` only. ``self.form``
+        must never be touched here: accessing it during ``__init__`` builds
+        and caches the form fields before subclasses assign their filter
+        querysets, freezing the declared (usually empty) queryset on the
+        field instances.
+        """
+        data = getattr(self, "data", None)
+        if data:
+            scope_val = data.get("scope")
+            if scope_val:
+                return scope_val
+        scope_filter = self.filters.get("scope")
+        if scope_filter is not None:
+            return scope_filter.extra.get("initial")
         return None
 
     def scoped_choice_queryset(self, queryset):
