@@ -38,7 +38,8 @@ class HamburgRoadsideTreeProductionTestCase(TestCase):
 
         result = InventoryAlgorithms.hamburg_roadside_tree_production(
             scenario_id=self.scenario.id,
-            feedstock_id=self.feedstock.id,
+            feedstock_id=self.feedstock.material_id,
+            sample_series_id=self.feedstock.id,
             catchment_id=self.catchment.id,
             point_yield={"value": 10.0, "standard_deviation": 1.0},
         )

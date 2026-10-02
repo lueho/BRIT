@@ -254,19 +254,26 @@ class InventoryExecutionIntegrationTests(TestCase):
     def configure_and_run_single_inventory(
         self, scenario, feedstock, algorithm, values
     ):
-        scenario.add_inventory_algorithm(feedstock, algorithm, values)
+        """``feedstock`` is the SampleSeries of the material being inventoried;
+        the configuration stores the material with the series as its temporal
+        profile."""
+        material = feedstock.material
+        scenario.add_inventory_algorithm(
+            material, algorithm, values, sample_series=feedstock
+        )
         execution_plan = scenario.inventory_execution_plan()
         self.assertEqual(len(execution_plan), 1)
         self.assertEqual(execution_plan[0]["algorithm"], algorithm)
-        self.assertEqual(execution_plan[0]["kwargs"]["feedstock_id"], feedstock.id)
+        self.assertEqual(execution_plan[0]["kwargs"]["feedstock_id"], material.id)
+        self.assertEqual(execution_plan[0]["kwargs"]["sample_series_id"], feedstock.id)
 
         self.assertTrue(
             run_inventory_algorithm.run(algorithm.id, **execution_plan[0]["kwargs"])
         )
-        finalize_inventory.run([True], scenario.id, [[algorithm.id, feedstock.id]])
+        finalize_inventory.run([True], scenario.id, [[algorithm.id, material.id]])
 
         return Layer.objects.get(
-            scenario=scenario, feedstock=feedstock, algorithm=algorithm
+            scenario=scenario, feedstock=material, algorithm=algorithm
         )
 
     def build_hamburg_feedstock_profile(self, feedstock, scenario):

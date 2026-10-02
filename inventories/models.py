@@ -86,6 +86,7 @@ class InventoryAlgorithm(models.Model):
 
     @staticmethod
     def available_modules():
+        core_modules = ["inventories.algorithms"]
         legacy_modules = sorted(InventoryAlgorithm.SOURCE_MODULE_PATH_ALIASES)
         source_modules = []
         for module in pkgutil.iter_modules(sources.__path__):
@@ -103,7 +104,7 @@ class InventoryAlgorithm(models.Model):
             if hasattr(inventory_module, "InventoryAlgorithms"):
                 source_modules.append(module_path)
 
-        return legacy_modules + sorted(source_modules)
+        return core_modules + legacy_modules + sorted(source_modules)
 
     @staticmethod
     def available_functions(module_name):
@@ -160,6 +161,7 @@ class InventoryAlgorithm(models.Model):
 
     def execute(self, **kwargs):
         module = self.import_module()
+        kwargs.setdefault("geodataset_id", self.geodataset_id)
         return getattr(module.InventoryAlgorithms, self.function_name)(**kwargs)
 
     def default_values(self):
@@ -351,16 +353,15 @@ class Scenario(NamedUserCreatedObject):
         """
         Returns all materials that can be included in this scenario.
         """
-        materials = Material.objects.filter(
+        return Material.objects.filter(
             id__in=self.available_inventory_algorithms().values("feedstocks")
         )
-        return SampleSeries.objects.filter(material__in=materials)
 
     def feedstocks(self):
         """
-        Returns all materials (SampleSeries) that have been included in this scenario.
+        Returns all materials that have been included in this scenario.
         """
-        return SampleSeries.objects.filter(
+        return Material.objects.filter(
             id__in=self.scenarioinventoryconfiguration_set.all().values("feedstock")
         )
 
@@ -392,7 +393,7 @@ class Scenario(NamedUserCreatedObject):
             feedstocks = Material.objects.filter(id=feedstock.id)
         return GeoDataset.objects.filter(
             id__in=ScenarioInventoryConfiguration.objects.filter(
-                scenario=self, feedstock__material__in=feedstocks
+                scenario=self, feedstock__in=feedstocks
             ).values("geodataset")
         )
 
@@ -444,7 +445,7 @@ class Scenario(NamedUserCreatedObject):
             return InventoryAlgorithm.objects.none()
         else:
             return InventoryAlgorithm.objects.filter(
-                feedstock=feedstock.material, geodataset=geodataset
+                feedstocks=feedstock, geodataset=geodataset
             )
 
     def default_inventory_algorithms(self):
@@ -459,6 +460,9 @@ class Scenario(NamedUserCreatedObject):
         return {
             "scenario": self,
             "feedstock": feedstock,
+            "sample_series": configuration.values_list(
+                "sample_series", flat=True
+            ).first(),
             "geodataset": algorithm.geodataset,
             "inventory_algorithm": algorithm,
             "parameters": [
@@ -475,6 +479,7 @@ class Scenario(NamedUserCreatedObject):
         feedstock: Material,
         algorithm: InventoryAlgorithm,
         custom_parameter_values=None,
+        sample_series: SampleSeries = None,
     ):
         """
         Adds an inventory algorithm to and the given parameter values to the scenario configuration. If no
@@ -499,6 +504,7 @@ class Scenario(NamedUserCreatedObject):
                 config = {
                     "scenario": self,
                     "feedstock": feedstock,
+                    "sample_series": sample_series,
                     "geodataset": algorithm.geodataset,
                     "inventory_algorithm": algorithm,
                 }
@@ -510,6 +516,7 @@ class Scenario(NamedUserCreatedObject):
                     config = {
                         "scenario": self,
                         "feedstock": feedstock,
+                        "sample_series": sample_series,
                         "geodataset": algorithm.geodataset,
                         "inventory_algorithm": algorithm,
                         "inventory_parameter": parameter,
@@ -518,7 +525,7 @@ class Scenario(NamedUserCreatedObject):
                     ScenarioInventoryConfiguration.objects.create(**config)
 
     def remove_inventory_algorithm(
-        self, algorithm: InventoryAlgorithm, feedstock: SampleSeries
+        self, algorithm: InventoryAlgorithm, feedstock: Material
     ):
         """
         Remove all entries from the configuration that are associated with the given algorithm.
@@ -582,9 +589,7 @@ class Scenario(NamedUserCreatedObject):
         :return:
         """
         for algorithm in self.default_inventory_algorithms():
-            for feedstock in SampleSeries.objects.filter(
-                material__in=algorithm.feedstocks.all()
-            ):
+            for feedstock in algorithm.feedstocks.all():
                 self.add_inventory_algorithm(feedstock, algorithm)
 
     def configuration(self):
@@ -609,14 +614,25 @@ class Scenario(NamedUserCreatedObject):
             if feedstock not in inventory_config.keys():
                 inventory_config[feedstock] = {}
             if algorithm.id not in inventory_config[feedstock].keys():
+                kwargs = {
+                    "catchment_id": self.catchment.id,
+                    "scenario_id": self.id,
+                    "feedstock_id": feedstock,
+                }
+                if entry.sample_series_id:
+                    kwargs["sample_series_id"] = entry.sample_series_id
                 inventory_config[feedstock][algorithm.id] = {
                     "algorithm": algorithm,
-                    "kwargs": {
-                        "catchment_id": self.catchment.id,
-                        "scenario_id": self.id,
-                        "feedstock_id": feedstock,
-                    },
+                    "kwargs": kwargs,
                 }
+            elif (
+                entry.sample_series_id
+                and "sample_series_id"
+                not in inventory_config[feedstock][algorithm.id]["kwargs"]
+            ):
+                inventory_config[feedstock][algorithm.id]["kwargs"][
+                    "sample_series_id"
+                ] = entry.sample_series_id
             if (
                 parameter
                 and parameter not in inventory_config[feedstock][algorithm.id]["kwargs"]
@@ -624,6 +640,8 @@ class Scenario(NamedUserCreatedObject):
                 inventory_config[feedstock][algorithm.id]["kwargs"][parameter] = {
                     "value": value,
                     "standard_deviation": standard_deviation,
+                    "unit": entry.inventory_parameter.unit or "",
+                    "selection": entry.inventory_value.name or "",
                 }
 
         return [
@@ -757,7 +775,17 @@ def manage_scenario_status(sender, instance, created, **kwargs):
 
 class ScenarioInventoryConfiguration(models.Model):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
-    feedstock = models.ForeignKey(SampleSeries, on_delete=models.CASCADE, null=True)
+    feedstock = models.ForeignKey(Material, on_delete=models.CASCADE, null=True)
+    sample_series = models.ForeignKey(
+        SampleSeries,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        help_text=(
+            "Optional temporal profile for algorithms that need seasonal "
+            "data. Most inventories only need the material itself."
+        ),
+    )
     geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)
     inventory_algorithm = models.ForeignKey(
         InventoryAlgorithm, on_delete=models.CASCADE

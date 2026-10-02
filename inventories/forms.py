@@ -6,9 +6,10 @@ from django_tomselect.widgets import TomSelectModelWidget
 from distributions.models import TemporalDistribution
 from maps.models import GeoDataset
 from maps.views import CatchmentAutocompleteView
+from materials.models import SampleSeries
 from utils.forms import ModalModelFormMixin, SimpleModelForm
 
-from .models import InventoryAlgorithm, Scenario, ScenarioInventoryConfiguration
+from .models import Scenario, ScenarioInventoryConfiguration
 
 
 class SeasonalDistributionModelForm(SimpleModelForm):
@@ -72,10 +73,26 @@ class InitialInstanceTomSelectModelChoiceField(TomSelectModelChoiceField):
 class ScenarioInventoryConfigurationForm(SimpleModelForm):
     feedstock = TomSelectModelChoiceField(
         config=TomSelectConfig(
-            url="sampleseries-autocomplete",
+            url="material-autocomplete",
             label_field="name",
         ),
         label="Feedstock",
+    )
+    sample_series = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="sampleseries-autocomplete",
+            label_field="name",
+            filter_by=(
+                "feedstock",
+                "material_id",
+            ),
+        ),
+        label="Temporal profile (optional)",
+        help_text=(
+            "Sample series used as the seasonal profile of this feedstock. "
+            "Only needed for algorithms that distribute production over time."
+        ),
+        required=False,
     )
     geodataset = InitialInstanceTomSelectModelChoiceField(
         config=TomSelectConfig(
@@ -117,6 +134,7 @@ class ScenarioInventoryConfigurationForm(SimpleModelForm):
         fields = (
             "scenario",
             "feedstock",
+            "sample_series",
             "geodataset",
             "inventory_algorithm",
             "inventory_parameter",
@@ -129,13 +147,18 @@ class ScenarioInventoryConfigurationAddForm(ScenarioInventoryConfigurationForm):
         super().__init__(*args, **kwargs)
         del self.fields["inventory_parameter"]
         del self.fields["inventory_value"]
+        # The add form offers generic functions (geometry-driven) plus
+        # registered algorithms via a JS-rendered `algorithm_choice` select,
+        # not a model-bound TomSelect.
+        del self.fields["inventory_algorithm"]
         initial = kwargs.get("initial")
         self.fields["scenario"].queryset = Scenario.objects.all()
         self.fields["scenario"].initial = initial.get("scenario")
         self.fields["scenario"].widget = HiddenInput()
         self.fields["feedstock"].queryset = initial.get("feedstocks")
         self.fields["geodataset"].queryset = GeoDataset.objects.none()
-        self.fields["inventory_algorithm"].queryset = InventoryAlgorithm.objects.none()
+        # Dataset-first flow: geodataset drives the function options.
+        self.fields["feedstock"] = self.fields.pop("feedstock")
 
 
 class ScenarioInventoryConfigurationUpdateForm(ScenarioInventoryConfigurationForm):
@@ -153,6 +176,10 @@ class ScenarioInventoryConfigurationUpdateForm(ScenarioInventoryConfigurationFor
         self.fields["scenario"].widget = HiddenInput()
         self.fields["feedstock"].queryset = scenario.available_feedstocks()
         self.fields["feedstock"].initial = feedstock
+        self.fields["sample_series"].queryset = SampleSeries.objects.filter(
+            material=feedstock
+        )
+        self.fields["sample_series"].initial = initial.get("sample_series")
         self.fields["geodataset"].queryset = scenario.available_geodatasets(
             feedstock=feedstock
         )

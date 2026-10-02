@@ -74,7 +74,8 @@ class NantesGreenhouseProductionTestCase(TestCase):
     def _run(self):
         return InventoryAlgorithms.nantes_greenhouse_production(
             scenario_id=self.scenario.id,
-            feedstock_id=self.feedstock.id,
+            feedstock_id=self.feedstock.material_id,
+            sample_series_id=self.feedstock.id,
             heated={"value": 2},
             lit={"value": 2},
             high_wire={"value": 2},
@@ -113,4 +114,26 @@ class NantesGreenhouseProductionTestCase(TestCase):
             aggregated_value(result, "Number of considered greenhouses"), 0
         )
         self.assertEqual(aggregated_value(result, "Total growth area"), 0)
+        self.assertEqual(aggregated_value(result, "Total production"), 0)
+
+    def test_material_without_sample_series_returns_zero_result(self):
+        """A feedstock material without a temporal profile yields a complete
+        zero result — with geom_type — instead of failing layer creation."""
+        self._greenhouse(surface_ha=2.0)
+        bare_material = Material.objects.create(name="Series-less residue")
+
+        result = InventoryAlgorithms.nantes_greenhouse_production(
+            scenario_id=self.scenario.id,
+            feedstock_id=bare_material.id,
+            heated={"value": 2},
+            lit={"value": 2},
+            high_wire={"value": 2},
+            above_ground={"value": 2},
+        )
+
+        self.assertEqual(result["geom_type"], "Point")
+        self.assertEqual(result["features"], [])
+        self.assertEqual(
+            aggregated_value(result, "Number of considered greenhouses"), 0
+        )
         self.assertEqual(aggregated_value(result, "Total production"), 0)

@@ -9,11 +9,14 @@ import unittest
 
 from django.apps import AppConfig
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.management import call_command
 from django.db.models.signals import post_migrate
 from django.dispatch import receiver
 from django.test.runner import (
     DiscoverRunner,
+    ParallelTestSuite,
+    _init_worker,
     filter_tests_by_tags,
     iter_test_cases,
     partition_suite_by_case,
@@ -172,6 +175,22 @@ def serial_test(obj):
     return obj
 
 
+def _clean_cache_init_worker(counter, *args, **kwargs):
+    """Worker initializer that drops caches inherited from the parent process.
+
+    Forked workers inherit the parent's ContentType cache. Its entries may be
+    keyed to a differently-numbered database under the same ``default`` alias,
+    which made e.g. ``get_for_model`` return the wrong row and silently link
+    permissions to an unrelated content type in some worker partitions.
+    """
+    _init_worker(counter, *args, **kwargs)
+    ContentType.objects.clear_cache()
+
+
+class CleanCacheParallelTestSuite(ParallelTestSuite):
+    init_worker = _clean_cache_init_worker
+
+
 class SerialAwareTestRunner(DiscoverRunner):
     """
     Django test runner with serial test support and initial data loading.
@@ -268,7 +287,7 @@ class SerialAwareTestRunner(DiscoverRunner):
             processes = min(requested_parallel, len(subsuites))
             self.parallel = processes
             if processes > 1:
-                parallel_suite = self.parallel_test_suite(
+                parallel_suite = CleanCacheParallelTestSuite(
                     subsuites,
                     processes,
                     self.failfast,

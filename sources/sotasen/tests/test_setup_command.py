@@ -93,11 +93,7 @@ class SetupSotasenDemoInventoryTestCase(TestCase):
     def test_creates_private_objects_owned_by_owner(self):
         self.run_command()
 
-        series = SampleSeries.objects.get(name="Sötåsen clover grass (Thomas 2025)")
-        self.assertEqual(series.material_id, self.material.id)
-        self.assertEqual(series.owner, self.owner)
-        self.assertEqual(series.publication_status, "private")
-        self.assertIsNone(series.submitted_at)
+        self.assertFalse(SampleSeries.objects.exists())
 
         scenario = Scenario.objects.get(
             name="Sötåsen grass-to-protein demo (Thomas 2025)"
@@ -183,9 +179,8 @@ class SetupSotasenDemoInventoryTestCase(TestCase):
         scenario = Scenario.objects.get(
             name="Sötåsen grass-to-protein demo (Thomas 2025)"
         )
-        series = SampleSeries.objects.get(name="Sötåsen clover grass (Thomas 2025)")
         config = ScenarioInventoryConfiguration.objects.filter(
-            scenario=scenario, feedstock=series
+            scenario=scenario, feedstock=self.material
         )
         self.assertEqual(config.count(), 3)
         values = {
@@ -248,8 +243,8 @@ class SetupSotasenDemoInventoryTestCase(TestCase):
         self.assertIn("DRY RUN", out)
         self.assertIn("Created", out)
         self.assertFalse(
-            SampleSeries.objects.filter(
-                name="Sötåsen clover grass (Thomas 2025)"
+            Scenario.objects.filter(
+                name="Sötåsen grass-to-protein demo (Thomas 2025)"
             ).exists()
         )
 
@@ -258,11 +253,7 @@ class SetupSotasenDemoInventoryTestCase(TestCase):
         with self.assertRaises(CommandError) as ctx:
             self.run_command()
         self.assertIn(str(self.material.id), str(ctx.exception))
-        self.assertFalse(
-            SampleSeries.objects.filter(
-                name="Sötåsen clover grass (Thomas 2025)"
-            ).exists()
-        )
+        self.assertFalse(SampleSeries.objects.exists())
         self.assertFalse(
             Scenario.objects.filter(
                 name="Sötåsen grass-to-protein demo (Thomas 2025)"

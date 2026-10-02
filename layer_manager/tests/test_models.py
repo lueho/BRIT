@@ -16,7 +16,7 @@ from layer_manager.models import (
     LayerField,
 )
 from maps.models import Catchment, GeoDataset, Region
-from materials.models import Material, MaterialComponent, SampleSeries
+from materials.models import Material, MaterialComponent
 from sources.urban_green_spaces.models import HamburgGreenAreas
 
 
@@ -32,7 +32,7 @@ class LayerTestCase(TestCase):
 
         geodataset = GeoDataset.objects.create(name="Test Geodataset", region=region)
 
-        feedstock = Material.objects.create(name="Test Feedstock")
+        Material.objects.create(name="Test Feedstock")
 
         InventoryAlgorithm.objects.create(
             name="Average Point Yield",
@@ -54,14 +54,10 @@ class LayerTestCase(TestCase):
                 ]
             )
         )
-        SampleSeries.objects.create(material=feedstock, name="Feedstock Test Series")
 
     def setUp(self):
         self.scenario = Scenario.objects.get(name="Test Scenario")
-        # self.feedstock = Material.objects.get(name='Test Feedstock')
-        self.feedstock_sample_series = SampleSeries.objects.get(
-            name="Feedstock Test Series"
-        )
+        self.feedstock_sample_series = Material.objects.get(name="Test Feedstock")
 
         self.testkwargs = {
             "name": "test name",
@@ -327,10 +323,7 @@ class MergeDuplicateLayerFieldsMigrationTestCase(TestCase):
             function_name="avg_point_yield",
             geodataset=geodataset,
         )
-        feedstock = SampleSeries.objects.create(
-            material=Material.objects.create(name="Test Feedstock"),
-            name="Feedstock Test Series",
-        )
+        feedstock = Material.objects.create(name="Test Feedstock")
         cls.layer_kwargs = {
             "geom_type": "Point",
             "scenario": scenario,

@@ -5,7 +5,7 @@ from django.test import TestCase
 
 from layer_manager.models import Layer
 from maps.models import GeoDataset, Region
-from materials.models import Material, SampleSeries
+from materials.models import Material
 
 from ..models import InventoryAlgorithm, RunningTask, Scenario, ScenarioStatus
 from ..tasks import (
@@ -66,10 +66,7 @@ class InventoryTaskFailureTests(TestCase):
                 region=region,
             ),
         )
-        feedstock = SampleSeries.objects.create(
-            name="Algorithm Failure Feedstock",
-            material=Material.objects.create(name="Algorithm Failure Material"),
-        )
+        feedstock = Material.objects.create(name="Algorithm Failure Material")
         scenario.set_status(ScenarioStatus.Status.RUNNING)
         RunningTask.objects.create(
             scenario=scenario,
@@ -115,10 +112,7 @@ class InventoryTaskFailureTests(TestCase):
                 region=region,
             ),
         )
-        feedstock = SampleSeries.objects.create(
-            name="Persistence Failure Feedstock",
-            material=Material.objects.create(name="Persistence Failure Material"),
-        )
+        feedstock = Material.objects.create(name="Persistence Failure Material")
         scenario.set_status(ScenarioStatus.Status.RUNNING)
         RunningTask.objects.create(
             scenario=scenario,
@@ -164,10 +158,7 @@ class InventoryRunSerializationTests(TestCase):
             function_name="removed_algorithm",
             geodataset=self.geodataset,
         )
-        self.feedstock = SampleSeries.objects.create(
-            name="Serialization Feedstock",
-            material=Material.objects.create(name="Serialization Material"),
-        )
+        self.feedstock = Material.objects.create(name="Serialization Material")
 
     def create_layer(self, algorithm, staged=False):
         return Layer.all_objects.create(

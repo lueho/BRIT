@@ -2,9 +2,11 @@ from django.db.models import Sum
 
 from distributions.models import TemporalDistribution
 from distributions.plots import Distribution
-from inventories.algorithms import InventoryAlgorithmsBase
+from inventories.algorithms import (
+    InventoryAlgorithmsBase,
+    resolve_feedstock_series,
+)
 from inventories.models import Scenario
-from materials.models import SampleSeries
 from sources.greenhouses.models import Greenhouse, NantesGreenhouses
 
 
@@ -15,14 +17,29 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         Here all the algorithms that are specific to the case study of the greenhouses in Nantes region are implemented.
         """
         scenario = Scenario.objects.get(id=kwargs.get("scenario_id"))
-        feedstock = SampleSeries.objects.get(id=kwargs.get("feedstock_id"))
+        feedstock = resolve_feedstock_series(**kwargs)
         catchment = scenario.catchment
 
         result = {
             "aggregated_values": [],
             "aggregated_distributions": [],
             "features": [],
+            "geom_type": "Point",
         }
+        if feedstock is None:
+            # Without a temporal profile no residue production can be
+            # attributed; report a complete zero result so layer creation
+            # succeeds and scenario totals stay consistent.
+            result["aggregated_values"] = [
+                {
+                    "name": "Number of considered greenhouses",
+                    "value": 0,
+                    "unit": "",
+                },
+                {"name": "Total growth area", "value": 0, "unit": "ha"},
+                {"name": "Total production", "value": 0, "unit": "Mg/a"},
+            ]
+            return result
 
         # Get all greenhouse data within the scenario catchment
         clipped = NantesGreenhouses.objects.filter(geom__intersects=catchment.geom)
