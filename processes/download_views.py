@@ -1,5 +1,5 @@
 from contextlib import suppress
-from ntpath import basename
+from pathlib import PurePosixPath
 
 from botocore.exceptions import BotoCoreError, ClientError
 from django.core.exceptions import PermissionDenied
@@ -48,12 +48,11 @@ class SupportingFileDownloadView(UserCreatedObjectDetailView):
             stream = field_file.storage.open(field_file.name, "rb")
             stream.read(1)
             stream.seek(0)
+            # Storage names use "/" separators; normalize stray "\"
+            # separators too so crafted names cannot smuggle a path.
+            name = PurePosixPath(field_file.name.replace("\\", "/")).name
             filename = (
-                "".join(
-                    character
-                    for character in basename(field_file.name)
-                    if character.isprintable()
-                )
+                "".join(character for character in name if character.isprintable())
                 or "document"
             )
             response = FileResponse(stream, as_attachment=True, filename=filename)
