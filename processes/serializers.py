@@ -255,6 +255,9 @@ class ProcessVisibilityMixin:
     def get_authors(self, obj):
         """Get author ids in explicit process author order, read-policy scoped."""
 
+        cache = getattr(obj, "_prefetched_objects_cache", {})
+        if "process_authors" in cache:
+            return [link.author_id for link in cache["process_authors"]]
         authors = obj.authors_ordered()
         if not authors:
             return []

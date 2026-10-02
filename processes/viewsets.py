@@ -17,6 +17,7 @@ from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 from .models import (
     Process,
+    ProcessAuthor,
     ProcessCategory,
     ProcessMaterial,
     ProcessOperatingParameter,
@@ -63,6 +64,14 @@ def _visible_process_relations(queryset, user):
                     )
                 )
             ),
+        ),
+        Prefetch(
+            "process_authors",
+            queryset=ProcessAuthor.objects.filter(
+                author__in=filter_queryset_for_user(Author.objects.all(), user)
+            )
+            .select_related("author")
+            .order_by("position", "author_id", "id"),
         ),
     ).annotate(
         parent_is_visible=Exists(
@@ -278,15 +287,12 @@ class ProcessViewSet(UserCreatedObjectViewSet):
     def by_mechanism(self, request):
         """Get processes grouped by mechanism."""
         processes = self.get_queryset()
+        serialized = ProcessListSerializer(
+            processes, many=True, context=self.get_serializer_context()
+        ).data
 
-        serializer_context = self.get_serializer_context()
         mechanisms = {}
-        for process in processes:
-            mechanism = process.mechanism or "Other"
-            if mechanism not in mechanisms:
-                mechanisms[mechanism] = []
-            mechanisms[mechanism].append(
-                ProcessListSerializer(process, context=serializer_context).data
-            )
+        for process, data in zip(processes, serialized, strict=True):
+            mechanisms.setdefault(process.mechanism or "Other", []).append(data)
 
         return Response(mechanisms)
