@@ -808,8 +808,8 @@ class ReviewExceptionHandlingTests(TestCase):
     def test_submit_post_survives_audit_log_db_failure(self):
         self.client.force_login(self.owner)
         with (
-            patch("utils.object_management.views.ReviewAction") as review_action,
-            self.assertLogs("utils.object_management.views", level="WARNING") as logs,
+            patch("utils.object_management.helpers.ReviewAction") as review_action,
+            self.assertLogs("utils.object_management.helpers", level="WARNING") as logs,
         ):
             review_action.objects.create.side_effect = DatabaseError("boom")
             response = self.client.post(self._submit_url())
@@ -819,7 +819,7 @@ class ReviewExceptionHandlingTests(TestCase):
     def test_submit_post_propagates_unexpected_audit_log_errors(self):
         self.client.force_login(self.owner)
         with (
-            patch("utils.object_management.views.ReviewAction") as review_action,
+            patch("utils.object_management.helpers.ReviewAction") as review_action,
             self.assertLogs("django.request", level="ERROR"),
         ):
             review_action.objects.create.side_effect = RuntimeError("boom")
