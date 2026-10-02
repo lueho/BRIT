@@ -1,4 +1,4 @@
-from maps.models import Region
+from maps.models import Catchment, Region
 from materials.models import Material
 from processes.models import Process
 from utils.tests.testcases import AbstractTestCases
@@ -46,6 +46,19 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
             }
         )
         return data
+
+    def test_create_view_renders_distinct_formset_controls_per_inline(self):
+        """Each inline gets its own add button, container and empty-row template."""
+        self.client.force_login(self.user_with_add_perm)
+        response = self.client.get(self.get_create_url())
+        self.assertEqual(response.status_code, 200)
+        for prefix in ("showcase_materials", "showcase_processes"):
+            for element in ("add-form", "formset-container", "empty-form-row"):
+                with self.subTest(prefix=prefix, element=element):
+                    self.assertContains(
+                        response, f'id="{prefix}_{element}"', count=1, html=False
+                    )
+            self.assertContains(response, f'data-formset-id="{prefix}"', count=1)
 
     def test_create_view_post_with_inline_materials_and_processes(self):
         """Creating a showcase can attach material and process links inline."""
@@ -139,3 +152,20 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         response = self.client.get(self.get_detail_url(showcase.pk))
         self.assertContains(response, "Private Detail Feedstock")
         self.assertContains(response, "Private Detail Step")
+
+    def test_detail_map_omits_private_catchment_for_anonymous_users(self):
+        owner = self.owner_user
+        showcase = self.published_object
+        showcase.catchment = Catchment.objects.create(
+            name="Private Map Catchment", region=showcase.region, owner=owner
+        )
+        showcase.save()
+
+        response = self.client.get(self.get_detail_url(showcase.pk))
+        self.assertIsNone(response.context["view"].get_catchment_feature_id())
+
+        self.client.force_login(owner)
+        response = self.client.get(self.get_detail_url(showcase.pk))
+        self.assertEqual(
+            showcase.catchment.pk, response.context["view"].get_catchment_feature_id()
+        )

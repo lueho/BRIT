@@ -50,6 +50,10 @@ class ShowcaseCreateView(UserCreatedObjectCreateWithInlinesView):
 class ShowcaseDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Showcase
 
+    def get_catchment_feature_id(self):
+        catchment = self.object.visible_catchment(self.request.user)
+        return catchment.pk if catchment is not None else None
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
