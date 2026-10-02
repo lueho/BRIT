@@ -2,6 +2,7 @@
 
 from unittest.mock import ANY, Mock, PropertyMock, call, patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
 
@@ -39,6 +40,17 @@ class CleanupOrphanedWasteFlyersTestCase(TestCase):
         deleted_count, _ = cleanup_orphaned_waste_flyers()
         self.assertEqual(deleted_count, 1)
         self.assertFalse(WasteFlyer.objects.filter(pk=flyer.pk).exists())
+
+
+class CleanupOrphanedWasteFlyersScheduleTestCase(SimpleTestCase):
+    """Orphaned flyers also arise outside the collection form (API mutations,
+    imports), so the cleanup must run periodically, not only on form saves."""
+
+    def test_cleanup_task_is_on_the_beat_schedule(self):
+        scheduled_tasks = {
+            entry["task"] for entry in settings.CELERY_BEAT_SCHEDULE.values()
+        }
+        self.assertIn("cleanup_orphaned_waste_flyers", scheduled_tasks)
 
 
 class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
