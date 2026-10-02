@@ -55,7 +55,7 @@
                                             Uncategorized
                                         {% endfor %}
                                         {% if object.mechanism %}· {{ object.mechanism }}{% endif %}
-                                        {% if object.parent %}· Variant of {{ object.parent.name }}{% endif %}
+                                        {% if object.parent and object.parent_is_visible %}· Variant of {{ object.parent.name }}{% endif %}
                                     </span>
                                     {% if object.short_description %}
                                         <span class="text-muted small d-block">{{ object.short_description|truncatewords:18 }}</span>
