@@ -1,5 +1,3 @@
-import string
-
 import celery
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
@@ -11,6 +9,8 @@ from utils.object_management.models import (
     UserCreatedObject,
     UserCreatedObjectManager,
 )
+
+from .utils import generate_citation_key
 
 AUTHOR_TYPES = (("person", "Person"), ("organization", "Organization"))
 
@@ -475,24 +475,7 @@ class Source(UserCreatedObject):
 
     def _disambiguated_abbreviation(self):
         """Generate an abbreviation with a/b/c suffix if the base key collides."""
-        base = self.generate_abbreviation()
-        if not base:
-            return base
-
-        # Find existing sources with the same base abbreviation (excluding self)
-        qs = Source.objects.filter(citation_key__startswith=base).exclude(pk=self.pk)
-        existing = set(qs.values_list("citation_key", flat=True))
-
-        if base not in existing:
-            return base
-
-        # Try suffixes a, b, c, ...
-        for letter in string.ascii_lowercase:
-            candidate = f"{base}{letter}"
-            if candidate not in existing:
-                return candidate
-
-        return base  # fallback if all 26 letters exhausted
+        return generate_citation_key(self)
 
     def _base_abbreviation_without_authors(self):
         """Generate a base abbreviation from title/year (no author data needed)."""
@@ -504,27 +487,7 @@ class Source(UserCreatedObject):
 
     def save(self, *args, **kwargs):
         if not self.citation_key:
-            if self.pk:
-                # Existing object: can use full generation with authors
-                self.citation_key = self._disambiguated_abbreviation()
-            else:
-                # First save: generate from title/year, then disambiguate
-                base = self._base_abbreviation_without_authors()
-                existing = set(
-                    Source.objects.filter(citation_key__startswith=base).values_list(
-                        "citation_key", flat=True
-                    )
-                )
-                if base not in existing:
-                    self.citation_key = base
-                else:
-                    for letter in string.ascii_lowercase:
-                        candidate = f"{base}{letter}"
-                        if candidate not in existing:
-                            self.citation_key = candidate
-                            break
-                    else:
-                        self.citation_key = base
+            self.citation_key = generate_citation_key(self)
         super().save(*args, **kwargs)
 
     def update_abbreviation(self):

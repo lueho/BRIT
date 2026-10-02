@@ -1,3 +1,5 @@
+import string
+
 import requests
 
 _REQUEST_HEADERS = {
@@ -105,3 +107,34 @@ def find_wayback_snapshot_for_year(url, year):
 
 def check_source_urls(params):
     pass
+
+
+def generate_citation_key(source):
+    """Return a disambiguated citation key for the given source.
+
+    Persisted sources use the full author/year generator; unsaved sources
+    fall back to a title/year base because their m2m authors are not
+    populated yet. Colliding keys get an a/b/c/... suffix.
+    """
+    if source.pk:
+        base = source.generate_abbreviation()
+    else:
+        base = source._base_abbreviation_without_authors()
+    if not base:
+        return base
+
+    existing = set(
+        type(source)
+        .objects.filter(citation_key__startswith=base)
+        .exclude(pk=source.pk)
+        .values_list("citation_key", flat=True)
+    )
+    if base not in existing:
+        return base
+
+    for letter in string.ascii_lowercase:
+        candidate = f"{base}{letter}"
+        if candidate not in existing:
+            return candidate
+
+    return base

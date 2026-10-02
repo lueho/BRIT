@@ -4,6 +4,7 @@ from django.test import TestCase
 from factory.django import mute_signals
 
 from ..models import Author, Licence, Source, SourceAuthor
+from ..utils import generate_citation_key
 
 
 class OrganizationAuthorTestCase(TestCase):
@@ -215,6 +216,33 @@ class SourceAbbreviationSignalTestCase(TestCase):
         SourceAuthor.objects.create(source=source, author=self.author1, position=1)
         source.refresh_from_db()
         self.assertEqual(source.abbreviation, "DIN EN 13039")
+
+
+class GenerateCitationKeyTestCase(TestCase):
+    """Tests for bibliography.utils.generate_citation_key()."""
+
+    def test_new_source_uses_first_title_word_and_year(self):
+        source = Source(title="Annual waste report", year=2024)
+        self.assertEqual(generate_citation_key(source), "Annual 2024")
+
+    def test_collision_appends_letter_suffix(self):
+        Source.objects.create(title="Annual waste report", year=2024)
+        source = Source(title="Annual review", year=2024)
+        self.assertEqual(generate_citation_key(source), "Annual 2024a")
+
+    def test_saved_source_uses_author_base(self):
+        source = Source.objects.create(title="Anything", year=2020)
+        author = Author.objects.create(first_names="Alice", last_names="Wonder")
+        SourceAuthor.objects.create(source=source, author=author, position=1)
+        self.assertEqual(generate_citation_key(source), "Wonder 2020")
+
+    def test_saved_source_key_does_not_collide_with_itself(self):
+        source = Source.objects.create(title="Anything", year=2020)
+        self.assertEqual(generate_citation_key(source), source.citation_key)
+
+    def test_save_generates_key_when_empty(self):
+        source = Source.objects.create(title="Silent spring", year=1962)
+        self.assertEqual(source.citation_key, "Silent 1962")
 
 
 class SourceUpdateAbbreviationTestCase(TestCase):
