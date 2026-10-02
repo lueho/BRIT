@@ -309,6 +309,14 @@ class SupportingFileDownloadTests:
             response = self.client.get(self.download_url)
         self.assert_download(response, filename="original report.pdf")
 
+    def test_attachment_filename_falls_back_for_trailing_separator(self):
+        """A storage key ending in a separator has no filename component."""
+        setattr(self.file_object, self.field_name, "private/folder/report.pdf/")
+        self.file_object.save(update_fields=[self.field_name])
+        with patch.object(self.storage, "open", return_value=BytesIO(self.payload)):
+            response = self.client.get(self.download_url)
+        self.assert_download(response, filename="document")
+
     def test_unexpected_programming_errors_are_not_hidden(self):
         with (
             patch.object(
