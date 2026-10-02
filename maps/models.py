@@ -600,6 +600,8 @@ class CatchmentManager(models.Manager):
 
 
 class Catchment(NamedUserCreatedObject, TreeNode):
+    scope_filtered_lists = True
+
     parent_region = models.ForeignKey(
         Region, on_delete=models.CASCADE, related_name="child_catchments", null=True
     )

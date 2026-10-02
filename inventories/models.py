@@ -319,6 +319,8 @@ class ScenarioStatus(models.Model):
 
 
 class Scenario(NamedUserCreatedObject):
+    scope_filtered_lists = True
+
     name = models.CharField(max_length=56, default="Custom Scenario")
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     description = models.TextField(blank=True, null=True)
