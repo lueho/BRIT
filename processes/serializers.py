@@ -177,10 +177,20 @@ class VisibleSourceSerializer(SourceModelSerializer):
 
     authors = serializers.SerializerMethodField()
     licence = serializers.SerializerMethodField()
+    citation_key = serializers.SerializerMethodField()
 
     def _user(self):
         request = self.context.get("request")
         return getattr(request, "user", None)
+
+    def get_citation_key(self, obj):
+        """Citation keys embed author surnames; hide them while an author is hidden."""
+        hidden = getattr(obj, "has_hidden_authors", None)
+        if hidden is None:
+            hidden = obj.authors.exclude(
+                pk__in=filter_queryset_for_user(Author.objects.all(), self._user())
+            ).exists()
+        return None if hidden else obj.citation_key
 
     def get_authors(self, obj):
         cache = getattr(obj, "_prefetched_objects_cache", {})
@@ -199,6 +209,26 @@ class VisibleSourceSerializer(SourceModelSerializer):
                 Licence.objects.filter(pk=obj.licence_id), self._user()
             ).exists()
         return LicenceModelSerializer(obj.licence).data if visible else None
+
+
+def visible_process_material_links(process, user):
+    """ProcessMaterial links for ``process`` whose material ``user`` may read.
+
+    Uses the prefetched link cache when present (already ``select_related`` on
+    material), otherwise loads the links with their materials in one query.
+    """
+    cache = getattr(process, "_prefetched_objects_cache", {})
+    if "process_materials" in cache:
+        links = list(cache["process_materials"])
+    else:
+        links = list(process.process_materials.select_related("material"))
+    visible_ids = set(
+        filter_queryset_for_user(
+            Material.objects.filter(pk__in={link.material_id for link in links}),
+            user,
+        ).values_list("pk", flat=True)
+    )
+    return [link for link in links if link.material_id in visible_ids]
 
 
 class ProcessVisibilityMixin:
@@ -228,16 +258,7 @@ class ProcessVisibilityMixin:
         if cache is None:
             cache = self._pm_cache = {}
         if obj.pk not in cache:
-            links = list(obj.process_materials.all())
-            visible_ids = set(
-                filter_queryset_for_user(
-                    Material.objects.filter(
-                        pk__in={link.material_id for link in links}
-                    ),
-                    self._request_user(),
-                ).values_list("pk", flat=True)
-            )
-            cache[obj.pk] = [link for link in links if link.material_id in visible_ids]
+            cache[obj.pk] = visible_process_material_links(obj, self._request_user())
         return cache[obj.pk]
 
     def get_categories(self, obj):

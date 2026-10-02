@@ -8,7 +8,7 @@ from rest_framework import filters, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from bibliography.models import Author, Licence, Source
+from bibliography.models import Author, Licence, Source, SourceAuthor
 from utils.object_management.permissions import (
     UserCreatedObjectPermission,
     filter_queryset_for_user,
@@ -28,7 +28,17 @@ from .serializers import (
     ProcessDetailSerializer,
     ProcessListSerializer,
     ProcessOperatingParameterSerializer,
+    visible_process_material_links,
 )
+
+
+def _source_has_hidden_authors(user):
+    """Exists-subquery flagging sources that link an author ``user`` may not read."""
+    return Exists(
+        SourceAuthor.objects.filter(source=OuterRef("pk")).exclude(
+            author__in=filter_queryset_for_user(Author.objects.all(), user)
+        )
+    )
 
 
 def _visible_process_relations(queryset, user):
@@ -62,7 +72,8 @@ def _visible_process_relations(queryset, user):
                         Licence.objects.filter(pk=OuterRef("licence_id")),
                         user,
                     )
-                )
+                ),
+                has_hidden_authors=_source_has_hidden_authors(user),
             ),
         ),
         Prefetch(
@@ -173,11 +184,19 @@ class ProcessViewSet(UserCreatedObjectViewSet):
     def materials(self, request, pk=None):
         """Get all materials (inputs and outputs) for this process."""
         process = self.get_object()
-        serializer = self.get_serializer(process)
+        links = visible_process_material_links(process, request.user)
         return Response(
             {
-                "inputs": serializer.data["input_materials"],
-                "outputs": serializer.data["output_materials"],
+                "inputs": [
+                    {"id": link.material_id, "name": link.material.name}
+                    for link in links
+                    if link.role == ProcessMaterial.Role.INPUT
+                ],
+                "outputs": [
+                    {"id": link.material_id, "name": link.material.name}
+                    for link in links
+                    if link.role == ProcessMaterial.Role.OUTPUT
+                ],
             }
         )
 
@@ -232,21 +251,26 @@ class ProcessViewSet(UserCreatedObjectViewSet):
         """Get all literature sources referenced by this process."""
         process = self.get_object()
         ordered = list(process.sources_ordered())
-        visible_ids = set(
-            filter_queryset_for_user(
+        visible_by_pk = {
+            s.pk: s
+            for s in filter_queryset_for_user(
                 Source.objects.filter(pk__in=[s.pk for s in ordered]),
                 request.user,
-            ).values_list("pk", flat=True)
-        )
+            ).annotate(has_hidden_authors=_source_has_hidden_authors(request.user))
+        }
         sources = [
             {
                 "id": s.id,
                 "title": s.title,
-                "abbreviation": s.abbreviation,
+                "abbreviation": (
+                    s.abbreviation
+                    if not visible_by_pk[s.pk].has_hidden_authors
+                    else None
+                ),
                 "type": s.type,
             }
             for s in ordered
-            if s.pk in visible_ids
+            if s.pk in visible_by_pk
         ]
         return Response(sources)
 

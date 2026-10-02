@@ -689,6 +689,47 @@ class ProcessAPIRelatedVisibilityTestCase(APITestCase):
             {m["name"] for m in response.data["inputs"]}, {"Published Material"}
         )
 
+    def _keyed_source(self, author, citation_key):
+        source = Source.objects.create(
+            title="Keyed Source",
+            abbreviation=citation_key,
+            owner=self.other,
+            publication_status="published",
+            year=2020,
+        )
+        SourceAuthor.objects.create(source=source, author=author, position=1)
+        self.published_process.sources.add(source)
+        return source
+
+    def test_detail_hides_citation_key_of_source_with_hidden_author(self):
+        """A citation key derived from a hidden author's name must not leak it."""
+        source = self._keyed_source(self.foreign_private_author, "Writer 2020")
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = next(s for s in response.data["sources"] if s["id"] == source.pk)
+        self.assertEqual(payload["authors"], [])
+        self.assertIsNone(payload["citation_key"])
+
+    def test_detail_keeps_citation_key_of_source_with_visible_authors(self):
+        source = self._keyed_source(self.published_author, "Writer 2020")
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = next(s for s in response.data["sources"] if s["id"] == source.pk)
+        self.assertEqual(payload["citation_key"], "Writer 2020")
+
+    def test_sources_action_hides_citation_key_with_hidden_author(self):
+        source = self._keyed_source(self.foreign_private_author, "Writer 2020")
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/sources/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = next(s for s in response.data if s["id"] == source.pk)
+        self.assertIsNone(payload["abbreviation"])
+
     def test_owner_of_private_relations_sees_them_in_list(self):
         """`other` owns the private relations and must see them on the process."""
         self.client.force_login(self.other)
@@ -780,4 +821,35 @@ class ProcessAPIQueryCountTestCase(APITestCase):
             self._add_category_with_process(index)
         with CaptureQueriesContext(connection) as scaled:
             self.client.get("/processes/api/processes/by_mechanism/")
+        self.assertEqual(len(scaled), len(baseline))
+
+    def test_materials_action_query_count_is_constant(self):
+        """The materials action must not serialize the full detail payload."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        process = Process.objects.create(
+            name="Perf Materials Process",
+            owner=self.owner,
+            publication_status="published",
+        )
+
+        def add_link(index):
+            ProcessMaterial.objects.create(
+                process=process,
+                material=Material.objects.create(
+                    name=f"Perf Material {index}",
+                    owner=self.owner,
+                    publication_status="published",
+                ),
+                role=ProcessMaterial.Role.INPUT,
+            )
+
+        add_link(1)
+        with CaptureQueriesContext(connection) as baseline:
+            self.client.get(f"/processes/api/processes/{process.pk}/materials/")
+        for index in range(2, 6):
+            add_link(index)
+        with CaptureQueriesContext(connection) as scaled:
+            self.client.get(f"/processes/api/processes/{process.pk}/materials/")
         self.assertEqual(len(scaled), len(baseline))
