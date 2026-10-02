@@ -116,6 +116,7 @@
                 this.focusEditor(active);
             } catch (error) {
                 this.close(active);
+                console.error("Workspace editor could not open.", error);
                 this.announce("Could not open the editor. Try again, or use the full-page editor link below the section heading.", true);
                 link.focus();
             } finally {
@@ -143,8 +144,14 @@
         loadAsset(element, kind) {
             const url = this.trustedMediaURL(element.getAttribute(kind === "script" ? "src" : "href"), kind);
             if (media.has(url.href)) return media.get(url.href);
-            const existing = Array.from(document.querySelectorAll(kind === "script" ? "script[src]" : 'link[rel="stylesheet"]')).find((node) => (kind === "script" ? node.src : node.href) === url.href);
-            if (existing) return Promise.resolve();
+            // A same-URL <script> already in the DOM may still be in flight, so it
+            // cannot prove the widget dependency has executed. Re-requesting hits
+            // the HTTP cache and the bundle is idempotent, so scripts always get
+            // their own node; stylesheets can safely reuse an existing link.
+            if (kind !== "script") {
+                const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).find((node) => node.href === url.href);
+                if (existing) return Promise.resolve();
+            }
             const promise = new Promise((resolve, reject) => {
                 const node = document.createElement(kind === "script" ? "script" : "link");
                 if (kind === "script") {
@@ -169,7 +176,9 @@
         async loadMedia(fragment) {
             if (!fragment.querySelector("select[data-workspace-select]")) return;
             for (const template of fragment.querySelectorAll("template[data-workspace-media]")) {
-                await Promise.all(Array.from(template.content.querySelectorAll('link[rel="stylesheet"]'), (link) => this.loadAsset(link, "style")));
+                // Stylesheets only affect appearance; a failed request must not
+                // keep the editor scripts below from loading.
+                await Promise.allSettled(Array.from(template.content.querySelectorAll('link[rel="stylesheet"]'), (link) => this.loadAsset(link, "style")));
                 for (const script of template.content.querySelectorAll("script[src]")) await this.loadAsset(script, "script");
                 template.remove();
             }
@@ -193,11 +202,18 @@
                     field.setAttribute("aria-describedby", `${field.id}_helptext ${field.id}_errors`);
                 }
             }
+            let failed = 0;
             for (const select of container.querySelectorAll("select[data-workspace-select]")) {
                 if (select.tomselect) continue;
                 if (!window.TomSelect) throw new Error("Select editor unavailable");
-                new window.TomSelect(select, this.autocompleteSettings(select));
+                try {
+                    new window.TomSelect(select, this.autocompleteSettings(select));
+                } catch (error) {
+                    failed += 1;
+                    console.error("Workspace search widget could not initialize.", error);
+                }
             }
+            if (failed) this.announce("Search could not load for every field. Existing selections and other fields can still be saved, but choosing new entries in the affected fields requires JavaScript search.", true);
         }
 
         autocompleteSettings(select) {
@@ -397,6 +413,7 @@
                     this.focusEditor({ editor: row });
                 }
             } catch (error) {
+                console.error("Workspace row widgets could not initialize.", error);
                 if (this.active === active) this.announce("Row added, but search could not load. Your entries are kept. You need JavaScript search to choose new entries; check your connection and retry.", true);
             }
             return row;
@@ -555,6 +572,7 @@
                 await workspace.loadMedia(root);
                 workspace.initializeWidgets(root);
             } catch (error) {
+                console.error("Workspace editor initialization failed.", error);
                 workspace.announce("Search could not load. Existing selections and other fields can still be saved, but choosing new entries requires JavaScript search. Check your connection and reload to retry.", true);
             }
             workspace.active = { form, editor: root, dirty: false, busy: false };
