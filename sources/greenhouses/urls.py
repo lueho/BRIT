@@ -115,6 +115,11 @@ urlpatterns = [
         GrowthCycleModalCreateView.as_view(),
         name="greenhousegrowthcycle-create",
     ),
+    # Slashless alias for clients that learned the pre-slash URL.
+    path(
+        "greenhouses/<int:pk>/growth_cycles/add",
+        GrowthCycleModalCreateView.as_view(),
+    ),
     path(
         "greenhouses/<int:pk>/growth_cycles/<int:cycle_pk>/update/",
         UpdateGreenhouseGrowthCycleValuesView.as_view(),
