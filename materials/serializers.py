@@ -659,6 +659,11 @@ class ComponentMeasurementWriteSerializer(ModelSerializer):
             )
         return unit
 
+    def validate_average(self, average):
+        if average < 0:
+            raise ValidationError("Component measurement averages cannot be negative.")
+        return average
+
 
 class MaterialPropertyValueReadSerializer(
     MeasurementMetadataSerializerMixin, ModelSerializer
