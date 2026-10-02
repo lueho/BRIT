@@ -74,7 +74,8 @@ class NantesGreenhouseProductionTestCase(TestCase):
     def _run(self):
         return InventoryAlgorithms.nantes_greenhouse_production(
             scenario_id=self.scenario.id,
-            feedstock_id=self.feedstock.id,
+            feedstock_id=self.feedstock.material_id,
+            sample_series_id=self.feedstock.id,
             heated={"value": 2},
             lit={"value": 2},
             high_wire={"value": 2},
