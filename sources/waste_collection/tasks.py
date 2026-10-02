@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 from types import SimpleNamespace
 
 from celery import chord
@@ -130,15 +131,39 @@ def check_wasteflyer_urls(self, params, user_id=None):
     return task_chord.task_id
 
 
+FLYER_ORPHAN_GRACE_PERIOD = timedelta(days=7)
+
+
 @app.task(name="cleanup_orphaned_waste_flyers", trail=True)
 def cleanup_orphaned_waste_flyers():
-    """Delete WasteFlyers that are no longer referenced by any collections or properties."""
+    """Delete WasteFlyers that are not referenced anywhere anymore.
+
+    WasteFlyer is a proxy of bibliography.Source, so a flyer can also be cited
+    by models outside waste_collection (materials, processes, maps, ...). The
+    orphan predicate must cover every Source back-reference: deleting a cited
+    flyer would silently drop M2M citations or abort on protected FKs. Flyers
+    younger than FLYER_ORPHAN_GRACE_PERIOD are kept so freshly created
+    standalone flyers can still be linked before the next cleanup run.
+    """
 
     return WasteFlyer.objects.filter(
+        created_at__lt=timezone.now() - FLYER_ORPHAN_GRACE_PERIOD,
         collections__isnull=True,
         collection__isnull=True,
         collectionpropertyvalue__isnull=True,
         aggregatedcollectionpropertyvalue__isnull=True,
+        analyticalmethod__isnull=True,
+        sample_groups__isnull=True,
+        materialpropertyvalue__isnull=True,
+        sample__isnull=True,
+        componentmeasurement__isnull=True,
+        processes__isnull=True,
+        process_source_links__isnull=True,
+        external_sample_records__isnull=True,
+        population_datasets__isnull=True,
+        inventoryalgorithm__isnull=True,
+        catchmentrevision__isnull=True,
+        geodatasets__isnull=True,
     ).delete()
 
 
