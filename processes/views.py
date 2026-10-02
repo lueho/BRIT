@@ -6,12 +6,14 @@ BRIT conventions and patterns from utils.object_management.views.
 
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Prefetch
+from django.db.models import Exists, OuterRef, Prefetch
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, TemplateView
 
+from bibliography.models import Source
+from materials.models import Material
 from utils.forms import workspace_section_formsets
 from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import (
@@ -99,22 +101,21 @@ class ProcessDashboardView(BreadcrumbContextMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        user = self.request.user
 
-        # Statistics
-        context["total_processes"] = Process.objects.filter(
-            publication_status="published"
-        ).count()
+        # Statistics: use the same read policy as the lists so counts match
+        # what the current user can actually see.
+        visible_processes = filter_queryset_for_user(Process.objects.all(), user)
+        context["total_processes"] = visible_processes.count()
         visible_categories = filter_queryset_for_user(
-            ProcessCategory.objects.all(), self.request.user
+            ProcessCategory.objects.all(), user
         )
         context["total_categories"] = visible_categories.count()
 
         # Recent processes
-        context["recent_processes"] = (
-            Process.objects.filter(publication_status="published")
-            .select_related("owner")
-            .prefetch_related("categories")[:5]
-        )
+        context["recent_processes"] = visible_processes.select_related(
+            "owner"
+        ).prefetch_related("categories")[:5]
 
         # Categories with process counts
         context["categories_with_counts"] = with_published_process_count(
@@ -122,10 +123,17 @@ class ProcessDashboardView(BreadcrumbContextMixin, TemplateView):
         ).order_by("-process_count")[:10]
 
         # User's private processes if authenticated
-        if self.request.user.is_authenticated:
-            context["my_processes"] = Process.objects.filter(
-                owner=self.request.user
-            ).order_by("-lastmodified_at")[:5]
+        if user.is_authenticated:
+            context["my_processes"] = Process.objects.filter(owner=user).order_by(
+                "-lastmodified_at"
+            )[:5]
+            context["can_add_process"] = user.has_perm("processes.add_process")
+            context["can_add_processcategory"] = user.has_perm(
+                "processes.add_processcategory"
+            )
+        else:
+            context["can_add_process"] = False
+            context["can_add_processcategory"] = False
 
         return context
 
@@ -204,17 +212,27 @@ class ProcessCategoryDetailView(UserCreatedObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        process_queryset = self.object.processes.all()
-        category_queryset = ProcessCategory.objects.filter(
-            processes__in=process_queryset
+        # Apply the read policy in both directions: a published category only
+        # lists processes the current user may read, and a non-published
+        # category must not leak other users' private processes either.
+        process_queryset = filter_queryset_for_user(
+            self.object.processes.all(), self.request.user
+        )
+        category_queryset = filter_queryset_for_user(
+            ProcessCategory.objects.filter(processes__in=process_queryset),
+            self.request.user,
         )
         process_count_status = None
         if self.object.publication_status == "published":
-            process_queryset = process_queryset.filter(publication_status="published")
-            category_queryset = category_queryset.filter(publication_status="published")
             process_count_status = "published"
         processes = process_queryset.select_related("owner").prefetch_related(
-            "authors", "categories"
+            "authors",
+            Prefetch(
+                "categories",
+                queryset=filter_queryset_for_user(
+                    ProcessCategory.objects.all(), self.request.user
+                ),
+            ),
         )
         context["processes"] = processes
         context["related_categories"] = with_process_count(
@@ -305,6 +323,29 @@ class ProcessModalCreateView(UserCreatedObjectModalCreateView):
     permission_required = "processes.add_process"
 
 
+def _process_list_queryset(queryset, user):
+    """Shared queryset for process list views.
+
+    Related user-created objects are filtered by the read policy so that
+    private category and parent names do not leak into list rows.
+    """
+    visible_parents = filter_queryset_for_user(
+        Process.objects.filter(pk=OuterRef("parent_id")), user
+    )
+    return (
+        queryset.select_related("owner", "parent")
+        .prefetch_related(
+            "authors",
+            Prefetch(
+                "categories",
+                queryset=filter_queryset_for_user(ProcessCategory.objects.all(), user),
+            ),
+            "process_materials__material",
+        )
+        .annotate(parent_is_visible=Exists(visible_parents))
+    )
+
+
 class ProcessPublishedFilterView(PublishedObjectFilterView):
     """List published Process objects with filtering."""
 
@@ -316,12 +357,7 @@ class ProcessPublishedFilterView(PublishedObjectFilterView):
     paginate_by = 20
 
     def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
-            .select_related("owner", "parent")
-            .prefetch_related("authors", "categories", "process_materials__material")
-        )
+        return _process_list_queryset(super().get_queryset(), self.request.user)
 
 
 class ProcessPrivateFilterView(PrivateObjectFilterView):
@@ -335,12 +371,7 @@ class ProcessPrivateFilterView(PrivateObjectFilterView):
     paginate_by = 20
 
     def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
-            .select_related("owner", "parent")
-            .prefetch_related("categories", "process_materials__material")
-        )
+        return _process_list_queryset(super().get_queryset(), self.request.user)
 
 
 class ProcessReviewFilterView(ReviewObjectFilterView):
@@ -354,12 +385,7 @@ class ProcessReviewFilterView(ReviewObjectFilterView):
     paginate_by = 20
 
     def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
-            .select_related("owner", "parent")
-            .prefetch_related("categories", "process_materials__material")
-        )
+        return _process_list_queryset(super().get_queryset(), self.request.user)
 
 
 class ProcessDetailView(UserCreatedObjectDetailView):
@@ -369,18 +395,29 @@ class ProcessDetailView(UserCreatedObjectDetailView):
     template_name = "processes/process_detail.html"
 
     def get_queryset(self):
-        # Optimize queries with prefetch
+        # Optimize queries with prefetch. Related user-created objects are
+        # prefetch-filtered by the read policy so private/in-review objects
+        # owned by others never reach the template.
+        user = self.request.user
         return (
             super()
             .get_queryset()
             .select_related("owner", "parent")
             .prefetch_related(
-                "categories",
+                Prefetch(
+                    "categories",
+                    queryset=filter_queryset_for_user(
+                        ProcessCategory.objects.all(), user
+                    ),
+                ),
                 Prefetch(
                     "process_authors",
                     queryset=ProcessAuthor.objects.select_related("author"),
                 ),
-                "variants",
+                Prefetch(
+                    "variants",
+                    queryset=filter_queryset_for_user(Process.objects.all(), user),
+                ),
                 Prefetch(
                     "process_materials",
                     queryset=ProcessMaterial.objects.select_related(
@@ -425,13 +462,36 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             ]
             return context
 
-        # Organize materials by role
-        context["input_materials"] = self.object._material_links_for_role(
-            ProcessMaterial.Role.INPUT
+        # Parent and variants are user-created objects: only expose the ones
+        # the current user may read.
+        visible_parent = self.object.parent
+        if (
+            visible_parent is not None
+            and not filter_queryset_for_user(
+                Process.objects.filter(pk=visible_parent.pk), self.request.user
+            ).exists()
+        ):
+            visible_parent = None
+        context["visible_parent"] = visible_parent
+
+        # Organize materials by role, dropping links to materials the current
+        # user cannot read so private material names do not leak.
+        input_links = self.object._material_links_for_role(ProcessMaterial.Role.INPUT)
+        output_links = self.object._material_links_for_role(ProcessMaterial.Role.OUTPUT)
+        material_ids = {link.material_id for link in input_links} | {
+            link.material_id for link in output_links
+        }
+        visible_material_ids = set(
+            filter_queryset_for_user(
+                Material.objects.filter(pk__in=material_ids), self.request.user
+            ).values_list("pk", flat=True)
         )
-        context["output_materials"] = self.object._material_links_for_role(
-            ProcessMaterial.Role.OUTPUT
-        )
+        context["input_materials"] = [
+            link for link in input_links if link.material_id in visible_material_ids
+        ]
+        context["output_materials"] = [
+            link for link in output_links if link.material_id in visible_material_ids
+        ]
 
         # Group parameters by type
         params_by_type = {}
@@ -448,17 +508,35 @@ class ProcessDetailView(UserCreatedObjectDetailView):
         ]
         context["process_links"] = list(self.object.links.all())
         context["process_info_resources"] = list(self.object.info_resources.all())
-        context["process_variants"] = list(self.object.variants.all())
+        # The prefetch above already applies the read policy; the explicit
+        # filter keeps this correct when get_context_data runs on an
+        # unprepared object (e.g. the review item detail view).
+        context["process_variants"] = list(
+            filter_queryset_for_user(self.object.variants.all(), self.request.user)
+        )
         context["process_authors"] = self.object.ordered_authors()
+        sources = self.object.sources_ordered()
+        visible_source_ids = set(
+            filter_queryset_for_user(
+                Source.objects.filter(pk__in=[s.pk for s in sources]),
+                self.request.user,
+            ).values_list("pk", flat=True)
+        )
         context["bibliography_sources"] = sorted(
-            self.object.sources_ordered(),
+            (s for s in sources if s.pk in visible_source_ids),
             key=lambda source: (source.abbreviation or source.title or "").casefold(),
         )
         context["process_policy"] = policy
-        context["review_timeline"] = self._build_review_timeline()
+        # The timeline only feeds the review banner, which renders solely for
+        # 'review' and 'declined' objects; skip the query otherwise.
+        context["review_timeline"] = (
+            self._build_review_timeline()
+            if self.object.publication_status in ("review", "declined")
+            else []
+        )
         context["section_anchors"] = self._build_section_anchors(context)
         context["has_related_processes"] = bool(
-            context["process_variants"] or self.object.parent_id
+            context["process_variants"] or context["visible_parent"]
         )
 
         return context

@@ -3,6 +3,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -208,3 +209,165 @@ class ProcessViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["name"], "Fast Pyrolysis")
+
+
+class ProcessAPIPermissionsTestCase(APITestCase):
+    """Write access on the processes API must follow the object policy."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create_user(username="api_owner")
+        cls.member = get_user_model().objects.create_user(username="api_member")
+        cls.member.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="processes",
+                codename__in=["add_process", "add_processcategory"],
+            )
+        )
+        cls.published_process = Process.objects.create(
+            name="Published Process",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.private_process = Process.objects.create(
+            name="Private Process",
+            owner=cls.owner,
+        )
+        cls.published_category = ProcessCategory.objects.create(
+            name="Published Category",
+            owner=cls.owner,
+            publication_status="published",
+        )
+
+    def test_anonymous_cannot_create_process(self):
+        response = self.client.post(
+            "/processes/api/processes/", {"name": "Anon"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(Process.objects.filter(name="Anon").exists())
+
+    def test_anonymous_cannot_create_category(self):
+        response = self.client.post(
+            "/processes/api/categories/", {"name": "Anon"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(ProcessCategory.objects.filter(name="Anon").exists())
+
+    def test_anonymous_cannot_patch_process(self):
+        response = self.client.patch(
+            f"/processes/api/processes/{self.published_process.pk}/",
+            {"name": "Defaced", "publication_status": "archived"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.published_process.refresh_from_db()
+        self.assertEqual(self.published_process.name, "Published Process")
+        self.assertEqual(self.published_process.publication_status, "published")
+
+    def test_anonymous_cannot_delete_process(self):
+        response = self.client.delete(
+            f"/processes/api/processes/{self.published_process.pk}/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertTrue(Process.objects.filter(pk=self.published_process.pk).exists())
+
+    def test_anonymous_cannot_delete_category(self):
+        response = self.client.delete(
+            f"/processes/api/categories/{self.published_category.pk}/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertTrue(
+            ProcessCategory.objects.filter(pk=self.published_category.pk).exists()
+        )
+
+    def test_authenticated_without_add_permission_cannot_create(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            "/processes/api/processes/", {"name": "NoPerm"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(Process.objects.filter(name="NoPerm").exists())
+
+    def test_member_create_process_becomes_private_and_owned(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            "/processes/api/processes/",
+            {"name": "Member Process", "publication_status": "published"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        process = Process.objects.get(name="Member Process")
+        self.assertEqual(process.owner, self.member)
+        # publication_status must not be client-settable; new objects start private
+        self.assertEqual(process.publication_status, "private")
+
+    def test_owner_cannot_patch_published_process(self):
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            f"/processes/api/processes/{self.published_process.pk}/",
+            {"name": "Renamed"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_owner_can_patch_private_process(self):
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            f"/processes/api/processes/{self.private_process.pk}/",
+            {"name": "Renamed Private"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.private_process.refresh_from_db()
+        self.assertEqual(self.private_process.name, "Renamed Private")
+
+    def test_non_owner_cannot_patch_private_process(self):
+        self.client.force_login(self.member)
+        response = self.client.patch(
+            f"/processes/api/processes/{self.private_process.pk}/",
+            {"name": "Hijack"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.private_process.refresh_from_db()
+        self.assertEqual(self.private_process.name, "Private Process")
+
+    def test_anonymous_can_read_detail_actions_on_published_process(self):
+        for suffix in ("materials", "parameters", "variants", "sources"):
+            response = self.client.get(
+                f"/processes/api/processes/{self.published_process.pk}/{suffix}/"
+            )
+            self.assertEqual(
+                response.status_code,
+                status.HTTP_200_OK,
+                msg=f"anonymous GET {suffix} should be allowed",
+            )
+
+    def test_anonymous_can_read_collection_actions(self):
+        for suffix in ("by_category", "by_mechanism"):
+            response = self.client.get(f"/processes/api/processes/{suffix}/")
+            self.assertEqual(
+                response.status_code,
+                status.HTTP_200_OK,
+                msg=f"anonymous GET {suffix} should be allowed",
+            )
+
+    def test_anonymous_cannot_read_private_process(self):
+        response = self.client.get(
+            f"/processes/api/processes/{self.private_process.pk}/"
+        )
+        self.assertIn(
+            response.status_code,
+            (
+                status.HTTP_401_UNAUTHORIZED,
+                status.HTTP_403_FORBIDDEN,
+                status.HTTP_404_NOT_FOUND,
+            ),
+        )
+
+    def test_owner_can_read_own_private_process(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            f"/processes/api/processes/{self.private_process.pk}/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

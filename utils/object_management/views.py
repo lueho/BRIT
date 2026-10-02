@@ -2392,8 +2392,14 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
         default_parent_label, _ = _get_default_breadcrumb_parent_module(obj.__class__)
         breadcrumb_section_label = _get_default_breadcrumb_section_label(obj.__class__)
         breadcrumb_object_label = _get_default_breadcrumb_object_label(obj)
-        # Show review panel when explicitly requested via ?review=1
-        show_panel = request.GET.get("review") is not None
+        # Show review panel when explicitly requested via ?review=1 — but only
+        # for users with a review relationship to the object. The panel exposes
+        # moderation metadata (reviewer names, actions, comments) that must not
+        # leak to arbitrary readers of a published object.
+        policy = get_object_policy(request.user, obj, request=request)
+        show_panel = request.GET.get("review") is not None and (
+            policy["is_owner"] or policy["is_editor"] or policy["is_moderator"]
+        )
 
         logs = []
         if show_panel:
