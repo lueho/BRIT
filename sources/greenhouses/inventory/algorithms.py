@@ -69,12 +69,11 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
             ):
                 greenhouse_group = clipped.filter(**greenhouse_type.filter_kwargs)
                 if greenhouse_group.exists():
-                    greenhouse_group.filter(
-                        culture_1=greenhouse_type.filter_kwargs["culture_1"]
+                    # surface_ha is nullable: Sum over all-NULL rows is None.
+                    total_group_surface = (
+                        greenhouse_group.aggregate(Sum("surface_ha"))["surface_ha__sum"]
+                        or 0
                     )
-                    total_group_surface = greenhouse_group.aggregate(Sum("surface_ha"))[
-                        "surface_ha__sum"
-                    ]
                     total_surface += total_group_surface
                     greenhouse_count += greenhouse_group.count()
                     for share in greenhouse_type.shares:
