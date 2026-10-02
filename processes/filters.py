@@ -173,14 +173,15 @@ class ProcessFilter(UserCreatedObjectScopedFilterSet):
 
     def filter_by_input_material(self, queryset, name, value):
         """Filter processes that have a specific material as input."""
-        return queryset.filter(
-            process_materials__material__name__icontains=value,
-            process_materials__role=ProcessMaterial.Role.INPUT,
-        ).distinct()
+        return self._filter_by_material(queryset, value, ProcessMaterial.Role.INPUT)
 
     def filter_by_output_material(self, queryset, name, value):
         """Filter processes that produce a specific material as output."""
+        return self._filter_by_material(queryset, value, ProcessMaterial.Role.OUTPUT)
+
+    @staticmethod
+    def _filter_by_material(queryset, value, role):
         return queryset.filter(
             process_materials__material__name__icontains=value,
-            process_materials__role=ProcessMaterial.Role.OUTPUT,
+            process_materials__role=role,
         ).distinct()
