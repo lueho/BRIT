@@ -404,6 +404,22 @@ class AreaBasedProductionLocalRelationTestCase(GenericAlgorithmBase):
         self.assertEqual(len(result["features"]), 1)
         self.assertEqual(result["geom_type"], "MultiPolygon")
 
+    def test_empty_result_reports_factor_chain_unit(self):
+        """An empty layer must report the same unit a populated layer of the
+        same factor chain would — otherwise scenario totals raise
+        UnitMismatchError when mixing with nonempty layers."""
+        with connection.cursor() as cursor:
+            cursor.execute(f"DELETE FROM public.{self.relation_name}")
+        result = InventoryAlgorithms.area_based_production(
+            **self.base_kwargs(self.dataset),
+            area_yield={"value": 9.0, "unit": "kg / hectare"},
+        )
+        production = aggregated_value(result, "Total production")
+        self.assertEqual(production["value"], 0)
+        # kg/hectare * m^2 -> kg -> Mg (not the hard-coded Mg/a default)
+        self.assertEqual(production["unit"], "Mg")
+        self.assertEqual(result["geom_type"], "MultiPolygon")
+
 
 class ExecutionPlanUnitWiringTestCase(GenericAlgorithmBase):
     """The execution plan must pass each parameter's unit to the algorithm."""
@@ -568,9 +584,10 @@ class GeometryFamilyTestCase(GenericAlgorithmBase):
         )
 
     def test_generic_functions_for_line_dataset(self):
+        """Line geometries have no polygon area — only counting applies."""
         self.assertEqual(
-            sorted(InventoryAlgorithms.generic_functions(self.relation_dataset)),
-            ["area_based_production", "count_based_production"],
+            InventoryAlgorithms.generic_functions(self.relation_dataset),
+            ["count_based_production"],
         )
 
 

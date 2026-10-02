@@ -24,8 +24,21 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
             "aggregated_values": [],
             "aggregated_distributions": [],
             "features": [],
+            "geom_type": "Point",
         }
         if feedstock is None:
+            # Without a temporal profile no residue production can be
+            # attributed; report a complete zero result so layer creation
+            # succeeds and scenario totals stay consistent.
+            result["aggregated_values"] = [
+                {
+                    "name": "Number of considered greenhouses",
+                    "value": 0,
+                    "unit": "",
+                },
+                {"name": "Total growth area", "value": 0, "unit": "ha"},
+                {"name": "Total production", "value": 0, "unit": "Mg/a"},
+            ]
             return result
 
         # Get all greenhouse data within the scenario catchment

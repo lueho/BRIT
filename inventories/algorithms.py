@@ -286,12 +286,14 @@ GENERIC_FUNCTION_LABELS = {
     "area_based_production": "Area-based production",
 }
 
-# Which generic functions a dataset's geometry family supports. Datasets whose
-# geometry cannot be classified (mixed collections, unresolvable sources)
-# offer all generic functions — the algorithms degrade gracefully.
+# Which generic functions a dataset's geometry family supports. Line
+# geometries carry no polygon area, so only feature counting applies.
+# Datasets whose geometry cannot be classified (mixed collections,
+# unresolvable sources) offer all generic functions.
 GEOMETRY_FAMILY_FUNCTIONS = {
     "point": ("count_based_production",),
     "polygon": ("area_based_production",),
+    "line": ("count_based_production",),
 }
 
 _GEOMETRY_TYPE_FAMILIES = {
@@ -370,11 +372,13 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
             "features": [],
             "geom_type": "MultiPolygon",
         }
+        # Derive the production unit from the factor chain even when the
+        # layer is empty, so its unit matches populated layers of the same
+        # chain and scenario totals stay consistent.
+        _, total_unit = cls._production(0.0, "meter ** 2", factors)
         total = 0.0
-        total_unit = "Mg/a"
         for geom, area in clipped:
-            production, unit = cls._production(area, "meter ** 2", factors)
-            total_unit = unit
+            production, _unit = cls._production(area, "meter ** 2", factors)
             total += production
             result["features"].append(
                 {"geom": geom, "area_ha": area / 10000, "production": production}

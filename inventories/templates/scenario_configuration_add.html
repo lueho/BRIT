@@ -226,7 +226,8 @@
             if (presetSelect) {
                 presetSelect.addEventListener("change", onPresetSelect);
             }
-            addKwargRow();
+            // Leave the factor list empty until a factor is explicitly added —
+            // factor-free and preset-only configurations must stay submittable.
         }
 
         async function loadRegisteredAlgorithmParameters(algorithmId) {

@@ -708,6 +708,87 @@ class GenericAlgorithmAddViewTestCase(TestCase):
         )
         self.assertEqual(config_row.inventory_value_id, preset_value.pk)
 
+    def test_conflicting_factor_unit_rejected(self):
+        """A shared factor parameter keeps its unit; posting the same factor
+        name with a different unit is rejected instead of silently
+        reinterpreting existing values."""
+        self._post(kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["kg / year"])
+        response = self._post(
+            kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["g / year"]
+        )
+        self.assertEqual(response.status_code, 400)
+        parameter = InventoryAlgorithmParameter.objects.get(short_name="yield")
+        self.assertEqual(parameter.unit, "kg / year")
+
+    def test_missing_unit_can_be_filled_later(self):
+        """A parameter whose unit was never set can receive one later —
+        that does not reinterpret existing values."""
+        self._post(kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=[""])
+        response = self._post(
+            kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["kg / year"]
+        )
+        self.assertEqual(response.status_code, 302)
+        parameter = InventoryAlgorithmParameter.objects.get(short_name="yield")
+        self.assertEqual(parameter.unit, "kg / year")
+
+    def test_feedstock_without_registered_algorithm_is_selectable(self):
+        """The add form must offer materials that no algorithm references
+        yet — the generic flow is how they get their first algorithm."""
+        new_material = Material.objects.create(name="Brand New Material")
+        self.client.force_login(self.owner)
+        response = self.client.get(self._url())
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            new_material, response.context["form"].fields["feedstock"].queryset
+        )
+
+    def test_private_geodataset_rejected_on_generic_post(self):
+        """A private dataset of another user must not be configurable —
+        generic execution would read and republish its features."""
+        stranger = User.objects.create_user(username="stranger", password="p")
+        private_dataset = GeoDataset.objects.create(
+            name="Private dataset",
+            owner=stranger,
+            region=self.region,
+            model_name="NantesGreenhouses",
+            publication_status="private",
+        )
+        response = self._post(
+            geodataset=private_dataset.pk,
+            kwarg_name=["yield"],
+            kwarg_value=["10"],
+            kwarg_unit=["kg"],
+        )
+        self.assertIn(response.status_code, [400, 404])
+        self.assertFalse(
+            InventoryAlgorithm.objects.filter(geodataset=private_dataset).exists()
+        )
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario
+            ).exists()
+        )
+
+    def test_functions_api_hides_private_dataset(self):
+        """The functions API must not leak sampled values of private
+        datasets to unrelated users."""
+        stranger = User.objects.create_user(username="stranger", password="p")
+        private_dataset = GeoDataset.objects.create(
+            name="Private dataset",
+            owner=stranger,
+            region=self.region,
+            model_name="NantesGreenhouses",
+            publication_status="private",
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(
+                "api-geodataset-functions",
+                kwargs={"geodataset_pk": private_dataset.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 404)
+
 
 class ScenarioDownloadSummaryAuthTests(TestCase):
     @classmethod
@@ -750,7 +831,10 @@ class ScenarioDownloadSummaryAuthTests(TestCase):
 
     def test_moderator_can_download(self):
         moderator = User.objects.create_user(username="mod", password="pass")
-        ct = ContentType.objects.get_for_model(Scenario)
+        # get_for_model() is fed from a process-global cache that parallel test
+        # workers inherit from their parent — query the row directly so the
+        # permission is attached to the correct content type.
+        ct = ContentType.objects.get(app_label="inventories", model="scenario")
         perm, _ = Permission.objects.get_or_create(
             codename="can_moderate_scenario",
             content_type=ct,
@@ -809,7 +893,10 @@ class ScenarioDownloadResultSummaryAuthTests(TestCase):
 
     def test_moderator_can_download(self):
         moderator = User.objects.create_user(username="mod", password="pass")
-        ct = ContentType.objects.get_for_model(Scenario)
+        # get_for_model() is fed from a process-global cache that parallel test
+        # workers inherit from their parent — query the row directly so the
+        # permission is attached to the correct content type.
+        ct = ContentType.objects.get(app_label="inventories", model="scenario")
         perm, _ = Permission.objects.get_or_create(
             codename="can_moderate_scenario",
             content_type=ct,
