@@ -2393,7 +2393,10 @@ class AddSeasonalVariationView(
     template_name = "modal_form.html"
 
     def get_object(self):
-        return Composition.objects.get(id=self.kwargs.get("pk"))
+        # Seasonal distributions live on the series; standalone samples 404.
+        return get_object_or_404(
+            Composition, pk=self.kwargs.get("pk"), sample__series__isnull=False
+        )
 
     def get_form(self, **kwargs):
         form = super().get_form(**kwargs)
@@ -2427,6 +2430,10 @@ class AddSeasonalVariationView(
 class RemoveSeasonalVariationView(UserCreatedObjectDetailView):
     template_name = "modal_delete.html"
     model = Composition
+
+    def get_queryset(self):
+        # Seasonal distributions live on the series; standalone samples 404.
+        return super().get_queryset().filter(sample__series__isnull=False)
 
     def get_distribution(self):
         return get_object_or_404(
