@@ -8,6 +8,7 @@ from rest_framework import filters, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from bibliography.models import Source
 from utils.object_management.permissions import (
     UserCreatedObjectPermission,
     filter_queryset_for_user,
@@ -75,6 +76,17 @@ class ProcessViewSet(UserCreatedObjectViewSet):
     ordering_fields = ["name", "created_at", "updated_at"]
     ordering = ["name"]
 
+    @staticmethod
+    def _prefetched_sources():
+        """Prefetch sources with the nested rows their serializer touches."""
+
+        return Prefetch(
+            "sources",
+            queryset=Source.objects.select_related("licence").prefetch_related(
+                "authors"
+            ),
+        )
+
     def get_queryset(self):
         """Optimize queries with select/prefetch related."""
         queryset = super().get_queryset()
@@ -82,7 +94,7 @@ class ProcessViewSet(UserCreatedObjectViewSet):
         if self.action in ("list", "by_mechanism"):
             queryset = queryset.select_related("owner", "parent").prefetch_related(
                 "categories",
-                "sources",
+                self._prefetched_sources(),
                 Prefetch(
                     "process_authors",
                     queryset=ProcessAuthor.objects.select_related("author").order_by(
@@ -106,7 +118,7 @@ class ProcessViewSet(UserCreatedObjectViewSet):
                 ),
                 "links",
                 "info_resources",
-                "sources",
+                self._prefetched_sources(),
             )
 
         return queryset
@@ -196,7 +208,7 @@ class ProcessViewSet(UserCreatedObjectViewSet):
             .select_related("owner", "parent")
             .prefetch_related(
                 "categories",
-                "sources",
+                self._prefetched_sources(),
                 Prefetch(
                     "process_authors",
                     queryset=ProcessAuthor.objects.select_related("author").order_by(

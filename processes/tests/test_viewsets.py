@@ -7,6 +7,7 @@ from django.contrib.auth.models import Permission
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from bibliography.models import Author, Licence, Source, SourceAuthor
 from materials.models import Material
 from utils.properties.models import Unit
 
@@ -496,6 +497,21 @@ class ProcessAPIQueryCountTestCase(APITestCase):
             publication_status="published",
         )
         process.categories.add(category)
+        # Link a source with nested author + licence so serialization has to
+        # resolve three levels; otherwise the grouped endpoints N+1 on them.
+        source = Source.objects.create(
+            title=f"Perf Source {index}",
+            abbreviation=f"S{index}",
+            licence=Licence.objects.create(name=f"Licence {index}"),
+            owner=self.owner,
+            publication_status="published",
+        )
+        SourceAuthor.objects.create(
+            source=source,
+            author=Author.objects.create(first_names="Ada", last_names=f"Perf{index}"),
+            position=1,
+        )
+        process.sources.add(source)
 
     def test_by_category_query_count_is_constant(self):
         from django.db import connection
