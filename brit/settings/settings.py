@@ -331,6 +331,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "utils.file_export.generic_tasks.cleanup_expired_exports",
         "schedule": crontab(hour=4, minute=0),
     },
+    # Remove accounts that never activated within ACCOUNT_ACTIVATION_DAYS,
+    # e.g. registrations whose activation email bounced.
+    "cleanup-expired-registrations": {
+        "task": "users.tasks.cleanup_expired_registrations",
+        "schedule": crontab(hour=5, minute=0),
+    },
     # Safety net for the GeoJSON caches: data changes already trigger warmup
     # via signals, and a warmup is queued on every worker start, but a daily
     # pass also covers cache evictions/flushes that no signal observes.
