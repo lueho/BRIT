@@ -15,7 +15,6 @@ from django.views.generic import ListView, TemplateView
 from bibliography.models import Source
 from materials.models import Material
 from utils.forms import workspace_section_formsets
-from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
@@ -429,43 +428,17 @@ def _process_detail_context(request, obj, policy=None):
         (s for s in sources if s.pk in visible_source_ids),
         key=lambda source: (source.abbreviation or source.title or "").casefold(),
     )
-    # The timeline only feeds the review banner, which renders solely for
-    # 'review' and 'declined' objects; skip the query otherwise.
-    context["review_timeline"] = (
-        _review_timeline(obj)
+    # The banner only feeds review/declined objects; skip the query otherwise.
+    context["latest_review_action"] = (
+        obj.latest_review_action
         if obj.publication_status in ("review", "declined")
-        else []
+        else None
     )
     context["section_anchors"] = _section_anchors(obj, context)
     context["has_related_processes"] = bool(
         context["process_variants"] or context["visible_parent"]
     )
     return context
-
-
-def _review_timeline(obj):
-    try:
-        actions = (
-            ReviewAction.for_object(obj)
-            .select_related("user")
-            .order_by("created_at", "id")
-        )
-    except Exception:
-        return []
-    timeline = []
-    for action in actions:
-        timeline.append(
-            {
-                "action": action.action,
-                "label": action.get_action_display()
-                if hasattr(action, "get_action_display")
-                else action.action,
-                "user": getattr(action.user, "username", None),
-                "created_at": action.created_at,
-                "comment": getattr(action, "comment", "") or "",
-            }
-        )
-    return timeline
 
 
 def _section_anchors(obj, context):

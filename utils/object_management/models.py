@@ -417,6 +417,12 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
             )
         # TODO: Implement notification to the owner
 
+    @property
+    def latest_review_action(self):
+        """Return the most recent ``ReviewAction`` for this object, if any."""
+
+        return ReviewAction.for_object(self).select_related("user").first()
+
     def archive(self):
         with transaction.atomic():
             self._lock_and_validate_transition(
