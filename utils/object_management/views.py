@@ -37,7 +37,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string, select_template
-from django.urls import NoReverseMatch, reverse
+from django.urls import NoReverseMatch, Resolver404, resolve, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.text import capfirst
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
@@ -2944,20 +2944,19 @@ class UserCreatedObjectModalDeleteView(
 
         The delete modal is often launched from the object's own detail page,
         which supplies ``?next=<detail url>``. Redirecting there after the
-        delete would land the user on a 404.
+        delete would land the user on a 404. Rather than enumerating each
+        model's URL properties — which misses alias routes and the generic
+        ``review_item_detail`` view — resolve the path and compare the
+        captured object identifiers.
         """
         if not self.object:
             return False
-        deleted_paths = {
-            url
-            for url in (
-                self.object.detail_url,
-                self.object.update_url,
-                self.object.modal_detail_url,
-            )
-            if url
-        }
-        return urlparse(next_url).path in deleted_paths
+        try:
+            match = resolve(urlparse(next_url).path)
+        except Resolver404:
+            return False
+        object_pk = str(self.object.pk)
+        return object_pk in {str(match.kwargs.get(key)) for key in ("pk", "object_id")}
 
     def get_success_url(self):
         # Respect a safe 'next' parameter from POST or GET first
