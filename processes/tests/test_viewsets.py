@@ -4,10 +4,13 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from bibliography.models import Author, Licence, Source, SourceAuthor
 from materials.models import Material
+from utils.object_management.models import ObjectEditorGrant
 from utils.properties.models import Unit
 
 from ..models import (
@@ -371,3 +374,600 @@ class ProcessAPIPermissionsTestCase(APITestCase):
             f"/processes/api/processes/{self.private_process.pk}/"
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class ProcessAPIRelatedVisibilityTestCase(APITestCase):
+    """Custom read actions must apply the same read policy as the HTML UI.
+
+    Anonymous users only see published related objects; authenticated users
+    additionally see their own non-published objects, matching
+    ``filter_queryset_for_user`` semantics used by the list/detail views.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        user_model = get_user_model()
+        cls.owner = user_model.objects.create_user(username="vis_owner")
+        cls.other = user_model.objects.create_user(username="vis_other")
+        cls.category = ProcessCategory.objects.create(
+            name="Shared Category",
+            owner=cls.other,
+            publication_status="published",
+        )
+        cls.published_process = Process.objects.create(
+            name="Published Member",
+            owner=cls.other,
+            publication_status="published",
+        )
+        cls.published_process.categories.add(cls.category)
+        cls.own_private_process = Process.objects.create(
+            name="My Private Member",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.own_private_process.categories.add(cls.category)
+        cls.foreign_private_process = Process.objects.create(
+            name="Foreign Private Member",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.foreign_private_process.categories.add(cls.category)
+        cls.own_private_variant = Process.objects.create(
+            name="My Private Variant",
+            parent=cls.published_process,
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.foreign_private_variant = Process.objects.create(
+            name="Foreign Private Variant",
+            parent=cls.published_process,
+            owner=cls.other,
+            publication_status="private",
+        )
+        # Relations owned by `other` with private visibility must not leak
+        # through the nested fields of the published process's serialization.
+        cls.foreign_private_category = ProcessCategory.objects.create(
+            name="Foreign Private Category",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.published_process.categories.add(cls.foreign_private_category)
+        cls.foreign_private_source = Source.objects.create(
+            title="Foreign Private Source",
+            abbreviation="FPS",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.published_process.sources.add(cls.foreign_private_source)
+        cls.published_source = Source.objects.create(
+            title="Published Source",
+            abbreviation="PS",
+            owner=cls.other,
+            publication_status="published",
+        )
+        cls.foreign_private_licence = Licence.objects.create(
+            name="Foreign Private Licence",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.published_source.licence = cls.foreign_private_licence
+        cls.published_source.save()
+        cls.foreign_private_author = Author.objects.create(
+            first_names="Hidden",
+            last_names="Writer",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.published_author = Author.objects.create(
+            first_names="Open",
+            last_names="Writer",
+            owner=cls.other,
+            publication_status="published",
+        )
+        SourceAuthor.objects.create(
+            source=cls.published_source,
+            author=cls.foreign_private_author,
+            position=1,
+        )
+        SourceAuthor.objects.create(
+            source=cls.published_source, author=cls.published_author, position=2
+        )
+        cls.published_process.sources.add(cls.published_source)
+        cls.published_process.authors.add(
+            cls.foreign_private_author, cls.published_author
+        )
+        foreign_private_parent = Process.objects.create(
+            name="Foreign Private Parent",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.published_child = Process.objects.create(
+            name="Published Child",
+            parent=foreign_private_parent,
+            owner=cls.other,
+            publication_status="published",
+        )
+        cls.foreign_private_material = Material.objects.create(
+            name="Foreign Private Material",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.published_material = Material.objects.create(
+            name="Published Material",
+            owner=cls.other,
+            publication_status="published",
+        )
+        ProcessMaterial.objects.create(
+            process=cls.published_process,
+            material=cls.foreign_private_material,
+            role=ProcessMaterial.Role.INPUT,
+        )
+        ProcessMaterial.objects.create(
+            process=cls.published_process,
+            material=cls.published_material,
+            role=ProcessMaterial.Role.INPUT,
+        )
+
+    def _member_names(self, response):
+        return {entry["name"] for entry in response.data}
+
+    def _published_process_payload(self, data):
+        return next(entry for entry in data if entry["id"] == self.published_process.pk)
+
+    def test_category_processes_anonymous_sees_only_published(self):
+        response = self.client.get(
+            f"/processes/api/categories/{self.category.pk}/processes/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._member_names(response), {"Published Member"})
+
+    def test_category_processes_owner_sees_own_private(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            f"/processes/api/categories/{self.category.pk}/processes/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            self._member_names(response),
+            {"Published Member", "My Private Member"},
+        )
+
+    def test_variants_anonymous_sees_only_published(self):
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/variants/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_variants_owner_sees_own_private(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/variants/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._member_names(response), {"My Private Variant"})
+
+    def test_by_category_anonymous_excludes_private(self):
+        response = self.client.get("/processes/api/processes/by_category/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {
+            process["name"] for entry in response.data for process in entry["processes"]
+        }
+        self.assertEqual(names, {"Published Member"})
+
+    def test_by_category_owner_includes_own_private(self):
+        self.client.force_login(self.owner)
+        response = self.client.get("/processes/api/processes/by_category/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {
+            process["name"] for entry in response.data for process in entry["processes"]
+        }
+        self.assertEqual(names, {"Published Member", "My Private Member"})
+
+    def _assert_foreign_relations_hidden(self, payload):
+        self.assertEqual(
+            {category["name"] for category in payload["categories"]},
+            {"Shared Category"},
+        )
+        self.assertEqual(payload["authors"], [self.published_author.pk])
+        sources = payload["sources"]
+        self.assertEqual({source["title"] for source in sources}, {"Published Source"})
+        source = sources[0]
+        self.assertEqual({a["last_names"] for a in source["authors"]}, {"Writer"})
+        self.assertEqual(len(source["authors"]), 1)
+        self.assertIsNone(source["licence"])
+
+    def test_list_hides_foreign_private_relations(self):
+        response = self.client.get("/processes/api/processes/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self._assert_foreign_relations_hidden(
+            self._published_process_payload(response.data)
+        )
+
+    def test_retrieve_hides_foreign_private_relations(self):
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data
+        self._assert_foreign_relations_hidden(payload)
+        self.assertEqual(
+            {m["name"] for m in payload["input_materials"]},
+            {"Published Material"},
+        )
+        self.assertEqual(
+            {pm["material"]["name"] for pm in payload["process_materials"]},
+            {"Published Material"},
+        )
+
+    def test_list_hides_foreign_private_parent_name(self):
+        response = self.client.get("/processes/api/processes/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        child = next(
+            entry for entry in response.data if entry["id"] == self.published_child.pk
+        )
+        self.assertIsNone(child["parent_name"])
+
+    def test_category_processes_hides_foreign_private_relations(self):
+        response = self.client.get(
+            f"/processes/api/categories/{self.category.pk}/processes/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self._assert_foreign_relations_hidden(
+            self._published_process_payload(response.data)
+        )
+
+    def test_by_category_hides_foreign_private_relations(self):
+        response = self.client.get("/processes/api/processes/by_category/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = self._published_process_payload(
+            [process for entry in response.data for process in entry["processes"]]
+        )
+        self._assert_foreign_relations_hidden(payload)
+
+    def test_by_mechanism_hides_foreign_private_relations(self):
+        response = self.client.get("/processes/api/processes/by_mechanism/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = self._published_process_payload(
+            [p for processes in response.data.values() for p in processes]
+        )
+        self._assert_foreign_relations_hidden(payload)
+
+    def test_variants_hides_foreign_private_relations(self):
+        """A private variant's private relations stay hidden if it becomes visible."""
+        self.foreign_private_variant.publication_status = "published"
+        self.foreign_private_variant.save()
+        self.foreign_private_variant.categories.add(self.foreign_private_category)
+        self.foreign_private_variant.sources.add(self.foreign_private_source)
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/variants/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        variant = next(
+            entry
+            for entry in response.data
+            if entry["id"] == self.foreign_private_variant.pk
+        )
+        self.assertEqual(variant["categories"], [])
+        self.assertEqual(variant["sources"], [])
+
+    def test_variants_owner_sees_foreign_relations_they_own(self):
+        self.foreign_private_variant.categories.add(self.foreign_private_category)
+        self.foreign_private_variant.sources.add(self.foreign_private_source)
+        self.client.force_login(self.other)
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/variants/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        variant = next(
+            entry
+            for entry in response.data
+            if entry["id"] == self.foreign_private_variant.pk
+        )
+        self.assertEqual(
+            {c["name"] for c in variant["categories"]},
+            {"Foreign Private Category"},
+        )
+        self.assertEqual(
+            {s["title"] for s in variant["sources"]},
+            {"Foreign Private Source"},
+        )
+
+    def test_sources_action_hides_foreign_private_sources(self):
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/sources/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            {source["title"] for source in response.data}, {"Published Source"}
+        )
+
+    def test_materials_action_hides_foreign_private_materials(self):
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/materials/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            {m["name"] for m in response.data["inputs"]}, {"Published Material"}
+        )
+
+    def _keyed_source(self, author, citation_key):
+        source = Source.objects.create(
+            title="Keyed Source",
+            abbreviation=citation_key,
+            owner=self.other,
+            publication_status="published",
+            year=2020,
+        )
+        SourceAuthor.objects.create(source=source, author=author, position=1)
+        self.published_process.sources.add(source)
+        return source
+
+    def test_detail_hides_citation_key_of_source_with_hidden_author(self):
+        """A citation key derived from a hidden author's name must not leak it."""
+        source = self._keyed_source(self.foreign_private_author, "Writer 2020")
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = next(s for s in response.data["sources"] if s["id"] == source.pk)
+        self.assertEqual(payload["authors"], [])
+        self.assertIsNone(payload["citation_key"])
+
+    def test_detail_keeps_citation_key_of_source_with_visible_authors(self):
+        source = self._keyed_source(self.published_author, "Writer 2020")
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = next(s for s in response.data["sources"] if s["id"] == source.pk)
+        self.assertEqual(payload["citation_key"], "Writer 2020")
+
+    def test_sources_action_hides_citation_key_with_hidden_author(self):
+        source = self._keyed_source(self.foreign_private_author, "Writer 2020")
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/sources/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = next(s for s in response.data if s["id"] == source.pk)
+        self.assertIsNone(payload["abbreviation"])
+
+    def test_detail_source_authors_follow_citation_order(self):
+        """Nested authors serialize in citation position, not alphabetical order."""
+        zulu = Author.objects.create(
+            first_names="Zed",
+            last_names="Zulu",
+            owner=self.other,
+            publication_status="published",
+        )
+        alpha = Author.objects.create(
+            first_names="Ann",
+            last_names="Alpha",
+            owner=self.other,
+            publication_status="published",
+        )
+        source = Source.objects.create(
+            title="Order Source",
+            abbreviation="OS",
+            owner=self.other,
+            publication_status="published",
+        )
+        SourceAuthor.objects.create(source=source, author=zulu, position=1)
+        SourceAuthor.objects.create(source=source, author=alpha, position=2)
+        self.published_process.sources.add(source)
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = next(s for s in response.data["sources"] if s["id"] == source.pk)
+        self.assertEqual(
+            [a["last_names"] for a in payload["authors"]], ["Zulu", "Alpha"]
+        )
+
+    def _content_type(self, model):
+        # Earlier rolled-back tests can leave phantom ContentType rows cached.
+        ContentType.objects.clear_cache()
+        return ContentType.objects.get_for_model(model)
+
+    def test_category_processes_editor_sees_granted_private(self):
+        editor = get_user_model().objects.create_user(username="vis_editor")
+        ObjectEditorGrant.objects.create(
+            content_type=self._content_type(Process),
+            object_id=self.foreign_private_process.pk,
+            editor=editor,
+            granted_by=self.other,
+        )
+        self.client.force_login(editor)
+        response = self.client.get(
+            f"/processes/api/categories/{self.category.pk}/processes/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            self._member_names(response),
+            {"Published Member", "Foreign Private Member"},
+        )
+
+    def test_list_shows_editor_granted_category(self):
+        editor = get_user_model().objects.create_user(username="vis_editor")
+        ObjectEditorGrant.objects.create(
+            content_type=self._content_type(ProcessCategory),
+            object_id=self.foreign_private_category.pk,
+            editor=editor,
+            granted_by=self.other,
+        )
+        self.client.force_login(editor)
+        response = self.client.get("/processes/api/processes/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = self._published_process_payload(response.data)
+        self.assertEqual(
+            {category["name"] for category in payload["categories"]},
+            {"Shared Category", "Foreign Private Category"},
+        )
+
+    def test_category_processes_moderator_sees_review_member(self):
+        review_process = Process.objects.create(
+            name="Review Member",
+            owner=self.other,
+            publication_status="review",
+        )
+        review_process.categories.add(self.category)
+        moderator = get_user_model().objects.create_user(username="vis_moderator")
+        permission, _ = Permission.objects.get_or_create(
+            codename="can_moderate_process",
+            content_type=self._content_type(Process),
+        )
+        moderator.user_permissions.add(permission)
+        self.client.force_login(moderator)
+        response = self.client.get(
+            f"/processes/api/categories/{self.category.pk}/processes/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            self._member_names(response), {"Published Member", "Review Member"}
+        )
+
+    def test_list_shows_review_category_to_moderator(self):
+        review_category = ProcessCategory.objects.create(
+            name="Review Category",
+            owner=self.other,
+            publication_status="review",
+        )
+        self.published_process.categories.add(review_category)
+        moderator = get_user_model().objects.create_user(username="vis_moderator")
+        permission, _ = Permission.objects.get_or_create(
+            codename="can_moderate_processcategory",
+            content_type=self._content_type(ProcessCategory),
+        )
+        moderator.user_permissions.add(permission)
+        self.client.force_login(moderator)
+        response = self.client.get("/processes/api/processes/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = self._published_process_payload(response.data)
+        self.assertEqual(
+            {category["name"] for category in payload["categories"]},
+            {"Shared Category", "Review Category"},
+        )
+
+    def test_owner_of_private_relations_sees_them_in_list(self):
+        """`other` owns the private relations and must see them on the process."""
+        self.client.force_login(self.other)
+        response = self.client.get("/processes/api/processes/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = self._published_process_payload(response.data)
+        self.assertEqual(
+            {c["name"] for c in payload["categories"]},
+            {"Shared Category", "Foreign Private Category"},
+        )
+        self.assertEqual(
+            {s["title"] for s in payload["sources"]},
+            {"Published Source", "Foreign Private Source"},
+        )
+        published_source = next(
+            s for s in payload["sources"] if s["title"] == "Published Source"
+        )
+        self.assertEqual(published_source["licence"]["name"], "Foreign Private Licence")
+        self.assertEqual(
+            {a["first_names"] for a in published_source["authors"]},
+            {"Hidden", "Open"},
+        )
+        self.assertCountEqual(
+            payload["authors"],
+            [self.foreign_private_author.pk, self.published_author.pk],
+        )
+
+
+class ProcessAPIQueryCountTestCase(APITestCase):
+    """Grouping endpoints must not issue a query per category or per process."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create_user(username="perf_owner")
+
+    def _add_category_with_process(self, index):
+        category = ProcessCategory.objects.create(
+            name=f"Perf Category {index}",
+            owner=self.owner,
+            publication_status="published",
+        )
+        process = Process.objects.create(
+            name=f"Perf Process {index}",
+            mechanism=f"Mechanism {index}",
+            owner=self.owner,
+            publication_status="published",
+        )
+        process.categories.add(category)
+        # Link a source with nested author + licence and a process author so
+        # serialization has to resolve every nested level.
+        source = Source.objects.create(
+            title=f"Perf Source {index}",
+            abbreviation=f"S{index}",
+            licence=Licence.objects.create(name=f"Licence {index}"),
+            owner=self.owner,
+            publication_status="published",
+        )
+        author = Author.objects.create(
+            first_names="Ada",
+            last_names=f"Perf{index}",
+            owner=self.owner,
+            publication_status="published",
+        )
+        SourceAuthor.objects.create(source=source, author=author, position=1)
+        process.sources.add(source)
+        process.authors.add(author)
+
+    def test_by_category_query_count_is_constant(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        self._add_category_with_process(1)
+        with CaptureQueriesContext(connection) as baseline:
+            self.client.get("/processes/api/processes/by_category/")
+        for index in range(2, 6):
+            self._add_category_with_process(index)
+        with CaptureQueriesContext(connection) as scaled:
+            self.client.get("/processes/api/processes/by_category/")
+        self.assertEqual(len(scaled), len(baseline))
+
+    def test_by_mechanism_query_count_is_constant(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        self._add_category_with_process(1)
+        with CaptureQueriesContext(connection) as baseline:
+            self.client.get("/processes/api/processes/by_mechanism/")
+        for index in range(2, 6):
+            self._add_category_with_process(index)
+        with CaptureQueriesContext(connection) as scaled:
+            self.client.get("/processes/api/processes/by_mechanism/")
+        self.assertEqual(len(scaled), len(baseline))
+
+    def test_materials_action_query_count_is_constant(self):
+        """The materials action must not serialize the full detail payload."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        process = Process.objects.create(
+            name="Perf Materials Process",
+            owner=self.owner,
+            publication_status="published",
+        )
+
+        def add_link(index):
+            ProcessMaterial.objects.create(
+                process=process,
+                material=Material.objects.create(
+                    name=f"Perf Material {index}",
+                    owner=self.owner,
+                    publication_status="published",
+                ),
+                role=ProcessMaterial.Role.INPUT,
+            )
+
+        add_link(1)
+        with CaptureQueriesContext(connection) as baseline:
+            self.client.get(f"/processes/api/processes/{process.pk}/materials/")
+        for index in range(2, 6):
+            add_link(index)
+        with CaptureQueriesContext(connection) as scaled:
+            self.client.get(f"/processes/api/processes/{process.pk}/materials/")
+        self.assertEqual(len(scaled), len(baseline))

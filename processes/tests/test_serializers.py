@@ -3,7 +3,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 
 from bibliography.models import Author
 from materials.models import Material
@@ -142,8 +142,12 @@ class ProcessListSerializerTestCase(TestCase):
         self.category = ProcessCategory.objects.create(
             name="Thermochemical", owner=self.owner
         )
-        self.author_1 = Author.objects.create(first_names="Ada", last_names="Lovelace")
-        self.author_2 = Author.objects.create(first_names="Grace", last_names="Hopper")
+        self.author_1 = Author.objects.create(
+            first_names="Ada", last_names="Lovelace", owner=self.owner
+        )
+        self.author_2 = Author.objects.create(
+            first_names="Grace", last_names="Hopper", owner=self.owner
+        )
 
         self.process = Process.objects.create(
             name="Pyrolysis",
@@ -157,7 +161,9 @@ class ProcessListSerializerTestCase(TestCase):
 
     def test_serialize_process_list(self):
         """List serializer should include basic process info."""
-        serializer = ProcessListSerializer(self.process)
+        request = RequestFactory().get("/")
+        request.user = self.owner
+        serializer = ProcessListSerializer(self.process, context={"request": request})
         data = serializer.data
 
         self.assertEqual(data["name"], "Pyrolysis")
@@ -176,8 +182,12 @@ class ProcessDetailSerializerTestCase(TestCase):
         self.category = ProcessCategory.objects.create(
             name="Thermochemical", owner=self.owner
         )
-        self.author_1 = Author.objects.create(first_names="Ada", last_names="Lovelace")
-        self.author_2 = Author.objects.create(first_names="Grace", last_names="Hopper")
+        self.author_1 = Author.objects.create(
+            first_names="Ada", last_names="Lovelace", owner=self.owner
+        )
+        self.author_2 = Author.objects.create(
+            first_names="Grace", last_names="Hopper", owner=self.owner
+        )
 
         self.process = Process.objects.create(
             name="Pyrolysis",
@@ -207,7 +217,9 @@ class ProcessDetailSerializerTestCase(TestCase):
 
     def test_serialize_process_detail(self):
         """Detail serializer should include all process information."""
-        serializer = ProcessDetailSerializer(self.process)
+        request = RequestFactory().get("/")
+        request.user = self.owner
+        serializer = ProcessDetailSerializer(self.process, context={"request": request})
         data = serializer.data
 
         self.assertEqual(data["name"], "Pyrolysis")
