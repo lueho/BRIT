@@ -4,9 +4,12 @@ Provides RESTful API endpoints for all process-related models.
 """
 
 from django.db.models import Prefetch
-from rest_framework import filters, permissions, viewsets
+from rest_framework import filters, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+from utils.object_management.permissions import UserCreatedObjectPermission
+from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 from .models import (
     Process,
@@ -23,21 +26,31 @@ from .serializers import (
 )
 
 
-class ProcessCategoryViewSet(viewsets.ModelViewSet):
+class ProcessObjectPermission(UserCreatedObjectPermission):
+    """Public read for all GET endpoints, policy-gated writes.
+
+    ``UserCreatedObjectPermission`` only treats the plain ``list``/``retrieve``
+    actions as publicly callable. The extra read actions below must stay
+    reachable anonymously as well; object-level read checks still gate access
+    to non-published objects in ``get_object``.
+    """
+
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return super().has_permission(request, view)
+
+
+class ProcessCategoryViewSet(UserCreatedObjectViewSet):
     """ViewSet for ProcessCategory CRUD operations."""
 
-    queryset = ProcessCategory.objects.filter(publication_status="published")
+    queryset = with_published_process_count(ProcessCategory.objects.all())
     serializer_class = ProcessCategorySerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [ProcessObjectPermission]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "description"]
     ordering_fields = ["name", "created_at", "updated_at"]
     ordering = ["name"]
-
-    def get_queryset(self):
-        """Annotate with process counts."""
-        queryset = super().get_queryset()
-        return with_published_process_count(queryset)
 
     @action(detail=True, methods=["get"])
     def processes(self, request, pk=None):
@@ -48,10 +61,11 @@ class ProcessCategoryViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class ProcessViewSet(viewsets.ModelViewSet):
+class ProcessViewSet(UserCreatedObjectViewSet):
     """ViewSet for Process CRUD operations."""
 
-    permission_classes = [permissions.AllowAny]
+    queryset = Process.objects.all()
+    permission_classes = [ProcessObjectPermission]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "short_description", "mechanism", "description"]
     ordering_fields = ["name", "created_at", "updated_at"]
@@ -59,7 +73,7 @@ class ProcessViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Optimize queries with select/prefetch related."""
-        queryset = Process.objects.filter(publication_status="published")
+        queryset = super().get_queryset()
 
         if self.action == "list":
             queryset = queryset.select_related("owner", "parent").prefetch_related(
@@ -160,7 +174,7 @@ class ProcessViewSet(viewsets.ModelViewSet):
                 "abbreviation": s.abbreviation,
                 "type": s.type,
             }
-            for s in process.sources
+            for s in process.sources_ordered()
         ]
         return Response(sources)
 

@@ -1,9 +1,14 @@
 # ------------------------------------------------------------
 # db_admin Docker image
-# PostGIS 15 + admin CLIs (Heroku & AWS) with minimal footprint
+# Postgres 15 client tools + admin CLIs (Heroku & AWS)
+#
+# Postgres 15 matches the Heroku add-on version; the postgis base
+# images still ship EOL Debian bullseye with a dead apt repo, so we
+# build on the maintained official postgres image instead. The admin
+# commands only need pg client tools — PostGIS lives in the db image.
 # ------------------------------------------------------------
 
-FROM postgis/postgis:15-3.4
+FROM postgres:15-trixie
 
 ENV DEBIAN_FRONTEND=noninteractive
 

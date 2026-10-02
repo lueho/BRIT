@@ -1,0 +1,311 @@
+"""Tests for the collapsed-identity cleanup in the feedstock→Material
+migrations (inventories 0009 / layer_manager 0004).
+
+The functions are exercised directly with the real app registry: the state
+they expect (feedstock already repointed to the material, the old series
+preserved in ``sample_series``) is built straight in the test database.
+"""
+
+import importlib
+
+from django.apps import apps
+from django.db import connection
+from django.test import TestCase
+
+from inventories.models import (
+    GeoDataset,
+    InventoryAlgorithm,
+    InventoryAlgorithmParameter,
+    InventoryAlgorithmParameterValue,
+    Scenario,
+    ScenarioInventoryConfiguration,
+)
+from layer_manager.models import (
+    DistributionSet,
+    DistributionShare,
+    Layer,
+    LayerAggregatedDistribution,
+    LayerAggregatedValue,
+    LayerField,
+)
+from maps.models import Region
+from materials.models import Material, SampleSeries
+
+config_migration = importlib.import_module(
+    "inventories.migrations.0009_feedstock_material"
+)
+config_dedup = config_migration.deduplicate_collapsed_configurations
+config_restore = config_migration.restore_collapsed_configurations
+layer_migration = importlib.import_module(
+    "layer_manager.migrations.0004_layer_feedstock_material"
+)
+layer_dedup = layer_migration.deduplicate_collapsed_layers
+layer_restore = layer_migration.restore_collapsed_layers
+
+
+class _SchemaEditorShim:
+    """Minimal stand-in for the ``schema_editor`` argument.
+
+    The real Postgres schema editor toggles constraint deferral on
+    enter/exit, which corrupts the enclosing TestCase transaction — all the
+    dedup functions need is ``execute()``.
+    """
+
+    connection = connection
+
+    def execute(self, sql, params=()):
+        with connection.cursor() as cursor:
+            cursor.execute(sql, params)
+
+
+def _relation_exists(name):
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT to_regclass(%s)", [name])
+        return cursor.fetchone()[0] is not None
+
+
+class MigrationDedupTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(name="Dedup Region")
+        cls.scenario = Scenario.objects.create(name="Dedup Scenario", region=cls.region)
+        cls.geodataset = GeoDataset.objects.create(
+            name="Dedup Dataset", region=cls.region
+        )
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="Dedup Algorithm", geodataset=cls.geodataset
+        )
+        cls.material = Material.objects.create(name="Dedup Material")
+        cls.series_a = SampleSeries.objects.create(material=cls.material, name="A")
+        cls.series_b = SampleSeries.objects.create(material=cls.material, name="B")
+        cls.parameter = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="Yield", short_name="yield"
+        )
+        cls.parameter.inventory_algorithm.add(cls.algorithm)
+
+    def _config(self, series, value_number, parameter=None, feedstock=None):
+        value = InventoryAlgorithmParameterValue.objects.create(
+            name=f"v{value_number}", parameter=self.parameter, value=value_number
+        )
+        return ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=feedstock or self.material,
+            sample_series=series,
+            geodataset=self.geodataset,
+            inventory_algorithm=self.algorithm,
+            inventory_parameter=parameter or self.parameter,
+            inventory_value=value,
+        )
+
+    def _run_config_dedup(self):
+        config_dedup(apps, _SchemaEditorShim())
+
+    def test_duplicate_parameter_rows_collapse_to_lowest_series(self):
+        winner = self._config(self.series_a, 1.0)
+        self._config(self.series_b, 2.0)
+
+        self._run_config_dedup()
+
+        remaining = ScenarioInventoryConfiguration.objects.filter(
+            scenario=self.scenario, inventory_algorithm=self.algorithm
+        )
+        self.assertEqual([winner.id], [row.id for row in remaining])
+        self.assertEqual(remaining.get().sample_series, self.series_a)
+        self.scenario.is_valid_configuration()
+
+    def test_layer_temporal_profile_decides_the_canonical_series(self):
+        self._config(self.series_a, 1.0)
+        loser_value = self._config(self.series_b, 2.0)
+        # A surviving result layer carries series B's provenance — its
+        # configuration row must win so plan and layer agree.
+        Layer.objects.create(
+            name="Result",
+            geom_type="Polygon",
+            table_name="dedup_canonical_layer",
+            scenario=self.scenario,
+            feedstock=self.material,
+            sample_series=self.series_b,
+            algorithm=self.algorithm,
+        )
+
+        self._run_config_dedup()
+
+        remaining = ScenarioInventoryConfiguration.objects.get(
+            scenario=self.scenario, inventory_algorithm=self.algorithm
+        )
+        self.assertEqual(remaining.id, loser_value.id)
+        self.assertEqual(remaining.sample_series, self.series_b)
+
+    def test_distinct_parameters_all_survive_under_one_series(self):
+        other_parameter = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="Share", short_name="share"
+        )
+        other_parameter.inventory_algorithm.add(self.algorithm)
+        self._config(self.series_a, 1.0)
+        self._config(self.series_a, 3.0, parameter=other_parameter)
+        self._config(self.series_b, 2.0)
+
+        self._run_config_dedup()
+
+        rows = ScenarioInventoryConfiguration.objects.filter(
+            scenario=self.scenario, inventory_algorithm=self.algorithm
+        )
+        self.assertEqual(2, rows.count())
+        self.assertEqual({self.series_a.id}, {row.sample_series_id for row in rows})
+        self.scenario.is_valid_configuration()
+
+    def test_reverse_restores_collapsed_configurations(self):
+        first = self._config(self.series_a, 1.0)
+        second = self._config(self.series_b, 2.0)
+        Layer.objects.create(
+            name="Result",
+            geom_type="Polygon",
+            table_name="dedup_restore_canonical_layer",
+            scenario=self.scenario,
+            feedstock=self.material,
+            sample_series=self.series_b,
+            algorithm=self.algorithm,
+        )
+        fields = ("id", "sample_series_id", "inventory_value_id", "feedstock_id")
+        before = list(
+            ScenarioInventoryConfiguration.objects.order_by("id").values(*fields)
+        )
+
+        self._run_config_dedup()
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(id=first.id).exists()
+        )
+        config_restore(apps, _SchemaEditorShim())
+
+        after = list(
+            ScenarioInventoryConfiguration.objects.order_by("id").values(*fields)
+        )
+        self.assertEqual(before, after)
+        self.assertEqual({first.id, second.id}, {row["id"] for row in after})
+        self.assertFalse(
+            _relation_exists(config_migration.BACKUP_TABLE),
+            "the backup is dropped once restored",
+        )
+
+    def test_reverse_without_backup_is_a_noop(self):
+        row = self._config(self.series_a, 1.0)
+
+        config_restore(apps, _SchemaEditorShim())
+
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(id=row.id).exists()
+        )
+
+    def test_untouched_groups_stay_unchanged(self):
+        self._config(self.series_a, 1.0)
+        other_material = Material.objects.create(name="Other Material")
+        other_series = SampleSeries.objects.create(material=other_material, name="C")
+        self._config(other_series, 5.0, feedstock=other_material)
+
+        self._run_config_dedup()
+
+        self.assertEqual(
+            2,
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario
+            ).count(),
+        )
+
+
+class LayerMigrationDedupTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(name="Layer Region")
+        cls.scenario = Scenario.objects.create(name="Layer Scenario", region=cls.region)
+        cls.geodataset = GeoDataset.objects.create(
+            name="Layer Dataset", region=cls.region
+        )
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="Layer Algorithm", geodataset=cls.geodataset
+        )
+        cls.material = Material.objects.create(name="Layer Material")
+        cls.series = SampleSeries.objects.create(material=cls.material, name="S")
+
+    def _layer(self, table_name, sample_series=None):
+        return Layer._base_manager.create(
+            name="Result",
+            geom_type="Polygon",
+            table_name=table_name,
+            scenario=self.scenario,
+            feedstock=self.material,
+            sample_series=sample_series,
+            algorithm=self.algorithm,
+        )
+
+    def test_collapsed_layers_keep_temporal_profile_and_drop_table(self):
+        self._layer("dedup_loser_table")
+        keeper = self._layer("dedup_keeper_table", sample_series=self.series)
+        with connection.cursor() as cursor:
+            cursor.execute('CREATE TABLE "dedup_loser_table" (id integer)')
+
+        layer_dedup(apps, _SchemaEditorShim())
+
+        self.assertQuerySetEqual(
+            Layer._base_manager.filter(scenario=self.scenario), [keeper]
+        )
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT to_regclass('dedup_loser_table')")
+            self.assertIsNone(cursor.fetchone()[0])
+
+    def test_reverse_restores_collapsed_layer_with_its_data(self):
+        loser = self._layer("dedup_restore_loser_table")
+        self._layer("dedup_restore_keeper_table", sample_series=self.series)
+        field = LayerField.objects.create(field_name="production", data_type="float")
+        loser.layer_fields.add(field)
+        aggregate = LayerAggregatedValue.objects.create(
+            name="Total production", value=4.2, unit="Mg/a", layer=loser
+        )
+        aggregated_distribution = LayerAggregatedDistribution.objects.create(
+            name="seasonal", type="seasonal", layer=loser
+        )
+        distribution_set = DistributionSet.objects.create(
+            aggregated_distribution=aggregated_distribution
+        )
+        share = DistributionShare.objects.create(
+            distribution_set=distribution_set, average=1.5, standard_deviation=0
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                'CREATE TABLE "dedup_restore_loser_table" (id integer, production float)'
+            )
+            cursor.execute(
+                'INSERT INTO "dedup_restore_loser_table" VALUES (1, 4.2), (2, 0.5)'
+            )
+
+        layer_dedup(apps, _SchemaEditorShim())
+        self.assertFalse(Layer._base_manager.filter(id=loser.id).exists())
+        self.assertFalse(_relation_exists("public.dedup_restore_loser_table"))
+        layer_restore(apps, _SchemaEditorShim())
+
+        restored = Layer._base_manager.get(id=loser.id)
+        self.assertEqual(restored.table_name, "dedup_restore_loser_table")
+        self.assertEqual(restored.sample_series_id, None)
+        self.assertEqual([field], list(restored.layer_fields.all()))
+        self.assertEqual(
+            [(aggregate.id, 4.2)],
+            list(restored.layeraggregatedvalue_set.values_list("id", "value")),
+        )
+        self.assertTrue(
+            DistributionShare.objects.filter(
+                id=share.id,
+                distribution_set__aggregated_distribution__layer=restored,
+            ).exists()
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                'SELECT id, production FROM "dedup_restore_loser_table" ORDER BY id'
+            )
+            self.assertEqual([(1, 4.2), (2, 0.5)], cursor.fetchall())
+        self.assertFalse(_relation_exists(layer_migration.BACKUP_TABLE))
+
+    def test_single_layer_is_untouched(self):
+        layer = self._layer("dedup_single_table")
+
+        layer_dedup(apps, _SchemaEditorShim())
+
+        self.assertTrue(Layer._base_manager.filter(id=layer.id).exists())

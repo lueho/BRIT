@@ -4,32 +4,21 @@ from unittest.mock import MagicMock
 
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory, SimpleTestCase
+from django.urls import reverse
 
-from ..templatetags.file_export_tags import export_link, export_modal_button
+from ..templatetags.file_export_tags import export_link_modal, export_modal_button
 
 
-class ExportLinkTagTestCase(SimpleTestCase):
-    """Tests for the export_link template tag."""
+class ExportLinkModalTagTestCase(SimpleTestCase):
+    """Regression tests for the documented export_link_modal template tag."""
 
-    def test_csv_format_returns_csv_icon_class(self):
-        result = export_link("csv", "export-modal")
-        self.assertIn("fa-file-csv", result["icon_class"])
+    def test_returns_modal_url_with_export_url_param(self):
+        result = export_link_modal("export-modal")
+        self.assertTrue(result.startswith(reverse("export-modal")))
 
-    def test_xlsx_format_returns_excel_icon_class(self):
-        result = export_link("xlsx", "export-modal")
-        self.assertIn("fa-file-excel", result["icon_class"])
-
-    def test_invalid_format_raises_value_error(self):
-        with self.assertRaises(ValueError):
-            export_link("pdf", "export-modal")
-
-    def test_returns_correct_file_format(self):
-        result = export_link("csv", "export-modal")
-        self.assertEqual(result["file_format"], "csv")
-
-    def test_progress_url_contains_placeholder(self):
-        result = export_link("csv", "export-modal")
-        self.assertIn("/progress/", result["progress_url"])
+    def test_extra_params_are_passed_through(self):
+        result = export_link_modal("export-modal", list_type="private")
+        self.assertIn("list_type=private", result)
 
 
 class ExportModalButtonTagTestCase(SimpleTestCase):

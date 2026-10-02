@@ -1599,3 +1599,242 @@ class ProcessAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse("processes:process-autocomplete"))
         self.assertEqual(200, response.status_code)
+
+
+class ProcessDetailRelatedVisibilityTestCase(ViewWithPermissionsTestCase):
+    """Related objects on the process detail page must follow the read policy.
+
+    Private or in-review objects owned by someone else must not leak their
+    names (or produce dead links) on a published process page.
+    """
+
+    member_permissions = ["add_process", "change_process"]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.published = Process.objects.create(
+            name="Public Process",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.secret_parent = Process.objects.create(
+            name="Secret Parent Process", owner=cls.outsider
+        )
+        cls.published.parent = cls.secret_parent
+        cls.published.save()
+
+        cls.secret_variant = Process.objects.create(
+            name="Secret Variant Process",
+            owner=cls.outsider,
+            parent=cls.published,
+        )
+        cls.secret_category = ProcessCategory.objects.create(
+            name="Secret Category", owner=cls.outsider
+        )
+        cls.published.categories.add(cls.secret_category)
+        cls.secret_material = Material.objects.create(
+            name="Secret Material", owner=cls.outsider
+        )
+        ProcessMaterial.objects.create(
+            process=cls.published,
+            material=cls.secret_material,
+            role=ProcessMaterial.Role.INPUT,
+        )
+        cls.secret_source = Source.objects.create(
+            title="Secret Source", owner=cls.outsider
+        )
+        ProcessSource.objects.create(process=cls.published, source=cls.secret_source)
+
+        cls.detail_url = reverse(
+            "processes:process-detail", kwargs={"pk": cls.published.pk}
+        )
+
+    def test_anonymous_does_not_see_private_parent(self):
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secret Parent Process")
+
+    def test_anonymous_does_not_see_private_variant(self):
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secret Variant Process")
+
+    def test_anonymous_does_not_see_private_category(self):
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secret Category")
+
+    def test_anonymous_does_not_see_private_material(self):
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secret Material")
+
+    def test_anonymous_does_not_see_private_source(self):
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secret Source")
+
+    def test_non_owner_member_does_not_see_private_related(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secret Variant Process")
+        self.assertNotContains(response, "Secret Parent Process")
+        self.assertNotContains(response, "Secret Category")
+        self.assertNotContains(response, "Secret Material")
+        self.assertNotContains(response, "Secret Source")
+
+    def test_variant_owner_sees_own_private_variant(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Secret Variant Process")
+        self.assertContains(response, "Secret Category")
+
+
+class ProcessDetailReviewPanelTestCase(ViewWithPermissionsTestCase):
+    """The detail review panel must not be exposable to arbitrary readers."""
+
+    member_permissions = ["add_process", "change_process"]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.published = Process.objects.create(
+            name="Reviewed Process",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.url = reverse("processes:process-detail", kwargs={"pk": cls.published.pk})
+
+    def test_anonymous_cannot_open_review_panel(self):
+        response = self.client.get(self.url, {"review": "1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["show_review_panel"])
+
+    def test_unrelated_member_cannot_open_review_panel(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url, {"review": "1"})
+        self.assertFalse(response.context["show_review_panel"])
+
+    def test_owner_can_open_review_panel(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(self.url, {"review": "1"})
+        self.assertTrue(response.context["show_review_panel"])
+
+    def test_staff_can_open_review_panel(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(self.url, {"review": "1"})
+        self.assertTrue(response.context["show_review_panel"])
+
+    def test_no_param_no_panel(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(self.url)
+        self.assertFalse(response.context["show_review_panel"])
+
+
+class ProcessCategoryDetailVisibilityTestCase(ViewWithPermissionsTestCase):
+    """Processes listed on a category detail page must follow the read policy."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.private_category = ProcessCategory.objects.create(
+            name="Private Category", owner=cls.owner
+        )
+        cls.outsider_private_process = Process.objects.create(
+            name="Outsider Secret Process", owner=cls.outsider
+        )
+        cls.outsider_private_process.categories.add(cls.private_category)
+        cls.own_private_process = Process.objects.create(
+            name="Own Secret Process", owner=cls.owner
+        )
+        cls.own_private_process.categories.add(cls.private_category)
+        cls.category_url = reverse(
+            "processes:processcategory-detail", kwargs={"pk": cls.private_category.pk}
+        )
+
+    def test_owner_does_not_see_other_users_private_processes(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(self.category_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Outsider Secret Process")
+        self.assertContains(response, "Own Secret Process")
+
+    def test_published_category_shows_own_private_process_to_owner(self):
+        published_category = ProcessCategory.objects.create(
+            name="Published Category",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.own_private_process.categories.add(published_category)
+        url = reverse(
+            "processes:processcategory-detail", kwargs={"pk": published_category.pk}
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(url)
+        self.assertContains(response, "Own Secret Process")
+
+        other = get_user_model().objects.create(username="unrelated")
+        self.client.force_login(other)
+        response = self.client.get(url)
+        self.assertNotContains(response, "Own Secret Process")
+
+
+class ProcessDashboardVisibilityTestCase(ViewWithPermissionsTestCase):
+    """Dashboard counters must use the same read policy as the lists."""
+
+    member_permissions = ["add_process"]
+
+    def test_total_processes_reflects_user_visibility(self):
+        Process.objects.create(
+            name="Published Process",
+            owner=self.owner,
+            publication_status="published",
+        )
+        Process.objects.create(name="Member Process", owner=self.member)
+        Process.objects.create(name="Outsider Process", owner=self.outsider)
+
+        response = self.client.get(reverse("processes:dashboard"))
+        self.assertEqual(1, response.context["total_processes"])
+
+        self.client.force_login(self.member)
+        response = self.client.get(reverse("processes:dashboard"))
+        self.assertEqual(2, response.context["total_processes"])
+
+    def test_quick_actions_hidden_for_anonymous(self):
+        response = self.client.get(reverse("processes:dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, reverse("processes:process-create"))
+
+    def test_quick_actions_hidden_without_add_permission(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse("processes:dashboard"))
+        self.assertNotContains(response, reverse("processes:process-create"))
+        self.assertNotContains(response, reverse("processes:processcategory-create"))
+
+    def test_quick_actions_visible_with_add_permission(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse("processes:dashboard"))
+        self.assertContains(response, reverse("processes:process-create"))
+
+
+class ProcessFilterViewQuerysetTests(TestCase):
+    def test_filter_views_share_the_queryset_mixin(self):
+        """The three process filter views share one queryset so related-object
+        prefetching cannot drift between scopes."""
+        from processes.views import (
+            ProcessFilterViewMixin,
+            ProcessPrivateFilterView,
+            ProcessPublishedFilterView,
+            ProcessReviewFilterView,
+        )
+
+        for view_class in (
+            ProcessPublishedFilterView,
+            ProcessPrivateFilterView,
+            ProcessReviewFilterView,
+        ):
+            with self.subTest(view_class=view_class.__name__):
+                self.assertTrue(issubclass(view_class, ProcessFilterViewMixin))

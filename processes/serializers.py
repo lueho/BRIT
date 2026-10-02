@@ -38,7 +38,12 @@ class ProcessCategorySerializer(serializers.ModelSerializer):
             "lastmodified_at",
             "process_count",
         ]
-        read_only_fields = ["owner", "created_at", "lastmodified_at"]
+        read_only_fields = [
+            "owner",
+            "publication_status",
+            "created_at",
+            "lastmodified_at",
+        ]
 
 
 class ProcessMaterialAPISerializer(serializers.ModelSerializer):
@@ -185,7 +190,12 @@ class ProcessListSerializer(serializers.ModelSerializer):
             "created_at",
             "lastmodified_at",
         ]
-        read_only_fields = ["owner", "created_at", "lastmodified_at"]
+        read_only_fields = [
+            "owner",
+            "publication_status",
+            "created_at",
+            "lastmodified_at",
+        ]
 
     def get_authors(self, obj):
         """Get author ids in explicit process author order."""
@@ -243,7 +253,12 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
             "output_materials",
             "sources",
         ]
-        read_only_fields = ["owner", "created_at", "lastmodified_at"]
+        read_only_fields = [
+            "owner",
+            "publication_status",
+            "created_at",
+            "lastmodified_at",
+        ]
 
     def get_authors(self, obj):
         """Get author ids in explicit process author order."""

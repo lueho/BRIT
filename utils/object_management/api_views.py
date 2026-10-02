@@ -10,6 +10,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .helpers import create_review_action
 from .models import ReviewAction
 from .permissions import UserCreatedObjectPermission
 from .review_context import build_review_context
@@ -99,12 +100,8 @@ class AddReviewCommentAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        action = ReviewAction.objects.create(
-            content_type=ContentType.objects.get_for_model(obj.__class__),
-            object_id=obj.pk,
-            action=ReviewAction.ACTION_COMMENT,
-            comment=comment,
-            user=request.user,
+        action = create_review_action(
+            obj, request.user, ReviewAction.ACTION_COMMENT, comment
         )
 
         return Response(

@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils.html import escapejs
 
 from maps.models import Catchment, GeoDataset, Region
-from materials.models import Material, SampleSeries
+from materials.models import Material
 from utils.object_management.models import User
 from utils.object_management.views import (
     UserCreatedObjectAutocompleteView,
@@ -216,13 +216,10 @@ class UserCreatedObjectAutocompleteViewFilterTests(SimpleTestCase):
 
 
 class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
-    """#213: apply_filters must use SampleSeries.material_id, not SampleSeries.id."""
+    """apply_filters resolves the feedstock id as a Material id."""
 
     @classmethod
     def setUpTestData(cls):
-        # Create spacer materials so Material PKs get ahead of SampleSeries PKs
-        for i in range(5):
-            Material.objects.create(name=f"Spacer Material {i}")
         cls.target_material = Material.objects.create(name="Autocomplete Target")
         cls.region = Region.objects.create(name="AC Region")
         cls.scenario = Scenario.objects.create(name="AC Scenario", region=cls.region)
@@ -233,18 +230,10 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
             name="AC Algorithm", geodataset=cls.geodataset
         )
         cls.algorithm.feedstocks.add(cls.target_material)
-        cls.series = SampleSeries.objects.create(
-            name="AC Series", material=cls.target_material
-        )
 
-    def test_apply_filters_uses_material_id_not_series_id(self):
-        self.assertNotEqual(
-            self.series.id,
-            self.target_material.id,
-            "Test requires SampleSeries.id != Material.id to catch the bug",
-        )
+    def test_apply_filters_uses_material_id(self):
         view = ScenarioGeoDataSetAutocompleteView()
-        view.filter_by = f"feedstock_id='{self.series.id}'"
+        view.filter_by = f"feedstock_id='{self.target_material.id}'"
         view.filters_by = []
         view.exclude_by = f"scenario_id='{self.scenario.id}'"
         view.excludes_by = []
@@ -258,7 +247,7 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
         response = self.client.get(
             reverse("scenario-geodataset-autocomplete"),
             {
-                "f": f"'feedstock__feedstock_id={self.series.id}'",
+                "f": f"'feedstock__feedstock_id={self.target_material.id}'",
                 "e": f"'scenario__scenario_id={self.scenario.id}'",
             },
         )
@@ -274,7 +263,7 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
             reverse("scenario-inventoryalgorithm-autocomplete"),
             {
                 "f": f"'geodataset__geodataset_id={self.geodataset.id}'",
-                "e": f"'feedstock__feedstock_id={self.series.id}'",
+                "e": f"'feedstock__feedstock_id={self.target_material.id}'",
             },
         )
 
@@ -319,6 +308,510 @@ class ScenarioResultCRUDViewsTestCase(
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class GeoDatasetFunctionsAPITestCase(TestCase):
+    """The functions API tells the add-inventory form which generic
+    algorithms apply to the selected dataset's geometry."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(username="fn-user", password="pass")
+        cls.region = Region.objects.create(
+            name="FN Region", publication_status="published"
+        )
+        cls.point_dataset = GeoDataset.objects.create(
+            name="Points",
+            region=cls.region,
+            model_name="NantesGreenhouses",
+            publication_status="published",
+        )
+        cls.polygon_dataset = GeoDataset.objects.create(
+            name="Parcels",
+            region=cls.region,
+            model_name="NutsRegion",
+            publication_status="published",
+        )
+
+    def _get(self, dataset):
+        self.client.force_login(self.user)
+        return self.client.get(
+            reverse("api-geodataset-functions", kwargs={"geodataset_pk": dataset.pk})
+        )
+
+    def test_point_dataset_offers_count_based(self):
+        response = self._get(self.point_dataset)
+        self.assertEqual(response.status_code, 200)
+        names = [f["function_name"] for f in response.json()["functions"]]
+        self.assertEqual(names, ["count_based_production"])
+
+    def test_polygon_dataset_offers_area_based(self):
+        response = self._get(self.polygon_dataset)
+        self.assertEqual(response.status_code, 200)
+        names = [f["function_name"] for f in response.json()["functions"]]
+        self.assertEqual(names, ["area_based_production"])
+
+    def test_response_includes_labels(self):
+        response = self._get(self.point_dataset)
+        functions = response.json()["functions"]
+        self.assertEqual(functions[0]["name"], "Count-based production")
+
+    def test_anonymous_is_denied(self):
+        response = self.client.get(
+            reverse(
+                "api-geodataset-functions",
+                kwargs={"geodataset_pk": self.point_dataset.pk},
+            )
+        )
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_unknown_dataset_returns_404(self):
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("api-geodataset-functions", kwargs={"geodataset_pk": 999999})
+        )
+        self.assertEqual(response.status_code, 404)
+
+
+class ScenarioGeodatasetAutocompleteRegionScopeTestCase(TestCase):
+    """In the generic flow the geodataset dropdown is driven by the
+    scenario's region — a feedstock filter may optionally narrow it."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(username="ac-user", password="pass")
+        cls.region = Region.objects.create(
+            name="Scope Region", publication_status="published"
+        )
+        cls.other_region = Region.objects.create(
+            name="Other Region", publication_status="published"
+        )
+        cls.scenario = Scenario.objects.create(name="Scope Scenario", region=cls.region)
+        cls.dataset_in_region = GeoDataset.objects.create(
+            name="In-region dataset",
+            region=cls.region,
+            publication_status="published",
+        )
+        cls.dataset_other_region = GeoDataset.objects.create(
+            name="Other-region dataset",
+            region=cls.other_region,
+            publication_status="published",
+        )
+
+    def test_region_scoped_listing_without_feedstock(self):
+        """With only the scenario filter the dropdown lists all datasets in
+        the scenario's region, regardless of pre-registered algorithms."""
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("scenario-geodataset-autocomplete"),
+            {"f": f"'scenario__scenario_id={self.scenario.id}'"},
+        )
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(self.dataset_in_region.id, ids)
+        self.assertNotIn(self.dataset_other_region.id, ids)
+
+
+class GenericAlgorithmAddViewTestCase(TestCase):
+    """POSTing a generic_function + kwarg rows materializes the algorithm
+    record, its parameters and the configuration entries."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="gen-owner", password="pass")
+        change_perm = Permission.objects.get(codename="change_scenario")
+        cls.owner.user_permissions.add(change_perm)
+        cls.region = Region.objects.create(
+            name="Gen Region", publication_status="published"
+        )
+        catchment = Catchment.objects.create(
+            name="Gen Catchment",
+            region=cls.region,
+            parent_region=cls.region,
+            publication_status="published",
+        )
+        cls.scenario = Scenario.objects.create(
+            name="Gen Scenario",
+            owner=cls.owner,
+            region=cls.region,
+            catchment=catchment,
+        )
+        cls.material = Material.objects.create(name="Gen Material")
+        cls.feedstock = cls.material
+        cls.point_dataset = GeoDataset.objects.create(
+            name="Gen Points",
+            region=cls.region,
+            model_name="NantesGreenhouses",
+            publication_status="published",
+        )
+        cls.other_region_dataset = GeoDataset.objects.create(
+            name="Foreign dataset",
+            region=Region.objects.create(
+                name="Foreign region", publication_status="published"
+            ),
+            model_name="NantesGreenhouses",
+            publication_status="published",
+        )
+
+    def _url(self):
+        return reverse("scenario-add-configuration", kwargs={"pk": self.scenario.pk})
+
+    def _post(self, **overrides):
+        data = {
+            "feedstock": self.feedstock.pk,
+            "geodataset": self.point_dataset.pk,
+            "generic_function": "count_based_production",
+        }
+        data.update(overrides)
+        self.client.force_login(self.owner)
+        return self.client.post(self._url(), data)
+
+    def test_creates_algorithm_config_and_parameters(self):
+        response = self._post(
+            kwarg_name=["point_yield", "availability"],
+            kwarg_value=["12.5", "0.8"],
+            kwarg_unit=["kg / year", ""],
+        )
+        self.assertEqual(response.status_code, 302)
+
+        algorithm = InventoryAlgorithm.objects.get(
+            geodataset=self.point_dataset,
+            function_name="count_based_production",
+        )
+        self.assertEqual(algorithm.source_module, "inventories.algorithms")
+        self.assertIn(self.material, algorithm.feedstocks.all())
+
+        configs = ScenarioInventoryConfiguration.objects.filter(
+            scenario=self.scenario, inventory_algorithm=algorithm
+        )
+        self.assertEqual(configs.count(), 2)
+        param_names = set(
+            configs.values_list("inventory_parameter__short_name", flat=True)
+        )
+        self.assertEqual(param_names, {"point_yield", "availability"})
+
+        plan = self.scenario.inventory_execution_plan()
+        kwargs = plan[0]["kwargs"]
+        self.assertEqual(kwargs["point_yield"]["value"], 12.5)
+        self.assertEqual(kwargs["point_yield"]["unit"], "kg / year")
+        self.assertEqual(kwargs["availability"]["value"], 0.8)
+
+    def test_reusing_algorithm_on_second_post(self):
+        self._post(kwarg_name=["f1"], kwarg_value=["1.0"], kwarg_unit=[""])
+        response = self._post(kwarg_name=["f1"], kwarg_value=["2.0"], kwarg_unit=["kg"])
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            InventoryAlgorithm.objects.filter(
+                geodataset=self.point_dataset,
+                function_name="count_based_production",
+            ).count(),
+            1,
+        )
+
+    def test_no_kwargs_still_configures_algorithm(self):
+        response = self._post()
+        self.assertEqual(response.status_code, 302)
+        algorithm = InventoryAlgorithm.objects.get(
+            geodataset=self.point_dataset,
+            function_name="count_based_production",
+        )
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario, inventory_algorithm=algorithm
+            ).exists()
+        )
+
+    def test_geometry_mismatch_returns_400(self):
+        response = self._post(generic_function="area_based_production")
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            InventoryAlgorithm.objects.filter(
+                geodataset=self.point_dataset,
+                function_name="area_based_production",
+            ).exists()
+        )
+
+    def test_dataset_outside_region_returns_400(self):
+        response = self._post(geodataset=self.other_region_dataset.pk)
+        self.assertIn(response.status_code, [400, 404])
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario
+            ).exists()
+        )
+
+    def test_invalid_kwarg_name_returns_400(self):
+        response = self._post(
+            kwarg_name=["not a valid name!"],
+            kwarg_value=["1.0"],
+            kwarg_unit=[""],
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_non_numeric_kwarg_value_returns_400(self):
+        response = self._post(
+            kwarg_name=["yield"],
+            kwarg_value=["banana"],
+            kwarg_unit=["kg"],
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario
+            ).exists()
+        )
+
+    def test_unknown_function_returns_400(self):
+        response = self._post(generic_function="definitely_not_a_function")
+        self.assertEqual(response.status_code, 400)
+
+    def test_feature_filter_creates_selection_parameter(self):
+        response = self._post(
+            filter_column="culture_1",
+            filter_value="Tomato",
+            kwarg_name=["yield"],
+            kwarg_value=["10"],
+            kwarg_unit=["kg"],
+        )
+        self.assertEqual(response.status_code, 302)
+        algorithm = InventoryAlgorithm.objects.get(
+            geodataset=self.point_dataset,
+            function_name="count_based_production",
+        )
+        param = InventoryAlgorithmParameter.objects.get(
+            inventory_algorithm=algorithm, short_name="feature_filter"
+        )
+        value = param.inventoryalgorithmparametervalue_set.get()
+        self.assertEqual(
+            value.type, InventoryAlgorithmParameterValue.ValueType.SELECTION
+        )
+        self.assertEqual(value.name, "culture_1=Tomato")
+        plan = self.scenario.inventory_execution_plan()
+        self.assertEqual(
+            plan[0]["kwargs"]["feature_filter"]["selection"], "culture_1=Tomato"
+        )
+
+    def test_feature_filter_rejects_unknown_column(self):
+        response = self._post(
+            filter_column="not_a_column",
+            filter_value="x",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_functions_api_lists_filter_columns(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(
+                "api-geodataset-functions",
+                kwargs={"geodataset_pk": self.point_dataset.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        columns = {c["name"]: c["values"] for c in response.json()["columns"]}
+        self.assertIn("culture_1", columns)
+        self.assertNotIn("geom", columns)
+
+    def test_update_config_includes_feature_filter_for_preselection(self):
+        """The update form builds its preselection map from
+        inventory_algorithm_config and the parameters API exposes the
+        scenario's custom values — together they preselect the filter."""
+        self._post(
+            filter_column="culture_1",
+            filter_value="Tomato",
+            kwarg_name=["yield"],
+            kwarg_value=["10"],
+            kwarg_unit=["kg"],
+        )
+        algorithm = InventoryAlgorithm.objects.get(
+            geodataset=self.point_dataset,
+            function_name="count_based_production",
+        )
+        config = self.scenario.inventory_algorithm_config(algorithm, self.feedstock)
+        preselected = {}
+        for entry in config["parameters"]:
+            preselected.update(entry)
+        self.assertIn("feature_filter", preselected)
+        filter_value_id = preselected["feature_filter"]
+
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(
+                "api-inventoryalgorithm-parameters",
+                kwargs={"algorithm_pk": algorithm.pk},
+            )
+            + f"?scenario={self.scenario.pk}"
+        )
+        self.assertEqual(response.status_code, 200)
+        params = {p["short_name"]: p for p in response.json()}
+        # The stored custom selection is offered so the select can preselect it.
+        filter_value_ids = [v["id"] for v in params["feature_filter"]["values"]]
+        self.assertIn(filter_value_id, filter_value_ids)
+        # The custom factor value is exposed too, so its select can preselect.
+        self.assertIn(
+            preselected["yield"], [v["id"] for v in params["yield"]["values"]]
+        )
+
+    def test_functions_api_includes_factor_presets(self):
+        """After a dataset+function has been configured once, its factors
+        are offered as presets for the next configuration."""
+        self._post(
+            kwarg_name=["yield"],
+            kwarg_value=["10"],
+            kwarg_unit=["kg"],
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(
+                "api-geodataset-functions",
+                kwargs={"geodataset_pk": self.point_dataset.pk},
+            )
+            + f"?scenario={self.scenario.pk}"
+        )
+        self.assertEqual(response.status_code, 200)
+        function = response.json()["functions"][0]
+        presets = {p["short_name"]: p for p in function["parameters"]}
+        self.assertIn("yield", presets)
+        self.assertEqual(presets["yield"]["values"][0]["value"], 10.0)
+
+    def test_functions_api_presets_exclude_feature_filter(self):
+        self._post(filter_column="culture_1", filter_value="Tomato")
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(
+                "api-geodataset-functions",
+                kwargs={"geodataset_pk": self.point_dataset.pk},
+            )
+            + f"?scenario={self.scenario.pk}"
+        )
+        function = response.json()["functions"][0]
+        names = [p["short_name"] for p in function["parameters"]]
+        self.assertNotIn("feature_filter", names)
+
+    def test_preset_value_reused_on_post(self):
+        """Picking a preset in the factor editor posts kwarg_preset with the
+        existing value id — the config reuses it instead of duplicating."""
+        self._post(kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["kg"])
+        preset_value = InventoryAlgorithmParameterValue.objects.get(
+            parameter__short_name="yield", value=10.0
+        )
+        # Configure a second feedstock on the same dataset, reusing the preset.
+        other_feedstock = Material.objects.create(name="Other Material")
+        response = self._post(
+            feedstock=other_feedstock.pk,
+            kwarg_name=["yield"],
+            kwarg_value=["10"],
+            kwarg_preset=[str(preset_value.pk)],
+        )
+        self.assertEqual(response.status_code, 302)
+        config_row = ScenarioInventoryConfiguration.objects.get(
+            scenario=self.scenario,
+            feedstock=other_feedstock,
+            inventory_parameter__short_name="yield",
+        )
+        self.assertEqual(config_row.inventory_value_id, preset_value.pk)
+
+    def test_conflicting_factor_unit_rejected(self):
+        """A shared factor parameter keeps its unit; posting the same factor
+        name with a different unit is rejected instead of silently
+        reinterpreting existing values."""
+        self._post(kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["kg / year"])
+        response = self._post(
+            kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["g / year"]
+        )
+        self.assertEqual(response.status_code, 400)
+        parameter = InventoryAlgorithmParameter.objects.get(short_name="yield")
+        self.assertEqual(parameter.unit, "kg / year")
+
+    def test_missing_unit_can_be_filled_later(self):
+        """A parameter whose unit was never set can receive one later —
+        that does not reinterpret existing values."""
+        self._post(kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=[""])
+        response = self._post(
+            kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["kg / year"]
+        )
+        self.assertEqual(response.status_code, 302)
+        parameter = InventoryAlgorithmParameter.objects.get(short_name="yield")
+        self.assertEqual(parameter.unit, "kg / year")
+
+    def test_feedstock_without_registered_algorithm_is_selectable(self):
+        """The add form must offer materials that no algorithm references
+        yet — the generic flow is how they get their first algorithm."""
+        new_material = Material.objects.create(name="Brand New Material")
+        self.client.force_login(self.owner)
+        response = self.client.get(self._url())
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            new_material, response.context["form"].fields["feedstock"].queryset
+        )
+
+    def test_private_geodataset_rejected_on_generic_post(self):
+        """A private dataset of another user must not be configurable —
+        generic execution would read and republish its features."""
+        stranger = User.objects.create_user(username="stranger", password="p")
+        private_dataset = GeoDataset.objects.create(
+            name="Private dataset",
+            owner=stranger,
+            region=self.region,
+            model_name="NantesGreenhouses",
+            publication_status="private",
+        )
+        response = self._post(
+            geodataset=private_dataset.pk,
+            kwarg_name=["yield"],
+            kwarg_value=["10"],
+            kwarg_unit=["kg"],
+        )
+        self.assertIn(response.status_code, [400, 404])
+        self.assertFalse(
+            InventoryAlgorithm.objects.filter(geodataset=private_dataset).exists()
+        )
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario
+            ).exists()
+        )
+
+    def test_posted_lookup_does_not_fall_back_on_empty_queryset(self):
+        """An empty visibility queryset must stay empty — falling back to
+        the unfiltered manager would re-open private-object access."""
+        from django.http import Http404
+
+        from ..views import _get_posted_object_or_404
+
+        stranger = User.objects.create_user(username="stranger", password="p")
+        private_dataset = GeoDataset.objects.create(
+            name="Private dataset",
+            owner=stranger,
+            region=self.region,
+            model_name="NantesGreenhouses",
+            publication_status="private",
+        )
+        with self.assertRaises(Http404):
+            _get_posted_object_or_404(
+                GeoDataset,
+                private_dataset.pk,
+                queryset=GeoDataset.objects.none(),
+            )
+
+    def test_functions_api_hides_private_dataset(self):
+        """The functions API must not leak sampled values of private
+        datasets to unrelated users."""
+        stranger = User.objects.create_user(username="stranger", password="p")
+        private_dataset = GeoDataset.objects.create(
+            name="Private dataset",
+            owner=stranger,
+            region=self.region,
+            model_name="NantesGreenhouses",
+            publication_status="private",
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(
+                "api-geodataset-functions",
+                kwargs={"geodataset_pk": private_dataset.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 404)
+
+
 class ScenarioDownloadSummaryAuthTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -360,7 +853,10 @@ class ScenarioDownloadSummaryAuthTests(TestCase):
 
     def test_moderator_can_download(self):
         moderator = User.objects.create_user(username="mod", password="pass")
-        ct = ContentType.objects.get_for_model(Scenario)
+        # get_for_model() is fed from a process-global cache that parallel test
+        # workers inherit from their parent — query the row directly so the
+        # permission is attached to the correct content type.
+        ct = ContentType.objects.get(app_label="inventories", model="scenario")
         perm, _ = Permission.objects.get_or_create(
             codename="can_moderate_scenario",
             content_type=ct,
@@ -419,7 +915,10 @@ class ScenarioDownloadResultSummaryAuthTests(TestCase):
 
     def test_moderator_can_download(self):
         moderator = User.objects.create_user(username="mod", password="pass")
-        ct = ContentType.objects.get_for_model(Scenario)
+        # get_for_model() is fed from a process-global cache that parallel test
+        # workers inherit from their parent — query the row directly so the
+        # permission is attached to the correct content type.
+        ct = ContentType.objects.get(app_label="inventories", model="scenario")
         perm, _ = Permission.objects.get_or_create(
             codename="can_moderate_scenario",
             content_type=ct,
@@ -486,10 +985,7 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
             name="B", owner=cls.owner_b, region=region, catchment=catchment
         )
         # Minimal valid fixtures so post() can complete without raising.
-        material = Material.objects.create(name="M", owner=cls.owner_a)
-        cls.feedstock = SampleSeries.objects.create(
-            name="F", owner=cls.owner_a, material=material
-        )
+        cls.feedstock = Material.objects.create(name="M", owner=cls.owner_a)
         geodataset = GeoDataset.objects.create(
             name="G", owner=cls.owner_a, region=region
         )
@@ -557,9 +1053,7 @@ class ScenarioCustomParameterValueTests(TestCase):
             name="S2", owner=cls.owner, region=region, catchment=catchment
         )
         material = Material.objects.create(name="M", owner=cls.owner)
-        cls.feedstock = SampleSeries.objects.create(
-            name="F", owner=cls.owner, material=material
-        )
+        cls.feedstock = material
         cls.geodataset = GeoDataset.objects.create(
             name="G", owner=cls.owner, region=region
         )
@@ -1111,9 +1605,7 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
             name="S", owner=cls.owner, region=cls.region, catchment=cls.catchment
         )
         cls.material = Material.objects.create(name="M", owner=cls.owner)
-        cls.feedstock = SampleSeries.objects.create(
-            name="F", owner=cls.owner, material=cls.material
-        )
+        cls.feedstock = cls.material
         cls.geodataset = GeoDataset.objects.create(
             name="G", owner=cls.owner, region=cls.region
         )
@@ -1205,11 +1697,8 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_add_view_post_unavailable_feedstock_returns_404(self):
-        unavailable_material = Material.objects.create(
+        unavailable_feedstock = Material.objects.create(
             name="Unusable", owner=self.owner
-        )
-        unavailable_feedstock = SampleSeries.objects.create(
-            name="Unusable F", owner=self.owner, material=unavailable_material
         )
         response = self.client.post(
             self.add_url(),
@@ -1296,11 +1785,8 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
             inventory_parameter=self.parameter,
             inventory_value=self.value,
         )
-        unavailable_material = Material.objects.create(
+        unavailable_feedstock = Material.objects.create(
             name="Unusable", owner=self.owner
-        )
-        unavailable_feedstock = SampleSeries.objects.create(
-            name="Unusable F", owner=self.owner, material=unavailable_material
         )
         response = self.client.post(
             self.update_url(),

@@ -11,7 +11,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY", default=get_random_secret_key())
 
 # Security settings
-SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
@@ -332,6 +331,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "utils.file_export.generic_tasks.cleanup_expired_exports",
         "schedule": crontab(hour=4, minute=0),
     },
+    # Remove accounts that never activated within ACCOUNT_ACTIVATION_DAYS,
+    # e.g. registrations whose activation email bounced.
+    "cleanup-expired-registrations": {
+        "task": "users.tasks.cleanup_expired_registrations",
+        "schedule": crontab(hour=5, minute=0),
+    },
     # Safety net for the GeoJSON caches: data changes already trigger warmup
     # via signals, and a warmup is queued on every worker start, but a daily
     # pass also covers cache evictions/flushes that no signal observes.
@@ -339,6 +344,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "warm_all_geojson_caches",
         "schedule": crontab(hour=3, minute=0),
         "kwargs": {"queue_subtasks": True},
+    },
+    # Orphans also arise from API mutations and imports, which do not trigger
+    # the post-save cleanup in the collection form.
+    "cleanup-orphaned-waste-flyers": {
+        "task": "cleanup_orphaned_waste_flyers",
+        "schedule": crontab(hour=4, minute=30),
     },
 }
 

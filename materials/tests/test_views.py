@@ -4570,6 +4570,53 @@ class RemoveSeasonalVariationViewTestCase(ViewWithPermissionsTestCase):
         self.assertTrue(Composition.objects.filter(pk=self.composition.pk).exists())
 
 
+class SeasonalVariationStandaloneSampleTestCase(ViewWithPermissionsTestCase):
+    """Standalone samples have no series; the seasonal routes must 404."""
+
+    member_permissions = "change_composition"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        material = Material.objects.create(owner=cls.member, name="Test Material")
+        group = MaterialComponentGroup.objects.create(
+            owner=cls.member, name="Test Group"
+        )
+        sample = Sample.objects.create(
+            owner=cls.member,
+            name="Standalone sample",
+            material=material,
+            standalone=True,
+        )
+        cls.composition = Composition.objects.create(
+            owner=cls.member,
+            sample=sample,
+            group=group,
+            fractions_of=MaterialComponent.objects.default(),
+        )
+
+    def test_add_seasonal_variation_returns_404(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse("add_seasonal_variation", kwargs={"pk": self.composition.pk})
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_remove_seasonal_variation_returns_404(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "remove_seasonal_variation",
+                kwargs={"pk": self.composition.pk, "distribution_pk": 1},
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+
 class ComponentOrderUpViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "change_composition"
 

@@ -1,4 +1,5 @@
 {% extends "detail_with_options.html" %}
+{% load moderation_tags %}
 {% block title %}
     BRIT | Process Category: {{ object.name }}
 {% endblock title %}
@@ -48,7 +49,7 @@
         <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
             {% for process in processes %}
                 <div class="col">
-                    <a href="{% url 'processes:process-detail' process.pk %}"
+                    <a href="{% detail_or_review_url process %}"
                        class="card h-100 text-decoration-none text-reset">
                         {% if process.image %}
                             <img src="{{ process.image.url }}"

@@ -18,11 +18,6 @@ def verbose_name(obj):
 
 
 @register.filter
-def class_name(obj):
-    return obj.__class__.__name__.lower()
-
-
-@register.filter
 def modulo(value, divisor):
     """Return ``value % divisor`` as an integer, or ``0`` on failure."""
 

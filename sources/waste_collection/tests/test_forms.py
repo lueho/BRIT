@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -6,6 +6,7 @@ from django.db.models import signals
 from django.forms import formset_factory
 from django.http import QueryDict
 from django.test import RequestFactory, TestCase
+from django.utils import timezone
 from factory.django import mute_signals
 
 from bibliography.models import Source
@@ -1012,6 +1013,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         ) as mock_cleanup:
             formset.save()
         mock_cleanup.assert_called_once()
+        WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
         with self.assertRaises(WasteFlyer.DoesNotExist):
             WasteFlyer.objects.get(url="")
@@ -1043,6 +1045,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         ):
             formset.save()
         mock_cleanup.assert_called_once()
+        WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
         WasteFlyer.objects.get(url="https://www.fest-flyers.org")
         self.assertEqual(len(initial_urls) + 1, self.collection.flyers.count())
@@ -1105,6 +1108,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         ) as mock_cleanup:
             formset.save()
         mock_cleanup.assert_called_once()
+        WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
         WasteFlyer.objects.get(url=self.flyer_2.url)
         self.assertEqual(original_flyer_count - 1, self.collection.flyers.count())
@@ -1131,6 +1135,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         ) as mock_cleanup:
             formset.save()
         mock_cleanup.assert_called_once()
+        WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
         with self.assertRaises(WasteFlyer.DoesNotExist):
             WasteFlyer.objects.get(url=self.flyer_3.url)
@@ -1161,6 +1166,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         ):
             formset.save()
         mock_cleanup.assert_called_once()
+        WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
         # get raises an error if the query returns more than one instance
         WasteFlyer.objects.get(url=url)
@@ -1203,6 +1209,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         ) as mock_cleanup:
             formset.save()
         mock_cleanup.assert_called_once()
+        WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
 
         # flyer_1 should still exist because it's referenced by prop_value
@@ -1252,6 +1259,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         ) as mock_cleanup:
             formset.save()
         mock_cleanup.assert_called_once()
+        WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
 
         # flyer_2 should still exist because it's referenced by agg_prop_value
@@ -1285,6 +1293,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         ) as mock_cleanup:
             formset.save()
         mock_cleanup.assert_called_once()
+        WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
 
         # flyer_3 should still exist because it's referenced by collection2.sources

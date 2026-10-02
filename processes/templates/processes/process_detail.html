@@ -136,17 +136,17 @@
           {% endif %}
         </div>
         <ul class="sdv2-hero-meta" aria-label="Process metadata">
-          {% if object.parent %}
+          {% if visible_parent %}
             <li>
               <span class="sdv2-meta-label">Parent</span>
-              <a href="{% url 'processes:process-detail' object.parent.pk %}">{{ object.parent.name }}</a>
+              <a href="{% detail_or_review_url visible_parent %}">{{ visible_parent.name }}</a>
             </li>
           {% endif %}
           {% if object.categories.all %}
             <li>
               <span class="sdv2-meta-label">Categories</span>
               {% for category in object.categories.all %}
-                <a href="{% url 'processes:processcategory-detail' category.pk %}">{{ category.name }}</a>{% if not forloop.last %},{% endif %}
+                <a href="{% detail_or_review_url category %}">{{ category.name }}</a>{% if not forloop.last %},{% endif %}
               {% endfor %}
             </li>
           {% endif %}
@@ -393,14 +393,14 @@
       {# ─── Related processes aside ─── #}
       {% if has_related_processes %}
       <aside class="sdv2-related" aria-label="Related processes">
-        {% if object.parent %}
+        {% if visible_parent %}
           <section class="sdv2-related-section sdv2-surface">
             <h3 class="sdv2-related-title">Parent process</h3>
             <ul class="sdv2-related-list">
               <li>
-                <a href="{% url 'processes:process-detail' object.parent.pk %}"
+                <a href="{% detail_or_review_url visible_parent %}"
                    class="sdv2-related-link">
-                  <span class="sdv2-related-name">{{ object.parent.name }}</span>
+                  <span class="sdv2-related-name">{{ visible_parent.name }}</span>
                 </a>
               </li>
             </ul>
@@ -412,7 +412,7 @@
             <ul class="sdv2-related-list">
               {% for variant in process_variants %}
                 <li>
-                  <a href="{% url 'processes:process-detail' variant.pk %}"
+                  <a href="{% detail_or_review_url variant %}"
                      class="sdv2-related-link">
                     <span class="sdv2-related-name">{{ variant.name }}</span>
                   </a>

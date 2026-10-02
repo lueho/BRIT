@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("closecycle", "0005_showcase_catchment_showcase_sample_series_and_more"),
-        ("inventories", "0008_inventoryalgorithmparametervalue_is_custom"),
+        ("inventories", "0009_feedstock_material"),
     ]
 
     operations = [

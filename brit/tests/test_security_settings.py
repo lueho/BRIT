@@ -8,6 +8,14 @@ from django.conf import settings
 from django.test import SimpleTestCase
 
 
+class DeprecatedSecuritySettingsTests(SimpleTestCase):
+    def test_removed_xss_filter_setting_is_not_reintroduced(self):
+        """SECURE_BROWSER_XSS_FILTER is a no-op since Django 4.0; the X-XSS-Protection
+        header it controlled was removed from browsers. It must not linger in
+        settings as a false sense of protection."""
+        self.assertFalse(hasattr(settings, "SECURE_BROWSER_XSS_FILTER"))
+
+
 class ProductionContentSecurityPolicyTests(SimpleTestCase):
     def test_report_only_policy_is_added_to_responses(self):
         environment = os.environ.copy()

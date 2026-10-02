@@ -217,6 +217,7 @@ class ScenarioTestCase(TestCase):
         self.assertEqual(
             InventoryAlgorithm.available_modules(),
             [
+                "inventories.algorithms",
                 "flexibi_hamburg",
                 "sources.greenhouses.inventory.algorithms",
             ],
@@ -247,7 +248,9 @@ class ScenarioTestCase(TestCase):
             result = algorithm.execute(example="value")
 
         self.assertEqual(result, {"result": "ok"})
-        execute.assert_called_once_with(example="value")
+        execute.assert_called_once_with(
+            example="value", geodataset_id=algorithm.geodataset_id
+        )
 
     def test_serialize_inventory_execution_plan_builds_sources_task_reference_shape(
         self,
@@ -292,11 +295,8 @@ class ScenarioTestCase(TestCase):
     def test_is_valid_configuration_scopes_required_parameters_to_current_scenario(
         self,
     ):
-        material = Material.objects.get(name="Feedstock 1")
-        feedstock = SampleSeries.objects.create(
-            material=material,
-            name="Feedstock 1 Series",
-        )
+        feedstock = Material.objects.get(name="Feedstock 1")
+        material = feedstock
         geodataset = GeoDataset.objects.get(name="Test Dataset")
         algorithm = InventoryAlgorithm.objects.create(
             name="Scoped Validation Algorithm",
@@ -345,14 +345,8 @@ class ScenarioTestCase(TestCase):
     ):
         material = Material.objects.get(name="Feedstock 1")
         other_material = Material.objects.get(name="Feedstock 2")
-        feedstock = SampleSeries.objects.create(
-            material=material,
-            name="Feedstock 1 Series",
-        )
-        other_feedstock = SampleSeries.objects.create(
-            material=other_material,
-            name="Feedstock 2 Series",
-        )
+        feedstock = material
+        other_feedstock = other_material
         geodataset = GeoDataset.objects.get(name="Test Dataset")
         algorithm = InventoryAlgorithm.objects.create(
             name="Scoped Config Algorithm",
@@ -408,9 +402,7 @@ class ScenarioTestCase(TestCase):
     def test_add_inventory_algorithm_creates_config_rows_atomically(self):
         """add_inventory_algorithm must create all config rows inside transaction.atomic."""
         material = Material.objects.get(name="Feedstock 1")
-        feedstock = SampleSeries.objects.create(
-            material=material, name="Atomic Feedstock Series"
-        )
+        feedstock = material
         geodataset = GeoDataset.objects.get(name="Test Dataset")
         algorithm = InventoryAlgorithm.objects.create(
             name="Atomic Test Algorithm", geodataset=geodataset
@@ -438,9 +430,7 @@ class ScenarioTestCase(TestCase):
         """#212: Changing a referenced InventoryAlgorithmParameterValue must
         mark all scenarios that use it as CHANGED."""
         material = Material.objects.get(name="Feedstock 1")
-        feedstock = SampleSeries.objects.create(
-            name="FK Signal Series", material=material
-        )
+        feedstock = material
         geodataset = GeoDataset.objects.get(name="Test Dataset")
         algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
         parameter = InventoryAlgorithmParameter.objects.create(
@@ -481,9 +471,7 @@ class ScenarioTestCase(TestCase):
         """#212: Changing a referenced InventoryAlgorithm must mark all
         scenarios that use it as CHANGED."""
         material = Material.objects.get(name="Feedstock 1")
-        feedstock = SampleSeries.objects.create(
-            name="FK Algo Series", material=material
-        )
+        feedstock = material
         geodataset = GeoDataset.objects.get(name="Test Dataset")
         algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
         ScenarioInventoryConfiguration.objects.create(
@@ -556,15 +544,12 @@ class ScenarioTestCase(TestCase):
 
     def test_create_default_configuration_handles_m2m_parameter_algorithms(self):
         """#219: create_default_configuration() must create one entry per
-        parameter and feedstock series even though
+        parameter and feedstock material even though
         InventoryAlgorithmParameter.inventory_algorithm is a ManyToManyField."""
         algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
         algorithm.default = True
         algorithm.save()
-        feedstock = SampleSeries.objects.create(
-            material=Material.objects.get(name="Feedstock 1"),
-            name="Default Feedstock Series",
-        )
+        feedstock = Material.objects.get(name="Feedstock 1")
 
         parameter = InventoryAlgorithmParameter.objects.create(
             short_name="test_param",
@@ -594,21 +579,25 @@ class ScenarioTestCase(TestCase):
         self.assertEqual(plan[0]["kwargs"]["feedstock_id"], feedstock.id)
         self.assertEqual(plan[0]["kwargs"]["test_param"]["value"], 1.0)
 
-    def test_create_default_configuration_creates_one_configuration_per_series(
+    def test_create_default_configuration_creates_one_configuration_per_material(
         self,
     ):
         algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
         algorithm.default = True
         algorithm.save()
         material = Material.objects.get(name="Feedstock 1")
-        series_a = SampleSeries.objects.create(material=material, name="Series A")
-        series_b = SampleSeries.objects.create(material=material, name="Series B")
+        other_material = Material.objects.get(name="Feedstock 2")
+        algorithm.feedstocks.add(other_material)
+        SampleSeries.objects.create(material=material, name="Series A")
+        SampleSeries.objects.create(material=material, name="Series B")
 
         self.scenario.create_default_configuration()
 
+        # Multiple series of a material collapse into a single material-level
+        # configuration — the series is an optional temporal profile.
         self.assertQuerySetEqual(
             self.scenario.feedstocks().order_by("name"),
-            [series_a, series_b],
+            [material, other_material],
         )
         self.assertFalse(
             self.scenario.configuration().filter(feedstock__isnull=True).exists()
@@ -618,7 +607,6 @@ class ScenarioTestCase(TestCase):
         """A parameter shared by two default algorithms is configured once per
         algorithm without tripping the duplicate-parameter validation."""
         material = Material.objects.get(name="Feedstock 1")
-        SampleSeries.objects.create(material=material, name="Shared Series")
         geodataset = GeoDataset.objects.get(name="Test Dataset")
         algorithm_a = InventoryAlgorithm.objects.get(name="Test Algorithm")
         algorithm_a.default = True
@@ -647,7 +635,7 @@ class ScenarioTestCase(TestCase):
         self,
     ):
         material = Material.objects.get(name="Feedstock 1")
-        feedstock = SampleSeries.objects.create(material=material, name="Dup Series")
+        feedstock = material
         geodataset = GeoDataset.objects.get(name="Test Dataset")
         algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
         parameter = InventoryAlgorithmParameter.objects.create(
@@ -687,7 +675,7 @@ class ScenarioResultHomogenizeTimestepsTestCase(TestCase):
             name="TS Algorithm", geodataset=geodataset
         )
         cls.algorithm.feedstocks.add(material)
-        cls.feedstock = SampleSeries.objects.create(name="TS Series", material=material)
+        cls.feedstock = material
 
     def tearDown(self):
         for name in list(apps.all_models["layer_manager"]):
@@ -748,3 +736,80 @@ class ScenarioResultHomogenizeTimestepsTestCase(TestCase):
 
         result = ScenarioResult(self.scenario)
         self.assertEqual(result.timesteps, [])
+
+
+class MaterialFeedstockContractTestCase(TestCase):
+    """Feedstock selection is material-based.
+
+    ``ScenarioInventoryConfiguration.feedstock`` identifies a Material; a
+    SampleSeries is an optional temporal profile for algorithms that need
+    seasonal data, not the carrier of the material identity.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.material = Material.objects.create(name="Contract Material")
+        cls.other_material = Material.objects.create(name="Other Material")
+        cls.region = Region.objects.create(name="Contract Region")
+        cls.catchment = Catchment.objects.create(
+            name="Contract Catchment", region=cls.region
+        )
+        cls.scenario = Scenario.objects.create(
+            name="Contract Scenario", region=cls.region, catchment=cls.catchment
+        )
+        cls.geodataset = GeoDataset.objects.create(
+            name="Contract Dataset", region=cls.region
+        )
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="Contract Algorithm", geodataset=cls.geodataset
+        )
+        cls.algorithm.feedstocks.add(cls.material)
+
+    def test_available_feedstocks_returns_materials(self):
+        feedstocks = self.scenario.available_feedstocks()
+        self.assertQuerySetEqual(feedstocks, [self.material])
+        for feedstock in feedstocks:
+            self.assertIsInstance(feedstock, Material)
+
+    def test_configuration_accepts_material_as_feedstock(self):
+        entry = ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=self.material,
+            geodataset=self.geodataset,
+            inventory_algorithm=self.algorithm,
+        )
+        self.assertIsInstance(entry.feedstock, Material)
+        self.assertEqual(entry.feedstock, self.material)
+
+    def test_scenario_feedstocks_returns_materials(self):
+        self.scenario.add_inventory_algorithm(self.material, self.algorithm)
+        self.assertQuerySetEqual(self.scenario.feedstocks(), [self.material])
+
+    def test_add_inventory_algorithm_stores_optional_sample_series(self):
+        series = SampleSeries.objects.create(
+            material=self.material, name="Contract Series"
+        )
+        self.scenario.add_inventory_algorithm(
+            self.material, self.algorithm, sample_series=series
+        )
+        entry = self.scenario.configuration().first()
+        self.assertEqual(entry.feedstock, self.material)
+        self.assertEqual(entry.sample_series, series)
+
+    def test_execution_plan_emits_material_id_and_series_id(self):
+        series = SampleSeries.objects.create(
+            material=self.material, name="Contract Series"
+        )
+        self.scenario.add_inventory_algorithm(
+            self.material, self.algorithm, sample_series=series
+        )
+        plan = self.scenario.inventory_execution_plan()
+        self.assertEqual(len(plan), 1)
+        self.assertEqual(plan[0]["kwargs"]["feedstock_id"], self.material.pk)
+        self.assertEqual(plan[0]["kwargs"]["sample_series_id"], series.pk)
+
+    def test_execution_plan_omits_series_id_when_unset(self):
+        self.scenario.add_inventory_algorithm(self.material, self.algorithm)
+        plan = self.scenario.inventory_execution_plan()
+        self.assertEqual(plan[0]["kwargs"]["feedstock_id"], self.material.pk)
+        self.assertNotIn("sample_series_id", plan[0]["kwargs"])

@@ -158,7 +158,7 @@ class ScenarioResult:
         layer_summaries = {}
         for layer in self.layers:
             layer_summaries[layer] = {
-                "feedstock": layer.feedstock(),
+                "feedstock": layer.feedstock,
                 "algorithm": layer.algorithm,
                 "aggregated_values": list(layer.layeraggregatedvalue_set.all()),
                 "map_link": layer.feature_table_url,

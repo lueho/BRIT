@@ -8,7 +8,7 @@ from django.db import transaction
 from brit.celery import app
 from inventories.models import InventoryAlgorithm, RunningTask, Scenario, ScenarioStatus
 from layer_manager.models import Layer
-from materials.models import SampleSeries
+from materials.models import Material, SampleSeries
 
 
 def _lock_scenario_status(scenario_id):
@@ -155,7 +155,10 @@ def run_inventory_algorithm(self, algorithm_id, **kwargs):
         layer_values = {
             "name": algorithm.function_name,
             "scenario": Scenario.objects.get(id=scenario_id),
-            "feedstock": SampleSeries.objects.get(id=kwargs["feedstock_id"]),
+            "feedstock": Material.objects.get(id=kwargs["feedstock_id"]),
+            "sample_series": SampleSeries.objects.filter(
+                id=kwargs.get("sample_series_id")
+            ).first(),
             "algorithm": algorithm,
             "results": results,
         }

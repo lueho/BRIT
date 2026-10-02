@@ -152,9 +152,14 @@ urlpatterns = [
         name="sampleseries-create",
     ),
     path(
-        "sample_series/create/modal",
+        "sample_series/create/modal/",
         views.SampleSeriesModalCreateView.as_view(),
         name="sampleseries-create-modal",
+    ),
+    # Slashless alias for clients that learned the pre-slash URL.
+    path(
+        "sample_series/create/modal",
+        views.SampleSeriesModalCreateView.as_view(),
     ),
     path(
         "sample_series/<int:pk>/",
@@ -333,9 +338,14 @@ urlpatterns = [
         name="sample-add-composition",
     ),
     path(
-        "samples/<int:pk>/add_property",
+        "samples/<int:pk>/add_property/",
         views.SampleAddPropertyView.as_view(),
         name="sample-add-property",
+    ),
+    # Slashless alias for clients that learned the pre-slash URL.
+    path(
+        "samples/<int:pk>/add_property",
+        views.SampleAddPropertyView.as_view(),
     ),
     path(
         "samples/<int:pk>/add_property/modal/",
@@ -428,9 +438,14 @@ urlpatterns = [
         name="materialcomponent-create",
     ),
     path(
-        "components/create/modal",
+        "components/create/modal/",
         views.ComponentModalCreateView.as_view(),
         name="materialcomponent-create-modal",
+    ),
+    # Slashless alias for clients that learned the pre-slash URL.
+    path(
+        "components/create/modal",
+        views.ComponentModalCreateView.as_view(),
     ),
     path(
         "components/<int:pk>/",
