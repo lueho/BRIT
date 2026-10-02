@@ -687,13 +687,6 @@ class ProcessModalDeleteView(UserCreatedObjectModalDeleteView):
 
     model = Process
 
-    def get_success_url(self):
-        if self.object.publication_status == "published":
-            return f"{self.model.public_list_url()}?scope=published"
-        if self.object.publication_status == "review":
-            return f"{self.model.review_list_url()}?scope=review"
-        return f"{self.model.private_list_url()}?scope=private"
-
 
 class ProcessAutocompleteView(UserCreatedObjectAutocompleteView):
     """Autocomplete view for Process selection."""

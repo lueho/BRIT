@@ -11,13 +11,14 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
+from django.db.models import Max
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.html import escape
 
 from bibliography.models import Author, Source
-from materials.models import Material
+from materials.models import BaseMaterial, Material
 from utils.properties.models import Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
@@ -1369,6 +1370,117 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
             f"{reverse(self.view_private_list_name)}?scope=private",
             fetch_redirect_response=False,
         )
+        self.assertFalse(Process.objects.filter(pk=process.pk).exists())
+
+    def test_modal_delete_ignores_review_item_next_url(self):
+        """Deleting from the review page must not redirect back to it."""
+        process = Process.objects.create(
+            name="Review modal delete target",
+            owner=self.owner_user,
+            publication_status="review",
+        )
+        review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(Process).id,
+                "object_id": process.pk,
+            },
+        )
+        delete_url = (
+            f"{reverse(self.view_delete_name, kwargs={'pk': process.pk})}"
+            f"?next={review_url}"
+        )
+
+        self.client.force_login(self.owner_user)
+        response = self.client.post(delete_url, {"next": review_url})
+
+        self.assertRedirects(
+            response,
+            f"{reverse('processes:process-list-review')}?scope=review",
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(Process.objects.filter(pk=process.pk).exists())
+
+    def test_modal_delete_ignores_alias_detail_next_url(self):
+        """Detail-URL aliases of the deleted object are also unsafe targets."""
+        process = Process.objects.create(
+            name="Alias modal delete target",
+            owner=self.owner_user,
+            publication_status="private",
+        )
+        alias_url = reverse("processes:processtype-detail", kwargs={"pk": process.pk})
+        delete_url = (
+            f"{reverse(self.view_delete_name, kwargs={'pk': process.pk})}"
+            f"?next={alias_url}"
+        )
+
+        self.client.force_login(self.owner_user)
+        response = self.client.post(delete_url, {"next": alias_url})
+
+        self.assertRedirects(
+            response,
+            f"{reverse(self.view_private_list_name)}?scope=private",
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(Process.objects.filter(pk=process.pk).exists())
+
+    def _create_process_and_material_sharing_pk(self, name, process_status):
+        shared_pk = 1 + max(
+            Process.objects.aggregate(max_pk=Max("pk"))["max_pk"] or 0,
+            BaseMaterial.objects.aggregate(max_pk=Max("pk"))["max_pk"] or 0,
+        )
+        process = Process.objects.create(
+            pk=shared_pk,
+            name=name,
+            owner=self.owner_user,
+            publication_status=process_status,
+        )
+        material = Material.objects.create(
+            pk=shared_pk,
+            name=name,
+            owner=self.owner_user,
+            publication_status="review",
+        )
+        return process, material
+
+    def test_modal_delete_honors_other_model_next_url_with_same_pk(self):
+        """A ``next`` URL of another model that shares the pk stays valid."""
+        process, material = self._create_process_and_material_sharing_pk(
+            "Other model next target", process_status="private"
+        )
+        other_url = reverse("material-detail", kwargs={"pk": material.pk})
+        delete_url = (
+            f"{reverse(self.view_delete_name, kwargs={'pk': process.pk})}"
+            f"?next={other_url}"
+        )
+
+        self.client.force_login(self.owner_user)
+        response = self.client.post(delete_url, {"next": other_url})
+
+        self.assertRedirects(response, other_url)
+        self.assertFalse(Process.objects.filter(pk=process.pk).exists())
+
+    def test_modal_delete_honors_other_content_type_review_next_url(self):
+        """A review page of another content type with the same id stays valid."""
+        process, material = self._create_process_and_material_sharing_pk(
+            "Other review next target", process_status="review"
+        )
+        other_review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(material).id,
+                "object_id": material.pk,
+            },
+        )
+        delete_url = (
+            f"{reverse(self.view_delete_name, kwargs={'pk': process.pk})}"
+            f"?next={other_review_url}"
+        )
+
+        self.client.force_login(self.owner_user)
+        response = self.client.post(delete_url, {"next": other_review_url})
+
+        self.assertRedirects(response, other_review_url)
         self.assertFalse(Process.objects.filter(pk=process.pk).exists())
 
     def get_update_success_url(self, pk):

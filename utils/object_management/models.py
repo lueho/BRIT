@@ -318,6 +318,12 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
 
     user_created = True
 
+    # Set True on models whose list views accept a ``?scope=`` filter
+    # parameter (i.e. their FilterSet derives from
+    # ``UserCreatedObjectScopedFilterSet``). Modal delete redirects append the
+    # matching scope only when this flag is set.
+    scope_filtered_lists = False
+
     # Templates access the model class via ``object_list.model``. Django auto-calls
     # callables during variable resolution, so without this flag every such access
     # instantiates the model (``Sample()`` etc.), which evaluates the ``owner``
