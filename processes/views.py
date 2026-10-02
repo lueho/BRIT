@@ -395,13 +395,13 @@ def _process_detail_context(request, obj, policy=None):
         link for link in output_links if link.material_id in visible_material_ids
     ]
 
-    # Group parameters by type
-    params_by_type = obj.operating_parameters_by_type()
-    context["parameters_by_type"] = params_by_type
+    # Group parameters by type; the flat list keeps the relation's saved
+    # ordering (order, id) — flattening the groups would lose positions
+    # between interleaved types.
+    context["parameters_by_type"] = obj.operating_parameters_by_type()
     context["operating_parameters"] = [
         param
-        for params in params_by_type.values()
-        for param in params
+        for param in obj.operating_parameters.all()
         if param.parameter != ProcessOperatingParameter.Parameter.YIELD
     ]
     context["process_links"] = list(obj.links.all())
