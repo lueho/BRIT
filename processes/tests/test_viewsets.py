@@ -478,3 +478,51 @@ class ProcessAPIRelatedVisibilityTestCase(APITestCase):
             for process in entry["processes"]
         }
         self.assertEqual(names, {"Published Member", "My Private Member"})
+
+
+class ProcessAPIQueryCountTestCase(APITestCase):
+    """Grouping endpoints must not issue a query per category or per process."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create_user(username="perf_owner")
+
+    def _add_category_with_process(self, index):
+        category = ProcessCategory.objects.create(
+            name=f"Perf Category {index}",
+            owner=self.owner,
+            publication_status="published",
+        )
+        process = Process.objects.create(
+            name=f"Perf Process {index}",
+            mechanism=f"Mechanism {index}",
+            owner=self.owner,
+            publication_status="published",
+        )
+        process.categories.add(category)
+
+    def test_by_category_query_count_is_constant(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        self._add_category_with_process(1)
+        with CaptureQueriesContext(connection) as baseline:
+            self.client.get("/processes/api/processes/by_category/")
+        for index in range(2, 6):
+            self._add_category_with_process(index)
+        with CaptureQueriesContext(connection) as scaled:
+            self.client.get("/processes/api/processes/by_category/")
+        self.assertEqual(len(scaled), len(baseline))
+
+    def test_by_mechanism_query_count_is_constant(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        self._add_category_with_process(1)
+        with CaptureQueriesContext(connection) as baseline:
+            self.client.get("/processes/api/processes/by_mechanism/")
+        for index in range(2, 6):
+            self._add_category_with_process(index)
+        with CaptureQueriesContext(connection) as scaled:
+            self.client.get("/processes/api/processes/by_mechanism/")
+        self.assertEqual(len(scaled), len(baseline))

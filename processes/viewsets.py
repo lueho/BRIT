@@ -16,6 +16,7 @@ from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 from .models import (
     Process,
+    ProcessAuthor,
     ProcessCategory,
     ProcessMaterial,
     ProcessOperatingParameter,
@@ -78,10 +79,16 @@ class ProcessViewSet(UserCreatedObjectViewSet):
         """Optimize queries with select/prefetch related."""
         queryset = super().get_queryset()
 
-        if self.action == "list":
+        if self.action in ("list", "by_mechanism"):
             queryset = queryset.select_related("owner", "parent").prefetch_related(
                 "categories",
                 "sources",
+                Prefetch(
+                    "process_authors",
+                    queryset=ProcessAuthor.objects.select_related("author").order_by(
+                        "position", "author_id", "id"
+                    ),
+                ),
             )
         elif self.action == "retrieve":
             queryset = queryset.select_related("owner", "parent").prefetch_related(
@@ -184,16 +191,28 @@ class ProcessViewSet(UserCreatedObjectViewSet):
     @action(detail=False, methods=["get"])
     def by_category(self, request):
         """Get processes grouped by category, scoped to what the user may read."""
+        visible_processes = (
+            filter_queryset_for_user(Process.objects.all(), request.user)
+            .select_related("owner", "parent")
+            .prefetch_related(
+                "categories",
+                "sources",
+                Prefetch(
+                    "process_authors",
+                    queryset=ProcessAuthor.objects.select_related("author").order_by(
+                        "position", "author_id", "id"
+                    ),
+                ),
+            )
+        )
         categories = filter_queryset_for_user(
             ProcessCategory.objects.all(), request.user
-        ).prefetch_related("processes")
+        ).prefetch_related(Prefetch("processes", queryset=visible_processes))
 
         result = []
         for category in categories:
-            processes = filter_queryset_for_user(
-                category.processes.all(), request.user
-            )
-            if processes.exists():
+            processes = category.processes.all()
+            if processes:
                 result.append(
                     {
                         "category": ProcessCategorySerializer(category).data,
@@ -207,12 +226,10 @@ class ProcessViewSet(UserCreatedObjectViewSet):
     def by_mechanism(self, request):
         """Get processes grouped by mechanism."""
         processes = self.get_queryset()
+        serialized = ProcessListSerializer(processes, many=True).data
 
         mechanisms = {}
-        for process in processes:
-            mechanism = process.mechanism or "Other"
-            if mechanism not in mechanisms:
-                mechanisms[mechanism] = []
-            mechanisms[mechanism].append(ProcessListSerializer(process).data)
+        for process, data in zip(processes, serialized):
+            mechanisms.setdefault(process.mechanism or "Other", []).append(data)
 
         return Response(mechanisms)

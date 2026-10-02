@@ -238,6 +238,11 @@ class Process(NamedUserCreatedObject):
         )
 
     def ordered_authors(self):
+        # Use the prefetch cache when present: an explicit order_by on the
+        # related manager would silently bypass it and re-query per process.
+        cache = getattr(self, "_prefetched_objects_cache", None) or {}
+        if "process_authors" in cache:
+            return cache["process_authors"]
         return self.process_authors.order_by(
             "position", "author_id", "id"
         ).select_related("author")
@@ -246,6 +251,9 @@ class Process(NamedUserCreatedObject):
         return [process_author.author for process_author in self.ordered_authors()]
 
     def ordered_sources(self):
+        cache = getattr(self, "_prefetched_objects_cache", None) or {}
+        if "process_sources" in cache:
+            return cache["process_sources"]
         return self.process_sources.order_by("order", "id").select_related("source")
 
     def sources_ordered(self):
