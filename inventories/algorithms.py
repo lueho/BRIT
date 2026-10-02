@@ -1,3 +1,4 @@
+import math
 from collections.abc import Mapping
 
 from django.contrib.gis.db.models.fields import GeometryField
@@ -241,6 +242,8 @@ class InventoryAlgorithmsBase:
 
 GENERIC_MODULE_PATH = "inventories.algorithms"
 
+PRODUCTION_DEVIATION_NAME = "Total production standard deviation"
+
 # Kwargs that wire the run to the scenario context; every other keyword argument
 # is treated as a factor in the production chain. ``feature_filter`` restricts
 # the features that feed the inventory (encoded as "column=value").
@@ -334,6 +337,8 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
 
         per_feature, _ = cls._production(1.0, "", factors)
         total, unit = cls._production(float(len(geometries)), "", factors)
+        per_feature_deviation = cls._production_deviation(1.0, "", factors)
+        total_deviation = cls._production_deviation(float(len(geometries)), "", factors)
         result = {
             "aggregated_values": [
                 {"name": "Count", "value": len(geometries), "unit": ""},
@@ -345,6 +350,16 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
             ],
             "geom_type": "Point",
         }
+        if total_deviation is not None:
+            result["aggregated_values"].append(
+                {
+                    "name": PRODUCTION_DEVIATION_NAME,
+                    "value": total_deviation,
+                    "unit": unit,
+                }
+            )
+            for feature in result["features"]:
+                feature["production_standard_deviation"] = per_feature_deviation
         return result
 
     @classmethod
@@ -380,12 +395,25 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         for geom, area in clipped:
             production, _unit = cls._production(area, "meter ** 2", factors)
             total += production
-            result["features"].append(
-                {"geom": geom, "area_ha": area / 10000, "production": production}
-            )
+            feature = {"geom": geom, "area_ha": area / 10000, "production": production}
+            deviation = cls._production_deviation(area, "meter ** 2", factors)
+            if deviation is not None:
+                feature["production_standard_deviation"] = deviation
+            result["features"].append(feature)
         result["aggregated_values"].append(
             {"name": "Total production", "value": total, "unit": total_unit}
         )
+        total_deviation = cls._production_deviation(
+            total_area_m2, "meter ** 2", factors
+        )
+        if total_deviation is not None:
+            result["aggregated_values"].append(
+                {
+                    "name": PRODUCTION_DEVIATION_NAME,
+                    "value": total_deviation,
+                    "unit": total_unit,
+                }
+            )
         return result
 
     # -- generic helpers -----------------------------------------------------
@@ -416,16 +444,46 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
                 continue
             if isinstance(raw, Mapping):
                 value = raw.get("value")
+                deviation = raw.get("standard_deviation")
                 unit = raw.get("unit") or ""
             else:
-                value, unit = raw, ""
+                value, deviation, unit = raw, None, ""
             try:
-                factors.append({"name": name, "value": float(value), "unit": unit})
+                value = float(value)
+                deviation = None if deviation is None else abs(float(deviation))
             except (TypeError, ValueError):
                 raise ImproperlyConfigured(
                     f"Parameter '{name}' is not a numeric factor."
                 ) from None
+            factors.append(
+                {
+                    "name": name,
+                    "value": value,
+                    "standard_deviation": deviation or None,
+                    "unit": unit,
+                }
+            )
         return factors
+
+    @classmethod
+    def _production_deviation(cls, base_magnitude, base_unit, factors):
+        """First-order standard deviation of the production chain.
+
+        Factors are treated as independent, so each factor's contribution
+        ``|dP/dv_i| * sd_i`` (the chain with ``v_i`` replaced by ``sd_i``) is
+        combined in quadrature. Returns None if no factor has a deviation.
+        """
+        contributions = []
+        for index, factor in enumerate(factors):
+            if factor["standard_deviation"] is None:
+                continue
+            chain = list(factors)
+            chain[index] = {**factor, "value": factor["standard_deviation"]}
+            contribution, _unit = cls._production(base_magnitude, base_unit, chain)
+            contributions.append(contribution)
+        if not contributions:
+            return None
+        return math.sqrt(sum(c * c for c in contributions))
 
     @staticmethod
     def _production(base_magnitude, base_unit, factors):

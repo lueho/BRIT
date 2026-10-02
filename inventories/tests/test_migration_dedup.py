@@ -20,16 +20,27 @@ from inventories.models import (
     Scenario,
     ScenarioInventoryConfiguration,
 )
-from layer_manager.models import Layer
+from layer_manager.models import (
+    DistributionSet,
+    DistributionShare,
+    Layer,
+    LayerAggregatedDistribution,
+    LayerAggregatedValue,
+    LayerField,
+)
 from maps.models import Region
 from materials.models import Material, SampleSeries
 
-config_dedup = importlib.import_module(
+config_migration = importlib.import_module(
     "inventories.migrations.0009_feedstock_material"
-).deduplicate_collapsed_configurations
-layer_dedup = importlib.import_module(
+)
+config_dedup = config_migration.deduplicate_collapsed_configurations
+config_restore = config_migration.restore_collapsed_configurations
+layer_migration = importlib.import_module(
     "layer_manager.migrations.0004_layer_feedstock_material"
-).deduplicate_collapsed_layers
+)
+layer_dedup = layer_migration.deduplicate_collapsed_layers
+layer_restore = layer_migration.restore_collapsed_layers
 
 
 class _SchemaEditorShim:
@@ -40,9 +51,17 @@ class _SchemaEditorShim:
     dedup functions need is ``execute()``.
     """
 
-    def execute(self, sql):
+    connection = connection
+
+    def execute(self, sql, params=()):
         with connection.cursor() as cursor:
-            cursor.execute(sql)
+            cursor.execute(sql, params)
+
+
+def _relation_exists(name):
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT to_regclass(%s)", [name])
+        return cursor.fetchone()[0] is not None
 
 
 class MigrationDedupTestCase(TestCase):
@@ -135,6 +154,48 @@ class MigrationDedupTestCase(TestCase):
         self.assertEqual({self.series_a.id}, {row.sample_series_id for row in rows})
         self.scenario.is_valid_configuration()
 
+    def test_reverse_restores_collapsed_configurations(self):
+        first = self._config(self.series_a, 1.0)
+        second = self._config(self.series_b, 2.0)
+        Layer.objects.create(
+            name="Result",
+            geom_type="Polygon",
+            table_name="dedup_restore_canonical_layer",
+            scenario=self.scenario,
+            feedstock=self.material,
+            sample_series=self.series_b,
+            algorithm=self.algorithm,
+        )
+        fields = ("id", "sample_series_id", "inventory_value_id", "feedstock_id")
+        before = list(
+            ScenarioInventoryConfiguration.objects.order_by("id").values(*fields)
+        )
+
+        self._run_config_dedup()
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(id=first.id).exists()
+        )
+        config_restore(apps, _SchemaEditorShim())
+
+        after = list(
+            ScenarioInventoryConfiguration.objects.order_by("id").values(*fields)
+        )
+        self.assertEqual(before, after)
+        self.assertEqual({first.id, second.id}, {row["id"] for row in after})
+        self.assertFalse(
+            _relation_exists(config_migration.BACKUP_TABLE),
+            "the backup is dropped once restored",
+        )
+
+    def test_reverse_without_backup_is_a_noop(self):
+        row = self._config(self.series_a, 1.0)
+
+        config_restore(apps, _SchemaEditorShim())
+
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(id=row.id).exists()
+        )
+
     def test_untouched_groups_stay_unchanged(self):
         self._config(self.series_a, 1.0)
         other_material = Material.objects.create(name="Other Material")
@@ -190,6 +251,57 @@ class LayerMigrationDedupTestCase(TestCase):
         with connection.cursor() as cursor:
             cursor.execute("SELECT to_regclass('dedup_loser_table')")
             self.assertIsNone(cursor.fetchone()[0])
+
+    def test_reverse_restores_collapsed_layer_with_its_data(self):
+        loser = self._layer("dedup_restore_loser_table")
+        self._layer("dedup_restore_keeper_table", sample_series=self.series)
+        field = LayerField.objects.create(field_name="production", data_type="float")
+        loser.layer_fields.add(field)
+        aggregate = LayerAggregatedValue.objects.create(
+            name="Total production", value=4.2, unit="Mg/a", layer=loser
+        )
+        aggregated_distribution = LayerAggregatedDistribution.objects.create(
+            name="seasonal", type="seasonal", layer=loser
+        )
+        distribution_set = DistributionSet.objects.create(
+            aggregated_distribution=aggregated_distribution
+        )
+        share = DistributionShare.objects.create(
+            distribution_set=distribution_set, average=1.5, standard_deviation=0
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                'CREATE TABLE "dedup_restore_loser_table" (id integer, production float)'
+            )
+            cursor.execute(
+                'INSERT INTO "dedup_restore_loser_table" VALUES (1, 4.2), (2, 0.5)'
+            )
+
+        layer_dedup(apps, _SchemaEditorShim())
+        self.assertFalse(Layer._base_manager.filter(id=loser.id).exists())
+        self.assertFalse(_relation_exists("public.dedup_restore_loser_table"))
+        layer_restore(apps, _SchemaEditorShim())
+
+        restored = Layer._base_manager.get(id=loser.id)
+        self.assertEqual(restored.table_name, "dedup_restore_loser_table")
+        self.assertEqual(restored.sample_series_id, None)
+        self.assertEqual([field], list(restored.layer_fields.all()))
+        self.assertEqual(
+            [(aggregate.id, 4.2)],
+            list(restored.layeraggregatedvalue_set.values_list("id", "value")),
+        )
+        self.assertTrue(
+            DistributionShare.objects.filter(
+                id=share.id,
+                distribution_set__aggregated_distribution__layer=restored,
+            ).exists()
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                'SELECT id, production FROM "dedup_restore_loser_table" ORDER BY id'
+            )
+            self.assertEqual([(1, 4.2), (2, 0.5)], cursor.fetchall())
+        self.assertFalse(_relation_exists(layer_migration.BACKUP_TABLE))
 
     def test_single_layer_is_untouched(self):
         layer = self._layer("dedup_single_table")

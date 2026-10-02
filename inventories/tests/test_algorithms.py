@@ -95,6 +95,42 @@ class CountBasedProductionModelBackendTestCase(GenericAlgorithmBase):
         self.assertEqual(production["unit"], "Mg/a")
         self.assertEqual(len(result["features"]), 2)
 
+    def test_factor_standard_deviations_propagate_to_production(self):
+        """Independent factor uncertainties combine in quadrature:
+        sd(P) = sqrt(sum_i (P * sd_i / v_i) ** 2)."""
+        result = InventoryAlgorithms.count_based_production(
+            **self.base_kwargs(self.dataset),
+            unit_yield={"value": 25.0, "standard_deviation": 5.0, "unit": "kg / year"},
+            collection_share={"value": 0.5, "standard_deviation": 0.1, "unit": ""},
+        )
+        # Each factor contributes 2 * 5 * 0.5 = 2 * 25 * 0.1 = 5 kg/year.
+        deviation = aggregated_value(result, "Total production standard deviation")
+        self.assertAlmostEqual(deviation["value"], 0.005 * 2**0.5)
+        self.assertEqual(deviation["unit"], "Mg/a")
+        for feature in result["features"]:
+            self.assertAlmostEqual(
+                feature["production_standard_deviation"], 0.0025 * 2**0.5
+            )
+
+    def test_zero_valued_factor_keeps_other_factor_uncertainty(self):
+        result = InventoryAlgorithms.count_based_production(
+            **self.base_kwargs(self.dataset),
+            unit_yield={"value": 25.0, "standard_deviation": None, "unit": "kg / year"},
+            collection_share={"value": 0.0, "standard_deviation": 0.1, "unit": ""},
+        )
+        self.assertEqual(aggregated_value(result, "Total production")["value"], 0)
+        deviation = aggregated_value(result, "Total production standard deviation")
+        self.assertAlmostEqual(deviation["value"], 0.005)
+
+    def test_without_standard_deviations_no_deviation_is_reported(self):
+        result = InventoryAlgorithms.count_based_production(
+            **self.base_kwargs(self.dataset),
+            unit_yield={"value": 25.0, "standard_deviation": None, "unit": "kg / year"},
+        )
+        names = {entry["name"] for entry in result["aggregated_values"]}
+        self.assertNotIn("Total production standard deviation", names)
+        self.assertNotIn("production_standard_deviation", result["features"][0])
+
     def test_unitless_factors_are_dimensionless(self):
         result = InventoryAlgorithms.count_based_production(
             **self.base_kwargs(self.dataset),
@@ -302,6 +338,24 @@ class AreaBasedProductionModelBackendTestCase(GenericAlgorithmBase):
         # Only the inner parcel contributes
         self.assertEqual(len(result["features"]), 1)
         self.assertEqual(result["geom_type"], "MultiPolygon")
+
+    def test_factor_standard_deviation_propagates_to_area_production(self):
+        result = self._run(
+            area_yield={
+                "value": 9.0,
+                "standard_deviation": 3.0,
+                "unit": "kg / hectare / year",
+            },
+            recovery={"value": 0.5},
+        )
+        area = aggregated_value(result, "Total area")
+        deviation = aggregated_value(result, "Total production standard deviation")
+        self.assertAlmostEqual(deviation["value"], area["value"] * 3.0 * 0.5 / 1000)
+        self.assertEqual(deviation["unit"], "Mg/a")
+        feature = result["features"][0]
+        self.assertAlmostEqual(
+            feature["production_standard_deviation"], feature["production"] / 3
+        )
 
     def test_area_is_clipped_to_catchment(self):
         # A parcel twice as wide as the catchment: the half east of

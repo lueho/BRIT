@@ -23,6 +23,16 @@ def legacy_feedstock_to_material(apps, schema_editor):
     schema_editor.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
 
+BACKUP_SCHEMA = "migration_backup"
+BACKUP_TABLE = f"{BACKUP_SCHEMA}.inventories_0009_collapsed_configurations"
+
+
+def _relation_exists(schema_editor, name):
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute("SELECT to_regclass(%s)", [name])
+        return cursor.fetchone()[0] is not None
+
+
 def deduplicate_collapsed_configurations(apps, schema_editor):
     """Collapse configs that became identical when feedstock became Material.
 
@@ -30,7 +40,9 @@ def deduplicate_collapsed_configurations(apps, schema_editor):
     (scenario, material, algorithm, parameter) — which is_valid_configuration
     rejects — and a single temporal profile must win per group so the
     execution plan stays unambiguous. The profile a surviving result layer
-    references is kept; otherwise the lowest series id.
+    references is kept; otherwise the lowest series id. Every row of a
+    collapsed group is copied to ``BACKUP_TABLE`` first so the reverse
+    migration can restore the dropped rows and original series.
     """
     config = apps.get_model("inventories", "ScenarioInventoryConfiguration")
     layer = apps.get_model("layer_manager", "Layer")
@@ -74,10 +86,51 @@ def deduplicate_collapsed_configurations(apps, schema_editor):
             keep_ids.append((preferred or parameter_rows)[0][0])
         keep_set = set(keep_ids)
         drop_ids = [r[0] for r in group if r[0] not in keep_set]
+        _backup_configurations(schema_editor, config, [r[0] for r in group])
         config.objects.filter(id__in=drop_ids).delete()
         config.objects.filter(id__in=keep_ids).exclude(
             sample_series_id=canonical
         ).update(sample_series_id=canonical)
+
+
+def _backup_configurations(schema_editor, config, ids):
+    table = config._meta.db_table
+    schema_editor.execute(f"CREATE SCHEMA IF NOT EXISTS {BACKUP_SCHEMA}")
+    schema_editor.execute(
+        f"CREATE TABLE IF NOT EXISTS {BACKUP_TABLE} ("
+        "ordinal serial PRIMARY KEY, payload jsonb NOT NULL)"
+    )
+    schema_editor.execute(
+        f"INSERT INTO {BACKUP_TABLE} (payload) "
+        f'SELECT to_jsonb(t) FROM "{table}" t WHERE t.id = ANY(%s)',
+        [list(ids)],
+    )
+
+
+def restore_collapsed_configurations(apps, schema_editor):
+    """Reinsert the dropped rows and the kept rows' original series."""
+    if not _relation_exists(schema_editor, BACKUP_TABLE):
+        return
+    table = apps.get_model(
+        "inventories", "ScenarioInventoryConfiguration"
+    )._meta.db_table
+    schema_editor.execute(
+        f'INSERT INTO "{table}" '
+        f'SELECT (jsonb_populate_record(NULL::"{table}", payload)).* '
+        f"FROM {BACKUP_TABLE} ORDER BY ordinal "
+        "ON CONFLICT (id) DO UPDATE SET sample_series_id = EXCLUDED.sample_series_id"
+    )
+    schema_editor.execute(f"DROP TABLE {BACKUP_TABLE}")
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = %s LIMIT 1",
+            [BACKUP_SCHEMA],
+        )
+        if cursor.fetchone() is None:
+            schema_editor.execute(f"DROP SCHEMA {BACKUP_SCHEMA}")
+    # Flush deferred constraint triggers so the following ALTER TABLEs work.
+    schema_editor.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
 
 def material_to_legacy_feedstock(apps, schema_editor):
@@ -134,7 +187,7 @@ class Migration(migrations.Migration):
             legacy_feedstock_to_material, material_to_legacy_feedstock
         ),
         migrations.RunPython(
-            deduplicate_collapsed_configurations, migrations.RunPython.noop
+            deduplicate_collapsed_configurations, restore_collapsed_configurations
         ),
         migrations.RemoveField(
             model_name="scenarioinventoryconfiguration",
