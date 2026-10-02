@@ -1423,6 +1423,50 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         )
         self.assertFalse(Process.objects.filter(pk=process.pk).exists())
 
+    def test_modal_delete_honors_other_model_next_url_with_same_pk(self):
+        """A ``next`` URL of another model that shares the pk stays valid."""
+        process = Process.objects.create(
+            name="Other model next target",
+            owner=self.owner_user,
+            publication_status="private",
+        )
+        other_url = reverse("material-detail", kwargs={"pk": process.pk})
+        delete_url = (
+            f"{reverse(self.view_delete_name, kwargs={'pk': process.pk})}"
+            f"?next={other_url}"
+        )
+
+        self.client.force_login(self.owner_user)
+        response = self.client.post(delete_url, {"next": other_url})
+
+        self.assertRedirects(response, other_url, fetch_redirect_response=False)
+        self.assertFalse(Process.objects.filter(pk=process.pk).exists())
+
+    def test_modal_delete_honors_other_content_type_review_next_url(self):
+        """A review page of another content type with the same id stays valid."""
+        process = Process.objects.create(
+            name="Other review next target",
+            owner=self.owner_user,
+            publication_status="review",
+        )
+        other_review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(Material).id,
+                "object_id": process.pk,
+            },
+        )
+        delete_url = (
+            f"{reverse(self.view_delete_name, kwargs={'pk': process.pk})}"
+            f"?next={other_review_url}"
+        )
+
+        self.client.force_login(self.owner_user)
+        response = self.client.post(delete_url, {"next": other_review_url})
+
+        self.assertRedirects(response, other_review_url, fetch_redirect_response=False)
+        self.assertFalse(Process.objects.filter(pk=process.pk).exists())
+
     def get_update_success_url(self, pk):
         return f"{reverse(self.view_detail_name, kwargs={'pk': pk})}?mode=edit"
 

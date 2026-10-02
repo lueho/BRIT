@@ -41,6 +41,7 @@ from django.urls import NoReverseMatch, Resolver404, resolve, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.text import capfirst
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
+from django.views.generic.detail import SingleObjectMixin
 from django_filters import FilterSet
 from django_filters.views import FilterView
 from django_tomselect.autocompletes import AutocompleteModelView
@@ -2944,10 +2945,10 @@ class UserCreatedObjectModalDeleteView(
 
         The delete modal is often launched from the object's own detail page,
         which supplies ``?next=<detail url>``. Redirecting there after the
-        delete would land the user on a 404. Rather than enumerating each
-        model's URL properties — which misses alias routes and the generic
-        ``review_item_detail`` view — resolve the path and compare the
-        captured object identifiers.
+        delete would land the user on a 404. The path is resolved so that alias
+        routes and the generic ``review_item_detail`` view are recognized too;
+        a URL is only treated as the deleted object's when both its identifier
+        and its model match.
         """
         if not self.object:
             return False
@@ -2956,7 +2957,23 @@ class UserCreatedObjectModalDeleteView(
         except Resolver404:
             return False
         object_pk = str(self.object.pk)
-        return object_pk in {str(match.kwargs.get(key)) for key in ("pk", "object_id")}
+        if "content_type_id" in match.kwargs:
+            content_type = ContentType.objects.get_for_model(self.object)
+            return (
+                str(match.kwargs["content_type_id"]) == str(content_type.pk)
+                and str(match.kwargs.get("object_id")) == object_pk
+            )
+        if str(match.kwargs.get("pk")) != object_pk:
+            return False
+        view_class = getattr(match.func, "view_class", None)
+        if view_class is None or not issubclass(view_class, SingleObjectMixin):
+            return True
+        view_model = view_class.model
+        if view_model is None and view_class.queryset is not None:
+            view_model = view_class.queryset.model
+        if view_model is None:
+            return True
+        return view_model._meta.concrete_model is self.object._meta.concrete_model
 
     def get_success_url(self):
         # Respect a safe 'next' parameter from POST or GET first
