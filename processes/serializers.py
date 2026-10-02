@@ -8,6 +8,7 @@ from rest_framework import serializers
 from bibliography.serializers import SourceModelSerializer
 from materials.models import Material
 from materials.serializers import MaterialAPISerializer
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import Unit
 from utils.properties.serializers import UnitModelSerializer
 
@@ -162,14 +163,75 @@ class ProcessInfoResourceSerializer(serializers.ModelSerializer):
         read_only_fields = ["process", "target_url"]
 
 
-class ProcessListSerializer(serializers.ModelSerializer):
+class ProcessVisibilityMixin:
+    """Applies the central read policy to nested user-created relations.
+
+    The viewsets prefetch these relations with visibility-filtered querysets,
+    so the prefetched cache already contains only visible rows. The fallback
+    path applies ``filter_queryset_for_user`` to the relation directly.
+    """
+
+    def _request_user(self):
+        request = self.context.get("request")
+        return getattr(request, "user", None)
+
+    def _visible_related(self, obj, related_name):
+        cache = getattr(obj, "_prefetched_objects_cache", {})
+        if related_name in cache:
+            return list(cache[related_name])
+        return filter_queryset_for_user(
+            getattr(obj, related_name).all(), self._request_user()
+        )
+
+    def _visible_process_materials(self, obj):
+        """ProcessMaterial rows whose material is visible to the request user."""
+
+        cache = getattr(self, "_pm_cache", None)
+        if cache is None:
+            cache = self._pm_cache = {}
+        if obj.pk not in cache:
+            links = list(obj.process_materials.all())
+            visible_ids = set(
+                filter_queryset_for_user(
+                    Material.objects.filter(
+                        pk__in={link.material_id for link in links}
+                    ),
+                    self._request_user(),
+                ).values_list("pk", flat=True)
+            )
+            cache[obj.pk] = [link for link in links if link.material_id in visible_ids]
+        return cache[obj.pk]
+
+    def get_categories(self, obj):
+        return ProcessCategorySerializer(
+            self._visible_related(obj, "categories"), many=True
+        ).data
+
+    def get_sources(self, obj):
+        return SourceModelSerializer(
+            self._visible_related(obj, "sources"), many=True
+        ).data
+
+    def get_parent_name(self, obj):
+        if obj.parent_id is None:
+            return None
+        annotated = getattr(obj, "parent_is_visible", None)
+        if annotated is not None:
+            return obj.parent.name if annotated else None
+        parent_visible = filter_queryset_for_user(
+            Process.objects.filter(pk=obj.parent_id), self._request_user()
+        ).exists()
+        return obj.parent.name if parent_visible else None
+
+
+class ProcessListSerializer(ProcessVisibilityMixin, serializers.ModelSerializer):
     """Simplified serializer for Process list views."""
 
-    categories = ProcessCategorySerializer(many=True, read_only=True)
-    sources = SourceModelSerializer(many=True, read_only=True)
+    categories = serializers.SerializerMethodField()
+    sources = serializers.SerializerMethodField()
     authors = serializers.SerializerMethodField()
     owner_name = serializers.CharField(source="owner.username", read_only=True)
-    parent_name = serializers.CharField(source="parent.name", read_only=True)
+    parent_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Process
@@ -203,17 +265,17 @@ class ProcessListSerializer(serializers.ModelSerializer):
         return [author.pk for author in obj.authors_ordered()]
 
 
-class ProcessDetailSerializer(serializers.ModelSerializer):
+class ProcessDetailSerializer(ProcessVisibilityMixin, serializers.ModelSerializer):
     """Comprehensive serializer for Process detail views."""
 
-    categories = ProcessCategorySerializer(many=True, read_only=True)
-    sources = SourceModelSerializer(many=True, read_only=True)
+    categories = serializers.SerializerMethodField()
+    sources = serializers.SerializerMethodField()
     authors = serializers.SerializerMethodField()
     owner_name = serializers.CharField(source="owner.username", read_only=True)
-    parent_name = serializers.CharField(source="parent.name", read_only=True)
+    parent_name = serializers.SerializerMethodField()
 
     # Related objects
-    process_materials = ProcessMaterialAPISerializer(many=True, read_only=True)
+    process_materials = serializers.SerializerMethodField()
     operating_parameters = ProcessOperatingParameterSerializer(
         many=True, read_only=True
     )
@@ -265,10 +327,22 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
 
         return [author.pk for author in obj.authors_ordered()]
 
+    def get_process_materials(self, obj):
+        return ProcessMaterialAPISerializer(
+            self._visible_process_materials(obj), many=True
+        ).data
+
+    def _materials_for_role(self, obj, role):
+        return [
+            {"id": link.material_id, "name": link.material.name}
+            for link in self._visible_process_materials(obj)
+            if link.role == role
+        ]
+
     def get_input_materials(self, obj):
         """Get list of input materials."""
-        return [{"id": m.id, "name": m.name} for m in obj.input_materials]
+        return self._materials_for_role(obj, ProcessMaterial.Role.INPUT)
 
     def get_output_materials(self, obj):
         """Get list of output materials."""
-        return [{"id": m.id, "name": m.name} for m in obj.output_materials]
+        return self._materials_for_role(obj, ProcessMaterial.Role.OUTPUT)

@@ -3,7 +3,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 
 from bibliography.models import Author
 from materials.models import Material
@@ -157,7 +157,9 @@ class ProcessListSerializerTestCase(TestCase):
 
     def test_serialize_process_list(self):
         """List serializer should include basic process info."""
-        serializer = ProcessListSerializer(self.process)
+        request = RequestFactory().get("/")
+        request.user = self.owner
+        serializer = ProcessListSerializer(self.process, context={"request": request})
         data = serializer.data
 
         self.assertEqual(data["name"], "Pyrolysis")
@@ -207,7 +209,9 @@ class ProcessDetailSerializerTestCase(TestCase):
 
     def test_serialize_process_detail(self):
         """Detail serializer should include all process information."""
-        serializer = ProcessDetailSerializer(self.process)
+        request = RequestFactory().get("/")
+        request.user = self.owner
+        serializer = ProcessDetailSerializer(self.process, context={"request": request})
         data = serializer.data
 
         self.assertEqual(data["name"], "Pyrolysis")
