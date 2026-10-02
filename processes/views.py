@@ -10,7 +10,7 @@ from django.db.models import Exists, OuterRef, Prefetch
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
-from django.views.generic import ListView, TemplateView
+from django.views.generic import TemplateView
 
 from bibliography.models import Source
 from materials.models import Material
@@ -27,7 +27,7 @@ from utils.object_management.views import (
     PublishedObjectListView,
     ReviewItemDetailView,
     ReviewObjectFilterView,
-    ReviewObjectListMixin,
+    ReviewObjectListView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
@@ -58,33 +58,6 @@ from .models import (
     ProcessSource,
 )
 from .querysets import with_process_count, with_published_process_count
-
-# ==============================================================================
-# Helper Views
-# ==============================================================================
-
-
-class ReviewObjectListView(ReviewObjectListMixin, ListView):
-    """
-    List view for objects in review (for moderators).
-    Combines ReviewObjectListMixin with ListView functionality.
-    """
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "list_type": self.list_type,
-                "scope": "review",
-            }
-        )
-        return context
-
-    def get_template_names(self):
-        template_names = super().get_template_names()
-        template_names.append("simple_list_card.html")
-        return template_names
-
 
 # ==============================================================================
 # Dashboard
