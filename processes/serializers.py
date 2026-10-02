@@ -203,14 +203,8 @@ class ProcessListSerializer(serializers.ModelSerializer):
         return [author.pk for author in obj.authors_ordered()]
 
 
-class ProcessDetailSerializer(serializers.ModelSerializer):
+class ProcessDetailSerializer(ProcessListSerializer):
     """Comprehensive serializer for Process detail views."""
-
-    categories = ProcessCategorySerializer(many=True, read_only=True)
-    sources = SourceModelSerializer(many=True, read_only=True)
-    authors = serializers.SerializerMethodField()
-    owner_name = serializers.CharField(source="owner.username", read_only=True)
-    parent_name = serializers.CharField(source="parent.name", read_only=True)
 
     # Related objects
     process_materials = ProcessMaterialAPISerializer(many=True, read_only=True)
@@ -224,25 +218,11 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
     input_materials = serializers.SerializerMethodField()
     output_materials = serializers.SerializerMethodField()
 
-    class Meta:
-        model = Process
+    class Meta(ProcessListSerializer.Meta):
         fields = [
-            "id",
-            "name",
-            "parent",
-            "parent_name",
-            "categories",
-            "short_description",
-            "authors",
-            "mechanism",
+            *ProcessListSerializer.Meta.fields,
             "description",
             "process_technology",
-            "image",
-            "publication_status",
-            "owner",
-            "owner_name",
-            "created_at",
-            "lastmodified_at",
             # Related objects
             "process_materials",
             "operating_parameters",
@@ -251,19 +231,7 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
             # Convenience fields
             "input_materials",
             "output_materials",
-            "sources",
         ]
-        read_only_fields = [
-            "owner",
-            "publication_status",
-            "created_at",
-            "lastmodified_at",
-        ]
-
-    def get_authors(self, obj):
-        """Get author ids in explicit process author order."""
-
-        return [author.pk for author in obj.authors_ordered()]
 
     def get_input_materials(self, obj):
         """Get list of input materials."""
