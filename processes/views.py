@@ -346,46 +346,30 @@ def _process_list_queryset(queryset, user):
     )
 
 
-class ProcessPublishedFilterView(PublishedObjectFilterView):
+class ProcessFilterViewMixin:
+    """Shared class attributes for the process list scopes."""
+
+    model = Process
+    template_name = "processes/process_list.html"
+    dashboard_url = reverse_lazy("processes:dashboard")
+    context_object_name = "processes"
+    filterset_class = ProcessFilter
+    paginate_by = 20
+
+    def get_queryset(self):
+        return _process_list_queryset(super().get_queryset(), self.request.user)
+
+
+class ProcessPublishedFilterView(ProcessFilterViewMixin, PublishedObjectFilterView):
     """List published Process objects with filtering."""
 
-    model = Process
-    template_name = "processes/process_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
-    context_object_name = "processes"
-    filterset_class = ProcessFilter
-    paginate_by = 20
 
-    def get_queryset(self):
-        return _process_list_queryset(super().get_queryset(), self.request.user)
-
-
-class ProcessPrivateFilterView(PrivateObjectFilterView):
+class ProcessPrivateFilterView(ProcessFilterViewMixin, PrivateObjectFilterView):
     """List user's private Process objects with filtering."""
 
-    model = Process
-    template_name = "processes/process_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
-    context_object_name = "processes"
-    filterset_class = ProcessFilter
-    paginate_by = 20
 
-    def get_queryset(self):
-        return _process_list_queryset(super().get_queryset(), self.request.user)
-
-
-class ProcessReviewFilterView(ReviewObjectFilterView):
+class ProcessReviewFilterView(ProcessFilterViewMixin, ReviewObjectFilterView):
     """List Process objects in review status for moderators."""
-
-    model = Process
-    template_name = "processes/process_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
-    context_object_name = "processes"
-    filterset_class = ProcessFilter
-    paginate_by = 20
-
-    def get_queryset(self):
-        return _process_list_queryset(super().get_queryset(), self.request.user)
 
 
 class ProcessDetailView(UserCreatedObjectDetailView):

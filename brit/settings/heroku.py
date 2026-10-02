@@ -119,18 +119,11 @@ DATABASES["default"]["ENGINE"] = "django.contrib.gis.db.backends.postgis"
 STATICFILES_LOCATION = "static"
 STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{STATICFILES_LOCATION}/"
 
-MEDIAFILES_LOCATION = "media"
-MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{MEDIAFILES_LOCATION}/"
-
+# The base STORAGES already points uploads at S3; only the staticfiles
+# backend differs (manifest storage on the CDN bucket). Copy the outer dict
+# so other settings modules importing base STORAGES are unaffected.
 STORAGES = {
-    "default": {
-        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
-        "OPTIONS": {
-            "bucket_name": AWS_STORAGE_BUCKET_NAME,
-            "custom_domain": AWS_S3_CUSTOM_DOMAIN,
-            "location": MEDIAFILES_LOCATION,
-        },
-    },
+    **STORAGES,
     "staticfiles": {
         "BACKEND": "brit.storages.StaticStorage",
         "OPTIONS": {
