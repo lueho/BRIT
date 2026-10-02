@@ -1,0 +1,1 @@
+[{{ site.name }}] {{ object_verbose_name }} "{{ object_name }}" {{ summary }}
