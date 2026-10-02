@@ -111,7 +111,7 @@ urlpatterns = [
         name="greenhouse-delete-modal",
     ),
     path(
-        "greenhouses/<int:pk>/growth_cycles/add",
+        "greenhouses/<int:pk>/growth_cycles/add/",
         GrowthCycleModalCreateView.as_view(),
         name="greenhousegrowthcycle-create",
     ),

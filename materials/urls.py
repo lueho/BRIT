@@ -152,7 +152,7 @@ urlpatterns = [
         name="sampleseries-create",
     ),
     path(
-        "sample_series/create/modal",
+        "sample_series/create/modal/",
         views.SampleSeriesModalCreateView.as_view(),
         name="sampleseries-create-modal",
     ),
@@ -333,7 +333,7 @@ urlpatterns = [
         name="sample-add-composition",
     ),
     path(
-        "samples/<int:pk>/add_property",
+        "samples/<int:pk>/add_property/",
         views.SampleAddPropertyView.as_view(),
         name="sample-add-property",
     ),
@@ -428,7 +428,7 @@ urlpatterns = [
         name="materialcomponent-create",
     ),
     path(
-        "components/create/modal",
+        "components/create/modal/",
         views.ComponentModalCreateView.as_view(),
         name="materialcomponent-create-modal",
     ),
