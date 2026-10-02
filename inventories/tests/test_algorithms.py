@@ -21,7 +21,7 @@ from maps.models import (
     GeoDatasetRuntimeConfiguration,
     Region,
 )
-from materials.models import Material, SampleSeries
+from materials.models import Material
 from sources.greenhouses.models import NantesGreenhouses
 from sources.urban_green_spaces.models import HamburgGreenAreas
 
@@ -45,9 +45,7 @@ class GenericAlgorithmBase(TestCase):
             name="Generic Catchment", region=cls.region
         )
         cls.material = Material.objects.create(name="Generic Material")
-        cls.feedstock = SampleSeries.objects.create(
-            name="Generic Series", material=cls.material
-        )
+        cls.feedstock = cls.material
         cls.scenario = Scenario.objects.create(
             name="Generic Scenario",
             region=cls.region,

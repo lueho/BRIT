@@ -3,16 +3,15 @@
 Creates (or updates) the private objects needed to evaluate the Sötåsen
 grass-to-protein demo scenario against production reference objects:
 
-- a private SampleSeries for material 2341 ("Clover grass");
 - an InventoryAlgorithm linked to GeoDataset 49 ("Sötåsen Agricultural Land
   Use", a local-relation dataset backed by ``raw_data.sotasen_land_use``),
-  material 2341 and bibliography source 21912 (Thomas 2025);
+  material 2341 ("Clover grass") and bibliography source 21912 (Thomas 2025);
 - the three required algorithm parameters (dry matter yield, crude protein
   fraction, protein recovery fraction) with their selectable values and
   defaults;
 - a private Scenario "Sötåsen grass-to-protein demo (Thomas 2025)" for region
   30994 (Töreboda) and catchment 31106 (Töreboda (1473)), configured with the
-  sample series and the default parameter values.
+  material as feedstock and the default parameter values.
 
 The command is atomic and idempotent. It never publishes objects or submits
 them for review. It fails before writing anything if a referenced production
@@ -38,7 +37,7 @@ from inventories.models import (
     ScenarioStatus,
 )
 from maps.models import Catchment, GeoDataset, Region
-from materials.models import Material, SampleSeries
+from materials.models import Material
 
 User = get_user_model()
 
@@ -56,7 +55,6 @@ CATCHMENT_NAME = "Töreboda (1473)"
 ALGORITHM_NAME = "Sötåsen grass-to-protein"
 ALGORITHM_MODULE = "sources.sotasen.inventory.algorithms"
 ALGORITHM_FUNCTION = "sotasen_grass_to_protein"
-SAMPLE_SERIES_NAME = "Sötåsen clover grass (Thomas 2025)"
 SCENARIO_NAME = "Sötåsen grass-to-protein demo (Thomas 2025)"
 
 ALGORITHM_DESCRIPTION = (
@@ -80,12 +78,6 @@ SCENARIO_DESCRIPTION = (
     "0.35 ha of grassland; across five batches the recovered crude protein "
     "was 8.1 +/- 3.8 kg and the reported recovery was 4-20%. Quantified "
     "biogas and biochar pathways were outside the study scope."
-)
-
-SAMPLE_SERIES_DESCRIPTION = (
-    "Feedstock placeholder for the Sötåsen grass-to-protein demo scenario. "
-    "Represents clover grass harvested from Sötåsen grassland as described in "
-    "Thomas 2025, 'Biorefinery Modules (Swedish showcase)'."
 )
 
 SELECTION = InventoryAlgorithmParameterValue.ValueType.SELECTION
@@ -290,7 +282,6 @@ class Command(BaseCommand):
         self._report.append(f"{verb}: {obj}")
 
     def _apply(self, owner, references):
-        sample_series = self._ensure_sample_series(owner, references["material"])
         algorithm = self._ensure_algorithm(
             references["geodataset"], references["material"], references["source"]
         )
@@ -298,23 +289,8 @@ class Command(BaseCommand):
         scenario = self._ensure_scenario(
             owner, references["region"], references["catchment"]
         )
-        self._ensure_scenario_configuration(scenario, sample_series, algorithm)
+        self._ensure_scenario_configuration(scenario, references["material"], algorithm)
         self._validate_configuration(scenario, parameters)
-
-    def _ensure_sample_series(self, owner, material):
-        sample_series, created = SampleSeries.objects.update_or_create(
-            name=SAMPLE_SERIES_NAME,
-            material=material,
-            owner=owner,
-            defaults={
-                "description": SAMPLE_SERIES_DESCRIPTION,
-                "publication_status": SampleSeries.STATUS_PRIVATE,
-            },
-        )
-        self._log(
-            "Created" if created else "Updated", f"SampleSeries '{sample_series}'"
-        )
-        return sample_series
 
     def _ensure_algorithm(self, geodataset, material, source):
         algorithm, created = InventoryAlgorithm.objects.update_or_create(
@@ -442,18 +418,18 @@ class Command(BaseCommand):
         self._log("Created" if created else "Updated", f"Scenario '{scenario}'")
         return scenario
 
-    def _ensure_scenario_configuration(self, scenario, sample_series, algorithm):
+    def _ensure_scenario_configuration(self, scenario, material, algorithm):
         existing = ScenarioInventoryConfiguration.objects.filter(
             scenario=scenario,
-            feedstock=sample_series,
+            feedstock=material,
             inventory_algorithm=algorithm,
         )
         if existing.exists():
             existing.delete()
-        scenario.add_inventory_algorithm(feedstock=sample_series, algorithm=algorithm)
+        scenario.add_inventory_algorithm(feedstock=material, algorithm=algorithm)
         self._log(
             "Configured",
-            f"Scenario '{scenario}' with feedstock '{sample_series}' "
+            f"Scenario '{scenario}' with feedstock '{material}' "
             f"and algorithm '{algorithm}'",
         )
 

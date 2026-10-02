@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils.html import escapejs
 
 from maps.models import Catchment, GeoDataset, Region
-from materials.models import Material, SampleSeries
+from materials.models import Material
 from utils.object_management.models import User
 from utils.object_management.views import (
     UserCreatedObjectAutocompleteView,
@@ -216,13 +216,10 @@ class UserCreatedObjectAutocompleteViewFilterTests(SimpleTestCase):
 
 
 class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
-    """#213: apply_filters must use SampleSeries.material_id, not SampleSeries.id."""
+    """apply_filters resolves the feedstock id as a Material id."""
 
     @classmethod
     def setUpTestData(cls):
-        # Create spacer materials so Material PKs get ahead of SampleSeries PKs
-        for i in range(5):
-            Material.objects.create(name=f"Spacer Material {i}")
         cls.target_material = Material.objects.create(name="Autocomplete Target")
         cls.region = Region.objects.create(name="AC Region")
         cls.scenario = Scenario.objects.create(name="AC Scenario", region=cls.region)
@@ -233,18 +230,10 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
             name="AC Algorithm", geodataset=cls.geodataset
         )
         cls.algorithm.feedstocks.add(cls.target_material)
-        cls.series = SampleSeries.objects.create(
-            name="AC Series", material=cls.target_material
-        )
 
-    def test_apply_filters_uses_material_id_not_series_id(self):
-        self.assertNotEqual(
-            self.series.id,
-            self.target_material.id,
-            "Test requires SampleSeries.id != Material.id to catch the bug",
-        )
+    def test_apply_filters_uses_material_id(self):
         view = ScenarioGeoDataSetAutocompleteView()
-        view.filter_by = f"feedstock_id='{self.series.id}'"
+        view.filter_by = f"feedstock_id='{self.target_material.id}'"
         view.filters_by = []
         view.exclude_by = f"scenario_id='{self.scenario.id}'"
         view.excludes_by = []
@@ -258,7 +247,7 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
         response = self.client.get(
             reverse("scenario-geodataset-autocomplete"),
             {
-                "f": f"'feedstock__feedstock_id={self.series.id}'",
+                "f": f"'feedstock__feedstock_id={self.target_material.id}'",
                 "e": f"'scenario__scenario_id={self.scenario.id}'",
             },
         )
@@ -274,7 +263,7 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
             reverse("scenario-inventoryalgorithm-autocomplete"),
             {
                 "f": f"'geodataset__geodataset_id={self.geodataset.id}'",
-                "e": f"'feedstock__feedstock_id={self.series.id}'",
+                "e": f"'feedstock__feedstock_id={self.target_material.id}'",
             },
         )
 
@@ -446,9 +435,7 @@ class GenericAlgorithmAddViewTestCase(TestCase):
             catchment=catchment,
         )
         cls.material = Material.objects.create(name="Gen Material")
-        cls.feedstock = SampleSeries.objects.create(
-            name="Gen Series", material=cls.material
-        )
+        cls.feedstock = cls.material
         cls.point_dataset = GeoDataset.objects.create(
             name="Gen Points",
             region=cls.region,
@@ -706,10 +693,7 @@ class GenericAlgorithmAddViewTestCase(TestCase):
             parameter__short_name="yield", value=10.0
         )
         # Configure a second feedstock on the same dataset, reusing the preset.
-        other_material = Material.objects.create(name="Other Material")
-        other_feedstock = SampleSeries.objects.create(
-            name="Other Series", material=other_material
-        )
+        other_feedstock = Material.objects.create(name="Other Material")
         response = self._post(
             feedstock=other_feedstock.pk,
             kwarg_name=["yield"],
@@ -892,10 +876,7 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
             name="B", owner=cls.owner_b, region=region, catchment=catchment
         )
         # Minimal valid fixtures so post() can complete without raising.
-        material = Material.objects.create(name="M", owner=cls.owner_a)
-        cls.feedstock = SampleSeries.objects.create(
-            name="F", owner=cls.owner_a, material=material
-        )
+        cls.feedstock = Material.objects.create(name="M", owner=cls.owner_a)
         geodataset = GeoDataset.objects.create(
             name="G", owner=cls.owner_a, region=region
         )
@@ -963,9 +944,7 @@ class ScenarioCustomParameterValueTests(TestCase):
             name="S2", owner=cls.owner, region=region, catchment=catchment
         )
         material = Material.objects.create(name="M", owner=cls.owner)
-        cls.feedstock = SampleSeries.objects.create(
-            name="F", owner=cls.owner, material=material
-        )
+        cls.feedstock = material
         cls.geodataset = GeoDataset.objects.create(
             name="G", owner=cls.owner, region=region
         )
@@ -1517,9 +1496,7 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
             name="S", owner=cls.owner, region=cls.region, catchment=cls.catchment
         )
         cls.material = Material.objects.create(name="M", owner=cls.owner)
-        cls.feedstock = SampleSeries.objects.create(
-            name="F", owner=cls.owner, material=cls.material
-        )
+        cls.feedstock = cls.material
         cls.geodataset = GeoDataset.objects.create(
             name="G", owner=cls.owner, region=cls.region
         )
@@ -1611,11 +1588,8 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_add_view_post_unavailable_feedstock_returns_404(self):
-        unavailable_material = Material.objects.create(
+        unavailable_feedstock = Material.objects.create(
             name="Unusable", owner=self.owner
-        )
-        unavailable_feedstock = SampleSeries.objects.create(
-            name="Unusable F", owner=self.owner, material=unavailable_material
         )
         response = self.client.post(
             self.add_url(),
@@ -1702,11 +1676,8 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
             inventory_parameter=self.parameter,
             inventory_value=self.value,
         )
-        unavailable_material = Material.objects.create(
+        unavailable_feedstock = Material.objects.create(
             name="Unusable", owner=self.owner
-        )
-        unavailable_feedstock = SampleSeries.objects.create(
-            name="Unusable F", owner=self.owner, material=unavailable_material
         )
         response = self.client.post(
             self.update_url(),

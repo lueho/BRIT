@@ -6,6 +6,7 @@ from django_tomselect.widgets import TomSelectModelWidget
 from distributions.models import TemporalDistribution
 from maps.models import GeoDataset
 from maps.views import CatchmentAutocompleteView
+from materials.models import SampleSeries
 from utils.forms import ModalModelFormMixin, SimpleModelForm
 
 from .models import Scenario, ScenarioInventoryConfiguration
@@ -72,10 +73,26 @@ class InitialInstanceTomSelectModelChoiceField(TomSelectModelChoiceField):
 class ScenarioInventoryConfigurationForm(SimpleModelForm):
     feedstock = TomSelectModelChoiceField(
         config=TomSelectConfig(
-            url="sampleseries-autocomplete",
+            url="material-autocomplete",
             label_field="name",
         ),
         label="Feedstock",
+    )
+    sample_series = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="sampleseries-autocomplete",
+            label_field="name",
+            filter_by=(
+                "feedstock",
+                "material_id",
+            ),
+        ),
+        label="Temporal profile (optional)",
+        help_text=(
+            "Sample series used as the seasonal profile of this feedstock. "
+            "Only needed for algorithms that distribute production over time."
+        ),
+        required=False,
     )
     geodataset = InitialInstanceTomSelectModelChoiceField(
         config=TomSelectConfig(
@@ -117,6 +134,7 @@ class ScenarioInventoryConfigurationForm(SimpleModelForm):
         fields = (
             "scenario",
             "feedstock",
+            "sample_series",
             "geodataset",
             "inventory_algorithm",
             "inventory_parameter",
@@ -158,6 +176,10 @@ class ScenarioInventoryConfigurationUpdateForm(ScenarioInventoryConfigurationFor
         self.fields["scenario"].widget = HiddenInput()
         self.fields["feedstock"].queryset = scenario.available_feedstocks()
         self.fields["feedstock"].initial = feedstock
+        self.fields["sample_series"].queryset = SampleSeries.objects.filter(
+            material=feedstock
+        )
+        self.fields["sample_series"].initial = initial.get("sample_series")
         self.fields["geodataset"].queryset = scenario.available_geodatasets(
             feedstock=feedstock
         )

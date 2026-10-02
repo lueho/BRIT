@@ -249,10 +249,34 @@ RESERVED_ALGORITHM_KWARGS = frozenset(
         "catchment_id",
         "scenario_id",
         "feedstock_id",
+        "sample_series_id",
         "geodataset_id",
         "feature_filter",
     )
 )
+
+
+def resolve_feedstock_series(**kwargs):
+    """Resolve the SampleSeries used as the temporal profile of a feedstock.
+
+    ``feedstock_id`` identifies the configured Material. The optional
+    ``sample_series_id`` kwarg pins the series; without it the material's
+    series is used when exactly one exists. Returns ``None`` when the
+    material has no series.
+    """
+    from materials.models import SampleSeries
+
+    sample_series_id = kwargs.get("sample_series_id")
+    if sample_series_id:
+        return SampleSeries.objects.get(id=sample_series_id)
+    series = SampleSeries.objects.filter(material_id=kwargs.get("feedstock_id"))
+    if series.count() > 1:
+        raise ImproperlyConfigured(
+            "The feedstock material has several sample series; configure one "
+            "on the inventory to select the temporal profile."
+        )
+    return series.first()
+
 
 # Equal-area projection used to measure polygon areas of model features.
 AREA_MEASUREMENT_SRID = 6933
