@@ -669,6 +669,23 @@ class QuerysetTomSelectModelMultipleChoiceField(TomSelectModelMultipleChoiceFiel
         return forms.ModelMultipleChoiceField._check_values(self, value)
 
 
+class PermissiveQuerysetTomSelectModelMultipleChoiceField(
+    QuerysetTomSelectModelMultipleChoiceField
+):
+    """Like the queryset-validating multi field, but drops out-of-queryset
+    submitted pks instead of rejecting the whole submission.
+
+    Used where selections must silently shrink to what the current user may
+    choose (e.g. categories scoped by the read policy).
+    """
+
+    def _check_values(self, value):
+        if isinstance(value, list | tuple):
+            pks = [v for v in value if v]
+            return list(self.queryset.filter(pk__in=pks))
+        return []
+
+
 class WorkspaceReferenceScopeMixin:
     """
     Restricts UserCreatedObject reference fields to objects the request user may

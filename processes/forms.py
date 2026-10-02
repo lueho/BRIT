@@ -1,19 +1,15 @@
 """Forms for the processes module following shared BRIT conventions."""
 
-import types
-
 from crispy_forms.layout import Layout
 from django import forms
 from django_tomselect.app_settings import TomSelectConfig
-from django_tomselect.forms import (
-    TomSelectModelChoiceField,
-    TomSelectModelMultipleChoiceField,
-)
+from django_tomselect.forms import TomSelectModelChoiceField
 
 from bibliography.models import Author, Source
 from materials.models import Material
 from utils.forms import (
     ModalModelFormMixin,
+    PermissiveQuerysetTomSelectModelMultipleChoiceField,
     QuerysetTomSelectModelChoiceField,
     QuerysetTomSelectModelMultipleChoiceField,
     SimpleModelForm,
@@ -21,6 +17,7 @@ from utils.forms import (
     WorkspaceSectionFormSet,
     image_metadata_section,
 )
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import Unit
 from utils.widgets import WorkspaceDocumentInput
 
@@ -34,22 +31,6 @@ from .models import (
     ProcessOperatingParameter,
     ProcessSource,
 )
-
-
-def queryset_valid_value(self, value):
-    """Validate TomSelect values against the configured queryset."""
-
-    return self.queryset.filter(pk=value).exists()
-
-
-def queryset_check_values(self, value):
-    """Check TomSelect multiple values against the configured queryset."""
-
-    if isinstance(value, list | tuple):
-        pks = [v for v in value if v]
-        return list(self.queryset.filter(pk__in=pks))
-    return []
-
 
 # ==============================================================================
 # ProcessCategory Forms
@@ -72,15 +53,15 @@ class ProcessCategoryModalModelForm(ModalModelFormMixin, ProcessCategoryModelFor
 
 
 class ProcessModelForm(SimpleModelForm):
-    # Note: When config with URL is provided, TomSelect validates via the autocomplete
-    # endpoint. For proper queryset validation in forms, we override in __init__.
-    parent = TomSelectModelChoiceField(
+    parent = QuerysetTomSelectModelChoiceField(
         queryset=Process.objects.all(),
         required=False,
         config=TomSelectConfig(url="processes:process-autocomplete"),
         label="Parent process",
     )
-    categories = TomSelectModelMultipleChoiceField(
+    # Categories outside the request-scoped queryset are silently dropped
+    # rather than rejecting the submission.
+    categories = PermissiveQuerysetTomSelectModelMultipleChoiceField(
         queryset=ProcessCategory.objects.all(),
         required=False,
         config=TomSelectConfig(url="processes:processcategory-autocomplete"),
@@ -116,10 +97,6 @@ class ProcessModelForm(SimpleModelForm):
         # valid so edits do not drop values the user can no longer see.
         request = getattr(self, "request", None)
         if request is not None and hasattr(request, "user"):
-            from utils.object_management.permissions import (
-                filter_queryset_for_user,
-            )
-
             categories_field = self.fields["categories"]
             queryset = filter_queryset_for_user(
                 ProcessCategory.objects.all(), request.user
@@ -134,15 +111,6 @@ class ProcessModelForm(SimpleModelForm):
             categories_field.widget.get_queryset = lambda field=categories_field: (
                 field.queryset
             )
-        # Override TomSelect field validation to use queryset instead of URL endpoint
-        # This fixes form validation in tests while maintaining autocomplete in production
-        for field_name in ["parent", "categories"]:
-            field = self.fields[field_name]
-
-            # Bind methods to the field instance
-            field.valid_value = types.MethodType(queryset_valid_value, field)
-            if hasattr(field, "_check_values"):
-                field._check_values = types.MethodType(queryset_check_values, field)
         self.helper.layout = Layout(
             "name",
             "parent",
