@@ -462,9 +462,7 @@ class ProcessAPIRelatedVisibilityTestCase(APITestCase):
         response = self.client.get("/processes/api/processes/by_category/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         names = {
-            process["name"]
-            for entry in response.data
-            for process in entry["processes"]
+            process["name"] for entry in response.data for process in entry["processes"]
         }
         self.assertEqual(names, {"Published Member"})
 
@@ -473,9 +471,7 @@ class ProcessAPIRelatedVisibilityTestCase(APITestCase):
         response = self.client.get("/processes/api/processes/by_category/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         names = {
-            process["name"]
-            for entry in response.data
-            for process in entry["processes"]
+            process["name"] for entry in response.data for process in entry["processes"]
         }
         self.assertEqual(names, {"Published Member", "My Private Member"})
 

@@ -229,7 +229,7 @@ class ProcessViewSet(UserCreatedObjectViewSet):
         serialized = ProcessListSerializer(processes, many=True).data
 
         mechanisms = {}
-        for process, data in zip(processes, serialized):
+        for process, data in zip(processes, serialized, strict=True):
             mechanisms.setdefault(process.mechanism or "Other", []).append(data)
 
         return Response(mechanisms)
