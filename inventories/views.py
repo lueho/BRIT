@@ -212,9 +212,11 @@ KWARG_NAME_PATTERN = re.compile(r"^\w{1,28}$")
 def _parse_kwarg_rows(request):
     """Parse the free-form factor rows of the generic add-inventory form.
 
-    Expects aligned ``kwarg_name``/``kwarg_value``/``kwarg_unit``/
-    ``kwarg_standard_deviation`` lists; returns ``[{"name", "value", "unit",
-    "standard_deviation"}]`` dicts.
+    Expects aligned ``kwarg_name``/``kwarg_value`` lists; optional
+    ``kwarg_unit``/``kwarg_standard_deviation``/``kwarg_preset`` lists are
+    padded. Returns ``[{"name", "value", "unit", "standard_deviation",
+    "preset"}]`` dicts — ``preset`` holds an existing
+    InventoryAlgorithmParameterValue id when the row was filled from a preset.
     """
     names = request.POST.getlist("kwarg_name")
     raw_values = request.POST.getlist("kwarg_value")
@@ -223,11 +225,13 @@ def _parse_kwarg_rows(request):
     # Optional lists may be shorter — pad them.
     units = request.POST.getlist("kwarg_unit")
     raw_stds = request.POST.getlist("kwarg_standard_deviation")
+    raw_presets = request.POST.getlist("kwarg_preset")
     units += [""] * (len(names) - len(units))
     raw_stds += [""] * (len(names) - len(raw_stds))
+    raw_presets += [""] * (len(names) - len(raw_presets))
     specs = []
-    for name, raw_value, unit, raw_std in zip(
-        names, raw_values, units, raw_stds, strict=False
+    for name, raw_value, unit, raw_std, raw_preset in zip(
+        names, raw_values, units, raw_stds, raw_presets, strict=False
     ):
         name = name.strip()
         if not KWARG_NAME_PATTERN.match(name):
@@ -251,12 +255,19 @@ def _parse_kwarg_rows(request):
             raise InvalidParameterValue(
                 f"The unit for parameter '{name}' is too long (max 20 characters)."
             )
+        preset = None
+        if raw_preset not in (None, ""):
+            try:
+                preset = int(raw_preset)
+            except ValueError:
+                raise InvalidParameterValue("Invalid preset reference.") from None
         specs.append(
             {
                 "name": name,
                 "value": value,
                 "unit": unit.strip(),
                 "standard_deviation": std,
+                "preset": preset,
             }
         )
     return specs
@@ -478,6 +489,23 @@ class ScenarioAddInventoryAlgorithmView(
                 elif spec["unit"] and parameter.unit != spec["unit"]:
                     parameter.unit = spec["unit"]
                     parameter.save(update_fields=["unit"])
+                if spec["preset"] is not None:
+                    preset = InventoryAlgorithmParameterValue.objects.filter(
+                        pk=spec["preset"], parameter=parameter
+                    ).first()
+                    scenario_customs = set(
+                        ScenarioInventoryConfiguration.objects.filter(
+                            scenario=scenario, inventory_parameter=parameter
+                        ).values_list("inventory_value_id", flat=True)
+                    )
+                    if preset is None or (
+                        preset.is_custom and preset.id not in scenario_customs
+                    ):
+                        return HttpResponseBadRequest(
+                            f"Invalid preset value for parameter '{spec['name']}'."
+                        )
+                    values[parameter] = [preset]
+                    continue
                 values[parameter] = [
                     InventoryAlgorithmParameterValue.objects.create(
                         name="",
@@ -693,16 +721,53 @@ class GeoDatasetFunctionsAPIView(LoginRequiredMixin, APIView):
     algorithms already registered on the dataset."""
 
     def get(self, request, geodataset_pk):
-        from .algorithms import GENERIC_FUNCTION_LABELS, InventoryAlgorithms
+        from .algorithms import (
+            GENERIC_FUNCTION_LABELS,
+            GENERIC_MODULE_PATH,
+            RESERVED_ALGORITHM_KWARGS,
+            InventoryAlgorithms,
+        )
+        from .serializers import InventoryAlgorithmParameterSerializer
 
         geodataset = get_object_or_404(GeoDataset, pk=geodataset_pk)
-        functions = [
-            {
+
+        scenario_id = request.query_params.get("scenario")
+        if not (
+            scenario_id
+            and scenario_id.isascii()
+            and scenario_id.isdigit()
+            and filter_queryset_for_user(Scenario.objects.all(), request.user)
+            .filter(pk=scenario_id)
+            .exists()
+        ):
+            scenario_id = None
+
+        functions = []
+        for function_name in InventoryAlgorithms.generic_functions(geodataset):
+            entry = {
                 "function_name": function_name,
                 "name": GENERIC_FUNCTION_LABELS[function_name],
+                "parameters": [],
             }
-            for function_name in InventoryAlgorithms.generic_functions(geodataset)
-        ]
+            # If the generic algorithm has been materialized for this dataset
+            # before, its parameters and their curated/scenario values are
+            # offered as presets in the factor editor.
+            algorithm = InventoryAlgorithm.objects.filter(
+                source_module=GENERIC_MODULE_PATH,
+                function_name=function_name,
+                geodataset=geodataset,
+            ).first()
+            if algorithm is not None:
+                parameters = algorithm.inventoryalgorithmparameter_set.exclude(
+                    short_name__in=RESERVED_ALGORITHM_KWARGS
+                )
+                entry["parameters"] = InventoryAlgorithmParameterSerializer(
+                    parameters,
+                    many=True,
+                    context={"scenario_id": scenario_id},
+                ).data
+            functions.append(entry)
+
         algorithms = InventoryAlgorithm.objects.filter(geodataset=geodataset)
         feedstock_id = request.query_params.get("feedstock")
         if feedstock_id:

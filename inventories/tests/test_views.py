@@ -622,6 +622,108 @@ class GenericAlgorithmAddViewTestCase(TestCase):
         self.assertIn("culture_1", columns)
         self.assertNotIn("geom", columns)
 
+    def test_update_config_includes_feature_filter_for_preselection(self):
+        """The update form builds its preselection map from
+        inventory_algorithm_config and the parameters API exposes the
+        scenario's custom values — together they preselect the filter."""
+        self._post(
+            filter_column="culture_1",
+            filter_value="Tomato",
+            kwarg_name=["yield"],
+            kwarg_value=["10"],
+            kwarg_unit=["kg"],
+        )
+        algorithm = InventoryAlgorithm.objects.get(
+            geodataset=self.point_dataset,
+            function_name="count_based_production",
+        )
+        config = self.scenario.inventory_algorithm_config(algorithm, self.feedstock)
+        preselected = {}
+        for entry in config["parameters"]:
+            preselected.update(entry)
+        self.assertIn("feature_filter", preselected)
+        filter_value_id = preselected["feature_filter"]
+
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(
+                "api-inventoryalgorithm-parameters",
+                kwargs={"algorithm_pk": algorithm.pk},
+            )
+            + f"?scenario={self.scenario.pk}"
+        )
+        self.assertEqual(response.status_code, 200)
+        params = {p["short_name"]: p for p in response.json()}
+        # The stored custom selection is offered so the select can preselect it.
+        filter_value_ids = [v["id"] for v in params["feature_filter"]["values"]]
+        self.assertIn(filter_value_id, filter_value_ids)
+        # The custom factor value is exposed too, so its select can preselect.
+        self.assertIn(
+            preselected["yield"], [v["id"] for v in params["yield"]["values"]]
+        )
+
+    def test_functions_api_includes_factor_presets(self):
+        """After a dataset+function has been configured once, its factors
+        are offered as presets for the next configuration."""
+        self._post(
+            kwarg_name=["yield"],
+            kwarg_value=["10"],
+            kwarg_unit=["kg"],
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(
+                "api-geodataset-functions",
+                kwargs={"geodataset_pk": self.point_dataset.pk},
+            )
+            + f"?scenario={self.scenario.pk}"
+        )
+        self.assertEqual(response.status_code, 200)
+        function = response.json()["functions"][0]
+        presets = {p["short_name"]: p for p in function["parameters"]}
+        self.assertIn("yield", presets)
+        self.assertEqual(presets["yield"]["values"][0]["value"], 10.0)
+
+    def test_functions_api_presets_exclude_feature_filter(self):
+        self._post(filter_column="culture_1", filter_value="Tomato")
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(
+                "api-geodataset-functions",
+                kwargs={"geodataset_pk": self.point_dataset.pk},
+            )
+            + f"?scenario={self.scenario.pk}"
+        )
+        function = response.json()["functions"][0]
+        names = [p["short_name"] for p in function["parameters"]]
+        self.assertNotIn("feature_filter", names)
+
+    def test_preset_value_reused_on_post(self):
+        """Picking a preset in the factor editor posts kwarg_preset with the
+        existing value id — the config reuses it instead of duplicating."""
+        self._post(kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["kg"])
+        preset_value = InventoryAlgorithmParameterValue.objects.get(
+            parameter__short_name="yield", value=10.0
+        )
+        # Configure a second feedstock on the same dataset, reusing the preset.
+        other_material = Material.objects.create(name="Other Material")
+        other_feedstock = SampleSeries.objects.create(
+            name="Other Series", material=other_material
+        )
+        response = self._post(
+            feedstock=other_feedstock.pk,
+            kwarg_name=["yield"],
+            kwarg_value=["10"],
+            kwarg_preset=[str(preset_value.pk)],
+        )
+        self.assertEqual(response.status_code, 302)
+        config_row = ScenarioInventoryConfiguration.objects.get(
+            scenario=self.scenario,
+            feedstock=other_feedstock,
+            inventory_parameter__short_name="yield",
+        )
+        self.assertEqual(config_row.inventory_value_id, preset_value.pk)
+
 
 class ScenarioDownloadSummaryAuthTests(TestCase):
     @classmethod

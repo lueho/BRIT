@@ -73,7 +73,7 @@
             valueInput.required = isCustom;
         }
 
-        function addKwargRow() {
+        function addKwargRow(preset) {
             const rows = document.getElementById("kwargRows");
             if (!rows) {
                 return;
@@ -90,10 +90,81 @@
                        placeholder="Std. dev. (optional)">
                 <input type="text" class="form-control" name="kwarg_unit"
                        placeholder="Unit (optional, e.g. kg / hectare / year)" maxlength="20">
+                <input type="hidden" name="kwarg_preset" value="${preset ? preset.valueId : ""}">
                 <button type="button" class="btn btn-outline-danger remove-kwarg">Remove</button>
             `;
+            if (preset) {
+                const inputs = row.querySelectorAll("input");
+                inputs[0].value = preset.name;
+                inputs[1].value = preset.value;
+                inputs[2].value = preset.standardDeviation ?? "";
+                inputs[3].value = preset.unit ?? "";
+                // Editing the row turns it back into a custom value.
+                inputs.forEach((input, i) => {
+                    if (i < 4) {
+                        input.addEventListener("input", () => {
+                            row.querySelector('input[name="kwarg_preset"]').value = "";
+                        });
+                    }
+                });
+            }
             row.querySelector(".remove-kwarg").addEventListener("click", () => row.remove());
             rows.appendChild(row);
+        }
+
+        let genericFunctions = [];
+
+        function renderPresetPicker(functionName) {
+            const fn = genericFunctions.find(f => f.function_name === functionName);
+            const parameters = fn ? fn.parameters || [] : [];
+            const options = [];
+            for (const param of parameters) {
+                for (const value of param.values || []) {
+                    const label = `${param.short_name} = ${value.name || value.value}` +
+                        `${value.source ? ` (${value.source})` : ""}`;
+                    options.push(
+                        `<option value="${param.short_name}|${value.id}">${escapeHtml(label)}</option>`
+                    );
+                }
+            }
+            if (!options.length) {
+                return "";
+            }
+            return `
+                <div class="form-group">
+                    <label for="id_preset_factor">Add a preset factor (optional)</label>
+                    <select id="id_preset_factor" class="select form-control">
+                        <option value="">-- choose a preset --</option>
+                        ${options.join("")}
+                    </select>
+                </div>
+            `;
+        }
+
+        function onPresetSelect() {
+            const select = document.getElementById("id_preset_factor");
+            if (!select || !select.value) {
+                return;
+            }
+            const [paramName, valueId] = select.value.split("|");
+            const fn = genericFunctions.find(f =>
+                f.parameters && f.parameters.some(p => p.short_name === paramName)
+            );
+            if (!fn) {
+                return;
+            }
+            const param = fn.parameters.find(p => p.short_name === paramName);
+            const value = (param.values || []).find(v => v.id == valueId);
+            if (value) {
+                addKwargRow({
+                    name: paramName,
+                    value: value.value,
+                    standardDeviation: value.standard_deviation,
+                    unit: param.unit,
+                    valueId: value.id,
+                });
+            }
+            select.value = "";
         }
 
         let datasetColumns = [];
@@ -136,19 +207,24 @@
             valueSelect.disabled = false;
         }
 
-        function renderKwargEditor() {
+        function renderKwargEditor(functionName) {
             const container = document.getElementById("parameterFormContainer");
             container.innerHTML = `
                 ${renderFeatureFilter()}
                 <h3>Factors</h3>
                 <p class="text-muted">Each factor is multiplied into the production chain.</p>
+                ${renderPresetPicker(functionName)}
                 <div id="kwargRows"></div>
                 <button type="button" id="addKwarg" class="btn btn-outline-primary">Add factor</button>
             `;
-            document.getElementById("addKwarg").addEventListener("click", addKwargRow);
+            document.getElementById("addKwarg").addEventListener("click", () => addKwargRow());
             const filterColumn = document.getElementById("id_filter_column");
             if (filterColumn) {
                 filterColumn.addEventListener("change", onFilterColumnChange);
+            }
+            const presetSelect = document.getElementById("id_preset_factor");
+            if (presetSelect) {
+                presetSelect.addEventListener("change", onPresetSelect);
             }
             addKwargRow();
         }
@@ -169,7 +245,7 @@
             const select = document.getElementById("id_algorithm_choice");
             const value = select ? select.value : "";
             if (value.startsWith("generic:")) {
-                renderKwargEditor();
+                renderKwargEditor(value.substring(8));
             } else if (value.startsWith("algo:")) {
                 loadRegisteredAlgorithmParameters(value.substring(5));
             } else {
@@ -180,7 +256,8 @@
         function renderAlgorithmChoices(data) {
             const container = document.getElementById("algorithmChoiceContainer");
             datasetColumns = data.columns || [];
-            const generic = data.functions || [];
+            genericFunctions = data.functions || [];
+            const generic = genericFunctions;
             const registered = data.algorithms || [];
             if (generic.length === 0 && registered.length === 0) {
                 container.innerHTML = "";
@@ -222,9 +299,9 @@
                 document.getElementById("parameterFormContainer").innerHTML = "";
                 return;
             }
-            let url = `/inventories/api/geodatasets/${geodatasetId}/functions/`;
+            let url = `/inventories/api/geodatasets/${geodatasetId}/functions/?scenario={{ scenario.pk }}`;
             if (feedstockField && feedstockField.value) {
-                url += `?feedstock=${feedstockField.value}`;
+                url += `&feedstock=${feedstockField.value}`;
             }
             try {
                 const response = await fetch(url);
