@@ -177,9 +177,14 @@ urlpatterns = [
         name="attribute-update-modal",
     ),
     path(
-        "attributes/<int:pk>/delete/modal",
+        "attributes/<int:pk>/delete/modal/",
         AttributeModalDeleteView.as_view(),
         name="attribute-delete-modal",
+    ),
+    # Slashless alias for clients that learned the pre-slash URL.
+    path(
+        "attributes/<int:pk>/delete/modal",
+        AttributeModalDeleteView.as_view(),
     ),
     path(
         "attributes/autocomplete/",
@@ -222,9 +227,14 @@ urlpatterns = [
         name="regionattributevalue-update-modal",
     ),
     path(
-        "attribute_values/<int:pk>/delete/modal",
+        "attribute_values/<int:pk>/delete/modal/",
         RegionAttributeValueModalDeleteView.as_view(),
         name="regionattributevalue-delete-modal",
+    ),
+    # Slashless alias for clients that learned the pre-slash URL.
+    path(
+        "attribute_values/<int:pk>/delete/modal",
+        RegionAttributeValueModalDeleteView.as_view(),
     ),
     path("catchments/", CatchmentPublishedFilterView.as_view(), name="catchment-list"),
     path(
