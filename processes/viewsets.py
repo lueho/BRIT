@@ -62,8 +62,12 @@ def _visible_process_relations(queryset, user):
             .select_related("licence")
             .prefetch_related(
                 Prefetch(
-                    "authors",
-                    queryset=filter_queryset_for_user(Author.objects.all(), user),
+                    "sourceauthors",
+                    queryset=SourceAuthor.objects.filter(
+                        author__in=filter_queryset_for_user(Author.objects.all(), user)
+                    )
+                    .select_related("author")
+                    .order_by("position"),
                 )
             )
             .annotate(

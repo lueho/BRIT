@@ -193,12 +193,21 @@ class VisibleSourceSerializer(SourceModelSerializer):
         return None if hidden else obj.citation_key
 
     def get_authors(self, obj):
+        """Authors in citation position order, read-policy scoped."""
         cache = getattr(obj, "_prefetched_objects_cache", {})
-        if "authors" in cache:
-            authors = cache["authors"]
+        if "sourceauthors" in cache:
+            links = cache["sourceauthors"]
         else:
-            authors = filter_queryset_for_user(obj.authors.all(), self._user())
-        return AuthorModelSerializer(authors, many=True).data
+            links = (
+                obj.sourceauthors.filter(
+                    author__in=filter_queryset_for_user(
+                        Author.objects.all(), self._user()
+                    )
+                )
+                .order_by("position")
+                .select_related("author")
+            )
+        return AuthorModelSerializer([link.author for link in links], many=True).data
 
     def get_licence(self, obj):
         if obj.licence_id is None:

@@ -4,11 +4,13 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from bibliography.models import Author, Licence, Source, SourceAuthor
 from materials.models import Material
+from utils.object_management.models import ObjectEditorGrant
 from utils.properties.models import Unit
 
 from ..models import (
@@ -729,6 +731,122 @@ class ProcessAPIRelatedVisibilityTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         payload = next(s for s in response.data if s["id"] == source.pk)
         self.assertIsNone(payload["abbreviation"])
+
+    def test_detail_source_authors_follow_citation_order(self):
+        """Nested authors serialize in citation position, not alphabetical order."""
+        zulu = Author.objects.create(
+            first_names="Zed",
+            last_names="Zulu",
+            owner=self.other,
+            publication_status="published",
+        )
+        alpha = Author.objects.create(
+            first_names="Ann",
+            last_names="Alpha",
+            owner=self.other,
+            publication_status="published",
+        )
+        source = Source.objects.create(
+            title="Order Source",
+            abbreviation="OS",
+            owner=self.other,
+            publication_status="published",
+        )
+        SourceAuthor.objects.create(source=source, author=zulu, position=1)
+        SourceAuthor.objects.create(source=source, author=alpha, position=2)
+        self.published_process.sources.add(source)
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = next(s for s in response.data["sources"] if s["id"] == source.pk)
+        self.assertEqual(
+            [a["last_names"] for a in payload["authors"]], ["Zulu", "Alpha"]
+        )
+
+    def _content_type(self, model):
+        # Earlier rolled-back tests can leave phantom ContentType rows cached.
+        ContentType.objects.clear_cache()
+        return ContentType.objects.get_for_model(model)
+
+    def test_category_processes_editor_sees_granted_private(self):
+        editor = get_user_model().objects.create_user(username="vis_editor")
+        ObjectEditorGrant.objects.create(
+            content_type=self._content_type(Process),
+            object_id=self.foreign_private_process.pk,
+            editor=editor,
+            granted_by=self.other,
+        )
+        self.client.force_login(editor)
+        response = self.client.get(
+            f"/processes/api/categories/{self.category.pk}/processes/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            self._member_names(response),
+            {"Published Member", "Foreign Private Member"},
+        )
+
+    def test_list_shows_editor_granted_category(self):
+        editor = get_user_model().objects.create_user(username="vis_editor")
+        ObjectEditorGrant.objects.create(
+            content_type=self._content_type(ProcessCategory),
+            object_id=self.foreign_private_category.pk,
+            editor=editor,
+            granted_by=self.other,
+        )
+        self.client.force_login(editor)
+        response = self.client.get("/processes/api/processes/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = self._published_process_payload(response.data)
+        self.assertEqual(
+            {category["name"] for category in payload["categories"]},
+            {"Shared Category", "Foreign Private Category"},
+        )
+
+    def test_category_processes_moderator_sees_review_member(self):
+        review_process = Process.objects.create(
+            name="Review Member",
+            owner=self.other,
+            publication_status="review",
+        )
+        review_process.categories.add(self.category)
+        moderator = get_user_model().objects.create_user(username="vis_moderator")
+        permission, _ = Permission.objects.get_or_create(
+            codename="can_moderate_process",
+            content_type=self._content_type(Process),
+        )
+        moderator.user_permissions.add(permission)
+        self.client.force_login(moderator)
+        response = self.client.get(
+            f"/processes/api/categories/{self.category.pk}/processes/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            self._member_names(response), {"Published Member", "Review Member"}
+        )
+
+    def test_list_shows_review_category_to_moderator(self):
+        review_category = ProcessCategory.objects.create(
+            name="Review Category",
+            owner=self.other,
+            publication_status="review",
+        )
+        self.published_process.categories.add(review_category)
+        moderator = get_user_model().objects.create_user(username="vis_moderator")
+        permission, _ = Permission.objects.get_or_create(
+            codename="can_moderate_processcategory",
+            content_type=self._content_type(ProcessCategory),
+        )
+        moderator.user_permissions.add(permission)
+        self.client.force_login(moderator)
+        response = self.client.get("/processes/api/processes/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = self._published_process_payload(response.data)
+        self.assertEqual(
+            {category["name"] for category in payload["categories"]},
+            {"Shared Category", "Review Category"},
+        )
 
     def test_owner_of_private_relations_sees_them_in_list(self):
         """`other` owns the private relations and must see them on the process."""
