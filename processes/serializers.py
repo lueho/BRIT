@@ -5,7 +5,12 @@ Provides REST API serializers for all process-related models.
 
 from rest_framework import serializers
 
-from bibliography.serializers import SourceModelSerializer
+from bibliography.models import Author, Licence
+from bibliography.serializers import (
+    AuthorModelSerializer,
+    LicenceModelSerializer,
+    SourceModelSerializer,
+)
 from materials.models import Material
 from materials.serializers import MaterialAPISerializer
 from utils.object_management.permissions import filter_queryset_for_user
@@ -163,6 +168,39 @@ class ProcessInfoResourceSerializer(serializers.ModelSerializer):
         read_only_fields = ["process", "target_url"]
 
 
+class VisibleSourceSerializer(SourceModelSerializer):
+    """Source serialization that hides relations the user may not read.
+
+    Nested ``authors`` and ``licence`` are user-created objects; a visible
+    source may still link private ones owned by someone else.
+    """
+
+    authors = serializers.SerializerMethodField()
+    licence = serializers.SerializerMethodField()
+
+    def _user(self):
+        request = self.context.get("request")
+        return getattr(request, "user", None)
+
+    def get_authors(self, obj):
+        cache = getattr(obj, "_prefetched_objects_cache", {})
+        if "authors" in cache:
+            authors = cache["authors"]
+        else:
+            authors = filter_queryset_for_user(obj.authors.all(), self._user())
+        return AuthorModelSerializer(authors, many=True).data
+
+    def get_licence(self, obj):
+        if obj.licence_id is None:
+            return None
+        visible = getattr(obj, "licence_is_visible", None)
+        if visible is None:
+            visible = filter_queryset_for_user(
+                Licence.objects.filter(pk=obj.licence_id), self._user()
+            ).exists()
+        return LicenceModelSerializer(obj.licence).data if visible else None
+
+
 class ProcessVisibilityMixin:
     """Applies the central read policy to nested user-created relations.
 
@@ -208,9 +246,28 @@ class ProcessVisibilityMixin:
         ).data
 
     def get_sources(self, obj):
-        return SourceModelSerializer(
-            self._visible_related(obj, "sources"), many=True
+        return VisibleSourceSerializer(
+            self._visible_related(obj, "sources"),
+            many=True,
+            context=self.context,
         ).data
+
+    def get_authors(self, obj):
+        """Get author ids in explicit process author order, read-policy scoped."""
+
+        cache = getattr(obj, "_prefetched_objects_cache", {})
+        if "process_authors" in cache:
+            return [link.author_id for link in cache["process_authors"]]
+        authors = obj.authors_ordered()
+        if not authors:
+            return []
+        visible_ids = set(
+            filter_queryset_for_user(
+                Author.objects.filter(pk__in=[a.pk for a in authors]),
+                self._request_user(),
+            ).values_list("pk", flat=True)
+        )
+        return [a.pk for a in authors if a.pk in visible_ids]
 
     def get_parent_name(self, obj):
         if obj.parent_id is None:
@@ -258,11 +315,6 @@ class ProcessListSerializer(ProcessVisibilityMixin, serializers.ModelSerializer)
             "created_at",
             "lastmodified_at",
         ]
-
-    def get_authors(self, obj):
-        """Get author ids in explicit process author order."""
-
-        return [author.pk for author in obj.authors_ordered()]
 
 
 class ProcessDetailSerializer(ProcessVisibilityMixin, serializers.ModelSerializer):
@@ -321,11 +373,6 @@ class ProcessDetailSerializer(ProcessVisibilityMixin, serializers.ModelSerialize
             "created_at",
             "lastmodified_at",
         ]
-
-    def get_authors(self, obj):
-        """Get author ids in explicit process author order."""
-
-        return [author.pk for author in obj.authors_ordered()]
 
     def get_process_materials(self, obj):
         return ProcessMaterialAPISerializer(

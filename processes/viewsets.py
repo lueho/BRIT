@@ -8,7 +8,7 @@ from rest_framework import filters, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from bibliography.models import Source
+from bibliography.models import Author, Licence, Source
 from utils.object_management.permissions import (
     UserCreatedObjectPermission,
     filter_queryset_for_user,
@@ -50,13 +50,28 @@ def _visible_process_relations(queryset, user):
             "sources",
             queryset=filter_queryset_for_user(Source.objects.all(), user)
             .select_related("licence")
-            .prefetch_related("authors"),
+            .prefetch_related(
+                Prefetch(
+                    "authors",
+                    queryset=filter_queryset_for_user(Author.objects.all(), user),
+                )
+            )
+            .annotate(
+                licence_is_visible=Exists(
+                    filter_queryset_for_user(
+                        Licence.objects.filter(pk=OuterRef("licence_id")),
+                        user,
+                    )
+                )
+            ),
         ),
         Prefetch(
             "process_authors",
-            queryset=ProcessAuthor.objects.select_related("author").order_by(
-                "position", "author_id", "id"
-            ),
+            queryset=ProcessAuthor.objects.filter(
+                author__in=filter_queryset_for_user(Author.objects.all(), user)
+            )
+            .select_related("author")
+            .order_by("position", "author_id", "id"),
         ),
     ).annotate(
         parent_is_visible=Exists(

@@ -142,8 +142,12 @@ class ProcessListSerializerTestCase(TestCase):
         self.category = ProcessCategory.objects.create(
             name="Thermochemical", owner=self.owner
         )
-        self.author_1 = Author.objects.create(first_names="Ada", last_names="Lovelace")
-        self.author_2 = Author.objects.create(first_names="Grace", last_names="Hopper")
+        self.author_1 = Author.objects.create(
+            first_names="Ada", last_names="Lovelace", owner=self.owner
+        )
+        self.author_2 = Author.objects.create(
+            first_names="Grace", last_names="Hopper", owner=self.owner
+        )
 
         self.process = Process.objects.create(
             name="Pyrolysis",
@@ -178,8 +182,12 @@ class ProcessDetailSerializerTestCase(TestCase):
         self.category = ProcessCategory.objects.create(
             name="Thermochemical", owner=self.owner
         )
-        self.author_1 = Author.objects.create(first_names="Ada", last_names="Lovelace")
-        self.author_2 = Author.objects.create(first_names="Grace", last_names="Hopper")
+        self.author_1 = Author.objects.create(
+            first_names="Ada", last_names="Lovelace", owner=self.owner
+        )
+        self.author_2 = Author.objects.create(
+            first_names="Grace", last_names="Hopper", owner=self.owner
+        )
 
         self.process = Process.objects.create(
             name="Pyrolysis",

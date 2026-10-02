@@ -443,7 +443,37 @@ class ProcessAPIRelatedVisibilityTestCase(APITestCase):
             owner=cls.other,
             publication_status="published",
         )
+        cls.foreign_private_licence = Licence.objects.create(
+            name="Foreign Private Licence",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.published_source.licence = cls.foreign_private_licence
+        cls.published_source.save()
+        cls.foreign_private_author = Author.objects.create(
+            first_names="Hidden",
+            last_names="Writer",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.published_author = Author.objects.create(
+            first_names="Open",
+            last_names="Writer",
+            owner=cls.other,
+            publication_status="published",
+        )
+        SourceAuthor.objects.create(
+            source=cls.published_source,
+            author=cls.foreign_private_author,
+            position=1,
+        )
+        SourceAuthor.objects.create(
+            source=cls.published_source, author=cls.published_author, position=2
+        )
         cls.published_process.sources.add(cls.published_source)
+        cls.published_process.authors.add(
+            cls.foreign_private_author, cls.published_author
+        )
         foreign_private_parent = Process.objects.create(
             name="Foreign Private Parent",
             owner=cls.other,
@@ -537,10 +567,13 @@ class ProcessAPIRelatedVisibilityTestCase(APITestCase):
             {category["name"] for category in payload["categories"]},
             {"Shared Category"},
         )
-        self.assertEqual(
-            {source["title"] for source in payload["sources"]},
-            {"Published Source"},
-        )
+        self.assertEqual(payload["authors"], [self.published_author.pk])
+        sources = payload["sources"]
+        self.assertEqual({source["title"] for source in sources}, {"Published Source"})
+        source = sources[0]
+        self.assertEqual({a["last_names"] for a in source["authors"]}, {"Writer"})
+        self.assertEqual(len(source["authors"]), 1)
+        self.assertIsNone(source["licence"])
 
     def test_list_hides_foreign_private_relations(self):
         response = self.client.get("/processes/api/processes/")
@@ -670,6 +703,18 @@ class ProcessAPIRelatedVisibilityTestCase(APITestCase):
             {s["title"] for s in payload["sources"]},
             {"Published Source", "Foreign Private Source"},
         )
+        published_source = next(
+            s for s in payload["sources"] if s["title"] == "Published Source"
+        )
+        self.assertEqual(published_source["licence"]["name"], "Foreign Private Licence")
+        self.assertEqual(
+            {a["first_names"] for a in published_source["authors"]},
+            {"Hidden", "Open"},
+        )
+        self.assertCountEqual(
+            payload["authors"],
+            [self.foreign_private_author.pk, self.published_author.pk],
+        )
 
 
 class ProcessAPIQueryCountTestCase(APITestCase):
@@ -692,8 +737,8 @@ class ProcessAPIQueryCountTestCase(APITestCase):
             publication_status="published",
         )
         process.categories.add(category)
-        # Link a source with nested author + licence so serialization has to
-        # resolve three levels; otherwise the grouped endpoints N+1 on them.
+        # Link a source with nested author + licence and a process author so
+        # serialization has to resolve every nested level.
         source = Source.objects.create(
             title=f"Perf Source {index}",
             abbreviation=f"S{index}",
@@ -701,12 +746,15 @@ class ProcessAPIQueryCountTestCase(APITestCase):
             owner=self.owner,
             publication_status="published",
         )
-        SourceAuthor.objects.create(
-            source=source,
-            author=Author.objects.create(first_names="Ada", last_names=f"Perf{index}"),
-            position=1,
+        author = Author.objects.create(
+            first_names="Ada",
+            last_names=f"Perf{index}",
+            owner=self.owner,
+            publication_status="published",
         )
+        SourceAuthor.objects.create(source=source, author=author, position=1)
         process.sources.add(source)
+        process.authors.add(author)
 
     def test_by_category_query_count_is_constant(self):
         from django.db import connection
