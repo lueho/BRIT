@@ -1818,3 +1818,23 @@ class ProcessDashboardVisibilityTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse("processes:dashboard"))
         self.assertContains(response, reverse("processes:process-create"))
+
+
+class ProcessFilterViewQuerysetTests(TestCase):
+    def test_filter_views_share_the_queryset_mixin(self):
+        """The three process filter views share one queryset so related-object
+        prefetching cannot drift between scopes."""
+        from processes.views import (
+            ProcessFilterViewMixin,
+            ProcessPrivateFilterView,
+            ProcessPublishedFilterView,
+            ProcessReviewFilterView,
+        )
+
+        for view_class in (
+            ProcessPublishedFilterView,
+            ProcessPrivateFilterView,
+            ProcessReviewFilterView,
+        ):
+            with self.subTest(view_class=view_class.__name__):
+                self.assertTrue(issubclass(view_class, ProcessFilterViewMixin))

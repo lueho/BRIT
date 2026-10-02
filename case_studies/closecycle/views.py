@@ -11,15 +11,10 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateView,
 )
 
+from .constants import SHOWCASE_PROCESS_MAP
 from .filters import ShowcaseFilterSet
 from .forms import ShowcaseModelForm
 from .models import Showcase
-
-# Hybrid mock: Showcase name to involved process names
-SHOWCASE_PROCESS_MAP = {
-    "Municipality & farms 1": ["Anaerobic Digestion", "Composting"],
-    "Agricultural Education": ["Anaerobic Digestion", "Pyrolysis", "Composting"],
-}
 
 # ----------- Showcase CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------

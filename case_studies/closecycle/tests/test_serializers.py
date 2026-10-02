@@ -24,3 +24,12 @@ class ShowcaseFlatSerializerRegressionTest(TestCase):
         data = serializer.data
         self.assertIn("involved_processes", data)
         self.assertEqual(data["involved_processes"], [])
+
+
+class ShowcaseProcessMapTests(TestCase):
+    def test_process_map_is_shared_between_view_and_serializer(self):
+        """The mock showcase->process mapping must be defined once so the
+        serializer and the detail view cannot drift apart."""
+        from case_studies.closecycle import serializers, views
+
+        self.assertIs(serializers.SHOWCASE_PROCESS_MAP, views.SHOWCASE_PROCESS_MAP)

@@ -11,6 +11,7 @@ from maps.serializers import (
 )
 from processes.models import Process
 
+from .constants import SHOWCASE_PROCESS_MAP
 from .models import BiogasPlantsSweden
 
 
@@ -31,15 +32,6 @@ class ShowcaseFlatSerializer(ModelSerializer):
         fields = ["id", "name", "region", "description", "involved_processes"]
 
     def get_involved_processes(self, obj):
-        # Showcase name to involved process names (keep in sync with view)
-        SHOWCASE_PROCESS_MAP = {
-            "Municipality & farms 1": ["Anaerobic Digestion", "Composting"],
-            "Agricultural Education": [
-                "Anaerobic Digestion",
-                "Pyrolysis",
-                "Composting",
-            ],
-        }
         request = getattr(self, "request", None)
         user = getattr(request, "user", None)
         # If no request or user, treat as anonymous (no permission)
