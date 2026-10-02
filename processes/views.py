@@ -346,6 +346,152 @@ def _process_list_queryset(queryset, user):
     )
 
 
+def _process_detail_context(request, obj, policy=None):
+    """Return the read-mode context for ``processes/process_detail.html``.
+
+    Shared by :class:`ProcessDetailView` and
+    :class:`ProcessReviewItemDetailView` so the review page renders the full
+    detail context without instantiating a sibling view. Related user-created
+    objects are filtered by the read policy so private/in-review objects owned
+    by others never reach the template.
+    """
+    user = request.user
+    if policy is None:
+        policy = get_object_policy(user, obj, request=request)
+    context = {
+        "process_policy": policy,
+        # Edit-mode context is only produced by ProcessDetailView itself.
+        "edit_mode_enabled": False,
+    }
+
+    # Parent and variants are user-created objects: only expose the ones the
+    # current user may read.
+    visible_parent = obj.parent
+    if (
+        visible_parent is not None
+        and not filter_queryset_for_user(
+            Process.objects.filter(pk=visible_parent.pk), user
+        ).exists()
+    ):
+        visible_parent = None
+    context["visible_parent"] = visible_parent
+
+    # Organize materials by role, dropping links to materials the current
+    # user cannot read so private material names do not leak.
+    input_links = obj._material_links_for_role(ProcessMaterial.Role.INPUT)
+    output_links = obj._material_links_for_role(ProcessMaterial.Role.OUTPUT)
+    material_ids = {link.material_id for link in input_links} | {
+        link.material_id for link in output_links
+    }
+    visible_material_ids = set(
+        filter_queryset_for_user(
+            Material.objects.filter(pk__in=material_ids), user
+        ).values_list("pk", flat=True)
+    )
+    context["input_materials"] = [
+        link for link in input_links if link.material_id in visible_material_ids
+    ]
+    context["output_materials"] = [
+        link for link in output_links if link.material_id in visible_material_ids
+    ]
+
+    # Group parameters by type
+    params_by_type = {}
+    for param in obj.operating_parameters.all():
+        param_type = param.get_parameter_display()
+        if param_type not in params_by_type:
+            params_by_type[param_type] = []
+        params_by_type[param_type].append(param)
+    context["parameters_by_type"] = params_by_type
+    context["operating_parameters"] = [
+        param
+        for param in obj.operating_parameters.all()
+        if param.parameter != ProcessOperatingParameter.Parameter.YIELD
+    ]
+    context["process_links"] = list(obj.links.all())
+    context["process_info_resources"] = list(obj.info_resources.all())
+    # The prefetch on ProcessDetailView.get_queryset already applies the read
+    # policy; the explicit filter keeps this correct for callers whose object
+    # was not fetched through that queryset (e.g. the review item detail view).
+    context["process_variants"] = list(
+        filter_queryset_for_user(obj.variants.all(), user)
+    )
+    context["process_authors"] = obj.ordered_authors()
+    sources = obj.sources_ordered()
+    visible_source_ids = set(
+        filter_queryset_for_user(
+            Source.objects.filter(pk__in=[s.pk for s in sources]), user
+        ).values_list("pk", flat=True)
+    )
+    context["bibliography_sources"] = sorted(
+        (s for s in sources if s.pk in visible_source_ids),
+        key=lambda source: (source.abbreviation or source.title or "").casefold(),
+    )
+    # The timeline only feeds the review banner, which renders solely for
+    # 'review' and 'declined' objects; skip the query otherwise.
+    context["review_timeline"] = (
+        _review_timeline(obj)
+        if obj.publication_status in ("review", "declined")
+        else []
+    )
+    context["section_anchors"] = _section_anchors(obj, context)
+    context["has_related_processes"] = bool(
+        context["process_variants"] or context["visible_parent"]
+    )
+    return context
+
+
+def _review_timeline(obj):
+    try:
+        actions = (
+            ReviewAction.for_object(obj)
+            .select_related("user")
+            .order_by("created_at", "id")
+        )
+    except Exception:
+        return []
+    timeline = []
+    for action in actions:
+        timeline.append(
+            {
+                "action": action.action,
+                "label": action.get_action_display()
+                if hasattr(action, "get_action_display")
+                else action.action,
+                "user": getattr(action.user, "username", None),
+                "created_at": action.created_at,
+                "comment": getattr(action, "comment", "") or "",
+            }
+        )
+    return timeline
+
+
+def _section_anchors(obj, context):
+    """Return label/id pairs for the sections rendered on the page."""
+    anchors = []
+    if (
+        obj.mechanism
+        or context["operating_parameters"]
+        or context["input_materials"]
+        or context["output_materials"]
+        or context["parameters_by_type"].get(
+            ProcessOperatingParameter.Parameter.YIELD.label
+        )
+    ):
+        anchors.append({"id": "facts", "name": "At a glance"})
+    if obj.description:
+        anchors.append({"id": "description", "name": "Description"})
+    if obj.process_technology:
+        anchors.append({"id": "technology", "name": "Process technology"})
+    if context["process_links"]:
+        anchors.append({"id": "links", "name": "Links"})
+    if context["process_info_resources"]:
+        anchors.append({"id": "resources", "name": "Information resources"})
+    if context["bibliography_sources"]:
+        anchors.append({"id": "bibliography", "name": "Bibliography"})
+    return anchors
+
+
 class ProcessPublishedFilterView(PublishedObjectFilterView):
     """List published Process objects with filtering."""
 
@@ -462,133 +608,8 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             ]
             return context
 
-        # Parent and variants are user-created objects: only expose the ones
-        # the current user may read.
-        visible_parent = self.object.parent
-        if (
-            visible_parent is not None
-            and not filter_queryset_for_user(
-                Process.objects.filter(pk=visible_parent.pk), self.request.user
-            ).exists()
-        ):
-            visible_parent = None
-        context["visible_parent"] = visible_parent
-
-        # Organize materials by role, dropping links to materials the current
-        # user cannot read so private material names do not leak.
-        input_links = self.object._material_links_for_role(ProcessMaterial.Role.INPUT)
-        output_links = self.object._material_links_for_role(ProcessMaterial.Role.OUTPUT)
-        material_ids = {link.material_id for link in input_links} | {
-            link.material_id for link in output_links
-        }
-        visible_material_ids = set(
-            filter_queryset_for_user(
-                Material.objects.filter(pk__in=material_ids), self.request.user
-            ).values_list("pk", flat=True)
-        )
-        context["input_materials"] = [
-            link for link in input_links if link.material_id in visible_material_ids
-        ]
-        context["output_materials"] = [
-            link for link in output_links if link.material_id in visible_material_ids
-        ]
-
-        # Group parameters by type
-        params_by_type = {}
-        for param in self.object.operating_parameters.all():
-            param_type = param.get_parameter_display()
-            if param_type not in params_by_type:
-                params_by_type[param_type] = []
-            params_by_type[param_type].append(param)
-        context["parameters_by_type"] = params_by_type
-        context["operating_parameters"] = [
-            param
-            for param in self.object.operating_parameters.all()
-            if param.parameter != ProcessOperatingParameter.Parameter.YIELD
-        ]
-        context["process_links"] = list(self.object.links.all())
-        context["process_info_resources"] = list(self.object.info_resources.all())
-        # The prefetch above already applies the read policy; the explicit
-        # filter keeps this correct when get_context_data runs on an
-        # unprepared object (e.g. the review item detail view).
-        context["process_variants"] = list(
-            filter_queryset_for_user(self.object.variants.all(), self.request.user)
-        )
-        context["process_authors"] = self.object.ordered_authors()
-        sources = self.object.sources_ordered()
-        visible_source_ids = set(
-            filter_queryset_for_user(
-                Source.objects.filter(pk__in=[s.pk for s in sources]),
-                self.request.user,
-            ).values_list("pk", flat=True)
-        )
-        context["bibliography_sources"] = sorted(
-            (s for s in sources if s.pk in visible_source_ids),
-            key=lambda source: (source.abbreviation or source.title or "").casefold(),
-        )
-        context["process_policy"] = policy
-        # The timeline only feeds the review banner, which renders solely for
-        # 'review' and 'declined' objects; skip the query otherwise.
-        context["review_timeline"] = (
-            self._build_review_timeline()
-            if self.object.publication_status in ("review", "declined")
-            else []
-        )
-        context["section_anchors"] = self._build_section_anchors(context)
-        context["has_related_processes"] = bool(
-            context["process_variants"] or context["visible_parent"]
-        )
-
+        context.update(_process_detail_context(self.request, self.object, policy))
         return context
-
-    def _build_review_timeline(self):
-        try:
-            actions = (
-                ReviewAction.for_object(self.object)
-                .select_related("user")
-                .order_by("created_at", "id")
-            )
-        except Exception:
-            return []
-        timeline = []
-        for action in actions:
-            timeline.append(
-                {
-                    "action": action.action,
-                    "label": action.get_action_display()
-                    if hasattr(action, "get_action_display")
-                    else action.action,
-                    "user": getattr(action.user, "username", None),
-                    "created_at": action.created_at,
-                    "comment": getattr(action, "comment", "") or "",
-                }
-            )
-        return timeline
-
-    def _build_section_anchors(self, context):
-        """Return label/id pairs for the sections rendered on the page."""
-        anchors = []
-        if (
-            self.object.mechanism
-            or context["operating_parameters"]
-            or context["input_materials"]
-            or context["output_materials"]
-            or context["parameters_by_type"].get(
-                ProcessOperatingParameter.Parameter.YIELD.label
-            )
-        ):
-            anchors.append({"id": "facts", "name": "At a glance"})
-        if self.object.description:
-            anchors.append({"id": "description", "name": "Description"})
-        if self.object.process_technology:
-            anchors.append({"id": "technology", "name": "Process technology"})
-        if context["process_links"]:
-            anchors.append({"id": "links", "name": "Links"})
-        if context["process_info_resources"]:
-            anchors.append({"id": "resources", "name": "Information resources"})
-        if context["bibliography_sources"]:
-            anchors.append({"id": "bibliography", "name": "Bibliography"})
-        return anchors
 
 
 class ProcessReviewItemDetailView(ReviewItemDetailView):
@@ -600,15 +621,7 @@ class ProcessReviewItemDetailView(ReviewItemDetailView):
         return "processes/process_detail.html"
 
     def get_review_specific_context(self, context):
-        detail_view = ProcessDetailView()
-        detail_view.request = self.request
-        detail_view.args = self.args
-        detail_view.kwargs = self.kwargs
-        detail_view.object = self.object
-        process_context = detail_view.get_context_data(object=self.object)
-        for review_key in ("review_logs", "review_mode", "show_review_panel"):
-            process_context.pop(review_key, None)
-        return process_context
+        return _process_detail_context(self.request, self.object)
 
 
 ProcessReviewItemDetailView.register_for_model(Process)
