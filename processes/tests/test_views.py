@@ -252,6 +252,26 @@ class ProcessMaintenanceViewsTestCase(TestCase):
         )
         self.assertEqual(self.process.process_materials.count(), 2)
 
+    def test_detail_view_keeps_operating_parameter_order_across_types(self):
+        """Interleaved parameter types must render in saved order, not grouped."""
+        ProcessOperatingParameter.objects.create(
+            process=self.process, parameter="temperature", order=2
+        )
+        ProcessOperatingParameter.objects.create(
+            process=self.process, parameter="pressure", order=3
+        )
+        ProcessOperatingParameter.objects.create(
+            process=self.process, parameter="temperature", order=4
+        )
+
+        response = self.client.get(self.process.get_absolute_url())
+
+        parameters = list(response.context["operating_parameters"])
+        self.assertEqual(
+            [param.parameter for param in parameters],
+            ["temperature", "temperature", "pressure", "temperature"],
+        )
+
     def test_detail_view_shows_one_sided_parameter_bounds(self):
         ProcessOperatingParameter.objects.create(
             process=self.process, parameter="pressure", value_min=Decimal("2")

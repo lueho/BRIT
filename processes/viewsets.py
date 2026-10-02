@@ -135,13 +135,8 @@ class ProcessViewSet(UserCreatedObjectViewSet):
         """Get operating parameters grouped by type."""
         process = self.get_object()
 
-        params_by_type = {}
-        for param in process.operating_parameters.all():
-            param_type = param.get_parameter_display()
-            if param_type not in params_by_type:
-                params_by_type[param_type] = []
-
-            params_by_type[param_type].append(
+        params_by_type = {
+            param_type: [
                 {
                     "id": param.id,
                     "name": param.name if param.name else param_type,
@@ -151,7 +146,10 @@ class ProcessViewSet(UserCreatedObjectViewSet):
                     "unit": param.unit.name if param.unit else None,
                     "basis": param.basis,
                 }
-            )
+                for param in params
+            ]
+            for param_type, params in process.operating_parameters_by_type().items()
+        }
 
         return Response(params_by_type)
 
