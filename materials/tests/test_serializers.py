@@ -87,6 +87,23 @@ class ComponentMeasurementWriteSerializerTestCase(TestCase):
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
+    def test_rejects_negative_average(self):
+        unit, _ = Unit.objects.get_or_create(name="%", defaults={"symbol": "%"})
+        data = self._data(unit)
+        data["average"] = "-0.5"
+        serializer = ComponentMeasurementWriteSerializer(data=data)
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("average", serializer.errors)
+
+    def test_accepts_zero_average(self):
+        unit, _ = Unit.objects.get_or_create(name="%", defaults={"symbol": "%"})
+        data = self._data(unit)
+        data["average"] = "0"
+        serializer = ComponentMeasurementWriteSerializer(data=data)
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
 
 class MaterialPropertySerializerTestCase(TestCase):
     @classmethod
