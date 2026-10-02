@@ -49,10 +49,13 @@ class SupportingFileDownloadView(UserCreatedObjectDetailView):
             stream.read(1)
             stream.seek(0)
             # Storage names use "/" separators; normalize stray "\"
-            # separators too so crafted names cannot smuggle a path. A key
-            # ending in a separator has no filename component, matching
-            # ntpath.basename semantics, and falls back to "document".
+            # separators and drop a leading drive prefix such as "C:" so
+            # crafted names cannot smuggle a path. A key ending in a
+            # separator has no filename component, matching ntpath.basename
+            # semantics, and falls back to "document".
             storage_name = field_file.name.replace("\\", "/")
+            if storage_name[1:2] == ":":
+                storage_name = storage_name[2:]
             name = (
                 "" if storage_name.endswith("/") else PurePosixPath(storage_name).name
             )

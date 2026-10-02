@@ -317,6 +317,13 @@ class SupportingFileDownloadTests:
             response = self.client.get(self.download_url)
         self.assert_download(response, filename="document")
 
+    def test_attachment_filename_excludes_drive_prefix(self):
+        setattr(self.file_object, self.field_name, "C:report.pdf")
+        self.file_object.save(update_fields=[self.field_name])
+        with patch.object(self.storage, "open", return_value=BytesIO(self.payload)):
+            response = self.client.get(self.download_url)
+        self.assert_download(response, filename="report.pdf")
+
     def test_unexpected_programming_errors_are_not_hidden(self):
         with (
             patch.object(
