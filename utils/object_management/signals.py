@@ -52,13 +52,18 @@ See Also:
 - utils/object_management/permissions.py
 """
 
+import logging
+
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models.signals import post_delete, post_migrate, post_save
 from django.dispatch import receiver
+
+logger = logging.getLogger(__name__)
 
 _moderation_permissions_loaded = set()
 
@@ -341,3 +346,41 @@ try:
 except Exception:
     # If connection fails during import, it's not critical
     pass
+
+
+@receiver(post_save, sender="object_management.ReviewAction")
+def enqueue_owner_review_notification(sender, instance, created, **kwargs):
+    """Queue an owner notification e-mail for a newly created ReviewAction.
+
+    Runs after the surrounding transaction commits so asynchronous workers
+    can see the action row. Eligibility (object still exists, owner differs
+    from the actor, owner has an e-mail address) is checked when sending.
+    """
+    if not created:
+        return
+
+    action_pk = instance.pk
+
+    def _enqueue():
+        try:
+            from .tasks import send_review_action_owner_notification
+
+            send_review_action_owner_notification.delay(action_pk)
+        except Exception:
+            # Broker unavailable: fall back to sending in-process so the
+            # notification is not lost silently.
+            logger.warning(
+                "Could not queue owner notification for ReviewAction %s; "
+                "sending synchronously.",
+                action_pk,
+            )
+            try:
+                from .notifications import notify_owner_of_review_action
+
+                notify_owner_of_review_action(instance)
+            except Exception:
+                logger.exception(
+                    "Owner notification for ReviewAction %s failed.", action_pk
+                )
+
+    transaction.on_commit(_enqueue)
