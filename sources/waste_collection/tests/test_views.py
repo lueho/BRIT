@@ -23,6 +23,7 @@ from django.http import JsonResponse
 from django.http.request import MultiValueDict, QueryDict
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from factory.django import mute_signals
 from openpyxl import load_workbook
 
@@ -2048,6 +2049,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                 self.get_update_url(self.unpublished_object.pk), data=data
             )
         mock_cleanup.assert_called_once()
+        WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
         self.assertEqual(response.status_code, 302)
         self.assertIn(

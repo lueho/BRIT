@@ -339,6 +339,12 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(hour=3, minute=0),
         "kwargs": {"queue_subtasks": True},
     },
+    # Orphans also arise from API mutations and imports, which do not trigger
+    # the post-save cleanup in the collection form.
+    "cleanup-orphaned-waste-flyers": {
+        "task": "cleanup_orphaned_waste_flyers",
+        "schedule": crontab(hour=4, minute=30),
+    },
 }
 
 GEO_BORDER_TOLERANCE = 0.005  # Tolerance for border detection in degrees for EPSG 4326

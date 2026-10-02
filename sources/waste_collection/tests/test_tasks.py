@@ -1,10 +1,15 @@
 """Tests for sources.waste_collection.tasks."""
 
+from datetime import timedelta
 from unittest.mock import ANY, Mock, PropertyMock, call, patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
 
+from materials.models import Material, Sample, SampleExternalRecord
+from processes.models import Process
 from sources.waste_collection.models import (
     Catchment,
     Collection,
@@ -29,16 +34,84 @@ from .test_views import (  # noqa: F401
 class CleanupOrphanedWasteFlyersTestCase(TestCase):
     """Test cleanup_orphaned_waste_flyers task does not raise FieldError."""
 
+    def _backdate(self, flyer, days=8):
+        WasteFlyer.objects.filter(pk=flyer.pk).update(
+            created_at=timezone.now() - timedelta(days=days)
+        )
+
+    def _orphan_flyer(self, owner, **kwargs):
+        flyer = WasteFlyer.objects.create(owner=owner, **kwargs)
+        self._backdate(flyer)
+        return flyer
+
     def test_cleanup_orphaned_waste_flyers_does_not_raise(self):
         """Calling the task should not raise a FieldError from an invalid reverse relation."""
         owner = get_user_model().objects.create(username="task_test_user")
-        flyer = WasteFlyer.objects.create(
+        flyer = self._orphan_flyer(
+            owner,
             url="https://www.example.com/orphan",
-            owner=owner,
         )
         deleted_count, _ = cleanup_orphaned_waste_flyers()
         self.assertEqual(deleted_count, 1)
         self.assertFalse(WasteFlyer.objects.filter(pk=flyer.pk).exists())
+
+    def test_recently_created_flyer_is_not_deleted(self):
+        """A flyer within the grace period is kept so it can still be linked."""
+        owner = get_user_model().objects.create(username="grace_user")
+        flyer = WasteFlyer.objects.create(
+            url="https://www.example.com/fresh",
+            owner=owner,
+        )
+        deleted_count, _ = cleanup_orphaned_waste_flyers()
+        self.assertEqual(deleted_count, 0)
+        self.assertTrue(WasteFlyer.objects.filter(pk=flyer.pk).exists())
+
+    def test_flyer_cited_by_process_is_not_deleted(self):
+        owner = get_user_model().objects.create(username="process_cite_user")
+        flyer = self._orphan_flyer(owner, url="https://www.example.com/process")
+        process = Process.objects.create(name="Test process", owner=owner)
+        process.sources.add(flyer)
+        deleted_count, _ = cleanup_orphaned_waste_flyers()
+        self.assertEqual(deleted_count, 0)
+        self.assertTrue(WasteFlyer.objects.filter(pk=flyer.pk).exists())
+
+    def test_flyer_cited_by_sample_is_not_deleted(self):
+        owner = get_user_model().objects.create(username="sample_cite_user")
+        flyer = self._orphan_flyer(owner, url="https://www.example.com/sample")
+        material = Material.objects.create(name="Test material", owner=owner)
+        sample = Sample.objects.create(
+            name="Test sample", material=material, owner=owner
+        )
+        sample.sources.add(flyer)
+        deleted_count, _ = cleanup_orphaned_waste_flyers()
+        self.assertEqual(deleted_count, 0)
+        self.assertTrue(WasteFlyer.objects.filter(pk=flyer.pk).exists())
+
+    def test_flyer_cited_by_external_sample_record_is_not_deleted(self):
+        """A PROTECTed FK citation must keep the flyer instead of aborting the delete."""
+        owner = get_user_model().objects.create(username="record_cite_user")
+        flyer = self._orphan_flyer(owner, url="https://www.example.com/record")
+        material = Material.objects.create(name="Record material", owner=owner)
+        sample = Sample.objects.create(
+            name="Record sample", material=material, owner=owner
+        )
+        SampleExternalRecord.objects.create(
+            sample=sample, source=flyer, external_id="1"
+        )
+        deleted_count, _ = cleanup_orphaned_waste_flyers()
+        self.assertEqual(deleted_count, 0)
+        self.assertTrue(WasteFlyer.objects.filter(pk=flyer.pk).exists())
+
+
+class CleanupOrphanedWasteFlyersScheduleTestCase(SimpleTestCase):
+    """Orphaned flyers also arise outside the collection form (API mutations,
+    imports), so the cleanup must run periodically, not only on form saves."""
+
+    def test_cleanup_task_is_on_the_beat_schedule(self):
+        scheduled_tasks = {
+            entry["task"] for entry in settings.CELERY_BEAT_SCHEDULE.values()
+        }
+        self.assertIn("cleanup_orphaned_waste_flyers", scheduled_tasks)
 
 
 class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
