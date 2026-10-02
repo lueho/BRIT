@@ -149,46 +149,52 @@ class Showcase(NamedUserCreatedObject):
         return cls._meta.get_field("scenarios").related_model
 
     @classmethod
-    def prefetch_visible_connections(cls, queryset, user):
+    def prefetch_visible_connections(cls, queryset, user, connections=None):
         """Prefetch the connections of each showcase that ``user`` may read.
 
         The ``visible_*`` methods read these caches instead of querying per
-        showcase.
+        showcase. ``connections`` limits the prefetch to the given keys
+        (``"material_links"``, ``"process_links"``, ``"samples"``,
+        ``"sample_series"``, ``"catchment"``, ``"scenarios"``); ``None``
+        prefetches all of them.
         """
-        return queryset.prefetch_related(
-            Prefetch(
+        prefetches = {
+            "material_links": Prefetch(
                 "showcase_materials",
                 queryset=cls._visible_material_links_queryset(user),
                 to_attr="_visible_material_links",
             ),
-            Prefetch(
+            "process_links": Prefetch(
                 "showcase_processes",
                 queryset=cls._visible_process_links_queryset(user),
                 to_attr="_visible_process_links",
             ),
-            Prefetch(
+            "samples": Prefetch(
                 "samples",
                 queryset=filter_queryset_for_user(Sample.objects.all(), user),
                 to_attr="_visible_samples",
             ),
-            Prefetch(
+            "sample_series": Prefetch(
                 "sample_series",
                 queryset=filter_queryset_for_user(SampleSeries.objects.all(), user),
                 to_attr="_visible_sample_series",
             ),
-            Prefetch(
+            "catchment": Prefetch(
                 "catchment",
                 queryset=filter_queryset_for_user(Catchment.objects.all(), user),
                 to_attr="_visible_catchment",
             ),
-            Prefetch(
+            "scenarios": Prefetch(
                 "scenarios",
                 queryset=filter_queryset_for_user(
                     cls._scenario_model().objects.all(), user
                 ),
                 to_attr="_visible_scenarios",
             ),
-        )
+        }
+        if connections is None:
+            connections = prefetches
+        return queryset.prefetch_related(*(prefetches[name] for name in connections))
 
     def visible_material_links(self, user):
         """Material links whose material ``user`` may read, by role and order."""

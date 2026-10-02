@@ -2,7 +2,9 @@ from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from case_studies.closecycle.models import Showcase
@@ -148,4 +150,46 @@ class ShowcaseModelSerializerConnectionsTest(TestCase):
         self.assertEqual(
             ["Public Step"],
             [proc["name"] for proc in serializer.data["involved_processes"]],
+        )
+
+
+class ShowcaseMapEndpointPrefetchTest(TestCase):
+    CONNECTION_TABLES = (
+        "closecycle_showcasematerial",
+        "closecycle_showcaseprocess",
+        "materials_sample",
+        "materials_sampleseries",
+        "maps_catchment",
+        "inventories_scenario",
+    )
+
+    @classmethod
+    def setUpTestData(cls):
+        region = Region.objects.create(name="Map Region")
+        cls.showcase = Showcase.objects.create(
+            name="Map Showcase", region=region, publication_status="published"
+        )
+        material = Material.objects.create(
+            name="Map Feedstock", publication_status="published"
+        )
+        cls.showcase.showcase_materials.create(material=material, role="input")
+        process = Process.objects.create(
+            name="Map Step", publication_status="published"
+        )
+        cls.showcase.showcase_processes.create(process=process, order=0)
+
+    def _queried_connection_tables(self, url_name):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse(url_name), {"id": self.showcase.pk})
+        self.assertEqual(200, response.status_code)
+        sql = " ".join(query["sql"] for query in queries.captured_queries)
+        return {table for table in self.CONNECTION_TABLES if f'"{table}"' in sql}
+
+    def test_geojson_does_not_load_connections(self):
+        self.assertEqual(set(), self._queried_connection_tables("api-showcase-geojson"))
+
+    def test_summaries_load_only_process_links(self):
+        self.assertEqual(
+            {"closecycle_showcaseprocess"},
+            self._queried_connection_tables("api-showcase-summaries"),
         )
