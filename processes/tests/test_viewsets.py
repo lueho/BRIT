@@ -422,9 +422,65 @@ class ProcessAPIRelatedVisibilityTestCase(APITestCase):
             owner=cls.other,
             publication_status="private",
         )
+        # Relations owned by `other` with private visibility must not leak
+        # through the nested fields of the published process's serialization.
+        cls.foreign_private_category = ProcessCategory.objects.create(
+            name="Foreign Private Category",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.published_process.categories.add(cls.foreign_private_category)
+        cls.foreign_private_source = Source.objects.create(
+            title="Foreign Private Source",
+            abbreviation="FPS",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.published_process.sources.add(cls.foreign_private_source)
+        cls.published_source = Source.objects.create(
+            title="Published Source",
+            abbreviation="PS",
+            owner=cls.other,
+            publication_status="published",
+        )
+        cls.published_process.sources.add(cls.published_source)
+        foreign_private_parent = Process.objects.create(
+            name="Foreign Private Parent",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.published_child = Process.objects.create(
+            name="Published Child",
+            parent=foreign_private_parent,
+            owner=cls.other,
+            publication_status="published",
+        )
+        cls.foreign_private_material = Material.objects.create(
+            name="Foreign Private Material",
+            owner=cls.other,
+            publication_status="private",
+        )
+        cls.published_material = Material.objects.create(
+            name="Published Material",
+            owner=cls.other,
+            publication_status="published",
+        )
+        ProcessMaterial.objects.create(
+            process=cls.published_process,
+            material=cls.foreign_private_material,
+            role=ProcessMaterial.Role.INPUT,
+        )
+        ProcessMaterial.objects.create(
+            process=cls.published_process,
+            material=cls.published_material,
+            role=ProcessMaterial.Role.INPUT,
+        )
 
     def _member_names(self, response):
         return {entry["name"] for entry in response.data}
+
+    def _published_process_payload(self, data):
+        return next(entry for entry in data if entry["id"] == self.published_process.pk)
 
     def test_category_processes_anonymous_sees_only_published(self):
         response = self.client.get(
@@ -475,6 +531,145 @@ class ProcessAPIRelatedVisibilityTestCase(APITestCase):
             process["name"] for entry in response.data for process in entry["processes"]
         }
         self.assertEqual(names, {"Published Member", "My Private Member"})
+
+    def _assert_foreign_relations_hidden(self, payload):
+        self.assertEqual(
+            {category["name"] for category in payload["categories"]},
+            {"Shared Category"},
+        )
+        self.assertEqual(
+            {source["title"] for source in payload["sources"]},
+            {"Published Source"},
+        )
+
+    def test_list_hides_foreign_private_relations(self):
+        response = self.client.get("/processes/api/processes/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self._assert_foreign_relations_hidden(
+            self._published_process_payload(response.data)
+        )
+
+    def test_retrieve_hides_foreign_private_relations(self):
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data
+        self._assert_foreign_relations_hidden(payload)
+        self.assertEqual(
+            {m["name"] for m in payload["input_materials"]},
+            {"Published Material"},
+        )
+        self.assertEqual(
+            {pm["material"]["name"] for pm in payload["process_materials"]},
+            {"Published Material"},
+        )
+
+    def test_list_hides_foreign_private_parent_name(self):
+        response = self.client.get("/processes/api/processes/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        child = next(
+            entry for entry in response.data if entry["id"] == self.published_child.pk
+        )
+        self.assertIsNone(child["parent_name"])
+
+    def test_category_processes_hides_foreign_private_relations(self):
+        response = self.client.get(
+            f"/processes/api/categories/{self.category.pk}/processes/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self._assert_foreign_relations_hidden(
+            self._published_process_payload(response.data)
+        )
+
+    def test_by_category_hides_foreign_private_relations(self):
+        response = self.client.get("/processes/api/processes/by_category/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = self._published_process_payload(
+            [process for entry in response.data for process in entry["processes"]]
+        )
+        self._assert_foreign_relations_hidden(payload)
+
+    def test_by_mechanism_hides_foreign_private_relations(self):
+        response = self.client.get("/processes/api/processes/by_mechanism/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = self._published_process_payload(
+            [p for processes in response.data.values() for p in processes]
+        )
+        self._assert_foreign_relations_hidden(payload)
+
+    def test_variants_hides_foreign_private_relations(self):
+        """A private variant's private relations stay hidden if it becomes visible."""
+        self.foreign_private_variant.publication_status = "published"
+        self.foreign_private_variant.save()
+        self.foreign_private_variant.categories.add(self.foreign_private_category)
+        self.foreign_private_variant.sources.add(self.foreign_private_source)
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/variants/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        variant = next(
+            entry
+            for entry in response.data
+            if entry["id"] == self.foreign_private_variant.pk
+        )
+        self.assertEqual(variant["categories"], [])
+        self.assertEqual(variant["sources"], [])
+
+    def test_variants_owner_sees_foreign_relations_they_own(self):
+        self.foreign_private_variant.categories.add(self.foreign_private_category)
+        self.foreign_private_variant.sources.add(self.foreign_private_source)
+        self.client.force_login(self.other)
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/variants/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        variant = next(
+            entry
+            for entry in response.data
+            if entry["id"] == self.foreign_private_variant.pk
+        )
+        self.assertEqual(
+            {c["name"] for c in variant["categories"]},
+            {"Foreign Private Category"},
+        )
+        self.assertEqual(
+            {s["title"] for s in variant["sources"]},
+            {"Foreign Private Source"},
+        )
+
+    def test_sources_action_hides_foreign_private_sources(self):
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/sources/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            {source["title"] for source in response.data}, {"Published Source"}
+        )
+
+    def test_materials_action_hides_foreign_private_materials(self):
+        response = self.client.get(
+            f"/processes/api/processes/{self.published_process.pk}/materials/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            {m["name"] for m in response.data["inputs"]}, {"Published Material"}
+        )
+
+    def test_owner_of_private_relations_sees_them_in_list(self):
+        """`other` owns the private relations and must see them on the process."""
+        self.client.force_login(self.other)
+        response = self.client.get("/processes/api/processes/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = self._published_process_payload(response.data)
+        self.assertEqual(
+            {c["name"] for c in payload["categories"]},
+            {"Shared Category", "Foreign Private Category"},
+        )
+        self.assertEqual(
+            {s["title"] for s in payload["sources"]},
+            {"Published Source", "Foreign Private Source"},
+        )
 
 
 class ProcessAPIQueryCountTestCase(APITestCase):
