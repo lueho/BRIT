@@ -244,6 +244,14 @@ class GenerateCitationKeyTestCase(TestCase):
         source = Source.objects.create(title="Silent spring", year=1962)
         self.assertEqual(source.citation_key, "Silent 1962")
 
+    def test_waste_flyer_key_collides_with_regular_source(self):
+        """WasteFlyer.objects only sees flyers; collisions span all Sources."""
+        from sources.waste_collection.models import WasteFlyer
+
+        Source.objects.create(title="Annual waste report", year=2024)
+        flyer = WasteFlyer(title="Annual waste report", year=2024)
+        self.assertEqual(generate_citation_key(flyer), "Annual 2024a")
+
 
 class SourceUpdateAbbreviationTestCase(TestCase):
     """Tests for the explicit update_abbreviation() method."""

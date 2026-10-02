@@ -123,9 +123,10 @@ def generate_citation_key(source):
     if not base:
         return base
 
+    # Query the concrete model's manager: proxy managers like
+    # WasteFlyer.objects filter by type, but citation keys share one column.
     existing = set(
-        type(source)
-        .objects.filter(citation_key__startswith=base)
+        source._meta.concrete_model.objects.filter(citation_key__startswith=base)
         .exclude(pk=source.pk)
         .values_list("citation_key", flat=True)
     )
