@@ -22,11 +22,11 @@
             {{ object.country }}
         </p>
     {% endif %}
-    {% if object.catchment %}
+    {% if visible_catchment %}
         <p class="card-text">
             <strong>Catchment:</strong>
             <br>
-            {{ object.catchment }}
+            {{ visible_catchment }}
         </p>
     {% endif %}
     {% if object.description %}
@@ -37,22 +37,22 @@
         </p>
     {% endif %}
     {% block additional_details %}
-        {% if object.process_chain %}
+        {% if process_chain %}
             <hr>
             <h5>Processing chain</h5>
             <ol>
-                {% for proc in object.process_chain %}
+                {% for proc in process_chain %}
                     <li>
                         <a href="{% url 'processes:processtype-detail' proc.id %}">{{ proc.name }}</a>
                     </li>
                 {% endfor %}
             </ol>
         {% endif %}
-        {% if object.showcase_materials.all %}
+        {% if material_links %}
             <hr>
             <h5>Materials</h5>
             <ul>
-                {% for link in object.showcase_materials.all %}
+                {% for link in material_links %}
                     <li>
                         <a href="{% url 'material-detail' link.material_id %}">{{ link.material.name }}</a>
                         ({{ link.get_role_display }})
@@ -60,33 +60,33 @@
                 {% endfor %}
             </ul>
         {% endif %}
-        {% if object.samples.all %}
+        {% if samples %}
             <hr>
             <h5>Samples</h5>
             <ul>
-                {% for sample in object.samples.all %}
+                {% for sample in samples %}
                     <li>
                         <a href="{% url 'sample-detail' sample.id %}">{{ sample.name }}</a>
                     </li>
                 {% endfor %}
             </ul>
         {% endif %}
-        {% if object.sample_series.all %}
+        {% if sample_series %}
             <hr>
             <h5>Sample series</h5>
             <ul>
-                {% for series in object.sample_series.all %}
+                {% for series in sample_series %}
                     <li>
                         <a href="{% url 'sampleseries-detail' series.id %}">{{ series.name }}</a>
                     </li>
                 {% endfor %}
             </ul>
         {% endif %}
-        {% if object.scenarios.all %}
+        {% if scenarios %}
             <hr>
             <h5>Scenarios</h5>
             <ul>
-                {% for scenario in object.scenarios.all %}
+                {% for scenario in scenarios %}
                     <li>
                         <a href="{% url 'scenario-detail' scenario.id %}">{{ scenario.name }}</a>
                     </li>

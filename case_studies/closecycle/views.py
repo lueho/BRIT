@@ -50,6 +50,21 @@ class ShowcaseCreateView(UserCreatedObjectCreateWithInlinesView):
 class ShowcaseDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Showcase
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        context.update(
+            {
+                "visible_catchment": self.object.visible_catchment(user),
+                "material_links": self.object.visible_material_links(user),
+                "process_chain": self.object.visible_process_chain(user),
+                "samples": self.object.visible_samples(user),
+                "sample_series": self.object.visible_sample_series(user),
+                "scenarios": self.object.visible_scenarios(user),
+            }
+        )
+        return context
+
 
 class ShowcaseUpdateView(UserCreatedObjectUpdateWithInlinesView):
     model = Showcase

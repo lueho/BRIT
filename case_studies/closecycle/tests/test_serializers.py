@@ -3,10 +3,15 @@ from types import SimpleNamespace
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.test import TestCase
+from django.urls import reverse
 
 from case_studies.closecycle.models import Showcase
-from case_studies.closecycle.serializers import ShowcaseFlatSerializer
+from case_studies.closecycle.serializers import (
+    ShowcaseFlatSerializer,
+    ShowcaseModelSerializer,
+)
 from maps.models import Region
+from materials.models import Material, Sample
 from processes.models import Process
 
 
@@ -60,3 +65,87 @@ class ShowcaseFlatSerializerRegressionTest(TestCase):
         serializer.request = SimpleNamespace(user=user)
         data = serializer.data
         self.assertEqual(data["involved_processes"], [])
+
+
+class ShowcaseModelSerializerConnectionsTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        User = get_user_model()
+        cls.owner = User.objects.create(username="private_owner")
+        region = Region.objects.create(name="API Region")
+        cls.showcase = Showcase.objects.create(
+            name="API Showcase", region=region, publication_status="published"
+        )
+        public_material = Material.objects.create(
+            name="Public Feedstock", publication_status="published"
+        )
+        private_material = Material.objects.create(
+            name="Private Feedstock", owner=cls.owner
+        )
+        for material in (public_material, private_material):
+            cls.showcase.showcase_materials.create(material=material, role="input")
+        public_process = Process.objects.create(
+            name="Public Step", publication_status="published"
+        )
+        private_process = Process.objects.create(name="Private Step", owner=cls.owner)
+        for order, process in enumerate((public_process, private_process)):
+            cls.showcase.showcase_processes.create(process=process, order=order)
+        cls.showcase.samples.add(
+            Sample.objects.create(
+                name="Private Sample", material=public_material, owner=cls.owner
+            )
+        )
+
+    def test_connection_fields_are_read_only(self):
+        fields = ShowcaseModelSerializer().fields
+        for name in (
+            "catchment",
+            "showcase_materials",
+            "process_chain",
+            "samples",
+            "sample_series",
+            "scenarios",
+        ):
+            with self.subTest(field=name):
+                self.assertTrue(fields[name].read_only)
+
+    def test_anonymous_api_detail_hides_private_connections(self):
+        response = self.client.get(
+            reverse("api-showcase-detail", args=[self.showcase.pk])
+        )
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(
+            ["Public Feedstock"],
+            [link["material"] for link in data["showcase_materials"]],
+        )
+        self.assertEqual(
+            ["Public Step"], [step["name"] for step in data["process_chain"]]
+        )
+        self.assertEqual([], data["samples"])
+
+    def test_owner_api_detail_includes_own_private_connections(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("api-showcase-detail", args=[self.showcase.pk])
+        )
+        data = response.json()
+        self.assertEqual(
+            ["Public Feedstock", "Private Feedstock"],
+            [link["material"] for link in data["showcase_materials"]],
+        )
+        self.assertEqual(
+            ["Public Step", "Private Step"],
+            [step["name"] for step in data["process_chain"]],
+        )
+        self.assertEqual(["Private Sample"], [s["name"] for s in data["samples"]])
+
+    def test_involved_processes_hide_private_processes(self):
+        user = get_user_model().objects.create(username="feature_user")
+        user.user_permissions.add(Permission.objects.get(codename="access_app_feature"))
+        serializer = ShowcaseFlatSerializer(self.showcase)
+        serializer.request = SimpleNamespace(user=user)
+        self.assertEqual(
+            ["Public Step"],
+            [proc["name"] for proc in serializer.data["involved_processes"]],
+        )

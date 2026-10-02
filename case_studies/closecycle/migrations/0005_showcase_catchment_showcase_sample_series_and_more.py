@@ -171,11 +171,4 @@ class Migration(migrations.Migration):
                 name="closecycle_showcasematerial_unique_material_role",
             ),
         ),
-        migrations.AddConstraint(
-            model_name="showcaseprocess",
-            constraint=models.UniqueConstraint(
-                fields=("showcase", "process"),
-                name="closecycle_showcaseprocess_unique_process",
-            ),
-        ),
     ]

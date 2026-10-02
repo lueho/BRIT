@@ -8,6 +8,7 @@ from django.db.models import (
     ManyToManyField,
     Model,
     PositiveIntegerField,
+    Prefetch,
     UniqueConstraint,
 )
 from django.urls import reverse
@@ -17,6 +18,7 @@ from maps.models import Catchment, Region
 from materials.models import Material, Sample, SampleSeries
 from processes.models import Process
 from utils.object_management.models import NamedUserCreatedObject
+from utils.object_management.permissions import filter_queryset_for_user
 
 
 class Showcase(NamedUserCreatedObject):
@@ -121,9 +123,111 @@ class Showcase(NamedUserCreatedObject):
     @property
     def process_chain(self):
         """Processes in their configured chain order (not Process.Meta ordering)."""
-        return [
-            link.process for link in self.showcase_processes.select_related("process")
-        ]
+        cache = getattr(self, "_prefetched_objects_cache", None)
+        if cache and "showcase_processes" in cache:
+            links = cache["showcase_processes"]
+        else:
+            links = self.showcase_processes.select_related("process")
+        return [link.process for link in links]
+
+    @staticmethod
+    def _visible_material_links_queryset(user):
+        visible_materials = filter_queryset_for_user(Material.objects.all(), user)
+        return ShowcaseMaterial.objects.filter(
+            material__in=visible_materials
+        ).select_related("material")
+
+    @staticmethod
+    def _visible_process_links_queryset(user):
+        visible_processes = filter_queryset_for_user(Process.objects.all(), user)
+        return ShowcaseProcess.objects.filter(
+            process__in=visible_processes
+        ).select_related("process")
+
+    @classmethod
+    def _scenario_model(cls):
+        return cls._meta.get_field("scenarios").related_model
+
+    @classmethod
+    def prefetch_visible_connections(cls, queryset, user):
+        """Prefetch the connections of each showcase that ``user`` may read.
+
+        The ``visible_*`` methods read these caches instead of querying per
+        showcase.
+        """
+        return queryset.prefetch_related(
+            Prefetch(
+                "showcase_materials",
+                queryset=cls._visible_material_links_queryset(user),
+                to_attr="_visible_material_links",
+            ),
+            Prefetch(
+                "showcase_processes",
+                queryset=cls._visible_process_links_queryset(user),
+                to_attr="_visible_process_links",
+            ),
+            Prefetch(
+                "samples",
+                queryset=filter_queryset_for_user(Sample.objects.all(), user),
+                to_attr="_visible_samples",
+            ),
+            Prefetch(
+                "sample_series",
+                queryset=filter_queryset_for_user(SampleSeries.objects.all(), user),
+                to_attr="_visible_sample_series",
+            ),
+            Prefetch(
+                "catchment",
+                queryset=filter_queryset_for_user(Catchment.objects.all(), user),
+                to_attr="_visible_catchment",
+            ),
+            Prefetch(
+                "scenarios",
+                queryset=filter_queryset_for_user(
+                    cls._scenario_model().objects.all(), user
+                ),
+                to_attr="_visible_scenarios",
+            ),
+        )
+
+    def visible_material_links(self, user):
+        """Material links whose material ``user`` may read, by role and order."""
+        if hasattr(self, "_visible_material_links"):
+            return self._visible_material_links
+        return list(self._visible_material_links_queryset(user).filter(showcase=self))
+
+    def visible_process_chain(self, user):
+        """Chain-ordered processes of this showcase that ``user`` may read."""
+        if hasattr(self, "_visible_process_links"):
+            links = self._visible_process_links
+        else:
+            links = self._visible_process_links_queryset(user).filter(showcase=self)
+        return [link.process for link in links]
+
+    def visible_samples(self, user):
+        if hasattr(self, "_visible_samples"):
+            return self._visible_samples
+        return list(filter_queryset_for_user(self.samples.all(), user))
+
+    def visible_sample_series(self, user):
+        if hasattr(self, "_visible_sample_series"):
+            return self._visible_sample_series
+        return list(filter_queryset_for_user(self.sample_series.all(), user))
+
+    def visible_scenarios(self, user):
+        if hasattr(self, "_visible_scenarios"):
+            return self._visible_scenarios
+        return list(filter_queryset_for_user(self.scenarios.all(), user))
+
+    def visible_catchment(self, user):
+        """The catchment if ``user`` may read it, otherwise ``None``."""
+        if self.catchment_id is None:
+            return None
+        if hasattr(self, "_visible_catchment"):
+            return self._visible_catchment
+        return filter_queryset_for_user(
+            Catchment.objects.filter(pk=self.catchment_id), user
+        ).first()
 
 
 class ShowcaseMaterial(Model):
@@ -182,12 +286,6 @@ class ShowcaseProcess(Model):
 
     class Meta:
         ordering = ["order", "id"]
-        constraints = [
-            UniqueConstraint(
-                fields=["showcase", "process"],
-                name="closecycle_showcaseprocess_unique_process",
-            )
-        ]
 
     def __str__(self):
         return f"{self.showcase}: {self.process} ({self.order})"

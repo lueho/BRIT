@@ -112,3 +112,30 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         response = self.client.post(self.get_update_url(showcase.pk), data)
         self.assertEqual(response.status_code, 302)
         self.assertEqual([process_b, process_a], showcase.process_chain)
+
+    def test_detail_view_hides_private_connections_from_anonymous_users(self):
+        owner = self.owner_user
+        showcase = self.published_object
+        public_material = Material.objects.create(
+            name="Public Detail Feedstock", publication_status="published"
+        )
+        private_material = Material.objects.create(
+            name="Private Detail Feedstock", owner=owner
+        )
+        for material in (public_material, private_material):
+            showcase.showcase_materials.create(material=material, role="input")
+        showcase.showcase_processes.create(
+            process=Process.objects.create(name="Private Detail Step", owner=owner),
+            order=1,
+        )
+
+        response = self.client.get(self.get_detail_url(showcase.pk))
+
+        self.assertContains(response, "Public Detail Feedstock")
+        self.assertNotContains(response, "Private Detail Feedstock")
+        self.assertNotContains(response, "Private Detail Step")
+
+        self.client.force_login(owner)
+        response = self.client.get(self.get_detail_url(showcase.pk))
+        self.assertContains(response, "Private Detail Feedstock")
+        self.assertContains(response, "Private Detail Step")

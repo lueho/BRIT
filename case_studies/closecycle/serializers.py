@@ -1,3 +1,4 @@
+from django.contrib.auth.models import AnonymousUser
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from rest_framework.serializers import ModelSerializer
@@ -23,10 +24,17 @@ class ShowcaseMaterialSerializer(ModelSerializer):
         fields = ["material_id", "material", "role", "order"]
 
 
+def _request_user(serializer):
+    request = serializer.context.get("request")
+    return request.user if request is not None else AnonymousUser()
+
+
 class ShowcaseModelSerializer(ModelSerializer):
+    """Showcase with its connections, limited to records the reader may see."""
+
     region = RegionModelSerializer()
-    catchment = CharField(source="catchment.name", default=None)
-    showcase_materials = ShowcaseMaterialSerializer(many=True)
+    catchment = serializers.SerializerMethodField()
+    showcase_materials = serializers.SerializerMethodField()
     process_chain = serializers.SerializerMethodField()
     samples = serializers.SerializerMethodField()
     sample_series = serializers.SerializerMethodField()
@@ -47,23 +55,36 @@ class ShowcaseModelSerializer(ModelSerializer):
             "scenarios",
         ]
 
+    def get_catchment(self, obj):
+        catchment = obj.visible_catchment(_request_user(self))
+        return catchment.name if catchment is not None else None
+
+    def get_showcase_materials(self, obj):
+        links = obj.visible_material_links(_request_user(self))
+        return ShowcaseMaterialSerializer(links, many=True).data
+
     def get_process_chain(self, obj):
         return [
-            {"id": process.id, "name": process.name} for process in obj.process_chain
+            {"id": process.id, "name": process.name}
+            for process in obj.visible_process_chain(_request_user(self))
         ]
 
     def get_samples(self, obj):
-        return [{"id": sample.id, "name": sample.name} for sample in obj.samples.all()]
+        return [
+            {"id": sample.id, "name": sample.name}
+            for sample in obj.visible_samples(_request_user(self))
+        ]
 
     def get_sample_series(self, obj):
         return [
-            {"id": series.id, "name": series.name} for series in obj.sample_series.all()
+            {"id": series.id, "name": series.name}
+            for series in obj.visible_sample_series(_request_user(self))
         ]
 
     def get_scenarios(self, obj):
         return [
             {"id": scenario.id, "name": scenario.name}
-            for scenario in obj.scenarios.all()
+            for scenario in obj.visible_scenarios(_request_user(self))
         ]
 
 
@@ -87,7 +108,7 @@ class ShowcaseFlatSerializer(ModelSerializer):
                 "id": proc.pk,
                 "url": f"/processes/types/{proc.pk}/",
             }
-            for proc in obj.process_chain
+            for proc in obj.visible_process_chain(user)
         ]
 
 
