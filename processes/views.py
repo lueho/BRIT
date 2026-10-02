@@ -227,11 +227,8 @@ class ProcessCategoryDetailView(UserCreatedObjectDetailView):
             process_count_status = "published"
         processes = process_queryset.select_related("owner").prefetch_related(
             "authors",
-            Prefetch(
-                "categories",
-                queryset=filter_queryset_for_user(
-                    ProcessCategory.objects.all(), self.request.user
-                ),
+            _visible_prefetch(
+                "categories", ProcessCategory.objects.all(), self.request.user
             ),
         )
         context["processes"] = processes
@@ -323,6 +320,18 @@ class ProcessModalCreateView(UserCreatedObjectModalCreateView):
     permission_required = "processes.add_process"
 
 
+def _visible_prefetch(lookup, queryset, user):
+    """Prefetch ``lookup`` restricted to rows the user may read."""
+
+    return Prefetch(lookup, queryset=filter_queryset_for_user(queryset, user))
+
+
+def _visible_ids(queryset, user):
+    """Return the PKs in ``queryset`` the user may read."""
+
+    return set(filter_queryset_for_user(queryset, user).values_list("pk", flat=True))
+
+
 def _process_list_queryset(queryset, user):
     """Shared queryset for process list views.
 
@@ -336,10 +345,7 @@ def _process_list_queryset(queryset, user):
         queryset.select_related("owner", "parent")
         .prefetch_related(
             "authors",
-            Prefetch(
-                "categories",
-                queryset=filter_queryset_for_user(ProcessCategory.objects.all(), user),
-            ),
+            _visible_prefetch("categories", ProcessCategory.objects.all(), user),
             "process_materials__material",
         )
         .annotate(parent_is_visible=Exists(visible_parents))
@@ -383,10 +389,8 @@ def _process_detail_context(request, obj, policy=None):
     material_ids = {link.material_id for link in input_links} | {
         link.material_id for link in output_links
     }
-    visible_material_ids = set(
-        filter_queryset_for_user(
-            Material.objects.filter(pk__in=material_ids), user
-        ).values_list("pk", flat=True)
+    visible_material_ids = _visible_ids(
+        Material.objects.filter(pk__in=material_ids), user
     )
     context["input_materials"] = [
         link for link in input_links if link.material_id in visible_material_ids
@@ -418,10 +422,8 @@ def _process_detail_context(request, obj, policy=None):
     )
     context["process_authors"] = obj.ordered_authors()
     sources = obj.sources_ordered()
-    visible_source_ids = set(
-        filter_queryset_for_user(
-            Source.objects.filter(pk__in=[s.pk for s in sources]), user
-        ).values_list("pk", flat=True)
+    visible_source_ids = _visible_ids(
+        Source.objects.filter(pk__in=[s.pk for s in sources]), user
     )
     context["bibliography_sources"] = sorted(
         (s for s in sources if s.pk in visible_source_ids),
@@ -550,20 +552,12 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             .get_queryset()
             .select_related("owner", "parent")
             .prefetch_related(
-                Prefetch(
-                    "categories",
-                    queryset=filter_queryset_for_user(
-                        ProcessCategory.objects.all(), user
-                    ),
-                ),
+                _visible_prefetch("categories", ProcessCategory.objects.all(), user),
                 Prefetch(
                     "process_authors",
                     queryset=ProcessAuthor.objects.select_related("author"),
                 ),
-                Prefetch(
-                    "variants",
-                    queryset=filter_queryset_for_user(Process.objects.all(), user),
-                ),
+                _visible_prefetch("variants", Process.objects.all(), user),
                 Prefetch(
                     "process_materials",
                     queryset=ProcessMaterial.objects.select_related(
