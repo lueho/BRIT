@@ -237,6 +237,14 @@ class Process(NamedUserCreatedObject):
             "order", "id"
         )
 
+    def operating_parameters_by_type(self):
+        """Return operating parameters grouped by their display label."""
+
+        grouped = {}
+        for param in self.operating_parameters.all():
+            grouped.setdefault(param.get_parameter_display(), []).append(param)
+        return grouped
+
     def ordered_authors(self):
         return self.process_authors.order_by(
             "position", "author_id", "id"
