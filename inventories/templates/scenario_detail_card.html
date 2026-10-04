@@ -27,6 +27,12 @@
             <strong>Catchment</strong>:
             <a href="{% url 'catchment-detail' object.catchment.pk %}">{{ object.catchment.name }}</a>
         </p>
+        {% if object.showcase %}
+            <p class="card-text">
+                <strong>Showcase:</strong>
+                <a href="{% url 'showcase-detail' object.showcase.pk %}">{{ object.showcase.name }}</a>
+            </p>
+        {% endif %}
     </div>
     <div class="card-footer d-flex">
         {% object_policy object as policy %}

@@ -1,3 +1,4 @@
+from django.contrib.auth.models import AnonymousUser
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from rest_framework.serializers import ModelSerializer
@@ -9,17 +10,82 @@ from maps.serializers import (
     PolygonSerializer,
     RegionModelSerializer,
 )
-from processes.models import Process
 
-from .models import BiogasPlantsSweden
+from .models import BiogasPlantsSweden, ShowcaseMaterial
+
+
+class ShowcaseMaterialSerializer(ModelSerializer):
+    material_id = serializers.IntegerField(source="material.id")
+    material = CharField(source="material.name")
+    role = CharField(source="get_role_display")
+
+    class Meta:
+        model = ShowcaseMaterial
+        fields = ["material_id", "material", "role", "order"]
+
+
+def _request_user(serializer):
+    request = serializer.context.get("request")
+    return request.user if request is not None else AnonymousUser()
 
 
 class ShowcaseModelSerializer(ModelSerializer):
+    """Showcase with its connections, limited to records the reader may see."""
+
     region = RegionModelSerializer()
+    catchment = serializers.SerializerMethodField()
+    showcase_materials = serializers.SerializerMethodField()
+    process_chain = serializers.SerializerMethodField()
+    samples = serializers.SerializerMethodField()
+    sample_series = serializers.SerializerMethodField()
+    scenarios = serializers.SerializerMethodField()
 
     class Meta:
         model = Showcase
-        fields = ["id", "name", "region", "description"]
+        fields = [
+            "id",
+            "name",
+            "region",
+            "catchment",
+            "description",
+            "showcase_materials",
+            "process_chain",
+            "samples",
+            "sample_series",
+            "scenarios",
+        ]
+
+    def get_catchment(self, obj):
+        catchment = obj.visible_catchment(_request_user(self))
+        return catchment.name if catchment is not None else None
+
+    def get_showcase_materials(self, obj):
+        links = obj.visible_material_links(_request_user(self))
+        return ShowcaseMaterialSerializer(links, many=True).data
+
+    def get_process_chain(self, obj):
+        return [
+            {"id": process.id, "name": process.name}
+            for process in obj.visible_process_chain(_request_user(self))
+        ]
+
+    def get_samples(self, obj):
+        return [
+            {"id": sample.id, "name": sample.name}
+            for sample in obj.visible_samples(_request_user(self))
+        ]
+
+    def get_sample_series(self, obj):
+        return [
+            {"id": series.id, "name": series.name}
+            for series in obj.visible_sample_series(_request_user(self))
+        ]
+
+    def get_scenarios(self, obj):
+        return [
+            {"id": scenario.id, "name": scenario.name}
+            for scenario in obj.visible_scenarios(_request_user(self))
+        ]
 
 
 class ShowcaseFlatSerializer(ModelSerializer):
@@ -31,34 +97,19 @@ class ShowcaseFlatSerializer(ModelSerializer):
         fields = ["id", "name", "region", "description", "involved_processes"]
 
     def get_involved_processes(self, obj):
-        # Showcase name to involved process names (keep in sync with view)
-        SHOWCASE_PROCESS_MAP = {
-            "Municipality & farms 1": ["Anaerobic Digestion", "Composting"],
-            "Agricultural Education": [
-                "Anaerobic Digestion",
-                "Pyrolysis",
-                "Composting",
-            ],
-        }
         request = getattr(self, "request", None)
         user = getattr(request, "user", None)
         # If no request or user, treat as anonymous (no permission)
         if not (user and user.has_perm("processes.access_app_feature")):
             return []
-        showcase_name = getattr(obj, "name", None)
-        involved_processes = []
-        if showcase_name in SHOWCASE_PROCESS_MAP:
-            process_names = SHOWCASE_PROCESS_MAP[showcase_name]
-            processes = Process.objects.filter(name__in=process_names)
-            for proc in processes:
-                involved_processes.append(
-                    {
-                        "name": proc.name,
-                        "id": proc.pk,
-                        "url": f"/processes/types/{proc.pk}/",
-                    }
-                )
-        return involved_processes
+        return [
+            {
+                "name": proc.name,
+                "id": proc.pk,
+                "url": f"/processes/types/{proc.pk}/",
+            }
+            for proc in obj.visible_process_chain(user)
+        ]
 
 
 class ShowcaseSummaryListSerializer(ModelSerializer):

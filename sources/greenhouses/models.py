@@ -39,28 +39,13 @@ class NantesGreenhouses(models.Model):
     above_ground = models.BooleanField(blank=True, null=True)
 
 
-class GreenhouseManager(UserCreatedObjectManager):
-    def types(self):
-        types = []
-        for greenhouse in self.all():
-            greenhouse_type = {
-                "heated": greenhouse.heated,
-                "lighted": greenhouse.lighted,
-                "high_wire": greenhouse.high_wire,
-                "above_ground": greenhouse.above_ground,
-            }
-            greenhouse_type.update(greenhouse.cultures())
-            types.append(greenhouse_type)
-        return types
-
-
 class Greenhouse(NamedUserCreatedObject):
     heated = models.BooleanField(blank=True, null=True)
     lighted = models.BooleanField(blank=True, null=True)
     high_wire = models.BooleanField(blank=True, null=True)
     above_ground = models.BooleanField(blank=True, null=True)
 
-    objects = GreenhouseManager()
+    objects = UserCreatedObjectManager()
 
     class Meta(NamedUserCreatedObject.Meta):
         pass

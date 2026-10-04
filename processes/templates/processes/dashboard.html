@@ -31,9 +31,17 @@
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">Quick Actions</h5>
-                        <a href="{% url 'processes:process-create' %}" class="btn btn-primary">Add Process</a>
-                        <a href="{% url 'processes:processcategory-create' %}"
-                           class="btn btn-secondary">Add Category</a>
+                        {% if can_add_process or can_add_processcategory %}
+                            {% if can_add_process %}
+                                <a href="{% url 'processes:process-create' %}" class="btn btn-primary">Add Process</a>
+                            {% endif %}
+                            {% if can_add_processcategory %}
+                                <a href="{% url 'processes:processcategory-create' %}"
+                                   class="btn btn-secondary">Add Category</a>
+                            {% endif %}
+                        {% else %}
+                            <p class="card-text text-muted mb-0">No actions available.</p>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -95,9 +103,7 @@
                                 {% for process in my_processes %}
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         <a href="{% url 'processes:process-detail' process.pk %}">{{ process.name }}</a>
-                                        <span class="badge bg-{{ process.publication_status|default:'secondary' }}">
-                                            {{ process.get_publication_status_display }}
-                                        </span>
+                                        {% include "object_management/review_status_badge.html" with object=process %}
                                     </li>
                                 {% endfor %}
                             </ul>

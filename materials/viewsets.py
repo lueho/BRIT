@@ -1,6 +1,7 @@
 from rest_framework.exceptions import PermissionDenied
 
 from utils.object_management.viewsets import UserCreatedObjectViewSet
+from utils.viewsets import ReadWriteSerializerViewSetMixin
 
 from .filters import (
     CompositionFilterSet,
@@ -65,83 +66,63 @@ class SampleBoundMutationViewSetMixin:
         super().perform_update(serializer)
 
 
-class MaterialViewSet(UserCreatedObjectViewSet):
+class MaterialViewSet(ReadWriteSerializerViewSetMixin, UserCreatedObjectViewSet):
     queryset = Material.objects.all()
     serializer_class = MaterialAPISerializer
+    write_serializer_class = MaterialWriteSerializer
     filterset_class = MaterialFilterSet
 
-    def get_serializer_class(self):
-        if self.action in ("create", "update", "partial_update"):
-            return MaterialWriteSerializer
-        return MaterialAPISerializer
 
-
-class SampleSeriesViewSet(UserCreatedObjectViewSet):
+class SampleSeriesViewSet(ReadWriteSerializerViewSetMixin, UserCreatedObjectViewSet):
     queryset = SampleSeries.objects.all()
     serializer_class = SampleSeriesAPISerializer
+    write_serializer_class = SampleSeriesWriteSerializer
     filterset_class = SampleSeriesFilterSet
 
-    def get_serializer_class(self):
-        if self.action in ("create", "update", "partial_update"):
-            return SampleSeriesWriteSerializer
-        return SampleSeriesAPISerializer
 
-
-class SampleGroupViewSet(UserCreatedObjectViewSet):
+class SampleGroupViewSet(ReadWriteSerializerViewSetMixin, UserCreatedObjectViewSet):
     queryset = SampleGroup.objects.all()
     serializer_class = SampleGroupAPISerializer
+    write_serializer_class = SampleGroupWriteSerializer
     filterset_class = SampleGroupFilterSet
 
-    def get_serializer_class(self):
-        if self.action in ("create", "update", "partial_update"):
-            return SampleGroupWriteSerializer
-        return SampleGroupAPISerializer
 
-
-class SampleViewSet(UserCreatedObjectViewSet):
+class SampleViewSet(ReadWriteSerializerViewSetMixin, UserCreatedObjectViewSet):
     queryset = Sample.objects.all()
     serializer_class = SampleAPISerializer
+    write_serializer_class = SampleWriteSerializer
     filterset_class = SampleFilterSet
 
-    def get_serializer_class(self):
-        if self.action in ("create", "update", "partial_update"):
-            return SampleWriteSerializer
-        return SampleAPISerializer
 
-
-class CompositionViewSet(SampleBoundMutationViewSetMixin, UserCreatedObjectViewSet):
+class CompositionViewSet(
+    ReadWriteSerializerViewSetMixin,
+    SampleBoundMutationViewSetMixin,
+    UserCreatedObjectViewSet,
+):
     queryset = Composition.objects.all()
     serializer_class = CompositionAPISerializer
+    write_serializer_class = CompositionWriteSerializer
     filterset_class = CompositionFilterSet
     sample_policy_key = "can_manage_samples"
 
-    def get_serializer_class(self):
-        if self.action in ("create", "update", "partial_update"):
-            return CompositionWriteSerializer
-        return CompositionAPISerializer
-
 
 class ComponentMeasurementViewSet(
-    SampleBoundMutationViewSetMixin, UserCreatedObjectViewSet
+    ReadWriteSerializerViewSetMixin,
+    SampleBoundMutationViewSetMixin,
+    UserCreatedObjectViewSet,
 ):
     queryset = ComponentMeasurement.objects.all()
     serializer_class = ComponentMeasurementReadSerializer
+    write_serializer_class = ComponentMeasurementWriteSerializer
     sample_policy_key = "can_manage_samples"
-
-    def get_serializer_class(self):
-        if self.action in ("create", "update", "partial_update"):
-            return ComponentMeasurementWriteSerializer
-        return ComponentMeasurementReadSerializer
 
 
 class MaterialPropertyValueViewSet(
-    SampleBoundMutationViewSetMixin, UserCreatedObjectViewSet
+    ReadWriteSerializerViewSetMixin,
+    SampleBoundMutationViewSetMixin,
+    UserCreatedObjectViewSet,
 ):
     queryset = MaterialPropertyValue.objects.all()
     serializer_class = MaterialPropertyValueReadSerializer
+    write_serializer_class = MaterialPropertyValueWriteSerializer
     sample_policy_key = "can_add_property"
-
-    def get_serializer_class(self):
-        if self.action in ("create", "update", "partial_update"):
-            return MaterialPropertyValueWriteSerializer
-        return MaterialPropertyValueReadSerializer

@@ -1,5 +1,6 @@
 import io
 import json
+import re
 
 from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
@@ -65,17 +66,36 @@ from .models import (
 from .tasks import start_inventory_run
 
 
-def _get_posted_object_or_404(model, pk):
+def _get_posted_object_or_404(model, pk, queryset=None):
     """Fetch an object by an id taken from request data.
 
     ``get_object_or_404`` only translates ``DoesNotExist``; ids arriving as
     POST strings can also fail with ``ValueError``/``TypeError`` before the
-    query reaches the database, so catch those too.
+    query reaches the database, so catch those too. ``queryset`` optionally
+    restricts the lookup — e.g. to objects visible to the requesting user.
     """
+    manager = model.objects if queryset is None else queryset
     try:
-        return model.objects.get(pk=pk)
+        return manager.get(pk=pk)
     except (model.DoesNotExist, ValueError, TypeError):
         raise Http404 from None
+
+
+def _posted_sample_series(request, feedstock):
+    """Resolve the optional ``sample_series`` POST field.
+
+    The series is the temporal profile of the configured feedstock material,
+    so it must belong to it. Returns ``None`` when no series was posted.
+    """
+    raw = request.POST.get("sample_series")
+    if not raw:
+        return None
+    series = _get_posted_object_or_404(SampleSeries, raw)
+    if series.material_id != feedstock.pk:
+        raise InvalidParameterValue(
+            "The sample series does not belong to the selected feedstock."
+        )
+    return series
 
 
 class InventoriesExplorerView(BreadcrumbContextMixin, TemplateView):
@@ -205,6 +225,72 @@ class ScenarioAutocompleteView(UserCreatedObjectAutocompleteView):
 
 CUSTOM_PARAMETER_VALUE = "custom"
 
+KWARG_NAME_PATTERN = re.compile(r"^\w{1,28}$")
+
+
+def _parse_kwarg_rows(request):
+    """Parse the free-form factor rows of the generic add-inventory form.
+
+    Expects aligned ``kwarg_name``/``kwarg_value`` lists; optional
+    ``kwarg_unit``/``kwarg_standard_deviation``/``kwarg_preset`` lists are
+    padded. Returns ``[{"name", "value", "unit", "standard_deviation",
+    "preset"}]`` dicts — ``preset`` holds an existing
+    InventoryAlgorithmParameterValue id when the row was filled from a preset.
+    """
+    names = request.POST.getlist("kwarg_name")
+    raw_values = request.POST.getlist("kwarg_value")
+    if len(names) != len(raw_values):
+        raise InvalidParameterValue("Incomplete factor row.")
+    # Optional lists may be shorter — pad them.
+    units = request.POST.getlist("kwarg_unit")
+    raw_stds = request.POST.getlist("kwarg_standard_deviation")
+    raw_presets = request.POST.getlist("kwarg_preset")
+    units += [""] * (len(names) - len(units))
+    raw_stds += [""] * (len(names) - len(raw_stds))
+    raw_presets += [""] * (len(names) - len(raw_presets))
+    specs = []
+    for name, raw_value, unit, raw_std, raw_preset in zip(
+        names, raw_values, units, raw_stds, raw_presets, strict=False
+    ):
+        name = name.strip()
+        if not KWARG_NAME_PATTERN.match(name):
+            raise InvalidParameterValue(
+                f"Invalid parameter name '{name}'. Use letters, digits and "
+                "underscores only (max 28 characters)."
+            )
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError):
+            raise InvalidParameterValue(
+                f"A numeric value is required for parameter '{name}'."
+            ) from None
+        try:
+            std = float(raw_std) if raw_std not in (None, "") else None
+        except ValueError:
+            raise InvalidParameterValue(
+                f"The standard deviation for parameter '{name}' must be numeric."
+            ) from None
+        if len(unit) > 20:
+            raise InvalidParameterValue(
+                f"The unit for parameter '{name}' is too long (max 20 characters)."
+            )
+        preset = None
+        if raw_preset not in (None, ""):
+            try:
+                preset = int(raw_preset)
+            except ValueError:
+                raise InvalidParameterValue("Invalid preset reference.") from None
+        specs.append(
+            {
+                "name": name,
+                "value": value,
+                "unit": unit.strip(),
+                "standard_deviation": std,
+                "preset": preset,
+            }
+        )
+    return specs
+
 
 def create_custom_parameter_value(request, parameter):
     """Creates a user-provided value for a parameter from POSTed custom inputs."""
@@ -299,28 +385,217 @@ class ScenarioAddInventoryAlgorithmView(
 
     def post(self, request, *args, **kwargs):
         scenario = get_object_or_404(Scenario, id=self.kwargs.get("pk"))
-        feedstock = _get_posted_object_or_404(
-            SampleSeries, request.POST.get("feedstock")
-        )
-        algorithm = _get_posted_object_or_404(
-            InventoryAlgorithm, request.POST.get("inventory_algorithm")
-        )
+        choice = request.POST.get("algorithm_choice", "")
+        if not choice:
+            if request.POST.get("generic_function"):
+                choice = f"generic:{request.POST.get('generic_function')}"
+            elif request.POST.get("inventory_algorithm"):
+                choice = f"algo:{request.POST.get('inventory_algorithm')}"
+        kind, _, ref = choice.partition(":")
+        if kind == "generic":
+            return self._post_generic(request, scenario, ref)
+        feedstock = _get_posted_object_or_404(Material, request.POST.get("feedstock"))
+        algorithm = _get_posted_object_or_404(InventoryAlgorithm, ref or None)
+        if (
+            not filter_queryset_for_user(GeoDataset.objects.all(), request.user)
+            .filter(pk=algorithm.geodataset_id)
+            .exists()
+        ):
+            raise Http404
         try:
+            sample_series = _posted_sample_series(request, feedstock)
             with transaction.atomic():
                 values = resolve_parameter_values(request, algorithm, scenario)
-                scenario.add_inventory_algorithm(feedstock, algorithm, values)
+                scenario.add_inventory_algorithm(
+                    feedstock, algorithm, values, sample_series=sample_series
+                )
         except InvalidParameterValue as exc:
             return HttpResponseBadRequest(str(exc))
         except FeedstockNotImplemented:
             raise Http404 from None
         return redirect("scenario-detail", pk=scenario.pk)
 
+    def _post_generic(self, request, scenario, function_name):
+        """Materialize a generic algorithm for the chosen dataset and apply
+        the free-form factor rows posted with the form."""
+        from .algorithms import (
+            GENERIC_FUNCTION_LABELS,
+            RESERVED_ALGORITHM_KWARGS,
+            InventoryAlgorithms,
+        )
+
+        if function_name not in GENERIC_FUNCTION_LABELS:
+            return HttpResponseBadRequest("Unknown generic function.")
+        geodataset = _get_posted_object_or_404(
+            GeoDataset,
+            request.POST.get("geodataset"),
+            queryset=filter_queryset_for_user(GeoDataset.objects.all(), request.user),
+        )
+        if geodataset.region_id != scenario.region_id:
+            return HttpResponseBadRequest(
+                "The geodataset does not belong to the scenario region."
+            )
+        if function_name not in InventoryAlgorithms.generic_functions(geodataset):
+            return HttpResponseBadRequest(
+                f"'{function_name}' does not apply to this dataset's geometry."
+            )
+        feedstock = _get_posted_object_or_404(Material, request.POST.get("feedstock"))
+        try:
+            sample_series = _posted_sample_series(request, feedstock)
+            kwarg_specs = _parse_kwarg_rows(request)
+        except InvalidParameterValue as exc:
+            return HttpResponseBadRequest(str(exc))
+        for spec in kwarg_specs:
+            if spec["name"] in RESERVED_ALGORITHM_KWARGS:
+                return HttpResponseBadRequest(
+                    f"'{spec['name']}' is a reserved parameter name."
+                )
+
+        # Optional feature filter ("column=value") restricts the inventory to a
+        # subset of features — e.g. one crop out of many in a parcels dataset.
+        filter_column = request.POST.get("filter_column", "").strip()
+        filter_value = request.POST.get("filter_value", "").strip()
+        filter_spec = None
+        if filter_column or filter_value:
+            if not (filter_column and filter_value):
+                return HttpResponseBadRequest(
+                    "Both a filter column and a filter value are required."
+                )
+            valid_columns = {
+                c["name"] for c in InventoryAlgorithms.feature_columns(geodataset)
+            }
+            if filter_column not in valid_columns:
+                return HttpResponseBadRequest(
+                    f"'{filter_column}' is not a filterable column of this dataset."
+                )
+            filter_spec = f"{filter_column}={filter_value}"
+            if len(filter_spec) > 56:
+                return HttpResponseBadRequest("The feature filter is too long.")
+
+        try:
+            with transaction.atomic():
+                self._apply_generic_post(
+                    scenario,
+                    function_name,
+                    geodataset,
+                    filter_spec,
+                    kwarg_specs,
+                    feedstock,
+                    sample_series,
+                )
+        except InvalidParameterValue as exc:
+            return HttpResponseBadRequest(str(exc))
+        except FeedstockNotImplemented:
+            raise Http404 from None
+        return redirect("scenario-detail", pk=scenario.pk)
+
+    def _apply_generic_post(
+        self,
+        scenario,
+        function_name,
+        geodataset,
+        filter_spec,
+        kwarg_specs,
+        feedstock,
+        sample_series,
+    ):
+        """Materialize the generic algorithm and store its configuration.
+
+        Runs inside a transaction — InvalidParameterValue aborts the whole
+        write so a rejected request leaves no partial parameter rows.
+        """
+        from .algorithms import GENERIC_FUNCTION_LABELS, GENERIC_MODULE_PATH
+
+        algorithm, _created = InventoryAlgorithm.objects.get_or_create(
+            source_module=GENERIC_MODULE_PATH,
+            function_name=function_name,
+            geodataset=geodataset,
+            defaults={"name": GENERIC_FUNCTION_LABELS[function_name]},
+        )
+        algorithm.feedstocks.add(feedstock)
+        values = {}
+        if filter_spec:
+            parameter = InventoryAlgorithmParameter.objects.filter(
+                inventory_algorithm=algorithm, short_name="feature_filter"
+            ).first()
+            if parameter is None:
+                parameter = InventoryAlgorithmParameter.objects.create(
+                    descriptive_name="Feature filter",
+                    short_name="feature_filter",
+                )
+                parameter.inventory_algorithm.add(algorithm)
+            values[parameter] = [
+                InventoryAlgorithmParameterValue.objects.create(
+                    name=filter_spec,
+                    parameter=parameter,
+                    value=1.0,
+                    type=InventoryAlgorithmParameterValue.ValueType.SELECTION,
+                    source="User selection",
+                    is_custom=True,
+                )
+            ]
+        for spec in kwarg_specs:
+            parameter = InventoryAlgorithmParameter.objects.filter(
+                inventory_algorithm=algorithm, short_name=spec["name"]
+            ).first()
+            if parameter is None:
+                parameter = InventoryAlgorithmParameter.objects.create(
+                    descriptive_name=spec["name"],
+                    short_name=spec["name"],
+                    unit=spec["unit"] or None,
+                )
+                parameter.inventory_algorithm.add(algorithm)
+            elif spec["unit"] and parameter.unit and parameter.unit != spec["unit"]:
+                # The parameter is shared by every configuration of this
+                # algorithm — mutating its unit would reinterpret the
+                # magnitudes of existing values.
+                raise InvalidParameterValue(
+                    f"Unit '{spec['unit']}' conflicts with the existing unit "
+                    f"'{parameter.unit}' of parameter '{spec['name']}'."
+                )
+            elif spec["unit"] and not parameter.unit:
+                parameter.unit = spec["unit"]
+                parameter.save(update_fields=["unit"])
+            if spec["preset"] is not None:
+                preset = InventoryAlgorithmParameterValue.objects.filter(
+                    pk=spec["preset"], parameter=parameter
+                ).first()
+                scenario_customs = set(
+                    ScenarioInventoryConfiguration.objects.filter(
+                        scenario=scenario, inventory_parameter=parameter
+                    ).values_list("inventory_value_id", flat=True)
+                )
+                if preset is None or (
+                    preset.is_custom and preset.id not in scenario_customs
+                ):
+                    raise InvalidParameterValue(
+                        f"Invalid preset value for parameter '{spec['name']}'."
+                    )
+                values[parameter] = [preset]
+                continue
+            values[parameter] = [
+                InventoryAlgorithmParameterValue.objects.create(
+                    name="",
+                    parameter=parameter,
+                    value=spec["value"],
+                    standard_deviation=spec["standard_deviation"],
+                    source="User assumption",
+                    is_custom=True,
+                )
+            ]
+        scenario.add_inventory_algorithm(
+            feedstock, algorithm, values, sample_series=sample_series
+        )
+
     def get_object(self, **kwargs):
         return get_object_or_404(Scenario, pk=self.kwargs.get("pk"))
 
     def get_initial(self):
         return {
-            "feedstocks": self.object.available_feedstocks(),
+            # Generic functions materialize their algorithm on submit, so any
+            # material may be picked — the dropdown itself is served by the
+            # visibility-filtered material autocomplete.
+            "feedstocks": Material.objects.all(),
             "scenario": self.object,
         }
 
@@ -357,21 +632,22 @@ class ScenarioAlgorithmConfigurationUpdateView(
             InventoryAlgorithm, id=self.kwargs.get("algorithm_pk")
         )
         current_feedstock = get_object_or_404(
-            SampleSeries, id=self.kwargs.get("feedstock_pk")
+            Material, id=self.kwargs.get("feedstock_pk")
         )
-        feedstock = _get_posted_object_or_404(
-            SampleSeries, request.POST.get("feedstock")
-        )
+        feedstock = _get_posted_object_or_404(Material, request.POST.get("feedstock"))
         new_algorithm = _get_posted_object_or_404(
             InventoryAlgorithm, request.POST.get("inventory_algorithm")
         )
         try:
+            sample_series = _posted_sample_series(request, feedstock)
             with transaction.atomic():
                 values = resolve_parameter_values(request, new_algorithm, scenario)
                 scenario.remove_inventory_algorithm(
                     current_algorithm, current_feedstock
                 )
-                scenario.add_inventory_algorithm(feedstock, new_algorithm, values)
+                scenario.add_inventory_algorithm(
+                    feedstock, new_algorithm, values, sample_series=sample_series
+                )
         except InvalidParameterValue as exc:
             return HttpResponseBadRequest(str(exc))
         except FeedstockNotImplemented:
@@ -386,7 +662,7 @@ class ScenarioAlgorithmConfigurationUpdateView(
         algorithm = get_object_or_404(
             InventoryAlgorithm, id=self.kwargs.get("algorithm_pk")
         )
-        feedstock = get_object_or_404(SampleSeries, id=self.kwargs.get("feedstock_pk"))
+        feedstock = get_object_or_404(Material, id=self.kwargs.get("feedstock_pk"))
         config = scenario.inventory_algorithm_config(algorithm, feedstock)
         return config
 
@@ -420,9 +696,7 @@ class ScenarioRemoveInventoryAlgorithmView(
         self.algorithm = get_object_or_404(
             InventoryAlgorithm, id=self.kwargs.get("algorithm_pk")
         )
-        self.feedstock = get_object_or_404(
-            SampleSeries, id=self.kwargs.get("feedstock_pk")
-        )
+        self.feedstock = get_object_or_404(Material, id=self.kwargs.get("feedstock_pk"))
         self.scenario.remove_inventory_algorithm(
             algorithm=self.algorithm, feedstock=self.feedstock
         )
@@ -430,57 +704,48 @@ class ScenarioRemoveInventoryAlgorithmView(
 
 
 class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
-    """GeoDataset autocomplete filtered by scenario and feedstock (create mode).
+    """GeoDataset autocomplete scoped to a scenario's region.
 
-    The form widget passes feedstock via ``filter_by`` and scenario via ``exclude_by``.
+    The widget passes the scenario id via either ``filter_by`` or
+    ``exclude_by`` and an optional feedstock id via ``filter_by``. With a
+    feedstock, datasets already configured for that feedstock's material in
+    the scenario are excluded. Without one, every dataset in the region is
+    offered — generic algorithms work on any dataset.
     """
 
     def apply_filters(self, queryset):
-        """Return GeoDatasets that *can* still be added for a given scenario/feedstock.
-
-        The widget passes the *feedstock* ID via ``filter_by`` and the *scenario* ID via
-        ``exclude_by``.  Instead of calling helper methods (which incur multiple queries)
-        we leverage correlated sub-queries so the whole operation executes in **one** SQL
-        statement.
-        """
-        feedstock_id = get_tomselect_filter_value(self, lookup="feedstock_id")
         scenario_id = get_tomselect_filter_value(
-            self, use_excludes=True, lookup="scenario_id"
-        )
+            self, lookup="scenario_id"
+        ) or get_tomselect_filter_value(self, use_excludes=True, lookup="scenario_id")
+        feedstock_id = get_tomselect_filter_value(self, lookup="feedstock_id")
 
-        if not (feedstock_id and scenario_id):
+        if not scenario_id:
             return GeoDataset.objects.none()
 
         try:
             scenario = Scenario.objects.get(pk=scenario_id)
-            feedstock_series = SampleSeries.objects.get(pk=feedstock_id)
-        except (Scenario.DoesNotExist, SampleSeries.DoesNotExist):
+        except Scenario.DoesNotExist:
             return GeoDataset.objects.none()
 
-        # Resolve which Material objects to consider
-        if feedstock_series is None:
-            feedstocks_qs = Material.objects.filter(type="material")
-        else:
-            feedstocks_qs = Material.objects.filter(id=feedstock_series.material_id)
+        queryset = queryset.filter(region=scenario.region)
 
-        # Build a single query using EXISTS sub-queries
-        from django.db.models import Exists, OuterRef
+        if feedstock_id:
+            try:
+                feedstock = Material.objects.get(pk=feedstock_id)
+            except Material.DoesNotExist:
+                return GeoDataset.objects.none()
+            from django.db.models import Exists, OuterRef
 
-        available_q = InventoryAlgorithm.objects.filter(
-            geodataset=OuterRef("pk"),
-            geodataset__region=scenario.region,
-            feedstocks__in=feedstocks_qs,
-        )
-        evaluated_q = ScenarioInventoryConfiguration.objects.filter(
-            geodataset=OuterRef("pk"),
-            scenario=scenario,
-            feedstock__material__in=feedstocks_qs,
-        )
+            evaluated_q = ScenarioInventoryConfiguration.objects.filter(
+                geodataset=OuterRef("pk"),
+                scenario=scenario,
+                feedstock=feedstock,
+            )
+            queryset = queryset.annotate(already_evaluated=Exists(evaluated_q)).filter(
+                already_evaluated=False
+            )
 
-        return GeoDataset.objects.annotate(
-            has_algorithm=Exists(available_q),
-            already_evaluated=Exists(evaluated_q),
-        ).filter(has_algorithm=True, already_evaluated=False)
+        return queryset
 
 
 class ScenarioInventoryAlgorithmAutocompleteView(InventoryAlgorithmAutocompleteView):
@@ -506,14 +771,95 @@ class ScenarioInventoryAlgorithmAutocompleteView(InventoryAlgorithmAutocompleteV
             return InventoryAlgorithm.objects.none()
 
         try:
-            feedstock_series = SampleSeries.objects.get(pk=feedstock_id)
+            feedstock = Material.objects.get(pk=feedstock_id)
             geodataset = GeoDataset.objects.get(pk=geodataset_id)
-        except (SampleSeries.DoesNotExist, GeoDataset.DoesNotExist):
+        except (Material.DoesNotExist, GeoDataset.DoesNotExist):
             return InventoryAlgorithm.objects.none()
 
         return InventoryAlgorithm.objects.filter(
-            feedstocks=feedstock_series.material,
+            feedstocks=feedstock,
             geodataset=geodataset,
+        )
+
+
+class GeoDatasetFunctionsAPIView(LoginRequiredMixin, APIView):
+    """JSON endpoint listing the inventory functions applicable to a
+    GeoDataset: the generic functions matching its geometry family plus any
+    algorithms already registered on the dataset."""
+
+    def get(self, request, geodataset_pk):
+        from .algorithms import (
+            GENERIC_FUNCTION_LABELS,
+            GENERIC_MODULE_PATH,
+            RESERVED_ALGORITHM_KWARGS,
+            InventoryAlgorithms,
+        )
+        from .serializers import InventoryAlgorithmParameterSerializer
+
+        geodataset = get_object_or_404(
+            filter_queryset_for_user(GeoDataset.objects.all(), request.user),
+            pk=geodataset_pk,
+        )
+
+        scenario_id = request.query_params.get("scenario")
+        if not (
+            scenario_id
+            and scenario_id.isascii()
+            and scenario_id.isdigit()
+            and filter_queryset_for_user(Scenario.objects.all(), request.user)
+            .filter(pk=scenario_id)
+            .exists()
+        ):
+            scenario_id = None
+
+        functions = []
+        for function_name in InventoryAlgorithms.generic_functions(geodataset):
+            entry = {
+                "function_name": function_name,
+                "name": GENERIC_FUNCTION_LABELS[function_name],
+                "parameters": [],
+            }
+            # If the generic algorithm has been materialized for this dataset
+            # before, its parameters and their curated/scenario values are
+            # offered as presets in the factor editor.
+            algorithm = InventoryAlgorithm.objects.filter(
+                source_module=GENERIC_MODULE_PATH,
+                function_name=function_name,
+                geodataset=geodataset,
+            ).first()
+            if algorithm is not None:
+                parameters = algorithm.inventoryalgorithmparameter_set.exclude(
+                    short_name__in=RESERVED_ALGORITHM_KWARGS
+                )
+                entry["parameters"] = InventoryAlgorithmParameterSerializer(
+                    parameters,
+                    many=True,
+                    context={"scenario_id": scenario_id},
+                ).data
+            functions.append(entry)
+
+        algorithms = InventoryAlgorithm.objects.filter(geodataset=geodataset)
+        feedstock_id = request.query_params.get("feedstock")
+        if feedstock_id:
+            try:
+                feedstock = Material.objects.get(pk=feedstock_id)
+                algorithms = algorithms.filter(feedstocks=feedstock)
+            except Material.DoesNotExist:
+                algorithms = algorithms.none()
+        try:
+            columns = InventoryAlgorithms.feature_columns(geodataset)
+        except Exception:
+            columns = []
+        return Response(
+            {
+                "geometry_family": InventoryAlgorithms.geometry_family(geodataset),
+                "functions": functions,
+                "algorithms": [
+                    {"id": algorithm.pk, "name": str(algorithm)}
+                    for algorithm in algorithms.order_by("name").distinct()
+                ],
+                "columns": columns,
+            }
         )
 
 
@@ -670,7 +1016,7 @@ class ScenarioResultDetailMapView(MapMixin, DetailView):
         algorithm = get_object_or_404(
             InventoryAlgorithm, id=self.kwargs.get("algorithm_pk")
         )
-        feedstock = get_object_or_404(SampleSeries, id=self.kwargs.get("feedstock_pk"))
+        feedstock = get_object_or_404(Material, id=self.kwargs.get("feedstock_pk"))
         return get_object_or_404(
             Layer, scenario=scenario, algorithm=algorithm, feedstock=feedstock
         )

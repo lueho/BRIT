@@ -23,7 +23,7 @@ from maps.models import (
     Region,
 )
 from maps.runtime_adapters import DatasetRuntimeAdapter
-from materials.models import Material, SampleSeries
+from materials.models import Material
 from sources.sotasen.inventory.algorithms import (
     GRASSLAND_LAND_USE,
     LAND_USE_FIELD,
@@ -357,9 +357,7 @@ class SotasenGrassToProteinLocalRelationTestCase(TestCase):
             function_name="sotasen_grass_to_protein",
             geodataset=self.dataset,
         )
-        feedstock = SampleSeries.objects.create(
-            name="Grass", material=Material.objects.create(name="Grass")
-        )
+        feedstock = Material.objects.create(name="Grass")
         ScenarioInventoryConfiguration.objects.create(
             scenario=scenario,
             inventory_algorithm=algorithm,

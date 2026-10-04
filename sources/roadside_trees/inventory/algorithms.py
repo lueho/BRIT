@@ -1,7 +1,10 @@
 from distributions.plots import Distribution
-from inventories.algorithms import InventoryAlgorithmsBase
+from inventories.algorithms import (
+    InventoryAlgorithmsBase,
+    resolve_feedstock_series,
+)
 from inventories.models import Scenario
-from materials.models import ComponentMeasurement, SampleSeries
+from materials.models import ComponentMeasurement
 from sources.roadside_trees.models import HamburgRoadsideTrees
 from sources.urban_green_spaces.models import HamburgGreenAreas
 
@@ -21,9 +24,11 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         result = super().avg_point_yield(**kwargs)
 
         scenario = Scenario.objects.get(id=kwargs.get("scenario_id"))
-        feedstock = SampleSeries.objects.get(id=kwargs.get("feedstock_id"))
+        feedstock = resolve_feedstock_series(**kwargs)
 
         result["aggregated_distributions"] = []
+        if feedstock is None:
+            return result
 
         inv_shares = feedstock.inventoryamountshare_set.filter(
             scenario=scenario

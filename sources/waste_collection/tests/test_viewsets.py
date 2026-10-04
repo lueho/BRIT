@@ -5924,6 +5924,45 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
                     )
                 )
 
+    def test_all_geojson_actions_get_the_subnet_anon_throttle(self):
+        """Every atlas geometry endpoint shares the maps GeoJSON policy: a
+        distributed crawler rotating through one subnet must not bypass the
+        per-IP atlas scope."""
+        cases = {
+            atlas_viewsets.CatchmentViewSet: (
+                "geojson",
+                "collection_geojson",
+                "collector_geojson",
+                "collection_change_geojson",
+                "collector_change_geojson",
+            ),
+            atlas_viewsets.ResidualCollectionAmountViewSet: ("acpv_outline_geojson",),
+            atlas_viewsets.BiowasteCollectionAmountViewSet: ("acpv_outline_geojson",),
+        }
+        for viewset_class, actions in cases.items():
+            for action in actions:
+                with self.subTest(viewset=viewset_class.__name__, action=action):
+                    viewset = viewset_class()
+                    viewset.action = action
+
+                    throttles = [type(throttle) for throttle in viewset.get_throttles()]
+
+                    self.assertIn(GeoJSONAnonThrottle, throttles)
+                    self.assertTrue(
+                        any(
+                            issubclass(throttle, ScopedRateThrottle)
+                            for throttle in throttles
+                        )
+                    )
+
+    def test_non_geojson_action_keeps_the_plain_atlas_scope(self):
+        viewset = atlas_viewsets.ResidualCollectionAmountViewSet()
+        viewset.action = "list"
+
+        throttles = [type(throttle) for throttle in viewset.get_throttles()]
+
+        self.assertNotIn(GeoJSONAnonThrottle, throttles)
+
 
 class WasteAtlasChangeOverlayPrecisionTests(APITestCase):
     """Change overlays compare boundaries at source precision."""

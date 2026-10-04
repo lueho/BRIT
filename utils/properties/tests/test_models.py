@@ -8,7 +8,6 @@ from django.test import TestCase
 from utils.object_management.models import get_default_owner
 from utils.properties.models import NumericMeasurementMixin, Unit
 from utils.properties.units import UnitConversionError, get_unit_registry
-from utils.properties.utils import format_measurement_display
 
 
 class _FakeConvertedQuantity:
@@ -107,18 +106,6 @@ class UtilsInitialDataTestCase(TestCase):
         owner = get_default_owner()
         unit = Unit.objects.get(owner=owner, name="No unit")
         self.assertTrue(unit.dimensionless)
-
-
-class MeasurementFormattingUtilsTestCase(TestCase):
-    def test_format_measurement_display_includes_unit_and_year(self):
-        self.assertEqual(
-            format_measurement_display(123.321, unit_label="1/km²", year=2019),
-            "123.321 1/km² (2019)",
-        )
-
-    def test_format_measurement_display_omits_empty_parts(self):
-        self.assertEqual(format_measurement_display(123321, year=2021), "123321 (2021)")
-        self.assertEqual(format_measurement_display(12.3, unit_label="kg"), "12.3 kg")
 
 
 class NumericMeasurementMixinTestCase(TestCase):

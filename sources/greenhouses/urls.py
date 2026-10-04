@@ -111,9 +111,14 @@ urlpatterns = [
         name="greenhouse-delete-modal",
     ),
     path(
-        "greenhouses/<int:pk>/growth_cycles/add",
+        "greenhouses/<int:pk>/growth_cycles/add/",
         GrowthCycleModalCreateView.as_view(),
         name="greenhousegrowthcycle-create",
+    ),
+    # Slashless alias for clients that learned the pre-slash URL.
+    path(
+        "greenhouses/<int:pk>/growth_cycles/add",
+        GrowthCycleModalCreateView.as_view(),
     ),
     path(
         "greenhouses/<int:pk>/growth_cycles/<int:cycle_pk>/update/",
