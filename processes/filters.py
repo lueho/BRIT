@@ -18,27 +18,6 @@ from utils.object_management.permissions import (
 from .models import Process, ProcessCategory, ProcessMaterial
 
 
-class ProcessCategoryFilter(django_filters.FilterSet):
-    """Filter for ProcessCategory list views."""
-
-    name = django_filters.CharFilter(
-        lookup_expr="icontains",
-        label="Category Name",
-        widget=forms.TextInput(
-            attrs={"class": "form-control", "placeholder": "Search by name..."}
-        ),
-    )
-    publication_status = django_filters.ChoiceFilter(
-        choices=[("", "All")] + list(STATUS_CHOICES),
-        label="Publication Status",
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
-
-    class Meta:
-        model = ProcessCategory
-        fields = ["name", "publication_status"]
-
-
 class ProcessFilter(UserCreatedObjectScopedFilterSet):
     """Filter for Process list views with comprehensive search options."""
 

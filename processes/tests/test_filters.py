@@ -5,47 +5,8 @@ from django.test import RequestFactory, TestCase
 
 from materials.models import Material
 
-from ..filters import ProcessCategoryFilter, ProcessFilter
+from ..filters import ProcessFilter
 from ..models import Process, ProcessCategory, ProcessMaterial
-
-
-class ProcessCategoryFilterTestCase(TestCase):
-    """Test ProcessCategory filters."""
-
-    def setUp(self):
-        self.owner = get_user_model().objects.create(username="test_user")
-        ProcessCategory.objects.create(
-            name="Thermochemical", owner=self.owner, publication_status="published"
-        )
-        ProcessCategory.objects.create(
-            name="Biochemical", owner=self.owner, publication_status="published"
-        )
-        ProcessCategory.objects.create(
-            name="Physical", owner=self.owner, publication_status="draft"
-        )
-
-    def test_filter_by_name(self):
-        """Filter should find categories by name."""
-        filterset = ProcessCategoryFilter(
-            data={"name": "Thermo"}, queryset=ProcessCategory.objects.all()
-        )
-        self.assertEqual(filterset.qs.count(), 1)
-        self.assertEqual(filterset.qs.first().name, "Thermochemical")
-
-    def test_filter_by_publication_status(self):
-        """Filter should find categories by publication status."""
-        filterset = ProcessCategoryFilter(
-            data={"publication_status": "published"},
-            queryset=ProcessCategory.objects.all(),
-        )
-        self.assertEqual(filterset.qs.count(), 2)
-
-    def test_no_filter_returns_all(self):
-        """Empty filter should return all categories."""
-        filterset = ProcessCategoryFilter(
-            data={}, queryset=ProcessCategory.objects.all()
-        )
-        self.assertEqual(filterset.qs.count(), 3)
 
 
 class ProcessFilterTestCase(TestCase):
