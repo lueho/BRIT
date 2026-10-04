@@ -3,12 +3,12 @@
 Provides RESTful API endpoints for all process-related models.
 """
 
-from django.db.models import Exists, OuterRef, Prefetch
+from django.db.models import Prefetch
 from rest_framework import filters, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from bibliography.models import Author, Licence, Source, SourceAuthor
+from bibliography.models import Source
 from utils.object_management.permissions import (
     UserCreatedObjectPermission,
     filter_queryset_for_user,
@@ -17,12 +17,15 @@ from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 from .models import (
     Process,
-    ProcessAuthor,
     ProcessCategory,
     ProcessMaterial,
     ProcessOperatingParameter,
 )
-from .querysets import with_published_process_count
+from .querysets import (
+    source_has_hidden_authors,
+    visible_process_relations,
+    with_published_process_count,
+)
 from .serializers import (
     ProcessCategorySerializer,
     ProcessDetailSerializer,
@@ -30,71 +33,6 @@ from .serializers import (
     ProcessOperatingParameterSerializer,
     visible_process_material_links,
 )
-
-
-def _source_has_hidden_authors(user):
-    """Exists-subquery flagging sources that link an author ``user`` may not read."""
-    return Exists(
-        SourceAuthor.objects.filter(source=OuterRef("pk")).exclude(
-            author__in=filter_queryset_for_user(Author.objects.all(), user)
-        )
-    )
-
-
-def _visible_process_relations(queryset, user):
-    """Prefetch nested relations through the read policy.
-
-    ``ProcessListSerializer``/``ProcessDetailSerializer`` serialize nested
-    categories, sources and the parent name. Without a filtered prefetch the
-    related managers would expose objects the user may not read. The
-    ``parent_is_visible`` annotation lets the serializer resolve the parent
-    name without a per-object policy query.
-    """
-
-    return queryset.prefetch_related(
-        Prefetch(
-            "categories",
-            queryset=filter_queryset_for_user(ProcessCategory.objects.all(), user),
-        ),
-        Prefetch(
-            "sources",
-            queryset=filter_queryset_for_user(Source.objects.all(), user)
-            .select_related("licence")
-            .prefetch_related(
-                Prefetch(
-                    "sourceauthors",
-                    queryset=SourceAuthor.objects.filter(
-                        author__in=filter_queryset_for_user(Author.objects.all(), user)
-                    )
-                    .select_related("author")
-                    .order_by("position"),
-                )
-            )
-            .annotate(
-                licence_is_visible=Exists(
-                    filter_queryset_for_user(
-                        Licence.objects.filter(pk=OuterRef("licence_id")),
-                        user,
-                    )
-                ),
-                has_hidden_authors=_source_has_hidden_authors(user),
-            ),
-        ),
-        Prefetch(
-            "process_authors",
-            queryset=ProcessAuthor.objects.filter(
-                author__in=filter_queryset_for_user(Author.objects.all(), user)
-            )
-            .select_related("author")
-            .order_by("position", "author_id", "id"),
-        ),
-    ).annotate(
-        parent_is_visible=Exists(
-            filter_queryset_for_user(
-                Process.objects.filter(pk=OuterRef("parent_id")), user
-            )
-        )
-    )
 
 
 class ProcessObjectPermission(UserCreatedObjectPermission):
@@ -127,7 +65,7 @@ class ProcessCategoryViewSet(UserCreatedObjectViewSet):
     def processes(self, request, pk=None):
         """Get all processes in this category visible to the current user."""
         category = self.get_object()
-        processes = _visible_process_relations(
+        processes = visible_process_relations(
             filter_queryset_for_user(
                 category.processes.all(), request.user
             ).select_related("owner", "parent"),
@@ -154,11 +92,11 @@ class ProcessViewSet(UserCreatedObjectViewSet):
         queryset = super().get_queryset()
 
         if self.action in ("list", "by_mechanism"):
-            queryset = _visible_process_relations(
+            queryset = visible_process_relations(
                 queryset.select_related("owner", "parent"), self.request.user
             )
         elif self.action == "retrieve":
-            queryset = _visible_process_relations(
+            queryset = visible_process_relations(
                 queryset.select_related("owner", "parent"), self.request.user
             ).prefetch_related(
                 "variants",
@@ -241,7 +179,7 @@ class ProcessViewSet(UserCreatedObjectViewSet):
     def variants(self, request, pk=None):
         """Get all process variants (children) visible to the current user."""
         process = self.get_object()
-        variants = _visible_process_relations(
+        variants = visible_process_relations(
             filter_queryset_for_user(process.variants.all(), request.user),
             request.user,
         )
@@ -260,7 +198,7 @@ class ProcessViewSet(UserCreatedObjectViewSet):
             for s in filter_queryset_for_user(
                 Source.objects.filter(pk__in=[s.pk for s in ordered]),
                 request.user,
-            ).annotate(has_hidden_authors=_source_has_hidden_authors(request.user))
+            ).annotate(has_hidden_authors=source_has_hidden_authors(request.user))
         }
         sources = [
             {
@@ -281,7 +219,7 @@ class ProcessViewSet(UserCreatedObjectViewSet):
     @action(detail=False, methods=["get"])
     def by_category(self, request):
         """Get processes grouped by category, scoped to what the user may read."""
-        visible_processes = _visible_process_relations(
+        visible_processes = visible_process_relations(
             filter_queryset_for_user(
                 Process.objects.all(), request.user
             ).select_related("owner", "parent"),

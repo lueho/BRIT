@@ -6,7 +6,7 @@ BRIT conventions and patterns from utils.object_management.views.
 
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Exists, OuterRef, Prefetch
+from django.db.models import Prefetch
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
@@ -57,7 +57,12 @@ from .models import (
     ProcessOperatingParameter,
     ProcessSource,
 )
-from .querysets import with_process_count, with_published_process_count
+from .querysets import (
+    annotate_parent_is_visible,
+    visible_prefetch,
+    with_process_count,
+    with_published_process_count,
+)
 
 # ==============================================================================
 # Dashboard
@@ -199,7 +204,7 @@ class ProcessCategoryDetailView(UserCreatedObjectDetailView):
             process_count_status = "published"
         processes = process_queryset.select_related("owner").prefetch_related(
             "authors",
-            _visible_prefetch(
+            visible_prefetch(
                 "categories", ProcessCategory.objects.all(), self.request.user
             ),
         )
@@ -292,12 +297,6 @@ class ProcessModalCreateView(UserCreatedObjectModalCreateView):
     permission_required = "processes.add_process"
 
 
-def _visible_prefetch(lookup, queryset, user):
-    """Prefetch ``lookup`` restricted to rows the user may read."""
-
-    return Prefetch(lookup, queryset=filter_queryset_for_user(queryset, user))
-
-
 def _visible_ids(queryset, user):
     """Return the PKs in ``queryset`` the user may read."""
 
@@ -310,17 +309,13 @@ def _process_list_queryset(queryset, user):
     Related user-created objects are filtered by the read policy so that
     private category and parent names do not leak into list rows.
     """
-    visible_parents = filter_queryset_for_user(
-        Process.objects.filter(pk=OuterRef("parent_id")), user
-    )
-    return (
-        queryset.select_related("owner", "parent")
-        .prefetch_related(
+    return annotate_parent_is_visible(
+        queryset.select_related("owner", "parent").prefetch_related(
             "authors",
-            _visible_prefetch("categories", ProcessCategory.objects.all(), user),
+            visible_prefetch("categories", ProcessCategory.objects.all(), user),
             "process_materials__material",
-        )
-        .annotate(parent_is_visible=Exists(visible_parents))
+        ),
+        user,
     )
 
 
@@ -498,12 +493,12 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             .get_queryset()
             .select_related("owner", "parent")
             .prefetch_related(
-                _visible_prefetch("categories", ProcessCategory.objects.all(), user),
+                visible_prefetch("categories", ProcessCategory.objects.all(), user),
                 Prefetch(
                     "process_authors",
                     queryset=ProcessAuthor.objects.select_related("author"),
                 ),
-                _visible_prefetch("variants", Process.objects.all(), user),
+                visible_prefetch("variants", Process.objects.all(), user),
                 Prefetch(
                     "process_materials",
                     queryset=ProcessMaterial.objects.select_related(
