@@ -1,5 +1,5 @@
 from crispy_forms.helper import FormHelper
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -34,6 +34,10 @@ from sources.greenhouses.models import (
 )
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.modal import is_ajax
+from utils.object_management.permissions import (
+    filter_queryset_for_user,
+    get_object_policy,
+)
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -151,20 +155,40 @@ class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateWithInlinesView)
         return self.object.get_absolute_url()
 
 
-class GrowthCycleModalCreateView(UserCreatedObjectModalCreateView):
+class GrowthCycleModalCreateView(UserPassesTestMixin, UserCreatedObjectModalCreateView):
     form_class = GrowthCycleCreateForm
     permission_required = "greenhouses.add_greenhousegrowthcycle"
+    greenhouse = None
+
+    def dispatch(self, request, *args, **kwargs):
+        self.greenhouse = get_object_or_404(Greenhouse, pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def test_func(self):
+        policy = get_object_policy(
+            self.request.user, self.greenhouse, request=self.request
+        )
+        return policy["can_manage_samples"]
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["greenhouse"] = self.greenhouse
+        return kwargs
 
     def form_valid(self, form):
-        form.instance.greenhouse = get_object_or_404(Greenhouse, pk=self.kwargs["pk"])
+        form.instance.greenhouse = self.greenhouse
         residue = form.instance.culture.residue
         if residue is None:
             form.add_error("culture", "The selected culture has no residue.")
             return self.form_invalid(form)
 
-        compositions = Composition.objects.filter(sample__series=residue).order_by(
-            "order", "pk"
-        )
+        compositions = filter_queryset_for_user(
+            Composition.objects.filter(sample__series=residue), self.request.user
+        ).order_by("order", "pk")
+        if self.greenhouse.is_published:
+            compositions = compositions.filter(
+                publication_status=Composition.STATUS_PUBLISHED
+            )
         group_settings = compositions.filter(group__name="Macro Components").first()
         if group_settings is None:
             group_settings = compositions.filter(

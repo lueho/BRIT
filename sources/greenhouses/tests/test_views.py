@@ -152,12 +152,16 @@ class GrowthCycleModalCreateViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         cls.greenhouse = Greenhouse.objects.create(owner=cls.member, name="Greenhouse")
         material = Material.objects.create(name="Crop residue")
-        cls.residue = SampleSeries.objects.create(material=material, name="Residue")
+        cls.residue = SampleSeries.objects.create(
+            owner=cls.member, material=material, name="Residue"
+        )
         cls.sample = cls.residue.samples.get(timestep=Timestep.objects.default())
         cls.base_composition = cls.sample.compositions.get(
             group=MaterialComponentGroup.objects.default()
         )
-        cls.culture = Culture.objects.create(name="Crop", residue=cls.residue)
+        cls.culture = Culture.objects.create(
+            owner=cls.member, name="Crop", residue=cls.residue
+        )
         distribution, _ = TemporalDistribution.objects.get_or_create(
             name="Months of the year"
         )
@@ -201,7 +205,9 @@ class GrowthCycleModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_macro_components_composition_is_preferred(self):
         group = MaterialComponentGroup.objects.create(name="Macro Components")
-        composition = Composition.objects.create(group=group, sample=self.sample)
+        composition = Composition.objects.create(
+            owner=self.member, group=group, sample=self.sample
+        )
 
         response = self.client.post(self.url, self.data)
 
@@ -248,6 +254,91 @@ class GrowthCycleModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 204)
         self.assertFalse(GreenhouseGrowthCycle.objects.exists())
 
+    def test_get_forbidden_on_foreign_greenhouse(self):
+        foreign = Greenhouse.objects.create(owner=self.owner, name="Foreign greenhouse")
+        url = reverse("greenhousegrowthcycle-create", kwargs={"pk": foreign.pk})
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_forbidden_on_foreign_greenhouse(self):
+        foreign = Greenhouse.objects.create(owner=self.owner, name="Foreign greenhouse")
+        url = reverse("greenhousegrowthcycle-create", kwargs={"pk": foreign.pk})
+
+        response = self.client.post(url, self.data)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(GreenhouseGrowthCycle.objects.exists())
+
+    def test_post_forbidden_on_own_published_greenhouse(self):
+        self.greenhouse.publication_status = "published"
+        self.greenhouse.save()
+
+        response = self.client.post(self.url, self.data)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(GreenhouseGrowthCycle.objects.exists())
+
+    def test_staff_can_add_cycle_to_published_greenhouse(self):
+        self.greenhouse.publication_status = "published"
+        self.greenhouse.save()
+        self.culture.publication_status = "published"
+        self.culture.save()
+        self.base_composition.publication_status = "published"
+        self.base_composition.save()
+        self.client.force_login(self.staff)
+
+        response = self.client.post(self.url, self.data)
+
+        self.assertRedirects(
+            response, self.greenhouse.get_absolute_url(), fetch_redirect_response=False
+        )
+        cycle = GreenhouseGrowthCycle.objects.get(greenhouse=self.greenhouse)
+        self.assertEqual(cycle.owner, self.staff)
+        self.assertEqual(cycle.group_settings, self.base_composition)
+
+    def test_culture_field_excludes_foreign_private_cultures(self):
+        foreign_culture = Culture.objects.create(
+            owner=self.owner, name="Foreign culture", residue=self.residue
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        culture_queryset = response.context["form"].fields["culture"].queryset
+        self.assertIn(self.culture, culture_queryset)
+        self.assertNotIn(foreign_culture, culture_queryset)
+
+    def test_post_rejects_foreign_private_culture(self):
+        foreign_culture = Culture.objects.create(
+            owner=self.owner, name="Foreign culture", residue=self.residue
+        )
+        data = {"culture": foreign_culture.pk, "timesteps": [self.timestep.pk]}
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(GreenhouseGrowthCycle.objects.exists())
+
+    def test_foreign_private_composition_is_not_selected(self):
+        group = MaterialComponentGroup.objects.create(name="Macro Components")
+        Composition.objects.create(owner=self.owner, group=group, sample=self.sample)
+
+        response = self.client.post(self.url, self.data)
+
+        self.assert_cycle_created(response, self.base_composition)
+
+    def test_published_greenhouse_rejects_unpublished_culture(self):
+        self.greenhouse.publication_status = "published"
+        self.greenhouse.save()
+        self.client.force_login(self.staff)
+
+        response = self.client.post(self.url, self.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(GreenhouseGrowthCycle.objects.exists())
+
 
 class GreenhouseUpdateViewPermissionTestCase(ViewWithPermissionsTestCase):
     """#209: GreenhouseUpdateView must require change_greenhouse permission."""
@@ -288,30 +379,87 @@ class GreenhouseDetailPermissionRegressionTest(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.greenhouse = Greenhouse.objects.create(
+        cls.published_greenhouse = Greenhouse.objects.create(
             owner=cls.owner,
             name="Published greenhouse",
             publication_status="published",
         )
+        cls.own_greenhouse = Greenhouse.objects.create(
+            owner=cls.member, name="Own greenhouse"
+        )
+        cls.own_published_greenhouse = Greenhouse.objects.create(
+            owner=cls.member,
+            name="Own published greenhouse",
+            publication_status="published",
+        )
 
-    def test_detail_shows_add_growth_cycle_link_for_user_with_permission(self):
+    def test_detail_shows_add_growth_cycle_link_on_own_greenhouse(self):
         self.client.force_login(self.member)
         response = self.client.get(
-            reverse("greenhouse-detail", kwargs={"pk": self.greenhouse.pk})
+            reverse("greenhouse-detail", kwargs={"pk": self.own_greenhouse.pk})
         )
 
         self.assertContains(
             response,
-            reverse("greenhousegrowthcycle-create", kwargs={"pk": self.greenhouse.pk}),
+            reverse(
+                "greenhousegrowthcycle-create", kwargs={"pk": self.own_greenhouse.pk}
+            ),
+        )
+
+    def test_detail_hides_add_growth_cycle_link_on_foreign_greenhouse(self):
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("greenhouse-detail", kwargs={"pk": self.published_greenhouse.pk})
+        )
+
+        self.assertNotContains(
+            response,
+            reverse(
+                "greenhousegrowthcycle-create",
+                kwargs={"pk": self.published_greenhouse.pk},
+            ),
+        )
+
+    def test_detail_hides_add_growth_cycle_link_on_own_published_greenhouse(self):
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse(
+                "greenhouse-detail", kwargs={"pk": self.own_published_greenhouse.pk}
+            )
+        )
+
+        self.assertNotContains(
+            response,
+            reverse(
+                "greenhousegrowthcycle-create",
+                kwargs={"pk": self.own_published_greenhouse.pk},
+            ),
+        )
+
+    def test_detail_shows_add_growth_cycle_link_for_staff(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse("greenhouse-detail", kwargs={"pk": self.published_greenhouse.pk})
+        )
+
+        self.assertContains(
+            response,
+            reverse(
+                "greenhousegrowthcycle-create",
+                kwargs={"pk": self.published_greenhouse.pk},
+            ),
         )
 
     def test_detail_hides_add_growth_cycle_link_without_permission(self):
         self.client.force_login(self.outsider)
         response = self.client.get(
-            reverse("greenhouse-detail", kwargs={"pk": self.greenhouse.pk})
+            reverse("greenhouse-detail", kwargs={"pk": self.published_greenhouse.pk})
         )
 
         self.assertNotContains(
             response,
-            reverse("greenhousegrowthcycle-create", kwargs={"pk": self.greenhouse.pk}),
+            reverse(
+                "greenhousegrowthcycle-create",
+                kwargs={"pk": self.published_greenhouse.pk},
+            ),
         )

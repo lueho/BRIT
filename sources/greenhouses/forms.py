@@ -15,6 +15,7 @@ from sources.greenhouses.models import (
     GrowthTimeStepSet,
 )
 from utils.forms import ModalModelForm, ModalModelFormMixin, SimpleModelForm
+from utils.object_management.permissions import filter_queryset_for_user
 
 
 class CultureModelForm(SimpleModelForm):
@@ -64,6 +65,16 @@ class GrowthCycleCreateForm(ModalModelForm):
     class Meta:
         model = GreenhouseGrowthCycle
         fields = ("culture",)
+
+    def __init__(self, *args, greenhouse=None, **kwargs):
+        self.greenhouse = greenhouse
+        super().__init__(*args, **kwargs)
+        cultures = self.fields["culture"].queryset
+        if self.request is not None:
+            cultures = filter_queryset_for_user(cultures, self.request.user)
+        if self.greenhouse is not None and self.greenhouse.is_published:
+            cultures = cultures.filter(publication_status=Culture.STATUS_PUBLISHED)
+        self.fields["culture"].queryset = cultures
 
 
 class PlainTextComponentWidget(Widget):
