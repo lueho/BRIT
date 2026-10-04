@@ -3,6 +3,7 @@
 import logging
 
 from celery import shared_task
+from django.contrib.auth import get_user_model
 
 from utils.file_export.storages import TempUserFileDownloadStorage
 
@@ -13,12 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True, name="export_sample_measurements_to_excel")
-def export_sample_measurements_to_excel(self, sample_id):
+def export_sample_measurements_to_excel(self, sample_id, user_id=None):
     """
     Export a sample's component measurements to an Excel file matching the import format.
 
     Args:
         sample_id: Primary key of the Sample to export
+        user_id: Primary key of the requesting user; scopes linked geography
 
     Returns:
         URL to download the generated Excel file
@@ -58,10 +60,12 @@ def export_sample_measurements_to_excel(self, sample_id):
         )
 
     # Render Excel file
+    user = get_user_model().objects.filter(pk=user_id).first() if user_id else None
     renderer = SampleMeasurementsXLSXRenderer(
         sample=sample,
         measurements=measurements,
         progress_callback=progress_callback,
+        user=user,
     )
     buffer = renderer.render()
 

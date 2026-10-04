@@ -23,7 +23,8 @@ class DummyFilterSet:
 
 
 class DummySerializer:
-    def __init__(self, instances, many=False):
+    def __init__(self, instances, many=False, context=None):
+        self.context = context
         self.data = [OrderedDict({"pk": obj.pk}) for obj in instances]
 
 

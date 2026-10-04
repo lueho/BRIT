@@ -1177,3 +1177,27 @@ class RegionAttributeTextValue(NamedUserCreatedObject):
     )
     date = models.DateField(blank=True, null=True)
     value = models.CharField(max_length=511)
+
+
+def region_for_point(geom):
+    """
+    Return the finest region covering ``geom`` (boundary included): a LAU
+    region when one covers the point, otherwise the deepest NUTS level in the
+    default vintage. Ties on shared borders resolve to the lowest pk.
+    Returns None when no loaded region covers the point.
+    """
+    if geom is None:
+        return None
+    lau = (
+        LauRegion.objects.filter(borders__geom__covers=geom)
+        .order_by("-year", "pk")
+        .first()
+    )
+    if lau is not None:
+        return lau
+    return (
+        NutsRegion.objects.in_vintage()
+        .filter(borders__geom__covers=geom)
+        .order_by("-levl_code", "pk")
+        .first()
+    )

@@ -7,6 +7,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from utils.file_export.renderers import BaseCSVRenderer, BaseXLSXRenderer
+from utils.object_management.permissions import visible_related_object
 
 QUALIFIER_HEADERS = [
     "Value qualifier",
@@ -75,6 +76,9 @@ class SampleCSVRenderer(BaseCSVRenderer):
         "datetime": "Sampling date/time",
         "datetime_precision": "Sampling date precision",
         "standalone": "Standalone",
+        "location": "Location",
+        "region": "Region",
+        "site": "Sampling site",
         "publication_status": "Publication status",
         "owner": "Owner",
         "created_at": "Created at",
@@ -147,7 +151,7 @@ PROPERTY_COLUMN_WIDTHS = [30, 12, 18, 10, 25, 30, 40, 40] + QUALIFIER_COLUMN_WID
 class SampleMeasurementsXLSXRenderer:
     """Renderer for exporting sample measurements to Excel format matching the import template."""
 
-    def __init__(self, sample, measurements, progress_callback=None):
+    def __init__(self, sample, measurements, progress_callback=None, user=None):
         """
         Initialize the renderer.
 
@@ -155,8 +159,10 @@ class SampleMeasurementsXLSXRenderer:
             sample: Sample model instance
             measurements: QuerySet of ComponentMeasurement objects
             progress_callback: Optional callable(percent, status) for progress reporting
+            user: Export user; region and site are omitted when hidden from them
         """
         self.sample = sample
+        self.user = user
         self.measurements = measurements
         self.progress_callback = progress_callback
         self._unknown_group_colors = {}
@@ -171,13 +177,23 @@ class SampleMeasurementsXLSXRenderer:
         """Build dictionary of metadata label -> value mappings."""
         sample = self.sample
         sample_sources = sample.sources.all()
+        region = visible_related_object(sample.region, self.user)
+        site = visible_related_object(sample.site, self.user)
 
         return {
             "Material type": sample.material.name if sample.material else "",
             "Sample name": sample.name or "",
             "Sample info (e.g. structure, harvesting, storing)": sample.description
             or "",
-            "Sample origin (e.g. location, region)": sample.location or "",
+            "Sample origin (e.g. location, region)": "; ".join(
+                part
+                for part in (
+                    sample.location or "",
+                    str(region) if region else "",
+                    str(site) if site else "",
+                )
+                if part
+            ),
             "Sample campaign (e.g. season, project)": sample.series.name
             if sample.series
             else "",

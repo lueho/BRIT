@@ -85,7 +85,7 @@ def export_user_created_object_to_file(
     data = []
     for i in range(0, total, BATCH_SIZE):
         batch = list(qs[i : i + BATCH_SIZE])
-        batch_data = spec.serializer(batch, many=True).data
+        batch_data = spec.serializer(batch, many=True, context={"user": user}).data
         data.extend(batch_data)
 
         current = min(i + BATCH_SIZE, total)

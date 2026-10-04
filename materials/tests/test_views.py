@@ -19,6 +19,7 @@ from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
+from maps.models import Location, Region
 from utils.object_management.models import (
     ObjectEditorGrant,
     ReviewAction,
@@ -2959,6 +2960,120 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Review feedback")
         self.assertNotContains(response, f'href="{review_url}')
+
+    def test_detail_view_renders_region_and_site_with_links(self):
+        region = Region.objects.create(
+            name="Brittany", country="FR", publication_status="published"
+        )
+        site = Location.objects.create(name="Viaverda", publication_status="published")
+        sample = self.model.objects.create(
+            name="Geo sample",
+            owner=self.owner_user,
+            publication_status="published",
+            location="Somewhere in Brittany",
+            region=region,
+            site=site,
+            **self.related_objects,
+        )
+
+        response = self.client.get(self.get_detail_url(sample.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Somewhere in Brittany")
+        self.assertContains(
+            response, reverse("region-detail", kwargs={"pk": region.pk})
+        )
+        self.assertContains(
+            response, reverse("location-detail", kwargs={"pk": site.pk})
+        )
+
+    def test_detail_view_hides_private_region_and_site_of_published_sample(self):
+        geo_owner = get_user_model().objects.create(username="private_geo_owner")
+        region = Region.objects.create(
+            name="Hidden region", country="FR", owner=geo_owner
+        )
+        site = Location.objects.create(
+            name="Hidden site", address="Secret street 1", owner=geo_owner
+        )
+        sample = self.model.objects.create(
+            name="Published sample with private geo",
+            owner=self.owner_user,
+            publication_status="published",
+            region=region,
+            site=site,
+            **self.related_objects,
+        )
+
+        response = self.client.get(self.get_detail_url(sample.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secret street 1")
+        self.assertNotContains(response, "Hidden region")
+        self.assertNotContains(
+            response, reverse("location-detail", kwargs={"pk": site.pk})
+        )
+        self.assertNotContains(
+            response, reverse("region-detail", kwargs={"pk": region.pk})
+        )
+
+    def test_export_view_passes_requesting_user_to_task(self):
+        self.client.force_login(self.owner_user)
+        with patch(
+            "materials.tasks.export_sample_measurements_to_excel.delay"
+        ) as delay:
+            delay.return_value.task_id = "task-id"
+            response = self.client.get(
+                reverse("sample-export", kwargs={"pk": self.unpublished_object.pk})
+            )
+        self.assertEqual(response.status_code, 200)
+        delay.assert_called_once_with(
+            self.unpublished_object.pk, user_id=self.owner_user.pk
+        )
+
+    def test_detail_view_without_geo_references_omits_region_and_site(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'sdv2-meta-label">Region')
+
+    def test_quick_create_form_excludes_region_and_site(self):
+        """Quick-create is a minimal draft form; geo lives in the sampling section."""
+        self.client.force_login(self.owner_user)
+        response = self.client.get(reverse(self.view_create_name))
+        self.assertEqual(response.status_code, 200)
+        form = response.context["form"]
+        self.assertNotIn("region", form.fields)
+        self.assertNotIn("site", form.fields)
+
+    def test_sampling_section_form_exposes_region_and_site(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(
+            f"{self.get_update_url(self.unpublished_object.pk)}?section=sampling"
+        )
+        self.assertEqual(response.status_code, 200)
+        form = response.context["form"]
+        self.assertIn("region", form.fields)
+        self.assertIn("site", form.fields)
+        self.assertIn("location", form.fields)
+
+    def test_sampling_section_update_saves_region_and_site(self):
+        region = Region.objects.create(
+            name="Brittany", country="FR", publication_status="published"
+        )
+        site = Location.objects.create(name="Viaverda", publication_status="published")
+        self.client.force_login(self.owner_user)
+        response = self.client.post(
+            f"{self.get_update_url(self.unpublished_object.pk)}?section=sampling",
+            {
+                "standalone": "on",
+                "region": str(region.pk),
+                "site": str(site.pk),
+            },
+        )
+        self.assertIn(response.status_code, (200, 302))
+        self.unpublished_object.refresh_from_db()
+        self.assertEqual(self.unpublished_object.region_id, region.pk)
+        self.assertEqual(self.unpublished_object.site_id, site.pk)
 
     def test_update_view_prefills_material_autocomplete_with_material_name(self):
         substrate_category, _ = MaterialCategory.objects.get_or_create(
