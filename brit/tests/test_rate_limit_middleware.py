@@ -69,19 +69,38 @@ class AnonymousRateLimitMiddlewareTests(SimpleTestCase):
 
     def test_showcase_map_data_api_is_exempt(self):
         """A showcase map load fans out into region boundaries, feature
-        GeoJSON and version checks; those endpoints have their own DRF
+        GeoJSON and version checks; those actions have their own DRF
         throttles, so the site-wide cap must not double-count them."""
         for path in (
             "/maps/api/region/geojson/",
             "/maps/api/region/version/",
             "/maps/api/catchment/geojson/",
+            "/maps/api/catchment/version/",
             "/closecycle/api/showcase/geojson/",
-            "/closecycle/api/showcase/summaries/",
+            "/closecycle/api/showcase/version/",
         ):
             for _ in range(LIMIT * 3):
                 self.assertEqual(self.middleware(self.request(path)).status_code, 200)
 
         self.assertEqual(self.middleware(self.request()).status_code, 200)
+
+    def test_unthrottled_actions_of_map_data_apis_are_still_limited(self):
+        """List, detail and summaries actions of the same viewsets carry no
+        DRF throttle, so they keep the site-wide anonymous cap."""
+        for path in (
+            "/maps/api/region/",
+            "/maps/api/region/1/",
+            "/maps/api/region/summaries/",
+            "/maps/api/catchment/",
+            "/closecycle/api/showcase/",
+            "/closecycle/api/showcase/summaries/",
+        ):
+            with self.subTest(path=path):
+                cache.clear()
+                for _ in range(LIMIT):
+                    self.middleware(self.request(path))
+
+                self.assertEqual(self.middleware(self.request(path)).status_code, 429)
 
     def test_other_map_api_paths_are_still_limited(self):
         """Location GeoJSON has no endpoint-specific throttle, so it keeps
