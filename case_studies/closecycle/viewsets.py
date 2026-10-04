@@ -2,9 +2,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from maps.mixins import (
+    CachedGeoJSONMixin,
     get_unbounded_geojson_rejection_response,
     get_view_geojson_bounded_query_params,
 )
+from maps.throttling import GeoJSONAnonThrottle
 from utils.viewsets import AutoPermModelViewSet
 
 from .models import BiogasPlantsSweden, Showcase
@@ -16,15 +18,17 @@ from .serializers import (
 )
 
 
-class ShowcaseViewSet(AutoPermModelViewSet):
+class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     queryset = Showcase.objects.all()
     serializer_class = ShowcaseModelSerializer
     filterset_fields = ("id", "region__country")
+    geojson_throttle_classes = (GeoJSONAnonThrottle,)
     custom_permission_required = {
         "list": None,
         "retrieve": None,
         "geojson": None,
         "summaries": None,
+        "version": None,
     }
 
     def get_queryset(self):
@@ -60,7 +64,11 @@ class ShowcaseViewSet(AutoPermModelViewSet):
         serializer = ShowcaseGeoFeatureModelSerializer(
             queryset, many=True, context={"request": request}
         )
-        return Response(serializer.data)
+        response = Response(serializer.data)
+        # Lets the client's IndexedDB cache revalidate via the version action.
+        response["X-Data-Version"] = self.get_dataset_version(request)
+        response["Access-Control-Expose-Headers"] = "X-Data-Version"
+        return response
 
     @action(detail=False, methods=["get"])
     def summaries(self, request, *args, **kwargs):
