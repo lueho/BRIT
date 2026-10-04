@@ -15,7 +15,9 @@
   {% if inlines %}
     {% with helper=formset_helper %}
       {% for inline in inlines %}
-        {% crispy inline helper %}
+        {% with form_id=inline.prefix %}
+          {% crispy inline helper %}
+        {% endwith %}
       {% endfor %}
     {% endwith %}
   {% endif %}

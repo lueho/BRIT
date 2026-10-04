@@ -27,6 +27,15 @@ class ShowcaseViewSet(AutoPermModelViewSet):
         "summaries": None,
     }
 
+    def get_queryset(self):
+        queryset = super().get_queryset().select_related("region")
+        if self.action == "geojson":
+            return queryset
+        connections = ("process_links",) if self.action == "summaries" else None
+        return Showcase.prefetch_visible_connections(
+            queryset, self.request.user, connections=connections
+        )
+
     @action(detail=False, methods=["get"])
     def geojson(self, request, *args, **kwargs):
         """
