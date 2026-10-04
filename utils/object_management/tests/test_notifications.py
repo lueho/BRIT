@@ -1,13 +1,16 @@
 """Tests for owner e-mail notifications on review actions."""
 
+import smtplib
+
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core import mail
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from sources.waste_collection.models import Collection
 from utils.object_management.models import ReviewAction, UserCreatedObject
+from utils.object_management.tasks import send_review_action_owner_notification
 
 
 class ReviewOwnerNotificationTests(TestCase):
@@ -129,3 +132,43 @@ class ReviewOwnerNotificationTests(TestCase):
                 comment="orphaned",
             )
         self.assertEqual(len(mail.outbox), 0)
+
+    def test_ownership_transfer_still_notifies_owner_at_review_time(self):
+        new_owner = User.objects.create_user(
+            username="newowner", email="newowner@example.com"
+        )
+        self.client.force_login(self.moderator)
+        with self.captureOnCommitCallbacks() as callbacks:
+            response = self.client.post(self._action_url("approve_item"))
+        self.assertEqual(response.status_code, 302)
+
+        self.collection.transfer_ownership(new_owner)
+        for callback in callbacks:
+            callback()
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.owner.email])
+        self.assertIn(f"Hello {self.owner.username}", mail.outbox[0].body)
+
+    def test_notification_task_retries_transient_mail_errors(self):
+        task = send_review_action_owner_notification
+        self.assertIn(smtplib.SMTPException, task.autoretry_for)
+        self.assertIn(OSError, task.autoretry_for)
+        self.assertGreater(task.max_retries, 0)
+
+    @override_settings(SECURE_SSL_REDIRECT=True)
+    def test_notification_links_use_https_when_ssl_redirect_enabled(self):
+        self.client.force_login(self.moderator)
+        self._post(self._action_url("approve_item"))
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("https://", mail.outbox[0].body)
+        self.assertNotIn("http://", mail.outbox[0].body)
+
+    @override_settings(SITE_ID=999, CANONICAL_HOST="brit.example.org")
+    def test_missing_site_row_falls_back_to_canonical_host(self):
+        self.client.force_login(self.moderator)
+        self._post(self._action_url("approve_item"))
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("http://brit.example.org", mail.outbox[0].body)

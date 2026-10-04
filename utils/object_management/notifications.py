@@ -29,25 +29,71 @@ def _from_email():
     return settings.DEFAULT_FROM_EMAIL or settings.SERVER_EMAIL
 
 
-def notify_owner_of_review_action(action):
+def _notification_site():
+    """Return the Site used for links in notification e-mails.
+
+    A fresh deployment may lack the Site row referenced by SITE_ID
+    (production uses SITE_ID=2 while Django's migrations only create
+    site 1), so fall back to the configured canonical host instead of
+    failing the notification.
+    """
+    try:
+        return Site.objects.get_current()
+    except Site.DoesNotExist:
+        domain = getattr(settings, "CANONICAL_HOST", "") or next(
+            (
+                host.lstrip(".")
+                for host in settings.ALLOWED_HOSTS
+                if host not in ("*", "")
+            ),
+            "",
+        )
+        logger.warning(
+            "No Site row for SITE_ID=%s; falling back to domain %r for "
+            "notification links.",
+            getattr(settings, "SITE_ID", None),
+            domain,
+        )
+        return Site(domain=domain, name=domain)
+
+
+def _notification_protocol():
+    """URL scheme for notification links; production enforces HTTPS."""
+    return "https" if getattr(settings, "SECURE_SSL_REDIRECT", False) else "http"
+
+
+def notify_owner_of_review_action(action, recipient=None):
     """Send a notification e-mail to the object owner for a review action.
 
-    Only actions performed by someone other than the owner trigger an
+    ``recipient`` is the user who owned the object when the action was
+    created; the post-save signal captures it so an ownership transfer
+    between enqueue and delivery does not redirect the notification. When
+    omitted, the object's current owner is used.
+
+    Only actions performed by someone other than the recipient trigger an
     e-mail. Returns True when an e-mail was sent.
     """
     obj = action.content_object
-    owner = getattr(obj, "owner", None) if obj is not None else None
-    if owner is None or owner.pk == action.user_id or not owner.email:
+    if recipient is None:
+        recipient = getattr(obj, "owner", None) if obj is not None else None
+    if (
+        obj is None
+        or recipient is None
+        or recipient.pk == action.user_id
+        or not recipient.email
+    ):
         return False
 
     context = {
         "action": action,
         "actor": action.user,
+        "recipient": recipient,
         "object": obj,
         "object_name": getattr(obj, "name", None) or str(obj),
         "object_verbose_name": capfirst(obj._meta.verbose_name),
         "summary": ACTION_SUMMARIES.get(action.action, "was updated during review"),
-        "site": Site.objects.get_current(),
+        "site": _notification_site(),
+        "protocol": _notification_protocol(),
         "review_url": reverse(
             "object_management:review_item_detail",
             kwargs={
@@ -62,13 +108,13 @@ def notify_owner_of_review_action(action):
         subject,
         body,
         _from_email(),
-        [owner.email],
+        [recipient.email],
     )
     logger.info(
         "Sent review notification for %s %s (action=%s) to %s",
         action.content_type.model,
         action.object_id,
         action.action,
-        owner.email,
+        recipient.email,
     )
     return True
