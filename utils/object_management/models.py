@@ -396,7 +396,6 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
                 self.approved_by = user
                 update_fields.append("approved_by")
             self.save(update_fields=update_fields)
-        # TODO: Implement notification to the owner
 
     def reject(self):
         with transaction.atomic():
@@ -415,7 +414,6 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
                     "approved_by",
                 ]
             )
-        # TODO: Implement notification to the owner
 
     def archive(self):
         with transaction.atomic():
