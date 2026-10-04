@@ -660,6 +660,7 @@ class CollectionModelForm(
         min_value=0,
         max_digits=8,
         decimal_places=1,
+        label="Smallest available bin size (L)",
         widget=NumberInput(attrs={"step": "0.1", "min": "0"}),
     )
     required_bin_capacity = DecimalField(

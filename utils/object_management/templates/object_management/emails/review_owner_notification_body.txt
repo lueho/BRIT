@@ -1,0 +1,11 @@
+{% load i18n %}Hello {{ recipient.username }},
+
+your {{ object_verbose_name|lower }} "{{ object_name }}" {{ summary }} (by {{ actor.username }}).
+{% if action.comment %}
+Comment: "{{ action.comment }}"
+{% endif %}
+You can view the details and the full review history here:
+{{ protocol }}://{{ site.domain }}{{ review_url }}
+
+Sincerely, your
+{{ site.name }} Team

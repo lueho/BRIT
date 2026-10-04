@@ -1,6 +1,8 @@
 from datetime import datetime
 
 from django.contrib.auth.models import Permission, User
+from django.contrib.gis.geos import GEOSGeometry, Point
+from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
 from django.http import QueryDict
 from django.test import RequestFactory, TestCase, override_settings
@@ -9,6 +11,7 @@ from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.forms import TomSelectModelChoiceField
 from factory.django import mute_signals
 
+from maps.models import GeoPolygon, Location, Region
 from utils.forms import CreateEnabledTomSelectModelMultipleChoiceField
 from utils.properties.models import Unit
 
@@ -86,6 +89,11 @@ class ComponentModelFormTestCase(TestCase):
         self.assertIn(component, queryset)
         self.assertNotIn(material.pk, queryset.values_list("pk", flat=True))
 
+    def test_comparable_component_label_matches_detail_view(self):
+        form = ComponentModelForm()
+
+        self.assertEqual(form.fields["comparable_component"].label, "Compared as")
+
 
 class MaterialPropertyModelFormTestCase(TestCase):
     def test_form_includes_comparable_property_field(self):
@@ -96,6 +104,11 @@ class MaterialPropertyModelFormTestCase(TestCase):
             form.fields["comparable_property"],
             TomSelectModelChoiceField,
         )
+
+    def test_comparable_property_label_matches_detail_view(self):
+        form = MaterialPropertyModelForm()
+
+        self.assertEqual(form.fields["comparable_property"].label, "Compared as")
 
 
 class MaterialPropertyValueModelFormTestCase(TestCase):
@@ -311,6 +324,92 @@ class SampleModelFormTestCase(TestCase):
                 form = self._sampling_form(value)
                 self.assertFalse(form.is_valid())
                 self.assertIn("datetime", form.errors)
+
+    def _geo_form(self, data_extra=None, instance=None):
+        data = QueryDict(mutable=True)
+        data.update(
+            {
+                "name": "Geo sample",
+                "material": str(self.substrate_material.pk),
+                "standalone": "on",
+            }
+        )
+        if data_extra:
+            data.update(data_extra)
+        return SampleModelForm(
+            data=data,
+            instance=instance or Sample(owner=self.owner),
+            request=self._build_request(self.owner),
+        )
+
+    def test_form_has_region_and_site_fields(self):
+        form = SampleModelForm(request=self._build_request(self.owner))
+        self.assertIn("region", form.fields)
+        self.assertIn("site", form.fields)
+        self.assertEqual(form.fields["region"].config.url, "region-autocomplete")
+        self.assertEqual(form.fields["site"].config.url, "location-autocomplete")
+        self.assertFalse(form.fields["region"].required)
+        self.assertFalse(form.fields["site"].required)
+
+    def test_form_saves_region_and_site(self):
+        region = Region.objects.create(
+            name="Brittany", country="FR", publication_status="published"
+        )
+        site = Location.objects.create(name="Orchard", publication_status="published")
+        form = self._geo_form({"region": str(region.pk), "site": str(site.pk)})
+        self.assertTrue(form.is_valid(), form.errors)
+        sample = form.save()
+        self.assertEqual(sample.region_id, region.pk)
+        self.assertEqual(sample.site_id, site.pk)
+
+    def test_form_rejects_private_region_and_site_owned_by_others(self):
+        other = User.objects.create_user(username="other")
+        region = Region.objects.create(name="Hidden region", country="FR", owner=other)
+        site = Location.objects.create(name="Hidden site", owner=other)
+        form = self._geo_form({"region": str(region.pk), "site": str(site.pk)})
+        self.assertFalse(form.is_valid())
+        self.assertIn("region", form.errors)
+        self.assertIn("site", form.errors)
+
+    def test_form_rejects_site_outside_region(self):
+        region = Region.objects.create(
+            name="Small region",
+            country="DE",
+            publication_status="published",
+            borders=GeoPolygon.objects.create(
+                geom=GEOSGeometry(
+                    "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))", srid=4326
+                )
+            ),
+        )
+        site = Location.objects.create(
+            name="Elsewhere",
+            geom=Point(5, 5, srid=4326),
+            publication_status="published",
+        )
+        form = self._geo_form({"region": str(region.pk), "site": str(site.pk)})
+        self.assertFalse(form.is_valid())
+        self.assertIn("site", form.errors)
+
+    def test_maintenance_form_sampling_section_includes_geo_fields(self):
+        form = SampleMaintenanceForm(
+            fields=["location", "region", "site"],
+            instance=Sample(owner=self.owner),
+            request=self._build_request(self.owner),
+        )
+        self.assertIn("location", form.fields)
+        self.assertIn("region", form.fields)
+        self.assertIn("site", form.fields)
+
+    def test_maintenance_form_drops_site_error_when_section_cannot_edit_geo(self):
+        form = SampleMaintenanceForm(
+            fields=["name"],
+            instance=Sample(owner=self.owner),
+            request=self._build_request(self.owner),
+        )
+        errors = ValidationError({"site": ["outside region"]})
+        form._update_errors(errors)
+        self.assertFalse(form.errors)
 
     def test_unchanged_sampling_date_preserves_legacy_timestamp(self):
         for value in (datetime(2024, 8, 27), datetime(2024, 8, 27, 14, 30, 12, 123456)):

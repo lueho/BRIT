@@ -163,6 +163,29 @@ Objects can be in one of five publication states:
 
 Moderators cannot approve or reject their own submissions. This ensures independent review.
 
+### Owner Notifications
+
+Creating a `ReviewAction` queues an e-mail to the object's owner via a
+`post_save` signal (`enqueue_owner_review_notification` in `signals.py`).
+The signal captures the owner at review time and passes their user id to
+the Celery task `send_review_action_owner_notification` (`tasks.py`), so an
+ownership transfer before delivery does not redirect the notification. If
+the captured owner can no longer open the review detail page at delivery
+time (they are neither the current owner nor a moderator), the e-mail is
+skipped rather than sending an unusable link.
+Sending is deferred to `transaction.on_commit`; if the broker is
+unavailable the signal falls back to sending synchronously. Transient mail
+delivery failures are retried with backoff (up to 3 retries).
+
+Owners are only notified about actions performed by other users (e.g.
+moderator approval, decline, or comments); their own actions send nothing.
+Owners without an e-mail address are skipped. The e-mail contains a link to
+the object's review detail page, which owners can always access. Links use
+the configured `Site`; if no `Site` row exists for `SITE_ID` (e.g. on a
+fresh production deployment), the domain falls back to `CANONICAL_HOST` or
+the first `ALLOWED_HOSTS` entry. The link scheme is `https` when
+`SECURE_SSL_REDIRECT` is enabled.
+
 ## Views and ViewSets
 
 ### Class-Based Views (CBVs)

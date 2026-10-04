@@ -19,6 +19,7 @@ from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
+from maps.models import Location, Region
 from utils.object_management.models import (
     ObjectEditorGrant,
     ReviewAction,
@@ -2711,8 +2712,8 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         # The list segment is the active/current one on the list page.
         self.assertContains(response, 'aria-current="page"')
         self.assertContains(response, 'title="View as list"')
-        # The featured (gallery) view is reachable as a peer.
-        self.assertContains(response, 'title="View as featured gallery"')
+        # The gallery view is reachable as a peer.
+        self.assertContains(response, 'title="View as gallery"')
         self.assertContains(response, reverse("sample-gallery"))
 
     def test_gallery_marks_featured_segment_active(self):
@@ -2735,15 +2736,131 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         # Detail is not a list representation, so no segment is marked active.
         self.assertNotContains(response, 'aria-pressed="true"')
 
-    def test_detail_keeps_explorer_separate_from_switcher(self):
+    def test_gallery_orders_samples_with_images_first(self):
+        series = SampleSeries.objects.create(
+            owner=self.owner,
+            name="Series With Image",
+            material=self.material,
+            image="materials_sampleseries/series-image.jpg",
+        )
+        Sample.objects.create(
+            owner=self.owner,
+            name="Alpha No-Image Sample",
+            publication_status="published",
+            material=self.material,
+            standalone=True,
+        )
+        Sample.objects.create(
+            owner=self.owner,
+            name="Zebra Own-Image Sample",
+            publication_status="published",
+            material=self.material,
+            standalone=True,
+            image="materials_sample/zebra.jpg",
+        )
+        Sample.objects.create(
+            owner=self.owner,
+            name="Beta Series-Image Sample",
+            publication_status="published",
+            material=self.material,
+            series=series,
+            standalone=True,
+        )
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        # Alphabetically, "Alpha" would sort first; image-bearing samples (own
+        # image or via the linked series) lead for visual appeal instead.
+        ordered_names = [obj.name for obj in response.context["object_list"]]
+        self.assertLess(
+            ordered_names.index("Zebra Own-Image Sample"),
+            ordered_names.index("Alpha No-Image Sample"),
+        )
+        self.assertLess(
+            ordered_names.index("Beta Series-Image Sample"),
+            ordered_names.index("Alpha No-Image Sample"),
+        )
+
+    def test_detail_nav_shows_switcher_and_explorer_link(self):
         response = self.client.get(
             reverse("sample-detail", kwargs={"pk": self.sample.pk})
         )
         self.assertEqual(response.status_code, 200)
-        # Explorer remains reachable as a distinct, secondary affordance and is
-        # not folded into the representation switcher.
+        # The detail header reuses the same peer-representation switcher as the
+        # list and gallery pages; the module Explorer stays a separate link
+        # because it leads to a broader scope, not another representation.
+        nav = self._context_nav_html(response)
+        self.assertIn('aria-label="View toggle"', nav)
+        self.assertIn(reverse("sample-list"), nav)
+        self.assertIn(reverse("sample-gallery"), nav)
+        self.assertIn(reverse("materials-explorer"), nav)
+
+    def test_detail_nav_links_carry_scope_only(self):
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+            {"mode": "edit", "back": "/somewhere/"},
+        )
+        self.assertEqual(response.status_code, 200)
+        nav = self._context_nav_html(response)
+        # Detail page query params (mode, back, ...) must not leak into the
+        # peer-view links; they navigate fresh with only the scope.
+        self.assertIn(f"{reverse('sample-list')}?scope=published", nav)
+        self.assertIn(f"{reverse('sample-gallery')}?scope=published", nav)
+        self.assertNotIn("mode=edit", nav)
+
+    def test_list_header_shows_switcher_and_separate_explorer_link(self):
+        response = self.client.get(reverse("sample-list"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        switcher = self._view_switcher_html(response)
+        # List and gallery are peer representations inside one control; the
+        # Explorer stays a separate affordance next to it.
+        self.assertIn(reverse("sample-gallery"), switcher)
+        self.assertIn(reverse("sample-list"), switcher)
+        self.assertNotIn(reverse("materials-explorer"), switcher)
         self.assertContains(response, reverse("materials-explorer"))
-        self.assertContains(response, "Materials explorer")
+        # The current (list) view is visibly active.
+        self.assertIn('aria-current="page"', switcher)
+
+    def test_gallery_header_shows_switcher_with_gallery_active(self):
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        switcher = self._view_switcher_html(response)
+        self.assertIn(reverse("sample-list"), switcher)
+        self.assertNotIn(reverse("materials-explorer"), switcher)
+        self.assertContains(response, reverse("materials-explorer"))
+        self.assertIn('aria-current="page"', switcher)
+        self.assertIn(f'href="{reverse("sample-gallery")}?scope=published"', switcher)
+
+    def test_switcher_preserves_active_filters_but_not_on_explorer(self):
+        response = self.client.get(
+            reverse("sample-list"), {"scope": "published", "q": "Test"}
+        )
+        self.assertEqual(response.status_code, 200)
+        switcher = self._view_switcher_html(response)
+        # Peer representations keep the active filter context.
+        self.assertIn("q=Test", switcher)
+        # The Explorer is module-level and does not take sample filters.
+        self.assertContains(response, f'href="{reverse("materials-explorer")}"')
+
+    def test_switcher_links_present_for_anonymous_and_authenticated(self):
+        for authenticated in (False, True):
+            if authenticated:
+                self.client.force_login(self.owner)
+            for url_name in ("sample-list", "sample-gallery"):
+                with self.subTest(authenticated=authenticated, url_name=url_name):
+                    response = self.client.get(
+                        reverse(url_name), {"scope": "published"}
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    switcher = self._view_switcher_html(response)
+                    self.assertIn(reverse("sample-gallery"), switcher)
+                    self.assertIn(reverse("sample-list"), switcher)
+                    self.assertContains(response, reverse("materials-explorer"))
+
+    @staticmethod
+    def _view_switcher_html(response):
+        """Return the rendered peer-representation switcher of a response."""
+        body = response.content.decode()
+        return body.split('aria-label="View toggle"', 1)[1].split("</div>", 1)[0]
 
     @staticmethod
     def _context_nav_html(response):
@@ -2959,6 +3076,120 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Review feedback")
         self.assertNotContains(response, f'href="{review_url}')
+
+    def test_detail_view_renders_region_and_site_with_links(self):
+        region = Region.objects.create(
+            name="Brittany", country="FR", publication_status="published"
+        )
+        site = Location.objects.create(name="Viaverda", publication_status="published")
+        sample = self.model.objects.create(
+            name="Geo sample",
+            owner=self.owner_user,
+            publication_status="published",
+            location="Somewhere in Brittany",
+            region=region,
+            site=site,
+            **self.related_objects,
+        )
+
+        response = self.client.get(self.get_detail_url(sample.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Somewhere in Brittany")
+        self.assertContains(
+            response, reverse("region-detail", kwargs={"pk": region.pk})
+        )
+        self.assertContains(
+            response, reverse("location-detail", kwargs={"pk": site.pk})
+        )
+
+    def test_detail_view_hides_private_region_and_site_of_published_sample(self):
+        geo_owner = get_user_model().objects.create(username="private_geo_owner")
+        region = Region.objects.create(
+            name="Hidden region", country="FR", owner=geo_owner
+        )
+        site = Location.objects.create(
+            name="Hidden site", address="Secret street 1", owner=geo_owner
+        )
+        sample = self.model.objects.create(
+            name="Published sample with private geo",
+            owner=self.owner_user,
+            publication_status="published",
+            region=region,
+            site=site,
+            **self.related_objects,
+        )
+
+        response = self.client.get(self.get_detail_url(sample.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secret street 1")
+        self.assertNotContains(response, "Hidden region")
+        self.assertNotContains(
+            response, reverse("location-detail", kwargs={"pk": site.pk})
+        )
+        self.assertNotContains(
+            response, reverse("region-detail", kwargs={"pk": region.pk})
+        )
+
+    def test_export_view_passes_requesting_user_to_task(self):
+        self.client.force_login(self.owner_user)
+        with patch(
+            "materials.tasks.export_sample_measurements_to_excel.delay"
+        ) as delay:
+            delay.return_value.task_id = "task-id"
+            response = self.client.get(
+                reverse("sample-export", kwargs={"pk": self.unpublished_object.pk})
+            )
+        self.assertEqual(response.status_code, 200)
+        delay.assert_called_once_with(
+            self.unpublished_object.pk, user_id=self.owner_user.pk
+        )
+
+    def test_detail_view_without_geo_references_omits_region_and_site(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'sdv2-meta-label">Region')
+
+    def test_quick_create_form_excludes_region_and_site(self):
+        """Quick-create is a minimal draft form; geo lives in the sampling section."""
+        self.client.force_login(self.owner_user)
+        response = self.client.get(reverse(self.view_create_name))
+        self.assertEqual(response.status_code, 200)
+        form = response.context["form"]
+        self.assertNotIn("region", form.fields)
+        self.assertNotIn("site", form.fields)
+
+    def test_sampling_section_form_exposes_region_and_site(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(
+            f"{self.get_update_url(self.unpublished_object.pk)}?section=sampling"
+        )
+        self.assertEqual(response.status_code, 200)
+        form = response.context["form"]
+        self.assertIn("region", form.fields)
+        self.assertIn("site", form.fields)
+        self.assertIn("location", form.fields)
+
+    def test_sampling_section_update_saves_region_and_site(self):
+        region = Region.objects.create(
+            name="Brittany", country="FR", publication_status="published"
+        )
+        site = Location.objects.create(name="Viaverda", publication_status="published")
+        self.client.force_login(self.owner_user)
+        response = self.client.post(
+            f"{self.get_update_url(self.unpublished_object.pk)}?section=sampling",
+            {
+                "standalone": "on",
+                "region": str(region.pk),
+                "site": str(site.pk),
+            },
+        )
+        self.assertIn(response.status_code, (200, 302))
+        self.unpublished_object.refresh_from_db()
+        self.assertEqual(self.unpublished_object.region_id, region.pk)
+        self.assertEqual(self.unpublished_object.site_id, site.pk)
 
     def test_update_view_prefills_material_autocomplete_with_material_name(self):
         substrate_category, _ = MaterialCategory.objects.get_or_create(
@@ -5804,8 +6035,8 @@ class EmptyStateViewsTestCase(TestCase):
                 self.assertNotIn('role="button"', navigation)
                 self.assertNotIn("aria-pressed", navigation)
                 for route, label in (
-                    ("sample-list", "All samples"),
-                    ("sample-gallery", "Featured samples"),
+                    ("sample-list", "View as list"),
+                    ("sample-gallery", "View as gallery"),
                     ("materials-explorer", "Materials explorer"),
                 ):
                     self.assertIn(reverse(route), navigation)
@@ -6178,8 +6409,9 @@ class EmptyStateViewsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "sdv2-context-nav")
-        self.assertContains(response, "All samples")
-        self.assertContains(response, "Featured")
+        self.assertContains(response, 'aria-label="View toggle"')
+        self.assertContains(response, reverse("sample-list"))
+        self.assertContains(response, reverse("sample-gallery"))
         self.assertContains(response, "Materials explorer")
 
         # The command palette and classic fallback are retired; secondary

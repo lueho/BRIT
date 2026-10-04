@@ -1,14 +1,14 @@
 from crispy_forms.helper import FormHelper
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import ObjectDoesNotExist
-from django.http import HttpResponseRedirect
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.http import HttpResponse, HttpResponseRedirect
+from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.views.generic import UpdateView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetPublishedFilteredMapView
-from materials.models import MaterialComponentGroup
+from materials.models import Composition, MaterialComponentGroup
 from sources.greenhouses.filters import (
     CultureListFilter,
     GreenhouseTypeFilter,
@@ -33,6 +33,11 @@ from sources.greenhouses.models import (
     GrowthTimeStepSet,
 )
 from utils.file_export.views import GenericUserCreatedObjectExportView
+from utils.modal import is_ajax
+from utils.object_management.permissions import (
+    filter_queryset_for_user,
+    get_object_policy,
+)
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -150,35 +155,61 @@ class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateWithInlinesView)
         return self.object.get_absolute_url()
 
 
-class GrowthCycleModalCreateView(UserCreatedObjectModalCreateView):
+class GrowthCycleModalCreateView(UserPassesTestMixin, UserCreatedObjectModalCreateView):
     form_class = GrowthCycleCreateForm
     permission_required = "greenhouses.add_greenhousegrowthcycle"
+    greenhouse = None
+
+    def dispatch(self, request, *args, **kwargs):
+        self.greenhouse = get_object_or_404(Greenhouse, pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def test_func(self):
+        policy = get_object_policy(
+            self.request.user, self.greenhouse, request=self.request
+        )
+        return policy["can_manage_samples"]
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["greenhouse"] = self.greenhouse
+        return kwargs
 
     def form_valid(self, form):
-        if not self.request.is_ajax():
-            form.instance.greenhouse = Greenhouse.objects.get(id=self.kwargs.get("pk"))
-            material_settings = form.instance.culture.residue
-            macro_components = MaterialComponentGroup.objects.get(
-                name="Macro Components"
+        form.instance.greenhouse = self.greenhouse
+        residue = form.instance.culture.residue
+        if residue is None:
+            form.add_error("culture", "The selected culture has no residue.")
+            return self.form_invalid(form)
+
+        compositions = filter_queryset_for_user(
+            Composition.objects.filter(sample__series=residue), self.request.user
+        ).order_by("order", "pk")
+        if self.greenhouse.is_published:
+            compositions = compositions.filter(
+                publication_status=Composition.STATUS_PUBLISHED
             )
-            base_group = MaterialComponentGroup.objects.default()
-            try:
-                group_settings = (
-                    material_settings.materialcomponentgroupsettings_set.get(
-                        group=macro_components
-                    )
-                )
-            except ObjectDoesNotExist:
-                group_settings = (
-                    material_settings.materialcomponentgroupsettings_set.get(
-                        group=base_group
-                    )
-                )
-            form.instance.group_settings = group_settings
-            self.object = form.save()
-            for timestep in form.cleaned_data["timesteps"]:
-                self.object.add_timestep(timestep)
-            self.object.greenhouse.sort_growth_cycles()
+        group_settings = compositions.filter(group__name="Macro Components").first()
+        if group_settings is None:
+            group_settings = compositions.filter(
+                group=MaterialComponentGroup.objects.default()
+            ).first()
+        if group_settings is None:
+            form.add_error(
+                "culture",
+                "The selected culture's residue has no Macro Components or default composition.",
+            )
+            return self.form_invalid(form)
+
+        if is_ajax(self.request):
+            return HttpResponse(status=204)
+
+        form.instance.group_settings = group_settings
+        form.instance.owner = self.request.user
+        self.object = form.save()
+        for timestep in form.cleaned_data["timesteps"]:
+            self.object.add_timestep(timestep)
+        self.object.greenhouse.sort_growth_cycles()
         return HttpResponseRedirect(self.get_success_url())
 
 

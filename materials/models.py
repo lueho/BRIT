@@ -2,9 +2,10 @@ from builtins import property as builtin_property
 from decimal import Decimal
 
 from django.conf import settings
+from django.contrib.gis.db.models import GeometryField
 from django.core.exceptions import ValidationError
 from django.db import connection, models, transaction
-from django.db.models import Max, Q
+from django.db.models import Case, F, Max, Q, When
 from django.db.models.functions import Lower
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
@@ -16,6 +17,7 @@ from utils.object_management.models import (
     NamedUserCreatedObject,
     UserCreatedObject,
     UserCreatedObjectManager,
+    UserCreatedObjectQuerySet,
     get_default_owner,
 )
 from utils.properties.models import (
@@ -825,6 +827,53 @@ class MaterialPropertyValue(
         return sample.get_absolute_url()
 
 
+class SampleQuerySet(UserCreatedObjectQuerySet):
+    def with_origin_geom(self):
+        """
+        Annotate ``origin_geom``: the site point when the sample has one,
+        otherwise the polygon of its attributed region.
+        """
+        return self.annotate(
+            origin_geom=Case(
+                When(site__geom__isnull=False, then=F("site__geom")),
+                default=F("region__borders__geom"),
+                output_field=GeometryField(),
+            )
+        )
+
+    def origin_within(self, geom):
+        """
+        Samples whose origin geometry lies entirely within ``geom``. The site
+        point is authoritative when present; the region polygon is the fallback.
+        """
+        return self.filter(
+            Q(site__geom__isnull=False, site__geom__within=geom)
+            | Q(
+                Q(site__isnull=True) | Q(site__geom__isnull=True),
+                region__borders__geom__within=geom,
+            )
+        )
+
+    def origin_intersects(self, geom):
+        """
+        Samples whose origin geometry intersects ``geom``. Broader than
+        ``origin_within``: regions merely overlapping or containing ``geom``
+        match as well, which suits "possibly from this area" queries.
+        """
+        return self.filter(
+            Q(site__geom__isnull=False, site__geom__intersects=geom)
+            | Q(
+                Q(site__isnull=True) | Q(site__geom__isnull=True),
+                region__borders__geom__intersects=geom,
+            )
+        )
+
+
+class SampleManager(UserCreatedObjectManager.from_queryset(SampleQuerySet)):
+    def get_queryset(self):
+        return SampleQuerySet(self.model, using=self._db)
+
+
 class Sample(NamedUserCreatedObject):
     """
     Representation of a single sample that was taken at a specific location and time. Equivalent samples of the same
@@ -832,6 +881,26 @@ class Sample(NamedUserCreatedObject):
     Samples can additionally belong to any number of non-temporal SampleGroups.
     """
 
+    objects = SampleManager()
+
+    region = models.ForeignKey(
+        "maps.Region",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="samples",
+        help_text="Geographic region the sample was taken in. The free-text "
+        "location field and the site field can hold finer detail.",
+    )
+    site = models.ForeignKey(
+        "maps.Location",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="samples",
+        verbose_name="sampling site",
+        help_text="Precise sampling site (address or coordinates) when known.",
+    )
     image = models.ImageField(upload_to="materials_sample/", blank=True, null=True)
     image_alt_text = models.CharField(
         max_length=255,
@@ -1057,8 +1126,44 @@ class Sample(NamedUserCreatedObject):
             errors["material"] = (
                 "The sample material must match the material of its series."
             )
+        if not self.site_lies_in_region(self.site, self.region):
+            errors["site"] = self.SITE_OUTSIDE_REGION_MESSAGE
         if errors:
             raise ValidationError(errors)
+
+    SITE_OUTSIDE_REGION_MESSAGE = (
+        "The sampling site lies outside the attributed region."
+    )
+
+    @staticmethod
+    def site_lies_in_region(site, region):
+        """False only when both geometries are known and the region does not
+        cover the site point (boundary points count as inside)."""
+        if site is None or region is None:
+            return True
+        if site.geom is None or region.geom is None:
+            return True
+        return region.geom.covers(site.geom)
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = kwargs["update_fields"] = list(update_fields)
+        geo_fields_saved = update_fields is None or not {"site", "region"}.isdisjoint(
+            update_fields
+        )
+        if (
+            geo_fields_saved
+            and self.region_id is None
+            and self.site_id is not None
+            and self.site.geom is not None
+        ):
+            from maps.models import region_for_point
+
+            self.region = region_for_point(self.site.geom)
+            if update_fields is not None and "region" not in update_fields:
+                kwargs["update_fields"] = [*update_fields, "region"]
+        super().save(*args, **kwargs)
 
     def approve(self, user=None):
         """
@@ -1098,6 +1203,8 @@ class Sample(NamedUserCreatedObject):
                         else ""
                     ),
                     location=kwargs.get("location", self.location),
+                    region=kwargs.get("region", self.region),
+                    site=kwargs.get("site", self.site),
                     analysis_date=kwargs.get("analysis_date", self.analysis_date),
                     analysis_laboratory=kwargs.get(
                         "analysis_laboratory", self.analysis_laboratory

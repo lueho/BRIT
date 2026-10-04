@@ -6,6 +6,7 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from bibliography.models import Source
+from maps.models import Location, Region
 from utils.properties.models import Unit
 from utils.tests.testcases import ViewSetWithPermissionsTestCase
 
@@ -585,6 +586,97 @@ class SampleViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 204)
         self.assertFalse(Sample.objects.filter(pk=to_delete.pk).exists())
+
+    # --- geographic referencing ---
+
+    def test_get_detail_exposes_location_region_and_site(self):
+        region = Region.objects.create(
+            name="Brittany", country="FR", publication_status="published"
+        )
+        site = Location.objects.create(name="Viaverda", publication_status="published")
+        self.published_sample.location = "Somewhere in Brittany"
+        self.published_sample.region = region
+        self.published_sample.site = site
+        self.published_sample.save()
+        self.client.force_login(self.outsider)
+        response = self.client.get(
+            reverse("api-sample-detail", kwargs={"pk": self.published_sample.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["location"], "Somewhere in Brittany")
+        self.assertEqual(response.data["region"], str(region))
+        self.assertEqual(response.data["site"], str(site))
+
+    def test_get_list_filters_by_region(self):
+        region = Region.objects.create(
+            name="Brittany", country="FR", publication_status="published"
+        )
+        other_region = Region.objects.create(
+            name="Hamburg", country="DE", publication_status="published"
+        )
+        self.published_sample.region = region
+        self.published_sample.save()
+        Sample.objects.create(
+            name="Hamburg Sample",
+            material=self.material,
+            standalone=True,
+            owner=self.owner,
+            region=other_region,
+            publication_status="published",
+        )
+        response = self.client.get(reverse("api-sample-list") + f"?region={region.pk}")
+        names = self._list_names(response)
+        self.assertIn(self.published_sample.name, names)
+        self.assertNotIn("Hamburg Sample", names)
+
+    def test_get_list_filters_by_site(self):
+        site = Location.objects.create(name="Viaverda", publication_status="published")
+        other_site = Location.objects.create(
+            name="TUHH campus", publication_status="published"
+        )
+        self.published_sample.site = site
+        self.published_sample.save()
+        Sample.objects.create(
+            name="TUHH Sample",
+            material=self.material,
+            standalone=True,
+            owner=self.owner,
+            site=other_site,
+            publication_status="published",
+        )
+        response = self.client.get(reverse("api-sample-list") + f"?site={site.pk}")
+        names = self._list_names(response)
+        self.assertIn(self.published_sample.name, names)
+        self.assertNotIn("TUHH Sample", names)
+
+    def test_patch_assigns_region_and_site(self):
+        region = Region.objects.create(
+            name="Brittany", country="FR", publication_status="published"
+        )
+        site = Location.objects.create(name="Viaverda", publication_status="published")
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-sample-detail", kwargs={"pk": self.private_sample.pk}),
+            data=json.dumps({"region": region.pk, "site": site.pk}),
+            content_type=JSON,
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.private_sample.refresh_from_db()
+        self.assertEqual(self.private_sample.region_id, region.pk)
+        self.assertEqual(self.private_sample.site_id, site.pk)
+
+    def test_patch_rejects_inaccessible_region_and_site(self):
+        hidden_region = Region.objects.create(
+            name="Hidden", country="FR", owner=self.outsider
+        )
+        hidden_site = Location.objects.create(name="Hidden site", owner=self.outsider)
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-sample-detail", kwargs={"pk": self.private_sample.pk}),
+            data=json.dumps({"region": hidden_region.pk, "site": hidden_site.pk}),
+            content_type=JSON,
+        )
+        self.assertEqual(response.status_code, 400)
 
 
 class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):

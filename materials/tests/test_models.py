@@ -4,6 +4,7 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from django.contrib.auth.models import User
+from django.contrib.gis.geos import GEOSGeometry, Point
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
@@ -14,6 +15,7 @@ from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
+from maps.models import GeoPolygon, LauRegion, Location, NutsRegion, Region
 from materials.models import (
     BaseMaterial,
     ComponentMeasurement,
@@ -1164,6 +1166,246 @@ class SampleTestCase(TestCase):
         with self.assertRaises(ValidationError) as ctx:
             sample.clean()
         self.assertIn("material", ctx.exception.message_dict)
+
+
+class SampleGeoReferenceTestCase(TestCase):
+    """
+    Samples carry a canonical region link (maps.Region) and optionally an
+    address-level site (maps.Location) with a point geometry.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.material = Material.objects.create(name="Geo Material")
+        cls.big_region = Region.objects.create(
+            name="Big Region",
+            country="DE",
+            borders=GeoPolygon.objects.create(
+                geom=GEOSGeometry(
+                    "MULTIPOLYGON(((0 0, 0 10, 10 10, 10 0, 0 0)))", srid=4326
+                )
+            ),
+        )
+        cls.inner_nuts = NutsRegion.objects.create(
+            name="Inner NUTS",
+            levl_code=3,
+            cntr_code="DE",
+            borders=GeoPolygon.objects.create(
+                geom=GEOSGeometry(
+                    "MULTIPOLYGON(((1 1, 1 5, 5 5, 5 1, 1 1)))", srid=4326
+                )
+            ),
+        )
+        cls.inner_lau = LauRegion.objects.create(
+            name="Inner LAU",
+            cntr_code="DE",
+            lau_id="00000001",
+            borders=GeoPolygon.objects.create(
+                geom=GEOSGeometry(
+                    "MULTIPOLYGON(((1 1, 1 3, 3 3, 3 1, 1 1)))", srid=4326
+                )
+            ),
+        )
+        cls.far_region = Region.objects.create(
+            name="Far Region",
+            country="DE",
+            borders=GeoPolygon.objects.create(
+                geom=GEOSGeometry(
+                    "MULTIPOLYGON(((20 20, 20 30, 30 30, 30 20, 20 20)))",
+                    srid=4326,
+                )
+            ),
+        )
+        cls.site_inside = Location.objects.create(
+            name="Research Station",
+            address="Schaessestraat 18, 9080 Destelbergen",
+            geom=Point(2, 2, srid=4326),
+        )
+        cls.site_outside = Location.objects.create(
+            name="Far Site",
+            geom=Point(25, 25, srid=4326),
+        )
+
+    def _sample(self, **kwargs):
+        kwargs.setdefault("material", self.material)
+        kwargs.setdefault("standalone", True)
+        return Sample.objects.create(**kwargs)
+
+    def test_region_and_site_are_optional(self):
+        sample = self._sample(name="Geo-free")
+        self.assertIsNone(sample.region)
+        self.assertIsNone(sample.site)
+
+    def test_region_is_set_null_when_region_deleted(self):
+        region = Region.objects.create(name="Deletable Region", country="DE")
+        sample = self._sample(name="Region sample", region=region)
+        region.delete()
+        sample.refresh_from_db()
+        self.assertIsNone(sample.region)
+
+    def test_site_is_set_null_when_location_deleted(self):
+        site = Location.objects.create(name="Temp Site", geom=Point(2, 2, srid=4326))
+        sample = self._sample(name="Site sample", site=site)
+        site.delete()
+        sample.refresh_from_db()
+        self.assertIsNone(sample.site)
+
+    def test_clean_rejects_site_outside_region(self):
+        sample = self._sample(
+            name="Mismatch", region=self.inner_lau, site=self.site_outside
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            sample.clean()
+        self.assertIn("site", ctx.exception.message_dict)
+
+    def test_clean_accepts_site_inside_region(self):
+        sample = self._sample(
+            name="Match", region=self.inner_lau, site=self.site_inside
+        )
+        sample.clean()
+
+    def test_clean_accepts_site_on_region_boundary(self):
+        site = Location.objects.create(name="Edge site", geom=Point(1, 2, srid=4326))
+        sample = self._sample(name="Edge", region=self.inner_lau, site=site)
+        sample.clean()
+
+    def test_save_derives_region_for_site_on_boundary(self):
+        site = Location.objects.create(name="Edge site", geom=Point(1, 2, srid=4326))
+        sample = self._sample(name="Edge derived", site=site)
+        sample.refresh_from_db()
+        self.assertEqual(sample.region_id, self.inner_lau.pk)
+
+    def test_partial_save_of_unrelated_fields_keeps_region_unset(self):
+        sample = self._sample(name="Partial", site=self.site_inside)
+        Sample.objects.filter(pk=sample.pk).update(region=None)
+        sample.refresh_from_db()
+        sample.name = "Partial renamed"
+        sample.save(update_fields=["name"])
+        sample.refresh_from_db()
+        self.assertEqual(sample.name, "Partial renamed")
+        self.assertIsNone(sample.region_id)
+
+    def test_empty_update_fields_is_a_no_op(self):
+        sample = self._sample(name="No-op", site=self.site_inside)
+        Sample.objects.filter(pk=sample.pk).update(region=None)
+        sample.refresh_from_db()
+        sample.save(update_fields=[])
+        sample.refresh_from_db()
+        self.assertIsNone(sample.region_id)
+
+    def test_generator_update_fields_saves_unrelated_field(self):
+        sample = self._sample(name="Generator", site=self.site_inside)
+        Sample.objects.filter(pk=sample.pk).update(region=None)
+        sample.refresh_from_db()
+        sample.name = "Generator renamed"
+        sample.save(update_fields=(field for field in ["name"]))
+        sample.refresh_from_db()
+        self.assertEqual(sample.name, "Generator renamed")
+        self.assertIsNone(sample.region_id)
+
+    def test_generator_update_fields_saves_site_and_derived_region(self):
+        sample = self._sample(name="Generator site")
+        sample.site = self.site_inside
+        sample.save(update_fields=(field for field in ["site"]))
+        sample.refresh_from_db()
+        self.assertEqual(sample.site_id, self.site_inside.pk)
+        self.assertEqual(sample.region_id, self.inner_lau.pk)
+
+    def test_clean_accepts_site_without_geometry(self):
+        site = Location.objects.create(name="Address only", geom=None)
+        sample = self._sample(name="No geom", region=self.inner_lau, site=site)
+        sample.clean()
+
+    def test_save_derives_lau_region_from_site(self):
+        sample = self._sample(name="Derived", site=self.site_inside)
+        sample.refresh_from_db()
+        self.assertEqual(sample.region_id, self.inner_lau.pk)
+
+    def test_save_derives_nuts_region_when_no_lau_covers_site(self):
+        site = Location.objects.create(
+            name="Nuts-only site", geom=Point(4, 4, srid=4326)
+        )
+        sample = self._sample(name="Derived nuts", site=site)
+        sample.refresh_from_db()
+        self.assertEqual(sample.region_id, self.inner_nuts.pk)
+
+    def test_save_keeps_explicit_region(self):
+        sample = self._sample(
+            name="Explicit", region=self.big_region, site=self.site_inside
+        )
+        sample.refresh_from_db()
+        self.assertEqual(sample.region, self.big_region)
+
+    def test_save_with_update_fields_still_derives_region(self):
+        site = Location.objects.create(name="Later site", geom=Point(4, 4, srid=4326))
+        sample = self._sample(name="Update fields")
+        self.assertIsNone(sample.region_id)
+        sample.site = site
+        sample.save(update_fields=["site"])
+        sample.refresh_from_db()
+        self.assertEqual(sample.region_id, self.inner_nuts.pk)
+
+    def test_save_leaves_region_unset_for_unresolvable_site(self):
+        site = Location.objects.create(
+            name="Unresolvable site", geom=Point(50, 50, srid=4326)
+        )
+        sample = self._sample(name="Unresolvable", site=site)
+        sample.refresh_from_db()
+        self.assertIsNone(sample.region)
+
+    def test_origin_geom_prefers_site_point(self):
+        sample = self._sample(
+            name="Origin site", region=self.big_region, site=self.site_inside
+        )
+        annotated = Sample.objects.with_origin_geom().get(pk=sample.pk)
+        self.assertEqual(annotated.origin_geom, self.site_inside.geom)
+
+    def test_origin_geom_falls_back_to_region_polygon(self):
+        sample = self._sample(name="Origin region", region=self.inner_nuts)
+        annotated = Sample.objects.with_origin_geom().get(pk=sample.pk)
+        self.assertEqual(annotated.origin_geom, self.inner_nuts.geom)
+
+    def test_origin_within_matches_region_polygon(self):
+        inside = self._sample(name="Inside", region=self.inner_nuts)
+        self._sample(name="Outside", region=self.far_region)
+        big = GEOSGeometry("MULTIPOLYGON(((0 0, 0 10, 10 10, 10 0, 0 0)))", srid=4326)
+        names = Sample.objects.origin_within(big).values_list("name", flat=True)
+        self.assertIn(inside.name, names)
+        self.assertNotIn("Outside", names)
+
+    def test_origin_within_matches_site_point(self):
+        inside = self._sample(name="Point inside", site=self.site_inside)
+        self._sample(name="Point outside", site=self.site_outside)
+        big = GEOSGeometry("MULTIPOLYGON(((0 0, 0 10, 10 10, 10 0, 0 0)))", srid=4326)
+        names = Sample.objects.origin_within(big).values_list("name", flat=True)
+        self.assertIn(inside.name, names)
+        self.assertNotIn("Point outside", names)
+
+    def test_origin_intersects_catches_containing_region(self):
+        """A sample attributed to a larger region is a 'possible' match for a
+        smaller query polygon (intersects), but not a definite one (within)."""
+        coarse = self._sample(name="Coarse", region=self.big_region)
+        inner = self._sample(name="Inner", region=self.inner_nuts)
+        query = GEOSGeometry("MULTIPOLYGON(((1 1, 1 5, 5 5, 5 1, 1 1)))", srid=4326)
+        within_names = Sample.objects.origin_within(query).values_list(
+            "name", flat=True
+        )
+        self.assertIn(inner.name, within_names)
+        self.assertNotIn(coarse.name, within_names)
+        intersects_names = Sample.objects.origin_intersects(query).values_list(
+            "name", flat=True
+        )
+        self.assertIn(inner.name, intersects_names)
+        self.assertIn(coarse.name, intersects_names)
+
+    def test_duplicate_keeps_region_and_site(self):
+        creator = User.objects.create(username="geo-duplicate-creator")
+        sample = self._sample(
+            name="Dup source", region=self.inner_nuts, site=self.site_inside
+        )
+        duplicate = sample.duplicate(creator)
+        self.assertEqual(duplicate.region, sample.region)
+        self.assertEqual(duplicate.site, sample.site)
 
 
 class CompositionTestCase(TestCase):
