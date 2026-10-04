@@ -6,22 +6,7 @@
       <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to results
     </a>
   {% endif %}
-  {% if sample_nav_scope == 'private' %}
-    {% url 'sample-list-owned' as nav_list_url %}
-    {% url 'sample-gallery-owned' as nav_gallery_url %}
-  {% elif sample_nav_scope == 'review' %}
-    {% url 'sample-list-review' as nav_list_url %}
-    {% url 'sample-gallery-review' as nav_gallery_url %}
-  {% else %}
-    {% url 'sample-list' as nav_list_url %}
-    {% url 'sample-gallery' as nav_gallery_url %}
-  {% endif %}
-  <a class="sdv2-btn sdv2-btn-ghost" href="{{ nav_list_url }}?scope={{ sample_nav_scope|default:'published' }}">
-    <i class="fas fa-list" aria-hidden="true"></i> All samples
-  </a>
-  <a class="sdv2-btn sdv2-btn-ghost" href="{{ nav_gallery_url }}?scope={{ sample_nav_scope|default:'published' }}">
-    <i class="fas fa-image" aria-hidden="true"></i> Featured samples
-  </a>
+  {% include "partials/representation_switcher.html" with list_type=sample_nav_scope scope_only=True %}
   <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'materials-explorer' %}">
     <i class="fas fa-table-cells-large" aria-hidden="true"></i> Materials explorer
   </a>

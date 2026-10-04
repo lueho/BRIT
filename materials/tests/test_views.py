@@ -2711,8 +2711,8 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         # The list segment is the active/current one on the list page.
         self.assertContains(response, 'aria-current="page"')
         self.assertContains(response, 'title="View as list"')
-        # The featured (gallery) view is reachable as a peer.
-        self.assertContains(response, 'title="View as featured gallery"')
+        # The gallery view is reachable as a peer.
+        self.assertContains(response, 'title="View as gallery"')
         self.assertContains(response, reverse("sample-gallery"))
 
     def test_gallery_marks_featured_segment_active(self):
@@ -2735,15 +2735,131 @@ class SampleRepresentationViewsTestCase(ViewWithPermissionsTestCase):
         # Detail is not a list representation, so no segment is marked active.
         self.assertNotContains(response, 'aria-pressed="true"')
 
-    def test_detail_keeps_explorer_separate_from_switcher(self):
+    def test_gallery_orders_samples_with_images_first(self):
+        series = SampleSeries.objects.create(
+            owner=self.owner,
+            name="Series With Image",
+            material=self.material,
+            image="materials_sampleseries/series-image.jpg",
+        )
+        Sample.objects.create(
+            owner=self.owner,
+            name="Alpha No-Image Sample",
+            publication_status="published",
+            material=self.material,
+            standalone=True,
+        )
+        Sample.objects.create(
+            owner=self.owner,
+            name="Zebra Own-Image Sample",
+            publication_status="published",
+            material=self.material,
+            standalone=True,
+            image="materials_sample/zebra.jpg",
+        )
+        Sample.objects.create(
+            owner=self.owner,
+            name="Beta Series-Image Sample",
+            publication_status="published",
+            material=self.material,
+            series=series,
+            standalone=True,
+        )
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        # Alphabetically, "Alpha" would sort first; image-bearing samples (own
+        # image or via the linked series) lead for visual appeal instead.
+        ordered_names = [obj.name for obj in response.context["object_list"]]
+        self.assertLess(
+            ordered_names.index("Zebra Own-Image Sample"),
+            ordered_names.index("Alpha No-Image Sample"),
+        )
+        self.assertLess(
+            ordered_names.index("Beta Series-Image Sample"),
+            ordered_names.index("Alpha No-Image Sample"),
+        )
+
+    def test_detail_nav_shows_switcher_and_explorer_link(self):
         response = self.client.get(
             reverse("sample-detail", kwargs={"pk": self.sample.pk})
         )
         self.assertEqual(response.status_code, 200)
-        # Explorer remains reachable as a distinct, secondary affordance and is
-        # not folded into the representation switcher.
+        # The detail header reuses the same peer-representation switcher as the
+        # list and gallery pages; the module Explorer stays a separate link
+        # because it leads to a broader scope, not another representation.
+        nav = self._context_nav_html(response)
+        self.assertIn('aria-label="View toggle"', nav)
+        self.assertIn(reverse("sample-list"), nav)
+        self.assertIn(reverse("sample-gallery"), nav)
+        self.assertIn(reverse("materials-explorer"), nav)
+
+    def test_detail_nav_links_carry_scope_only(self):
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+            {"mode": "edit", "back": "/somewhere/"},
+        )
+        self.assertEqual(response.status_code, 200)
+        nav = self._context_nav_html(response)
+        # Detail page query params (mode, back, ...) must not leak into the
+        # peer-view links; they navigate fresh with only the scope.
+        self.assertIn(f"{reverse('sample-list')}?scope=published", nav)
+        self.assertIn(f"{reverse('sample-gallery')}?scope=published", nav)
+        self.assertNotIn("mode=edit", nav)
+
+    def test_list_header_shows_switcher_and_separate_explorer_link(self):
+        response = self.client.get(reverse("sample-list"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        switcher = self._view_switcher_html(response)
+        # List and gallery are peer representations inside one control; the
+        # Explorer stays a separate affordance next to it.
+        self.assertIn(reverse("sample-gallery"), switcher)
+        self.assertIn(reverse("sample-list"), switcher)
+        self.assertNotIn(reverse("materials-explorer"), switcher)
         self.assertContains(response, reverse("materials-explorer"))
-        self.assertContains(response, "Materials explorer")
+        # The current (list) view is visibly active.
+        self.assertIn('aria-current="page"', switcher)
+
+    def test_gallery_header_shows_switcher_with_gallery_active(self):
+        response = self.client.get(reverse("sample-gallery"), {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        switcher = self._view_switcher_html(response)
+        self.assertIn(reverse("sample-list"), switcher)
+        self.assertNotIn(reverse("materials-explorer"), switcher)
+        self.assertContains(response, reverse("materials-explorer"))
+        self.assertIn('aria-current="page"', switcher)
+        self.assertIn(f'href="{reverse("sample-gallery")}?scope=published"', switcher)
+
+    def test_switcher_preserves_active_filters_but_not_on_explorer(self):
+        response = self.client.get(
+            reverse("sample-list"), {"scope": "published", "q": "Test"}
+        )
+        self.assertEqual(response.status_code, 200)
+        switcher = self._view_switcher_html(response)
+        # Peer representations keep the active filter context.
+        self.assertIn("q=Test", switcher)
+        # The Explorer is module-level and does not take sample filters.
+        self.assertContains(response, f'href="{reverse("materials-explorer")}"')
+
+    def test_switcher_links_present_for_anonymous_and_authenticated(self):
+        for authenticated in (False, True):
+            if authenticated:
+                self.client.force_login(self.owner)
+            for url_name in ("sample-list", "sample-gallery"):
+                with self.subTest(authenticated=authenticated, url_name=url_name):
+                    response = self.client.get(
+                        reverse(url_name), {"scope": "published"}
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    switcher = self._view_switcher_html(response)
+                    self.assertIn(reverse("sample-gallery"), switcher)
+                    self.assertIn(reverse("sample-list"), switcher)
+                    self.assertContains(response, reverse("materials-explorer"))
+
+    @staticmethod
+    def _view_switcher_html(response):
+        """Return the rendered peer-representation switcher of a response."""
+        body = response.content.decode()
+        return body.split('aria-label="View toggle"', 1)[1].split("</div>", 1)[0]
 
     @staticmethod
     def _context_nav_html(response):
@@ -5757,8 +5873,8 @@ class EmptyStateViewsTestCase(TestCase):
                 self.assertNotIn('role="button"', navigation)
                 self.assertNotIn("aria-pressed", navigation)
                 for route, label in (
-                    ("sample-list", "All samples"),
-                    ("sample-gallery", "Featured samples"),
+                    ("sample-list", "View as list"),
+                    ("sample-gallery", "View as gallery"),
                     ("materials-explorer", "Materials explorer"),
                 ):
                     self.assertIn(reverse(route), navigation)
@@ -6033,8 +6149,9 @@ class EmptyStateViewsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "sdv2-context-nav")
-        self.assertContains(response, "All samples")
-        self.assertContains(response, "Featured")
+        self.assertContains(response, 'aria-label="View toggle"')
+        self.assertContains(response, reverse("sample-list"))
+        self.assertContains(response, reverse("sample-gallery"))
         self.assertContains(response, "Materials explorer")
 
         # The command palette and classic fallback are retired; secondary
