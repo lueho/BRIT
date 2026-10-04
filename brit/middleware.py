@@ -61,11 +61,20 @@ class AnonymousRateLimitMiddleware:
     """
 
     EXEMPT_PATHS = frozenset({"/health/"})
-    # One atlas map load fans out into several data requests (atlas data and
-    # NUTS boundaries); both endpoints are limited by their own DRF throttles.
+    # A map page load fans out into several data requests (boundary and
+    # feature GeoJSON, dataset version checks). Those actions carry their own
+    # DRF throttles (subnet-aware GeoJSON throttles or the atlas scope), so the
+    # site-wide cap must not double-count them. Other actions of the same
+    # viewsets (list, detail, summaries) have no DRF throttle and stay capped.
     EXEMPT_PATH_PREFIXES = (
         "/waste_collection/waste-atlas/api/",
         "/maps/api/nuts_region/geojson/",
+        "/maps/api/region/geojson/",
+        "/maps/api/region/version/",
+        "/maps/api/catchment/geojson/",
+        "/maps/api/catchment/version/",
+        "/closecycle/api/showcase/geojson/",
+        "/closecycle/api/showcase/version/",
     )
     WINDOW_SECONDS = 60
 
