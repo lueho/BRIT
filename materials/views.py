@@ -12,7 +12,7 @@ from django.contrib.auth.mixins import (
 )
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import BooleanField, ExpressionWrapper, F, Q
 from django.db.models.aggregates import Count
 from django.http import (
     Http404,
@@ -1313,7 +1313,7 @@ def get_sample_representation_urls():
     """Return the URLs for the sample representation switcher.
 
     The switcher offers true peer representations of the same sample dataset
-    (list and featured gallery). The Explorer dashboard is a separate
+    (list and gallery). The Explorer dashboard is a separate
     navigation level and is intentionally not part of this set.
     """
     return {
@@ -1408,12 +1408,26 @@ class SampleRepresentationMixin:
     dashboard_url = reverse_lazy("materials-explorer")
 
     def get_queryset(self):
-        return (
+        queryset = (
             super()
             .get_queryset()
             .select_related("material", "series", "timestep")
             .prefetch_related("sources", "property_values")
         )
+        # The gallery is a visual representation: without an explicit sort it
+        # leads with samples that have a display image (their own or the
+        # series') so the cards look appealing out of the box.
+        if (
+            getattr(self, "representation_mode", "list") == "gallery"
+            and not self.get_current_sort()
+        ):
+            queryset = queryset.annotate(
+                has_display_image=ExpressionWrapper(
+                    Q(image__gt="") | Q(series__image__gt=""),
+                    output_field=BooleanField(),
+                )
+            ).order_by(F("has_display_image").desc(nulls_last=True), "name", "pk")
+        return queryset
 
     def get_gallery_context_urls(self):
         urls = get_sample_representation_urls()
@@ -1726,7 +1740,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
             }
         )
 
-        # Representation switcher context (List / Featured) so the detail header
+        # Representation switcher context (List / Gallery) so the detail header
         # exposes the same peer-view navigation as the list and gallery pages.
         # No segment is marked active on a detail page (representation_mode is
         # neither 'list' nor 'gallery'). Samples have no map representation.
@@ -1763,7 +1777,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
     def _sample_nav_scope(self):
         """Scope for the detail context-nav links, kept from the return URL.
 
-        List and featured-gallery links on the detail page should return the
+        List and gallery links on the detail page should return the
         user to the same list scope they came from. The scope is read from the
         validated same-host ``back`` (regular detail) or ``next`` (review
         detail) parameter and is only honoured when the return path is the

@@ -103,6 +103,14 @@
   font-weight: 500;
 }
 
+/* The peer-representation switcher inside the context nav uses regular
+   Bootstrap buttons; align their height with the ghost buttons. */
+.sdv2 .sdv2-context-nav .btn-group .btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+}
+
 .sdv2-rail-workspace,
 .sdv2-rail-status {
   display: flex;
