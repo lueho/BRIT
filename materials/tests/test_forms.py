@@ -86,6 +86,11 @@ class ComponentModelFormTestCase(TestCase):
         self.assertIn(component, queryset)
         self.assertNotIn(material.pk, queryset.values_list("pk", flat=True))
 
+    def test_comparable_component_label_matches_detail_view(self):
+        form = ComponentModelForm()
+
+        self.assertEqual(form.fields["comparable_component"].label, "Compared as")
+
 
 class MaterialPropertyModelFormTestCase(TestCase):
     def test_form_includes_comparable_property_field(self):
@@ -96,6 +101,11 @@ class MaterialPropertyModelFormTestCase(TestCase):
             form.fields["comparable_property"],
             TomSelectModelChoiceField,
         )
+
+    def test_comparable_property_label_matches_detail_view(self):
+        form = MaterialPropertyModelForm()
+
+        self.assertEqual(form.fields["comparable_property"].label, "Compared as")
 
 
 class MaterialPropertyValueModelFormTestCase(TestCase):

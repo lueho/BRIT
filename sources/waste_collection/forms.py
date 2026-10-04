@@ -152,7 +152,6 @@ class CollectionFrequencyModelForm(SimpleModelForm):
     class Meta:
         model = CollectionFrequency
         fields = ("name", "type", "description")
-        labels = {"name": "Label"}
         help_texts = {
             "name": "Optional. Leave blank to generate a canonical label from the schedule.",
             "description": MARKDOWN_HELP_TEXT,
@@ -660,6 +659,7 @@ class CollectionModelForm(
         min_value=0,
         max_digits=8,
         decimal_places=1,
+        label="Smallest available bin size (L)",
         widget=NumberInput(attrs={"step": "0.1", "min": "0"}),
     )
     required_bin_capacity = DecimalField(

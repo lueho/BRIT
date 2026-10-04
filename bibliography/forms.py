@@ -229,7 +229,7 @@ class SourceAuthorForm(SimpleModelForm):
             url="author-autocomplete",
             label_field="label",
         ),
-        label="Authors",
+        label="Author",
     )
 
     class Meta:

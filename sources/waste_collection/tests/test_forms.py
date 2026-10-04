@@ -17,6 +17,7 @@ from utils.object_management.models import get_default_owner
 from ..forms import (
     CollectionAddPredecessorForm,
     CollectionAddWasteSampleForm,
+    CollectionFrequencyModelForm,
     CollectionModelForm,
     CollectionPropertyValueModelForm,
     CollectionRemovePredecessorForm,
@@ -1727,3 +1728,19 @@ class CollectionModelFormPermissionTestCase(TestCase):
             form.is_valid()
         except Exception as e:
             self.fail(f"Form raised unexpected exception without request: {e}")
+
+
+class FormLabelConsistencyTestCase(TestCase):
+    """Form labels must match the labels readers see on detail pages (#69)."""
+
+    def test_min_bin_size_label_matches_detail_view(self):
+        form = CollectionModelForm()
+
+        self.assertEqual(
+            form.fields["min_bin_size"].label, "Smallest available bin size (L)"
+        )
+
+    def test_collection_frequency_name_label_matches_detail_view(self):
+        form = CollectionFrequencyModelForm()
+
+        self.assertEqual(form.fields["name"].label, "Name")

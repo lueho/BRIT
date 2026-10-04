@@ -7,7 +7,12 @@ from factory.django import mute_signals
 
 from sources.waste_collection.models import WasteFlyer
 
-from ..forms import AuthorModelForm, SourceAuthorFormSet, SourceModelForm
+from ..forms import (
+    AuthorModelForm,
+    SourceAuthorForm,
+    SourceAuthorFormSet,
+    SourceModelForm,
+)
 from ..models import Source, SourceAuthor
 
 
@@ -149,3 +154,10 @@ class SourceModelFormLastAccessedTestCase(TestCase):
         form.save()
         source.refresh_from_db()
         self.assertEqual(source.last_accessed, date.today())
+
+
+class SourceAuthorFormTestCase(TestCase):
+    def test_author_label_is_singular(self):
+        form = SourceAuthorForm()
+
+        self.assertEqual(form.fields["author"].label, "Author")
