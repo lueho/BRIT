@@ -1740,7 +1740,7 @@ class FormLabelConsistencyTestCase(TestCase):
             form.fields["min_bin_size"].label, "Smallest available bin size (L)"
         )
 
-    def test_collection_frequency_name_label_matches_detail_view(self):
+    def test_collection_frequency_name_keeps_label_wording(self):
         form = CollectionFrequencyModelForm()
 
-        self.assertEqual(form.fields["name"].label, "Name")
+        self.assertEqual(form.fields["name"].label, "Label")

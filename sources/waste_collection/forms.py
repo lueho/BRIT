@@ -152,6 +152,7 @@ class CollectionFrequencyModelForm(SimpleModelForm):
     class Meta:
         model = CollectionFrequency
         fields = ("name", "type", "description")
+        labels = {"name": "Label"}
         help_texts = {
             "name": "Optional. Leave blank to generate a canonical label from the schedule.",
             "description": MARKDOWN_HELP_TEXT,
