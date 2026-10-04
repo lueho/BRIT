@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AnonymousUser
+from django.urls import reverse
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from rest_framework.serializers import ModelSerializer
@@ -25,6 +26,7 @@ class ShowcaseMaterialSerializer(ModelSerializer):
 
 
 def _request_user(serializer):
+    # If no request or user, treat as anonymous (no permission)
     request = serializer.context.get("request")
     return request.user if request is not None else AnonymousUser()
 
@@ -89,27 +91,74 @@ class ShowcaseModelSerializer(ModelSerializer):
 
 
 class ShowcaseFlatSerializer(ModelSerializer):
-    region = CharField(source="region.name")
+    region = CharField(source="region.name", allow_null=True)
+    url = serializers.SerializerMethodField()
     involved_processes = serializers.SerializerMethodField()
+    input_materials = serializers.SerializerMethodField()
+    intermediate_materials = serializers.SerializerMethodField()
+    products = serializers.SerializerMethodField()
 
     class Meta:
         model = Showcase
-        fields = ["id", "name", "region", "description", "involved_processes"]
+        fields = [
+            "id",
+            "name",
+            "region",
+            "description",
+            "url",
+            "involved_processes",
+            "input_materials",
+            "intermediate_materials",
+            "products",
+        ]
+
+    def _material_links_by_role(self, obj):
+        """Group this showcase's visible material links by role, once per object."""
+        cache = getattr(self, "_material_links_cache", None)
+        if cache is None:
+            cache = self._material_links_cache = {}
+        if obj.pk not in cache:
+            grouped = {role: [] for role in ShowcaseMaterial.Role.values}
+            for link in obj.visible_material_links(_request_user(self)):
+                grouped[link.role].append(link)
+            cache[obj.pk] = grouped
+        return cache[obj.pk]
+
+    @staticmethod
+    def _material_entries(links):
+        return [
+            {
+                "id": link.material.pk,
+                "name": link.material.name,
+                "url": reverse("material-detail", args=[link.material.pk]),
+            }
+            for link in links
+        ]
+
+    def get_url(self, obj):
+        return reverse("showcase-detail", args=[obj.pk])
 
     def get_involved_processes(self, obj):
-        request = getattr(self, "request", None)
-        user = getattr(request, "user", None)
-        # If no request or user, treat as anonymous (no permission)
-        if not (user and user.has_perm("processes.access_app_feature")):
-            return []
         return [
             {
                 "name": proc.name,
                 "id": proc.pk,
-                "url": f"/processes/types/{proc.pk}/",
+                "url": reverse("processes:processtype-detail", args=[proc.pk]),
             }
-            for proc in obj.visible_process_chain(user)
+            for proc in obj.visible_process_chain(_request_user(self))
         ]
+
+    def get_input_materials(self, obj):
+        links = self._material_links_by_role(obj)
+        return self._material_entries(links[ShowcaseMaterial.Role.INPUT])
+
+    def get_intermediate_materials(self, obj):
+        links = self._material_links_by_role(obj)
+        return self._material_entries(links[ShowcaseMaterial.Role.INTERMEDIATE])
+
+    def get_products(self, obj):
+        links = self._material_links_by_role(obj)
+        return self._material_entries(links[ShowcaseMaterial.Role.PRODUCT])
 
 
 class ShowcaseSummaryListSerializer(ModelSerializer):

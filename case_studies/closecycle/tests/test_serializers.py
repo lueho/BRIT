@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import AnonymousUser
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
@@ -17,56 +17,172 @@ from materials.models import Material, Sample
 from processes.models import Process
 
 
-class ShowcaseFlatSerializerRegressionTest(TestCase):
-    def setUp(self):
+def _context(user=None):
+    return {"request": SimpleNamespace(user=user or AnonymousUser())}
+
+
+class ShowcaseFlatSerializerTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
         User = get_user_model()
-        self.user = User.objects.create(username="dummy", is_staff=True)
-        self.region = Region.objects.create(name="Test Region")
-        self.showcase = Showcase.objects.create(
-            name="Test Showcase", region_id=self.region.id
+        cls.owner = User.objects.create(username="connection_owner")
+        cls.other_user = User.objects.create(username="unrelated_user")
+        cls.region = Region.objects.create(name="Test Region")
+        cls.showcase = Showcase.objects.create(
+            name="Test Showcase",
+            region=cls.region,
+            publication_status="published",
         )
-
-    def test_showcase_flat_serializer_works_without_request(self):
-        """
-        Regression test: ShowcaseFlatSerializer should work without a request context.
-        involved_processes should be an empty list if no request/user is present.
-        """
-        serializer = ShowcaseFlatSerializer(self.showcase)
-        data = serializer.data
-        self.assertIn("involved_processes", data)
-        self.assertEqual(data["involved_processes"], [])
-
-    def test_involved_processes_returns_linked_process_chain(self):
-        process = Process.objects.create(
-            name="Linked Process", publication_status="published"
+        cls.input_material = Material.objects.create(
+            name="Input Feedstock", publication_status="published"
         )
-        self.showcase.showcase_processes.create(process=process, order=1)
-        permission = Permission.objects.get(codename="access_app_feature")
-        self.user.user_permissions.add(permission)
-        serializer = ShowcaseFlatSerializer(self.showcase)
-        serializer.request = SimpleNamespace(user=self.user)
-        data = serializer.data
+        cls.intermediate_material = Material.objects.create(
+            name="Intermediate Feedstock", publication_status="published"
+        )
+        cls.product_material = Material.objects.create(
+            name="Product Feedstock", publication_status="published"
+        )
+        cls.private_material = Material.objects.create(
+            name="Private Feedstock", owner=cls.owner
+        )
+        cls.showcase.showcase_materials.create(
+            material=cls.input_material, role="input", order=0
+        )
+        cls.showcase.showcase_materials.create(
+            material=cls.intermediate_material, role="intermediate", order=0
+        )
+        cls.showcase.showcase_materials.create(
+            material=cls.product_material, role="product", order=0
+        )
+        cls.showcase.showcase_materials.create(
+            material=cls.private_material, role="input", order=1
+        )
+        cls.showcase.showcase_materials.create(
+            material=cls.input_material, role="product", order=1
+        )
+        cls.process_b = Process.objects.create(
+            name="Zeta Step", publication_status="published"
+        )
+        cls.process_a = Process.objects.create(
+            name="Alpha Step", publication_status="published"
+        )
+        cls.private_process = Process.objects.create(
+            name="Private Step", owner=cls.owner
+        )
+        cls.showcase.showcase_processes.create(process=cls.process_b, order=0)
+        cls.showcase.showcase_processes.create(process=cls.process_a, order=1)
+        cls.showcase.showcase_processes.create(process=cls.private_process, order=2)
+
+    def test_works_without_request_context_as_anonymous(self):
+        data = ShowcaseFlatSerializer(self.showcase).data
         self.assertEqual(
-            data["involved_processes"],
+            ["Zeta Step", "Alpha Step"],
+            [proc["name"] for proc in data["involved_processes"]],
+        )
+
+    def test_process_chain_follows_configured_order_not_alphabetical(self):
+        data = ShowcaseFlatSerializer(self.showcase, context=_context()).data
+        self.assertEqual(
             [
                 {
-                    "name": "Linked Process",
-                    "id": process.pk,
-                    "url": f"/processes/types/{process.pk}/",
-                }
+                    "name": "Zeta Step",
+                    "id": self.process_b.pk,
+                    "url": reverse(
+                        "processes:processtype-detail", args=[self.process_b.pk]
+                    ),
+                },
+                {
+                    "name": "Alpha Step",
+                    "id": self.process_a.pk,
+                    "url": reverse(
+                        "processes:processtype-detail", args=[self.process_a.pk]
+                    ),
+                },
             ],
+            data["involved_processes"],
         )
 
-    def test_involved_processes_empty_for_user_without_permission(self):
-        process = Process.objects.create(
-            name="Linked Process", publication_status="published"
+    def test_material_roles_are_grouped_and_ordered(self):
+        data = ShowcaseFlatSerializer(self.showcase, context=_context()).data
+        self.assertEqual(
+            ["Input Feedstock"],
+            [entry["name"] for entry in data["input_materials"]],
         )
-        self.showcase.showcase_processes.create(process=process, order=1)
-        user = get_user_model().objects.create(username="no_perm")
-        serializer = ShowcaseFlatSerializer(self.showcase)
-        serializer.request = SimpleNamespace(user=user)
-        data = serializer.data
-        self.assertEqual(data["involved_processes"], [])
+        self.assertEqual(
+            ["Intermediate Feedstock"],
+            [entry["name"] for entry in data["intermediate_materials"]],
+        )
+        self.assertEqual(
+            ["Product Feedstock", "Input Feedstock"],
+            [entry["name"] for entry in data["products"]],
+        )
+        input_entry = data["input_materials"][0]
+        self.assertEqual(
+            {
+                "id": self.input_material.pk,
+                "name": "Input Feedstock",
+                "url": reverse("material-detail", args=[self.input_material.pk]),
+            },
+            input_entry,
+        )
+
+    def test_private_connections_hidden_for_anonymous(self):
+        data = ShowcaseFlatSerializer(self.showcase).data
+        self.assertNotIn(
+            "Private Feedstock",
+            [entry["name"] for entry in data["input_materials"]],
+        )
+        self.assertNotIn(
+            "Private Step",
+            [proc["name"] for proc in data["involved_processes"]],
+        )
+
+    def test_private_connections_hidden_for_unrelated_user(self):
+        data = ShowcaseFlatSerializer(
+            self.showcase, context=_context(self.other_user)
+        ).data
+        self.assertNotIn(
+            "Private Feedstock",
+            [entry["name"] for entry in data["input_materials"]],
+        )
+        self.assertNotIn(
+            "Private Step",
+            [proc["name"] for proc in data["involved_processes"]],
+        )
+
+    def test_owner_sees_private_connections(self):
+        data = ShowcaseFlatSerializer(self.showcase, context=_context(self.owner)).data
+        self.assertIn(
+            "Private Feedstock",
+            [entry["name"] for entry in data["input_materials"]],
+        )
+        self.assertIn(
+            "Private Step",
+            [proc["name"] for proc in data["involved_processes"]],
+        )
+
+    def test_url_points_to_showcase_detail(self):
+        data = ShowcaseFlatSerializer(self.showcase).data
+        self.assertEqual(
+            reverse("showcase-detail", args=[self.showcase.pk]), data["url"]
+        )
+
+    def test_missing_region_serializes_as_null(self):
+        showcase = Showcase.objects.create(
+            name="No Region", publication_status="published"
+        )
+        data = ShowcaseFlatSerializer(showcase).data
+        self.assertIsNone(data["region"])
+
+    def test_empty_connections_serialize_as_empty_lists(self):
+        showcase = Showcase.objects.create(
+            name="Empty Showcase", publication_status="published"
+        )
+        data = ShowcaseFlatSerializer(showcase).data
+        self.assertEqual([], data["involved_processes"])
+        self.assertEqual([], data["input_materials"])
+        self.assertEqual([], data["intermediate_materials"])
+        self.assertEqual([], data["products"])
 
 
 class ShowcaseModelSerializerConnectionsTest(TestCase):
@@ -143,14 +259,61 @@ class ShowcaseModelSerializerConnectionsTest(TestCase):
         self.assertEqual(["Private Sample"], [s["name"] for s in data["samples"]])
 
     def test_involved_processes_hide_private_processes(self):
-        user = get_user_model().objects.create(username="feature_user")
-        user.user_permissions.add(Permission.objects.get(codename="access_app_feature"))
-        serializer = ShowcaseFlatSerializer(self.showcase)
-        serializer.request = SimpleNamespace(user=user)
+        serializer = ShowcaseFlatSerializer(self.showcase, context=_context())
         self.assertEqual(
             ["Public Step"],
             [proc["name"] for proc in serializer.data["involved_processes"]],
         )
+
+
+class ShowcaseSummariesEndpointTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        region = Region.objects.create(name="Summary Region")
+        cls.first = Showcase.objects.create(
+            name="First Showcase", region=region, publication_status="published"
+        )
+        cls.second = Showcase.objects.create(
+            name="Second Showcase", region=region, publication_status="published"
+        )
+        cls.private = Showcase.objects.create(
+            name="Private Showcase",
+            region=region,
+            owner=get_user_model().objects.create(username="shy_owner"),
+        )
+
+    def test_summaries_returns_empty_list_without_matches(self):
+        response = self.client.get(reverse("api-showcase-summaries"), {"id": 999999})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"summaries": []}, response.json())
+
+    def test_summaries_returns_all_matching_showcases(self):
+        response = self.client.get(reverse("api-showcase-summaries"))
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        names = [summary["name"] for summary in data["summaries"]]
+        self.assertEqual(["First Showcase", "Second Showcase"], names)
+
+    def test_summaries_can_be_filtered_by_id(self):
+        response = self.client.get(
+            reverse("api-showcase-summaries"), {"id": self.second.pk}
+        )
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(1, len(data["summaries"]))
+        self.assertEqual("Second Showcase", data["summaries"][0]["name"])
+
+    def test_summaries_hides_private_showcases(self):
+        response = self.client.get(reverse("api-showcase-summaries"))
+        data = response.json()
+        self.assertNotIn(
+            "Private Showcase",
+            [summary["name"] for summary in data["summaries"]],
+        )
+        response = self.client.get(
+            reverse("api-showcase-summaries"), {"id": self.private.pk}
+        )
+        self.assertEqual({"summaries": []}, response.json())
 
 
 class ShowcaseMapEndpointPrefetchTest(TestCase):
@@ -188,8 +351,32 @@ class ShowcaseMapEndpointPrefetchTest(TestCase):
     def test_geojson_does_not_load_connections(self):
         self.assertEqual(set(), self._queried_connection_tables("api-showcase-geojson"))
 
-    def test_summaries_load_only_process_links(self):
+    def test_summaries_load_only_material_and_process_links(self):
         self.assertEqual(
-            {"closecycle_showcaseprocess"},
+            {"closecycle_showcasematerial", "closecycle_showcaseprocess"},
             self._queried_connection_tables("api-showcase-summaries"),
         )
+
+    def test_summaries_queries_do_not_grow_with_showcase_count(self):
+        def count_queries():
+            with CaptureQueriesContext(connection) as queries:
+                response = self.client.get(reverse("api-showcase-summaries"))
+            self.assertEqual(200, response.status_code)
+            return len(queries.captured_queries)
+
+        baseline = count_queries()
+        for index in range(2):
+            showcase = Showcase.objects.create(
+                name=f"Extra Showcase {index}",
+                region=self.showcase.region,
+                publication_status="published",
+            )
+            material = Material.objects.create(
+                name=f"Extra Feedstock {index}", publication_status="published"
+            )
+            showcase.showcase_materials.create(material=material, role="input")
+            process = Process.objects.create(
+                name=f"Extra Step {index}", publication_status="published"
+            )
+            showcase.showcase_processes.create(process=process, order=0)
+        self.assertEqual(baseline, count_queries())
