@@ -1,7 +1,7 @@
 import contextlib
 import logging
 
-from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.gis.geos import GEOSGeometry, Point
 from django.db.models import QuerySet
 from django.test import TestCase
 from django.urls import reverse
@@ -18,10 +18,12 @@ from ..models import (
     GeoDatasetRuntimeConfiguration,
     LauRegion,
     NutsRegion,
+    NutsVintage,
     Region,
     RegionAttributeTextValue,
     RegionAttributeValue,
     RegionProperty,
+    region_for_point,
 )
 
 
@@ -85,6 +87,76 @@ class RegionTestCase(TestCase):
             "DE",
             catchment_region.country,
         )
+
+
+class RegionForPointTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.inner_borders = GeoPolygon.objects.create(
+            geom=GEOSGeometry("MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))", srid=4326)
+        )
+        cls.outer_borders = GeoPolygon.objects.create(
+            geom=GEOSGeometry(
+                "MULTIPOLYGON(((-1 -1, -1 2, 2 2, 2 -1, -1 -1)))", srid=4326
+            )
+        )
+        cls.lau_borders = GeoPolygon.objects.create(
+            geom=GEOSGeometry(
+                "MULTIPOLYGON(((0.1 0.1, 0.1 0.4, 0.4 0.4, 0.4 0.1, 0.1 0.1)))",
+                srid=4326,
+            )
+        )
+        cls.nuts3 = NutsRegion.objects.create(
+            name="Inner NUTS",
+            levl_code=3,
+            cntr_code="DE",
+            nuts_id="DEZZZ",
+            borders=cls.inner_borders,
+        )
+        cls.lau = LauRegion.objects.create(
+            name="Inner LAU",
+            cntr_code="DE",
+            lau_id="00999999",
+            borders=cls.lau_borders,
+        )
+
+    def test_returns_none_for_none_geometry(self):
+        self.assertIsNone(region_for_point(None))
+
+    def test_returns_none_when_nothing_covers_the_point(self):
+        self.assertIsNone(region_for_point(Point(50, 50, srid=4326)))
+
+    def test_prefers_lau_over_nuts(self):
+        self.assertEqual(region_for_point(Point(0.2, 0.2, srid=4326)).pk, self.lau.pk)
+
+    def test_falls_back_to_nuts_when_no_lau_covers(self):
+        self.assertEqual(region_for_point(Point(0.8, 0.8, srid=4326)).pk, self.nuts3.pk)
+
+    def test_prefers_deepest_nuts_level(self):
+        nuts0 = NutsRegion.objects.create(
+            name="Country",
+            levl_code=0,
+            cntr_code="DE",
+            nuts_id="DEZ",
+            borders=self.outer_borders,
+        )
+        result = region_for_point(Point(0.8, 0.8, srid=4326))
+        self.assertEqual(result.pk, self.nuts3.pk)
+        self.assertNotEqual(result.pk, nuts0.pk)
+
+    def test_ignores_regions_outside_the_default_vintage(self):
+        other_vintage = NutsVintage.objects.create(year=2016)
+        NutsRegion.objects.create(
+            name="Old Inner NUTS",
+            levl_code=3,
+            cntr_code="DE",
+            nuts_id="DEYYY",
+            version=other_vintage,
+            borders=self.inner_borders,
+        )
+        # Still resolves to the default-vintage LAU/NUTS, not the 2016 one.
+        result = region_for_point(Point(0.8, 0.8, srid=4326))
+        self.assertEqual(result.pk, self.nuts3.pk)
 
 
 class CatchmentPostDeleteTestCase(TestCase):

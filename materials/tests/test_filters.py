@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.test import TestCase
 from django.utils import timezone
 
+from maps.models import Location, Region
 from utils.properties.models import Unit
 
 from ..filters import (
@@ -377,6 +378,50 @@ class SampleFilterTestCase(TestCase):
         )
 
         self.assertEqual(list(filtr.qs), [])
+
+    def test_filter_form_has_region_and_site_fields(self):
+        filtr = SampleFilter(queryset=Sample.objects.all())
+
+        self.assertIn("region", filtr.form.fields)
+        self.assertIn("site", filtr.form.fields)
+
+    def test_region_filter_returns_only_samples_in_region(self):
+        region = Region.objects.create(
+            name="Brittany", country="FR", publication_status="published"
+        )
+        other_region = Region.objects.create(
+            name="Hamburg", country="DE", publication_status="published"
+        )
+        sample_in = Sample.objects.create(
+            name="In Brittany", material=self.substrate_material, region=region
+        )
+        Sample.objects.create(
+            name="In Hamburg",
+            material=self.substrate_material,
+            region=other_region,
+        )
+
+        filtr = SampleFilter(
+            data={"region": str(region.pk)}, queryset=Sample.objects.all()
+        )
+
+        self.assertEqual(list(filtr.qs), [sample_in])
+
+    def test_site_filter_returns_only_samples_at_site(self):
+        site = Location.objects.create(name="Viaverda", publication_status="published")
+        other_site = Location.objects.create(
+            name="TUHH campus", publication_status="published"
+        )
+        sample_at = Sample.objects.create(
+            name="At Viaverda", material=self.substrate_material, site=site
+        )
+        Sample.objects.create(
+            name="At TUHH", material=self.substrate_material, site=other_site
+        )
+
+        filtr = SampleFilter(data={"site": str(site.pk)}, queryset=Sample.objects.all())
+
+        self.assertEqual(list(filtr.qs), [sample_at])
 
 
 class SampleGroupFilterTestCase(TestCase):

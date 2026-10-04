@@ -19,6 +19,7 @@ from django_tomselect.forms import (
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution
+from maps.models import Location, Region
 from utils.forms import (
     CreateEnabledTomSelectModelChoiceField,
     ModalForm,
@@ -33,6 +34,7 @@ from utils.forms import (
     configure_tomselect_inline_create,
     image_metadata_section,
 )
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.forms import NumericMeasurementFieldsFormMixin
 from utils.properties.models import Unit, get_default_unit_pk
 
@@ -606,6 +608,24 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
         ),
         label="Sample groups",
     )
+    region = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="region-autocomplete",
+            label_field="display_name",
+            value_field="id",
+        ),
+        required=False,
+        label="Region",
+    )
+    site = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="location-autocomplete",
+            label_field="name",
+            value_field="id",
+        ),
+        required=False,
+        label="Sampling site",
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -636,6 +656,18 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
                 create_url=reverse("sample-substrate-material-quick-create"),
                 error_message="Could not create substrate.",
             )
+        if "region" in self.fields:
+            region_queryset = Region.objects.all()
+            if request and hasattr(request, "user"):
+                region_queryset = filter_queryset_for_user(
+                    region_queryset, request.user
+                )
+            self.fields["region"].queryset = region_queryset
+        if "site" in self.fields:
+            site_queryset = Location.objects.all()
+            if request and hasattr(request, "user"):
+                site_queryset = filter_queryset_for_user(site_queryset, request.user)
+            self.fields["site"].queryset = site_queryset
         self._locked_group_ids = []
         groups_field = self.fields.get("sample_groups")
         if groups_field is not None:
@@ -659,6 +691,8 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             image_metadata_section(),
             "datetime",
             "location",
+            "region",
+            "site",
             "description",
             "standalone",
             "series",
@@ -738,6 +772,8 @@ class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModel
             "image_rights_notice",
             "datetime",
             "location",
+            "region",
+            "site",
             "description",
             "standalone",
             "series",
@@ -833,6 +869,8 @@ class SampleMaintenanceForm(WorkspaceReferenceScopeMixin, SampleModelForm):
                 errors.error_dict.pop("series", None)
             if "material" not in self.fields:
                 errors.error_dict.pop("material", None)
+            if "site" not in self.fields or "region" not in self.fields:
+                errors.error_dict.pop("site", None)
             if not errors.error_dict:
                 return
         super()._update_errors(errors)
@@ -855,6 +893,8 @@ SAMPLE_SECTIONS = {
         "fields": (
             "datetime",
             "location",
+            "region",
+            "site",
             "standalone",
             "series",
             "timestep",

@@ -201,6 +201,18 @@
               {{ object.location }}
             </li>
           {% endif %}
+          {% if object.region %}
+            <li>
+              <span class="sdv2-meta-label">Region</span>
+              <a href="{% url 'region-detail' object.region.pk %}">{{ object.region.display_name }}</a>
+            </li>
+          {% endif %}
+          {% if object.site %}
+            <li>
+              <span class="sdv2-meta-label">Site</span>
+              <a href="{% url 'location-detail' object.site.pk %}">{{ object.site }}</a>
+            </li>
+          {% endif %}
           {% if object.analysis_laboratory %}
             <li>
               <span class="sdv2-meta-label">Lab</span>

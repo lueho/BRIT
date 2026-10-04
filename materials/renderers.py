@@ -75,6 +75,9 @@ class SampleCSVRenderer(BaseCSVRenderer):
         "datetime": "Sampling date/time",
         "datetime_precision": "Sampling date precision",
         "standalone": "Standalone",
+        "location": "Location",
+        "region": "Region",
+        "site": "Sampling site",
         "publication_status": "Publication status",
         "owner": "Owner",
         "created_at": "Created at",
@@ -177,7 +180,15 @@ class SampleMeasurementsXLSXRenderer:
             "Sample name": sample.name or "",
             "Sample info (e.g. structure, harvesting, storing)": sample.description
             or "",
-            "Sample origin (e.g. location, region)": sample.location or "",
+            "Sample origin (e.g. location, region)": "; ".join(
+                part
+                for part in (
+                    sample.location or "",
+                    str(sample.region) if sample.region else "",
+                    str(sample.site) if sample.site else "",
+                )
+                if part
+            ),
             "Sample campaign (e.g. season, project)": sample.series.name
             if sample.series
             else "",

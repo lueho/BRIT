@@ -8,6 +8,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from openpyxl import load_workbook
 
+from maps.models import Location, Region
 from utils.properties.models import Unit
 
 from ..models import (
@@ -24,6 +25,7 @@ from ..renderers import (
     SampleMeasurementsXLSXRenderer,
     SampleXLSXRenderer,
 )
+from ..serializers import SampleFlatSerializer
 
 
 class SamplePrecisionExportRendererTestCase(SimpleTestCase):
@@ -60,6 +62,76 @@ class SamplePrecisionExportRendererTestCase(SimpleTestCase):
                         row[precision_column] or "", expected["datetime_precision"]
                     )
                     self.assertEqual(row[datetime_column], expected["datetime"])
+
+
+class SampleGeoExportRendererTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(
+            name="Brittany", country="FR", publication_status="published"
+        )
+        cls.site = Location.objects.create(
+            name="Viaverda", publication_status="published"
+        )
+        cls.sample = Sample.objects.create(
+            name="Geo export sample",
+            material=Material.objects.create(name="Geo export material"),
+            location="Somewhere in Brittany",
+            region=cls.region,
+            site=cls.site,
+        )
+
+    def test_flat_export_includes_location_region_and_site_columns(self):
+        data = SampleFlatSerializer(
+            Sample.objects.filter(pk=self.sample.pk), many=True
+        ).data
+        for renderer_class in (SampleCSVRenderer, SampleXLSXRenderer):
+            with self.subTest(renderer=renderer_class):
+                renderer = renderer_class()
+                buffer = BytesIO()
+                renderer.render(buffer, data)
+                if renderer_class is SampleCSVRenderer:
+                    rows = list(
+                        csv.reader(StringIO(buffer.getvalue().decode("utf-8-sig")))
+                    )
+                else:
+                    buffer.seek(0)
+                    rows = list(
+                        load_workbook(buffer).active.iter_rows(values_only=True)
+                    )
+                header = rows[0]
+                for label in ("Location", "Region", "Sampling site"):
+                    self.assertIn(label, header)
+                row = rows[1]
+                self.assertEqual(row[header.index("Location")], "Somewhere in Brittany")
+                self.assertEqual(row[header.index("Region")], str(self.region))
+                self.assertEqual(row[header.index("Sampling site")], str(self.site))
+
+    def test_xlsx_sample_origin_combines_location_region_and_site(self):
+        renderer = SampleMeasurementsXLSXRenderer(
+            sample=self.sample,
+            measurements=self.sample.component_measurements.all(),
+        )
+        origin = renderer._build_metadata_values()[
+            "Sample origin (e.g. location, region)"
+        ]
+        self.assertIn("Somewhere in Brittany", origin)
+        self.assertIn(str(self.region), origin)
+        self.assertIn(str(self.site), origin)
+
+    def test_xlsx_sample_origin_without_geo_references_keeps_location(self):
+        sample = Sample.objects.create(
+            name="Text-only sample",
+            material=self.sample.material,
+            location="Somewhere",
+        )
+        renderer = SampleMeasurementsXLSXRenderer(
+            sample=sample, measurements=sample.component_measurements.all()
+        )
+        origin = renderer._build_metadata_values()[
+            "Sample origin (e.g. location, region)"
+        ]
+        self.assertEqual(origin, "Somewhere")
 
 
 class SampleMeasurementsXLSXRendererTestCase(TestCase):

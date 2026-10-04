@@ -12,6 +12,7 @@ from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import Timestep
+from maps.models import Location, Region
 from utils.object_management.models import ObjectEditorGrant
 from utils.properties.models import Unit
 
@@ -137,6 +138,98 @@ class SampleSeriesModelSerializerTestCase(TestCase):
         self.assertIn("id", data)
         self.assertIn("name", data)
         self.assertIn("distributions", data)
+
+
+class SampleGeoReferenceSerializerTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(username="geo_writer")
+        cls.material = Material.objects.create(name="Geo material")
+        cls.region = Region.objects.create(
+            name="Brittany", country="FR", publication_status="published"
+        )
+        cls.site = Location.objects.create(
+            name="Viaverda", publication_status="published"
+        )
+        cls.sample = Sample.objects.create(
+            name="Geo sample",
+            material=cls.material,
+            region=cls.region,
+            site=cls.site,
+            location="Somewhere in Brittany",
+        )
+
+    def _request(self, user=None):
+        request = RequestFactory().get(reverse("home"))
+        request.user = user or self.user
+        return request
+
+    def test_model_serializer_exposes_region_and_site_with_links(self):
+        data = SampleModelSerializer(
+            self.sample, context={"request": self._request()}
+        ).data
+        self.assertEqual(data["region"], self.region.pk)
+        self.assertEqual(data["region_name"], str(self.region))
+        self.assertIn(
+            reverse("region-detail", args=[self.region.pk]), data["region_url"]
+        )
+        self.assertEqual(data["site"], self.site.pk)
+        self.assertEqual(data["site_name"], str(self.site))
+        self.assertIn(reverse("location-detail", args=[self.site.pk]), data["site_url"])
+
+    def test_flat_serializer_exposes_location_region_and_site(self):
+        data = SampleFlatSerializer(self.sample).data
+        self.assertEqual(data["location"], "Somewhere in Brittany")
+        self.assertEqual(data["region"], str(self.region))
+        self.assertEqual(data["site"], str(self.site))
+
+    def test_api_serializer_exposes_location_region_and_site(self):
+        data = SampleAPISerializer(self.sample).data
+        self.assertEqual(data["location"], "Somewhere in Brittany")
+        self.assertEqual(data["region"], str(self.region))
+        self.assertEqual(data["site"], str(self.site))
+
+    def test_write_serializer_accepts_region_and_site(self):
+        serializer = SampleWriteSerializer(
+            data={
+                "name": "Written geo sample",
+                "material": self.material.pk,
+                "region": self.region.pk,
+                "site": self.site.pk,
+            },
+            context={"request": self._request()},
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        sample = serializer.save()
+        self.assertEqual(sample.region_id, self.region.pk)
+        self.assertEqual(sample.site_id, self.site.pk)
+
+    def test_write_serializer_allows_omitted_geo_fields(self):
+        serializer = SampleWriteSerializer(
+            data={"name": "No geo", "material": self.material.pk},
+            context={"request": self._request()},
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        sample = serializer.save()
+        self.assertIsNone(sample.region_id)
+        self.assertIsNone(sample.site_id)
+
+    def test_write_serializer_rejects_inaccessible_region_and_site(self):
+        other = get_user_model().objects.create_user(username="geo_other")
+        private_region = Region.objects.create(name="Hidden", country="FR", owner=other)
+        private_site = Location.objects.create(name="Hidden site", owner=other)
+        serializer = SampleWriteSerializer(
+            data={
+                "name": "Bad geo",
+                "material": self.material.pk,
+                "region": private_region.pk,
+                "site": private_site.pk,
+            },
+            context={"request": self._request()},
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("region", serializer.errors)
+        self.assertIn("site", serializer.errors)
 
 
 class SampleDatetimePrecisionSerializerTestCase(TestCase):

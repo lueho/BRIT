@@ -13,6 +13,7 @@ from rest_framework.serializers import (
 from bibliography.models import Source
 from bibliography.serializers import SourceAbbreviationSerializer
 from distributions.models import TemporalDistribution
+from maps.models import Location, Region
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.serializers import NumericMeasurementSerializerMixin
 
@@ -203,6 +204,14 @@ class SampleModelSerializer(ModelSerializer):
     series_url = HyperlinkedRelatedField(
         source="series", read_only=True, view_name="sampleseries-detail"
     )
+    region_name = StringRelatedField(source="region")
+    region_url = HyperlinkedRelatedField(
+        source="region", read_only=True, view_name="region-detail"
+    )
+    site_name = StringRelatedField(source="site")
+    site_url = HyperlinkedRelatedField(
+        source="site", read_only=True, view_name="location-detail"
+    )
     compositions = NormalizedCompositionsField()
     properties = SerializerMethodField()
     sources = SourceAbbreviationSerializer(many=True)
@@ -238,6 +247,13 @@ class SampleModelSerializer(ModelSerializer):
             "timestep",
             "datetime",
             "datetime_precision",
+            "location",
+            "region",
+            "region_name",
+            "region_url",
+            "site",
+            "site_name",
+            "site_url",
             "image",
             "compositions",
             "properties",
@@ -251,6 +267,8 @@ class SampleFlatSerializer(ModelSerializer):
     series = StringRelatedField()
     timestep = StringRelatedField()
     owner = StringRelatedField()
+    region = StringRelatedField()
+    site = StringRelatedField()
     detail_url = SerializerMethodField()
 
     class Meta:
@@ -264,6 +282,9 @@ class SampleFlatSerializer(ModelSerializer):
             "datetime",
             "datetime_precision",
             "standalone",
+            "location",
+            "region",
+            "site",
             "publication_status",
             "owner",
             "created_at",
@@ -340,6 +361,8 @@ class SampleGroupSummarySerializer(ModelSerializer):
 
 class SampleAPISerializer(ModelSerializer):
     timestep = StringRelatedField()
+    region = StringRelatedField()
+    site = StringRelatedField()
     compositions = NormalizedCompositionsField()
     properties = SerializerMethodField()
     sample_groups = SerializerMethodField()
@@ -360,7 +383,16 @@ class SampleAPISerializer(ModelSerializer):
 
     class Meta:
         model = Sample
-        fields = ("name", "timestep", "properties", "compositions", "sample_groups")
+        fields = (
+            "name",
+            "timestep",
+            "location",
+            "region",
+            "site",
+            "properties",
+            "compositions",
+            "sample_groups",
+        )
 
 
 class SampleSeriesAPISerializer(ModelSerializer):
@@ -528,6 +560,42 @@ class SampleWriteSerializer(ModelSerializer):
         queryset=SampleGroup.objects.all(),
         required=False,
     )
+    region = PrimaryKeyRelatedField(
+        queryset=Region.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    site = PrimaryKeyRelatedField(
+        queryset=Location.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+
+    def _validate_visible_related(self, value, queryset, message):
+        if value is None:
+            return value
+        user = _request_user(self.context)
+        if not getattr(user, "is_authenticated", False):
+            raise ValidationError(
+                "Authentication is required to assign related objects."
+            )
+        if not filter_queryset_for_user(queryset, user).filter(pk=value.pk).exists():
+            raise ValidationError(message)
+        return value
+
+    def validate_region(self, value):
+        return self._validate_visible_related(
+            value,
+            Region.objects.all(),
+            "The selected region is not accessible.",
+        )
+
+    def validate_site(self, value):
+        return self._validate_visible_related(
+            value,
+            Location.objects.all(),
+            "The selected sampling site is not accessible.",
+        )
 
     def validate_sample_groups(self, value):
         user = _request_user(self.context)
@@ -583,6 +651,8 @@ class SampleWriteSerializer(ModelSerializer):
             "datetime",
             "datetime_precision",
             "location",
+            "region",
+            "site",
             "analysis_date",
             "analysis_laboratory",
             "lab_accreditation",

@@ -10,6 +10,7 @@ from django_filters.widgets import DateRangeWidget
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
+from maps.models import Location, Region
 from utils.filters import (
     FreeTextSearchFilterMixin,
     UserCreatedObjectScopedFilterSet,
@@ -368,6 +369,32 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
         help_text="Show samples taken within this date range.",
         widget=DateRangeWidget(attrs={"type": "date"}),
     )
+    region = ModelChoiceFilter(
+        queryset=Region.objects.none(),
+        field_name="region",
+        label="Region",
+        help_text="Show samples attributed to this region.",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="region-autocomplete",
+                value_field="id",
+            )
+        ),
+    )
+    site = ModelChoiceFilter(
+        queryset=Location.objects.none(),
+        field_name="site",
+        label="Sampling site",
+        help_text="Show samples taken at this site.",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="location-autocomplete",
+                value_field="id",
+            )
+        ),
+    )
 
     def filter_parameter(self, queryset, name, value):
         canonical_property = value.canonical_property
@@ -422,6 +449,12 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
         self.filters["sample_group"].queryset = self.scoped_choice_queryset(
             SampleGroup.objects.all()
         )
+        self.filters["region"].queryset = self.scoped_choice_queryset(
+            Region.objects.all()
+        )
+        self.filters["site"].queryset = self.scoped_choice_queryset(
+            Location.objects.all()
+        )
 
     class Meta:
         model = Sample
@@ -437,6 +470,8 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             "series",
             "sample_group",
             "sample_date",
+            "region",
+            "site",
         )
 
 
@@ -508,6 +543,8 @@ class SampleFilterSet(rf_filters.FilterSet):
             "timestep",
             "property_values",
             "sample_groups",
+            "region",
+            "site",
         )
 
 
