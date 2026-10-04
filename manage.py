@@ -6,7 +6,7 @@ import sys
 
 
 def main():
-    if "test" in sys.argv:
+    if len(sys.argv) > 1 and sys.argv[1] == "test":
         # Tests must run against the dedicated testrunner settings (isolated
         # caches, eager Celery, seeded initial data). --settings or
         # DJANGO_TEST_SETTINGS_MODULE can still override this.
