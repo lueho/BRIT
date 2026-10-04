@@ -91,6 +91,12 @@ def notify_owner_of_review_action(action, recipient=None):
         or not recipient.email
     ):
         return False
+    try:
+        # The action may carry a content_object cached before an ownership
+        # transfer (e.g. the synchronous broker fallback); use committed state.
+        obj.refresh_from_db(fields=["owner"])
+    except obj.__class__.DoesNotExist:
+        return False
     if not _can_open_review_link(recipient, obj):
         logger.info(
             "Skipping review notification for %s %s (action=%s): recipient %s "

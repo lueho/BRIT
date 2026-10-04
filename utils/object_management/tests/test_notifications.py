@@ -1,6 +1,7 @@
 """Tests for owner e-mail notifications on review actions."""
 
 import smtplib
+from unittest import mock
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
@@ -169,6 +170,29 @@ class ReviewOwnerNotificationTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, [self.owner.email])
         self.assertIn(f"Hello {self.owner.username}", mail.outbox[0].body)
+
+    def test_broker_fallback_uses_committed_owner_after_transfer(self):
+        new_owner = User.objects.create_user(
+            username="newowner", email="newowner@example.com"
+        )
+        with (
+            mock.patch.object(
+                send_review_action_owner_notification,
+                "delay",
+                side_effect=ConnectionError("broker down"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            ReviewAction.objects.create(
+                content_type_id=self.content_type_id,
+                object_id=self.collection.id,
+                user=self.moderator,
+                action=ReviewAction.ACTION_COMMENT,
+                comment="Please add a source.",
+            )
+            self.collection.transfer_ownership(new_owner)
+
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_notification_task_retries_transient_mail_errors(self):
         task = send_review_action_owner_notification
