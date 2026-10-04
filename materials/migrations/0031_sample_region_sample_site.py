@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("maps", "0019_region_name_en"),
-        ("materials", "0029_merge_20260922_1559"),
+        ("materials", "0030_product_material_category"),
     ]
 
     operations = [
