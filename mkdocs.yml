@@ -16,11 +16,6 @@ nav:
           - Overview: 02_developer_guide/architecture.md
           - Data Flow: 02_developer_guide/architecture/data_flow.md
           - Deployment: 02_developer_guide/architecture/deployment.md
-  - Operations:
-      - Overview: 03_operations/README.md
-      - Operations Guide: 03_operations/operations.md
-  - Design Decisions:
-      - Overview: 04_design_decisions/README.md
   - Roadmap:
       - Platform Consolidation: 05_roadmap/README.md
 

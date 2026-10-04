@@ -10,14 +10,8 @@ This index is the entry point for project documentation. Each topic has a clear 
 - **Development workflow and day-to-day commands**
   Use the [Developer Guide](02_developer_guide/README.md), especially [Guidelines](02_developer_guide/guidelines.md). For public app versus internal tooling boundaries, use [Repository Boundaries](02_developer_guide/repository_boundaries.md). For agent memory offloading and context hygiene, use [Context Retention](02_developer_guide/context_retention.md).
 
-- **Deployment and operations**
-  Use [Operations](03_operations/operations.md) as the canonical source for deployment, runtime operations, logs, and backups.
-
-- **Architecture and app boundaries**
+- **Architecture, deployment, and app boundaries**
   Use [Architecture Overview](02_developer_guide/architecture.md), [Deployment Overview](02_developer_guide/architecture/deployment.md), and [Applications Overview](02_developer_guide/applications.md).
-
-- **Design rationale and historical decisions**
-  Use [Design Decisions](04_design_decisions/README.md).
 
 - **Technical agenda and architectural workstreams**
   Use the [Platform Consolidation Roadmap](05_roadmap/README.md).
