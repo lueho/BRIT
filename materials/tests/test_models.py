@@ -1293,6 +1293,24 @@ class SampleGeoReferenceTestCase(TestCase):
         sample.refresh_from_db()
         self.assertIsNone(sample.region_id)
 
+    def test_generator_update_fields_saves_unrelated_field(self):
+        sample = self._sample(name="Generator", site=self.site_inside)
+        Sample.objects.filter(pk=sample.pk).update(region=None)
+        sample.refresh_from_db()
+        sample.name = "Generator renamed"
+        sample.save(update_fields=(field for field in ["name"]))
+        sample.refresh_from_db()
+        self.assertEqual(sample.name, "Generator renamed")
+        self.assertIsNone(sample.region_id)
+
+    def test_generator_update_fields_saves_site_and_derived_region(self):
+        sample = self._sample(name="Generator site")
+        sample.site = self.site_inside
+        sample.save(update_fields=(field for field in ["site"]))
+        sample.refresh_from_db()
+        self.assertEqual(sample.site_id, self.site_inside.pk)
+        self.assertEqual(sample.region_id, self.inner_lau.pk)
+
     def test_clean_accepts_site_without_geometry(self):
         site = Location.objects.create(name="Address only", geom=None)
         sample = self._sample(name="No geom", region=self.inner_lau, site=site)

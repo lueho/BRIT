@@ -1147,6 +1147,8 @@ class Sample(NamedUserCreatedObject):
 
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = kwargs["update_fields"] = list(update_fields)
         geo_fields_saved = update_fields is None or not {"site", "region"}.isdisjoint(
             update_fields
         )

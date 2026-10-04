@@ -674,10 +674,11 @@ class SampleWriteSerializer(ModelSerializer):
                     "datetime_precision": "Sampling date is required when precision is set."
                 }
             )
-        region = attrs.get("region", getattr(self.instance, "region", None))
-        site = attrs.get("site", getattr(self.instance, "site", None))
-        if not Sample.site_lies_in_region(site, region):
-            raise ValidationError({"site": Sample.SITE_OUTSIDE_REGION_MESSAGE})
+        if self.instance is None or not {"site", "region"}.isdisjoint(attrs):
+            region = attrs.get("region", getattr(self.instance, "region", None))
+            site = attrs.get("site", getattr(self.instance, "site", None))
+            if not Sample.site_lies_in_region(site, region):
+                raise ValidationError({"site": Sample.SITE_OUTSIDE_REGION_MESSAGE})
         return attrs
 
     class Meta:

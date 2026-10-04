@@ -373,6 +373,22 @@ class SampleWriteSerializerGeoConsistencyTestCase(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("site", serializer.errors)
 
+    def test_partial_update_of_unrelated_field_ignores_stored_mismatch(self):
+        sample = Sample.objects.create(
+            name="Stored mismatch",
+            material=self.material,
+            owner=self.user,
+            region=self.region,
+            site=self.site_outside,
+        )
+        serializer = SampleWriteSerializer(
+            sample,
+            data={"name": "Corrected label"},
+            partial=True,
+            context=self._context(),
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
     def test_accepts_site_inside_region(self):
         serializer = SampleWriteSerializer(
             data={
