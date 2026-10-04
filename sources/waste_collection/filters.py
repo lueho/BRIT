@@ -37,10 +37,7 @@ from utils.filters import (
     NullableRangeFilter,
     UserCreatedObjectScopedFilterSet,
 )
-from utils.object_management.permissions import (
-    apply_scope_filter,
-    filter_queryset_for_user,
-)
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.widgets import NullableRangeSliderWidget
 
 
@@ -83,26 +80,9 @@ class CollectionSystemListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = CollectionSystem.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            CollectionSystem.objects.all()
+        )
 
     class Meta:
         model = CollectionSystem
@@ -124,26 +104,9 @@ class WasteCategoryListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = WasteCategory.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            WasteCategory.objects.all()
+        )
 
     class Meta:
         model = WasteCategory
@@ -165,26 +128,9 @@ class WasteComponentListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = WasteComponent.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            WasteComponent.objects.all()
+        )
 
     class Meta:
         model = WasteComponent
@@ -206,26 +152,9 @@ class FeeSystemListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = FeeSystem.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            FeeSystem.objects.all()
+        )
 
     class Meta:
         model = FeeSystem
@@ -247,26 +176,9 @@ class CollectionFrequencyListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = CollectionFrequency.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            CollectionFrequency.objects.all()
+        )
 
     class Meta:
         model = CollectionFrequency
@@ -591,23 +503,6 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         if not skip_min_max:
             self._set_filter_ranges()
 
-        try:
-            scope_val = None
-            if hasattr(self, "data") and self.data:
-                scope_val = self.data.get("scope")
-            if not scope_val and hasattr(self.form, "initial"):
-                scope_val = self.form.initial.get("scope")
-        except Exception:
-            scope_val = None
-
-        if scope_val != "private":
-            try:
-                self.filters["publication_status"].field.widget = HiddenInput()
-                self.filters["publication_status"].field.label = ""
-                self.filters["publication_status"].extra["help_text"] = ""
-            except KeyError:
-                pass
-
     def _set_filter_ranges(self):
         property_filters = {
             name: self.filters[name]
@@ -636,8 +531,6 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
             filter_ = self.filters[name]
             filter_.set_min_max(maximum)
             filter_.field.widget = filter_.extra["widget"]
-            if hasattr(self, "_form"):
-                self._form.fields[name].widget = filter_.field.widget
 
     @cached_property
     def _waste_component_choices(self):
