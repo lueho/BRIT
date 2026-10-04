@@ -1567,23 +1567,21 @@ class SampleDetailView(UserCreatedObjectDetailView):
             and all(property_value.unit_id for property_value in property_values)
         )
 
-        # Point unit/method checks at the section that actually lacks data;
-        # default to measurements when both or neither side is incomplete.
-        units_section = (
-            "properties"
-            if any(value.unit_id is None for value in property_values)
-            and all(measurement.unit_id for measurement in component_measurements)
-            else "measurements"
-        )
-        methods_section = (
-            "properties"
-            if any(value.analytical_method_id is None for value in property_values)
-            and all(
-                measurement.analytical_method_id
-                for measurement in component_measurements
-            )
-            else "measurements"
-        )
+        # Unit/method checks list every section that lacks data so the link can
+        # target one the user may edit; without data, either section can fix it.
+        def incomplete_sections(field):
+            sections = [
+                key
+                for key, values in (
+                    ("measurements", component_measurements),
+                    ("properties", property_values),
+                )
+                if any(getattr(value, field) is None for value in values)
+            ]
+            return sections or ["measurements", "properties"]
+
+        units_sections = incomplete_sections("unit_id")
+        methods_sections = incomplete_sections("analytical_method_id")
 
         checks = [
             {
@@ -1609,12 +1607,14 @@ class SampleDetailView(UserCreatedObjectDetailView):
             {
                 "label": "Units complete",
                 "complete": units_complete,
-                "section": units_section,
+                "section": units_sections[0],
+                "fallback_sections": units_sections[1:],
             },
             {
                 "label": "Methods complete",
                 "complete": methods_complete,
-                "section": methods_section,
+                "section": methods_sections[0],
+                "fallback_sections": methods_sections[1:],
             },
         ]
         completed_count = sum(1 for check in checks if check["complete"])
@@ -1799,9 +1799,11 @@ class SampleDetailView(UserCreatedObjectDetailView):
         for check in sample_completeness["checks"]:
             if check["complete"]:
                 continue
-            section_url = editable_section_urls.get(check["section"])
-            if section_url:
-                check["section_url"] = section_url
+            for section in [check["section"], *check.get("fallback_sections", [])]:
+                if section in editable_section_urls:
+                    check["section"] = section
+                    check["section_url"] = editable_section_urls[section]
+                    break
 
         context["related_groups"] = list(
             filter_queryset_for_user(

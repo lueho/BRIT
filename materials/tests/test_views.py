@@ -6188,6 +6188,64 @@ class EmptyStateViewsTestCase(TestCase):
             f"{sample.update_url}?section=properties",
         )
 
+    def test_v2_edit_mode_completeness_links_prefer_editable_incomplete_section(self):
+        """Property-only editors get links when both data types are incomplete."""
+        sample, owner = self._create_v2_owner_sample("Check Fallback", "published")
+        # Owners of published samples cannot manage measurements but may add
+        # property values with the matching permission.
+        owner.user_permissions.add(
+            Permission.objects.get(
+                codename="add_materialpropertyvalue",
+                content_type=ContentType.objects.get_for_model(MaterialPropertyValue),
+            )
+        )
+        self.client.force_login(owner)
+        detail_url = reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        properties_url = f"{sample.update_url}?section=properties"
+
+        def get_checks():
+            response = self.client.get(detail_url)
+            self.assertEqual(response.status_code, 200)
+            self.assertFalse(response.context["sample_policy"]["can_manage_samples"])
+            return {
+                check["label"]: check
+                for check in response.context["sample_completeness"]["checks"]
+            }
+
+        # Without any data the property editor can still populate properties.
+        checks = get_checks()
+        self.assertFalse(checks["Methods complete"]["complete"])
+        self.assertEqual(checks["Methods complete"]["section_url"], properties_url)
+        self.assertEqual(checks["Methods complete"]["section"], "properties")
+        self.assertEqual(checks["Units complete"]["section_url"], properties_url)
+
+        # Both a measurement and a property value lack an analytical method.
+        ComponentMeasurement.objects.create(
+            owner=owner,
+            sample=sample,
+            group=MaterialComponentGroup.objects.create(
+                owner=owner, name="Check Fallback Group"
+            ),
+            component=MaterialComponent.objects.create(
+                owner=owner, name="Check Fallback Component"
+            ),
+            average=Decimal("10.0"),
+        )
+        MaterialPropertyValue.objects.create(
+            owner=owner,
+            sample=sample,
+            property=MaterialProperty.objects.create(
+                name="Check Fallback Property", owner=owner
+            ),
+            average=Decimal("1.5"),
+        )
+        checks = get_checks()
+        self.assertFalse(checks["Methods complete"]["complete"])
+        self.assertEqual(checks["Methods complete"]["section_url"], properties_url)
+        self.assertContains(
+            self.client.get(detail_url), 'data-workspace-edit="properties"'
+        )
+
     def test_v2_edit_mode_exposes_composition_creation_actions(self):
         sample, _group = self._create_sample_with_composition_and_property()
         for model, codename in (
