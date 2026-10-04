@@ -1,4 +1,5 @@
 import json
+from urllib.parse import urlencode
 
 from crispy_forms.helper import FormHelper
 from django.core.exceptions import ImproperlyConfigured, ValidationError
@@ -674,7 +675,12 @@ class WorkspaceReferenceScopeMixin:
     Restricts UserCreatedObject reference fields to objects the request user may
     access, and exposes selected-only options plus the autocomplete endpoint for
     lazy workspace select rendering.
+
+    ``workspace_autocomplete_params`` may map a field name to extra GET params
+    appended to its autocomplete URL (e.g. ``{"source": {"label": "abbreviation"}}``).
     """
+
+    workspace_autocomplete_params = {}
 
     def __init__(self, *args, request=None, field_names=None, **kwargs):
         from django import forms
@@ -717,7 +723,11 @@ class WorkspaceReferenceScopeMixin:
                 if ids
                 else []
             )
-            field.workspace_autocomplete_url = reverse(field.widget.url)
+            autocomplete_url = reverse(field.widget.url)
+            params = self.workspace_autocomplete_params.get(name)
+            if params:
+                autocomplete_url = f"{autocomplete_url}?{urlencode(params)}"
+            field.workspace_autocomplete_url = autocomplete_url
             field.workspace_label_field = field.widget.label_field or "name"
             field.workspace_value_field = "id"
 

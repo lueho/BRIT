@@ -374,9 +374,7 @@ class ProcessSourceSectionForm(WorkspaceReferenceScopeMixin, ProcessSourceForm):
         label="Source",
     )
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["source"].workspace_autocomplete_url += "?label=abbreviation"
+    workspace_autocomplete_params = {"source": {"label": "abbreviation"}}
 
 
 class ProcessAuthorSectionForm(WorkspaceReferenceScopeMixin, ProcessAuthorForm):
