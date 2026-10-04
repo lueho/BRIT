@@ -137,43 +137,36 @@ class ProcessCategoryModalCreateView(UserCreatedObjectModalCreateView):
     permission_required = "processes.add_processcategory"
 
 
-class ProcessCategoryPublishedListView(PublishedObjectListView):
+class ProcessCategoryListViewMixin:
+    """Shared configuration for the ProcessCategory scoped list views."""
+
+    model = ProcessCategory
+    template_name = "processes/processcategory_list.html"
+    dashboard_url = reverse_lazy("processes:dashboard")
+    context_object_name = "categories"
+    paginate_by = 20
+    process_count_status = None
+
+    def get_queryset(self):
+        return with_process_count(super().get_queryset(), self.process_count_status)
+
+
+class ProcessCategoryPublishedListView(
+    ProcessCategoryListViewMixin, PublishedObjectListView
+):
     """List published ProcessCategory objects."""
 
-    model = ProcessCategory
-    template_name = "processes/processcategory_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
-    context_object_name = "categories"
-    paginate_by = 20
-
-    def get_queryset(self):
-        return with_published_process_count(super().get_queryset())
+    process_count_status = "published"
 
 
-class ProcessCategoryPrivateListView(PrivateObjectListView):
+class ProcessCategoryPrivateListView(
+    ProcessCategoryListViewMixin, PrivateObjectListView
+):
     """List user's private ProcessCategory objects."""
 
-    model = ProcessCategory
-    template_name = "processes/processcategory_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
-    context_object_name = "categories"
-    paginate_by = 20
 
-    def get_queryset(self):
-        return with_process_count(super().get_queryset())
-
-
-class ProcessCategoryReviewListView(ReviewObjectListView):
+class ProcessCategoryReviewListView(ProcessCategoryListViewMixin, ReviewObjectListView):
     """List ProcessCategory objects in review status for moderators."""
-
-    model = ProcessCategory
-    template_name = "processes/processcategory_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
-    context_object_name = "categories"
-    paginate_by = 20
-
-    def get_queryset(self):
-        return with_process_count(super().get_queryset())
 
 
 class ProcessCategoryDetailView(UserCreatedObjectDetailView):
@@ -440,46 +433,30 @@ def _section_anchors(obj, context):
     return anchors
 
 
-class ProcessPublishedFilterView(PublishedObjectFilterView):
+class ProcessFilterViewMixin:
+    """Shared configuration for the Process scoped filter views."""
+
+    model = Process
+    template_name = "processes/process_list.html"
+    dashboard_url = reverse_lazy("processes:dashboard")
+    context_object_name = "processes"
+    filterset_class = ProcessFilter
+    paginate_by = 20
+
+    def get_queryset(self):
+        return _process_list_queryset(super().get_queryset(), self.request.user)
+
+
+class ProcessPublishedFilterView(ProcessFilterViewMixin, PublishedObjectFilterView):
     """List published Process objects with filtering."""
 
-    model = Process
-    template_name = "processes/process_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
-    context_object_name = "processes"
-    filterset_class = ProcessFilter
-    paginate_by = 20
 
-    def get_queryset(self):
-        return _process_list_queryset(super().get_queryset(), self.request.user)
-
-
-class ProcessPrivateFilterView(PrivateObjectFilterView):
+class ProcessPrivateFilterView(ProcessFilterViewMixin, PrivateObjectFilterView):
     """List user's private Process objects with filtering."""
 
-    model = Process
-    template_name = "processes/process_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
-    context_object_name = "processes"
-    filterset_class = ProcessFilter
-    paginate_by = 20
 
-    def get_queryset(self):
-        return _process_list_queryset(super().get_queryset(), self.request.user)
-
-
-class ProcessReviewFilterView(ReviewObjectFilterView):
+class ProcessReviewFilterView(ProcessFilterViewMixin, ReviewObjectFilterView):
     """List Process objects in review status for moderators."""
-
-    model = Process
-    template_name = "processes/process_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
-    context_object_name = "processes"
-    filterset_class = ProcessFilter
-    paginate_by = 20
-
-    def get_queryset(self):
-        return _process_list_queryset(super().get_queryset(), self.request.user)
 
 
 class ProcessDetailView(UserCreatedObjectDetailView):
