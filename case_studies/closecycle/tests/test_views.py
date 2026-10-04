@@ -228,3 +228,16 @@ class ShowcaseGeoJSONVersionTestCase(TestCase):
         )
 
         self.assertNotEqual(self.version(), before)
+
+    def test_version_changes_on_region_edits_within_one_second(self):
+        first_edit = timezone.now().replace(microsecond=100_000) + timedelta(seconds=5)
+        Region.objects.filter(pk=self.region.pk).update(
+            name="North", lastmodified_at=first_edit
+        )
+        before = self.version()
+
+        Region.objects.filter(pk=self.region.pk).update(
+            name="East", lastmodified_at=first_edit.replace(microsecond=800_000)
+        )
+
+        self.assertNotEqual(self.version(), before)

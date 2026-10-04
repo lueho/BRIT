@@ -64,11 +64,16 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         }
 
     def _version_timestamp(self, agg):
-        ts = super()._version_timestamp(agg)
+        # Full-precision timestamps, so edits within one second still rotate.
+        max_mod = agg.get("max_mod")
         region_mod = agg.get("max_region_mod")
-        if region_mod:
-            ts = max(ts, int(region_mod.timestamp()))
-        return f"{ts}:{agg.get('max_borders_xmin') or 0}"
+        return ":".join(
+            (
+                max_mod.isoformat() if max_mod else "",
+                region_mod.isoformat() if region_mod else "",
+                str(agg.get("max_borders_xmin") or 0),
+            )
+        )
 
     @action(detail=False, methods=["get"])
     def geojson(self, request, *args, **kwargs):
