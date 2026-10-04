@@ -495,15 +495,10 @@ class Scenario(NamedUserCreatedObject):
         parameter values are given, the algorithm will be added with default values.
         """
 
-        # self.remove_inventory_algorithm(algorithm, feedstock)
-
         if feedstock not in self.available_feedstocks():
             raise FeedstockNotImplemented(feedstock)
 
         if custom_parameter_values:
-            # for value in custom_parameter_values:
-            #     if not value.parameter.inventory_algorithm == algorithm:
-            #         raise WrongParameterForInventoryAlgorithm(value)
             values = custom_parameter_values
         else:
             values = algorithm.default_values()
@@ -809,19 +804,6 @@ class ScenarioInventoryConfiguration(models.Model):
     def save(self, *args, **kwargs):
         self.scenario.set_status(ScenarioStatus.Status.CHANGED)
         super().save(*args, **kwargs)
-
-    # def save(self, *args, **kwargs):
-    #     # Only save if there is no previous entry for a parameter in a scenario. Otherwise drop old entry first.
-    #     if not ScenarioInventoryConfiguration.objects.filter(scenario=self.scenario,
-    #                                                          inventory_algorithm=self.inventory_algorithm,
-    #                                                          inventory_parameter=self.inventory_parameter):
-    #         super(ScenarioInventoryConfiguration, self).save(*args, **kwargs)
-    #     else:
-    #         ScenarioInventoryConfiguration.objects \
-    #             .filter(scenario=self.scenario,
-    #                     inventory_algorithm=self.inventory_algorithm,
-    #                     inventory_parameter=self.inventory_parameter) \
-    #             .update(inventory_value=self.inventory_value)
 
     def get_absolute_url(self):
         return reverse("scenario-detail", kwargs={"pk": self.scenario.pk})

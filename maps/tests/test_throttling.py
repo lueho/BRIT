@@ -95,3 +95,23 @@ class GeoJSONThrottleTests(APITestCase):
 
         self.assertEqual(first.status_code, status.HTTP_200_OK)
         self.assertEqual(second.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_version_action_shares_the_geojson_throttle_bucket(self):
+        """Version checks are exempt from the site-wide anonymous cap, so
+        they must be limited by the GeoJSON throttle instead."""
+        for name in ("api-region", "api-catchment", "api-showcase"):
+            with self.subTest(viewset=name):
+                cache.clear()
+                with patch(
+                    "rest_framework.throttling.SimpleRateThrottle.THROTTLE_RATES",
+                    {"geojson_anon": "1/minute"},
+                ):
+                    first = self.client.get(
+                        reverse(f"{name}-version"), REMOTE_ADDR="202.46.62.65"
+                    )
+                    second = self.client.get(
+                        reverse(f"{name}-geojson"), REMOTE_ADDR="202.46.62.65"
+                    )
+
+                self.assertEqual(first.status_code, status.HTTP_200_OK)
+                self.assertEqual(second.status_code, status.HTTP_429_TOO_MANY_REQUESTS)

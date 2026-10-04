@@ -1,4 +1,12 @@
-from maps.models import Catchment, Region
+from datetime import timedelta
+
+from django.contrib.gis.geos import MultiPolygon, Polygon
+from django.db import transaction
+from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
+
+from maps.models import Catchment, GeoPolygon, Region
 from materials.models import Material
 from processes.models import Process
 from utils.tests.testcases import AbstractTestCases
@@ -169,3 +177,67 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         self.assertEqual(
             showcase.catchment.pk, response.context["view"].get_catchment_feature_id()
         )
+
+
+class ShowcaseGeoJSONVersionTestCase(TestCase):
+    """The showcase GeoJSON serializes its region's name and borders, so the
+    dataset version used for client cache revalidation must track them."""
+
+    def setUp(self):
+        self.region = Region.objects.create(
+            name="Showcase Region", publication_status="published"
+        )
+        self.region.geom = MultiPolygon(Polygon.from_bbox((0, 0, 1, 1)))
+        self.region.save()
+        Showcase.objects.create(
+            name="Showcase", region=self.region, publication_status="published"
+        )
+
+    def version(self):
+        response = self.client.get(
+            reverse("api-showcase-version"), {"scope": "published"}
+        )
+        self.assertEqual(response.status_code, 200)
+        return response.json()["version"]
+
+    def test_geojson_header_matches_version_action(self):
+        response = self.client.get(
+            reverse("api-showcase-geojson"), {"scope": "published"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Data-Version"], self.version())
+
+    def test_version_changes_when_region_borders_change_in_place(self):
+        before = self.version()
+
+        # A savepoint gives the update its own (sub)transaction id, as a
+        # separate request would in production.
+        with transaction.atomic():
+            borders = GeoPolygon.objects.get(pk=self.region.borders_id)
+            borders.geom = MultiPolygon(Polygon.from_bbox((0, 0, 2, 2)))
+            borders.save()
+
+        self.assertNotEqual(self.version(), before)
+
+    def test_version_changes_when_region_is_modified(self):
+        before = self.version()
+
+        Region.objects.filter(pk=self.region.pk).update(
+            name="Renamed Region",
+            lastmodified_at=timezone.now() + timedelta(seconds=5),
+        )
+
+        self.assertNotEqual(self.version(), before)
+
+    def test_version_changes_on_region_edits_within_one_second(self):
+        first_edit = timezone.now().replace(microsecond=100_000) + timedelta(seconds=5)
+        Region.objects.filter(pk=self.region.pk).update(
+            name="North", lastmodified_at=first_edit
+        )
+        before = self.version()
+
+        Region.objects.filter(pk=self.region.pk).update(
+            name="East", lastmodified_at=first_edit.replace(microsecond=800_000)
+        )
+
+        self.assertNotEqual(self.version(), before)
