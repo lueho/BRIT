@@ -198,20 +198,25 @@ class Process(NamedUserCreatedObject):
             "processes:process-supplementary-document", kwargs={"pk": self.pk}
         )
 
+    def _prefetched_or(self, name, fallback):
+        """Return the prefetched ``name`` relation, else evaluate ``fallback``."""
+        cache = getattr(self, "_prefetched_objects_cache", None) or {}
+        if name in cache:
+            return cache[name]
+        return fallback()
+
     def _material_links_for_role(self, role: ProcessMaterial.Role):
         """Return prefetched material links for ``role`` if available."""
 
-        links = None
-        cache = getattr(self, "_prefetched_objects_cache", None)
-        if cache and "process_materials" in cache:
-            links = [link for link in cache["process_materials"] if link.role == role]
-        if links is None:
-            links = list(
+        links = self._prefetched_or(
+            "process_materials",
+            lambda: list(
                 self.process_materials.select_related("material")
                 .filter(role=role)
                 .order_by("order", "id")
-            )
-        return links
+            ),
+        )
+        return [link for link in links if link.role == role]
 
     @property
     def input_materials(self):
@@ -241,21 +246,23 @@ class Process(NamedUserCreatedObject):
     def ordered_authors(self):
         # Use the prefetch cache when present: an explicit order_by on the
         # related manager would silently bypass it and re-query per process.
-        cache = getattr(self, "_prefetched_objects_cache", None) or {}
-        if "process_authors" in cache:
-            return cache["process_authors"]
-        return self.process_authors.order_by(
-            "position", "author_id", "id"
-        ).select_related("author")
+        return self._prefetched_or(
+            "process_authors",
+            lambda: self.process_authors.order_by(
+                "position", "author_id", "id"
+            ).select_related("author"),
+        )
 
     def authors_ordered(self):
         return [process_author.author for process_author in self.ordered_authors()]
 
     def ordered_sources(self):
-        cache = getattr(self, "_prefetched_objects_cache", None) or {}
-        if "process_sources" in cache:
-            return cache["process_sources"]
-        return self.process_sources.order_by("order", "id").select_related("source")
+        return self._prefetched_or(
+            "process_sources",
+            lambda: self.process_sources.order_by("order", "id").select_related(
+                "source"
+            ),
+        )
 
     def sources_ordered(self):
         return [process_source.source for process_source in self.ordered_sources()]
