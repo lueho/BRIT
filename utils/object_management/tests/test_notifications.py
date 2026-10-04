@@ -133,13 +133,33 @@ class ReviewOwnerNotificationTests(TestCase):
             )
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_ownership_transfer_still_notifies_owner_at_review_time(self):
+    def test_ownership_transfer_before_delivery_skips_former_owner(self):
         new_owner = User.objects.create_user(
             username="newowner", email="newowner@example.com"
         )
         self.client.force_login(self.moderator)
         with self.captureOnCommitCallbacks() as callbacks:
-            response = self.client.post(self._action_url("approve_item"))
+            response = self.client.post(
+                self._action_url("add_review_comment"),
+                data={"message": "Please add a source."},
+            )
+        self.assertEqual(response.status_code, 302)
+
+        self.collection.transfer_ownership(new_owner)
+        for callback in callbacks:
+            callback()
+
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_ownership_transfer_still_notifies_former_owner_with_review_access(self):
+        new_owner = User.objects.create_user(
+            username="newowner", email="newowner@example.com"
+        )
+        self.owner.is_staff = True
+        self.owner.save(update_fields=["is_staff"])
+        self.client.force_login(self.moderator)
+        with self.captureOnCommitCallbacks() as callbacks:
+            response = self.client.post(self._action_url("reject_item"))
         self.assertEqual(response.status_code, 302)
 
         self.collection.transfer_ownership(new_owner)

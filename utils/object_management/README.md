@@ -169,7 +169,10 @@ Creating a `ReviewAction` queues an e-mail to the object's owner via a
 `post_save` signal (`enqueue_owner_review_notification` in `signals.py`).
 The signal captures the owner at review time and passes their user id to
 the Celery task `send_review_action_owner_notification` (`tasks.py`), so an
-ownership transfer before delivery does not redirect the notification.
+ownership transfer before delivery does not redirect the notification. If
+the captured owner can no longer open the review detail page at delivery
+time (they are neither the current owner nor a moderator), the e-mail is
+skipped rather than sending an unusable link.
 Sending is deferred to `transaction.on_commit`; if the broker is
 unavailable the signal falls back to sending synchronously. Transient mail
 delivery failures are retried with backoff (up to 3 retries).

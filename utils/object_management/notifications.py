@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils.text import capfirst
 
 from .models import ReviewAction
+from .permissions import user_is_moderator_for_model
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,11 @@ def _notification_protocol():
     return "https" if getattr(settings, "SECURE_SSL_REDIRECT", False) else "http"
 
 
+def _can_open_review_link(user, obj):
+    """Mirror ``ReviewItemDetailView`` access: current owner or moderator."""
+    return user.pk == obj.owner_id or user_is_moderator_for_model(user, obj.__class__)
+
+
 def notify_owner_of_review_action(action, recipient=None):
     """Send a notification e-mail to the object owner for a review action.
 
@@ -71,7 +77,9 @@ def notify_owner_of_review_action(action, recipient=None):
     omitted, the object's current owner is used.
 
     Only actions performed by someone other than the recipient trigger an
-    e-mail. Returns True when an e-mail was sent.
+    e-mail. A former owner who can no longer open the review detail page
+    (ownership transferred before delivery) is skipped. Returns True when
+    an e-mail was sent.
     """
     obj = action.content_object
     if recipient is None:
@@ -82,6 +90,16 @@ def notify_owner_of_review_action(action, recipient=None):
         or recipient.pk == action.user_id
         or not recipient.email
     ):
+        return False
+    if not _can_open_review_link(recipient, obj):
+        logger.info(
+            "Skipping review notification for %s %s (action=%s): recipient %s "
+            "no longer owns the object.",
+            action.content_type.model,
+            action.object_id,
+            action.action,
+            recipient.pk,
+        )
         return False
 
     context = {
