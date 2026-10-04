@@ -1552,30 +1552,54 @@ class SampleDetailView(UserCreatedObjectDetailView):
             and all(property_value.unit_id for property_value in property_values)
         )
 
+        # Point unit/method checks at the section that actually lacks data;
+        # default to measurements when both or neither side is incomplete.
+        units_section = (
+            "properties"
+            if any(value.unit_id is None for value in property_values)
+            and all(measurement.unit_id for measurement in component_measurements)
+            else "measurements"
+        )
+        methods_section = (
+            "properties"
+            if any(value.analytical_method_id is None for value in property_values)
+            and all(
+                measurement.analytical_method_id
+                for measurement in component_measurements
+            )
+            else "measurements"
+        )
+
         checks = [
             {
                 "label": "Description present",
                 "complete": bool(obj.description),
+                "section": "overview",
             },
             {
                 "label": "At least one source linked",
                 "complete": bool(sample_summary["sample_source_count"]),
+                "section": "sources",
             },
             {
                 "label": "At least one raw data group",
                 "complete": bool(sample_summary["component_measurement_group_count"]),
+                "section": "measurements",
             },
             {
                 "label": "Normalization available",
                 "complete": bool(sample_summary["composition_count"]),
+                "section": "measurements",
             },
             {
                 "label": "Units complete",
                 "complete": units_complete,
+                "section": units_section,
             },
             {
                 "label": "Methods complete",
                 "complete": methods_complete,
+                "section": methods_section,
             },
         ]
         completed_count = sum(1 for check in checks if check["complete"])
@@ -1744,6 +1768,19 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 sample_policy=sample_policy,
             )
         )
+
+        # Turn failing completeness checks into deep links into the matching
+        # section editor, but only for sections the user can actually edit.
+        editable_section_urls = {
+            section["key"]: section["url"]
+            for section in context["maintenance_sections"]
+        }
+        for check in sample_completeness["checks"]:
+            if check["complete"]:
+                continue
+            section_url = editable_section_urls.get(check["section"])
+            if section_url:
+                check["section_url"] = section_url
 
         context["related_groups"] = list(
             filter_queryset_for_user(
