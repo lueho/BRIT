@@ -1,7 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
 
-from django.test import TestCase
+from django.contrib.auth.models import User
+from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
 from maps.models import Location, Region
@@ -422,6 +423,35 @@ class SampleFilterTestCase(TestCase):
         filtr = SampleFilter(data={"site": str(site.pk)}, queryset=Sample.objects.all())
 
         self.assertEqual(list(filtr.qs), [sample_at])
+
+    def test_private_scope_keeps_published_geography_of_other_owners(self):
+        alice = User.objects.create(username="geo_filter_alice")
+        bob = User.objects.create(username="geo_filter_bob")
+        region = Region.objects.create(
+            name="Bob's region", country="FR", owner=bob, publication_status="published"
+        )
+        site = Location.objects.create(
+            name="Bob's site", owner=bob, publication_status="published"
+        )
+        sample = Sample.objects.create(
+            name="Alice private geo sample",
+            material=self.substrate_material,
+            owner=alice,
+            region=region,
+            site=site,
+        )
+        request = RequestFactory().get("/")
+        request.user = alice
+
+        for field, value in (("region", region.pk), ("site", site.pk)):
+            with self.subTest(field=field):
+                filtr = SampleFilter(
+                    data={"scope": "private", field: str(value)},
+                    queryset=Sample.objects.filter(owner=alice),
+                    request=request,
+                )
+                self.assertTrue(filtr.is_valid(), filtr.errors)
+                self.assertEqual(list(filtr.qs), [sample])
 
 
 class SampleGroupFilterTestCase(TestCase):

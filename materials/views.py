@@ -40,6 +40,7 @@ from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
     user_is_moderator_for_model,
+    visible_related_object,
 )
 from utils.object_management.views import (
     PrivateObjectFilterView,
@@ -1716,6 +1717,12 @@ class SampleDetailView(UserCreatedObjectDetailView):
                 "sample_completeness": sample_completeness,
                 "sample_workflow": sample_workflow,
                 "sample_layout_mode": sample_layout_mode,
+                "sample_region": visible_related_object(
+                    self.object.region, self.request.user
+                ),
+                "sample_site": visible_related_object(
+                    self.object.site, self.request.user
+                ),
             }
         )
 
@@ -2471,3 +2478,6 @@ class SampleExportView(SingleObjectFileExportView):
         from .tasks import export_sample_measurements_to_excel
 
         return export_sample_measurements_to_excel
+
+    def get_task_kwargs(self, obj):
+        return {"user_id": self.request.user.pk}

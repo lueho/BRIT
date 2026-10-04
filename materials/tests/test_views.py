@@ -2987,6 +2987,49 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             response, reverse("location-detail", kwargs={"pk": site.pk})
         )
 
+    def test_detail_view_hides_private_region_and_site_of_published_sample(self):
+        geo_owner = get_user_model().objects.create(username="private_geo_owner")
+        region = Region.objects.create(
+            name="Hidden region", country="FR", owner=geo_owner
+        )
+        site = Location.objects.create(
+            name="Hidden site", address="Secret street 1", owner=geo_owner
+        )
+        sample = self.model.objects.create(
+            name="Published sample with private geo",
+            owner=self.owner_user,
+            publication_status="published",
+            region=region,
+            site=site,
+            **self.related_objects,
+        )
+
+        response = self.client.get(self.get_detail_url(sample.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secret street 1")
+        self.assertNotContains(response, "Hidden region")
+        self.assertNotContains(
+            response, reverse("location-detail", kwargs={"pk": site.pk})
+        )
+        self.assertNotContains(
+            response, reverse("region-detail", kwargs={"pk": region.pk})
+        )
+
+    def test_export_view_passes_requesting_user_to_task(self):
+        self.client.force_login(self.owner_user)
+        with patch(
+            "materials.tasks.export_sample_measurements_to_excel.delay"
+        ) as delay:
+            delay.return_value.task_id = "task-id"
+            response = self.client.get(
+                reverse("sample-export", kwargs={"pk": self.unpublished_object.pk})
+            )
+        self.assertEqual(response.status_code, 200)
+        delay.assert_called_once_with(
+            self.unpublished_object.pk, user_id=self.owner_user.pk
+        )
+
     def test_detail_view_without_geo_references_omits_region_and_site(self):
         self.client.force_login(self.owner_user)
         response = self.client.get(self.get_detail_url(self.unpublished_object.pk))

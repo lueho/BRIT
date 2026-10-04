@@ -132,6 +132,12 @@ class RegionForPointTestCase(TestCase):
     def test_falls_back_to_nuts_when_no_lau_covers(self):
         self.assertEqual(region_for_point(Point(0.8, 0.8, srid=4326)).pk, self.nuts3.pk)
 
+    def test_resolves_point_on_region_boundary(self):
+        self.assertEqual(region_for_point(Point(0, 0.5, srid=4326)).pk, self.nuts3.pk)
+
+    def test_resolves_point_on_lau_boundary(self):
+        self.assertEqual(region_for_point(Point(0.1, 0.2, srid=4326)).pk, self.lau.pk)
+
     def test_prefers_deepest_nuts_level(self):
         nuts0 = NutsRegion.objects.create(
             name="Country",

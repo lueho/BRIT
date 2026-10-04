@@ -21,7 +21,8 @@ class DummyFilterSet:
 class DummySerializer:
     """Minimal serializer stand-in that returns dicts with a pk key."""
 
-    def __init__(self, instances, many=False):
+    def __init__(self, instances, many=False, context=None):
+        self.context = context
         self.data = [OrderedDict({"pk": obj.pk}) for obj in instances]
 
 
@@ -100,6 +101,34 @@ class ExportTaskTestCase(TestCase):
         mock_write.assert_called_once()
         call_args, _ = mock_write.call_args
         self.assertEqual(call_args[0], "user_fake-request-id.csv")
+
+    @patch(
+        "utils.file_export.generic_tasks.utils.file_export.storages.write_file_for_download"
+    )
+    @patch("utils.file_export.generic_tasks.get_export_spec")
+    def test_serializer_receives_requesting_user_in_context(
+        self, mock_get_spec, mock_write
+    ):
+        """Serializers need the user to hide related objects they may not see."""
+        contexts = []
+
+        class RecordingSerializer(DummySerializer):
+            def __init__(self, instances, many=False, context=None):
+                super().__init__(instances, many=many, context=context)
+                contexts.append(context)
+
+        mock_get_spec.return_value = self._make_spec()._replace(
+            serializer=RecordingSerializer
+        )
+        mock_write.return_value = "url"
+
+        self._run_task(
+            "auth.User", "csv", {}, {"user_id": self.owner.pk, "list_type": "public"}
+        )
+
+        self.assertTrue(contexts)
+        for context in contexts:
+            self.assertEqual(context["user"], self.owner)
 
     @patch(
         "utils.file_export.generic_tasks.utils.file_export.storages.write_file_for_download"

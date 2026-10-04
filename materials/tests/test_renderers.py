@@ -119,6 +119,39 @@ class SampleGeoExportRendererTestCase(TestCase):
         self.assertIn(str(self.region), origin)
         self.assertIn(str(self.site), origin)
 
+    def test_xlsx_sample_origin_hides_private_geography_from_other_users(self):
+        from django.contrib.auth.models import User
+
+        geo_owner = User.objects.create(username="xlsx_geo_owner")
+        outsider = User.objects.create(username="xlsx_geo_outsider")
+        sample = Sample.objects.create(
+            name="Private geo sample",
+            material=self.sample.material,
+            publication_status="published",
+            location="Somewhere",
+            region=Region.objects.create(
+                name="Hidden region", country="FR", owner=geo_owner
+            ),
+            site=Location.objects.create(
+                name="Hidden site", address="Secret street 1", owner=geo_owner
+            ),
+        )
+        for user, expected in (
+            (None, "Somewhere"),
+            (outsider, "Somewhere"),
+            (geo_owner, f"Somewhere; {sample.region}; {sample.site}"),
+        ):
+            with self.subTest(user=user):
+                renderer = SampleMeasurementsXLSXRenderer(
+                    sample=sample,
+                    measurements=sample.component_measurements.all(),
+                    user=user,
+                )
+                origin = renderer._build_metadata_values()[
+                    "Sample origin (e.g. location, region)"
+                ]
+                self.assertEqual(origin, expected)
+
     def test_xlsx_sample_origin_without_geo_references_keeps_location(self):
         sample = Sample.objects.create(
             name="Text-only sample",

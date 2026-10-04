@@ -1126,27 +1126,39 @@ class Sample(NamedUserCreatedObject):
             errors["material"] = (
                 "The sample material must match the material of its series."
             )
-        if (
-            self.site_id is not None
-            and self.region_id is not None
-            and self.site.geom is not None
-            and self.region.geom is not None
-            and not self.site.geom.within(self.region.geom)
-        ):
-            errors["site"] = "The sampling site lies outside the attributed region."
+        if not self.site_lies_in_region(self.site, self.region):
+            errors["site"] = self.SITE_OUTSIDE_REGION_MESSAGE
         if errors:
             raise ValidationError(errors)
 
+    SITE_OUTSIDE_REGION_MESSAGE = (
+        "The sampling site lies outside the attributed region."
+    )
+
+    @staticmethod
+    def site_lies_in_region(site, region):
+        """False only when both geometries are known and the region does not
+        cover the site point (boundary points count as inside)."""
+        if site is None or region is None:
+            return True
+        if site.geom is None or region.geom is None:
+            return True
+        return region.geom.covers(site.geom)
+
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        geo_fields_saved = update_fields is None or not {"site", "region"}.isdisjoint(
+            update_fields
+        )
         if (
-            self.region_id is None
+            geo_fields_saved
+            and self.region_id is None
             and self.site_id is not None
             and self.site.geom is not None
         ):
             from maps.models import region_for_point
 
             self.region = region_for_point(self.site.geom)
-            update_fields = kwargs.get("update_fields")
             if update_fields is not None and "region" not in update_fields:
                 kwargs["update_fields"] = [*update_fields, "region"]
         super().save(*args, **kwargs)

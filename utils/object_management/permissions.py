@@ -818,6 +818,14 @@ def filter_queryset_for_user(queryset, user):
     return queryset.filter(owner_filter | published_filter | editor_filter)
 
 
+def visible_related_object(obj, user):
+    """Return ``obj`` when ``user`` may see it under read policy, else None."""
+    if obj is None:
+        return None
+    queryset = type(obj)._base_manager.filter(pk=obj.pk)
+    return obj if filter_queryset_for_user(queryset, user).exists() else None
+
+
 def build_scope_filter_params(scope: str | None, user):
     """Return list-valued filter kwargs for export endpoints.
 

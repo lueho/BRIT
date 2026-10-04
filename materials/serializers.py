@@ -38,12 +38,48 @@ def _get_composition_shares(composition):
 
 
 def _visible_related(queryset, context):
-    """Related objects the request user may see; published-only without one."""
+    """Related objects the context user may see; published-only without one.
+
+    The user comes from the request, or from ``context["user"]`` for
+    request-less serialization such as file exports.
+    """
     request = context.get("request")
-    user = getattr(request, "user", None)
+    user = getattr(request, "user", None) or context.get("user")
     if user is None:
         return queryset.filter(publication_status="published")
     return filter_queryset_for_user(queryset, user)
+
+
+def _visible_related_object(obj, context):
+    """Return ``obj`` if the context user may see it, otherwise None."""
+    if obj is None or obj.publication_status == "published":
+        return obj
+    queryset = type(obj)._base_manager.filter(pk=obj.pk)
+    return obj if _visible_related(queryset, context).exists() else None
+
+
+class VisibleRelatedObjectMixin:
+    """Render a forward relation as null when its target is hidden from the user."""
+
+    def use_pk_only_optimization(self):
+        return False
+
+    def get_attribute(self, instance):
+        return _visible_related_object(super().get_attribute(instance), self.context)
+
+
+class VisibleStringRelatedField(VisibleRelatedObjectMixin, StringRelatedField):
+    pass
+
+
+class VisiblePrimaryKeyRelatedField(VisibleRelatedObjectMixin, PrimaryKeyRelatedField):
+    pass
+
+
+class VisibleHyperlinkedRelatedField(
+    VisibleRelatedObjectMixin, HyperlinkedRelatedField
+):
+    pass
 
 
 class NormalizedCompositionsField(Field):
@@ -204,12 +240,14 @@ class SampleModelSerializer(ModelSerializer):
     series_url = HyperlinkedRelatedField(
         source="series", read_only=True, view_name="sampleseries-detail"
     )
-    region_name = StringRelatedField(source="region")
-    region_url = HyperlinkedRelatedField(
+    region = VisiblePrimaryKeyRelatedField(read_only=True)
+    region_name = VisibleStringRelatedField(source="region")
+    region_url = VisibleHyperlinkedRelatedField(
         source="region", read_only=True, view_name="region-detail"
     )
-    site_name = StringRelatedField(source="site")
-    site_url = HyperlinkedRelatedField(
+    site = VisiblePrimaryKeyRelatedField(read_only=True)
+    site_name = VisibleStringRelatedField(source="site")
+    site_url = VisibleHyperlinkedRelatedField(
         source="site", read_only=True, view_name="location-detail"
     )
     compositions = NormalizedCompositionsField()
@@ -267,8 +305,8 @@ class SampleFlatSerializer(ModelSerializer):
     series = StringRelatedField()
     timestep = StringRelatedField()
     owner = StringRelatedField()
-    region = StringRelatedField()
-    site = StringRelatedField()
+    region = VisibleStringRelatedField()
+    site = VisibleStringRelatedField()
     detail_url = SerializerMethodField()
 
     class Meta:
@@ -361,8 +399,8 @@ class SampleGroupSummarySerializer(ModelSerializer):
 
 class SampleAPISerializer(ModelSerializer):
     timestep = StringRelatedField()
-    region = StringRelatedField()
-    site = StringRelatedField()
+    region = VisibleStringRelatedField()
+    site = VisibleStringRelatedField()
     compositions = NormalizedCompositionsField()
     properties = SerializerMethodField()
     sample_groups = SerializerMethodField()
@@ -636,6 +674,10 @@ class SampleWriteSerializer(ModelSerializer):
                     "datetime_precision": "Sampling date is required when precision is set."
                 }
             )
+        region = attrs.get("region", getattr(self.instance, "region", None))
+        site = attrs.get("site", getattr(self.instance, "site", None))
+        if not Sample.site_lies_in_region(site, region):
+            raise ValidationError({"site": Sample.SITE_OUTSIDE_REGION_MESSAGE})
         return attrs
 
     class Meta:

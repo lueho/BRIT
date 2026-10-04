@@ -1264,6 +1264,35 @@ class SampleGeoReferenceTestCase(TestCase):
         )
         sample.clean()
 
+    def test_clean_accepts_site_on_region_boundary(self):
+        site = Location.objects.create(name="Edge site", geom=Point(1, 2, srid=4326))
+        sample = self._sample(name="Edge", region=self.inner_lau, site=site)
+        sample.clean()
+
+    def test_save_derives_region_for_site_on_boundary(self):
+        site = Location.objects.create(name="Edge site", geom=Point(1, 2, srid=4326))
+        sample = self._sample(name="Edge derived", site=site)
+        sample.refresh_from_db()
+        self.assertEqual(sample.region_id, self.inner_lau.pk)
+
+    def test_partial_save_of_unrelated_fields_keeps_region_unset(self):
+        sample = self._sample(name="Partial", site=self.site_inside)
+        Sample.objects.filter(pk=sample.pk).update(region=None)
+        sample.refresh_from_db()
+        sample.name = "Partial renamed"
+        sample.save(update_fields=["name"])
+        sample.refresh_from_db()
+        self.assertEqual(sample.name, "Partial renamed")
+        self.assertIsNone(sample.region_id)
+
+    def test_empty_update_fields_is_a_no_op(self):
+        sample = self._sample(name="No-op", site=self.site_inside)
+        Sample.objects.filter(pk=sample.pk).update(region=None)
+        sample.refresh_from_db()
+        sample.save(update_fields=[])
+        sample.refresh_from_db()
+        self.assertIsNone(sample.region_id)
+
     def test_clean_accepts_site_without_geometry(self):
         site = Location.objects.create(name="Address only", geom=None)
         sample = self._sample(name="No geom", region=self.inner_lau, site=site)

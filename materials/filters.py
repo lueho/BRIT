@@ -15,6 +15,7 @@ from utils.filters import (
     FreeTextSearchFilterMixin,
     UserCreatedObjectScopedFilterSet,
 )
+from utils.object_management.permissions import filter_queryset_for_user
 
 from .models import (
     AnalyticalMethod,
@@ -449,12 +450,21 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
         self.filters["sample_group"].queryset = self.scoped_choice_queryset(
             SampleGroup.objects.all()
         )
-        self.filters["region"].queryset = self.scoped_choice_queryset(
+        # Geography is shared reference data: a private sample may point to a
+        # published region or site of another owner, so the list scope must not
+        # narrow these choices.
+        self.filters["region"].queryset = self.visible_choice_queryset(
             Region.objects.all()
         )
-        self.filters["site"].queryset = self.scoped_choice_queryset(
+        self.filters["site"].queryset = self.visible_choice_queryset(
             Location.objects.all()
         )
+
+    def visible_choice_queryset(self, queryset):
+        user = getattr(getattr(self, "request", None), "user", None)
+        if user is None:
+            return queryset
+        return filter_queryset_for_user(queryset, user)
 
     class Meta:
         model = Sample

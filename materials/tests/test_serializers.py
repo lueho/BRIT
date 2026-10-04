@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
+from django.contrib.gis.geos import GEOSGeometry, Point
 from django.db.models.signals import post_save
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
@@ -12,7 +13,7 @@ from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import Timestep
-from maps.models import Location, Region
+from maps.models import GeoPolygon, Location, Region
 from utils.object_management.models import ObjectEditorGrant
 from utils.properties.models import Unit
 
@@ -230,6 +231,142 @@ class SampleGeoReferenceSerializerTestCase(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("region", serializer.errors)
         self.assertIn("site", serializer.errors)
+
+
+class SampleGeoReferenceVisibilityTestCase(TestCase):
+    """A published sample must not leak a private region or site."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.geo_owner = get_user_model().objects.create_user(username="geo_owner")
+        cls.outsider = get_user_model().objects.create_user(username="geo_outsider")
+        cls.region = Region.objects.create(
+            name="Private region", country="FR", owner=cls.geo_owner
+        )
+        cls.site = Location.objects.create(
+            name="Private site",
+            address="Secret street 1",
+            owner=cls.geo_owner,
+        )
+        cls.sample = Sample.objects.create(
+            name="Published geo sample",
+            material=Material.objects.create(name="Visibility material"),
+            publication_status="published",
+            region=cls.region,
+            site=cls.site,
+        )
+
+    def _context(self, user):
+        request = RequestFactory().get(reverse("home"))
+        request.user = user
+        return {"request": request}
+
+    def test_model_serializer_hides_private_geography_from_outsiders(self):
+        for user in (AnonymousUser(), self.outsider):
+            with self.subTest(user=user):
+                data = SampleModelSerializer(
+                    self.sample, context=self._context(user)
+                ).data
+                for field in (
+                    "region",
+                    "region_name",
+                    "region_url",
+                    "site",
+                    "site_name",
+                    "site_url",
+                ):
+                    self.assertIsNone(data[field], field)
+
+    def test_model_serializer_shows_private_geography_to_its_owner(self):
+        data = SampleModelSerializer(
+            self.sample, context=self._context(self.geo_owner)
+        ).data
+        self.assertEqual(data["region"], self.region.pk)
+        self.assertEqual(data["site_name"], str(self.site))
+        self.assertIn(reverse("location-detail", args=[self.site.pk]), data["site_url"])
+
+    def test_api_and_flat_serializers_hide_private_geography(self):
+        for serializer_class in (SampleAPISerializer, SampleFlatSerializer):
+            for context in ({}, self._context(self.outsider)):
+                with self.subTest(serializer=serializer_class, context=context):
+                    data = serializer_class(self.sample, context=context).data
+                    self.assertIsNone(data["region"])
+                    self.assertIsNone(data["site"])
+
+    def test_flat_serializer_shows_private_geography_to_export_user(self):
+        data = SampleFlatSerializer(self.sample, context={"user": self.geo_owner}).data
+        self.assertEqual(data["region"], str(self.region))
+        self.assertEqual(data["site"], str(self.site))
+
+
+class SampleWriteSerializerGeoConsistencyTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(username="geo_consistency")
+        cls.material = Material.objects.create(name="Consistency material")
+        cls.region = Region.objects.create(
+            name="Unit square",
+            country="DE",
+            publication_status="published",
+            borders=GeoPolygon.objects.create(
+                geom=GEOSGeometry(
+                    "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))", srid=4326
+                )
+            ),
+        )
+        cls.site_inside = Location.objects.create(
+            name="Inside", geom=Point(0.5, 0.5, srid=4326), owner=cls.user
+        )
+        cls.site_outside = Location.objects.create(
+            name="Outside", geom=Point(5, 5, srid=4326), owner=cls.user
+        )
+
+    def _context(self):
+        request = RequestFactory().get(reverse("home"))
+        request.user = self.user
+        return {"request": request}
+
+    def test_rejects_site_outside_region_on_create(self):
+        serializer = SampleWriteSerializer(
+            data={
+                "name": "Mismatch",
+                "material": self.material.pk,
+                "region": self.region.pk,
+                "site": self.site_outside.pk,
+            },
+            context=self._context(),
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("site", serializer.errors)
+
+    def test_rejects_partial_update_moving_site_outside_existing_region(self):
+        sample = Sample.objects.create(
+            name="Existing",
+            material=self.material,
+            owner=self.user,
+            region=self.region,
+            site=self.site_inside,
+        )
+        serializer = SampleWriteSerializer(
+            sample,
+            data={"site": self.site_outside.pk},
+            partial=True,
+            context=self._context(),
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("site", serializer.errors)
+
+    def test_accepts_site_inside_region(self):
+        serializer = SampleWriteSerializer(
+            data={
+                "name": "Match",
+                "material": self.material.pk,
+                "region": self.region.pk,
+                "site": self.site_inside.pk,
+            },
+            context=self._context(),
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
 
 
 class SampleDatetimePrecisionSerializerTestCase(TestCase):
