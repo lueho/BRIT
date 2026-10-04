@@ -81,7 +81,7 @@ class ComponentModelForm(SimpleModelForm):
             url="materialcomponent-autocomplete",
             label_field="name",
         ),
-        label="Comparable as",
+        label="Compared as",
     )
 
     def __init__(self, *args, **kwargs):
@@ -126,7 +126,7 @@ class MaterialPropertyModelForm(SimpleModelForm):
             url="materialproperty-autocomplete",
             label_field="name",
         ),
-        label="Comparable as",
+        label="Compared as",
     )
 
     def __init__(self, *args, **kwargs):
