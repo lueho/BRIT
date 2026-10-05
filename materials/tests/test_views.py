@@ -6090,6 +6090,162 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(edit_response, "sdv2-completeness")
         self.assertContains(edit_response, "sdv2-timeline")
 
+    def test_v2_edit_mode_failing_completeness_checks_link_to_sections(self):
+        sample, owner = self._create_v2_owner_sample("Check Links", "private")
+        # Owners need materials.change_sample for the overview/sources
+        # sections to show up as editable.
+        owner.user_permissions.add(
+            Permission.objects.get(
+                codename="change_sample",
+                content_type=ContentType.objects.get_for_model(Sample),
+            )
+        )
+        self.client.force_login(owner)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        )
+        self.assertEqual(response.status_code, 200)
+
+        checks = {
+            check["label"]: check
+            for check in response.context["sample_completeness"]["checks"]
+        }
+        update_url = sample.update_url
+
+        # Failing checks deep-link into the matching section editor.
+        self.assertEqual(
+            checks["Description present"]["section_url"],
+            f"{update_url}?section=overview",
+        )
+        self.assertEqual(
+            checks["At least one source linked"]["section_url"],
+            f"{update_url}?section=sources",
+        )
+        self.assertEqual(
+            checks["At least one raw data group"]["section_url"],
+            f"{update_url}?section=measurements",
+        )
+
+        # The rendered items carry the workspace link so the editor opens inline.
+        self.assertContains(response, "sdv2-check-link")
+        self.assertContains(response, 'data-workspace-edit="overview"')
+
+        # Completed checks stay plain text.
+        sample.description = "Described."
+        sample.save()
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        )
+        checks = {
+            check["label"]: check
+            for check in response.context["sample_completeness"]["checks"]
+        }
+        self.assertNotIn("section_url", checks["Description present"])
+
+    def test_v2_edit_mode_completeness_links_respect_section_permissions(self):
+        """Checks whose target section the user cannot edit stay plain text."""
+        sample, owner = self._create_v2_owner_sample("Check Perms", "private")
+        # A property value without analytical method makes the "Methods
+        # complete" check fail and point at the gated "properties" section.
+        MaterialPropertyValue.objects.create(
+            owner=owner,
+            sample=sample,
+            property=MaterialProperty.objects.create(
+                name="Check Perm Property", owner=owner
+            ),
+            average=Decimal("1.5"),
+        )
+
+        self.client.force_login(owner)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        )
+        checks = {
+            check["label"]: check
+            for check in response.context["sample_completeness"]["checks"]
+        }
+        # The owner lacks materials.add_materialpropertyvalue, so the failing
+        # check cannot link to the "properties" section.
+        self.assertFalse(checks["Methods complete"]["complete"])
+        self.assertNotIn("section_url", checks["Methods complete"])
+
+        # With the permission, the properties section becomes editable and the
+        # failing check links to it.
+        permission = Permission.objects.get(
+            codename="add_materialpropertyvalue",
+            content_type=ContentType.objects.get_for_model(MaterialPropertyValue),
+        )
+        owner.user_permissions.add(permission)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        )
+        checks = {
+            check["label"]: check
+            for check in response.context["sample_completeness"]["checks"]
+        }
+        self.assertEqual(
+            checks["Methods complete"]["section_url"],
+            f"{sample.update_url}?section=properties",
+        )
+
+    def test_v2_edit_mode_completeness_links_prefer_editable_incomplete_section(self):
+        """Property-only editors get links when both data types are incomplete."""
+        sample, owner = self._create_v2_owner_sample("Check Fallback", "published")
+        # Owners of published samples cannot manage measurements but may add
+        # property values with the matching permission.
+        owner.user_permissions.add(
+            Permission.objects.get(
+                codename="add_materialpropertyvalue",
+                content_type=ContentType.objects.get_for_model(MaterialPropertyValue),
+            )
+        )
+        self.client.force_login(owner)
+        detail_url = reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        properties_url = f"{sample.update_url}?section=properties"
+
+        def get_checks():
+            response = self.client.get(detail_url)
+            self.assertEqual(response.status_code, 200)
+            self.assertFalse(response.context["sample_policy"]["can_manage_samples"])
+            return {
+                check["label"]: check
+                for check in response.context["sample_completeness"]["checks"]
+            }
+
+        # Without any data the property editor can still populate properties.
+        checks = get_checks()
+        self.assertFalse(checks["Methods complete"]["complete"])
+        self.assertEqual(checks["Methods complete"]["section_url"], properties_url)
+        self.assertEqual(checks["Methods complete"]["section"], "properties")
+        self.assertEqual(checks["Units complete"]["section_url"], properties_url)
+
+        # Both a measurement and a property value lack an analytical method.
+        ComponentMeasurement.objects.create(
+            owner=owner,
+            sample=sample,
+            group=MaterialComponentGroup.objects.create(
+                owner=owner, name="Check Fallback Group"
+            ),
+            component=MaterialComponent.objects.create(
+                owner=owner, name="Check Fallback Component"
+            ),
+            average=Decimal("10.0"),
+        )
+        MaterialPropertyValue.objects.create(
+            owner=owner,
+            sample=sample,
+            property=MaterialProperty.objects.create(
+                name="Check Fallback Property", owner=owner
+            ),
+            average=Decimal("1.5"),
+        )
+        checks = get_checks()
+        self.assertFalse(checks["Methods complete"]["complete"])
+        self.assertEqual(checks["Methods complete"]["section_url"], properties_url)
+        self.assertContains(
+            self.client.get(detail_url), 'data-workspace-edit="properties"'
+        )
+
     def test_v2_edit_mode_exposes_composition_creation_actions(self):
         sample, _group = self._create_sample_with_composition_and_property()
         for model, codename in (

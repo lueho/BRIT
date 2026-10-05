@@ -295,9 +295,15 @@
       <ul class="sdv2-completeness-checks">
         {% for check in sample_completeness.checks %}
           <li class="sdv2-check {% if check.complete %}sdv2-check-done{% else %}sdv2-check-todo{% endif %}"
-              title="{% if check.complete %}Complete{% else %}Needs work{% endif %}">
+              title="{% if check.complete %}Complete{% else %}Needs work — open section to fix{% endif %}">
             <span class="sdv2-check-dot" aria-hidden="true"></span>
-            {{ check.label }}
+            {% if check.section_url %}
+              <a class="sdv2-check-link"
+                 href="{{ check.section_url }}"
+                 data-workspace-edit="{{ check.section }}">{{ check.label }}</a>
+            {% else %}
+              {{ check.label }}
+            {% endif %}
           </li>
         {% endfor %}
       </ul>

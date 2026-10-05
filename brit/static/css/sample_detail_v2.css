@@ -607,6 +607,17 @@
   background: var(--sdv2-accent-warn);
 }
 
+.sdv2-check-link {
+  color: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.sdv2-check-link:hover,
+.sdv2-check-link:focus-visible {
+  color: var(--sdv2-text);
+}
+
 /* ── Review banner ─────────────────────────────────────────────────── */
 .sdv2-review-banner {
   display: flex;
