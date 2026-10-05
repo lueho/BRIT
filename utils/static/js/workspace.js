@@ -3,6 +3,8 @@
 (() => {
     const media = new Map();
 
+    const PARTIAL_SEARCH_MESSAGE = "Search could not load for every field. Existing selections and other fields can still be saved, but choosing new entries in the affected fields requires JavaScript search.";
+
     class MaintenanceWorkspace {
         constructor(root) {
             this.root = root;
@@ -112,7 +114,8 @@
                 active.summary.hidden = true;
                 active.editor.hidden = false;
                 this.setExpanded(active, true);
-                this.announce("Edit this section, then save or cancel. Other sections are unchanged.");
+                if (active.searchFailed) this.announce(`Edit this section, then save or cancel. ${PARTIAL_SEARCH_MESSAGE}`, true);
+                else this.announce("Edit this section, then save or cancel. Other sections are unchanged.");
                 this.focusEditor(active);
             } catch (error) {
                 this.close(active);
@@ -213,7 +216,7 @@
                     console.error("Workspace search widget could not initialize.", error);
                 }
             }
-            if (failed) this.announce("Search could not load for every field. Existing selections and other fields can still be saved, but choosing new entries in the affected fields requires JavaScript search.", true);
+            return failed;
         }
 
         autocompleteSettings(select) {
@@ -292,7 +295,7 @@
             active.editor.replaceChildren(fragment);
             active.form = active.editor.querySelector("form[data-workspace-section-form]");
             if (!active.form) throw new Error("Missing section form");
-            this.initializeWidgets(active.editor);
+            if (this.initializeWidgets(active.editor)) active.searchFailed = true;
         }
 
         focusEditor(active) {
@@ -406,7 +409,10 @@
             try {
                 await this.loadMedia(active.editor);
                 if (this.active !== active) return null;
-                this.initializeWidgets(row);
+                if (this.initializeWidgets(row)) {
+                    active.searchFailed = true;
+                    this.announce(`Row added. ${PARTIAL_SEARCH_MESSAGE}`, true);
+                }
                 if (active.busy) {
                     row.querySelectorAll("select[data-workspace-select]").forEach((select) => select.tomselect?.disable());
                 } else {
@@ -414,6 +420,7 @@
                 }
             } catch (error) {
                 console.error("Workspace row widgets could not initialize.", error);
+                active.searchFailed = true;
                 if (this.active === active) this.announce("Row added, but search could not load. Your entries are kept. You need JavaScript search to choose new entries; check your connection and retry.", true);
             }
             return row;
@@ -501,6 +508,11 @@
                     const field = row.querySelector(`[name$="-${column}"]`);
                     if (!field) continue;
                     if (field.matches("select[data-workspace-select]")) {
+                        if (!field.tomselect) {
+                            unresolved += 1;
+                            this.flagPasteField(row, column, `Search could not load for this field, so "${text}" was not applied.`);
+                            continue;
+                        }
                         try {
                             if (await this.resolveReference(field, text)) continue;
                         } catch (error) { /* fall through to flag */ }
@@ -530,8 +542,9 @@
             const parts = [`Added ${added} row${added === 1 ? "" : "s"}.`];
             if (skipped) parts.push(skippedMessage);
             if (unresolved) parts.push(`${unresolved} value${unresolved === 1 ? "" : "s"} need${unresolved === 1 ? "s" : ""} attention — fix the marked field${unresolved === 1 ? "" : "s"} before saving.`);
-            if (!skipped && !unresolved) parts.push("Review them, then save the section.");
-            this.announce(parts.join(" "), skipped > 0 || unresolved > 0);
+            if (active.searchFailed) parts.push(PARTIAL_SEARCH_MESSAGE);
+            if (!skipped && !unresolved && !active.searchFailed) parts.push("Review them, then save the section.");
+            this.announce(parts.join(" "), skipped > 0 || unresolved > 0 || Boolean(active.searchFailed));
         }
 
         setExpanded(active, expanded) {
@@ -570,7 +583,7 @@
             const form = root.querySelector("form[data-workspace-section-form]");
             try {
                 await workspace.loadMedia(root);
-                workspace.initializeWidgets(root);
+                if (workspace.initializeWidgets(root)) workspace.announce(PARTIAL_SEARCH_MESSAGE, true);
             } catch (error) {
                 console.error("Workspace editor initialization failed.", error);
                 workspace.announce("Search could not load. Existing selections and other fields can still be saved, but choosing new entries requires JavaScript search. Check your connection and reload to retry.", true);

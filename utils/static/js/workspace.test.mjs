@@ -568,10 +568,99 @@ test("one failing select does not abort widget initialization for the rest", () 
         }
     };
     const container = element({ querySelectorAll: (selector) => selector === "select[data-workspace-select]" ? [bad, good] : [] });
-    fixture.workspace.initializeWidgets(container);
+    assert.equal(fixture.workspace.initializeWidgets(container), 1);
     assert.equal(bad.tomselect, undefined);
     assert.ok(good.tomselect);
-    assert.match(fixture.status.textContent, /search/i);
+});
+
+function failingWidgets(fixture, names) {
+    const widgets = names.map((name) => element({
+        tagName: "SELECT", type: "select-one", name: `rows-0-${name}`,
+        dataset: { workspaceSelect: "", autocompleteUrl: "/materials/autocomplete/" },
+        classList: { add() { } }, closest: () => null, labels: [{ textContent: name }],
+        matches: (selector) => selector === "select[data-workspace-select]",
+    }));
+    fixture.window.TomSelect = class {
+        constructor(node) {
+            if (node === widgets[0]) throw new Error("widget setup failed");
+            node.tomselect = { addOption() { }, addItem() { } };
+        }
+    };
+    return widgets;
+}
+
+test("a partial widget failure stays announced after the editor opens", async () => {
+    const fixture = setup(async () => ({ ok: true, status: 200, json: async () => ({ section: "overview", saved: false, html: "Editor" }) }));
+    const widgets = failingWidgets(fixture, ["broken", "working"]);
+    const form = element();
+    fixture.editor.replaceChildren = () => { };
+    fixture.editor.querySelector = (selector) => selector === "form[data-workspace-section-form]" ? form : null;
+    fixture.editor.querySelectorAll = (selector) => selector.includes("select") ? widgets : [];
+    fixture.workspace.fragment = () => element();
+    fixture.workspace.loadMedia = async () => { };
+    fixture.workspace.stripScripts = () => { };
+    await fixture.workspace.open(fixture.link);
+    assert.equal(fixture.editor.hidden, false);
+    assert.match(fixture.status.textContent, /Search could not load for every field/);
+    assert.equal(fixture.status.className, "alert alert-danger");
+});
+
+test("a pasted row whose search failed keeps the failure in the paste summary", async () => {
+    const fixture = setup();
+    activate(fixture);
+    const [component, other] = failingWidgets(fixture, ["component", "unit"]);
+    const average = element({ name: "rows-0-average", matches: () => false });
+    const errors = {};
+    const row = element({
+        querySelector(selector) {
+            if (selector === '[name$="-component"]') return component;
+            if (selector === '[name$="-average"]') return average;
+            const byError = selector.match(/\[data-workspace-errors="([^"]+)"\]/);
+            if (byError) return (errors[byError[1]] ??= element());
+            return null;
+        },
+        querySelectorAll: (selector) => selector.includes("select") ? [component, other] : [],
+    });
+    const total = element({ value: "0" });
+    const formset = element({
+        querySelector(selector) {
+            return {
+                'input[name$="-TOTAL_FORMS"]': total,
+                "template[data-workspace-empty]": element(),
+                "[data-workspace-rows]": { appendChild() { } },
+            }[selector] || null;
+        },
+    });
+    fixture.workspace.fragment = () => element({ querySelector: () => row });
+    fixture.workspace.stripScripts = () => { };
+    fixture.workspace.loadMedia = async () => { };
+    fixture.workspace.focusEditor = () => { };
+    let fetched = 0;
+    fixture.workspace.fetchOptions = async () => { fetched += 1; return { options: [], hasMore: false }; };
+    const input = element({ value: "Ash\t12.5" });
+    await fixture.workspace.fillPastedRows(fixture.workspace.active, formset, input, ["component", "average"], [["Ash", "12.5"]]);
+    assert.equal(fetched, 0);
+    assert.equal(average.value, "12.5");
+    assert.match(errors["rows-0-component"].textContent, /Search could not load/);
+    assert.match(fixture.status.textContent, /Added 1 row/);
+    assert.match(fixture.status.textContent, /Search could not load for every field/);
+    assert.equal(fixture.status.className, "alert alert-danger");
+});
+
+test("the standalone editor reports a partial widget failure", async () => {
+    const fixture = setup();
+    const widgets = failingWidgets(fixture, ["broken", "working"]);
+    const status = element();
+    const root = element({
+        querySelector: (selector) => selector === "[data-workspace-status]" ? status : null,
+        querySelectorAll: (selector) => selector.includes("select") ? widgets : [],
+    });
+    fixture.document.querySelectorAll = (selector) => selector === "[data-workspace-standalone]" ? [root] : [];
+    fixture.window.MaintenanceWorkspace.prototype.loadMedia = async () => { };
+    await fixture.document.listeners.DOMContentLoaded();
+    assert.ok(widgets[1].tomselect);
+    assert.match(status.textContent, /Search could not load for every field/);
+    assert.equal(status.className, "alert alert-danger");
 });
 
 function pasteFixture(fixture, { text, results = {}, maxRows = Infinity, columns = "component,average" }) {
