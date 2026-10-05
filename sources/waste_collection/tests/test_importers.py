@@ -8,9 +8,11 @@ from unittest.mock import patch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import connection, connections
-from django.test import TransactionTestCase
+from django.test import TestCase, TransactionTestCase
 
-from distributions.models import TemporalDistribution, Timestep
+from bibliography.models import Source
+from distributions.models import Period, TemporalDistribution, Timestep
+from materials.models import MaterialCategory
 from sources.waste_collection.importers import CollectionImporter
 from sources.waste_collection.models import (
     Collection,
@@ -21,12 +23,37 @@ from sources.waste_collection.models import (
     CollectionSystem,
     Collector,
     WasteCategory,
+    WasteFlyer,
 )
+from utils.object_management.models import ReviewAction
 from utils.tests.testrunner import serial_test
 
 
 @serial_test
 class CollectionImporterConcurrencyTests(TransactionTestCase):
+    def _fixture_teardown(self):
+        """Delete the objects these tests can create instead of flushing.
+
+        The default TransactionTestCase teardown TRUNCATEs every table in the
+        database, which costs ~60s per test on this stack. These tests only
+        write a bounded set of objects, so removing them directly restores the
+        same isolation without the flush.
+        """
+        ReviewAction.objects.all().delete()
+        Collection.objects.all().delete()
+        WasteFlyer.objects.all().delete()
+        Source.objects.all().delete()
+        CollectionCountOptions.objects.all().delete()
+        CollectionFrequency.objects.all().delete()
+        Period.objects.all().delete()
+        Collector.objects.all().delete()
+        CollectionCatchment.objects.all().delete()
+        CollectionSystem.objects.all().delete()
+        WasteCategory.objects.all().delete()
+        Timestep.objects.all().delete()
+        TemporalDistribution.objects.all().delete()
+        User.objects.filter(username="concurrent-importer").delete()
+
     def setUp(self):
         default_owner, _ = User.objects.get_or_create(
             username=settings.DEFAULT_OBJECT_OWNER_USERNAME
@@ -182,3 +209,38 @@ class CollectionImporterConcurrencyTests(TransactionTestCase):
         self.assertEqual(
             Collection.objects.filter(catchment__in=self.catchments).count(), 1
         )
+
+
+class ImporterTeardownScopeTests(TestCase):
+    """The concurrency tests replace the default full-database flush with a
+    targeted teardown. It must remove the objects those tests create while
+    leaving unrelated rows untouched — the full flush costs ~60s per test on
+    this stack for no benefit."""
+
+    def test_fixture_teardown_preserves_unrelated_rows(self):
+        marker = MaterialCategory.objects.create(name="Teardown scope marker")
+        case = CollectionImporterConcurrencyTests(
+            "test_concurrent_collector_creation_by_name"
+        )
+        case._fixture_teardown()
+        self.assertTrue(MaterialCategory.objects.filter(pk=marker.pk).exists())
+
+    def test_fixture_teardown_removes_objects_the_tests_create(self):
+        case = CollectionImporterConcurrencyTests(
+            "test_concurrent_collector_creation_by_name"
+        )
+        case.setUp()
+        case._fixture_teardown()
+        self.assertFalse(
+            CollectionCatchment.objects.filter(
+                name__startswith="Concurrent catchment"
+            ).exists()
+        )
+        self.assertFalse(
+            CollectionSystem.objects.filter(name="Concurrent system").exists()
+        )
+        self.assertFalse(
+            WasteCategory.objects.filter(name="Concurrent category").exists()
+        )
+        self.assertFalse(User.objects.filter(username="concurrent-importer").exists())
+        self.assertFalse(Period.objects.filter(pk=case.season.pk).exists())

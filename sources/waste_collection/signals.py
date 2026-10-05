@@ -84,17 +84,16 @@ def capture_previous_collection_publication_status(sender, instance, **kwargs):
         instance._previous_publication_status = None
         return
 
-    update_fields = kwargs.get("update_fields")
-    if update_fields and "publication_status" not in update_fields:
-        # publication_status cannot change in this save call
-        instance._previous_publication_status = instance.publication_status
-        return
-
-    instance._previous_publication_status = (
-        sender.objects.filter(pk=instance.pk)
-        .values_list("publication_status", flat=True)
-        .first()
-    )
+    # UserCreatedObject.from_db records the persisted status; only fall back
+    # to a query when it is unknown (e.g. manually constructed instances).
+    previous_status = getattr(instance, "_loaded_publication_status", None)
+    if previous_status is None:
+        previous_status = (
+            sender.objects.filter(pk=instance.pk)
+            .values_list("publication_status", flat=True)
+            .first()
+        )
+    instance._previous_publication_status = previous_status
 
 
 @receiver(post_save, sender=Collection)

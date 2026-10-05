@@ -1,6 +1,7 @@
 import logging
 import time
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -118,13 +119,20 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     filter_backends = (CollectionDjangoFilterBackend,)
     filterset_class = CollectionFilterSet
     pagination_class = CollectionListPagination
-    collection_list_slow_log_threshold_seconds = 1.0
+    # ``None`` falls back to ``COLLECTION_LIST_SLOW_LOG_THRESHOLD_SECONDS``
+    # (default 1.0) so deployments and tests can tune the threshold.
+    collection_list_slow_log_threshold_seconds = None
     requires_add_permission_actions = {
         "create_collection",
         "create_new_version",
         "create_collection_property_value",
         "create_aggregated_collection_property_value",
     }
+
+    def _slow_log_threshold_seconds(self):
+        if self.collection_list_slow_log_threshold_seconds is not None:
+            return self.collection_list_slow_log_threshold_seconds
+        return getattr(settings, "COLLECTION_LIST_SLOW_LOG_THRESHOLD_SECONDS", 1.0)
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -323,7 +331,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             response["Cache-Control"] = "private, no-store"
 
         duration_seconds = time.perf_counter() - started_at
-        if duration_seconds >= self.collection_list_slow_log_threshold_seconds:
+        if duration_seconds >= self._slow_log_threshold_seconds():
             data = response.data
             result_count = None
             total_count = None

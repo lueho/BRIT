@@ -330,6 +330,24 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
             models.Index(fields=["publication_status"]),
         ]
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        try:
+            index = field_names.index("publication_status")
+        except ValueError:
+            # Deferred load: the persisted status is unknown and signal
+            # handlers must fall back to conservative behaviour.
+            pass
+        else:
+            instance._loaded_publication_status = values[index]
+        return instance
+
+    def refresh_from_db(self, using=None, fields=None):
+        super().refresh_from_db(using=using, fields=fields)
+        if fields is None or "publication_status" in fields:
+            self._loaded_publication_status = self.publication_status
+
     def _lock_and_validate_transition(self, expected_statuses, error_message):
         current_status = (
             self.__class__._default_manager.select_for_update()

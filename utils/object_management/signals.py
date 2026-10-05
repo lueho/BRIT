@@ -166,27 +166,29 @@ def clear_moderation_cache_on_save(sender, instance, **kwargs):
             current_status = getattr(instance, "publication_status", None)
             if current_status == "review":
                 _clear_moderator_caches()
+            instance._loaded_publication_status = current_status
             return
 
         # For updates, check if publication_status changed to/from 'review'
-        # We need to detect status changes by checking the update_fields or
-        # comparing with the database value
         update_fields = kwargs.get("update_fields")
 
         # If update_fields is specified and doesn't include publication_status, skip
         if update_fields is not None and "publication_status" not in update_fields:
             return
 
-        # Check current status - if it's 'review' or was 'review', clear cache
+        # UserCreatedObject.from_db records the persisted status on
+        # _loaded_publication_status, so a review transition can be detected
+        # without an extra query. When the persisted status is unknown
+        # (manually constructed instance), fall back to clearing.
         current_status = getattr(instance, "publication_status", None)
-        if current_status == "review":
+        previous_status = getattr(instance, "_loaded_publication_status", None)
+        if (
+            current_status == "review"
+            or previous_status == "review"
+            or previous_status is None
+        ):
             _clear_moderator_caches()
-        else:
-            # The status might have changed FROM 'review' to something else
-            # We can't easily detect this without tracking, so clear cache
-            # when update_fields includes publication_status
-            if update_fields is None or "publication_status" in update_fields:
-                _clear_moderator_caches()
+        instance._loaded_publication_status = current_status
 
     except Exception:
         # Be defensive - if cache clearing fails, don't break the save operation
@@ -212,8 +214,12 @@ def clear_moderation_cache_on_delete(sender, instance, **kwargs):
         ):
             return
 
-        # Only clear cache if the deleted object was in review status
-        deleted_status = getattr(instance, "publication_status", None)
+        # Only clear cache if the deleted object was in review status.
+        # Prefer the persisted status recorded by from_db over the in-memory
+        # value, which may have been mutated without saving.
+        deleted_status = getattr(instance, "_loaded_publication_status", None)
+        if deleted_status is None:
+            deleted_status = getattr(instance, "publication_status", None)
         if deleted_status == "review":
             _clear_moderator_caches()
 

@@ -785,6 +785,12 @@ class CollectionSeasonTestCase(TestCase):
             CollectionSeason.objects.all(),
         )
 
+    def test_get_queryset_filters_by_subquery(self):
+        """The manager must filter in SQL — resolving the distribution eagerly
+        costs two extra queries on every queryset construction."""
+        with self.assertNumQueries(1):
+            list(CollectionSeason.objects.all())
+
 
 class CollectionFrequencyTestCase(TestCase):
     @classmethod

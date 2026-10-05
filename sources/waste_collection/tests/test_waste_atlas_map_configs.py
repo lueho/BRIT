@@ -11,7 +11,7 @@ from importlib import import_module
 from django.apps import apps
 from django.template import Context
 from django.test import TestCase
-from django.urls import Resolver404, resolve
+from django.urls import Resolver404, resolve, reverse
 
 from sources.waste_collection.waste_atlas.map_configs import (
     MAP_CONFIGS,
@@ -24,6 +24,7 @@ from sources.waste_collection.waste_atlas.map_selection import (
     THEME_LABELS,
     WASTE_ATLAS_MAP_SELECTIONS,
     build_map_selection_context,
+    build_overview_directory_context,
 )
 from sources.waste_collection.waste_atlas.models import (
     WasteAtlasMapConfiguration,
@@ -678,6 +679,68 @@ class WasteAtlasMapConfigStructureTests(TestCase):
             "no separate biowaste collection" in label
             or "no separate door-to-door collection" in label
             or value in {"no_bio", "no_door_to_door", "no_bio_collection"}
+        )
+
+
+class MapSelectionContextCachingTests(TestCase):
+    """The selection/directory contexts resolve ~1000 URLs per call over a
+    static registry, so the resolved structure is cached per reverse
+    function."""
+
+    def test_repeated_calls_resolve_urls_only_once(self):
+        calls = []
+
+        def counting_reverse(route_name, args=None):
+            calls.append(route_name)
+            return f"/{route_name}/"
+
+        build_map_selection_context(counting_reverse)
+        resolved = len(calls)
+        self.assertGreater(resolved, 0)
+        build_map_selection_context(counting_reverse)
+        self.assertEqual(len(calls), resolved)
+
+    def test_directory_context_reuses_resolved_urls(self):
+        calls = []
+
+        def counting_reverse(route_name, args=None):
+            calls.append(route_name)
+            return f"/{route_name}/"
+
+        build_overview_directory_context(counting_reverse)
+        resolved = len(calls)
+        self.assertGreater(resolved, 0)
+        build_overview_directory_context(counting_reverse)
+        self.assertEqual(len(calls), resolved)
+
+    def test_selection_flags_still_vary_per_call(self):
+        selected = build_map_selection_context(
+            reverse, selected_map_set="DE", selected_theme="orga_level"
+        )
+        other = build_map_selection_context(
+            reverse, selected_map_set="SE", selected_theme="orga_level"
+        )
+
+        de_entry = next(
+            entry
+            for entry in selected["map_selection_map_sets"]
+            if entry["value"] == "DE"
+        )
+        se_entry = next(
+            entry for entry in other["map_selection_map_sets"] if entry["value"] == "SE"
+        )
+        self.assertTrue(de_entry["selected"])
+        self.assertTrue(se_entry["selected"])
+        self.assertEqual(selected["selected_map_set"], "DE")
+        self.assertEqual(other["selected_map_set"], "SE")
+
+    def test_cached_results_are_isolated_between_calls(self):
+        """Mutating a returned context must not poison the shared cache."""
+        first = build_map_selection_context(reverse)
+        first["map_selection_themes_by_map_set"]["DE"][0]["url"] = "MUTATED"
+        second = build_map_selection_context(reverse)
+        self.assertNotEqual(
+            second["map_selection_themes_by_map_set"]["DE"][0]["url"], "MUTATED"
         )
 
 

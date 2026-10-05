@@ -477,6 +477,37 @@ class CollectionViewSetTestCase(APITestCase):
         self.assertIn("serializer=CollectionResearchSerializer", logs.output[0])
         self.assertIn("result_count=2", logs.output[0])
 
+    def test_list_endpoint_slow_log_threshold_comes_from_settings(self):
+        """The threshold is configurable so test settings can raise it instead
+        of absorbing timing-dependent warnings under parallel contention."""
+        self.client.force_login(self.regular_user)
+
+        with (
+            override_settings(COLLECTION_LIST_SLOW_LOG_THRESHOLD_SECONDS=0),
+            self.assertLogs(
+                "sources.waste_collection.viewsets", level="WARNING"
+            ) as logs,
+        ):
+            response = self.client.get(
+                reverse("api-waste-collection-list"), {"page_size": 1}
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("slow_collection_list_api", logs.output[0])
+
+    def test_list_endpoint_raised_threshold_stays_quiet(self):
+        self.client.force_login(self.regular_user)
+
+        with (
+            override_settings(COLLECTION_LIST_SLOW_LOG_THRESHOLD_SECONDS=600),
+            self.assertNoLogs("sources.waste_collection.viewsets", level="WARNING"),
+        ):
+            response = self.client.get(
+                reverse("api-waste-collection-list"), {"page_size": 1}
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     def test_list_non_public_scope_requires_authentication(self):
         response = self.client.get(
             reverse("api-waste-collection-list"),
