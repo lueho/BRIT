@@ -26,8 +26,23 @@
 {% endblock list_intro %}
 
 {% block list_card_header %}
-    <strong>Processes</strong>
+    {% if list_type == 'private' %}
+        <strong>My processes</strong>
+    {% elif list_type == 'review' %}
+        <strong>Processes in review</strong>
+    {% else %}
+        <strong>Processes</strong>
+    {% endif %}
 {% endblock list_card_header %}
+
+{% block list_primary_actions %}
+    {% if create_permission in perms or user.is_staff %}
+        <a class="btn btn-primary btn-sm"
+           href="{% url 'processes:process-create' %}">
+            <i class="fas fa-plus"></i> Add process
+        </a>
+    {% endif %}
+{% endblock list_primary_actions %}
 
 {% block list_table %}
     <div class="collection-list-min-height">
@@ -81,12 +96,8 @@
     </div>
 {% endblock list_table %}
 
-{% block options_pane_body %}
-    {% if create_permission in perms or user.is_staff %}
-        <a class="btn btn-success w-100 mb-2"
-           href="{{ object_list.model.create_url }}"
-           aria-label="Create new {{ object_list.model.get_verbose_name }}">
-            <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
-        </a>
-    {% endif %}
-{% endblock options_pane_body %}
+{% block options_tab_button %}
+{% endblock options_tab_button %}
+
+{% block options_tab_pane %}
+{% endblock options_tab_pane %}
