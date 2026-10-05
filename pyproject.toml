@@ -50,6 +50,9 @@ dev = [
 
     # Testing
     "factory-boy>=3.3.3",
+    # Django's parallel test runner needs tblib to report tracebacks
+    # from worker processes.
+    "tblib>=3.2.2",
 
     # Code quality
     "ruff==0.15.12",
