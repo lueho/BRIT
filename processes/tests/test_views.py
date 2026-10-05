@@ -7,7 +7,7 @@ import re
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
@@ -21,6 +21,7 @@ from materials.models import Material
 from utils.properties.models import Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
+from ..forms import PROCESS_SECTIONS
 from ..models import (
     Process,
     ProcessCategory,
@@ -1915,3 +1916,315 @@ class ProcessFilterViewQuerysetTests(TestCase):
         ):
             with self.subTest(view_class=view_class.__name__):
                 self.assertTrue(issubclass(view_class, ProcessFilterViewMixin))
+
+
+class ProcessWorkshopJourneyViewsTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user_model = get_user_model()
+        cls.participant = user_model.objects.create_user(
+            username="workshop-participant"
+        )
+        cls.participant.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="processes",
+                codename__in=["add_process", "change_process"],
+            )
+        )
+        cls.participant.groups.add(Group.objects.get_or_create(name="process-team")[0])
+        cls.observer = user_model.objects.create_user(username="workshop-observer")
+        cls.moderator = user_model.objects.create_user(
+            username="workshop-moderator", is_staff=True
+        )
+        cls.feed_material = Material.objects.create(
+            name="Workshop feedstock",
+            owner=cls.participant,
+            publication_status="published",
+        )
+        cls.product_material = Material.objects.create(
+            name="Workshop product",
+            owner=cls.participant,
+            publication_status="published",
+        )
+
+    def setUp(self):
+        self.client.force_login(self.participant)
+
+    def create_draft(self, name="Workshop draft process"):
+        return Process.objects.create(
+            owner=self.participant,
+            name=name,
+            short_description="Draft recorded during the workshop",
+        )
+
+    @staticmethod
+    def section_url(process, section):
+        update_url = reverse("processes:process-update", kwargs={"pk": process.pk})
+        return f"{update_url}?section={section}"
+
+    @staticmethod
+    def material_payload(material):
+        return {
+            "process_materials-TOTAL_FORMS": "1",
+            "process_materials-INITIAL_FORMS": "0",
+            "process_materials-0-material": str(material.pk),
+            "process_materials-0-quantity_value": "",
+            "process_materials-0-quantity_unit": "",
+        }
+
+    def test_process_list_shows_prominent_add_process_action(self):
+        response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Add process")
+        self.assertContains(response, f'href="{reverse("processes:process-create")}"')
+        self.assertNotContains(response, 'id="options-tab"')
+        self.assertNotContains(response, 'id="options-pane"')
+
+    def test_add_process_hidden_for_anonymous_and_users_without_permission(self):
+        url = reverse("processes:process-list")
+        create_url = reverse("processes:process-create")
+
+        self.client.logout()
+        response = self.client.get(url, {"scope": "published"})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Add process")
+        self.assertNotContains(response, create_url)
+
+        self.client.force_login(self.observer)
+        response = self.client.get(url, {"scope": "published"})
+        self.assertNotContains(response, "Add process")
+        self.assertNotContains(response, create_url)
+
+    def test_list_heading_matches_scope(self):
+        private_response = self.client.get(
+            reverse("processes:process-list-owned"), {"scope": "private"}
+        )
+        self.assertContains(
+            private_response, "<strong>My processes</strong>", html=True
+        )
+
+        published_response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+        self.assertContains(published_response, "<strong>Processes</strong>", html=True)
+        self.assertNotContains(published_response, "My processes")
+
+        self.client.force_login(self.moderator)
+        review_response = self.client.get(
+            reverse("processes:process-list-review"), {"scope": "review"}
+        )
+        self.assertContains(
+            review_response, "<strong>Processes in review</strong>", html=True
+        )
+
+    def test_detail_nav_links_back_to_owned_list_for_authenticated_users(self):
+        published = Process.objects.create(
+            name="Published workshop process",
+            owner=self.moderator,
+            publication_status="published",
+        )
+        url = reverse("processes:process-detail", kwargs={"pk": published.pk})
+        owned_url = f"{reverse('processes:process-list-owned')}?scope=private"
+
+        response = self.client.get(url)
+        self.assertContains(response, f'href="{owned_url}"')
+        self.assertContains(response, "My processes")
+
+        self.client.logout()
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "My processes")
+        self.assertNotContains(response, reverse("processes:process-list-owned"))
+
+    def test_edit_workspace_jump_nav_matches_rendered_sections(self):
+        process = self.create_draft()
+
+        response = self.client.get(f"{process.get_absolute_url()}?mode=edit")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sdv2-anchor-nav")
+        self.assertContains(response, 'aria-label="Jump to editing section"')
+        self.assertContains(response, "sdv2-anchor-chip", count=len(PROCESS_SECTIONS))
+        self.assertContains(response, "sdv2-anchor-target", count=len(PROCESS_SECTIONS))
+        for key in PROCESS_SECTIONS:
+            with self.subTest(section=key):
+                self.assertContains(response, f'href="#workspace-section-{key}"')
+                self.assertContains(response, f'id="workspace-section-{key}"')
+        self.assertNotContains(response, "TOTAL_FORMS")
+
+        reading_response = self.client.get(process.get_absolute_url())
+        self.assertNotContains(reading_response, "Jump to editing section")
+
+    def test_material_guidance_renders_in_section_forms_and_fragments(self):
+        process = self.create_draft()
+        guidance = (
+            "Choose an existing material. Quantity and unit are optional; "
+            "leave both blank if you are not recording an amount."
+        )
+
+        for section, add_label in (("inputs", "Add input"), ("outputs", "Add output")):
+            with self.subTest(section=section):
+                response = self.client.get(self.section_url(process, section))
+                self.assertContains(response, guidance)
+                self.assertContains(response, "data-workspace-empty")
+                self.assertContains(response, add_label)
+
+                fragment = self.client.get(
+                    self.section_url(process, section),
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                )
+                self.assertEqual(fragment.status_code, 200)
+                html = fragment.json()["html"]
+                self.assertIn(guidance, html)
+                self.assertIn("quantity_value", html)
+                self.assertIn("quantity_unit", html)
+
+    def test_empty_section_form_has_no_rows_and_add_controls(self):
+        process = self.create_draft()
+
+        for section, add_label in (("inputs", "Add input"), ("outputs", "Add output")):
+            with self.subTest(section=section):
+                response = self.client.get(self.section_url(process, section))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(len(response.context["inlines"][0].initial_forms), 0)
+                self.assertContains(response, add_label)
+                self.assertContains(response, "data-workspace-empty")
+
+    def test_participant_ajax_journey(self):
+        create_response = self.client.post(
+            reverse("processes:process-create"),
+            {
+                "name": "Workshop AJAX process",
+                "short_description": "Draft recorded during the workshop",
+            },
+        )
+        self.assertEqual(create_response.status_code, 302)
+        process = Process.objects.get(name="Workshop AJAX process")
+        self.assertEqual(process.owner, self.participant)
+        self.assertEqual(process.publication_status, "private")
+
+        ajax = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+        response = self.client.post(
+            self.section_url(process, "inputs"),
+            self.material_payload(self.feed_material),
+            **ajax,
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["saved"])
+        self.assertEqual(payload["section"], "inputs")
+        self.assertIn("Workshop feedstock", payload["html"])
+        self.assertNotIn("Workshop product", payload["html"])
+
+        response = self.client.post(
+            self.section_url(process, "outputs"),
+            self.material_payload(self.product_material),
+            **ajax,
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["saved"])
+        self.assertEqual(payload["section"], "outputs")
+        self.assertIn("Workshop product", payload["html"])
+        self.assertNotIn("Workshop feedstock", payload["html"])
+
+        process.refresh_from_db()
+        self.assertEqual(process.owner, self.participant)
+        self.assertEqual(process.publication_status, "private")
+        input_link = process.process_materials.get(role="input")
+        output_link = process.process_materials.get(role="output")
+        self.assertEqual(input_link.material, self.feed_material)
+        self.assertEqual(output_link.material, self.product_material)
+        for link in (input_link, output_link):
+            self.assertIsNone(link.quantity_value)
+            self.assertIsNone(link.quantity_unit)
+
+        reading_response = self.client.get(process.get_absolute_url())
+        self.assertContains(reading_response, "Draft recorded during the workshop")
+        self.assertContains(reading_response, "Workshop feedstock")
+        self.assertContains(reading_response, "Workshop product")
+
+        owned_response = self.client.get(
+            reverse("processes:process-list-owned"), {"scope": "private"}
+        )
+        self.assertContains(owned_response, "Workshop AJAX process")
+        published_response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+        self.assertNotContains(published_response, "Workshop AJAX process")
+        self.assertNotIn(process, published_response.context["object_list"])
+
+    def test_participant_full_page_journey(self):
+        create_response = self.client.post(
+            reverse("processes:process-create"),
+            {
+                "name": "Workshop full-page process",
+                "short_description": "Draft recorded during the workshop",
+            },
+        )
+        process = Process.objects.get(name="Workshop full-page process")
+        self.assertRedirects(
+            create_response,
+            f"{process.get_absolute_url()}?mode=edit",
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(process.owner, self.participant)
+        self.assertEqual(process.publication_status, "private")
+
+        response = self.client.post(
+            self.section_url(process, "inputs"),
+            self.material_payload(self.feed_material),
+        )
+        self.assertRedirects(
+            response,
+            f"{process.get_absolute_url()}?mode=edit",
+            fetch_redirect_response=False,
+        )
+        response = self.client.post(
+            self.section_url(process, "outputs"),
+            self.material_payload(self.product_material),
+        )
+        self.assertRedirects(
+            response,
+            f"{process.get_absolute_url()}?mode=edit",
+            fetch_redirect_response=False,
+        )
+
+        process.refresh_from_db()
+        self.assertEqual(process.owner, self.participant)
+        self.assertEqual(process.publication_status, "private")
+        self.assertEqual(
+            process.short_description, "Draft recorded during the workshop"
+        )
+        input_link = process.process_materials.get(role="input")
+        output_link = process.process_materials.get(role="output")
+        self.assertEqual(input_link.material, self.feed_material)
+        self.assertEqual(output_link.material, self.product_material)
+        for link in (input_link, output_link):
+            self.assertIsNone(link.quantity_value)
+            self.assertIsNone(link.quantity_unit)
+
+        reading_response = self.client.get(process.get_absolute_url())
+        self.assertContains(reading_response, "Workshop full-page process")
+        self.assertContains(reading_response, "Draft recorded during the workshop")
+        self.assertContains(reading_response, "Workshop feedstock")
+        self.assertContains(reading_response, "Workshop product")
+        self.assertContains(reading_response, "sdv2-status-private")
+
+        owned_response = self.client.get(
+            reverse("processes:process-list-owned"), {"scope": "private"}
+        )
+        self.assertContains(owned_response, "Workshop full-page process")
+        self.assertContains(owned_response, f'href="{process.get_absolute_url()}')
+        reopened_response = self.client.get(process.get_absolute_url())
+        self.assertEqual(reopened_response.status_code, 200)
+        self.assertContains(reopened_response, "Workshop full-page process")
+
+        published_response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+        self.assertNotContains(published_response, "Workshop full-page process")
+        self.assertNotIn(process, published_response.context["object_list"])

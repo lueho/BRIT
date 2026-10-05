@@ -9,6 +9,11 @@
   <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'processes:process-list' %}?scope=published">
     <i class="fas fa-list" aria-hidden="true"></i> All processes
   </a>
+  {% if user.is_authenticated %}
+    <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'processes:process-list-owned' %}?scope=private">
+      <i class="fas fa-user" aria-hidden="true"></i> My processes
+    </a>
+  {% endif %}
   <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'processes:processcategory-list' %}">
     <i class="fas fa-tags" aria-hidden="true"></i> Process categories
   </a>

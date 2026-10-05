@@ -29,6 +29,8 @@
               {% endblock list_card_header %}
             </h5>
             <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
+              {% block list_primary_actions %}
+              {% endblock list_primary_actions %}
               {# View toggle (List / Featured / Map) – peer representations of the same dataset. #}
               {% include "partials/representation_switcher.html" %}
               {# Scope toggle – visible for authenticated users and only for UserCreatedObject models #}

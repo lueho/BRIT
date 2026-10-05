@@ -1,5 +1,6 @@
 <fieldset class="border rounded p-3 mb-3" data-workspace-row>
   <legend class="float-none w-auto px-2 fs-6">{{ row_label|default:'Entry' }}</legend>
+  <p class="small text-muted">Choose an existing material. Quantity and unit are optional; leave both blank if you are not recording an amount.</p>
   <div class="text-danger" tabindex="-1" data-workspace-errors="{{ workspace_row.prefix }}-__all__">{{ workspace_row.non_field_errors }}</div>
   {% for field in workspace_row.hidden_fields %}
     {% include "utils/includes/workspace_field.html" with field=field only %}

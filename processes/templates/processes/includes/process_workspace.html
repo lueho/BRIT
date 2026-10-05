@@ -20,6 +20,11 @@
       {% endif %}
     </div>
   </header>
+  <nav class="sdv2-anchor-nav" aria-label="Jump to editing section">
+    {% for section in maintenance_sections %}
+      <a class="sdv2-anchor-chip" href="#workspace-section-{{ section.key }}">{{ section.label }}</a>
+    {% endfor %}
+  </nav>
   <p class="small text-muted mb-3" data-workspace-status role="status" aria-live="polite" aria-atomic="true">Choose a section to edit.</p>
   {% include "utils/includes/workspace_sections.html" %}
 </div>
