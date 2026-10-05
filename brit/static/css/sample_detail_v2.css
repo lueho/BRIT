@@ -77,7 +77,17 @@
 
 .sdv2-review-panel {
   margin-top: 1rem;
+  margin-bottom: 1rem;
   padding: 1rem;
+}
+
+.sdv2 #review-panel a.btn-success,
+.sdv2 #review-panel a.btn-success:hover,
+.sdv2 #review-panel a.btn-success:focus,
+.sdv2 #review-panel a.btn-danger,
+.sdv2 #review-panel a.btn-danger:hover,
+.sdv2 #review-panel a.btn-danger:focus {
+  color: #fff;
 }
 
 /* Context navigation: lives inside the rail for signed-in users and as a

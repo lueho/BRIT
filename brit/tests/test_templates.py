@@ -878,6 +878,22 @@ class BreadcrumbRailGlobalStylingAssetTests(SimpleTestCase):
         self.assertNotIn("margin-top", match.group(1))
 
 
+class ReviewPanelAssetTests(SimpleTestCase):
+    def test_review_panel_spacing_and_action_colors(self):
+        import re
+
+        css = (
+            Path(settings.BASE_DIR) / "brit/static/css/sample_detail_v2.css"
+        ).read_text(encoding="utf-8")
+        panel = re.search(r"\.sdv2-review-panel\s*\{([^}]*)\}", css)
+        self.assertIsNotNone(panel)
+        self.assertIn("margin-bottom: 1rem;", panel.group(1))
+        self.assertRegex(
+            css,
+            r"\.sdv2 #review-panel a\.btn-(?:success|danger)[^{]*\{[^}]*color: #fff;",
+        )
+
+
 class NarrativeSpacingAssetTests(SimpleTestCase):
     def test_about_body_spacing_rules(self):
         import re
