@@ -598,6 +598,16 @@ class ProcessReviewItemDetailView(ReviewItemDetailView):
 ProcessReviewItemDetailView.register_for_model(Process)
 
 
+class ProcessCategoryReviewItemDetailView(ReviewItemDetailView):
+    """Render process category moderation with the full category detail context."""
+
+    model = ProcessCategory
+    detail_view_class = ProcessCategoryDetailView
+
+
+ProcessCategoryReviewItemDetailView.register_for_model(ProcessCategory)
+
+
 class ProcessModalDetailView(UserCreatedObjectModalDetailView):
     """Display Process details in a modal."""
 
