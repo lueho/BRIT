@@ -19,6 +19,17 @@ _BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*")
 _LEGACY_SECTION_SEPARATOR_RE = re.compile(r"(?:\s*;\s*){2,}")
 
 
+# Params that carry a return path back into the app. They are stripped before
+# embedding the current path into a new back/next/return_to param so the value
+# can never nest — otherwise each list->detail->list round trip doubles the URL
+# and crawlers discover an unbounded URL space.
+_RETURN_PATH_PARAMS = frozenset({"back", "next", "return_to"})
+
+# Breadcrumb targets beyond this length can only be leftovers of the
+# historical nesting trap or forged URLs — never a page worth returning to.
+_MAX_BACK_URL_LENGTH = 512
+
+
 @register.simple_tag(takes_context=True)
 def safe_back_url(context):
     request = context.get("request")
@@ -26,16 +37,28 @@ def safe_back_url(context):
         return ""
 
     back = request.GET.get("back")
-    if not back:
+    if not back or len(back) > _MAX_BACK_URL_LENGTH:
         return ""
 
-    if url_has_allowed_host_and_scheme(
-        back,
-        allowed_hosts={request.get_host()},
-        require_https=request.is_secure(),
-    ):
-        return back
-    return ""
+    try:
+        is_safe = url_has_allowed_host_and_scheme(
+            back,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        )
+        nested_params = parse_qsl(urlsplit(back).query, keep_blank_values=True)
+    except ValueError:
+        return ""
+
+    if not is_safe:
+        return ""
+
+    # A value that itself carries return-path params is a leftover of the
+    # unbounded nesting trap; echoing it keeps feeding crawlers the trap.
+    if any(key in _RETURN_PATH_PARAMS for key, _ in nested_params):
+        return ""
+
+    return back
 
 
 @register.filter
@@ -310,13 +333,6 @@ def object_policy(context, obj, review_mode=False):
             pass
         # Last resort: minimal fallback without error message
         return _safe_policy_fallback(user, obj, review_mode)
-
-
-# Params that carry a return path back into the app. They are stripped before
-# embedding the current path into a new back/next/return_to param so the value
-# can never nest — otherwise each list->detail->list round trip doubles the URL
-# and crawlers discover an unbounded URL space.
-_RETURN_PATH_PARAMS = frozenset({"back", "next", "return_to"})
 
 
 @register.filter
