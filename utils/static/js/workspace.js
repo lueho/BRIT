@@ -3,6 +3,8 @@
 (() => {
     const media = new Map();
 
+    const PARTIAL_SEARCH_MESSAGE = "Search could not load for every field. Existing selections and other fields can still be saved, but choosing new entries in the affected fields requires JavaScript search.";
+
     class MaintenanceWorkspace {
         constructor(root) {
             this.root = root;
@@ -112,10 +114,12 @@
                 active.summary.hidden = true;
                 active.editor.hidden = false;
                 this.setExpanded(active, true);
-                this.announce("Edit this section, then save or cancel. Other sections are unchanged.");
+                if (active.searchFailed) this.announce(`Edit this section, then save or cancel. ${PARTIAL_SEARCH_MESSAGE}`, true);
+                else this.announce("Edit this section, then save or cancel. Other sections are unchanged.");
                 this.focusEditor(active);
             } catch (error) {
                 this.close(active);
+                console.error("Workspace editor could not open.", error);
                 this.announce("Could not open the editor. Try again, or use the full-page editor link below the section heading.", true);
                 link.focus();
             } finally {
@@ -143,8 +147,14 @@
         loadAsset(element, kind) {
             const url = this.trustedMediaURL(element.getAttribute(kind === "script" ? "src" : "href"), kind);
             if (media.has(url.href)) return media.get(url.href);
-            const existing = Array.from(document.querySelectorAll(kind === "script" ? "script[src]" : 'link[rel="stylesheet"]')).find((node) => (kind === "script" ? node.src : node.href) === url.href);
-            if (existing) return Promise.resolve();
+            // A same-URL <script> already in the DOM may still be in flight, so it
+            // cannot prove the widget dependency has executed. Re-requesting hits
+            // the HTTP cache and the bundle is idempotent, so scripts always get
+            // their own node; stylesheets can safely reuse an existing link.
+            if (kind !== "script") {
+                const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).find((node) => node.href === url.href);
+                if (existing) return Promise.resolve();
+            }
             const promise = new Promise((resolve, reject) => {
                 const node = document.createElement(kind === "script" ? "script" : "link");
                 if (kind === "script") {
@@ -169,7 +179,9 @@
         async loadMedia(fragment) {
             if (!fragment.querySelector("select[data-workspace-select]")) return;
             for (const template of fragment.querySelectorAll("template[data-workspace-media]")) {
-                await Promise.all(Array.from(template.content.querySelectorAll('link[rel="stylesheet"]'), (link) => this.loadAsset(link, "style")));
+                // Stylesheets only affect appearance; a failed request must not
+                // keep the editor scripts below from loading.
+                await Promise.allSettled(Array.from(template.content.querySelectorAll('link[rel="stylesheet"]'), (link) => this.loadAsset(link, "style")));
                 for (const script of template.content.querySelectorAll("script[src]")) await this.loadAsset(script, "script");
                 template.remove();
             }
@@ -193,11 +205,18 @@
                     field.setAttribute("aria-describedby", `${field.id}_helptext ${field.id}_errors`);
                 }
             }
+            let failed = 0;
             for (const select of container.querySelectorAll("select[data-workspace-select]")) {
                 if (select.tomselect) continue;
                 if (!window.TomSelect) throw new Error("Select editor unavailable");
-                new window.TomSelect(select, this.autocompleteSettings(select));
+                try {
+                    new window.TomSelect(select, this.autocompleteSettings(select));
+                } catch (error) {
+                    failed += 1;
+                    console.error("Workspace search widget could not initialize.", error);
+                }
             }
+            return failed;
         }
 
         autocompleteSettings(select) {
@@ -276,7 +295,7 @@
             active.editor.replaceChildren(fragment);
             active.form = active.editor.querySelector("form[data-workspace-section-form]");
             if (!active.form) throw new Error("Missing section form");
-            this.initializeWidgets(active.editor);
+            if (this.initializeWidgets(active.editor)) active.searchFailed = true;
         }
 
         focusEditor(active) {
@@ -390,13 +409,18 @@
             try {
                 await this.loadMedia(active.editor);
                 if (this.active !== active) return null;
-                this.initializeWidgets(row);
+                if (this.initializeWidgets(row)) {
+                    active.searchFailed = true;
+                    this.announce(`Row added. ${PARTIAL_SEARCH_MESSAGE}`, true);
+                }
                 if (active.busy) {
                     row.querySelectorAll("select[data-workspace-select]").forEach((select) => select.tomselect?.disable());
                 } else {
                     this.focusEditor({ editor: row });
                 }
             } catch (error) {
+                console.error("Workspace row widgets could not initialize.", error);
+                active.searchFailed = true;
                 if (this.active === active) this.announce("Row added, but search could not load. Your entries are kept. You need JavaScript search to choose new entries; check your connection and retry.", true);
             }
             return row;
@@ -484,6 +508,11 @@
                     const field = row.querySelector(`[name$="-${column}"]`);
                     if (!field) continue;
                     if (field.matches("select[data-workspace-select]")) {
+                        if (!field.tomselect) {
+                            unresolved += 1;
+                            this.flagPasteField(row, column, `Search could not load for this field, so "${text}" was not applied.`);
+                            continue;
+                        }
                         try {
                             if (await this.resolveReference(field, text)) continue;
                         } catch (error) { /* fall through to flag */ }
@@ -513,8 +542,9 @@
             const parts = [`Added ${added} row${added === 1 ? "" : "s"}.`];
             if (skipped) parts.push(skippedMessage);
             if (unresolved) parts.push(`${unresolved} value${unresolved === 1 ? "" : "s"} need${unresolved === 1 ? "s" : ""} attention — fix the marked field${unresolved === 1 ? "" : "s"} before saving.`);
-            if (!skipped && !unresolved) parts.push("Review them, then save the section.");
-            this.announce(parts.join(" "), skipped > 0 || unresolved > 0);
+            if (active.searchFailed) parts.push(PARTIAL_SEARCH_MESSAGE);
+            if (!skipped && !unresolved && !active.searchFailed) parts.push("Review them, then save the section.");
+            this.announce(parts.join(" "), skipped > 0 || unresolved > 0 || Boolean(active.searchFailed));
         }
 
         setExpanded(active, expanded) {
@@ -553,8 +583,9 @@
             const form = root.querySelector("form[data-workspace-section-form]");
             try {
                 await workspace.loadMedia(root);
-                workspace.initializeWidgets(root);
+                if (workspace.initializeWidgets(root)) workspace.announce(PARTIAL_SEARCH_MESSAGE, true);
             } catch (error) {
+                console.error("Workspace editor initialization failed.", error);
                 workspace.announce("Search could not load. Existing selections and other fields can still be saved, but choosing new entries requires JavaScript search. Check your connection and reload to retry.", true);
             }
             workspace.active = { form, editor: root, dirty: false, busy: false };
