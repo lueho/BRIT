@@ -13,9 +13,9 @@ run:
   # Container deploys don't get WEB_CONCURRENCY, so gunicorn defaulted to a
   # single sync worker: one slow request queued everything behind it until
   # Heroku's 30s router timeout cut in (H12 storm during the Oct 2026 crawler
-  # burst). 2 workers x 2 threads fits the Standard-1X quota (~450MB of 512MB)
-  # and isolates CPU-bound renders from cheap requests.
-  web: gunicorn $DJANGO_WSGI --bind 0.0.0.0:$PORT --workers 2 --threads 2 --access-logfile - --error-logfile -
+  # burst). One process with four threads avoids duplicating application
+  # memory; request recycling limits retained allocations between workloads.
+  web: gunicorn $DJANGO_WSGI --bind 0.0.0.0:$PORT --worker-class gthread --workers 1 --threads 4 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile -
   worker:
     image: web
     command:
