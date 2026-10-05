@@ -550,6 +550,7 @@ def build_map_selection_context(
         "map_selection_themes_by_map_set": themes_by_map_set,
         "map_selection_waste_categories": MAP_SELECTION_WASTE_CATEGORIES,
         "map_selection_years": MAP_SELECTION_YEARS,
+        "atlas_urlconf": _resolved_urlconf(),
         "selected_map_set": selected_map_set,
         "selected_map_theme": selected_theme,
         "selected_waste_category": _selected_waste_category(
@@ -695,6 +696,7 @@ def build_overview_directory_context(reverse_func, selected_region=None):
         "directory_region_groups": deepcopy(
             _overview_directory_base(reverse_func, _resolved_urlconf())
         ),
+        "atlas_urlconf": _resolved_urlconf(),
         "directory_waste_categories": MAP_SELECTION_WASTE_CATEGORIES,
         "directory_selected_region": resolve_overview_region(selected_region),
     }

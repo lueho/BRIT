@@ -13,11 +13,7 @@ from django.utils.functional import cached_property
 from ..models import CRUDUrlsMixin
 
 
-def get_default_owner():
-    """
-    Returns the default owner User instance, using DEFAULT_OBJECT_OWNER_USERNAME or ADMIN_USERNAME.
-    Raises RuntimeError if the user does not exist.
-    """
+def _default_owner_username():
     username = getattr(settings, "DEFAULT_OBJECT_OWNER_USERNAME", None)
     if not username:
         username = getattr(settings, "ADMIN_USERNAME", None)
@@ -25,6 +21,15 @@ def get_default_owner():
         raise RuntimeError(
             "Neither DEFAULT_OBJECT_OWNER_USERNAME in settings nor ADMIN_USERNAME env var is set."
         )
+    return username
+
+
+def get_default_owner():
+    """
+    Returns the default owner User instance, using DEFAULT_OBJECT_OWNER_USERNAME or ADMIN_USERNAME.
+    Raises RuntimeError if the user does not exist.
+    """
+    username = _default_owner_username()
     try:
         return User.objects.get(username=username)
     except User.DoesNotExist as err:
@@ -33,8 +38,19 @@ def get_default_owner():
         ) from err
 
 
+# The owner field default runs on every ownerless UserCreatedObject
+# instantiation; the pk is cached per username and cleared by the User
+# post_save/post_delete/post_migrate receivers in signals.py.
+_default_owner_pk_cache = {}
+
+
 def get_default_owner_pk():
-    return get_default_owner().pk
+    username = _default_owner_username()
+    pk = _default_owner_pk_cache.get(username)
+    if pk is None:
+        pk = get_default_owner().pk
+        _default_owner_pk_cache[username] = pk
+    return pk
 
 
 STATUS_CHOICES = (

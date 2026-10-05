@@ -4792,6 +4792,29 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 response = self.client.get(reverse(page["name"]))
                 self.assertIsNotNone(self._map_config(response))
 
+    def test_repeated_page_render_skips_cached_selector_fragments(self):
+        """The ~600-entry selector/tree loops are fragment-cached: a second
+        render of the same page must not evaluate them again."""
+        from django.core.cache import cache
+        from django.template.defaulttags import ForNode
+
+        cache.clear()
+        url = reverse("waste-atlas-germany-collection-system-map")
+        renders = []
+
+        original_render = ForNode.render
+
+        def counting_render(node, context):
+            renders.append(node)
+            return original_render(node, context)
+
+        with patch.object(ForNode, "render", counting_render):
+            self.client.get(url)
+            first_pass = len(renders)
+            renders.clear()
+            self.client.get(url)
+        self.assertLess(len(renders), first_pass)
+
     def test_region_property_map_does_not_link_to_an_unrelated_collection(self):
         response = self.client.get(
             reverse("waste-atlas-germany-population-density-map")

@@ -776,3 +776,37 @@ class WasteAtlasMapSelectionTests(TestCase):
             for waste_category, labels in by_waste_category.items():
                 with self.subTest(map_set=map_set, waste_category=waste_category):
                     self.assertEqual(sorted(labels), sorted(set(labels)))
+
+
+class MapConfigurationLookupCachingTests(TestCase):
+    """MAP_CONFIGS lookups are per-request hot paths, so they are cached, but
+    the cache must stay in sync with runtime edits through the ORM."""
+
+    def test_repeated_lookup_does_not_query_again(self):
+        MAP_CONFIGS["collection_system"]
+        with self.assertNumQueries(0):
+            for _ in range(3):
+                config = MAP_CONFIGS["collection_system"]
+        self.assertIsInstance(config, dict)
+
+    def test_lookup_returns_an_independent_copy(self):
+        """Mutating a returned config must not corrupt the cached value."""
+        first = MAP_CONFIGS["collection_system"]
+        first["__probe__"] = "mutated"
+        first.setdefault("legend", {})["title"] = "mutated title"
+        second = MAP_CONFIGS["collection_system"]
+        self.assertNotIn("__probe__", second)
+        self.assertNotEqual(second.get("legend", {}).get("title"), "mutated title")
+
+    def test_lookup_reflects_saved_configuration(self):
+        MAP_CONFIGS["collection_system"]
+        stored = WasteAtlasMapConfiguration.objects.get(key="collection_system")
+        stored.configuration["marker"] = "updated"
+        stored.save()
+        self.assertEqual(MAP_CONFIGS["collection_system"]["marker"], "updated")
+
+    def test_lookup_raises_keyerror_after_delete(self):
+        MAP_CONFIGS["collection_system"]
+        WasteAtlasMapConfiguration.objects.get(key="collection_system").delete()
+        with self.assertRaises(KeyError):
+            MAP_CONFIGS["collection_system"]

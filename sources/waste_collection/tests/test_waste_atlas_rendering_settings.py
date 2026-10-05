@@ -49,6 +49,26 @@ class WasteAtlasRenderingSettingsModelTests(TestCase):
         WasteAtlasRenderingSettings.load()
         self.assertEqual(WasteAtlasRenderingSettings.objects.count(), 1)
 
+    def test_load_serves_cached_settings_without_querying(self):
+        """load() runs on every map render; repeat calls must not hit the DB."""
+        WasteAtlasRenderingSettings.load()
+        with self.assertNumQueries(0):
+            loaded = WasteAtlasRenderingSettings.load()
+        self.assertEqual(loaded.pk, WasteAtlasRenderingSettings.SINGLETON_PK)
+
+    def test_load_returns_independent_instances(self):
+        """Mutating a loaded instance must not leak into later loads."""
+        first = WasteAtlasRenderingSettings.load()
+        first.no_data_color = "#000000"
+        self.assertNotEqual(WasteAtlasRenderingSettings.load().no_data_color, "#000000")
+
+    def test_load_reflects_saved_changes(self):
+        """A save must invalidate the cached settings immediately."""
+        settings_row = WasteAtlasRenderingSettings.load()
+        settings_row.no_data_color = "#123456"
+        settings_row.save()
+        self.assertEqual(WasteAtlasRenderingSettings.load().no_data_color, "#123456")
+
     def test_client_defaults_expose_the_stored_values(self):
         settings = WasteAtlasRenderingSettings.load()
         settings.no_data_color = "#123456"

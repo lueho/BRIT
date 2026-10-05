@@ -394,3 +394,22 @@ def enqueue_owner_review_notification(sender, instance, created, **kwargs):
                 )
 
     transaction.on_commit(_enqueue)
+
+
+@receiver(post_save, sender="auth.User")
+@receiver(post_delete, sender="auth.User")
+def clear_default_owner_pk_cache_on_user_change(sender, **kwargs):
+    """User writes may change which row resolves as the default owner; the
+    cache is tiny, so clearing it wholesale is simpler than tracking which
+    username changed."""
+    from utils.object_management.models import _default_owner_pk_cache
+
+    _default_owner_pk_cache.clear()
+
+
+@receiver(post_migrate)
+def clear_default_owner_pk_cache_on_migrate(sender, **kwargs):
+    """Flushes and fixture reloads can recreate the owner under a different pk."""
+    from utils.object_management.models import _default_owner_pk_cache
+
+    _default_owner_pk_cache.clear()

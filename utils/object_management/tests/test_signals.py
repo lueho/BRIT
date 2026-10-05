@@ -101,3 +101,45 @@ class ModerationCacheSignalTests(TestCase):
         self._warm_moderator_caches()
         reloaded.save()
         self._assert_caches_cleared()
+
+
+class DefaultOwnerLookupCacheTests(TestCase):
+    """``get_default_owner_pk`` is the ``owner`` field default of every
+    UserCreatedObject — it must not query on every model instantiation, but
+    must recover when the underlying user changes."""
+
+    def test_repeated_default_owner_lookup_queries_once(self):
+        from unittest.mock import patch
+
+        import utils.object_management.models as object_models
+
+        Collection()  # prime the cache through the field default
+        with patch.object(
+            object_models,
+            "get_default_owner",
+            wraps=object_models.get_default_owner,
+        ) as owner_lookup:
+            Collection()
+            Collection()
+        self.assertEqual(owner_lookup.call_count, 0)
+
+    def test_user_save_invalidates_the_cached_pk(self):
+        """Renaming the default owner must surface the RuntimeError path again
+        instead of silently returning the renamed user's pk."""
+        from django.conf import settings
+
+        from utils.object_management.models import get_default_owner_pk
+
+        username = getattr(settings, "DEFAULT_OBJECT_OWNER_USERNAME", None) or getattr(
+            settings, "ADMIN_USERNAME", None
+        )
+        owner = User.objects.get(username=username)
+        get_default_owner_pk()  # prime the cache
+        owner.username = f"renamed-{username}"
+        owner.save()
+        try:
+            with self.assertRaises(RuntimeError):
+                get_default_owner_pk()
+        finally:
+            owner.username = username
+            owner.save()

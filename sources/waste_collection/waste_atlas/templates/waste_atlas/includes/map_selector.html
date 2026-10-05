@@ -1,3 +1,4 @@
+{% load cache %}
   <form class="atlas-selector-form"
         id="atlas-selection-form"
         data-empty-message="No maps match these filters."
@@ -42,6 +43,7 @@
       <div class="atlas-selector-field atlas-selector-field--theme">
         <label for="sel-theme">Theme</label>
         <select id="sel-theme">
+          {% cache 3600 atlas_theme_options selected_map_set selected_map_theme atlas_urlconf %}
           {% for map_set, themes in map_selection_themes_by_map_set.items %}
             {% for option in themes %}
               <option value="{{ option.value }}"
@@ -56,6 +58,7 @@
               </option>
             {% endfor %}
           {% endfor %}
+          {% endcache %}
         </select>
       </div>
       <div class="atlas-selector-field atlas-selector-field--year">
