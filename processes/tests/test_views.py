@@ -1859,6 +1859,50 @@ class ProcessCategoryDetailVisibilityTestCase(ViewWithPermissionsTestCase):
         self.assertNotContains(response, "Own Secret Process")
 
 
+class ProcessCategoryReviewDetailTestCase(ViewWithPermissionsTestCase):
+    """A category review page must list the processes in that category."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.moderator = get_user_model().objects.create_user(
+            username="category_moderator"
+        )
+        cls.moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="processes",
+                codename="can_moderate_processcategory",
+            )
+        )
+        cls.review_category = ProcessCategory.objects.create(
+            name="Pulping",
+            owner=cls.outsider,
+            publication_status="review",
+        )
+        cls.review_process = Process.objects.create(
+            name="Pulping Process",
+            owner=cls.outsider,
+            publication_status="published",
+        )
+        cls.review_process.categories.add(cls.review_category)
+        cls.review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(
+                    ProcessCategory
+                ).pk,
+                "object_id": cls.review_category.pk,
+            },
+        )
+
+    def test_review_detail_shows_processes_in_category(self):
+        self.client.force_login(self.moderator)
+        response = self.client.get(self.review_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pulping Process")
+        self.assertNotContains(response, "No processes in this category yet.")
+
+
 class ProcessDashboardVisibilityTestCase(ViewWithPermissionsTestCase):
     """Dashboard counters must use the same read policy as the lists."""
 
