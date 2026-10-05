@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 from unittest.mock import patch
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlencode
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -136,7 +136,7 @@ class SafeBackUrlTagTests(SimpleTestCase):
 
     Values carrying nested return-path params are leftovers of the historical
     unbounded ?back=/?next= nesting; echoing them into a followable link keeps
-    feeding the crawler the trap. Oversized values get dropped too.
+    feeding the crawler the trap. Long ordinary filter URLs stay intact.
     """
 
     def setUp(self):
@@ -178,10 +178,17 @@ class SafeBackUrlTagTests(SimpleTestCase):
 
                 self.assertEqual(url, "")
 
-    def test_oversized_back_url_is_dropped(self):
-        url = self.back_url("/x/?back=/" + "a" * 600 + "/")
+    def test_long_ordinary_filtered_back_url_is_returned(self):
+        filters = urlencode(
+            [("scope", "published")]
+            + [("material", str(pk)) for pk in range(1000, 1120)]
+        )
+        list_url = f"/materials/samples/?{filters}"
+        self.assertGreater(len(list_url), 1000)
 
-        self.assertEqual(url, "")
+        url = self.back_url("/materials/samples/9/?back=" + quote(list_url, safe=""))
+
+        self.assertEqual(url, list_url)
 
     def test_without_request_returns_empty(self):
         self.assertEqual(safe_back_url({}), "")

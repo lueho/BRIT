@@ -25,10 +25,6 @@ _LEGACY_SECTION_SEPARATOR_RE = re.compile(r"(?:\s*;\s*){2,}")
 # and crawlers discover an unbounded URL space.
 _RETURN_PATH_PARAMS = frozenset({"back", "next", "return_to"})
 
-# Breadcrumb targets beyond this length can only be leftovers of the
-# historical nesting trap or forged URLs — never a page worth returning to.
-_MAX_BACK_URL_LENGTH = 512
-
 
 @register.simple_tag(takes_context=True)
 def safe_back_url(context):
@@ -37,7 +33,7 @@ def safe_back_url(context):
         return ""
 
     back = request.GET.get("back")
-    if not back or len(back) > _MAX_BACK_URL_LENGTH:
+    if not back:
         return ""
 
     try:
