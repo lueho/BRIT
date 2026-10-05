@@ -715,12 +715,13 @@ function resetFeaturesLayer() {
  * false when the caller should fall back to renderFeatures.
  */
 function addFeatureBatch(features) {
-    if (!features || features.length === 0) {
+    const locatedFeatures = (features || []).filter(feature => feature.geometry != null);
+    if (locatedFeatures.length === 0) {
         return false;
     }
 
     if (!featuresLayer) {
-        featuresLayer = createFeaturesLayer(null, features[0].geometry.type);
+        featuresLayer = createFeaturesLayer(null, locatedFeatures[0].geometry.type);
         if (!featuresLayer) {
             return false;
         }
@@ -728,7 +729,7 @@ function addFeatureBatch(features) {
         featuresLayer.addTo(map);
     }
 
-    featuresLayer.addData(features);
+    featuresLayer.addData(locatedFeatures);
     return true;
 }
 
@@ -736,13 +737,14 @@ function renderFeatures(geoJson) {
 
     resetFeaturesLayer();
 
-    if (!geoJson || !geoJson.features || geoJson.features.length === 0) {
+    const locatedFeatures = (geoJson?.features || []).filter(feature => feature.geometry != null);
+    if (locatedFeatures.length === 0) {
         console.warn('The provided GeoJSON object is empty or does not contain any features.');
         return;
     }
 
-    const geometryType = geoJson.features[0].geometry.type;
-    featuresLayer = createFeaturesLayer(geoJson, geometryType);
+    const geometryType = locatedFeatures[0].geometry.type;
+    featuresLayer = createFeaturesLayer({ ...geoJson, features: locatedFeatures }, geometryType);
     if (!featuresLayer) {
         console.warn('Unsupported feature geometry type:', geometryType);
         return;

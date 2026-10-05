@@ -36,6 +36,7 @@ class ShowcaseModelSerializer(ModelSerializer):
     """Showcase with its connections, limited to records the reader may see."""
 
     region = RegionModelSerializer()
+    geom = GeometryField(allow_null=True, read_only=True)
     catchment = serializers.SerializerMethodField()
     showcase_materials = serializers.SerializerMethodField()
     process_chain = serializers.SerializerMethodField()
@@ -48,6 +49,7 @@ class ShowcaseModelSerializer(ModelSerializer):
         fields = [
             "id",
             "name",
+            "geom",
             "region",
             "catchment",
             "description",
@@ -189,7 +191,7 @@ class ShowcaseSummaryListSerializer(ModelSerializer):
 
 
 class ShowcaseGeoFeatureModelSerializer(BaseGeoFeatureModelSerializer):
-    region = CharField(source="region.name")
+    region = CharField(source="region.name", allow_null=True)
 
     class Meta:
         model = Showcase

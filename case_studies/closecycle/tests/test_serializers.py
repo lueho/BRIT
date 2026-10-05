@@ -219,6 +219,7 @@ class ShowcaseModelSerializerConnectionsTest(TestCase):
     def test_connection_fields_are_read_only(self):
         fields = ShowcaseModelSerializer().fields
         for name in (
+            "geom",
             "catchment",
             "showcase_materials",
             "process_chain",
@@ -243,6 +244,30 @@ class ShowcaseModelSerializerConnectionsTest(TestCase):
             ["Public Step"], [step["name"] for step in data["process_chain"]]
         )
         self.assertEqual([], data["samples"])
+
+    def test_api_detail_includes_site_geometry(self):
+        self.showcase.geom = Point(14, 55, srid=4326)
+        self.showcase.save()
+        response = self.client.get(
+            reverse("api-showcase-detail", args=[self.showcase.pk])
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            {"type": "Point", "coordinates": [14.0, 55.0]}, response.json()["geom"]
+        )
+
+    def test_detail_geometry_is_null_without_a_site_not_a_region_centroid(self):
+        self.showcase.region.geom = MultiPolygon(Polygon.from_bbox((0, 0, 2, 2)))
+        self.showcase.region.save()
+        data = ShowcaseModelSerializer(self.showcase).data
+        self.assertIsNone(data["geom"])
+
+    def test_list_serializer_includes_site_geometry(self):
+        self.showcase.geom = Point(14, 55, srid=4326)
+        data = ShowcaseModelSerializer([self.showcase], many=True).data
+        self.assertEqual(
+            {"type": "Point", "coordinates": [14.0, 55.0]}, data[0]["geom"]
+        )
 
     def test_owner_api_detail_includes_own_private_connections(self):
         self.client.force_login(self.owner)
@@ -312,6 +337,18 @@ class ShowcaseGeoFeatureModelSerializerTest(TestCase):
             publication_status="published",
         )
         self.assertIsNone(self._geometry(showcase))
+
+    def test_site_without_region_serializes_region_as_null(self):
+        showcase = Showcase.objects.create(
+            name="Regionless Site",
+            geom=Point(14, 55, srid=4326),
+            publication_status="published",
+        )
+        data = ShowcaseGeoFeatureModelSerializer(showcase).data
+        self.assertIsNone(data["properties"]["region"])
+        self.assertEqual(
+            {"type": "Point", "coordinates": [14.0, 55.0]}, data["geometry"]
+        )
 
 
 class ShowcaseSummariesEndpointTest(TestCase):

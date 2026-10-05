@@ -182,7 +182,7 @@ function featureClickHandler(e, featureGroup) {
         const popupContent = document.createElement('div');
         const regionGroups = new Map();
         intersectingFeatures.forEach(layers => {
-            const regionName = layers[0].feature.properties.region;
+            const regionName = layers[0].feature.properties.region || 'No region';
             if (!regionGroups.has(regionName)) {
                 regionGroups.set(regionName, []);
             }

@@ -495,3 +495,22 @@ test("co-located showcase points open a popup instead of autoselecting", () => {
     const links = findAll(calls.openPopup[0].content, el => el.tagName === "A");
     assert.deepEqual(links.map(el => el.textContent), ["First", "Second"]);
 });
+
+test("co-located points without regions use a meaningful fallback heading", () => {
+    const { sandbox, calls } = setup();
+    const layers = [
+        makePointLayer({ id: 1, name: "No anchor" }),
+        makePointLayer({ id: 2, name: "Null anchor", region: null }),
+        makePointLayer({ id: 3, name: "Anchored", region: "Region A" }),
+    ];
+    sandbox.featureClickHandler(clickEvent, makeFeatureGroup(layers));
+    const { content } = calls.openPopup[0];
+    assert.deepEqual(
+        findAll(content, el => el.tagName === "STRONG").map(el => el.textContent),
+        ["No region", "Region A"]
+    );
+    const links = findAll(content, el => el.tagName === "A");
+    assert.deepEqual(links.map(el => el.textContent), ["No anchor", "Null anchor", "Anchored"]);
+    links[0].click();
+    assert.deepEqual(calls.fetchSummaries.map(params => params.id), [1]);
+});

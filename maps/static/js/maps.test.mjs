@@ -338,6 +338,69 @@ function fakeBounds(tag) {
     return { tag, isValid: () => true };
 }
 
+function setupFeatureRendering() {
+    const { sandbox, window } = setup();
+    const map = { removeLayer() {} };
+    window.listeners["map:init"]({ detail: { map } });
+    const calls = { created: [], added: [], batches: [] };
+    sandbox.L = {
+        geoJson(data, options) {
+            calls.created.push({ data, options });
+            return {
+                on() {},
+                addTo(target) { calls.added.push(target); },
+                addData(features) { calls.batches.push(features); },
+            };
+        },
+    };
+    return { sandbox, calls, map };
+}
+
+const locatedFeature = {
+    type: "Feature",
+    id: 2,
+    geometry: { type: "Point", coordinates: [14, 55] },
+    properties: {},
+};
+const unlocatedFeature = { type: "Feature", id: 1, geometry: null, properties: {} };
+
+test("renderFeatures ignores null geometries before and after located points", () => {
+    const { sandbox, calls, map } = setupFeatureRendering();
+    const geoJson = {
+        type: "FeatureCollection",
+        features: [unlocatedFeature, locatedFeature, unlocatedFeature],
+    };
+
+    sandbox.renderFeatures(geoJson);
+
+    assert.deepEqual(Array.from(calls.created[0].data.features), [locatedFeature]);
+    assert.equal(typeof calls.created[0].options.pointToLayer, "function");
+    assert.deepEqual(calls.added, [map]);
+    assert.equal(geoJson.features.length, 3);
+});
+
+test("renderFeatures leaves no layer for an all-null collection", () => {
+    const { sandbox, calls } = setupFeatureRendering();
+    sandbox.renderFeatures({ type: "FeatureCollection", features: [unlocatedFeature] });
+    assert.equal(calls.created.length, 0);
+    assert.equal(vm.runInContext("featuresLayer", sandbox), null);
+});
+
+test("addFeatureBatch skips null geometry batches and filters mixed batches", () => {
+    const { sandbox, calls, map } = setupFeatureRendering();
+    assert.equal(sandbox.addFeatureBatch([unlocatedFeature]), false);
+    assert.equal(calls.created.length, 0);
+    assert.equal(sandbox.addFeatureBatch([unlocatedFeature, locatedFeature]), true);
+    assert.equal(sandbox.addFeatureBatch([locatedFeature, unlocatedFeature]), true);
+    assert.equal(sandbox.addFeatureBatch([unlocatedFeature]), false);
+    assert.equal(calls.created.length, 1);
+    assert.equal(typeof calls.created[0].options.pointToLayer, "function");
+    assert.deepEqual(calls.added, [map]);
+    assert.deepEqual(calls.batches.map(batch => Array.from(batch)), [
+        [locatedFeature], [locatedFeature],
+    ]);
+});
+
 function fakeLayer(bounds) {
     return {
         addTo() {},
