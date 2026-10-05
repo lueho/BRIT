@@ -300,6 +300,83 @@ class ProcessMaintenanceViewsTestCase(TestCase):
         response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
         self.assertContains(response, "(range: 1 – 9)")
 
+    def test_detail_view_shows_material_stage_stream_and_optional_badges(self):
+        self.input.stage = "Pretreatment hall"
+        self.input.stream_label = "Feed stream A"
+        self.input.optional = True
+        self.input.save()
+        self.output.stage = "Product recovery"
+        self.output.stream_label = "Product stream B"
+        self.output.optional = True
+        self.output.save()
+        for url in (
+            self.process.get_absolute_url(),
+            f"{self.process.get_absolute_url()}?mode=edit",
+        ):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertContains(response, "Stage: Pretreatment hall")
+                self.assertContains(response, "Stream: Feed stream A")
+                self.assertContains(response, "Stage: Product recovery")
+                self.assertContains(response, "Stream: Product stream B")
+                self.assertContains(
+                    response, '<span class="badge text-bg-light">Optional</span>'
+                )
+
+    def test_detail_view_omits_blank_material_metadata(self):
+        response = self.client.get(self.process.get_absolute_url())
+        self.assertNotContains(response, "Stage:")
+        self.assertNotContains(response, "Stream:")
+        self.assertNotContains(response, ">Optional</span>")
+
+    def test_detail_view_shows_range_label_for_nominal_with_two_sided_bounds(self):
+        ProcessOperatingParameter.objects.create(
+            process=self.process,
+            parameter="pressure",
+            nominal_value=Decimal("5"),
+            value_min=Decimal("1"),
+            value_max=Decimal("9"),
+        )
+        ProcessOperatingParameter.objects.create(
+            process=self.process,
+            parameter="yield",
+            nominal_value=Decimal("50"),
+            value_min=Decimal("40"),
+            value_max=Decimal("60"),
+        )
+        response = self.client.get(self.process.get_absolute_url())
+        self.assertContains(response, "(range: 1 – 9)")
+        self.assertContains(response, "(range: 40 – 60)")
+
+    def test_detail_view_shows_one_sided_bounds_with_nominal(self):
+        ProcessOperatingParameter.objects.create(
+            process=self.process,
+            parameter="pressure",
+            nominal_value=Decimal("5"),
+            value_min=Decimal("0"),
+        )
+        ProcessOperatingParameter.objects.create(
+            process=self.process,
+            parameter="yield",
+            nominal_value=Decimal("50"),
+            value_max=Decimal("60"),
+        )
+        response = self.client.get(self.process.get_absolute_url())
+        self.assertContains(response, "(at least 0)")
+        self.assertContains(response, "(at most 60)")
+        self.assertNotContains(response, "(range:")
+
+    def test_detail_view_range_only_parameters_render_once_without_range_label(self):
+        ProcessOperatingParameter.objects.create(
+            process=self.process,
+            parameter="pressure",
+            value_min=Decimal("1"),
+            value_max=Decimal("9"),
+        )
+        response = self.client.get(self.process.get_absolute_url())
+        self.assertContains(response, "1 – 9", count=1)
+        self.assertNotContains(response, "(range:")
+
     def test_detail_descriptive_fields_keep_single_line_breaks_and_paragraphs(self):
         self.process.description = "First line\nSecond line\n\nNew paragraph"
         self.process.process_technology = "First step\nSecond step\n\nNew stage"

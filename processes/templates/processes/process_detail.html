@@ -244,6 +244,11 @@
                             -
                           {% endif %}
                           {% if param.unit %}{{ param.unit.name }}{% endif %}
+                          {% if param.nominal_value is not None and param.value_min is not None and param.value_max is not None %}
+                            <span class="small">(range: {{ param.get_value_range_display }})</span>
+                          {% elif param.nominal_value is not None and param.get_value_range_display %}
+                            <span class="small">({{ param.get_value_range_display }})</span>
+                          {% endif %}
                           {% if param.basis %}<span class="text-muted">({{ param.basis }})</span>{% endif %}
                           {% if param.notes %}<div class="small text-muted">{{ param.notes|linebreaksbr }}</div>{% endif %}
                         </li>
@@ -268,6 +273,11 @@
                             -
                           {% endif %}
                           {% if param.unit %}{{ param.unit.name }}{% endif %}
+                          {% if param.nominal_value is not None and param.value_min is not None and param.value_max is not None %}
+                            <span class="small">(range: {{ param.get_value_range_display }})</span>
+                          {% elif param.nominal_value is not None and param.get_value_range_display %}
+                            <span class="small">({{ param.get_value_range_display }})</span>
+                          {% endif %}
                           {% if param.basis %}<span class="text-muted">({{ param.basis }})</span>{% endif %}
                           {% if param.notes %}<div class="small text-muted">{{ param.notes|linebreaksbr }}</div>{% endif %}
                         </li>
@@ -290,6 +300,9 @@
                             {% if pm.quantity_value is not None %}
                               <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
                             {% endif %}
+                            {% if pm.optional %}<span class="badge text-bg-light">Optional</span>{% endif %}
+                            {% if pm.stage %}<div class="small">Stage: {{ pm.stage }}</div>{% endif %}
+                            {% if pm.stream_label %}<div class="small">Stream: {{ pm.stream_label }}</div>{% endif %}
                             {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes|linebreaksbr }}</p>{% endif %}
                           </li>
                         {% endfor %}
@@ -308,6 +321,9 @@
                             {% if pm.quantity_value is not None %}
                               <span class="text-muted ms-1">{{ pm.get_quantity_value_display }}{% if pm.quantity_unit %} {{ pm.quantity_unit.name }}{% endif %}</span>
                             {% endif %}
+                            {% if pm.optional %}<span class="badge text-bg-light">Optional</span>{% endif %}
+                            {% if pm.stage %}<div class="small">Stage: {{ pm.stage }}</div>{% endif %}
+                            {% if pm.stream_label %}<div class="small">Stream: {{ pm.stream_label }}</div>{% endif %}
                             {% if pm.notes %}<p class="mb-0 text-muted small">{{ pm.notes|linebreaksbr }}</p>{% endif %}
                           </li>
                         {% endfor %}
