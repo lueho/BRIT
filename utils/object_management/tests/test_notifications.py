@@ -181,6 +181,7 @@ class ReviewOwnerNotificationTests(TestCase):
                 "delay",
                 side_effect=ConnectionError("broker down"),
             ),
+            self.assertLogs("utils.object_management.signals", level="WARNING") as logs,
             self.captureOnCommitCallbacks(execute=True),
         ):
             ReviewAction.objects.create(
@@ -192,6 +193,9 @@ class ReviewOwnerNotificationTests(TestCase):
             )
             self.collection.transfer_ownership(new_owner)
 
+        self.assertTrue(
+            any("Could not queue owner notification" in line for line in logs.output)
+        )
         self.assertEqual(len(mail.outbox), 0)
 
     def test_notification_task_retries_transient_mail_errors(self):
@@ -212,7 +216,11 @@ class ReviewOwnerNotificationTests(TestCase):
     @override_settings(SITE_ID=999, CANONICAL_HOST="brit.example.org")
     def test_missing_site_row_falls_back_to_canonical_host(self):
         self.client.force_login(self.moderator)
-        self._post(self._action_url("approve_item"))
+        with self.assertLogs(
+            "utils.object_management.notifications", level="WARNING"
+        ) as logs:
+            self._post(self._action_url("approve_item"))
 
+        self.assertTrue(any("No Site row" in line for line in logs.output))
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("http://brit.example.org", mail.outbox[0].body)

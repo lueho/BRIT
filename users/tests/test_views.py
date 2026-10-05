@@ -1,4 +1,6 @@
+import contextlib
 import datetime
+import io
 import smtplib
 from unittest.mock import patch
 
@@ -55,20 +57,29 @@ class RegistrationEmailDeliveryTests(TestCase):
         refused = smtplib.SMTPRecipientsRefused(
             {"newbie@example.org": (550, b"5.1.1 no such user")}
         )
-        with patch(SEND_EMAIL, side_effect=refused):
+        with (
+            patch(SEND_EMAIL, side_effect=refused),
+            self.assertLogs("users.views", level="WARNING") as logs,
+        ):
             response = self.client.post(
                 reverse("registration_register"), self.registration_data()
             )
+        self.assertIn("Registration email refused", logs.output[0])
+        self.assertIn("newbie@example.org", logs.output[0])
         self.assertEqual(response.status_code, 200)
         self.assertIn("email", response.context["form"].errors)
         self.assertFalse(User.objects.filter(username="newbie").exists())
         self.assertFalse(RegistrationProfile.objects.exists())
 
     def test_transient_smtp_failure_shows_generic_error_and_rolls_back_user(self):
-        with patch(SEND_EMAIL, side_effect=smtplib.SMTPServerDisconnected("lost")):
+        with (
+            patch(SEND_EMAIL, side_effect=smtplib.SMTPServerDisconnected("lost")),
+            self.assertLogs("users.views", level="WARNING") as logs,
+        ):
             response = self.client.post(
                 reverse("registration_register"), self.registration_data()
             )
+        self.assertIn("Registration email could not be sent", logs.output[0])
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["form"].non_field_errors())
         self.assertFalse(User.objects.filter(username="newbie").exists())
@@ -89,16 +100,20 @@ class ResendActivationEmailDeliveryTests(TestCase):
 
     def test_resend_smtp_failure_shows_error_and_keeps_activation_key(self):
         original_key = self.profile.activation_key
-        with patch(
-            SEND_EMAIL,
-            side_effect=smtplib.SMTPRecipientsRefused(
-                {"pending@example.org": (550, b"5.1.1 no such user")}
+        with (
+            patch(
+                SEND_EMAIL,
+                side_effect=smtplib.SMTPRecipientsRefused(
+                    {"pending@example.org": (550, b"5.1.1 no such user")}
+                ),
             ),
+            self.assertLogs("users.views", level="WARNING") as logs,
         ):
             response = self.client.post(
                 reverse("registration_resend_activation"),
                 {"email": "pending@example.org"},
             )
+        self.assertIn("Activation resend failed", logs.output[0])
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["form"].non_field_errors())
         self.profile.refresh_from_db()
@@ -134,6 +149,13 @@ class CleanupExpiredRegistrationsTaskTests(TestCase):
         )
         from users.tasks import cleanup_expired_registrations
 
-        cleanup_expired_registrations()
+        with (
+            self.assertLogs("registration.models", level="WARNING") as logs,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            cleanup_expired_registrations()
+        self.assertTrue(
+            any("Deleting expired Registration profile" in line for line in logs.output)
+        )
         self.assertFalse(User.objects.filter(username="stale").exists())
         self.assertTrue(User.objects.filter(username="admin").exists())
