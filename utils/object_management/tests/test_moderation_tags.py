@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 from unittest.mock import patch
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlencode
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -16,6 +16,7 @@ from utils.object_management.templatetags.moderation_tags import (
     detail_or_review_url,
     has_pending_review_items_for_user,
     markdown_to_html,
+    safe_back_url,
 )
 
 
@@ -128,6 +129,92 @@ class DetailOrReviewUrlTagTests(SimpleTestCase):
         url = detail_or_review_url({}, self.obj, use_back=True)
 
         self.assertEqual(url, "/materials/samples/9/")
+
+
+class SafeBackUrlTagTests(SimpleTestCase):
+    """The back breadcrumb must not echo crawler-trap URLs.
+
+    Values carrying nested return-path params are leftovers of the historical
+    unbounded ?back=/?next= nesting; echoing them into a followable link keeps
+    feeding the crawler the trap. Long ordinary filter URLs stay intact.
+    """
+
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def back_url(self, path):
+        request = self.factory.get(path)
+        return safe_back_url({"request": request})
+
+    def test_simple_back_url_is_returned(self):
+        url = self.back_url("/materials/samples/9/?back=/materials/samples/")
+
+        self.assertEqual(url, "/materials/samples/")
+
+    def test_back_url_with_ordinary_query_params_is_returned(self):
+        url = self.back_url(
+            "/materials/samples/9/?back="
+            + quote("/materials/samples/?scope=published&page=2", safe="")
+        )
+
+        self.assertEqual(url, "/materials/samples/?scope=published&page=2")
+
+    def test_external_back_url_is_dropped(self):
+        url = self.back_url("/x/?back=https://evil.example.com/phish")
+
+        self.assertEqual(url, "")
+
+    def test_nested_back_param_is_dropped(self):
+        nested = "/materials/samples/?back=" + quote("/materials/samples/", safe="")
+        url = self.back_url("/x/?back=" + quote(nested, safe=""))
+
+        self.assertEqual(url, "")
+
+    def test_nested_next_and_return_to_params_are_dropped(self):
+        for nested_param in ("next", "return_to"):
+            with self.subTest(nested_param=nested_param):
+                nested = f"/list/?{nested_param}=/detail/1/"
+                url = self.back_url("/x/?back=" + quote(nested, safe=""))
+
+                self.assertEqual(url, "")
+
+    def test_long_ordinary_filtered_back_url_is_returned(self):
+        filters = urlencode(
+            [("scope", "published")]
+            + [("material", str(pk)) for pk in range(1000, 1120)]
+        )
+        list_url = f"/materials/samples/?{filters}"
+        self.assertGreater(len(list_url), 1000)
+
+        url = self.back_url("/materials/samples/9/?back=" + quote(list_url, safe=""))
+
+        self.assertEqual(url, list_url)
+
+    def test_without_request_returns_empty(self):
+        self.assertEqual(safe_back_url({}), "")
+
+
+class ContextNavNoFollowTests(SimpleTestCase):
+    """Back breadcrumbs are crawlable anchors into the ?back= URL space, so
+    every context nav must mark them nofollow."""
+
+    CONTEXT_NAV_TEMPLATES = (
+        "includes/sdv2_context_nav.html",
+        "materials/includes/sample_context_nav.html",
+        "processes/includes/process_context_nav.html",
+    )
+
+    def test_back_link_is_nofollow(self):
+        request = RequestFactory().get("/x/?back=/materials/samples/")
+
+        for template_name in self.CONTEXT_NAV_TEMPLATES:
+            with self.subTest(template=template_name):
+                rendered = Template(f'{{% include "{template_name}" %}}').render(
+                    Context({"request": request})
+                )
+
+                self.assertIn('href="/materials/samples/"', rendered)
+                self.assertIn('rel="nofollow"', rendered)
 
 
 class MarkdownToHtmlFilterTests(TestCase):
