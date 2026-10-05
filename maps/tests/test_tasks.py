@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from celery.result import EagerResult
 from django.conf import settings
@@ -105,7 +105,10 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
     ):
         tree_warmer = Mock()
         collection_warmer = Mock()
-        mock_base_task.apply_async.return_value.id = "base-task"
+        mock_base_task.apply_async.side_effect = [
+            Mock(id="nuts-task"),
+            Mock(id="regions-task"),
+        ]
         tree_warmer.apply_async.return_value.id = "tree-task"
         collection_warmer.apply_async.return_value.id = "collection-task"
         mock_get_warmers.return_value = (
@@ -117,14 +120,23 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
             nuts_levels=[0], regions_limit=5, nuts_limit=10, queue_subtasks=True
         )
 
-        mock_base_task.apply_async.assert_called_once_with(
-            kwargs={"nuts_levels": [0], "regions_limit": 5, "nuts_limit": 10}
+        self.assertEqual(
+            mock_base_task.apply_async.call_args_list,
+            [
+                call(
+                    kwargs={"nuts_levels": [0], "regions_limit": None, "nuts_limit": 10}
+                ),
+                call(kwargs={"nuts_levels": None, "regions_limit": 5}),
+            ],
         )
         tree_warmer.apply_async.assert_called_once_with()
         collection_warmer.apply_async.assert_called_once_with()
         tree_warmer.apply.assert_not_called()
         collection_warmer.apply.assert_not_called()
-        self.assertEqual(result["maps"], {"status": "queued", "task_id": "base-task"})
+        self.assertEqual(
+            result["maps"],
+            {"status": "queued", "task_ids": ["nuts-task", "regions-task"]},
+        )
         self.assertEqual(
             result["waste_collection"],
             {"status": "queued", "task_id": "collection-task"},
@@ -257,6 +269,24 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
         self.assertEqual(result["nuts"]["status"], "success")
         self.assertEqual(result["regions"]["status"], "success")
 
+    def test_valid_region_payload_is_not_serialized_again(self):
+        warm_base_geojson_caches.run(nuts_levels=None, regions_limit=10)
+        with patch(
+            "maps.cache_warmup.RegionGeoFeatureModelSerializer",
+            side_effect=AssertionError("repeated serialization"),
+        ):
+            result = warm_base_geojson_caches.run(nuts_levels=None, regions_limit=10)
+        self.assertEqual(result["regions"]["features_count"], 0)
+
+    def test_valid_nuts_payload_is_not_serialized_again(self):
+        warm_base_geojson_caches.run(nuts_levels=[0], regions_limit=None)
+        with patch(
+            "maps.cache_warmup.NutsRegionGeometrySerializer",
+            side_effect=AssertionError("repeated serialization"),
+        ):
+            result = warm_base_geojson_caches.run(nuts_levels=[0], regions_limit=None)
+        self.assertEqual(result["nuts"]["features_count"], 0)
+
     def test_skips_nuts_when_levels_is_none(self):
         result = warm_base_geojson_caches.run(nuts_levels=None, regions_limit=10)
 
@@ -307,6 +337,21 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
         self.assertFalse(
             any(geom_column in query["sql"] for query in ctx.captured_queries),
             "geometry column selected for a skipped region",
+        )
+
+    def test_limited_nuts_warmup_does_not_cache_a_partial_level(self):
+        NutsRegion.objects.create(
+            name="Luxembourg",
+            nuts_id="LU",
+            levl_code=0,
+            cntr_code="LU",
+            version=self.vintage,
+        )
+        warm_base_geojson_caches.run(nuts_levels=[0], regions_limit=None, nuts_limit=1)
+        self.assertIsNone(
+            self.geojson_cache.get(
+                get_nuts_region_cache_key(level=0, version=self.vintage.year)
+            )
         )
 
     def test_nuts_limit_slices_per_level_queryset(self):

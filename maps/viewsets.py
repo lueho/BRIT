@@ -53,6 +53,7 @@ class LocationViewSet(AutoPermModelViewSet):
 
 
 class RegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
+    geojson_geometry_field = "borders__geom"
     queryset = Region.objects.select_related("borders").all()
     serializer_class = RegionModelSerializer
     filterset_class = RegionFilterSet
@@ -85,6 +86,7 @@ class RegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
 
 
 class CatchmentViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
+    geojson_geometry_field = "region__borders__geom"
     queryset = Catchment.objects.select_related("region", "region__borders").all()
     serializer_class = CatchmentModelSerializer
     filterset_class = CatchmentFilterSet
@@ -123,6 +125,7 @@ class CatchmentViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
 
 
 class NutsRegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
+    geojson_geometry_field = "borders__geom"
     queryset = (
         NutsRegion.objects.select_related("borders", "parent")
         .prefetch_related(

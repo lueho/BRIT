@@ -17,8 +17,13 @@ from maps.serializers import (
     RegionGeoFeatureModelSerializer,
 )
 from maps.utils import (
+    GEOJSON_MAX_BUFFERED_POINTS,
+    cache_rendered_geojson,
+    geojson_version_aggregates,
+    geojson_version_token,
     get_nuts_region_cache_key,
     get_region_cache_key,
+    rendered_geojson_cache_key,
     set_geojson_cache_payload,
 )
 
@@ -40,6 +45,33 @@ DEFAULT_REGIONS_LIMIT = 50
 REGION_GEOJSON_WARMUP_MAX_POINTS = 100_000
 
 
+def _warm_geojson_entry(cache, cache_key, queryset, serializer_class, timeout):
+    aggregates = queryset.aggregate(**geojson_version_aggregates("borders__geom"))
+    rendered_key = rendered_geojson_cache_key(
+        cache_key, geojson_version_token(aggregates)
+    )
+    marker_key = f"{rendered_key}:warm"
+    if cache.has_key(rendered_key) or (
+        cache.has_key(marker_key) and cache.has_key(cache_key)
+    ):
+        return False
+    if (aggregates.get("num_points") or 0) > GEOJSON_MAX_BUFFERED_POINTS:
+        warmed = cache_rendered_geojson(
+            cache,
+            rendered_key,
+            queryset,
+            serializer_class,
+            "borders__geom",
+            timeout=timeout,
+        )
+        cache.delete(cache_key)
+        return warmed
+    serializer = serializer_class(queryset.iterator(chunk_size=1), many=True)
+    set_geojson_cache_payload(cache, cache_key, serializer.data, timeout=timeout)
+    cache.set(marker_key, True, timeout=timeout)
+    return True
+
+
 def warm_nuts_geojson_cache(nuts_levels=None, limit=None):
     """Warm the NUTS region GeoJSON cache.
 
@@ -51,6 +83,8 @@ def warm_nuts_geojson_cache(nuts_levels=None, limit=None):
         nuts_levels = DEFAULT_NUTS_LEVELS
     vintage = NutsVintage.default()
     year = vintage.year if vintage else None
+    cache_alias = getattr(settings, "GEOJSON_CACHE", "default")
+    timeout = settings.CACHES.get(cache_alias, {}).get("TIMEOUT", 3600)
 
     warmed = 0
     for level in nuts_levels:
@@ -60,16 +94,29 @@ def warm_nuts_geojson_cache(nuts_levels=None, limit=None):
         if limit:
             queryset = queryset[:limit]
 
-        for region in queryset:
-            cache_key = get_nuts_region_cache_key(nuts_id=region.id, version=year)
-            serializer = NutsRegionGeometrySerializer([region], many=True)
-            set_geojson_cache_payload(geojson_cache, cache_key, serializer.data)
-            warmed += 1
+        for region_id in queryset.values_list("pk", flat=True).iterator(chunk_size=100):
+            cache_key = get_nuts_region_cache_key(nuts_id=region_id, version=year)
+            entry_queryset = NutsRegion.objects.filter(pk=region_id).select_related(
+                "borders"
+            )
+            warmed += _warm_geojson_entry(
+                geojson_cache,
+                cache_key,
+                entry_queryset,
+                NutsRegionGeometrySerializer,
+                timeout,
+            )
 
         # Also cache the per-level collection
-        cache_key = get_nuts_region_cache_key(level=level, version=year)
-        serializer = NutsRegionGeometrySerializer(queryset, many=True)
-        set_geojson_cache_payload(geojson_cache, cache_key, serializer.data)
+        if not limit:
+            cache_key = get_nuts_region_cache_key(level=level, version=year)
+            _warm_geojson_entry(
+                geojson_cache,
+                cache_key,
+                queryset.select_related("borders"),
+                NutsRegionGeometrySerializer,
+                timeout,
+            )
 
     logger.info("NUTS GeoJSON cache warmed: %d entries", warmed)
     return {"status": "success", "features_count": warmed}
@@ -118,13 +165,11 @@ def warm_region_geojson_cache(limit=None, max_points=None):
 
     warmed = 0
     for region_id in eligible_ids:
-        region = Region.objects.select_related("borders").get(id=region_id)
-        cache_key = get_region_cache_key(region_id=region.id)
-        serializer = RegionGeoFeatureModelSerializer([region], many=True)
-        set_geojson_cache_payload(
-            geojson_cache, cache_key, serializer.data, timeout=timeout
+        queryset = Region.objects.filter(pk=region_id).select_related("borders")
+        cache_key = get_region_cache_key(region_id=region_id)
+        warmed += _warm_geojson_entry(
+            geojson_cache, cache_key, queryset, RegionGeoFeatureModelSerializer, timeout
         )
-        warmed += 1
 
     if skipped:
         logger.warning(

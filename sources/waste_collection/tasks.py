@@ -12,7 +12,11 @@ from bibliography.utils import check_url, find_wayback_snapshot_for_year
 from brit.celery import app
 from maps.db_functions import SimplifyPreserveTopology
 from maps.signals import get_geojson_cache
-from maps.utils import build_collection_cache_key, set_geojson_cache_payload
+from maps.utils import (
+    build_collection_cache_key,
+    cache_rendered_geojson,
+    rendered_geojson_cache_key,
+)
 from sources.waste_collection.filters import WasteFlyerFilter
 from sources.waste_collection.geojson import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
@@ -52,23 +56,36 @@ def warm_collection_geojson_cache(self):
         # Compute the versioned key before serializing: a write landing
         # mid-task then produces a fresh payload under an orphaned old key,
         # never stale geometry under a current key.
-        cache_key = build_collection_cache_key(scope="published")
-        serializer = WasteCollectionGeometrySerializer(qs, many=True)
-        data = serializer.data
+        from sources.waste_collection.viewsets import CollectionViewSet
+
+        base_key = build_collection_cache_key(scope="published")
+        view = CollectionViewSet()
+        aggregates = qs.aggregate(**view._version_aggregates())
+        cache_key = rendered_geojson_cache_key(
+            base_key, view._version_token(aggregates)
+        )
         cache = get_geojson_cache()
         timeout = getattr(settings, "GEOJSON_CACHE_TIMEOUT", 86400)
-        set_geojson_cache_payload(cache, cache_key, data, timeout=timeout)
-
-        feature_count = (
-            len(data.get("features", [])) if isinstance(data, dict) else len(data)
+        cached = cache.has_key(cache_key)
+        warmed = cached or cache_rendered_geojson(
+            cache,
+            cache_key,
+            qs,
+            WasteCollectionGeometrySerializer,
+            "simplified_geom",
+            timeout=timeout,
+            geometry_defer_field="catchment__region__borders__geom",
         )
+        cache.delete(base_key)
+        cache.delete(f"{base_key}:count")
+        feature_count = 0 if cached else aggregates["cnt"] or 0
         logger.info(
             "Collection GeoJSON cache warmed: %d features, key=%s",
             feature_count,
             cache_key,
         )
         return {
-            "status": "success",
+            "status": "success" if warmed else "skipped",
             "features_count": feature_count,
             "cache_key": cache_key,
         }
