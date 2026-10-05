@@ -97,7 +97,9 @@ class RoadsideTreesGeoJSONWarmTaskTestCase(SimpleTestCase):
             "version": "dv123",
         }
 
-        result = warm_roadside_tree_geojson_cache.run()
+        with self.assertLogs("sources.roadside_trees.tasks", level="WARNING") as logs:
+            result = warm_roadside_tree_geojson_cache.run()
+        self.assertIn("features exceed", logs.output[0])
 
         self.assertEqual(result["status"], "skipped")
         self.assertEqual(result["features_count"], 230615)
