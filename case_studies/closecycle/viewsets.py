@@ -10,14 +10,15 @@ from maps.mixins import (
 )
 from maps.models import GeoPolygon
 from maps.throttling import GeoJSONAnonThrottle
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.viewsets import AutoPermModelViewSet
 
 from .models import BiogasPlantsSweden, Showcase
 from .serializers import (
     BiogasPlantsSwedenSimpleModelSerializer,
+    ShowcaseFlatSerializer,
     ShowcaseGeoFeatureModelSerializer,
     ShowcaseModelSerializer,
-    ShowcaseSummaryListSerializer,
 )
 
 
@@ -35,10 +36,14 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     }
 
     def get_queryset(self):
-        queryset = super().get_queryset().select_related("region")
-        if self.action == "geojson":
+        queryset = filter_queryset_for_user(
+            super().get_queryset(), self.request.user
+        ).select_related("region")
+        if self.action in ("geojson", "version"):
             return queryset
-        connections = ("process_links",) if self.action == "summaries" else None
+        connections = (
+            ("material_links", "process_links") if self.action == "summaries" else None
+        )
         return Showcase.prefetch_visible_connections(
             queryset, self.request.user, connections=connections
         )
@@ -118,10 +123,10 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
             Response: The serialized summary of the Showcase instance.
         """
         queryset = self.filter_queryset(self.get_queryset())
-        serializer = ShowcaseSummaryListSerializer(
-            queryset, many=True, context={"request": request}
+        serializer = ShowcaseFlatSerializer(
+            queryset, many=True, context=self.get_serializer_context()
         )
-        return Response(serializer.data[0])
+        return Response({"summaries": serializer.data})
 
 
 class SwedenBiogasPlantsViewSet(AutoPermModelViewSet):
