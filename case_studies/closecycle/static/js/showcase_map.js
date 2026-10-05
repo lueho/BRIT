@@ -131,22 +131,34 @@ function renderSummaries(featureInfos) {
     document.querySelector('#info-card-body')?.classList.add('show');
 }
 
+// Click tolerance in screen pixels for point (circle marker) features, which
+// render smaller than a comfortable click target.
+const POINT_CLICK_TOLERANCE_PX = 10;
+
 function featureClickHandler(e, featureGroup) {
     resetFeatureStyles(featureGroup);
 
     const intersectingFeatures = new Map();
+    const clickPoint = map.latLngToLayerPoint(e.latlng);
 
     featureGroup.eachLayer(layer => {
+        let hit = false;
         if (layer instanceof L.Polygon) {
             const polygon = layer.toGeoJSON();
             const point = [e.latlng.lng, e.latlng.lat];
-            if (turf.inside(point, polygon)) {
-                const showcaseId = layer.feature.id;
-                if (!intersectingFeatures.has(showcaseId)) {
-                    intersectingFeatures.set(showcaseId, []);
-                }
-                intersectingFeatures.get(showcaseId).push(layer);
+            hit = turf.inside(point, polygon);
+        } else if (typeof layer.getLatLng === 'function') {
+            const markerPoint = map.latLngToLayerPoint(layer.getLatLng());
+            const dx = clickPoint.x - markerPoint.x;
+            const dy = clickPoint.y - markerPoint.y;
+            hit = Math.sqrt(dx * dx + dy * dy) <= POINT_CLICK_TOLERANCE_PX;
+        }
+        if (hit) {
+            const showcaseId = layer.feature.id;
+            if (!intersectingFeatures.has(showcaseId)) {
+                intersectingFeatures.set(showcaseId, []);
             }
+            intersectingFeatures.get(showcaseId).push(layer);
         }
     });
 
@@ -170,7 +182,7 @@ function featureClickHandler(e, featureGroup) {
         const popupContent = document.createElement('div');
         const regionGroups = new Map();
         intersectingFeatures.forEach(layers => {
-            const regionName = layers[0].feature.properties.region;
+            const regionName = layers[0].feature.properties.region || 'No region';
             if (!regionGroups.has(regionName)) {
                 regionGroups.set(regionName, []);
             }

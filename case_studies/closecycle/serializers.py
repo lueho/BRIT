@@ -3,13 +3,14 @@ from django.urls import reverse
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from rest_framework.serializers import ModelSerializer
+from rest_framework_gis.fields import GeometryField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from case_studies.closecycle.models import Showcase
 from maps.serializers import (
     BaseGeoFeatureModelSerializer,
-    PolygonSerializer,
     RegionModelSerializer,
+    get_nested_attr,
 )
 
 from .models import BiogasPlantsSweden, ShowcaseMaterial
@@ -35,6 +36,7 @@ class ShowcaseModelSerializer(ModelSerializer):
     """Showcase with its connections, limited to records the reader may see."""
 
     region = RegionModelSerializer()
+    geom = GeometryField(allow_null=True, read_only=True)
     catchment = serializers.SerializerMethodField()
     showcase_materials = serializers.SerializerMethodField()
     process_chain = serializers.SerializerMethodField()
@@ -47,6 +49,7 @@ class ShowcaseModelSerializer(ModelSerializer):
         fields = [
             "id",
             "name",
+            "geom",
             "region",
             "catchment",
             "description",
@@ -188,18 +191,26 @@ class ShowcaseSummaryListSerializer(ModelSerializer):
 
 
 class ShowcaseGeoFeatureModelSerializer(BaseGeoFeatureModelSerializer):
-    region = CharField(source="region.name")
+    region = CharField(source="region.name", allow_null=True)
 
     class Meta:
         model = Showcase
         geo_field = "geom"
-        attr_path = "region.borders"
-        geo_serializer_class = PolygonSerializer
         fields = [
             "id",
             "name",
             "region",
         ]
+
+    def get_geom(self, obj):
+        geom = obj.geom
+        if geom is None:
+            borders = get_nested_attr(obj, "region.borders")
+            if borders is not None and borders.geom:
+                geom = borders.geom.centroid
+        if geom is None:
+            return None
+        return GeometryField().to_representation(geom)
 
 
 class BiogasPlantsSwedenSimpleModelSerializer(serializers.ModelSerializer):

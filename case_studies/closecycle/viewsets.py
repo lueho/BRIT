@@ -38,7 +38,7 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     def get_queryset(self):
         queryset = filter_queryset_for_user(
             super().get_queryset(), self.request.user
-        ).select_related("region")
+        ).select_related("region__borders")
         if self.action in ("geojson", "version"):
             return queryset
         connections = (

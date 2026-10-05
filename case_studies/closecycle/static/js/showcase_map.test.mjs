@@ -108,6 +108,10 @@ function setup({ loadShared = false } = {}) {
         closePopup() {
             calls.closePopup += 1;
         },
+        // Test projection: 1 degree = 1 pixel.
+        latLngToLayerPoint(latlng) {
+            return { x: latlng.lng, y: latlng.lat };
+        },
     };
 
     const elements = {
@@ -191,6 +195,15 @@ function makeLayer({ L, id, name, region }) {
     layer.feature = { id, properties: { name, region } };
     layer.toGeoJSON = () => ({ geometry: { id } });
     return layer;
+}
+
+function makePointLayer({ id, name, region, lat = 55, lng = 14 }) {
+    return {
+        feature: { id, properties: { name, region } },
+        getLatLng() {
+            return { lat, lng };
+        },
+    };
 }
 
 function makeFeatureGroup(layers) {
@@ -444,4 +457,60 @@ test("duplicate polygons of one showcase autoselect without popup", () => {
     assert.deepEqual(calls.fetchSummaries.map(params => params.id), [1]);
     assert.equal(calls.selected[0], firstA);
     assert.equal(calls.selected[1], firstB);
+});
+
+test("click near a showcase point selects it", () => {
+    const { sandbox, calls } = setup();
+    const marker = makePointLayer({ id: 1, name: "Site", region: "Region A" });
+    const distant = makePointLayer({ id: 2, name: "Far", region: "Region B", lat: 60, lng: 30 });
+    const group = makeFeatureGroup([marker, distant]);
+
+    sandbox.featureClickHandler(clickEvent, group);
+
+    assert.equal(calls.openPopup.length, 0);
+    assert.deepEqual(calls.fetchSummaries.map(params => params.id), [1]);
+    assert.equal(calls.selected[0], marker);
+});
+
+test("click misses a far-away showcase point", () => {
+    const { sandbox, calls } = setup();
+    const distant = makePointLayer({ id: 2, name: "Far", region: "Region B", lat: 60, lng: 30 });
+    const group = makeFeatureGroup([distant]);
+
+    sandbox.featureClickHandler(clickEvent, group);
+
+    assert.equal(calls.openPopup.length, 1);
+    assert.equal(calls.fetchSummaries.length, 0);
+});
+
+test("co-located showcase points open a popup instead of autoselecting", () => {
+    const { sandbox, calls } = setup();
+    const first = makePointLayer({ id: 1, name: "First", region: "Region A" });
+    const second = makePointLayer({ id: 2, name: "Second", region: "Region A" });
+    const group = makeFeatureGroup([first, second]);
+
+    sandbox.featureClickHandler(clickEvent, group);
+
+    assert.equal(calls.openPopup.length, 1);
+    const links = findAll(calls.openPopup[0].content, el => el.tagName === "A");
+    assert.deepEqual(links.map(el => el.textContent), ["First", "Second"]);
+});
+
+test("co-located points without regions use a meaningful fallback heading", () => {
+    const { sandbox, calls } = setup();
+    const layers = [
+        makePointLayer({ id: 1, name: "No anchor" }),
+        makePointLayer({ id: 2, name: "Null anchor", region: null }),
+        makePointLayer({ id: 3, name: "Anchored", region: "Region A" }),
+    ];
+    sandbox.featureClickHandler(clickEvent, makeFeatureGroup(layers));
+    const { content } = calls.openPopup[0];
+    assert.deepEqual(
+        findAll(content, el => el.tagName === "STRONG").map(el => el.textContent),
+        ["No region", "Region A"]
+    );
+    const links = findAll(content, el => el.tagName === "A");
+    assert.deepEqual(links.map(el => el.textContent), ["No anchor", "Null anchor", "Anchored"]);
+    links[0].click();
+    assert.deepEqual(calls.fetchSummaries.map(params => params.id), [1]);
 });

@@ -37,6 +37,12 @@ class Showcase(NamedUserCreatedObject):
     flows.
     """
 
+    geom = PointField(
+        blank=True,
+        null=True,
+        help_text="Location of the showcase installation. Falls back to the "
+        "centroid of the region's borders on maps when not set.",
+    )
     region = ForeignKey(Region, on_delete=PROTECT, null=True, blank=True)
     catchment = ForeignKey(
         Catchment,
