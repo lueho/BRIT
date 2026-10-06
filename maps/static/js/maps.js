@@ -272,21 +272,13 @@ function hideLoadingIndicator() {
 }
 
 function showMapOverlay() {
-    try {
-        const overlay = document.getElementById('map-overlay');
-        overlay.classList.add('map-overlay-visible');
-    } catch (error) {
-        console.warn('Map overlay could not be shown:', error);
-    }
+    const overlay = document.getElementById('map-overlay');
+    if (overlay) overlay.classList.add('map-overlay-visible');
 }
 
 function hideMapOverlay() {
-    try {
-        const overlay = document.getElementById('map-overlay');
-        overlay.classList.remove('map-overlay-visible');
-    } catch (error) {
-        console.warn('Map overlay could not be hidden:', error);
-    }
+    const overlay = document.getElementById('map-overlay');
+    if (overlay) overlay.classList.remove('map-overlay-visible');
 }
 
 function displayErrorMessage(error) {
@@ -333,10 +325,12 @@ function prepareMapRefresh() {
     } catch (error) {
         console.warn('Custom elements were not locked', error);
     }
-    try {
-        lockFilter();
-    } catch (error) {
-        console.warn('Filter was not locked', error);
+    if (typeof lockFilter === 'function') {
+        try {
+            lockFilter();
+        } catch (error) {
+            console.warn('Filter was not locked', error);
+        }
     }
     showLoadingIndicator();
 }
@@ -372,6 +366,7 @@ function refreshMap(promises, filterParameters, timeLimit = 120000) {
 }
 
 function updateUrlSearchParams() {
+    if (typeof parseFilterParameters !== 'function') return;
     const params = parseFilterParameters();
     const url = new URL(window.location);
     url.search = params.toString();
@@ -385,10 +380,12 @@ function cleanup() {
         console.warn('URL search parameters were not updated:', error);
     }
     hideLoadingIndicator();
-    try {
-        unlockFilter();
-    } catch (error) {
-        console.warn('Filter was not unlocked', error);
+    if (typeof unlockFilter === 'function') {
+        try {
+            unlockFilter();
+        } catch (error) {
+            console.warn('Filter was not unlocked', error);
+        }
     }
     try {
         unlockCustomElements();

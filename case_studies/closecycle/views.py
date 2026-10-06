@@ -1,3 +1,7 @@
+from django.db.models import F
+
+from inventories.models import ScenarioStatus
+from layer_manager.models import LayerAggregatedValue
 from maps.views import GeoDataSetPublishedFilteredMapView, MapMixin
 from utils.object_management.views import (
     PrivateObjectFilterView,
@@ -15,7 +19,14 @@ from .forms import (
     ShowcaseModelForm,
     ShowcaseProcessInline,
 )
-from .models import Showcase
+from .models import Showcase, ShowcaseMaterial
+
+CHAIN_STAGES = (
+    ("input", "Inputs", "fa-seedling"),
+    ("process", "Process steps", "fa-gears"),
+    ("intermediate", "Intermediates", "fa-flask"),
+    ("product", "Products", "fa-box-open"),
+)
 
 # ----------- Showcase CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -57,17 +68,63 @@ class ShowcaseDetailView(MapMixin, UserCreatedObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
+        material_links = self.object.visible_material_links(user)
+        process_chain = self.object.visible_process_chain(user)
+        scenarios = self.object.visible_scenarios(user)
         context.update(
             {
                 "visible_catchment": self.object.visible_catchment(user),
-                "material_links": self.object.visible_material_links(user),
-                "process_chain": self.object.visible_process_chain(user),
+                "material_links": material_links,
+                "process_chain": process_chain,
+                "chain_stages": chain_stages(material_links, process_chain),
                 "samples": self.object.visible_samples(user),
                 "sample_series": self.object.visible_sample_series(user),
-                "scenarios": self.object.visible_scenarios(user),
+                "scenarios": scenarios,
+                "scenario_cards": scenario_cards(scenarios),
             }
         )
         return context
+
+
+def chain_stages(material_links, process_chain):
+    """Non-empty stages of the processing chain in flow order."""
+    items = {role: [] for role in ShowcaseMaterial.Role.values}
+    for link in material_links:
+        items[link.role].append(link.material)
+    items["process"] = list(process_chain)
+    return [
+        {"key": key, "label": label, "icon": icon, "items": items[key]}
+        for key, label, icon in CHAIN_STAGES
+        if items[key]
+    ]
+
+
+def scenario_cards(scenarios):
+    """Scenarios with their status and, once evaluated, their headline results."""
+    statuses = dict(
+        ScenarioStatus.objects.filter(scenario__in=scenarios).values_list(
+            "scenario_id", "status"
+        )
+    )
+    evaluated = {
+        pk
+        for pk, status in statuses.items()
+        if status == ScenarioStatus.Status.FINISHED
+    }
+    results = {pk: [] for pk in evaluated}
+    values = LayerAggregatedValue.objects.filter(
+        layer__scenario_id__in=evaluated, layer__staged=False
+    ).order_by("layer__scenario_id", "layer_id", "pk")
+    for value in values.annotate(scenario_id=F("layer__scenario_id")):
+        results[value.scenario_id].append(value)
+    return [
+        {
+            "scenario": scenario,
+            "evaluated": scenario.pk in evaluated,
+            "results": results.get(scenario.pk, []),
+        }
+        for scenario in scenarios
+    ]
 
 
 class ShowcaseUpdateView(UserCreatedObjectUpdateWithInlinesView):

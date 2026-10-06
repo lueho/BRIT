@@ -1,3 +1,5 @@
+import re
+
 from django.contrib.gis.db.models import PointField
 from django.db import models
 from django.db.models import (
@@ -19,6 +21,10 @@ from materials.models import Material, Sample, SampleSeries
 from processes.models import Process
 from utils.object_management.models import NamedUserCreatedObject
 from utils.object_management.permissions import filter_queryset_for_user
+
+SHOWCASE_CODE_PATTERN = re.compile(
+    r"^(?P<code>SC\d+[A-Za-z]?)\s*[\u2013\u2014-]\s*(?P<title>.+)$"
+)
 
 
 class Showcase(NamedUserCreatedObject):
@@ -90,6 +96,21 @@ class Showcase(NamedUserCreatedObject):
     @classmethod
     def public_map_url(cls):
         return reverse("Showcase")
+
+    def _split_name(self):
+        return SHOWCASE_CODE_PATTERN.match(self.name or "")
+
+    @property
+    def code(self):
+        """Project code at the start of the name, e.g. ``SC14``."""
+        match = self._split_name()
+        return match.group("code") if match else None
+
+    @property
+    def title(self):
+        """The name without its leading project code."""
+        match = self._split_name()
+        return match.group("title") if match else self.name
 
     def _material_links_for_role(self, role: "ShowcaseMaterial.Role"):
         """Return material links for ``role``, using the prefetch cache if set."""
