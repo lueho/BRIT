@@ -14,7 +14,7 @@ from case_studies.closecycle.serializers import (
     ShowcaseGeoFeatureModelSerializer,
     ShowcaseModelSerializer,
 )
-from maps.models import Region
+from maps.models import Catchment, Region
 from materials.models import Material, Sample
 from processes.models import Process
 
@@ -351,6 +351,250 @@ class ShowcaseGeoFeatureModelSerializerTest(TestCase):
         )
 
 
+class ShowcasePilotRegionGeoJSONTest(TestCase):
+    """The showcase GeoJSON combines showcase site points with one
+    pilot-region polygon per visible catchment (or the showcase's region for
+    showcases without a catchment)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        User = get_user_model()
+        cls.owner = User.objects.create(username="pilot_region_owner")
+
+        cls.catchment_region = Region.objects.create(
+            name="TBN Region", publication_status="published"
+        )
+        cls.catchment_region.geom = MultiPolygon(Polygon.from_bbox((0, 0, 10, 10)))
+        cls.catchment_region.save()
+        cls.catchment = Catchment.objects.create(
+            name="TBN Catchment",
+            region=cls.catchment_region,
+            publication_status="published",
+        )
+        cls.first = Showcase.objects.create(
+            name="First Pilot",
+            region=cls.catchment_region,
+            catchment=cls.catchment,
+            geom=Point(1, 2, srid=4326),
+            publication_status="published",
+        )
+        cls.second = Showcase.objects.create(
+            name="Second Pilot",
+            catchment=cls.catchment,
+            geom=Point(3, 4, srid=4326),
+            publication_status="published",
+        )
+
+        cls.legacy_region = Region.objects.create(
+            name="Legacy Region", publication_status="published"
+        )
+        cls.legacy_region.geom = MultiPolygon(Polygon.from_bbox((20, 20, 30, 30)))
+        cls.legacy_region.save()
+        cls.legacy = Showcase.objects.create(
+            name="Legacy Showcase",
+            region=cls.legacy_region,
+            geom=Point(25, 25, srid=4326),
+            publication_status="published",
+        )
+
+        cls.stray = Showcase.objects.create(
+            name="Stray Showcase", publication_status="published"
+        )
+
+        cls.private_region = Region.objects.create(
+            name="Private TBN Region", owner=cls.owner
+        )
+        cls.private_region.geom = MultiPolygon(Polygon.from_bbox((40, 40, 50, 50)))
+        cls.private_region.save()
+        cls.private_catchment = Catchment.objects.create(
+            name="Private Catchment",
+            region=cls.private_region,
+            owner=cls.owner,
+        )
+        cls.private_link = Showcase.objects.create(
+            name="Private Link",
+            catchment=cls.private_catchment,
+            geom=Point(45, 45, srid=4326),
+            publication_status="published",
+        )
+
+        cls.hidden = Showcase.objects.create(
+            name="Hidden Showcase",
+            catchment=cls.catchment,
+            geom=Point(5, 6, srid=4326),
+            owner=cls.owner,
+        )
+
+    def _features(self, params=None, user=None):
+        if user is not None:
+            self.client.force_login(user)
+        response = self.client.get(
+            reverse("api-showcase-geojson"), params or {"scope": "published"}
+        )
+        self.assertEqual(200, response.status_code)
+        return response.json()["features"]
+
+    @staticmethod
+    def _pilots(features):
+        return [
+            f for f in features if f["properties"].get("feature_type") == "pilot_region"
+        ]
+
+    @staticmethod
+    def _points(features):
+        return [
+            f for f in features if f["properties"].get("feature_type") == "showcase"
+        ]
+
+    def test_points_and_pilot_polygon_coexist(self):
+        features = self._features()
+        points = {f["id"]: f for f in self._points(features)}
+        self.assertEqual(
+            {"type": "Point", "coordinates": [1.0, 2.0]},
+            points[self.first.pk]["geometry"],
+        )
+        pilots = {f["id"]: f for f in self._pilots(features)}
+        catchment_feature = pilots[f"pilot-catchment-{self.catchment.pk}"]
+        self.assertEqual("MultiPolygon", catchment_feature["geometry"]["type"])
+        longitudes = [
+            coord[0]
+            for polygon in catchment_feature["geometry"]["coordinates"]
+            for ring in polygon
+            for coord in ring
+        ]
+        self.assertEqual(0.0, min(longitudes))
+        self.assertEqual(10.0, max(longitudes))
+
+    def test_shared_catchment_produces_one_polygon_listing_both_showcases(self):
+        features = self._features()
+        pilots = [
+            f
+            for f in self._pilots(features)
+            if f["id"] == f"pilot-catchment-{self.catchment.pk}"
+        ]
+        self.assertEqual(1, len(pilots))
+        self.assertEqual("TBN Catchment", pilots[0]["properties"]["name"])
+        memberships = {
+            entry["id"]: entry for entry in pilots[0]["properties"]["showcases"]
+        }
+        self.assertEqual(
+            {"id": self.first.pk, "name": "First Pilot", "region": "TBN Region"},
+            memberships[self.first.pk],
+        )
+        self.assertEqual(
+            {"id": self.second.pk, "name": "Second Pilot", "region": None},
+            memberships[self.second.pk],
+        )
+
+    def test_showcase_without_catchment_falls_back_to_region(self):
+        features = self._features()
+        pilots = {f["id"]: f for f in self._pilots(features)}
+        fallback = pilots[f"pilot-region-{self.legacy_region.pk}"]
+        self.assertEqual("Legacy Region", fallback["properties"]["name"])
+        self.assertEqual("MultiPolygon", fallback["geometry"]["type"])
+        self.assertEqual(
+            [self.legacy.pk],
+            [entry["id"] for entry in fallback["properties"]["showcases"]],
+        )
+
+    def test_showcase_without_region_or_catchment_does_not_crash(self):
+        features = self._features()
+        points = {f["id"]: f for f in self._points(features)}
+        self.assertIn(self.stray.pk, points)
+        self.assertIsNone(points[self.stray.pk]["geometry"])
+        self.assertNotIn(
+            self.stray.pk,
+            [
+                entry["id"]
+                for pilot in self._pilots(features)
+                for entry in pilot["properties"]["showcases"]
+            ],
+        )
+
+    def test_private_catchment_geometry_hidden_from_anonymous(self):
+        features = self._features()
+        self.assertNotIn(
+            f"pilot-catchment-{self.private_catchment.pk}",
+            [f["id"] for f in self._pilots(features)],
+        )
+        self.assertNotIn(
+            "Private Catchment",
+            [f["properties"].get("name") for f in features],
+        )
+        self.assertIn(self.private_link.pk, [f["id"] for f in self._points(features)])
+
+        features = self._features(user=self.owner)
+        pilots = {f["id"]: f for f in self._pilots(features)}
+        self.assertIn(f"pilot-catchment-{self.private_catchment.pk}", pilots)
+
+    def test_private_catchment_does_not_fall_back_to_its_region_geometry(self):
+        features = self._features()
+        pilots = self._pilots(features)
+        self.assertNotIn(
+            f"pilot-region-{self.private_region.pk}", [f["id"] for f in pilots]
+        )
+        for pilot in pilots:
+            longitudes = [
+                coord[0]
+                for polygon in pilot["geometry"]["coordinates"]
+                for ring in polygon
+                for coord in ring
+            ]
+            self.assertLess(max(longitudes), 40)
+
+    def test_private_showcase_excluded_from_markers_and_pilot_membership(self):
+        features = self._features()
+        self.assertNotIn(self.hidden.pk, [f["id"] for f in self._points(features)])
+        pilot = next(
+            f
+            for f in self._pilots(features)
+            if f["id"] == f"pilot-catchment-{self.catchment.pk}"
+        )
+        self.assertNotIn(
+            self.hidden.pk,
+            [entry["id"] for entry in pilot["properties"]["showcases"]],
+        )
+
+        features = self._features(user=self.owner)
+        self.assertIn(self.hidden.pk, [f["id"] for f in self._points(features)])
+        pilot = next(
+            f
+            for f in self._pilots(features)
+            if f["id"] == f"pilot-catchment-{self.catchment.pk}"
+        )
+        self.assertIn(
+            self.hidden.pk,
+            [entry["id"] for entry in pilot["properties"]["showcases"]],
+        )
+
+    def test_id_filter_reduces_pilot_membership(self):
+        features = self._features({"id": self.first.pk})
+        self.assertEqual([self.first.pk], [f["id"] for f in self._points(features)])
+        pilots = self._pilots(features)
+        self.assertEqual(1, len(pilots))
+        self.assertEqual(
+            [self.first.pk],
+            [entry["id"] for entry in pilots[0]["properties"]["showcases"]],
+        )
+
+    def test_catchment_without_region_geometry_is_skipped(self):
+        bald_region = Region.objects.create(name="Bald", publication_status="published")
+        bald_catchment = Catchment.objects.create(
+            name="Bald Catchment",
+            region=bald_region,
+            publication_status="published",
+        )
+        showcase = Showcase.objects.create(
+            name="Bald Pilot",
+            catchment=bald_catchment,
+            geom=Point(7, 8, srid=4326),
+            publication_status="published",
+        )
+        features = self._features({"id": showcase.pk})
+        self.assertEqual([], self._pilots(features))
+        self.assertEqual([showcase.pk], [f["id"] for f in self._points(features)])
+
+
 class ShowcaseSummariesEndpointTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -434,7 +678,10 @@ class ShowcaseMapEndpointPrefetchTest(TestCase):
         return {table for table in self.CONNECTION_TABLES if f'"{table}"' in sql}
 
     def test_geojson_does_not_load_connections(self):
-        self.assertEqual(set(), self._queried_connection_tables("api-showcase-geojson"))
+        self.assertEqual(
+            {"maps_catchment"},
+            self._queried_connection_tables("api-showcase-geojson"),
+        )
 
     def test_summaries_load_only_material_and_process_links(self):
         self.assertEqual(

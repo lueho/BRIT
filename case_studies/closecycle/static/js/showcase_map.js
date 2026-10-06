@@ -131,6 +131,42 @@ function renderSummaries(featureInfos) {
     document.querySelector('#info-card-body')?.classList.add('show');
 }
 
+function bindShowcaseFeature(feature, layer) {
+    bindFeaturePopup(feature, layer);
+    if (layer instanceof L.Polygon && typeof layer.on === 'function') {
+        layer.on('add', () => layer.bringToBack());
+    }
+}
+
+function createFeaturesLayer(geoJson, geometryType) {
+    return L.geoJson(geoJson, {
+        pane: 'featuresPane',
+        onEachFeature: bindShowcaseFeature,
+        style: featuresLayerStyle,
+        pointToLayer: (feature, latlng) => L.circleMarker(latlng, featuresLayerStyle),
+    });
+}
+
+function resetFeatureStyles(featureGroup) {
+    featureGroup.resetStyle();
+    featureGroup.eachLayer(layer => {
+        if (layer instanceof L.Polygon && typeof layer.bringToBack === 'function') {
+            layer.bringToBack();
+        }
+    });
+}
+
+function selectFeature(layer) {
+    layer.setStyle({ "color": "#f49a33" });
+    if (!(layer instanceof L.Polygon) && typeof layer.bringToFront === 'function') {
+        layer.bringToFront();
+    }
+}
+
+function isMarkerLayer(layer) {
+    return typeof layer.getLatLng === 'function' && !(layer instanceof L.Polygon);
+}
+
 // Click tolerance in screen pixels for point (circle marker) features, which
 // render smaller than a comfortable click target.
 const POINT_CLICK_TOLERANCE_PX = 10;
@@ -139,28 +175,86 @@ function featureClickHandler(e, featureGroup) {
     resetFeatureStyles(featureGroup);
 
     const intersectingFeatures = new Map();
+    const showcaseMeta = new Map();
     const clickPoint = map.latLngToLayerPoint(e.latlng);
+    const markerLayers = new Map();
+    const polygonLayers = [];
 
     featureGroup.eachLayer(layer => {
-        let hit = false;
         if (layer instanceof L.Polygon) {
-            const polygon = layer.toGeoJSON();
-            const point = [e.latlng.lng, e.latlng.lat];
-            hit = turf.inside(point, polygon);
-        } else if (typeof layer.getLatLng === 'function') {
-            const markerPoint = map.latLngToLayerPoint(layer.getLatLng());
-            const dx = clickPoint.x - markerPoint.x;
-            const dy = clickPoint.y - markerPoint.y;
-            hit = Math.sqrt(dx * dx + dy * dy) <= POINT_CLICK_TOLERANCE_PX;
-        }
-        if (hit) {
+            polygonLayers.push(layer);
+        } else if (isMarkerLayer(layer)) {
             const showcaseId = layer.feature.id;
-            if (!intersectingFeatures.has(showcaseId)) {
-                intersectingFeatures.set(showcaseId, []);
+            if (!markerLayers.has(showcaseId)) {
+                markerLayers.set(showcaseId, []);
             }
-            intersectingFeatures.get(showcaseId).push(layer);
+            markerLayers.get(showcaseId).push(layer);
         }
     });
+
+    const addShowcase = (id, name, region, layers) => {
+        if (!intersectingFeatures.has(id)) {
+            intersectingFeatures.set(id, []);
+            showcaseMeta.set(id, { name, region });
+        }
+        const existing = intersectingFeatures.get(id);
+        layers.forEach(layer => {
+            if (!existing.includes(layer)) {
+                existing.push(layer);
+            }
+        });
+    };
+
+    const markerHit = layer => {
+        const markerPoint = map.latLngToLayerPoint(layer.getLatLng());
+        const dx = clickPoint.x - markerPoint.x;
+        const dy = clickPoint.y - markerPoint.y;
+        return Math.sqrt(dx * dx + dy * dy) <= POINT_CLICK_TOLERANCE_PX;
+    };
+
+    const addHitMarkers = () => {
+        markerLayers.forEach((layers, showcaseId) => {
+            const hits = layers.filter(markerHit);
+            if (hits.length > 0) {
+                const properties = layers[0].feature.properties || {};
+                addShowcase(showcaseId, properties.name, properties.region, hits);
+            }
+        });
+    };
+
+    const addPilotPolygon = layer => {
+        const properties = layer.feature.properties || {};
+        const showcases = properties.showcases;
+        if (properties.feature_type === 'pilot_region' || Array.isArray(showcases)) {
+            (showcases || []).forEach(entry => {
+                if (entry && Number.isInteger(entry.id)) {
+                    addShowcase(
+                        entry.id,
+                        entry.name,
+                        entry.region || properties.region,
+                        [layer, ...(markerLayers.get(entry.id) || [])]
+                    );
+                }
+            });
+        } else {
+            addShowcase(layer.feature.id, properties.name, properties.region, [layer]);
+        }
+    };
+
+    const clickedLayer = e.layer;
+    if (clickedLayer && isMarkerLayer(clickedLayer)) {
+        addHitMarkers();
+    } else {
+        const clickGeoPoint = [e.latlng.lng, e.latlng.lat];
+        polygonLayers.forEach(layer => {
+            if (turf.inside(clickGeoPoint, layer.toGeoJSON())) {
+                addPilotPolygon(layer);
+            }
+        });
+        if (!(clickedLayer instanceof L.Polygon)) {
+            addHitMarkers();
+        }
+    }
 
     // Store intersecting features globally to access in handleShowcaseClick
     window.intersectingFeatures = intersectingFeatures;
@@ -171,7 +265,7 @@ function featureClickHandler(e, featureGroup) {
         // If only one region, fetch and render the summary for that feature only
         const layers = intersectingFeatures.values().next().value;
         layers.forEach(layer => selectFeature(layer));
-        fetchFeaturesLayerSummary({ id: layers[0].feature.id });
+        fetchFeaturesLayerSummary({ id: intersectingFeatures.keys().next().value });
     } else {
         // Select all overlapping features
         intersectingFeatures.forEach(layers => {
@@ -181,12 +275,13 @@ function featureClickHandler(e, featureGroup) {
         // Generate popup content
         const popupContent = document.createElement('div');
         const regionGroups = new Map();
-        intersectingFeatures.forEach(layers => {
-            const regionName = layers[0].feature.properties.region || 'No region';
+        intersectingFeatures.forEach((layers, showcaseId) => {
+            const meta = showcaseMeta.get(showcaseId) || {};
+            const regionName = meta.region || 'No region';
             if (!regionGroups.has(regionName)) {
                 regionGroups.set(regionName, []);
             }
-            regionGroups.get(regionName).push(layers[0].feature);
+            regionGroups.get(regionName).push({ id: showcaseId, name: meta.name });
         });
 
         regionGroups.forEach((features, regionName) => {
@@ -197,7 +292,7 @@ function featureClickHandler(e, featureGroup) {
             features.forEach(feature => {
                 const link = document.createElement('a');
                 link.href = '#';
-                link.textContent = feature.properties.name;
+                link.textContent = feature.name;
                 link.addEventListener('click', (event) => {
                     event.preventDefault();
                     handleShowcaseClick(feature.id);

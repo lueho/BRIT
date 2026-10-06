@@ -19,6 +19,7 @@ from .serializers import (
     ShowcaseFlatSerializer,
     ShowcaseGeoFeatureModelSerializer,
     ShowcaseModelSerializer,
+    pilot_region_features,
 )
 
 
@@ -62,21 +63,39 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
             )
             .values("row_xmin")[:1]
         )
+        catchment_borders_xmin = (
+            GeoPolygon.objects.filter(pk=OuterRef("catchment__region__borders_id"))
+            .annotate(
+                row_xmin=RawSQL(
+                    "xmin::text::bigint", [], output_field=BigIntegerField()
+                )
+            )
+            .values("row_xmin")[:1]
+        )
         return {
             **super()._version_aggregates(),
             "max_region_mod": Max("region__lastmodified_at"),
             "max_borders_xmin": Max(Subquery(borders_xmin)),
+            "max_catchment_mod": Max("catchment__lastmodified_at"),
+            "max_catchment_region_mod": Max("catchment__region__lastmodified_at"),
+            "max_catchment_borders_xmin": Max(Subquery(catchment_borders_xmin)),
         }
 
     def _version_timestamp(self, agg):
         # Full-precision timestamps, so edits within one second still rotate.
         max_mod = agg.get("max_mod")
         region_mod = agg.get("max_region_mod")
+        catchment_mod = agg.get("max_catchment_mod")
+        catchment_region_mod = agg.get("max_catchment_region_mod")
         return ":".join(
             (
+                "pilot-regions-v1",
                 max_mod.isoformat() if max_mod else "",
                 region_mod.isoformat() if region_mod else "",
                 str(agg.get("max_borders_xmin") or 0),
+                catchment_mod.isoformat() if catchment_mod else "",
+                catchment_region_mod.isoformat() if catchment_region_mod else "",
+                str(agg.get("max_catchment_borders_xmin") or 0),
             )
         )
 
@@ -104,7 +123,11 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         serializer = ShowcaseGeoFeatureModelSerializer(
             queryset, many=True, context={"request": request}
         )
-        response = Response(serializer.data)
+        data = serializer.data
+        pilots = pilot_region_features(queryset, request.user)
+        if pilots:
+            data = {**data, "features": pilots + list(data["features"])}
+        response = Response(data)
         # Lets the client's IndexedDB cache revalidate via the version action.
         response["X-Data-Version"] = self.get_dataset_version(request)
         response["Access-Control-Expose-Headers"] = "X-Data-Version"
