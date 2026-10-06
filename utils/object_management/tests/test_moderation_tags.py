@@ -182,6 +182,8 @@ class SafeBackUrlTagTests(SimpleTestCase):
         for modal_path in (
             "/materials/componentgroups/5/modal/",
             "/object_management/modal/approve/1/2/",
+            "/materials/componentgroups/5/mo%64al/",
+            "/materials/componentgroups/5/mo%2564al/",
         ):
             with self.subTest(modal_path=modal_path):
                 url = self.back_url(
