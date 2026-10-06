@@ -488,3 +488,32 @@ test("loadLayers forwards the filter parameters to refreshMap", async () => {
 
     assert.equal(seen?.get("name"), "oak");
 });
+
+test("map:init points Leaflet's default icon path at the leaflet static dir", () => {
+    const { sandbox, window } = setup();
+    sandbox.L = { Icon: { Default: {} } };
+    sandbox.document.querySelector = (selector) => (
+        selector === 'script[src*="/leaflet/leaflet."]'
+            ? { src: "https://cdn.example/static/leaflet/leaflet.25c3da10cb19.js" }
+            : null
+    );
+
+    window.listeners["map:init"]({ detail: { map: {} } });
+
+    assert.equal(
+        sandbox.L.Icon.Default.imagePath,
+        "https://cdn.example/static/leaflet/images/",
+    );
+});
+
+test("map:init keeps an explicitly configured default icon path", () => {
+    const { sandbox, window } = setup();
+    sandbox.L = { Icon: { Default: { imagePath: "/custom/" } } };
+    sandbox.document.querySelector = () => ({
+        src: "https://cdn.example/static/leaflet/leaflet.js",
+    });
+
+    window.listeners["map:init"]({ detail: { map: {} } });
+
+    assert.equal(sandbox.L.Icon.Default.imagePath, "/custom/");
+});

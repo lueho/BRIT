@@ -61,9 +61,10 @@
                                                 {% endfor %}
                                             </div>
                                             <div class="card-footer">
-                                                {#                                                <a href="{% url "scenario-result-map" layer.scenario.pk layer.inventory_algorithm.pk layer.feedstock.pk %}">#}
-                                                {#                                                    <i class="fas fa-fw fa-map"></i> show map#}
-                                                {#                                                </a>#}
+                                                <a class="btn btn-sm btn-outline-primary"
+                                                   href="{% url "scenario-result-map" layer.scenario.pk layer.inventory_algorithm.pk layer.feedstock.pk %}">
+                                                    <i class="fas fa-fw fa-map"></i> Show result map
+                                                </a>
                                             </div>
                                         </div>
                                     </div>
