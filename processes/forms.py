@@ -79,12 +79,6 @@ class ProcessCategoryModalModelForm(ModalModelFormMixin, ProcessCategoryModelFor
 class ProcessModelForm(SimpleModelForm):
     # Note: When config with URL is provided, TomSelect validates via the autocomplete
     # endpoint. For proper queryset validation in forms, we override in __init__.
-    parent = TomSelectModelChoiceField(
-        queryset=Process.objects.all(),
-        required=False,
-        config=TomSelectConfig(url="processes:process-autocomplete"),
-        label="Parent process",
-    )
     categories = TomSelectModelMultipleChoiceField(
         queryset=ProcessCategory.objects.all(),
         required=False,
@@ -96,7 +90,6 @@ class ProcessModelForm(SimpleModelForm):
         model = Process
         fields = (
             "name",
-            "parent",
             "categories",
             "short_description",
             "mechanism",
@@ -141,7 +134,7 @@ class ProcessModelForm(SimpleModelForm):
             )
         # Override TomSelect field validation to use queryset instead of URL endpoint
         # This fixes form validation in tests while maintaining autocomplete in production
-        for field_name in ["parent", "categories"]:
+        for field_name in ["categories"]:
             field = self.fields[field_name]
 
             # Bind methods to the field instance
@@ -150,7 +143,6 @@ class ProcessModelForm(SimpleModelForm):
                 field._check_values = types.MethodType(queryset_check_values, field)
         self.helper.layout = Layout(
             "name",
-            "parent",
             "categories",
             "short_description",
             "mechanism",
@@ -440,12 +432,6 @@ class ProcessInfoResourceInline(InlineFormSetFactory):
 
 
 class ProcessMaintenanceForm(WorkspaceReferenceScopeMixin, SimpleModelForm):
-    parent = QuerysetTomSelectModelChoiceField(
-        queryset=Process.objects.all(),
-        required=False,
-        config=TomSelectConfig(url="processes:process-autocomplete"),
-        label="Parent process",
-    )
     categories = QuerysetTomSelectModelMultipleChoiceField(
         queryset=ProcessCategory.objects.all(),
         required=False,
@@ -463,10 +449,6 @@ class ProcessMaintenanceForm(WorkspaceReferenceScopeMixin, SimpleModelForm):
     def __init__(self, *args, fields=None, **kwargs):
         selected = fields if fields is not None else self.Meta.fields
         super().__init__(*args, field_names=selected, **kwargs)
-        if self.instance.pk and "parent" in self.fields:
-            self.fields["parent"].queryset = self.fields["parent"].queryset.exclude(
-                pk=self.instance.pk
-            )
         if self.instance.pk and "supplementary_document" in self.fields:
             self.fields[
                 "supplementary_document"
@@ -582,7 +564,7 @@ class ProcessSectionFormSet(WorkspaceSectionFormSet):
 PROCESS_SECTIONS = {
     "overview": {
         "label": "Overview",
-        "fields": ("name", "short_description", "categories", "parent"),
+        "fields": ("name", "short_description", "categories"),
     },
     "image": {
         "label": "Image",

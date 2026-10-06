@@ -43,7 +43,6 @@ Users can:
 
 The main process detail view aggregates the current process data model, including:
 
-- Parent/variant relationships
 - Categories
 - Input and output materials
 - Operating parameters grouped by parameter type
@@ -75,7 +74,7 @@ This follows the shared four-eyes review pattern used across BRIT.
 
 ### Important model behavior
 
-- `Process` supports parent/child variant relationships
+- `Process` is grouped by `ProcessCategory` memberships; a process can belong to multiple categories
 - `Process` groups materials through the `ProcessMaterial` through-model
 - `Process` exposes convenience accessors such as `input_materials` and `output_materials`
 - `ProcessOperatingParameter` stores typed parameters with optional nominal and range values
@@ -87,7 +86,6 @@ This follows the shared four-eyes review pattern used across BRIT.
 The module uses TomSelect-based form fields for related-object selection.
 Current autocomplete-backed fields include:
 
-- Parent process
 - Process categories
 - Materials
 - Units
@@ -123,7 +121,6 @@ Current custom API actions include:
 - Process materials
 - Process parameters
 - Process parameters grouped by type
-- Process variants
 - Process sources
 - Processes grouped by category
 - Processes grouped by mechanism

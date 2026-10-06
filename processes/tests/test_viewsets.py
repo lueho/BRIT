@@ -139,6 +139,9 @@ class ProcessViewSetTestCase(APITestCase):
         response = self.client.get("/processes/api/processes/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
+        for process_data in response.data:
+            self.assertNotIn("parent", process_data)
+            self.assertNotIn("parent_name", process_data)
 
     def test_retrieve_process(self):
         """API should retrieve a single process with full details."""
@@ -147,6 +150,8 @@ class ProcessViewSetTestCase(APITestCase):
         self.assertEqual(response.data["name"], "Pyrolysis")
         self.assertIn("input_materials", response.data)
         self.assertIn("output_materials", response.data)
+        self.assertNotIn("parent", response.data)
+        self.assertNotIn("parent_name", response.data)
 
     def test_search_processes(self):
         """API should support searching processes."""
@@ -194,21 +199,12 @@ class ProcessViewSetTestCase(APITestCase):
         self.assertIn("Thermal Decomposition", response.data)
         self.assertIn("Partial Oxidation", response.data)
 
-    def test_variants_action(self):
-        """API should return process variants."""
-        Process.objects.create(
-            name="Fast Pyrolysis",
-            parent=self.process1,
-            owner=self.owner,
-            publication_status="published",
-        )
-
+    def test_variants_endpoint_is_removed(self):
+        """Process variants were removed; the endpoint must return 404."""
         response = self.client.get(
             f"/processes/api/processes/{self.process1.pk}/variants/"
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["name"], "Fast Pyrolysis")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 class ProcessAPIPermissionsTestCase(APITestCase):
@@ -333,7 +329,7 @@ class ProcessAPIPermissionsTestCase(APITestCase):
         self.assertEqual(self.private_process.name, "Private Process")
 
     def test_anonymous_can_read_detail_actions_on_published_process(self):
-        for suffix in ("materials", "parameters", "variants", "sources"):
+        for suffix in ("materials", "parameters", "sources"):
             response = self.client.get(
                 f"/processes/api/processes/{self.published_process.pk}/{suffix}/"
             )

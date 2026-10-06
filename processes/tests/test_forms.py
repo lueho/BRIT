@@ -13,6 +13,7 @@ from ..forms import (
     ProcessAuthorInlineForm,
     ProcessCategoryModalModelForm,
     ProcessCategoryModelForm,
+    ProcessMaintenanceForm,
     ProcessModalModelForm,
     ProcessModelForm,
     ProcessSourceFormSet,
@@ -163,6 +164,40 @@ class ProcessFormTestCase(TestCase):
         )
         self.assertFalse(form.is_valid())
         self.assertIn("name", form.errors)
+
+    def test_process_forms_have_no_parent_field(self):
+        """Processes are grouped by categories; forms must not offer a parent."""
+        self.assertNotIn("parent", ProcessModelForm().fields)
+        self.assertNotIn("parent", ProcessModelForm.Meta.fields)
+        self.assertNotIn("parent", ProcessMaintenanceForm().fields)
+        self.assertNotIn("parent", ProcessMaintenanceForm.Meta.fields)
+        self.assertNotIn("parent", ProcessModalModelForm().fields)
+
+    def test_multiple_categories_are_saved(self):
+        """A process can be saved with more than one category."""
+        owner = get_user_model().objects.create(username="multi_owner")
+        self.category.publication_status = "published"
+        self.category.owner = owner
+        self.category.save()
+        second_category = ProcessCategory.objects.create(
+            name="Second Category",
+            owner=owner,
+            publication_status="published",
+        )
+        request = RequestFactory().post("/")
+        request.user = owner
+        form = ProcessMaintenanceForm(
+            data={
+                "name": "Multi Category Process",
+                "categories": [self.category.pk, second_category.pk],
+            },
+            request=request,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        process = form.save()
+        self.assertEqual(
+            {self.category, second_category}, set(process.categories.all())
+        )
 
     def test_modal_form_valid(self):
         """Modal form should work with minimal data."""

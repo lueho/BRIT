@@ -15,7 +15,7 @@
             <strong><i class="fas fa-industry me-1"></i> Processes</strong>
             <p class="mb-0 small text-muted">
                 Explore conversion and treatment processes for bioresources.
-                Filter by category, mechanism, parent process, or material flows.
+                Filter by category, mechanism, or material flows.
             </p>
         </div>
         <button type="button"
@@ -70,7 +70,6 @@
                                             Uncategorized
                                         {% endfor %}
                                         {% if object.mechanism %}· {{ object.mechanism }}{% endif %}
-                                        {% if object.parent and object.parent_is_visible %}· Variant of {{ object.parent.name }}{% endif %}
                                     </span>
                                     {% if object.short_description %}
                                         <span class="text-muted small d-block">{{ object.short_description|truncatewords:18 }}</span>

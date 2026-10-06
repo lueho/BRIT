@@ -568,15 +568,13 @@ class ProcessMaintenanceViewsTestCase(TestCase):
                 any(f'FROM "{table}"' in query["sql"] for query in queries), table
             )
 
-    def test_inaccessible_category_and_parent_are_rejected(self):
+    def test_inaccessible_category_is_rejected(self):
         category = ProcessCategory.objects.create(
             name="Private category", owner=self.other
         )
-        parent = Process.objects.create(name="Private parent", owner=self.other)
         for data in (
             {"categories": [category.pk]},
             {"categories": [999999]},
-            {"parent": parent.pk},
         ):
             with self.subTest(data=data):
                 response = self.client.post(
@@ -1696,17 +1694,6 @@ class ProcessDetailRelatedVisibilityTestCase(ViewWithPermissionsTestCase):
             owner=cls.owner,
             publication_status="published",
         )
-        cls.secret_parent = Process.objects.create(
-            name="Secret Parent Process", owner=cls.outsider
-        )
-        cls.published.parent = cls.secret_parent
-        cls.published.save()
-
-        cls.secret_variant = Process.objects.create(
-            name="Secret Variant Process",
-            owner=cls.outsider,
-            parent=cls.published,
-        )
         cls.secret_category = ProcessCategory.objects.create(
             name="Secret Category", owner=cls.outsider
         )
@@ -1728,16 +1715,6 @@ class ProcessDetailRelatedVisibilityTestCase(ViewWithPermissionsTestCase):
             "processes:process-detail", kwargs={"pk": cls.published.pk}
         )
 
-    def test_anonymous_does_not_see_private_parent(self):
-        response = self.client.get(self.detail_url)
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Secret Parent Process")
-
-    def test_anonymous_does_not_see_private_variant(self):
-        response = self.client.get(self.detail_url)
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Secret Variant Process")
-
     def test_anonymous_does_not_see_private_category(self):
         response = self.client.get(self.detail_url)
         self.assertEqual(response.status_code, 200)
@@ -1757,18 +1734,63 @@ class ProcessDetailRelatedVisibilityTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(self.detail_url)
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Secret Variant Process")
-        self.assertNotContains(response, "Secret Parent Process")
         self.assertNotContains(response, "Secret Category")
         self.assertNotContains(response, "Secret Material")
         self.assertNotContains(response, "Secret Source")
 
-    def test_variant_owner_sees_own_private_variant(self):
+    def test_owner_sees_own_private_category(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.detail_url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Secret Variant Process")
         self.assertContains(response, "Secret Category")
+
+    def test_detail_page_has_no_hierarchy_sections(self):
+        visible_category = ProcessCategory.objects.create(
+            name="Visible Category",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.published.categories.add(visible_category)
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        for label in ("Parent process", "Sibling processes", "Process variants"):
+            self.assertNotContains(response, label)
+        self.assertNotContains(response, "sdv2-related")
+        self.assertContains(response, "Visible Category")
+
+    def test_edit_workspace_has_no_parent_field(self):
+        draft = Process.objects.create(name="Editable Draft", owner=self.owner)
+        self.client.force_login(self.owner)
+        response = self.client.get(f"{draft.get_absolute_url()}?mode=edit")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="parent"')
+        self.assertNotContains(response, "Parent process")
+
+    def test_list_page_has_no_parent_metadata(self):
+        response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+        self.assertNotContains(response, "Variant of")
+        self.assertNotContains(response, "parent process")
+
+    def test_review_page_has_no_hierarchy_labels(self):
+        declined = Process.objects.create(
+            name="Declined Process",
+            owner=self.owner,
+            publication_status="declined",
+        )
+        self.client.force_login(self.owner)
+        review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(Process).pk,
+                "object_id": declined.pk,
+            },
+        )
+        response = self.client.get(review_url)
+        self.assertEqual(response.status_code, 200)
+        for label in ("Parent process", "Sibling processes", "Process variants"):
+            self.assertNotContains(response, label)
 
 
 class ProcessDetailReviewPanelTestCase(ViewWithPermissionsTestCase):

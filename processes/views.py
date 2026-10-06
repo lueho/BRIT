@@ -6,7 +6,7 @@ BRIT conventions and patterns from utils.object_management.views.
 
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Exists, OuterRef, Prefetch
+from django.db.models import Prefetch
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
@@ -327,22 +327,15 @@ def _process_list_queryset(queryset, user):
     """Shared queryset for process list views.
 
     Related user-created objects are filtered by the read policy so that
-    private category and parent names do not leak into list rows.
+    private category names do not leak into list rows.
     """
-    visible_parents = filter_queryset_for_user(
-        Process.objects.filter(pk=OuterRef("parent_id")), user
-    )
-    return (
-        queryset.select_related("owner", "parent")
-        .prefetch_related(
-            "authors",
-            Prefetch(
-                "categories",
-                queryset=filter_queryset_for_user(ProcessCategory.objects.all(), user),
-            ),
-            "process_materials__material",
-        )
-        .annotate(parent_is_visible=Exists(visible_parents))
+    return queryset.select_related("owner").prefetch_related(
+        "authors",
+        Prefetch(
+            "categories",
+            queryset=filter_queryset_for_user(ProcessCategory.objects.all(), user),
+        ),
+        "process_materials__material",
     )
 
 
@@ -386,7 +379,7 @@ class ProcessDetailView(UserCreatedObjectDetailView):
         return (
             super()
             .get_queryset()
-            .select_related("owner", "parent")
+            .select_related("owner")
             .prefetch_related(
                 Prefetch(
                     "categories",
@@ -397,10 +390,6 @@ class ProcessDetailView(UserCreatedObjectDetailView):
                 Prefetch(
                     "process_authors",
                     queryset=ProcessAuthor.objects.select_related("author"),
-                ),
-                Prefetch(
-                    "variants",
-                    queryset=filter_queryset_for_user(Process.objects.all(), user),
                 ),
                 Prefetch(
                     "process_materials",
@@ -446,18 +435,6 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             ]
             return context
 
-        # Parent and variants are user-created objects: only expose the ones
-        # the current user may read.
-        visible_parent = self.object.parent
-        if (
-            visible_parent is not None
-            and not filter_queryset_for_user(
-                Process.objects.filter(pk=visible_parent.pk), self.request.user
-            ).exists()
-        ):
-            visible_parent = None
-        context["visible_parent"] = visible_parent
-
         # Organize materials by role, dropping links to materials the current
         # user cannot read so private material names do not leak.
         input_links = self.object._material_links_for_role(ProcessMaterial.Role.INPUT)
@@ -492,12 +469,6 @@ class ProcessDetailView(UserCreatedObjectDetailView):
         ]
         context["process_links"] = list(self.object.links.all())
         context["process_info_resources"] = list(self.object.info_resources.all())
-        # The prefetch above already applies the read policy; the explicit
-        # filter keeps this correct when get_context_data runs on an
-        # unprepared object (e.g. the review item detail view).
-        context["process_variants"] = list(
-            filter_queryset_for_user(self.object.variants.all(), self.request.user)
-        )
         context["process_authors"] = self.object.ordered_authors()
         sources = self.object.sources_ordered()
         visible_source_ids = set(
@@ -519,9 +490,6 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             else []
         )
         context["section_anchors"] = self._build_section_anchors(context)
-        context["has_related_processes"] = bool(
-            context["process_variants"] or context["visible_parent"]
-        )
 
         return context
 

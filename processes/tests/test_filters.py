@@ -85,19 +85,6 @@ class ProcessFilterTestCase(TestCase):
         )
         self.process3.categories.add(self.category2)
 
-        self.parent_process = Process.objects.create(
-            name="Parent Process",
-            owner=self.owner,
-            publication_status="published",
-        )
-
-        self.child_process = Process.objects.create(
-            name="Child Process",
-            parent=self.parent_process,
-            owner=self.owner,
-            publication_status="published",
-        )
-
     def test_filter_by_name(self):
         """Filter should find processes by name."""
         filterset = ProcessFilter(data={"name": "Pyro"}, queryset=Process.objects.all())
@@ -133,13 +120,24 @@ class ProcessFilterTestCase(TestCase):
         self.assertNotIn("categories", filterset.filters)
         self.assertNotIn("categories", filterset.form.fields)
 
-    def test_filter_by_parent(self):
-        """Filter should find child processes by parent."""
+    def test_parent_filters_are_removed(self):
+        """The process filter must not expose parent/has_parent fields."""
+        filterset = ProcessFilter(data={}, queryset=Process.objects.all())
+        self.assertNotIn("parent", filterset.filters)
+        self.assertNotIn("has_parent", filterset.filters)
+        self.assertNotIn("parent", filterset.form.fields)
+
+    def test_process_in_overlapping_categories_is_returned_once(self):
+        """Selecting overlapping categories must not duplicate a process."""
+        self.process1.categories.add(self.category2)
         filterset = ProcessFilter(
-            data={"parent": self.parent_process.pk}, queryset=Process.objects.all()
+            data={"categories": [self.category1.pk, self.category2.pk]},
+            queryset=Process.objects.all(),
         )
-        self.assertEqual(filterset.qs.count(), 1)
-        self.assertEqual(filterset.qs.first().name, "Child Process")
+        self.assertEqual(filterset.qs.count(), 3)
+        self.assertEqual(
+            list(filterset.qs.filter(pk=self.process1.pk)), [self.process1]
+        )
 
     def test_filter_by_publication_status(self):
         """Filter should find processes by publication status."""
@@ -152,7 +150,7 @@ class ProcessFilterTestCase(TestCase):
         filterset = ProcessFilter(
             data={"publication_status": "published"}, queryset=Process.objects.all()
         )
-        self.assertEqual(filterset.qs.count(), 5)  # Excludes draft
+        self.assertEqual(filterset.qs.count(), 3)  # Excludes draft
 
     def test_filter_by_input_material(self):
         """Filter should find processes by input material."""

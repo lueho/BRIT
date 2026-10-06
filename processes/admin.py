@@ -46,7 +46,7 @@ class ProcessInfoResourceInline(admin.TabularInline):
 
 @admin.register(Process)
 class ProcessAdmin(admin.ModelAdmin):
-    list_display = ("name", "author_list", "owner", "parent", "publication_status")
+    list_display = ("name", "author_list", "owner", "publication_status")
     list_filter = ("categories", "publication_status")
     search_fields = (
         "name",

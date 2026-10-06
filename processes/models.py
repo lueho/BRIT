@@ -5,7 +5,7 @@ just enough structure to display demo content.  The models in this module now
 move beyond that baseline by introducing reusable entities that can capture
 real-world process data:
 
-* processes retain their hierarchical organisation and descriptive metadata
+* processes are organised by categories and descriptive metadata
 * structured operating parameters are stored in :class:`ProcessOperatingParameter`
   records so editors can capture ranges for temperature, pressure, residence
   time, yield and custom metrics – each with explicit units
@@ -106,14 +106,6 @@ class Process(NamedUserCreatedObject):
 
     url_format = "processes:{name_lower}-{action}{suffix}"
 
-    parent = models.ForeignKey(
-        "self",
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True,
-        related_name="variants",
-        help_text="Optional parent process that groups this technology.",
-    )
     categories = models.ManyToManyField(
         ProcessCategory,
         blank=True,
