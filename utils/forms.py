@@ -427,13 +427,14 @@ class UserCreatedObjectFormMixin:
 
                 # Collect submitted IDs for this field
                 submitted_ids = set()
+                data_key = self.add_prefix(field_name)
 
                 # Handle both single and multiple choice fields
-                if field_name in data:
+                if data_key in data:
                     values = (
-                        data.getlist(field_name)
+                        data.getlist(data_key)
                         if hasattr(data, "getlist")
-                        else [data.get(field_name)]
+                        else [data.get(data_key)]
                     )
                     for val in values:
                         if val:

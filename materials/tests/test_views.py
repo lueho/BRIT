@@ -3748,6 +3748,54 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         new = self.sample.component_measurements.get(component=self.moisture)
         self.assertEqual(list(new.sources.all()), [self.source])
 
+    def test_measurements_post_changes_group_of_existing_row(self):
+        other_group = MaterialComponentGroup.objects.create(
+            owner=self.editor,
+            name="Carbohydrates",
+            publication_status="published",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(self.measurement.pk),
+                        group=str(other_group.pk),
+                        component=str(self.moisture.pk),
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(response.json()["saved"])
+        self.measurement.refresh_from_db()
+        self.assertEqual(self.measurement.group, other_group)
+        self.assertEqual(self.measurement.component, self.moisture)
+
+    def test_measurements_post_rejects_change_to_inaccessible_group(self):
+        locked = MaterialComponentGroup.objects.create(
+            owner=self.editor,
+            name="Locked group",
+            publication_status="private",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(self.measurement.pk), group=str(locked.pk)
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.measurement.refresh_from_db()
+        self.assertEqual(self.measurement.group, self.group)
+
     def test_measurements_post_invalid_rows_roll_back_everything(self):
         response = self.client.post(
             self.section_url("measurements"),
