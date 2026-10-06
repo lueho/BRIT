@@ -1,6 +1,6 @@
 """Set up the Sötåsen grass-to-protein demo inventory.
 
-Creates (or updates) the private objects needed to evaluate the Sötåsen
+Creates (or updates) the objects needed to evaluate the Sötåsen
 grass-to-protein demo scenario against production reference objects:
 
 - an InventoryAlgorithm linked to GeoDataset 49 ("Sötåsen Agricultural Land
@@ -9,12 +9,15 @@ grass-to-protein demo scenario against production reference objects:
 - the three required algorithm parameters (dry matter yield, crude protein
   fraction, protein recovery fraction) with their selectable values and
   defaults;
-- a private Scenario "Sötåsen grass-to-protein demo (Thomas 2025)" for region
+- a Scenario "Sötåsen grass-to-protein demo (Thomas 2025)" for region
   30994 (Töreboda) and catchment 31106 (Töreboda (1473)), configured with the
   material as feedstock and the default parameter values.
 
-The command is atomic and idempotent. It never publishes objects or submits
-them for review. It fails before writing anything if a referenced production
+New objects are created private. On re-runs, the scenario keeps its current
+publication status; if its region, catchment or configuration had drifted from
+the defaults, its result layers are deleted so a published scenario never shows
+results that no longer match its configuration. The command is atomic and
+idempotent. It never publishes objects or submits them for review. It fails before writing anything if a referenced production
 object is missing or does not match the expected name/type.
 
 Usage::
@@ -22,6 +25,8 @@ Usage::
     python manage.py setup_sotasen_demo_inventory --owner <username>
     python manage.py setup_sotasen_demo_inventory --owner <username> --dry-run
 """
+
+from collections import Counter
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
@@ -176,7 +181,10 @@ PARAMETERS = (
 
 
 class Command(BaseCommand):
-    help = "Create/update the private Sötåsen grass-to-protein demo inventory objects."
+    help = (
+        "Create/update the Sötåsen grass-to-protein demo inventory objects "
+        "(created private; re-runs keep the scenario's publication status)."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -287,10 +295,18 @@ class Command(BaseCommand):
             references["geodataset"], references["material"], references["source"]
         )
         parameters = self._ensure_parameters(algorithm)
-        scenario = self._ensure_scenario(
+        scenario, inputs_changed = self._ensure_scenario(
             owner, references["region"], references["catchment"]
         )
-        self._ensure_scenario_configuration(scenario, references["material"], algorithm)
+        configuration_changed = self._ensure_scenario_configuration(
+            scenario, references["material"], algorithm
+        )
+        if (inputs_changed or configuration_changed) and scenario.layer_set(
+            manager="all_objects"
+        ).exists():
+            scenario.delete_result_layers()
+            scenario.set_status(ScenarioStatus.Status.CHANGED)
+            self._log("Removed", f"stale result layers of Scenario '{scenario}'")
         self._validate_configuration(scenario, parameters)
 
     def _ensure_algorithm(self, geodataset, material, source):
@@ -407,16 +423,20 @@ class Command(BaseCommand):
                 "publication_status": Scenario.STATUS_PRIVATE,
             },
         )
+        inputs_changed = False
         if not created:
             # The related status row must exist before save() triggers the
             # post_save signal that flips the scenario status to CHANGED.
             ScenarioStatus.objects.get_or_create(scenario=scenario)
+            inputs_changed = (
+                scenario.region_id != region.id or scenario.catchment_id != catchment.id
+            )
             scenario.region = region
             scenario.catchment = catchment
             scenario.description = SCENARIO_DESCRIPTION
             scenario.save()
         self._log("Created" if created else "Updated", f"Scenario '{scenario}'")
-        return scenario
+        return scenario, inputs_changed
 
     def _ensure_scenario_configuration(self, scenario, material, algorithm):
         existing = ScenarioInventoryConfiguration.objects.filter(
@@ -424,14 +444,34 @@ class Command(BaseCommand):
             feedstock=material,
             inventory_algorithm=algorithm,
         )
-        if existing.exists():
-            existing.delete()
+        current = Counter(
+            existing.values_list(
+                "geodataset_id",
+                "sample_series_id",
+                "inventory_parameter_id",
+                "inventory_value_id",
+            )
+        )
+        desired = Counter(
+            (algorithm.geodataset_id, None, parameter.id, value.id)
+            for parameter, values in algorithm.default_values().items()
+            for value in values
+        )
+        if current == desired:
+            self._log(
+                "Unchanged",
+                f"Scenario '{scenario}' configuration for feedstock "
+                f"'{material}' and algorithm '{algorithm}'",
+            )
+            return False
+        existing.delete()
         scenario.add_inventory_algorithm(feedstock=material, algorithm=algorithm)
         self._log(
             "Configured",
             f"Scenario '{scenario}' with feedstock '{material}' "
             f"and algorithm '{algorithm}'",
         )
+        return True
 
     @staticmethod
     def _validate_configuration(scenario, parameters):
