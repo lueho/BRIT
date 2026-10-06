@@ -317,9 +317,7 @@ class ProcessModelTestCase(TestCase):
         other_category = ProcessCategory.objects.create(
             name="Biochemical", owner=self.owner
         )
-        process = Process.objects.create(
-            name="Anaerobic Digestion", owner=self.owner
-        )
+        process = Process.objects.create(name="Anaerobic Digestion", owner=self.owner)
         process.categories.add(self.category, other_category)
 
         self.assertIn(process, self.category.processes.all())
