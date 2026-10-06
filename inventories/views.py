@@ -6,7 +6,7 @@ import re
 from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Q
 from django.http import (
     Http404,
@@ -935,15 +935,32 @@ def get_visible_result_layer(user, layer_name):
 
 
 def result_layer_version(layer):
-    """Fingerprint that changes whenever the layer's results are recomputed."""
+    """Fingerprint of the layer's feature rows and aggregates.
+
+    Recomputations replace the rows of the result table, so hashing their
+    content changes the token whenever any result value or geometry changes.
+    """
+    table = connection.ops.quote_name(layer.get_feature_collection()._meta.db_table)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"SELECT md5(coalesce(string_agg(t::text, '|' ORDER BY t.id), '')) "  # noqa: S608
+            f"FROM {table} t"
+        )
+        features_digest = cursor.fetchone()[0]
     aggregates = list(
         layer.layeraggregatedvalue_set.order_by("pk").values_list(
             "pk", "name", "value", "unit"
         )
     )
-    feature_count = layer.get_feature_collection().objects.count()
-    payload = json.dumps([layer.pk, feature_count, aggregates], default=str)
+    payload = json.dumps([layer.pk, features_digest, aggregates], default=str)
     return hashlib.sha256(payload.encode()).hexdigest()[:32]
+
+
+def mark_private_result_uncacheable(response, layer):
+    """Keep layers of unpublished scenarios out of browser caches."""
+    if layer.scenario.publication_status != Scenario.STATUS_PUBLISHED:
+        response["Cache-Control"] = "private, no-store"
+    return response
 
 
 class ResultLayerGeoJSONAPI(APIView):
@@ -963,7 +980,7 @@ class ResultLayerGeoJSONAPI(APIView):
         serializer = serializer_class(feature_collection.objects.all(), many=True)
         response = Response(serializer.data)
         response["X-Data-Version"] = result_layer_version(layer)
-        return response
+        return mark_private_result_uncacheable(response, layer)
 
 
 class ResultLayerVersionAPI(APIView):
@@ -973,7 +990,8 @@ class ResultLayerVersionAPI(APIView):
 
     def get(self, request, layer_name):
         layer = get_visible_result_layer(request.user, layer_name)
-        return Response({"version": result_layer_version(layer)})
+        response = Response({"version": result_layer_version(layer)})
+        return mark_private_result_uncacheable(response, layer)
 
 
 class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):

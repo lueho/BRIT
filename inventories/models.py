@@ -775,9 +775,10 @@ def detect_scenario_evaluation_input_change(
     """Records whether a save changes a field that the evaluation depends on."""
     if instance.pk is None:
         return
-    if update_fields is not None and not set(update_fields) & set(
-        SCENARIO_EVALUATION_INPUT_FIELDS
-    ):
+    input_names = set(SCENARIO_EVALUATION_INPUT_FIELDS) | {
+        f"{name}_id" for name in SCENARIO_EVALUATION_INPUT_FIELDS
+    }
+    if update_fields is not None and not set(update_fields) & input_names:
         instance._evaluation_inputs_changed = False
         return
     fields = [f"{name}_id" for name in SCENARIO_EVALUATION_INPUT_FIELDS]

@@ -1973,7 +1973,7 @@ class ScenarioResultMapTestCase(TestCase):
         self.published_layer = self.create_layer(self.published_scenario)
         self.private_layer = self.create_layer(self.private_scenario)
 
-    def create_layer(self, scenario, total=100.0):
+    def create_layer(self, scenario, total=100.0, yields=(12.5,)):
         layer, _ = Layer.objects.create_or_replace(
             name="Result layer",
             scenario=scenario,
@@ -1982,9 +1982,12 @@ class ScenarioResultMapTestCase(TestCase):
             results={
                 "features": [
                     {
-                        "geom": MultiPolygon(Polygon(((0, 0), (0, 1), (1, 1), (0, 0)))),
-                        "yield": 12.5,
+                        "geom": MultiPolygon(
+                            Polygon(((i, 0), (i, 1), (i + 1, 1), (i, 0)))
+                        ),
+                        "yield": value,
                     }
+                    for i, value in enumerate(yields)
                 ],
                 "aggregated_values": [
                     {"name": "Total production", "value": total, "unit": "Mg/a"}
@@ -2093,6 +2096,32 @@ class ScenarioResultMapTestCase(TestCase):
             "version"
         ]
         self.assertNotEqual(new_version, version)
+
+    def test_version_changes_when_feature_values_change_with_same_totals(self):
+        self.create_layer(self.published_scenario, yields=(10.0, 12.0))
+        version = self.client.get(self.version_url(self.published_layer)).json()[
+            "version"
+        ]
+
+        self.create_layer(self.published_scenario, yields=(12.0, 10.0))
+
+        new_version = self.client.get(self.version_url(self.published_layer)).json()[
+            "version"
+        ]
+        self.assertNotEqual(new_version, version)
+
+    def test_private_result_layer_responses_are_not_cacheable(self):
+        self.client.force_login(self.owner)
+        for url in (
+            self.geojson_url(self.private_layer),
+            self.version_url(self.private_layer),
+        ):
+            response = self.client.get(url)
+            self.assertIn("no-store", response.headers.get("Cache-Control", ""))
+
+    def test_published_result_layer_responses_are_cacheable(self):
+        response = self.client.get(self.geojson_url(self.published_layer))
+        self.assertNotIn("no-store", response.headers.get("Cache-Control", ""))
 
     def test_result_page_links_to_result_map(self):
         self.published_scenario.set_status(ScenarioStatus.Status.FINISHED)

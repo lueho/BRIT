@@ -77,6 +77,17 @@ class ScenarioTestCase(TestCase):
 
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
 
+    def test_scenario_catchment_id_update_field_marks_changed(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        self.scenario.catchment_id = Catchment.objects.create(
+            name="Other Catchment", region=self.scenario.region
+        ).pk
+        self.scenario.save(update_fields=["catchment_id"])
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+
     def test_scenario_metadata_edit_keeps_finished_status(self):
         self.scenario.set_status(ScenarioStatus.Status.FINISHED)
 
