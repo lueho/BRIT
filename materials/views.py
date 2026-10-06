@@ -2344,19 +2344,32 @@ def ensure_derived_composition_settings(sample, owner):
     for composition in sample.compositions.order_by("order", "id"):
         composition_settings_by_group.setdefault(composition.group_id, composition)
 
-    default_component = MaterialComponent.objects.default()
-    for measurement in sample.component_measurements.select_related("group").order_by(
-        "group__name", "group_id", "id"
-    ):
+    other_component = MaterialComponent.objects.other()
+    groups = {}
+    bases_by_group = defaultdict(set)
+    for measurement in sample.component_measurements.select_related(
+        "group", "component"
+    ).order_by("group__name", "group_id", "id"):
         if measurement.group_id in composition_settings_by_group:
             continue
-        composition_settings_by_group[measurement.group_id] = (
-            Composition.objects.create(
-                owner=owner,
-                sample=sample,
-                group=measurement.group,
-                fractions_of=default_component,
-            )
+        groups.setdefault(measurement.group_id, measurement.group)
+        if (
+            measurement.component_id != other_component.pk
+            and not measurement.component.is_aggregate
+        ):
+            bases_by_group[measurement.group_id].add(measurement.basis_component_id)
+
+    default_component = MaterialComponent.objects.default()
+    for group_id, group in groups.items():
+        bases = bases_by_group[group_id]
+        fractions_of_id = (
+            next(iter(bases)) if len(bases) == 1 and None not in bases else None
+        )
+        composition_settings_by_group[group_id] = Composition.objects.create(
+            owner=owner,
+            sample=sample,
+            group=group,
+            fractions_of_id=fractions_of_id or default_component.pk,
         )
 
     return composition_settings_by_group
