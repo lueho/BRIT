@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from celery.result import EagerResult
 from django.conf import settings
@@ -8,6 +8,7 @@ from django.db import connection
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 
+from maps.cache_warmup import warm_nuts_geojson_cache
 from maps.models import GeoPolygon, NutsRegion, NutsVintage, Region
 from maps.tasks import (
     startup_warmup_flag_cache_key,
@@ -17,8 +18,11 @@ from maps.tasks import (
 )
 from maps.utils import (
     compute_collection_dataset_version,
+    geojson_version_aggregates,
+    geojson_version_token,
     get_nuts_region_cache_key,
     get_region_cache_key,
+    rendered_geojson_cache_key,
 )
 from utils.tests.testrunner import serial_test
 
@@ -105,7 +109,10 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
     ):
         tree_warmer = Mock()
         collection_warmer = Mock()
-        mock_base_task.apply_async.return_value.id = "base-task"
+        mock_base_task.apply_async.side_effect = [
+            Mock(id="nuts-task"),
+            Mock(id="regions-task"),
+        ]
         tree_warmer.apply_async.return_value.id = "tree-task"
         collection_warmer.apply_async.return_value.id = "collection-task"
         mock_get_warmers.return_value = (
@@ -117,14 +124,23 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
             nuts_levels=[0], regions_limit=5, nuts_limit=10, queue_subtasks=True
         )
 
-        mock_base_task.apply_async.assert_called_once_with(
-            kwargs={"nuts_levels": [0], "regions_limit": 5, "nuts_limit": 10}
+        self.assertEqual(
+            mock_base_task.apply_async.call_args_list,
+            [
+                call(
+                    kwargs={"nuts_levels": [0], "regions_limit": None, "nuts_limit": 10}
+                ),
+                call(kwargs={"nuts_levels": None, "regions_limit": 5}),
+            ],
         )
         tree_warmer.apply_async.assert_called_once_with()
         collection_warmer.apply_async.assert_called_once_with()
         tree_warmer.apply.assert_not_called()
         collection_warmer.apply.assert_not_called()
-        self.assertEqual(result["maps"], {"status": "queued", "task_id": "base-task"})
+        self.assertEqual(
+            result["maps"],
+            {"status": "queued", "task_ids": ["nuts-task", "regions-task"]},
+        )
         self.assertEqual(
             result["waste_collection"],
             {"status": "queued", "task_id": "collection-task"},
@@ -257,6 +273,24 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
         self.assertEqual(result["nuts"]["status"], "success")
         self.assertEqual(result["regions"]["status"], "success")
 
+    def test_valid_region_payload_is_not_serialized_again(self):
+        warm_base_geojson_caches.run(nuts_levels=None, regions_limit=10)
+        with patch(
+            "maps.cache_warmup.RegionGeoFeatureModelSerializer",
+            side_effect=AssertionError("repeated serialization"),
+        ):
+            result = warm_base_geojson_caches.run(nuts_levels=None, regions_limit=10)
+        self.assertEqual(result["regions"]["features_count"], 0)
+
+    def test_valid_nuts_payload_is_not_serialized_again(self):
+        warm_base_geojson_caches.run(nuts_levels=[0], regions_limit=None)
+        with patch(
+            "maps.cache_warmup.NutsRegionGeometrySerializer",
+            side_effect=AssertionError("repeated serialization"),
+        ):
+            result = warm_base_geojson_caches.run(nuts_levels=[0], regions_limit=None)
+        self.assertEqual(result["nuts"]["features_count"], 0)
+
     def test_skips_nuts_when_levels_is_none(self):
         result = warm_base_geojson_caches.run(nuts_levels=None, regions_limit=10)
 
@@ -309,6 +343,21 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
             "geometry column selected for a skipped region",
         )
 
+    def test_limited_nuts_warmup_does_not_cache_a_partial_level(self):
+        NutsRegion.objects.create(
+            name="Luxembourg",
+            nuts_id="LU",
+            levl_code=0,
+            cntr_code="LU",
+            version=self.vintage,
+        )
+        warm_base_geojson_caches.run(nuts_levels=[0], regions_limit=None, nuts_limit=1)
+        self.assertIsNone(
+            self.geojson_cache.get(
+                get_nuts_region_cache_key(level=0, version=self.vintage.year)
+            )
+        )
+
     def test_nuts_limit_slices_per_level_queryset(self):
         NutsRegion.objects.create(
             name="Luxembourg",
@@ -323,3 +372,49 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
         )
 
         self.assertEqual(result["nuts"]["features_count"], 1)
+
+
+@serial_test
+class NutsWarmupConnectionReleaseTests(TestCase):
+    """Releasing the connection after a large entry must not abort the level."""
+
+    def setUp(self):
+        self.geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
+        self.geojson_cache.clear()
+        self.addCleanup(self.geojson_cache.clear)
+        self.vintage = NutsVintage.default()
+        for nuts_id in ("DE", "LU"):
+            region = NutsRegion(
+                name=nuts_id,
+                nuts_id=nuts_id,
+                levl_code=0,
+                cntr_code=nuts_id,
+                version=self.vintage,
+            )
+            region.geom = MultiPolygon(
+                Polygon(((0, 0), (1, 0), (1, 1), (0, 1), (0, 0)))
+            )
+            region.save()
+
+    def test_released_connection_does_not_abort_the_level_warmup(self):
+        # Closing a connection drops its server-side cursors; CLOSE ALL has
+        # the same effect without leaving the test transaction.
+        released = Mock(in_atomic_block=False)
+        released.close.side_effect = lambda: connection.cursor().execute("CLOSE ALL")
+        with (
+            patch("maps.cache_warmup.GEOJSON_MAX_BUFFERED_POINTS", 0),
+            patch("maps.utils.GEOJSON_MAX_DB_RESULT_BYTES", 0),
+            patch("maps.utils.connections", {"default": released}),
+        ):
+            result = warm_nuts_geojson_cache(nuts_levels=[0])
+
+        self.assertTrue(released.close.called)
+        self.assertEqual(result["features_count"], 2)
+        level = NutsRegion.objects.filter(levl_code=0).in_vintage(self.vintage)
+        token = geojson_version_token(
+            level.aggregate(**geojson_version_aggregates("borders__geom"))
+        )
+        level_key = get_nuts_region_cache_key(level=0, version=self.vintage.year)
+        self.assertTrue(
+            self.geojson_cache.has_key(rendered_geojson_cache_key(level_key, token))
+        )

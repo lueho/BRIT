@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import connection, transaction
-from django.db.models import F, Prefetch, Q
+from django.db.models import F, Max, Prefetch, Q
 from django.urls import reverse
 from django.utils import timezone
 from django_filters import rest_framework as rf_filters
@@ -115,6 +115,8 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     queryset = Collection.objects.all()
     serializer_class = CollectionFlatSerializer
     geojson_serializer_class = WasteCollectionGeometrySerializer
+    geojson_geometry_field = "simplified_geom"
+    geojson_point_field = "catchment__region__borders__geom"
     filter_backends = (CollectionDjangoFilterBackend,)
     filterset_class = CollectionFilterSet
     pagination_class = CollectionListPagination
@@ -172,6 +174,21 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             "catchment__region__lauregion__nuts_parent__parent__parent__parent",
         ]
         return queryset.select_related(*nuts_ancestry).order_by("pk")
+
+    def _version_aggregates(self):
+        return {
+            **super()._version_aggregates(),
+            "max_region_mod": Max("catchment__region__lastmodified_at"),
+        }
+
+    def _version_timestamp(self, aggregates):
+        timestamp = super()._version_timestamp(aggregates)
+        region_modified = aggregates.get("max_region_mod")
+        return (
+            max(timestamp, int(region_modified.timestamp()))
+            if region_modified
+            else timestamp
+        )
 
     def get_geojson_queryset(self):
         """Return optimized queryset for GeoJSON with simplified geometry.
