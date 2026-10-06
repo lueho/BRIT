@@ -797,6 +797,15 @@ class AbstractTestCases:
                     response, self.get_delete_url(self.published_object.pk)
                 )
 
+        def test_modal_detail_view_does_not_offer_back_to_modal(self):
+            """The modal's own URL is no result list to return to."""
+            if not self.modal_detail_view:
+                self.skipTest("Modal detail view is not enabled for this test case.")
+            url = self.get_modal_detail_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            self.assertNotContains(response, "back=")
+
         def test_modal_detail_view_published_as_authenticated_owner(self):
             if not self.modal_detail_view:
                 self.skipTest("Modal detail view is not enabled for this test case.")

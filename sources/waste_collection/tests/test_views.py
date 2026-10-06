@@ -7004,3 +7004,44 @@ class CollectionImporterBinConfigurationTestCase(TestCase):
         col.refresh_from_db()
         self.assertEqual(col.established, 2010)
         col.delete()
+
+
+class CollectionDetailBackLinkTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.collection = Collection.objects.create(
+            name="BackLinkCollection", publication_status="published"
+        )
+        cls.collector = Collector.objects.create(
+            name="BackLinkCollector", publication_status="published"
+        )
+
+    def detail_urls(self):
+        return (
+            reverse("collection-detail", kwargs={"pk": self.collection.pk}),
+            reverse("collector-detail", kwargs={"pk": self.collector.pk}),
+        )
+
+    def test_back_link_to_result_list_is_shown(self):
+        list_url = reverse("collection-list") + "?scope=published"
+        for detail_url in self.detail_urls():
+            with self.subTest(detail_url=detail_url):
+                response = self.client.get(detail_url, {"back": list_url})
+
+                self.assertContains(response, "Back to results")
+                self.assertContains(
+                    response, f'href="{list_url.replace("&", "&amp;")}"'
+                )
+
+    def test_unsafe_or_modal_back_link_is_hidden(self):
+        for detail_url in self.detail_urls():
+            for back in (
+                f"{detail_url}modal/",
+                "https://evil.example/x",
+                "javascript:alert(1)",
+            ):
+                with self.subTest(detail_url=detail_url, back=back):
+                    response = self.client.get(detail_url, {"back": back})
+
+                    self.assertNotContains(response, "Back to results")
+                    self.assertNotContains(response, "?next=javascript")

@@ -9,7 +9,6 @@ from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
-from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import FormView, TemplateView
 from rest_framework import status
@@ -18,6 +17,7 @@ from rest_framework.views import APIView
 
 from utils.forms import TomSelectFormsetHelper
 from utils.object_management.permissions import get_object_policy
+from utils.object_management.templatetags.moderation_tags import safe_back_url
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -324,16 +324,7 @@ class SourceDetailView(UserCreatedObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        back_url = self.request.GET.get("back", "").strip()
-        context["back_url"] = (
-            back_url
-            if url_has_allowed_host_and_scheme(
-                back_url,
-                allowed_hosts={self.request.get_host()},
-                require_https=self.request.is_secure(),
-            )
-            else ""
-        )
+        context["back_url"] = safe_back_url({"request": self.request})
         return context
 
 

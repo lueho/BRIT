@@ -49,6 +49,10 @@ def safe_back_url(context):
     if not is_safe:
         return ""
 
+    # Modal endpoints render bare fragments; they are never a page to return to.
+    if "modal" in urlsplit(back).path.split("/"):
+        return ""
+
     # A value that itself carries return-path params is a leftover of the
     # unbounded nesting trap; echoing it keeps feeding crawlers the trap.
     if any(key in _RETURN_PATH_PARAMS for key, _ in nested_params):
