@@ -142,6 +142,34 @@ class CollectionViewSetTestCase(APITestCase):
         CACHES={
             "default": {
                 "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-limit-default",
+            },
+            "geojson": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-limit-data",
+                "TIMEOUT": 86400,
+            },
+        }
+    )
+    def test_rendered_cache_hit_keeps_unbounded_request_limit(self):
+        from sources.waste_collection.tasks import warm_collection_geojson_cache
+
+        warm_collection_geojson_cache.run()
+        url = reverse("api-waste-collection-geojson")
+        with patch.object(CollectionViewSet, "max_unbounded_geojson_features", 0):
+            unbounded = self.client.get(url, REMOTE_ADDR="10.9.8.2")
+            bounded = self.client.get(
+                url, {"id": self.published_collection.pk}, REMOTE_ADDR="10.9.8.2"
+            )
+
+        self.assertEqual(unbounded.status_code, 400)
+        self.assertEqual(unbounded["X-Cache-Status"], "REJECT")
+        self.assertEqual(bounded.status_code, 200)
+
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
                 "LOCATION": "rendered-collection-default",
             },
             "geojson": {

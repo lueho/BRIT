@@ -8,6 +8,7 @@ from django.db import connection
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 
+from maps.cache_warmup import warm_nuts_geojson_cache
 from maps.models import GeoPolygon, NutsRegion, NutsVintage, Region
 from maps.tasks import (
     startup_warmup_flag_cache_key,
@@ -17,8 +18,11 @@ from maps.tasks import (
 )
 from maps.utils import (
     compute_collection_dataset_version,
+    geojson_version_aggregates,
+    geojson_version_token,
     get_nuts_region_cache_key,
     get_region_cache_key,
+    rendered_geojson_cache_key,
 )
 from utils.tests.testrunner import serial_test
 
@@ -368,3 +372,49 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
         )
 
         self.assertEqual(result["nuts"]["features_count"], 1)
+
+
+@serial_test
+class NutsWarmupConnectionReleaseTests(TestCase):
+    """Releasing the connection after a large entry must not abort the level."""
+
+    def setUp(self):
+        self.geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
+        self.geojson_cache.clear()
+        self.addCleanup(self.geojson_cache.clear)
+        self.vintage = NutsVintage.default()
+        for nuts_id in ("DE", "LU"):
+            region = NutsRegion(
+                name=nuts_id,
+                nuts_id=nuts_id,
+                levl_code=0,
+                cntr_code=nuts_id,
+                version=self.vintage,
+            )
+            region.geom = MultiPolygon(
+                Polygon(((0, 0), (1, 0), (1, 1), (0, 1), (0, 0)))
+            )
+            region.save()
+
+    def test_released_connection_does_not_abort_the_level_warmup(self):
+        # Closing a connection drops its server-side cursors; CLOSE ALL has
+        # the same effect without leaving the test transaction.
+        released = Mock(in_atomic_block=False)
+        released.close.side_effect = lambda: connection.cursor().execute("CLOSE ALL")
+        with (
+            patch("maps.cache_warmup.GEOJSON_MAX_BUFFERED_POINTS", 0),
+            patch("maps.utils.GEOJSON_MAX_DB_RESULT_BYTES", 0),
+            patch("maps.utils.connections", {"default": released}),
+        ):
+            result = warm_nuts_geojson_cache(nuts_levels=[0])
+
+        self.assertTrue(released.close.called)
+        self.assertEqual(result["features_count"], 2)
+        level = NutsRegion.objects.filter(levl_code=0).in_vintage(self.vintage)
+        token = geojson_version_token(
+            level.aggregate(**geojson_version_aggregates("borders__geom"))
+        )
+        level_key = get_nuts_region_cache_key(level=0, version=self.vintage.year)
+        self.assertTrue(
+            self.geojson_cache.has_key(rendered_geojson_cache_key(level_key, token))
+        )

@@ -41,7 +41,8 @@ DEFAULT_REGIONS_LIMIT = 50
 # them materializes the full coordinate tree in the worker process and OOMs a
 # Basic (512 MB) dyno — observed R15 at ~1.1 GB on the ~1M-point
 # "Waste Atlas Background" region, which then crash-loops the dyno via the
-# worker_ready re-warm. Oversized regions stay request-cached instead.
+# worker_ready re-warm. Oversized regions are streamed per request instead,
+# without filling the request cache.
 REGION_GEOJSON_WARMUP_MAX_POINTS = 100_000
 
 
@@ -94,7 +95,9 @@ def warm_nuts_geojson_cache(nuts_levels=None, limit=None):
         if limit:
             queryset = queryset[:limit]
 
-        for region_id in queryset.values_list("pk", flat=True).iterator(chunk_size=100):
+        # Fetch the IDs up front: warming a large entry may close the
+        # connection, which would invalidate a server-side cursor.
+        for region_id in list(queryset.values_list("pk", flat=True)):
             cache_key = get_nuts_region_cache_key(nuts_id=region_id, version=year)
             entry_queryset = NutsRegion.objects.filter(pk=region_id).select_related(
                 "borders"
@@ -132,7 +135,8 @@ def warm_region_geojson_cache(limit=None, max_points=None):
 
     Regions above ``max_points`` vertices are skipped: their serialized
     payload does not fit into the worker's memory quota (see
-    ``REGION_GEOJSON_WARMUP_MAX_POINTS``).
+    ``REGION_GEOJSON_WARMUP_MAX_POINTS``). Requests for them stream fresh
+    every time and are not cached.
     """
     cache_alias = getattr(settings, "GEOJSON_CACHE", "default")
     geojson_cache = caches[cache_alias]
