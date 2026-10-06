@@ -374,6 +374,7 @@ class UserCreatedObjectFormMixin:
 
     def __init__(self, *args, **kwargs):
         """Capture request and adjust UserCreatedObject field querysets."""
+        from django.db.models import Q
         from django.forms import ModelChoiceField, ModelMultipleChoiceField
 
         from utils.object_management.models import UserCreatedObject
@@ -427,13 +428,14 @@ class UserCreatedObjectFormMixin:
 
                 # Collect submitted IDs for this field
                 submitted_ids = set()
+                data_key = self.add_prefix(field_name)
 
                 # Handle both single and multiple choice fields
-                if field_name in data:
+                if data_key in data:
                     values = (
-                        data.getlist(field_name)
+                        data.getlist(data_key)
                         if hasattr(data, "getlist")
-                        else [data.get(field_name)]
+                        else [data.get(data_key)]
                     )
                     for val in values:
                         if val:
@@ -452,10 +454,13 @@ class UserCreatedObjectFormMixin:
                         elif hasattr(attr, "pk"):  # FK field
                             existing_ids.add(attr.pk)
 
-                # Expand queryset to include all relevant IDs
+                # Narrow to submitted choices the field allows, plus existing ones
                 all_ids = submitted_ids | existing_ids
                 if all_ids:
-                    field.queryset = model.objects.filter(pk__in=all_ids)
+                    field.queryset = model.objects.filter(
+                        Q(pk__in=field.queryset.filter(pk__in=submitted_ids))
+                        | Q(pk__in=existing_ids)
+                    )
                     if hasattr(field.widget, "get_queryset"):
                         field.widget.get_queryset = lambda field=field: field.queryset
 
