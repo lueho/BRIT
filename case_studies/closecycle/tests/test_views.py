@@ -241,3 +241,124 @@ class ShowcaseGeoJSONVersionTestCase(TestCase):
         )
 
         self.assertNotEqual(self.version(), before)
+
+    def test_version_rotates_on_catchment_region_border_change_in_place(self):
+        """The GeoJSON also ships pilot polygons built from catchment region
+        borders, so in-place border edits must rotate the version."""
+        catchment_region = Region.objects.create(
+            name="TBN Region", publication_status="published"
+        )
+        catchment_region.geom = MultiPolygon(Polygon.from_bbox((3, 3, 4, 4)))
+        catchment_region.save()
+        catchment = Catchment.objects.create(
+            name="TBN Catchment",
+            region=catchment_region,
+            publication_status="published",
+        )
+        Showcase.objects.filter(region=self.region).update(catchment=catchment)
+        before = self.version()
+
+        with transaction.atomic():
+            borders = GeoPolygon.objects.get(pk=catchment_region.borders_id)
+            borders.geom = MultiPolygon(Polygon.from_bbox((3, 3, 5, 5)))
+            borders.save()
+
+        self.assertNotEqual(self.version(), before)
+
+    def test_version_rotates_when_catchment_is_modified(self):
+        catchment = Catchment.objects.create(
+            name="TBN Catchment",
+            region=self.region,
+            publication_status="published",
+        )
+        Showcase.objects.filter(region=self.region).update(catchment=catchment)
+        before = self.version()
+
+        Catchment.objects.filter(pk=catchment.pk).update(
+            name="Renamed Catchment",
+            lastmodified_at=timezone.now() + timedelta(seconds=5),
+        )
+
+        self.assertNotEqual(self.version(), before)
+
+    def test_version_rotates_on_catchment_reassignment(self):
+        other_region = Region.objects.create(
+            name="Other TBN Region", publication_status="published"
+        )
+        other_catchment = Catchment.objects.create(
+            name="Other Catchment",
+            region=other_region,
+            publication_status="published",
+        )
+        before = self.version()
+
+        showcase = Showcase.objects.get(region=self.region)
+        showcase.catchment = other_catchment
+        showcase.save()
+
+        self.assertNotEqual(self.version(), before)
+
+    def _two_catchment_pilots(self):
+        """Two showcases, each with its own published catchment; the first
+        catchment carries the older modification time."""
+        older, newer = (
+            Catchment.objects.create(
+                name=name, region=self.region, publication_status="published"
+            )
+            for name in ("Older Catchment", "Newer Catchment")
+        )
+        now = timezone.now()
+        Catchment.objects.filter(pk=older.pk).update(
+            lastmodified_at=now - timedelta(hours=2)
+        )
+        Catchment.objects.filter(pk=newer.pk).update(
+            lastmodified_at=now - timedelta(hours=1)
+        )
+        Showcase.objects.filter(region=self.region).update(catchment=older)
+        Showcase.objects.create(
+            name="Second Showcase",
+            region=self.region,
+            catchment=newer,
+            publication_status="published",
+        )
+        older.refresh_from_db()
+        return older, newer
+
+    def test_version_rotates_when_non_latest_catchment_changes(self):
+        """Max aggregates miss edits to a row below the latest timestamp."""
+        older, _ = self._two_catchment_pilots()
+        before = self.version()
+
+        with transaction.atomic():
+            Catchment.objects.filter(pk=older.pk).update(
+                name="Renamed Older Catchment",
+                lastmodified_at=older.lastmodified_at + timedelta(minutes=1),
+            )
+
+        self.assertNotEqual(self.version(), before)
+
+    def test_version_rotates_when_non_latest_fallback_region_changes(self):
+        other_region = Region.objects.create(
+            name="Other Region", publication_status="published"
+        )
+        Showcase.objects.create(
+            name="Other Showcase",
+            region=other_region,
+            publication_status="published",
+        )
+        older_mod = timezone.now() - timedelta(hours=2)
+        Region.objects.filter(pk=self.region.pk).update(lastmodified_at=older_mod)
+        before = self.version()
+
+        with transaction.atomic():
+            Region.objects.filter(pk=self.region.pk).update(
+                name="Renamed Region",
+                lastmodified_at=older_mod + timedelta(minutes=1),
+            )
+
+        self.assertNotEqual(self.version(), before)
+
+    def test_version_timestamp_carries_pilot_region_schema_salt(self):
+        from ..viewsets import ShowcaseViewSet
+
+        self.assertIn("pilot-regions-v1", ShowcaseViewSet()._version_timestamp({}))

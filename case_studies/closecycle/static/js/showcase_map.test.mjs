@@ -88,10 +88,37 @@ function setup({ loadShared = false } = {}) {
         infoCardShown: 0,
     };
 
+    const geoJsonLayers = [];
     class FakePolygon {}
     const L = {
         Polygon: FakePolygon,
+        GeoJSON: class {},
         point: (x, y) => ({ x, y }),
+        canvas: () => ({}),
+        circleMarker(latlng, style) {
+            return { latlng, style, getLatLng: () => latlng };
+        },
+        geoJson(data, options) {
+            const layer = {
+                options,
+                data,
+                added: [],
+                on() {},
+                addTo() {
+                    return this;
+                },
+                addData(d) {
+                    this.added.push(d);
+                },
+                eachLayer(callback) {
+                    (this.layers || []).forEach(callback);
+                },
+                resetStyle() {},
+                bringToBack() {},
+            };
+            geoJsonLayers.push(layer);
+            return layer;
+        },
     };
 
     const insideChecks = new Map();
@@ -171,9 +198,7 @@ function setup({ loadShared = false } = {}) {
             calls.fetchSummaries.push(params);
             return Promise.resolve();
         },
-        selectFeature(layer) {
-            calls.selected.push(layer);
-        },
+        selectFeature() {},
         resetFeatureStyles() {
             calls.resets += 1;
         },
@@ -187,27 +212,79 @@ function setup({ loadShared = false } = {}) {
         );
     }
     vm.runInContext(source, sandbox);
-    return { sandbox, calls, L, insideChecks, elements, documentListeners };
+    const pageSelectFeature = sandbox.selectFeature;
+    sandbox.selectFeature = layer => {
+        calls.selected.push(layer);
+        return pageSelectFeature(layer);
+    };
+    return { sandbox, calls, L, insideChecks, elements, documentListeners, geoJsonLayers };
+}
+
+function addLayerBehaviors(layer) {
+    layer._listeners = {};
+    layer.on = (type, callback) => {
+        (layer._listeners[type] ||= []).push(callback);
+    };
+    layer.fire = type => {
+        (layer._listeners[type] || []).forEach(callback => callback());
+    };
+    layer.setStyle = style => {
+        layer.style = style;
+    };
+    layer.bringToBack = () => {};
+    layer.bringToFront = () => {};
+    return layer;
+}
+
+function mountInOrder(order) {
+    return layer => {
+        order.push(layer);
+        layer.bringToBack = () => {
+            order.splice(order.indexOf(layer), 1);
+            order.unshift(layer);
+        };
+        layer.bringToFront = () => {
+            order.splice(order.indexOf(layer), 1);
+            order.push(layer);
+        };
+        layer.fire("add");
+    };
 }
 
 function makeLayer({ L, id, name, region }) {
-    const layer = new L.Polygon();
+    const layer = addLayerBehaviors(new L.Polygon());
     layer.feature = { id, properties: { name, region } };
     layer.toGeoJSON = () => ({ geometry: { id } });
     return layer;
 }
 
 function makePointLayer({ id, name, region, lat = 55, lng = 14 }) {
-    return {
-        feature: { id, properties: { name, region } },
+    return addLayerBehaviors({
+        feature: { id, properties: { name, region, feature_type: "showcase" } },
         getLatLng() {
             return { lat, lng };
         },
+    });
+}
+
+function makePilotLayer({ L, id, name, showcases }) {
+    const layer = addLayerBehaviors(new L.Polygon());
+    layer.feature = {
+        id,
+        properties: {
+            feature_type: "pilot_region",
+            name,
+            region: name,
+            showcases,
+        },
     };
+    layer.toGeoJSON = () => ({ geometry: { id } });
+    return layer;
 }
 
 function makeFeatureGroup(layers) {
     return {
+        resetStyle() {},
         eachLayer(callback) {
             layers.forEach(callback);
         },
@@ -513,4 +590,276 @@ test("co-located points without regions use a meaningful fallback heading", () =
     assert.deepEqual(links.map(el => el.textContent), ["No anchor", "Null anchor", "Anchored"]);
     links[0].click();
     assert.deepEqual(calls.fetchSummaries.map(params => params.id), [1]);
+});
+
+test("features layer renders pilot polygons and showcase points together", () => {
+    const { sandbox, geoJsonLayers } = setup({ loadShared: true });
+    sandbox.mapConfig.regionLayerStyle = {};
+    sandbox.mapConfig.catchmentLayerStyle = {};
+    sandbox.mapConfig.featuresLayerStyle = { radius: 4, color: "#123456" };
+    sandbox.initializeRenderers();
+
+    const layer = sandbox.createFeaturesLayer(null, "MultiPolygon");
+
+    assert.equal(geoJsonLayers.length, 1);
+    assert.equal(typeof layer.options.pointToLayer, "function");
+    assert.equal(typeof layer.options.style, "object");
+    assert.equal(layer.options.style.color, "#123456");
+    const marker = layer.options.pointToLayer(
+        { properties: { feature_type: "showcase" } },
+        { lat: 1, lng: 2 }
+    );
+    assert.equal(marker.style.color, "#123456");
+    assert.equal(typeof marker.getLatLng, "function");
+});
+
+test("streaming batches keep polygons and points in a single mixed layer", () => {
+    const { sandbox, geoJsonLayers } = setup({ loadShared: true });
+    sandbox.mapConfig.regionLayerStyle = {};
+    sandbox.mapConfig.catchmentLayerStyle = {};
+    sandbox.mapConfig.featuresLayerStyle = { radius: 4 };
+    sandbox.initializeRenderers();
+
+    const pilot = {
+        type: "Feature",
+        id: "pilot-catchment-3",
+        geometry: { type: "MultiPolygon", coordinates: [] },
+        properties: { feature_type: "pilot_region", showcases: [] },
+    };
+    const point = {
+        type: "Feature",
+        id: 5,
+        geometry: { type: "Point", coordinates: [1, 2] },
+        properties: { feature_type: "showcase" },
+    };
+
+    assert.equal(sandbox.addFeatureBatch([pilot]), true);
+    assert.equal(sandbox.addFeatureBatch([point]), true);
+
+    assert.equal(geoJsonLayers.length, 1);
+    assert.deepEqual(geoJsonLayers[0].added, [[pilot], [point]]);
+    assert.equal(typeof geoJsonLayers[0].options.pointToLayer, "function");
+    assert.equal(typeof geoJsonLayers[0].options.style, "object");
+});
+
+test("null geometry features are ignored by batch and full renders", () => {
+    const { sandbox, geoJsonLayers } = setup({ loadShared: true });
+    sandbox.mapConfig.regionLayerStyle = {};
+    sandbox.mapConfig.catchmentLayerStyle = {};
+    sandbox.mapConfig.featuresLayerStyle = { radius: 4 };
+    sandbox.initializeRenderers();
+
+    const noGeom = { type: "Feature", id: 9, geometry: null, properties: {} };
+    const point = {
+        type: "Feature",
+        id: 5,
+        geometry: { type: "Point", coordinates: [1, 2] },
+        properties: {},
+    };
+
+    assert.equal(sandbox.addFeatureBatch([noGeom]), false);
+    sandbox.renderFeatures({
+        type: "FeatureCollection",
+        features: [noGeom, point],
+    });
+    assert.equal(geoJsonLayers.length, 1);
+    assert.deepEqual(geoJsonLayers[0].data.features, [point]);
+});
+
+test("pilot polygon click fetches numeric showcase id and highlights polygon and marker", () => {
+    const { sandbox, calls, L } = setup();
+    const pilot = makePilotLayer({
+        L,
+        id: "pilot-catchment-9",
+        name: "Pilot Nine",
+        showcases: [{ id: 5, name: "Site A", region: "Pilot Nine" }],
+    });
+    const marker = makePointLayer({ id: 5, name: "Site A", region: "Pilot Nine", lat: 80, lng: 80 });
+    const group = makeFeatureGroup([pilot, marker]);
+
+    sandbox.featureClickHandler({ latlng: { lng: 14, lat: 55 }, layer: pilot }, group);
+
+    assert.equal(calls.openPopup.length, 0);
+    assert.deepEqual(calls.fetchSummaries.map(params => params.id), [5]);
+    assert.ok(calls.selected.includes(pilot));
+    assert.ok(calls.selected.includes(marker));
+});
+
+test("pilot polygon with several showcases offers a choice popup with numeric ids", () => {
+    const { sandbox, calls, L } = setup();
+    const pilot = makePilotLayer({
+        L,
+        id: "pilot-catchment-9",
+        name: "Pilot Nine",
+        showcases: [
+            { id: 5, name: "Site A", region: "Pilot Nine" },
+            { id: 7, name: "Site <b>B</b>", region: "Pilot Nine" },
+        ],
+    });
+    const group = makeFeatureGroup([pilot]);
+
+    sandbox.featureClickHandler({ latlng: { lng: 14, lat: 55 }, layer: pilot }, group);
+
+    assert.equal(calls.openPopup.length, 1);
+    const links = findAll(calls.openPopup[0].content, el => el.tagName === "A");
+    assert.deepEqual(links.map(el => el.textContent), ["Site A", "Site <b>B</b>"]);
+    links[1].click();
+    assert.deepEqual(calls.fetchSummaries.map(params => params.id), [7]);
+});
+
+test("overlapping pilot polygons deduplicate showcases in the choice popup", () => {
+    const { sandbox, calls, L } = setup();
+    const first = makePilotLayer({
+        L,
+        id: "pilot-catchment-1",
+        name: "Pilot One",
+        showcases: [
+            { id: 5, name: "Site A", region: "Pilot One" },
+            { id: 6, name: "Site B", region: "Pilot One" },
+        ],
+    });
+    const second = makePilotLayer({
+        L,
+        id: "pilot-catchment-2",
+        name: "Pilot Two",
+        showcases: [{ id: 5, name: "Site A", region: "Pilot Two" }],
+    });
+    const group = makeFeatureGroup([first, second]);
+
+    sandbox.featureClickHandler({ latlng: { lng: 14, lat: 55 }, layer: first }, group);
+
+    const links = findAll(calls.openPopup[0].content, el => el.tagName === "A");
+    assert.deepEqual(links.map(el => el.textContent), ["Site A", "Site B"]);
+});
+
+test("click on a point marker selects it without the containing pilot polygon", () => {
+    const { sandbox, calls, L } = setup();
+    const pilot = makePilotLayer({
+        L,
+        id: "pilot-catchment-9",
+        name: "Pilot Nine",
+        showcases: [
+            { id: 5, name: "Site A", region: "Pilot Nine" },
+            { id: 7, name: "Site B", region: "Pilot Nine" },
+        ],
+    });
+    const marker = makePointLayer({ id: 5, name: "Site A", region: "Pilot Nine" });
+    const group = makeFeatureGroup([pilot, marker]);
+
+    sandbox.featureClickHandler({ latlng: { lng: 14, lat: 55 }, layer: marker }, group);
+
+    assert.equal(calls.openPopup.length, 0);
+    assert.deepEqual(calls.fetchSummaries.map(params => params.id), [5]);
+    assert.deepEqual(calls.selected, [marker]);
+});
+
+test("click on empty map still matches nearby markers and hit polygons", () => {
+    const { sandbox, calls, L } = setup();
+    const pilot = makePilotLayer({
+        L,
+        id: "pilot-catchment-9",
+        name: "Pilot Nine",
+        showcases: [{ id: 5, name: "Site A", region: "Pilot Nine" }],
+    });
+    const marker = makePointLayer({ id: 8, name: "Site C", region: "Elsewhere" });
+    const group = makeFeatureGroup([pilot, marker]);
+
+    sandbox.featureClickHandler(clickEvent, group);
+
+    const links = findAll(calls.openPopup[0].content, el => el.tagName === "A");
+    assert.deepEqual(links.map(el => el.textContent), ["Site A", "Site C"]);
+});
+
+function initSharedStyles(sandbox) {
+    sandbox.mapConfig.regionLayerStyle = {};
+    sandbox.mapConfig.catchmentLayerStyle = {};
+    sandbox.mapConfig.featuresLayerStyle = { radius: 4 };
+    sandbox.initializeRenderers();
+}
+
+test("pilot polygons mounted after points still end up below markers", () => {
+    const { sandbox, L } = setup({ loadShared: true });
+    initSharedStyles(sandbox);
+    const layer = sandbox.createFeaturesLayer(null, "Point");
+    const order = [];
+    const mount = mountInOrder(order);
+    const marker = makePointLayer({ id: 5, name: "Site A", region: "Pilot" });
+    const pilot = makePilotLayer({
+        L,
+        id: "pilot-catchment-9",
+        name: "Pilot",
+        showcases: [{ id: 5, name: "Site A", region: "Pilot" }],
+    });
+    layer.options.onEachFeature(marker.feature, marker);
+    layer.options.onEachFeature(pilot.feature, pilot);
+    mount(marker);
+    mount(pilot);
+    assert.equal(order[0], pilot);
+    assert.equal(order[order.length - 1], marker);
+});
+
+test("resetFeatureStyles pushes polygons to the back without moving markers", () => {
+    const { sandbox, L } = setup();
+    const order = [];
+    const mount = mountInOrder(order);
+    const marker = makePointLayer({ id: 5, name: "Site A", region: "Pilot" });
+    const pilot = makePilotLayer({
+        L,
+        id: "pilot-catchment-9",
+        name: "Pilot",
+        showcases: [{ id: 5, name: "Site A", region: "Pilot" }],
+    });
+    mount(marker);
+    mount(pilot);
+    assert.equal(order[order.length - 1], pilot);
+
+    sandbox.resetFeatureStyles(makeFeatureGroup([pilot, marker]));
+
+    assert.equal(order[0], pilot);
+    assert.equal(order[order.length - 1], marker);
+});
+
+test("selectFeature highlights a polygon without raising it above markers", () => {
+    const { sandbox, L } = setup();
+    const order = [];
+    const mount = mountInOrder(order);
+    const pilot = makePilotLayer({
+        L,
+        id: "pilot-catchment-9",
+        name: "Pilot",
+        showcases: [{ id: 5, name: "Site A", region: "Pilot" }],
+    });
+    const marker = makePointLayer({ id: 5, name: "Site A", region: "Pilot" });
+    mount(pilot);
+    mount(marker);
+
+    sandbox.selectFeature(pilot);
+    assert.equal(pilot.style.color, "#f49a33");
+    assert.equal(order[0], pilot);
+    assert.equal(order[order.length - 1], marker);
+
+    sandbox.selectFeature(marker);
+    assert.equal(order[order.length - 1], marker);
+});
+
+test("pilot polygon click orders the polygon below its associated marker", () => {
+    const { sandbox, calls, L } = setup();
+    const order = [];
+    const mount = mountInOrder(order);
+    const pilot = makePilotLayer({
+        L,
+        id: "pilot-catchment-9",
+        name: "Pilot Nine",
+        showcases: [{ id: 5, name: "Site A", region: "Pilot Nine" }],
+    });
+    const marker = makePointLayer({ id: 5, name: "Site A", region: "Pilot Nine", lat: 80, lng: 80 });
+    mount(marker);
+    mount(pilot);
+    const group = makeFeatureGroup([pilot, marker]);
+
+    sandbox.featureClickHandler({ latlng: { lng: 14, lat: 55 }, layer: pilot }, group);
+
+    assert.deepEqual(calls.fetchSummaries.map(params => params.id), [5]);
+    assert.equal(order[0], pilot);
+    assert.equal(order[order.length - 1], marker);
 });
