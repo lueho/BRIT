@@ -1,8 +1,12 @@
 import os
+import shlex
 import subprocess
 import sys
+from pathlib import Path
 
+from django.conf import settings
 from django.test import SimpleTestCase
+from gunicorn.config import Config
 
 
 class ProductionSecretKeyTests(SimpleTestCase):
@@ -46,6 +50,30 @@ class ProductionSecretKeyTests(SimpleTestCase):
             "SECRET_KEY must be set in production.",
             completed.stderr,
         )
+
+
+class ProductionWebMemoryTests(SimpleTestCase):
+    def setUp(self):
+        deployment = (Path(settings.BASE_DIR) / "heroku.yml").read_text()
+        command = next(
+            line.split(":", 1)[1]
+            for line in deployment.splitlines()
+            if line.startswith("  web:")
+        )
+        arguments = shlex.split(command)
+        self.assertEqual(arguments[0], "gunicorn")
+        self.arguments = Config().parser().parse_args(arguments[1:])
+
+    def test_threads_share_one_application_process(self):
+        self.assertEqual(self.arguments.workers, 1)
+        self.assertEqual(self.arguments.threads, 4)
+
+    def test_threaded_worker_is_explicit(self):
+        self.assertEqual(self.arguments.worker_class, "gthread")
+
+    def test_requests_trigger_bounded_worker_recycling(self):
+        self.assertEqual(self.arguments.max_requests, 1000)
+        self.assertEqual(self.arguments.max_requests_jitter, 100)
 
 
 class ProductionStoragesTests(SimpleTestCase):
