@@ -76,7 +76,7 @@
             {% csrf_token %}
             {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
             <input type="hidden" name="access_action" value="remove_editor_group">
-            <input type="hidden" name="group" value="{{ group.name }}">
+            <input type="hidden" name="group_id" value="{{ group.pk }}">
             <button type="submit" class="btn btn-sm btn-outline-secondary">
               <i class="fas fa-times"></i> Remove
             </button>

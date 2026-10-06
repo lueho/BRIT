@@ -98,12 +98,80 @@ class GroupAccessManagementTests(TestCase):
         self.assertEqual(grants.count(), 1)
         self.assertEqual(grants.get().granted_by, self.owner)
 
-    def test_group_name_is_trimmed(self):
+    def test_add_trims_input_only_when_no_exact_group_name_exists(self):
         response = self.client.post(
             self.url("add_editor_group"), {"group": f"  {self.group.name}  "}
         )
         self.assertEqual(response.status_code, 302)
         self.assertTrue(ObjectGroupEditorGrant.for_object(self.process).exists())
+
+    def test_add_prefers_exact_padded_group_name_over_trimmed_collision(self):
+        padded = Group.objects.create(name=f" {self.group.name} ")
+        response = self.client.post(
+            self.url("add_editor_group"), {"group": padded.name}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            ObjectGroupEditorGrant.for_object(self.process).get().group, padded
+        )
+
+    def test_legacy_name_removal_uses_exact_padded_name(self):
+        padded = Group.objects.create(name=f" {self.group.name} ")
+        normal_grant = self.grant()
+        padded_grant = self.grant(group=padded)
+        response = self.client.post(
+            self.url("remove_editor_group"), {"group": padded.name}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            ObjectGroupEditorGrant.objects.filter(pk=padded_grant.pk).exists()
+        )
+        self.assertTrue(
+            ObjectGroupEditorGrant.objects.filter(pk=normal_grant.pk).exists()
+        )
+
+    def test_dialog_submits_stable_group_id_for_removal(self):
+        self.grant()
+        response = self.client.get(self.url("manage_access_modal"))
+        self.assertContains(
+            response,
+            f'<input type="hidden" name="group_id" value="{self.group.pk}">',
+            html=True,
+        )
+
+    def test_group_id_removal_survives_rename_and_takes_precedence_over_name(self):
+        grant = self.grant()
+        old_name = self.group.name
+        self.group.name = " Renamed editors "
+        self.group.save()
+        replacement = Group.objects.create(name=old_name)
+        replacement_grant = self.grant(group=replacement)
+        response = self.client.post(
+            self.url("remove_editor_group"),
+            {"group_id": self.group.pk, "group": old_name},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ObjectGroupEditorGrant.objects.filter(pk=grant.pk).exists())
+        self.assertTrue(
+            ObjectGroupEditorGrant.objects.filter(pk=replacement_grant.pk).exists()
+        )
+
+    def test_invalid_group_ids_do_not_fall_back_to_name_or_remove_any_grant(self):
+        grant = self.grant()
+        for group_id in ("", "invalid", "99999999", "9223372036854775808"):
+            with self.subTest(group_id=group_id):
+                response = self.client.post(
+                    self.url("remove_editor_group"),
+                    {"group_id": group_id, "group": self.group.name},
+                )
+                self.assertEqual(response.status_code, 302)
+                self.assertIn(
+                    "does not exist",
+                    " ".join(str(item) for item in get_messages(response.wsgi_request)),
+                )
+                self.assertTrue(
+                    ObjectGroupEditorGrant.objects.filter(pk=grant.pk).exists()
+                )
 
     def test_unknown_group_is_reported_without_creating_group_or_grant(self):
         before = Group.objects.count()
@@ -122,7 +190,7 @@ class GroupAccessManagementTests(TestCase):
         self.grant()
         other_grant = self.grant(process=self.unshared)
         response = self.client.post(
-            self.url("remove_editor_group"), {"group": self.group.name}
+            self.url("remove_editor_group"), {"group_id": self.group.pk}
         )
         self.assertEqual(response.status_code, 302)
         self.assertFalse(ObjectGroupEditorGrant.for_object(self.process).exists())
@@ -268,7 +336,7 @@ class GroupAccessManagementTests(TestCase):
         self.assertTrue(ObjectGroupEditorGrant.for_object(self.process).exists())
         self.assertTrue(self.process.editor_grants.exists())
         for action, data in (
-            ("remove_editor_group", {"group": self.group.name}),
+            ("remove_editor_group", {"group_id": self.group.pk}),
             ("remove_editor", {"user": self.member.username}),
         ):
             response = self.client.post(

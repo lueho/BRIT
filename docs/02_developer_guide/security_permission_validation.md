@@ -212,9 +212,13 @@ This table summarizes effective policy from `get_object_policy(...)` and
 
 - Owners and staff can inspect direct user grants and group grants separately in
   the access dialog. They can grant or revoke either kind on that object.
-- Group grants target existing Django groups by name. They never create groups,
-  alter membership, or assign model permissions. Current and future group members
-  inherit the object's grant while they belong to the group.
+- Adding a group grant resolves the exact existing group name first, including
+  leading/trailing whitespace; trimmed input is considered only if no exact match
+  exists. The dialog removes grants by stable group ID, so renames or whitespace
+  cannot redirect removal to another group. Legacy name-based removal uses exact
+  names only. These actions never create groups, alter membership, or assign model
+  permissions. Current and future members inherit the object's grant while they
+  belong to the group.
 - A grant provides read access but does not itself assign `change_<model>`.
   Non-staff editors need that permission for content editing and cannot edit
   published or archived records. Grants do not confer ownership, moderation,

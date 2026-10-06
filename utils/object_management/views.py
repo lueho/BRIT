@@ -1373,12 +1373,20 @@ class BaseObjectAccessActionView(LoginRequiredMixin, UserPassesTestMixin, View):
         except User.DoesNotExist:
             return None
 
-    def _resolve_group(self, name):
+    def _resolve_group(self, name, *, trim=False):
+        from django.contrib.auth.models import Group
+
+        group = Group.objects.filter(name=name).first()
+        if group is None and trim:
+            group = Group.objects.filter(name=name.strip()).first()
+        return group
+
+    def _resolve_group_id(self, group_id):
         from django.contrib.auth.models import Group
 
         try:
-            return Group.objects.get(name=name)
-        except Group.DoesNotExist:
+            return Group.objects.filter(pk=group_id).first()
+        except (TypeError, ValueError):
             return None
 
 
@@ -1492,7 +1500,7 @@ class AddEditorGroupView(BaseObjectAccessActionView):
 
     def post(self, request, *args, **kwargs):
         obj = self.get_object()
-        group = self._resolve_group((request.POST.get("group") or "").strip())
+        group = self._resolve_group(request.POST.get("group") or "", trim=True)
         if group is None:
             messages.error(request, "The specified group does not exist.")
             return HttpResponseRedirect(self.get_success_url())
@@ -1512,7 +1520,10 @@ class RemoveEditorGroupView(BaseObjectAccessActionView):
 
     def post(self, request, *args, **kwargs):
         obj = self.get_object()
-        group = self._resolve_group((request.POST.get("group") or "").strip())
+        if "group_id" in request.POST:
+            group = self._resolve_group_id(request.POST.get("group_id"))
+        else:
+            group = self._resolve_group(request.POST.get("group") or "")
         if group is None:
             messages.error(request, "The specified group does not exist.")
             return HttpResponseRedirect(self.get_success_url())
