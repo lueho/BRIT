@@ -56,6 +56,7 @@ ALGORITHM_NAME = "Sötåsen grass-to-protein"
 ALGORITHM_MODULE = "sources.sotasen.inventory.algorithms"
 ALGORITHM_FUNCTION = "sotasen_grass_to_protein"
 SCENARIO_NAME = "Sötåsen grass-to-protein demo (Thomas 2025)"
+DEMO_ASSUMPTION_SOURCE = "Demo assumption"
 
 ALGORITHM_DESCRIPTION = (
     "Estimates annual grassland biomass and recovered protein production for "
@@ -94,11 +95,11 @@ PARAMETERS = (
         ),
         "values": [
             {
-                "name": "9.0 t DM/ha/a (demo assumption)",
+                "name": "9.0 t DM/ha/a",
                 "type": NUMERIC,
                 "value": 9.0,
                 "default": True,
-                "source": SOURCE_CITATION_KEY,
+                "source": DEMO_ASSUMPTION_SOURCE,
                 "description": "Demo assumption for the Sötåsen showcase.",
             },
         ],
@@ -114,11 +115,11 @@ PARAMETERS = (
         ),
         "values": [
             {
-                "name": "0.20 (20% CP, demo assumption)",
+                "name": "0.20 (20% CP)",
                 "type": NUMERIC,
                 "value": 0.20,
                 "default": True,
-                "source": SOURCE_CITATION_KEY,
+                "source": DEMO_ASSUMPTION_SOURCE,
                 "description": "Demo assumption for the Sötåsen showcase.",
             },
         ],
@@ -143,11 +144,11 @@ PARAMETERS = (
                 "description": "Lower endpoint of the recovery range observed in the project.",
             },
             {
-                "name": "12% (midpoint demo assumption)",
+                "name": "12% (midpoint)",
                 "type": SELECTION,
                 "value": 0.12,
                 "default": True,
-                "source": SOURCE_CITATION_KEY,
+                "source": DEMO_ASSUMPTION_SOURCE,
                 "description": (
                     "Midpoint demo assumption; not a measured mean of the "
                     "observed 4-20% recovery range."
@@ -162,7 +163,7 @@ PARAMETERS = (
                 "description": "Upper endpoint of the recovery range observed in the project.",
             },
             {
-                "name": "42% (literature benchmark, Thomas 2025)",
+                "name": "42% (literature benchmark)",
                 "type": SELECTION,
                 "value": 0.42,
                 "default": False,
@@ -413,7 +414,6 @@ class Command(BaseCommand):
             scenario.region = region
             scenario.catchment = catchment
             scenario.description = SCENARIO_DESCRIPTION
-            scenario.publication_status = Scenario.STATUS_PRIVATE
             scenario.save()
         self._log("Created" if created else "Updated", f"Scenario '{scenario}'")
         return scenario

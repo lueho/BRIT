@@ -173,6 +173,45 @@ class SetupSotasenDemoInventoryTestCase(TestCase):
             0.20,
         )
 
+    def test_value_names_do_not_embed_the_citation(self):
+        """The UI appends ` (source)` to option labels, so names must not
+        repeat the citation. Only study-reported values cite Thomas 2025;
+        demo assumptions are marked as such."""
+        self.run_command()
+
+        values = InventoryAlgorithmParameterValue.objects.filter(
+            parameter__inventory_algorithm__function_name="sotasen_grass_to_protein"
+        )
+        for value in values:
+            self.assertNotIn("Thomas 2025", value.name)
+        self.assertEqual(
+            {
+                v.value: v.source
+                for v in values.filter(
+                    parameter__short_name="protein_recovery_fraction"
+                )
+            },
+            {
+                0.04: "Thomas 2025",
+                0.12: "Demo assumption",
+                0.20: "Thomas 2025",
+                0.42: "Thomas 2025",
+            },
+        )
+
+    def test_rerun_does_not_demote_published_scenario(self):
+        self.run_command()
+        scenario = Scenario.objects.get(
+            name="Sötåsen grass-to-protein demo (Thomas 2025)"
+        )
+        scenario.publication_status = "published"
+        scenario.save()
+
+        self.run_command()
+
+        scenario.refresh_from_db()
+        self.assertEqual(scenario.publication_status, "published")
+
     def test_scenario_configuration_uses_defaults(self):
         self.run_command()
 
