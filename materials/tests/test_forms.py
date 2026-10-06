@@ -967,6 +967,26 @@ class SampleModelFormSampleGroupsTestCase(TestCase):
             sample.sample_groups.all(), [self.group2, self.foreign_published_group]
         )
 
+    def test_maintenance_form_preselects_editable_groups_on_reopen(self):
+        sample = Sample.objects.create(
+            name="Grouped sample",
+            material=self.material,
+            owner=self.owner,
+            standalone=True,
+        )
+        sample.sample_groups.add(self.group1, self.foreign_published_group)
+        form = SampleMaintenanceForm(
+            instance=sample,
+            fields=("standalone", "sample_groups"),
+            request=self._request(self.owner),
+        )
+
+        self.assertCountEqual(form.initial["sample_groups"], [self.group1])
+        self.assertEqual(
+            form.fields["sample_groups"].workspace_options,
+            [{"value": str(self.group1.pk), "label": self.group1.name}],
+        )
+
 
 class ComponentGroupModelFormTestCase(TestCase):
     def test_is_compositional_field_can_be_disabled(self):

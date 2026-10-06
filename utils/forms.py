@@ -688,9 +688,9 @@ class WorkspaceReferenceScopeMixin:
         from utils.object_management.models import UserCreatedObject
         from utils.object_management.permissions import filter_queryset_for_user
 
-        super().__init__(*args, **kwargs)
         if request is not None:
             self.request = request
+        super().__init__(*args, **kwargs)
         if field_names is not None:
             self.fields = {name: self.fields[name] for name in field_names}
         for name, field in self.fields.items():
