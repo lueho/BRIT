@@ -456,6 +456,38 @@ def iter_rendered_geojson(payload, chunk_size=65536):
         raise ValueError("Incomplete cached GeoJSON payload")
 
 
+def render_geojson_payload(
+    queryset,
+    serializer_class,
+    geometry_field,
+    *,
+    context=None,
+    geometry_defer_field=None,
+):
+    """Render a queryset to bounded zlib-compressed GeoJSON bytes.
+
+    Returns ``None`` when the compressed output exceeds
+    ``GEOJSON_MAX_RENDERED_CACHE_BYTES``.
+    """
+    with (
+        BytesIO() as buffer,
+        closing(
+            iter_geojson_features(
+                queryset,
+                serializer_class,
+                geometry_field,
+                context=context,
+                geometry_defer_field=geometry_defer_field,
+            )
+        ) as chunks,
+    ):
+        for chunk in _compressed_geojson_chunks(chunks):
+            if buffer.tell() + len(chunk) > GEOJSON_MAX_RENDERED_CACHE_BYTES:
+                return None
+            buffer.write(chunk)
+        return buffer.getvalue()
+
+
 def cache_rendered_geojson(
     cache,
     cache_key,
@@ -468,23 +500,16 @@ def cache_rendered_geojson(
     oversized_key = f"{cache_key}:oversized:{GEOJSON_MAX_RENDERED_CACHE_BYTES}"
     if cache.has_key(cache_key) or cache.has_key(oversized_key):
         return False
-    with (
-        BytesIO() as buffer,
-        closing(
-            iter_geojson_features(
-                queryset,
-                serializer_class,
-                geometry_field,
-                geometry_defer_field=geometry_defer_field,
-            )
-        ) as chunks,
-    ):
-        for chunk in _compressed_geojson_chunks(chunks):
-            if buffer.tell() + len(chunk) > GEOJSON_MAX_RENDERED_CACHE_BYTES:
-                cache.set(oversized_key, True, timeout=timeout)
-                return False
-            buffer.write(chunk)
-        cache.set(cache_key, buffer.getvalue(), timeout=timeout)
+    payload = render_geojson_payload(
+        queryset,
+        serializer_class,
+        geometry_field,
+        geometry_defer_field=geometry_defer_field,
+    )
+    if payload is None:
+        cache.set(oversized_key, True, timeout=timeout)
+        return False
+    cache.set(cache_key, payload, timeout=timeout)
     cache.set(f"{cache_key}:count", queryset.count(), timeout=timeout)
     return True
 

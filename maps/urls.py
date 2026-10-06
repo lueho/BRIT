@@ -3,6 +3,7 @@ from django.urls import include, path
 from maps.contracts import SourceDomainMapMount
 from maps.registry import register_source_domain_map_mount_listener
 
+from .geojson_assets import RegionGeoJSONAssetView
 from .router import router
 from .views import (
     AttributeAutocompleteView,
@@ -289,6 +290,11 @@ urlpatterns = [
     path("regions/", RegionPublishedFilterView.as_view(), name="region-list"),
     path("regions/user/", RegionPrivateFilterView.as_view(), name="region-list-owned"),
     path("regions/create/", RegionCreateView.as_view(), name="region-create"),
+    path(
+        "regions/<int:pk>/geojson/<str:version>.json",
+        RegionGeoJSONAssetView.as_view(),
+        name="region-geojson-asset",
+    ),
     path("regions/<int:pk>/", RegionDetailView.as_view(), name="region-detail"),
     path("regions/<int:pk>/update/", RegionUpdateView.as_view(), name="region-update"),
     path(

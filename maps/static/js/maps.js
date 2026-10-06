@@ -107,6 +107,23 @@ async function storeInIndexedDB(url, data, version = null) {
     }
 }
 
+function regionAssetUrlParts(url) {
+    try {
+        const parsed = new URL(url, window.location.origin);
+        if (parsed.origin !== window.location.origin) {
+            return null;
+        }
+        const match = parsed.pathname.match(/^\/maps\/regions\/(\d+)\/geojson\/([a-f0-9]{32})\.json$/);
+        return match ? { regionId: match[1], version: match[2] } : null;
+    } catch (error) {
+        return null;
+    }
+}
+
+function isImmutableRegionAssetUrl(url) {
+    return regionAssetUrlParts(url) !== null;
+}
+
 async function getFromIndexedDB(url) {
     try {
         const db = await initializeDB();
@@ -117,7 +134,9 @@ async function getFromIndexedDB(url) {
 
             request.onsuccess = event => {
                 const entry = event.target.result;
-                if (entry && (Date.now() - entry.timestamp) < clientCacheConfig.maxAge) {
+                const reusable = isImmutableRegionAssetUrl(url)
+                    || (Date.now() - entry?.timestamp) < clientCacheConfig.maxAge;
+                if (entry && reusable) {
                     console.log(`Cache hit for: ${url}`);
                     // Return full entry including version for validation
                     resolve(entry);
@@ -173,8 +192,14 @@ async function fetchDataVersion(baseUrl) {
 async function fetchWithVersionValidation(url, cacheKey) {
     // Check for cached data
     const cached = await getFromIndexedDB(cacheKey);
+    const assetParts = regionAssetUrlParts(url);
 
-    if (cached && cached.version) {
+    if (assetParts) {
+        if (cached && cached.version === assetParts.version) {
+            console.log(`Immutable asset cache hit for: ${cacheKey}`);
+            return { data: cached.data, fromCache: true };
+        }
+    } else if (cached && cached.version) {
         // We have cached data with a version - validate it
         const currentVersion = await fetchDataVersion(url);
 
@@ -200,8 +225,16 @@ async function fetchWithVersionValidation(url, cacheKey) {
     const version = response.headers.get('X-Data-Version');
 
     // Store with version for future validation
-    await storeInIndexedDB(cacheKey, data, version);
-    await cleanupCache();
+    if (assetParts) {
+        const cacheControl = response.headers.get('Cache-Control') || '';
+        if (cacheControl.includes('immutable') && version === assetParts.version) {
+            await storeInIndexedDB(cacheKey, data, version);
+            await cleanupCache();
+        }
+    } else {
+        await storeInIndexedDB(cacheKey, data, version);
+        await cleanupCache();
+    }
 
     return { data: data, fromCache: false };
 }
@@ -494,10 +527,18 @@ function buildUrl(base, params) {
 
 async function fetchRegionGeometry(params, isCurrent = () => true) {
     validateParams(params, ['id']);
-    const url = buildUrl(mapConfig.regionLayerGeometriesUrl, { id: params.id });
-    const cacheKey = normalizeUrl(url);
 
     try {
+        let geometriesUrl = mapConfig.regionLayerGeometriesUrl;
+        const assetParts = regionAssetUrlParts(geometriesUrl);
+        if (assetParts && String(params.id) !== assetParts.regionId) {
+            geometriesUrl = mapConfig.regionLayerDynamicGeometriesUrl;
+            if (!geometriesUrl) {
+                throw new Error(`No geometry endpoint configured for region ${params.id}`);
+            }
+        }
+        const url = buildUrl(geometriesUrl, { id: params.id });
+        const cacheKey = normalizeUrl(url);
         const { data } = await fetchWithVersionValidation(url, cacheKey);
         if (!isCurrent()) return;
         renderRegion(data);

@@ -152,9 +152,14 @@ def warm_region_geojson_cache(limit=None, max_points=None):
     # Decide from the point counts alone which regions to warm: selecting
     # the geometries up front would load every oversized geometry into the
     # worker before it is skipped.
+    static_names = getattr(settings, "GEOJSON_STATIC_REGION_NAMES", ())
+    candidates = Region.objects.filter(borders__isnull=False)
+    if static_names:
+        candidates = candidates.exclude(
+            name__in=static_names, publication_status="published"
+        )
     candidates = (
-        Region.objects.filter(borders__isnull=False)
-        .annotate(num_points=NumPoints("borders__geom"))
+        candidates.annotate(num_points=NumPoints("borders__geom"))
         .order_by("-num_points")
         .values_list("id", "name", "num_points")[:limit]
     )

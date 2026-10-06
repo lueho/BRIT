@@ -212,6 +212,8 @@ CACHES = {
 # Use the geojson cache for all geojson-related operations
 GEOJSON_CACHE = "geojson"
 
+GEOJSON_STATIC_REGION_NAMES = ("Europe (NUTS)",)
+
 # Identifies the deployed release (Heroku dyno metadata sets
 # HEROKU_RELEASE_VERSION); used to scope per-release startup work.
 RELEASE_ID = os.environ.get("HEROKU_RELEASE_VERSION", "")
