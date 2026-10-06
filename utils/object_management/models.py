@@ -1,6 +1,6 @@
 from ambient_toolbox.models import CommonInfo
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
@@ -166,6 +166,49 @@ class ObjectEditorGrant(models.Model):
         )
 
 
+class ObjectGroupEditorGrant(models.Model):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+    group = models.ForeignKey(
+        Group, on_delete=models.CASCADE, related_name="object_editor_grants"
+    )
+    granted_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["content_type", "object_id", "group"],
+                name="unique_group_editor_grant_per_object",
+            )
+        ]
+        indexes = [models.Index(fields=["content_type", "object_id"])]
+
+    def __str__(self):
+        return f"Edit access for {self.group} on {self.content_type} #{self.object_id}"
+
+    @classmethod
+    def for_object(cls, obj):
+        return cls.objects.filter(
+            content_type=ContentType.objects.get_for_model(obj.__class__),
+            object_id=obj.pk,
+        )
+
+
+def editor_grant_object_ids(model, user):
+    content_type = ContentType.objects.get_for_model(model)
+    individual_grants = ObjectEditorGrant.objects.filter(
+        content_type=content_type, editor=user
+    ).values_list("object_id", flat=True)
+    group_grants = ObjectGroupEditorGrant.objects.filter(
+        content_type=content_type, group__in=user.groups.all()
+    ).values_list("object_id", flat=True)
+    return individual_grants.union(group_grants)
+
+
 def annotate_owner_review_feedback(queryset, user):
     if not user or not user.is_authenticated:
         return queryset
@@ -234,10 +277,7 @@ class UserCreatedObjectQuerySet(models.QuerySet):
         )
 
     def _editor_grant_object_ids(self, user):
-        return ObjectEditorGrant.objects.filter(
-            content_type=ContentType.objects.get_for_model(self.model),
-            editor=user,
-        ).values("object_id")
+        return editor_grant_object_ids(self.model, user)
 
     def reviewable_by_user(self, user):
         if self._is_moderator(user):
@@ -462,7 +502,9 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
             return False
         if user.pk == self.owner_id:
             return True
-        return self.editor_grants.filter(editor=user).exists()
+        return self.__class__.objects.filter(
+            pk=self.pk, pk__in=editor_grant_object_ids(self.__class__, user)
+        ).exists()
 
     def transfer_ownership(self, new_owner, initiator=None):
         """Transfer ownership of this object to ``new_owner``.

@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -113,6 +113,12 @@ class EditorPermissionTests(TestCase):
 
     def setUp(self):
         self.collection.add_editor(self.editor)
+        self.editor.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="change_collection",
+            )
+        )
         self.permission = UserCreatedObjectPermission()
 
     def _request(self, user, method="PATCH", data=None):
@@ -133,6 +139,14 @@ class EditorPermissionTests(TestCase):
     def test_editor_can_modify_non_status_fields(self):
         request = self._request(self.editor, data={"name": "Renamed"})
         self.assertTrue(
+            self.permission.has_object_permission(request, None, self.collection)
+        )
+
+    def test_editor_cannot_modify_without_change_permission(self):
+        self.editor.user_permissions.clear()
+        editor = User.objects.get(pk=self.editor.pk)
+        request = self._request(editor, data={"name": "Renamed"})
+        self.assertFalse(
             self.permission.has_object_permission(request, None, self.collection)
         )
 
