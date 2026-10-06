@@ -1,10 +1,8 @@
 {% extends 'filtered_map.html' %}
 {% load static %}
 
-{% block filter_form_card %}{% endblock filter_form_card %}
-{% block filter_result_card %}{% endblock filter_result_card %}
-
-{% block extra_cards %}
+{% block user_actions %}
+<div class="d-flex flex-column gap-3 filter-sticky">
     <div class="card shadow">
         <div class="card-header"
              role="button"
@@ -47,4 +45,5 @@
                 {% endfor %}
         </div>
     </div>
-{% endblock extra_cards %}
+</div>
+{% endblock user_actions %}

@@ -2038,6 +2038,13 @@ class ScenarioResultMapTestCase(TestCase):
             self.geojson_url(self.published_layer),
         )
 
+    def test_result_map_sidebar_shows_result_cards_without_filter_tabs(self):
+        response = self.client.get(self.map_url(self.published_scenario))
+
+        self.assertNotContains(response, 'id="filters-tab"')
+        self.assertContains(response, "Source information")
+        self.assertContains(response, "Total production")
+
     def test_result_map_breadcrumbs_lead_back_to_scenario_results(self):
         response = self.client.get(self.map_url(self.published_scenario))
 
