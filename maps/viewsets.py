@@ -1,4 +1,7 @@
+from types import SimpleNamespace
+
 from django.db.models import Count, Max
+from django.http import HttpResponseRedirect
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -6,6 +9,11 @@ from rest_framework.response import Response
 from utils.viewsets import AutoPermModelViewSet
 
 from .filters import CatchmentFilterSet, RegionFilterSet
+from .geojson_assets import (
+    get_static_region_geojson_url,
+    get_static_region_geojson_version,
+    is_static_region_geojson_eligible,
+)
 from .mixins import CachedGeoJSONMixin, get_unbounded_geojson_rejection_response
 from .models import Catchment, Location, NutsRegion, NutsVintage, Region
 from .serializers import (
@@ -75,6 +83,64 @@ class RegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         if self.action == "geojson":
             return RegionGeoFeatureModelSerializer
         return RegionModelSerializer
+
+    def _static_geojson_region_candidate(self, request):
+        params = request.query_params
+        if not set(params.keys()) <= {"id", "format"}:
+            return None
+        values = [v for v in params.getlist("id") if str(v).strip()]
+        if len(values) != 1:
+            return None
+        try:
+            region_id = int(values[0])
+        except (TypeError, ValueError):
+            return None
+        row = (
+            self.filter_queryset(self.get_queryset())
+            .filter(pk=region_id)
+            .values(
+                "pk",
+                "name",
+                "country",
+                "description",
+                "publication_status",
+                "borders_id",
+                "lastmodified_at",
+            )
+            .first()
+        )
+        if row is None:
+            return None
+        region = SimpleNamespace(**row)
+        if not is_static_region_geojson_eligible(region):
+            return None
+        return region
+
+    @action(detail=False, methods=["get"])
+    def geojson(self, request, *args, **kwargs):
+        region = self._static_geojson_region_candidate(request)
+        if region is not None:
+            version = get_static_region_geojson_version(region)
+            response = HttpResponseRedirect(
+                get_static_region_geojson_url(region), status=302
+            )
+            response["Cache-Control"] = "no-cache"
+            response["X-Data-Version"] = version
+            response["X-Total-Count"] = "1"
+            response["Access-Control-Expose-Headers"] = "X-Total-Count, X-Data-Version"
+            return response
+        return super().geojson(request, *args, **kwargs)
+
+    @action(detail=False, methods=["get", "head"])
+    def version(self, request, *args, **kwargs):
+        region = self._static_geojson_region_candidate(request)
+        if region is not None:
+            version = get_static_region_geojson_version(region)
+            response = Response({"version": version})
+            response["X-Data-Version"] = version
+            response["Cache-Control"] = "no-cache"
+            return response
+        return super().version(request, *args, **kwargs)
 
     @action(detail=False, methods=["get"])
     def summaries(self, request, *args, **kwargs):

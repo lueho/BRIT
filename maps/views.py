@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from urllib.parse import urlparse
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
@@ -16,6 +17,7 @@ from django_filters.views import FilterView
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.views import APIView, Response
 
+from maps.geojson_assets import get_static_region_geojson_url
 from maps.mixins import (
     GEOJSON_CONTROL_QUERY_PARAMS,
     get_unbounded_geojson_rejection_response,
@@ -365,6 +367,44 @@ class MapMixin:
             map_config["loadFeatures"] = False
         if not map_config.get("featuresLayerSummariesUrl"):
             map_config["loadFeaturesLayerSummary"] = False
+        return self._swap_static_region_geometries_url(map_config)
+
+    def _swap_static_region_geometries_url(self, map_config):
+        url = map_config.get("regionLayerGeometriesUrl")
+        region_id = map_config.get("regionId")
+        if not url or not region_id:
+            return map_config
+        parsed = urlparse(str(url))
+        if parsed.query or parsed.fragment or parsed.params:
+            return map_config
+        if parsed.netloc:
+            request = getattr(self, "request", None)
+            if request is None or parsed.netloc.lower() != request.get_host().lower():
+                return map_config
+        standard_url = reverse("api-region-geojson").rstrip("/") + "/"
+        if parsed.path.rstrip("/") + "/" != standard_url:
+            return map_config
+        try:
+            region_id = int(region_id)
+        except (TypeError, ValueError):
+            return map_config
+        region = (
+            Region.objects.filter(pk=region_id)
+            .only(
+                "id",
+                "name",
+                "country",
+                "description",
+                "publication_status",
+                "lastmodified_at",
+                "borders",
+            )
+            .first()
+        )
+        asset_url = get_static_region_geojson_url(region)
+        if asset_url:
+            map_config["regionLayerDynamicGeometriesUrl"] = url
+            map_config["regionLayerGeometriesUrl"] = asset_url
         return map_config
 
     def get_context_data(self, **kwargs):
