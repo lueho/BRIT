@@ -1581,6 +1581,89 @@ class ScenarioDetailRunAuthorizationTests(TestCase):
         self.assertContains(response, 'name="run"')
 
 
+class ScenarioInventoryEditLinkTests(TestCase):
+    """The per-inventory "Edit" link follows policy.can_edit: staff see it
+    even on published scenarios, owners only on unpublished ones."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner", password="pass")
+        cls.owner.user_permissions.add(
+            Permission.objects.get(codename="change_scenario")
+        )
+        cls.staff = User.objects.create_user(
+            username="staff", password="pass", is_staff=True
+        )
+        region = Region.objects.create(name="R", publication_status="published")
+        catchment = Catchment.objects.create(
+            name="C",
+            region=region,
+            parent_region=region,
+            publication_status="published",
+        )
+        cls.published_scenario = Scenario.objects.create(
+            name="Published",
+            owner=cls.owner,
+            region=region,
+            catchment=catchment,
+            publication_status="published",
+        )
+        cls.private_scenario = Scenario.objects.create(
+            name="Private", owner=cls.owner, region=region, catchment=catchment
+        )
+        feedstock = Material.objects.create(name="M", owner=cls.owner)
+        geodataset = GeoDataset.objects.create(name="G", owner=cls.owner, region=region)
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="A", geodataset=geodataset
+        )
+        cls.algorithm.feedstocks.add(feedstock)
+        cls.feedstock = feedstock
+        for scenario in (cls.published_scenario, cls.private_scenario):
+            ScenarioInventoryConfiguration.objects.create(
+                scenario=scenario,
+                feedstock=feedstock,
+                geodataset=geodataset,
+                inventory_algorithm=cls.algorithm,
+            )
+
+    def edit_url(self, scenario):
+        return reverse(
+            "scenario-update-config",
+            kwargs={
+                "scenario_pk": scenario.pk,
+                "feedstock_pk": self.feedstock.pk,
+                "algorithm_pk": self.algorithm.pk,
+            },
+        )
+
+    def detail(self, scenario):
+        return self.client.get(reverse("scenario-detail", kwargs={"pk": scenario.pk}))
+
+    def test_staff_sees_edit_link_on_published_scenario(self):
+        self.client.force_login(self.staff)
+
+        response = self.detail(self.published_scenario)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.edit_url(self.published_scenario))
+
+    def test_owner_does_not_see_edit_link_on_published_scenario(self):
+        self.client.force_login(self.owner)
+
+        response = self.detail(self.published_scenario)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, self.edit_url(self.published_scenario))
+
+    def test_owner_sees_edit_link_on_private_scenario(self):
+        self.client.force_login(self.owner)
+
+        response = self.detail(self.private_scenario)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.edit_url(self.private_scenario))
+
+
 # ----------- Missing-object lookups must return 404, not 500 ----------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
