@@ -20,6 +20,8 @@ from processes.models import Process
 from utils.object_management.models import NamedUserCreatedObject
 from utils.object_management.permissions import filter_queryset_for_user
 
+from .themes import THEME_CHOICES, get_theme
+
 
 class Showcase(NamedUserCreatedObject):
     """
@@ -36,6 +38,10 @@ class Showcase(NamedUserCreatedObject):
     process chain and scenarios that describe its inventory and material
     flows.
     """
+
+    theme = CharField(
+        max_length=32, choices=THEME_CHOICES, blank=True, default="", db_default=""
+    )
 
     geom = PointField(
         blank=True,
@@ -86,6 +92,10 @@ class Showcase(NamedUserCreatedObject):
         help_text="Temporal sample series measured at this showcase, e.g. "
         "feedstock monitoring of the processing chain.",
     )
+
+    @property
+    def theme_info(self):
+        return get_theme(self.theme)
 
     @classmethod
     def public_map_url(cls):

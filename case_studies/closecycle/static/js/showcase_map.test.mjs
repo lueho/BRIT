@@ -143,6 +143,7 @@ function setup({ loadShared = false } = {}) {
 
     const elements = {
         "summary-container": makeElement("div"),
+        "pilot-region-context": makeElement("div"),
         "summary-tab": makeElement("button"),
         "info-card-body": makeElement("div"),
     };
@@ -603,8 +604,8 @@ test("features layer renders pilot polygons and showcase points together", () =>
 
     assert.equal(geoJsonLayers.length, 1);
     assert.equal(typeof layer.options.pointToLayer, "function");
-    assert.equal(typeof layer.options.style, "object");
-    assert.equal(layer.options.style.color, "#123456");
+    assert.equal(typeof layer.options.style, "function");
+    assert.equal(layer.options.style({ properties: {} }).color, "#123456");
     const marker = layer.options.pointToLayer(
         { properties: { feature_type: "showcase" } },
         { lat: 1, lng: 2 }
@@ -639,7 +640,7 @@ test("streaming batches keep polygons and points in a single mixed layer", () =>
     assert.equal(geoJsonLayers.length, 1);
     assert.deepEqual(geoJsonLayers[0].added, [[pilot], [point]]);
     assert.equal(typeof geoJsonLayers[0].options.pointToLayer, "function");
-    assert.equal(typeof geoJsonLayers[0].options.style, "object");
+    assert.equal(typeof geoJsonLayers[0].options.style, "function");
 });
 
 test("null geometry features are ignored by batch and full renders", () => {
@@ -862,4 +863,89 @@ test("pilot polygon click orders the polygon below its associated marker", () =>
     assert.deepEqual(calls.fetchSummaries.map(params => params.id), [5]);
     assert.equal(order[0], pilot);
     assert.equal(order[order.length - 1], marker);
+});
+
+test("source theme colour applies to markers and lightly filled pilot polygons", () => {
+    const { sandbox } = setup({ loadShared: true });
+    initSharedStyles(sandbox);
+    const theme = { color: "#ff4f4f" };
+    const point = sandbox.showcaseFeatureStyle({ properties: { feature_type: "showcase", theme } });
+    const polygon = sandbox.showcaseFeatureStyle({ properties: { feature_type: "pilot_region", theme } });
+    assert.equal(point.color, "#ff4f4f");
+    assert.equal(point.fillColor, "#ff4f4f");
+    assert.equal(point.fillOpacity, 0.9);
+    assert.equal(polygon.fillOpacity, 0.15);
+    assert.equal(polygon.color, point.color);
+});
+
+test("unassigned themes and unsafe colour values use the configured default", () => {
+    const { sandbox } = setup({ loadShared: true });
+    initSharedStyles(sandbox);
+    sandbox.mapConfig.featuresLayerStyle.color = "#123456";
+    assert.equal(sandbox.showcaseFeatureStyle({ properties: {} }).color, "#123456");
+    assert.equal(sandbox.showcaseFeatureStyle({ properties: { theme: { color: "url(evil)" } } }).color, "#123456");
+});
+
+test("theme explanation renders text safely and only links to local URLs", () => {
+    const { sandbox } = setup();
+    const container = makeElement("div");
+    sandbox.appendThemeContext(container, {
+        label: "<script>Apple</script>", description: "Regional circular focus", url: "//evil.test",
+    });
+    assert.ok(textOf(container).includes("Theme: <script>Apple</script>"));
+    assert.ok(textOf(container).includes("Regional circular focus"));
+    assert.equal(findAll(container, el => el.tagName === "A").length, 0);
+});
+
+test("pilot context explains stakeholders and boundary limits without duplicate cards", () => {
+    const { sandbox, elements } = setup();
+    const pilot = { id: 7, name: "<b>Network</b>", description: "Regional exchanges",
+        role: "Territorial Biorefinery Network stakeholders", boundary_note: "Not exact flow boundaries",
+        url: "/maps/catchments/7/", showcases_url: "/closecycle/showcases/map/?pilot_region=7" };
+    sandbox.renderPilotRegions([pilot, pilot]);
+    const container = elements["pilot-region-context"];
+    assert.equal(container.hidden, false);
+    assert.equal(findAll(container, el => el.tagName === "SECTION").length, 1);
+    assert.ok(textOf(container).includes("<b>Network</b>"));
+    assert.ok(textOf(container).includes("stakeholders"));
+    assert.ok(textOf(container).includes("Not exact flow boundaries"));
+    const links = findAll(container, el => el.tagName === "A");
+    assert.equal(links[0].href, pilot.url);
+    assert.equal(links[1].href, pilot.showcases_url);
+    assert.equal(links[1].textContent, "Explore regional showcases");
+    sandbox.renderPilotRegions([]);
+    assert.equal(container.hidden, true);
+    assert.equal(container.children.length, 0);
+});
+
+test("pilot polygon reveals network context before a showcase is chosen", () => {
+    const { sandbox, calls, L, elements } = setup();
+    const pilot = makePilotLayer({ L, id: "pilot-7", name: "Network",
+        showcases: [{ id: 5, name: "One" }, { id: 6, name: "Two" }] });
+    pilot.feature.properties.pilot_region = { id: 7, name: "Regional network", role: "Stakeholder exchanges" };
+    sandbox.featureClickHandler({ ...clickEvent, layer: pilot }, makeFeatureGroup([pilot]));
+    assert.equal(calls.fetchSummaries.length, 0);
+    assert.equal(elements["pilot-region-context"].hidden, false);
+    assert.ok(textOf(elements["pilot-region-context"]).includes("Regional network"));
+});
+
+test("marker context follows its linked pilot rather than unrelated polygons", () => {
+    const { sandbox, L, elements } = setup();
+    const first = makePilotLayer({ L, id: "pilot-7", name: "One", showcases: [{ id: 5, name: "Site" }] });
+    first.feature.properties.pilot_region = { id: 7, name: "Selected network" };
+    const other = makePilotLayer({ L, id: "pilot-8", name: "Other", showcases: [{ id: 9, name: "Other site" }] });
+    other.feature.properties.pilot_region = { id: 8, name: "Unrelated network" };
+    const marker = makePointLayer({ id: 5, name: "Site" });
+    sandbox.featureClickHandler({ ...clickEvent, layer: marker }, makeFeatureGroup([first, other, marker]));
+    const text = textOf(elements["pilot-region-context"]);
+    assert.ok(text.includes("Selected network"));
+    assert.equal(text.includes("Unrelated network"), false);
+});
+
+test("summary refresh clears previous pilot context when the selected showcase has none", () => {
+    const { sandbox, elements } = setup();
+    sandbox.renderSummaries({ summaries: [makeSummary({ pilot_region: { id: 7, name: "Network" } })] });
+    assert.equal(elements["pilot-region-context"].hidden, false);
+    sandbox.renderSummaries({ summaries: [makeSummary({ pilot_region: null })] });
+    assert.equal(elements["pilot-region-context"].hidden, true);
 });

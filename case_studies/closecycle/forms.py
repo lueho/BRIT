@@ -29,7 +29,7 @@ class ShowcaseModelForm(SimpleModelForm):
             filter_by=("region", CatchmentAutocompleteView.IN_REGION_LOOKUP),
             label_field="name",
         ),
-        label="Catchment",
+        label="Pilot region / Territorial Biorefinery Network (TBN)",
         required=False,
     )
     samples = TomSelectModelMultipleChoiceField(
@@ -49,6 +49,7 @@ class ShowcaseModelForm(SimpleModelForm):
         model = Showcase
         fields = (
             "name",
+            "theme",
             "geom",
             "region",
             "catchment",

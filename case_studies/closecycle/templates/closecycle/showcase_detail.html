@@ -1,97 +1,103 @@
 {% extends "geo_detail_card.html" %}
 {% load moderation_tags %}
-
 {% block title %}
-    BRIT | CLOSECYCLE Showcase {{ object.name }}
+  BRIT | CLOSECYCLE Showcase {{ object.name }}
 {% endblock title %}
-
 {% block detail_header %}
-    Showcase: {{ object.name }}
+  Showcase: {{ object.name }}
 {% endblock detail_header %}
-
 {% block detail_body %}
+  <p class="card-text">
+    <strong>Name:</strong>
+    <br>
+    {{ object.name }}
+  </p>
+  {% if object.country %}
     <p class="card-text">
-        <strong>Name:</strong>
-        <br>
-        {{ object.name }}
+      <strong>Country:</strong>
+      <br>
+      {{ object.country }}
     </p>
-    {% if object.country %}
-        <p class="card-text">
-            <strong>Country:</strong>
-            <br>
-            {{ object.country }}
-        </p>
+  {% endif %}
+  {% if object.theme_info %}
+    <section class="mb-3" aria-label="CLOSECYCLE theme">
+      <h5>Theme: <a href="{{ object.theme_info.url }}">{{ object.theme_info.label }}</a></h5>
+      <p>{{ object.theme_info.description }}</p>
+    </section>
+  {% endif %}
+  {% if visible_catchment %}
+    <section class="mb-3" aria-label="Pilot region and regional network">
+      <h5>Pilot region / Territorial Biorefinery Network (TBN)</h5>
+      <p><a href="{{ visible_catchment.get_absolute_url }}">{{ visible_catchment }}</a></p>
+      <p>{{ pilot_region_role }}</p>
+      {% if visible_catchment.description %}<p>{{ visible_catchment.description|linebreaksbr }}</p>{% endif %}
+      <p class="small text-muted">{{ pilot_boundary_note }}</p>
+      <a href="{% url 'Showcase' %}?pilot_region={{ visible_catchment.pk }}">Explore regional showcases</a>
+    </section>
+  {% endif %}
+  {% if object.description %}
+    <p class="card-text">
+      <strong>Description:</strong>
+      <br>
+      {{ object.description|markdown_to_html }}
+    </p>
+  {% endif %}
+  {% block additional_details %}
+    {% if process_chain %}
+      <hr>
+      <h5>Processing chain</h5>
+      <ol>
+        {% for proc in process_chain %}
+          <li>
+            <a href="{% url 'processes:processtype-detail' proc.id %}">{{ proc.name }}</a>
+          </li>
+        {% endfor %}
+      </ol>
     {% endif %}
-    {% if visible_catchment %}
-        <p class="card-text">
-            <strong>Catchment:</strong>
-            <br>
-            {{ visible_catchment }}
-        </p>
+    {% if material_links %}
+      <hr>
+      <h5>Materials</h5>
+      <ul>
+        {% for link in material_links %}
+          <li>
+            <a href="{% url 'material-detail' link.material_id %}">{{ link.material.name }}</a>
+            ({{ link.get_role_display }})
+          </li>
+        {% endfor %}
+      </ul>
     {% endif %}
-    {% if object.description %}
-        <p class="card-text">
-            <strong>Description:</strong>
-            <br>
-            {{ object.description|markdown_to_html }}
-        </p>
+    {% if samples %}
+      <hr>
+      <h5>Samples</h5>
+      <ul>
+        {% for sample in samples %}
+          <li>
+            <a href="{% url 'sample-detail' sample.id %}">{{ sample.name }}</a>
+          </li>
+        {% endfor %}
+      </ul>
     {% endif %}
-    {% block additional_details %}
-        {% if process_chain %}
-            <hr>
-            <h5>Processing chain</h5>
-            <ol>
-                {% for proc in process_chain %}
-                    <li>
-                        <a href="{% url 'processes:processtype-detail' proc.id %}">{{ proc.name }}</a>
-                    </li>
-                {% endfor %}
-            </ol>
-        {% endif %}
-        {% if material_links %}
-            <hr>
-            <h5>Materials</h5>
-            <ul>
-                {% for link in material_links %}
-                    <li>
-                        <a href="{% url 'material-detail' link.material_id %}">{{ link.material.name }}</a>
-                        ({{ link.get_role_display }})
-                    </li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-        {% if samples %}
-            <hr>
-            <h5>Samples</h5>
-            <ul>
-                {% for sample in samples %}
-                    <li>
-                        <a href="{% url 'sample-detail' sample.id %}">{{ sample.name }}</a>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-        {% if sample_series %}
-            <hr>
-            <h5>Sample series</h5>
-            <ul>
-                {% for series in sample_series %}
-                    <li>
-                        <a href="{% url 'sampleseries-detail' series.id %}">{{ series.name }}</a>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-        {% if scenarios %}
-            <hr>
-            <h5>Scenarios</h5>
-            <ul>
-                {% for scenario in scenarios %}
-                    <li>
-                        <a href="{% url 'scenario-detail' scenario.id %}">{{ scenario.name }}</a>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    {% endblock additional_details %}
+    {% if sample_series %}
+      <hr>
+      <h5>Sample series</h5>
+      <ul>
+        {% for series in sample_series %}
+          <li>
+            <a href="{% url 'sampleseries-detail' series.id %}">{{ series.name }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% if scenarios %}
+      <hr>
+      <h5>Scenarios</h5>
+      <ul>
+        {% for scenario in scenarios %}
+          <li>
+            <a href="{% url 'scenario-detail' scenario.id %}">{{ scenario.name }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endblock additional_details %}
 {% endblock detail_body %}
