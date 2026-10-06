@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlsplit
 
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
@@ -17,6 +18,7 @@ from maps.models import (
 from ..filters import ShowcaseFilterSet
 from ..models import Showcase
 from ..serializers import ShowcaseFlatSerializer
+from ..themes import get_theme, pilot_region_info
 
 
 class ShowcaseThemeContextTest(TestCase):
@@ -193,7 +195,9 @@ class ShowcaseThemeContextTest(TestCase):
 
     def test_map_has_theme_legend_filters_and_region_explanation(self):
         self.assign_theme()
-        response = self.client.get(reverse("Showcase"), {"theme": "apple_chain"})
+        response = self.client.get(
+            reverse("Showcase"), {"scope": "published", "theme": "apple_chain"}
+        )
         self.assertEqual(200, response.status_code)
         for text in (
             "Apple Chain",
@@ -205,6 +209,34 @@ class ShowcaseThemeContextTest(TestCase):
             'name="pilot_region"',
         ):
             self.assertContains(response, text)
+
+    def test_map_filter_form_and_links_keep_published_scope(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("Showcase"), {"scope": "published", "theme": "apple_chain"}
+        )
+        self.assertContains(
+            response, '<input type="hidden" name="scope" value="published">', html=True
+        )
+        theme_url = get_theme("apple_chain")["url"]
+        self.assertEqual(
+            {"published"}, set(parse_qs(urlsplit(theme_url).query)["scope"])
+        )
+        showcases_url = pilot_region_info(self.pilot)["showcases_url"]
+        query = parse_qs(urlsplit(showcases_url).query)
+        self.assertEqual(["published"], query["scope"])
+        self.assertEqual([str(self.pilot.pk)], query["pilot_region"])
+
+    def test_map_without_scope_redirects_to_published_scope(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("Showcase"), {"theme": "apple_chain", "pilot_region": self.pilot.pk}
+        )
+        self.assertEqual(302, response.status_code)
+        query = parse_qs(urlsplit(response["Location"]).query)
+        self.assertEqual(["published"], query["scope"])
+        self.assertEqual(["apple_chain"], query["theme"])
+        self.assertEqual([str(self.pilot.pk)], query["pilot_region"])
 
     def test_detail_page_explains_theme_and_network_without_calling_it_catchment(self):
         self.assign_theme()

@@ -1,3 +1,5 @@
+from django.http import HttpResponseRedirect
+
 from maps.views import GeoDataSetPublishedFilteredMapView, MapMixin
 from utils.object_management.views import (
     PrivateObjectFilterView,
@@ -39,6 +41,14 @@ class ShowcasePublishedMapView(GeoDataSetPublishedFilteredMapView):
     filterset_class = ShowcaseFilterSet
     map_title = "CLOSECYCLE Showcases & Pilot Regions"
     features_layer_api_basename = "api-showcase"
+
+    def get(self, request, *args, **kwargs):
+        # The features API only restricts visibility when ``scope`` is present.
+        if request.GET and "scope" not in request.GET:
+            params = request.GET.copy()
+            params["scope"] = "published"
+            return HttpResponseRedirect(f"{request.path}?{params.urlencode()}")
+        return super().get(request, *args, **kwargs)
 
     def post_process_map_config(self, map_config):
         config = super().post_process_map_config(map_config)

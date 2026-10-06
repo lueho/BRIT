@@ -58,7 +58,9 @@ def get_theme(key):
         {
             "key": key,
             **theme,
-            "url": reverse("Showcase") + "?" + urlencode({"theme": key}),
+            "url": reverse("Showcase")
+            + "?"
+            + urlencode({"scope": "published", "theme": key}),
         }
         if theme
         else None
@@ -73,7 +75,7 @@ def pilot_region_info(catchment):
         "url": reverse("catchment-detail", args=[catchment.pk]),
         "showcases_url": reverse("Showcase")
         + "?"
-        + urlencode({"pilot_region": catchment.pk}),
+        + urlencode({"scope": "published", "pilot_region": catchment.pk}),
         "role": PILOT_REGION_ROLE,
         "boundary_note": PILOT_BOUNDARY_NOTE,
     }

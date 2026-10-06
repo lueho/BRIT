@@ -36,6 +36,7 @@
 {% endblock map_card_footer %}
 {% block filter_form_card %}
   <form method="get">
+    <input type="hidden" name="scope" value="published">
     {{ filter.form.theme|as_crispy_field }}
     {{ filter.form.pilot_region|as_crispy_field }}
     {{ filter.form.country|as_crispy_field }}
