@@ -5178,6 +5178,57 @@ class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
             reordered_content.index(f'id="group-{self.chemical_group.pk}"'),
         )
 
+    def test_order_down_creates_settings_with_measured_basis(self):
+        dry_matter = MaterialComponent.objects.create(
+            owner=self.member,
+            name="Dry Matter",
+            publication_status="published",
+        )
+        volatile_solids = MaterialComponent.objects.create(
+            owner=self.member,
+            name="Volatile Solids",
+            publication_status="published",
+        )
+        self.sample.component_measurements.filter(group=self.chemical_group).update(
+            basis_component=dry_matter
+        )
+        organic_measurements = self.sample.component_measurements.filter(
+            group=self.organic_group
+        ).order_by("id")
+        organic_measurements.filter(pk=organic_measurements[0].pk).update(
+            basis_component=dry_matter
+        )
+        organic_measurements.filter(pk=organic_measurements[1].pk).update(
+            basis_component=volatile_solids
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "derived-composition-order-down",
+                kwargs={"sample_pk": self.sample.pk, "group_pk": self.organic_group.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        settings_by_group = {
+            composition.group_id: composition.fractions_of
+            for composition in self.sample.compositions.all()
+        }
+        self.assertEqual(settings_by_group[self.chemical_group.pk], dry_matter)
+        self.assertEqual(
+            settings_by_group[self.organic_group.pk],
+            MaterialComponent.objects.default(),
+        )
+
+        detail_response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        self.assertNotContains(
+            detail_response,
+            "The configured composition basis differs from the measurement basis.",
+        )
+
     def test_order_down_redirects_to_next_url(self):
         self.client.force_login(self.member)
         next_url = (
