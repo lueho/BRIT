@@ -1,5 +1,15 @@
-from django.db.models import BigIntegerField, Max, OuterRef, Subquery
+import hashlib
+
+from django.db.models import (
+    BigIntegerField,
+    CharField,
+    OuterRef,
+    StringAgg,
+    Subquery,
+    Value,
+)
 from django.db.models.expressions import RawSQL
+from django.db.models.functions import Cast, Concat
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -8,7 +18,7 @@ from maps.mixins import (
     get_unbounded_geojson_rejection_response,
     get_view_geojson_bounded_query_params,
 )
-from maps.models import GeoPolygon
+from maps.models import Catchment, GeoPolygon, Region
 from maps.throttling import GeoJSONAnonThrottle
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.viewsets import AutoPermModelViewSet
@@ -49,53 +59,58 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
             queryset, self.request.user, connections=connections
         )
 
+    @staticmethod
+    def _row_xmin(model, pk_ref):
+        """Transaction id of the ``model`` row at ``pk_ref`` as text."""
+        return Cast(
+            Subquery(
+                model.objects.filter(pk=OuterRef(pk_ref))
+                .annotate(
+                    row_xmin=RawSQL(
+                        "xmin::text::bigint", [], output_field=BigIntegerField()
+                    )
+                )
+                .values("row_xmin")[:1]
+            ),
+            CharField(),
+        )
+
     def _version_aggregates(self):
-        """Showcase GeoJSON serializes the related Region's name and borders,
-        so the version also tracks the Region modification time and the
-        newest transaction id of the border rows, which are edited in place
-        and carry no timestamp of their own."""
-        borders_xmin = (
-            GeoPolygon.objects.filter(pk=OuterRef("region__borders_id"))
-            .annotate(
-                row_xmin=RawSQL(
-                    "xmin::text::bigint", [], output_field=BigIntegerField()
-                )
-            )
-            .values("row_xmin")[:1]
+        """Showcase GeoJSON also serializes the linked catchments, regions and
+        their borders as pilot polygons. Max aggregates over those rows miss
+        edits to any row but the newest one, so the version fingerprints
+        every linked row by its modification time and its transaction id, which
+        changes on each update however the row was written."""
+        linked_rows = (
+            (Region, "region_id", "region__lastmodified_at"),
+            (GeoPolygon, "region__borders_id", None),
+            (Catchment, "catchment_id", "catchment__lastmodified_at"),
+            (Region, "catchment__region_id", "catchment__region__lastmodified_at"),
+            (GeoPolygon, "catchment__region__borders_id", None),
         )
-        catchment_borders_xmin = (
-            GeoPolygon.objects.filter(pk=OuterRef("catchment__region__borders_id"))
-            .annotate(
-                row_xmin=RawSQL(
-                    "xmin::text::bigint", [], output_field=BigIntegerField()
-                )
-            )
-            .values("row_xmin")[:1]
-        )
+        parts = [Cast("pk", CharField())]
+        for model, pk_ref, modified_ref in linked_rows:
+            parts += [Value(":"), self._row_xmin(model, pk_ref)]
+            if modified_ref:
+                parts += [Value("@"), Cast(modified_ref, CharField())]
         return {
             **super()._version_aggregates(),
-            "max_region_mod": Max("region__lastmodified_at"),
-            "max_borders_xmin": Max(Subquery(borders_xmin)),
-            "max_catchment_mod": Max("catchment__lastmodified_at"),
-            "max_catchment_region_mod": Max("catchment__region__lastmodified_at"),
-            "max_catchment_borders_xmin": Max(Subquery(catchment_borders_xmin)),
+            "pilot_fingerprint": StringAgg(
+                Concat(*parts, output_field=CharField()),
+                Value(";"),
+                order_by="pk",
+            ),
         }
 
     def _version_timestamp(self, agg):
-        # Full-precision timestamps, so edits within one second still rotate.
+        # Full-precision timestamp, so edits within one second still rotate.
         max_mod = agg.get("max_mod")
-        region_mod = agg.get("max_region_mod")
-        catchment_mod = agg.get("max_catchment_mod")
-        catchment_region_mod = agg.get("max_catchment_region_mod")
+        fingerprint = agg.get("pilot_fingerprint") or ""
         return ":".join(
             (
                 "pilot-regions-v1",
                 max_mod.isoformat() if max_mod else "",
-                region_mod.isoformat() if region_mod else "",
-                str(agg.get("max_borders_xmin") or 0),
-                catchment_mod.isoformat() if catchment_mod else "",
-                catchment_region_mod.isoformat() if catchment_region_mod else "",
-                str(agg.get("max_catchment_borders_xmin") or 0),
+                hashlib.sha1(fingerprint.encode("utf-8")).hexdigest(),
             )
         )
 
