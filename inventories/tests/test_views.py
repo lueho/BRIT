@@ -1612,9 +1612,7 @@ class ScenarioInventoryEditLinkTests(TestCase):
             name="Private", owner=cls.owner, region=region, catchment=catchment
         )
         feedstock = Material.objects.create(name="M", owner=cls.owner)
-        geodataset = GeoDataset.objects.create(
-            name="G", owner=cls.owner, region=region
-        )
+        geodataset = GeoDataset.objects.create(name="G", owner=cls.owner, region=region)
         cls.algorithm = InventoryAlgorithm.objects.create(
             name="A", geodataset=geodataset
         )
@@ -1639,9 +1637,7 @@ class ScenarioInventoryEditLinkTests(TestCase):
         )
 
     def detail(self, scenario):
-        return self.client.get(
-            reverse("scenario-detail", kwargs={"pk": scenario.pk})
-        )
+        return self.client.get(reverse("scenario-detail", kwargs={"pk": scenario.pk}))
 
     def test_staff_sees_edit_link_on_published_scenario(self):
         self.client.force_login(self.staff)
