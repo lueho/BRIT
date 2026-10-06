@@ -169,15 +169,12 @@ class ProcessListSerializer(serializers.ModelSerializer):
     sources = SourceModelSerializer(many=True, read_only=True)
     authors = serializers.SerializerMethodField()
     owner_name = serializers.CharField(source="owner.username", read_only=True)
-    parent_name = serializers.CharField(source="parent.name", read_only=True)
 
     class Meta:
         model = Process
         fields = [
             "id",
             "name",
-            "parent",
-            "parent_name",
             "categories",
             "short_description",
             "authors",
@@ -210,7 +207,6 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
     sources = SourceModelSerializer(many=True, read_only=True)
     authors = serializers.SerializerMethodField()
     owner_name = serializers.CharField(source="owner.username", read_only=True)
-    parent_name = serializers.CharField(source="parent.name", read_only=True)
 
     # Related objects
     process_materials = ProcessMaterialAPISerializer(many=True, read_only=True)
@@ -229,8 +225,6 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
-            "parent",
-            "parent_name",
             "categories",
             "short_description",
             "authors",

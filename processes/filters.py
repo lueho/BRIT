@@ -5,8 +5,6 @@ Provides FilterSets for searching and filtering processes and related models.
 
 import django_filters
 from django import forms
-from django_tomselect.app_settings import TomSelectConfig
-from django_tomselect.widgets import TomSelectModelWidget
 
 from utils.filters import UserCreatedObjectScopedFilterSet
 from utils.object_management.models import STATUS_CHOICES
@@ -67,26 +65,6 @@ class ProcessFilter(UserCreatedObjectScopedFilterSet):
         ),
     )
 
-    has_parent = django_filters.BooleanFilter(
-        field_name="parent",
-        lookup_expr="isnull",
-        exclude=True,
-        label="Has Parent Process",
-        widget=forms.NullBooleanSelect(attrs={"class": "form-select"}),
-    )
-
-    parent = django_filters.ModelChoiceFilter(
-        queryset=Process.objects.none(),
-        label="Parent Process",
-        empty_label="All",
-        widget=TomSelectModelWidget(
-            config=TomSelectConfig(
-                url="processes:process-autocomplete",
-                filter_by=("scope", "name"),
-            )
-        ),
-    )
-
     publication_status = django_filters.ChoiceFilter(
         choices=[("", "All")] + list(STATUS_CHOICES),
         label="Publication Status",
@@ -123,18 +101,15 @@ class ProcessFilter(UserCreatedObjectScopedFilterSet):
             "name",
             "categories",
             "mechanism",
-            "parent",
             "publication_status",
         ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         request = getattr(self, "request", None)
-        queryset = Process.objects.all()
         category_queryset = ProcessCategory.objects.all()
 
         if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
             category_queryset = filter_queryset_for_user(
                 category_queryset, request.user
             )
@@ -144,15 +119,9 @@ class ProcessFilter(UserCreatedObjectScopedFilterSet):
             scope_value = self.data.get("scope")
 
         if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
             category_queryset = apply_scope_filter(
                 category_queryset, scope_value, user=getattr(request, "user", None)
             )
-
-        parent_qs = queryset.filter(parent__isnull=True)
-        self.filters["parent"].queryset = parent_qs
 
         # Drop the categories filter entirely when the scoped queryset is
         # empty so the form does not render a label-only filter widget.
@@ -165,7 +134,6 @@ class ProcessFilter(UserCreatedObjectScopedFilterSet):
         # accessing self.form). Sync ModelChoiceFilter querysets to the form fields so
         # validation uses the correct queryset regardless of instantiation order.
         if "_form" in self.__dict__ and self._form is not None:
-            self._form.fields["parent"].queryset = parent_qs
             if "categories" in self.filters:
                 self._form.fields["categories"].queryset = category_queryset
             else:

@@ -76,14 +76,13 @@ class ProcessViewSet(UserCreatedObjectViewSet):
         queryset = super().get_queryset()
 
         if self.action == "list":
-            queryset = queryset.select_related("owner", "parent").prefetch_related(
+            queryset = queryset.select_related("owner").prefetch_related(
                 "categories",
                 "sources",
             )
         elif self.action == "retrieve":
-            queryset = queryset.select_related("owner", "parent").prefetch_related(
+            queryset = queryset.select_related("owner").prefetch_related(
                 "categories",
-                "variants",
                 Prefetch(
                     "process_materials",
                     queryset=ProcessMaterial.objects.select_related(
@@ -154,14 +153,6 @@ class ProcessViewSet(UserCreatedObjectViewSet):
             )
 
         return Response(params_by_type)
-
-    @action(detail=True, methods=["get"])
-    def variants(self, request, pk=None):
-        """Get all process variants (children) of this process."""
-        process = self.get_object()
-        variants = process.variants.filter(publication_status="published")
-        serializer = ProcessListSerializer(variants, many=True)
-        return Response(serializer.data)
 
     @action(detail=True, methods=["get"])
     def sources(self, request, pk=None):

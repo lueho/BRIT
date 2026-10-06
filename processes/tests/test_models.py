@@ -306,18 +306,29 @@ class ProcessModelTestCase(TestCase):
         internal_resource.url = "/internal/path/"
         internal_resource.full_clean()
 
-    def test_process_hierarchy(self):
-        """Test that processes can have parent-child relationships."""
-        parent = Process.objects.create(name="Anaerobic Digestion", owner=self.owner)
-        variant1 = Process.objects.create(
-            name="Mesophilic AD", parent=parent, owner=self.owner
-        )
-        variant2 = Process.objects.create(
-            name="Thermophilic AD", parent=parent, owner=self.owner
-        )
+    def test_process_has_no_parent_field(self):
+        """Processes are grouped by categories only, not by a hierarchy."""
+        field_names = [field.name for field in Process._meta.get_fields()]
+        self.assertNotIn("parent", field_names)
+        self.assertNotIn("variants", field_names)
 
-        self.assertEqual(variant1.parent, parent)
-        self.assertEqual(list(parent.variants.all()), [variant1, variant2])
+    def test_process_categories_overlap(self):
+        """A process can belong to multiple categories; peers stay independent."""
+        other_category = ProcessCategory.objects.create(
+            name="Biochemical", owner=self.owner
+        )
+        process = Process.objects.create(
+            name="Anaerobic Digestion", owner=self.owner
+        )
+        process.categories.add(self.category, other_category)
+
+        self.assertIn(process, self.category.processes.all())
+        self.assertIn(process, other_category.processes.all())
+
+        peer = Process.objects.create(name="Mesophilic AD", owner=self.owner)
+        peer.categories.add(self.category)
+        self.assertIn(peer, self.category.processes.all())
+        self.assertNotIn(peer, other_category.processes.all())
 
     def test_process_short_description(self):
         """Test that short_description field works correctly."""

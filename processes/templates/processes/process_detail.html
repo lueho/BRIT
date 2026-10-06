@@ -136,12 +136,6 @@
           {% endif %}
         </div>
         <ul class="sdv2-hero-meta" aria-label="Process metadata">
-          {% if visible_parent %}
-            <li>
-              <span class="sdv2-meta-label">Parent</span>
-              <a href="{% detail_or_review_url visible_parent %}">{{ visible_parent.name }}</a>
-            </li>
-          {% endif %}
           {% if object.categories.all %}
             <li>
               <span class="sdv2-meta-label">Categories</span>
@@ -213,8 +207,8 @@
         </div>
       </div>
     {% endif %}
-    {# ─── Main column + related aside ─── #}
-    <div class="sdv2-layout{% if not has_related_processes %} sdv2-layout-full{% endif %}">
+    {# ─── Main column ─── #}
+    <div class="sdv2-layout sdv2-layout-full">
       <main class="sdv2-main">
         {% if object.mechanism or operating_parameters or parameters_by_type.Yield or input_materials or output_materials %}
           <section class="sdv2-section-panel sdv2-anchor-target"
@@ -406,39 +400,6 @@
           </section>
         {% endif %}
       </main>
-      {# ─── Related processes aside ─── #}
-      {% if has_related_processes %}
-      <aside class="sdv2-related" aria-label="Related processes">
-        {% if visible_parent %}
-          <section class="sdv2-related-section sdv2-surface">
-            <h3 class="sdv2-related-title">Parent process</h3>
-            <ul class="sdv2-related-list">
-              <li>
-                <a href="{% detail_or_review_url visible_parent %}"
-                   class="sdv2-related-link">
-                  <span class="sdv2-related-name">{{ visible_parent.name }}</span>
-                </a>
-              </li>
-            </ul>
-          </section>
-        {% endif %}
-        {% if process_variants %}
-          <section class="sdv2-related-section sdv2-surface">
-            <h3 class="sdv2-related-title">Process variants</h3>
-            <ul class="sdv2-related-list">
-              {% for variant in process_variants %}
-                <li>
-                  <a href="{% detail_or_review_url variant %}"
-                     class="sdv2-related-link">
-                    <span class="sdv2-related-name">{{ variant.name }}</span>
-                  </a>
-                </li>
-              {% endfor %}
-            </ul>
-          </section>
-        {% endif %}
-      </aside>
-      {% endif %}
     </div>
     {% endif %}
     </div>
