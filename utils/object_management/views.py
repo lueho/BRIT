@@ -1373,6 +1373,14 @@ class BaseObjectAccessActionView(LoginRequiredMixin, UserPassesTestMixin, View):
         except User.DoesNotExist:
             return None
 
+    def _resolve_group(self, name):
+        from django.contrib.auth.models import Group
+
+        try:
+            return Group.objects.get(name=name)
+        except Group.DoesNotExist:
+            return None
+
 
 class TransferOwnershipView(BaseObjectAccessActionView):
     """Transfer ownership of a UserCreatedObject to another user."""
@@ -1449,7 +1457,7 @@ class AddEditorView(BaseObjectAccessActionView):
             return HttpResponseRedirect(self.get_success_url())
         messages.success(
             request,
-            f"{user.username} can now edit this {obj._meta.verbose_name}.",
+            f"Added a direct edit grant for {user.username} on this {obj._meta.verbose_name}.",
         )
         return HttpResponseRedirect(self.get_success_url())
 
@@ -1471,7 +1479,47 @@ class RemoveEditorView(BaseObjectAccessActionView):
         obj.remove_editor(user)
         messages.success(
             request,
-            f"{user.username} can no longer edit this {obj._meta.verbose_name}.",
+            f"Removed the direct edit grant for {user.username} on this {obj._meta.verbose_name}.",
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class AddEditorGroupView(BaseObjectAccessActionView):
+    permission_method = "has_manage_editors_permission"
+    permission_denied_message = (
+        "You don't have permission to manage group edit access for this item."
+    )
+
+    def post(self, request, *args, **kwargs):
+        obj = self.get_object()
+        group = self._resolve_group((request.POST.get("group") or "").strip())
+        if group is None:
+            messages.error(request, "The specified group does not exist.")
+            return HttpResponseRedirect(self.get_success_url())
+        obj.add_editor_group(group, granted_by=request.user)
+        messages.success(
+            request,
+            f"Added an edit grant for group {group.name} on this {obj._meta.verbose_name}.",
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class RemoveEditorGroupView(BaseObjectAccessActionView):
+    permission_method = "has_manage_editors_permission"
+    permission_denied_message = (
+        "You don't have permission to manage group edit access for this item."
+    )
+
+    def post(self, request, *args, **kwargs):
+        obj = self.get_object()
+        group = self._resolve_group((request.POST.get("group") or "").strip())
+        if group is None:
+            messages.error(request, "The specified group does not exist.")
+            return HttpResponseRedirect(self.get_success_url())
+        obj.remove_editor_group(group)
+        messages.success(
+            request,
+            f"Removed the edit grant for group {group.name} on this {obj._meta.verbose_name}.",
         )
         return HttpResponseRedirect(self.get_success_url())
 
@@ -1491,6 +1539,7 @@ class ManageAccessModalView(BaseObjectAccessActionView):
             "object": obj,
             "modal_title": f"Manage access for {obj._meta.verbose_name}",
             "editors": obj.editors.order_by("username"),
+            "editor_groups": obj.editor_groups.order_by("name"),
             "next_url": request.GET.get("next"),
             "content_type_id": self.kwargs.get("content_type_id"),
             "object_id": self.kwargs.get("object_id"),
@@ -1509,6 +1558,15 @@ class ManageAccessModalView(BaseObjectAccessActionView):
             return HttpResponse(status=204)
         if "new_owner" in request.POST:
             return TransferOwnershipView.as_view()(request, *args, **kwargs)
+        actions = {
+            "add_editor": AddEditorView,
+            "remove_editor": RemoveEditorView,
+            "add_editor_group": AddEditorGroupView,
+            "remove_editor_group": RemoveEditorGroupView,
+        }
+        action_view = actions.get(request.POST.get("access_action"))
+        if action_view is not None:
+            return action_view.as_view()(request, *args, **kwargs)
         return HttpResponseNotAllowed(["GET", "POST"])
 
 
@@ -1568,8 +1626,8 @@ class BulkManageAccessView(LoginRequiredMixin, View):
                 skipped += 1
 
         label = {
-            "add_editor": f"Granted edit access to {target_user.username}",
-            "remove_editor": f"Revoked edit access from {target_user.username}",
+            "add_editor": f"Added direct editor grants for {target_user.username}",
+            "remove_editor": f"Removed direct editor grants for {target_user.username}",
             "transfer_ownership": f"Transferred ownership to {target_user.username}",
         }[action]
         if applied:

@@ -496,6 +496,31 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         """Revoke ``user``'s edit access to this object."""
         self.editor_grants.filter(editor=user).delete()
 
+    @property
+    def group_editor_grants(self):
+        return ObjectGroupEditorGrant.for_object(self)
+
+    @property
+    def editor_groups(self):
+        return Group.objects.filter(
+            object_editor_grants__content_type=ContentType.objects.get_for_model(
+                self.__class__
+            ),
+            object_editor_grants__object_id=self.pk,
+        )
+
+    def add_editor_group(self, group, granted_by=None):
+        grant, _ = ObjectGroupEditorGrant.objects.get_or_create(
+            content_type=ContentType.objects.get_for_model(self.__class__),
+            object_id=self.pk,
+            group=group,
+            defaults={"granted_by": granted_by},
+        )
+        return grant
+
+    def remove_editor_group(self, group):
+        self.group_editor_grants.filter(group=group).delete()
+
     def is_editable_by(self, user):
         """Return whether ``user`` is the owner or has an editor grant."""
         if not user or not getattr(user, "is_authenticated", False):

@@ -5,6 +5,10 @@ for `UserCreatedObject` data in BRIT.
 
 ## Source of truth in code
 
+- `utils/object_management/models.py`
+  - `ObjectEditorGrant` and `ObjectGroupEditorGrant`
+  - `editor_grant_object_ids(...)` combines individual grants and current group membership
+  - `UserCreatedObject` exposes individual/group grant inspection and mutation helpers
 - `utils/object_management/permissions.py`
   - `UserCreatedObjectPermission`
   - `get_object_policy(...)`
@@ -31,8 +35,9 @@ If this page conflicts with implementation, update this page together with code.
 ### Roles
 
 - **Anonymous**: not authenticated
-- **Authenticated user**: authenticated, but not owner/moderator/staff
+- **Authenticated regular user**: authenticated, but not owner/moderator/staff; may have editor grants
 - **Owner**: `obj.owner == user`
+- **Editor**: has an `ObjectEditorGrant` on the object or belongs to a group with an `ObjectGroupEditorGrant` on it. Grants are object-specific, not model-wide.
 - **Moderator**: has per-model permission `can_moderate_<model>`
 - **Staff**: `is_staff=True` (treated as moderator for moderation checks)
 
@@ -116,7 +121,7 @@ deviation.
    If a scoped filterset exposes a `publication_status` field, that control
    should be hidden outside the private scope. The generic `scope` selection
    decides the visibility bucket; `publication_status` is only for refining the
-   owner's private list within that bucket.
+   owned/shared workspace within that bucket.
 
 8. **Scope switchers, counts, and exports must use the same policy helpers.**
 
@@ -138,34 +143,42 @@ deviation.
 |---|---|
 | Staff | All |
 | Anonymous | `published` only |
-| Authenticated regular | Own + `published` |
-| Authenticated moderator | Own + `published` + `review` |
+| Authenticated regular | Own + `published` + individually/group-granted records |
+| Authenticated moderator | Own + `published` + `review` + individually/group-granted records |
 
 ### Scope filter (`apply_scope_filter`)
 
 | Scope | Anonymous | Authenticated regular | Moderator | Staff |
 |---|---|---|---|---|
 | `published` | published | published | published | published |
-| `private` | none | own (all statuses) | own (all statuses) | own (all statuses) |
+| `private` | none | own + granted (all statuses) | own + granted (all statuses) | own + granted (all statuses) |
 | `review` | none | own `review` | all `review` | all `review` |
 | `declined` | none | own `declined` | own `declined` | all `declined` |
 | `archived` | none | own `archived` | own `archived` | all `archived` |
 
 Notes:
 
+- Granted records match the object's content type and ID through either an individual grant or current group membership; overlapping grants do not duplicate records.
+- The `private` scope is an owned/shared workspace across publication states, not a filter to records whose status is `private`.
+- Other scopes retain the role/state restrictions shown above; a grant alone does not include another owner's records in the `review`, `declined`, or `archived` scope.
 - Unknown scopes currently return the queryset unchanged.
 - Scope filtering requires a model with `publication_status`; owner-restricted scopes also require an `owner` field.
 - The shared `UserCreatedObjectScopedFilterSet` currently exposes `published`, `private`, and `review` as the generic UI scopes for filtered list/map views.
 
 ### Object-level safe-method reads (`_check_safe_permissions`)
 
-| State | Anonymous | Authenticated regular | Owner | Moderator/Staff |
-|---|---|---|---|---|
-| `published` | ✅ | ✅ | ✅ | ✅ |
-| `review` | ❌ | ❌ | ✅ | ✅ |
-| `private` | ❌ | ❌ | ✅ | ✅ |
-| `archived` | ❌ | ❌ | ✅ | ✅ |
-| `declined` | ❌ | ❌ | ✅ | ✅ |
+| State | Anonymous | Authenticated regular without grant | Owner | Individual/group editor | Moderator/Staff |
+|---|---|---|---|---|---|
+| `published` | Yes | Yes | Yes | Yes | Yes |
+| `review` | No | No | Yes | Yes | Yes |
+| `private` | No | No | Yes | Yes | Yes |
+| `archived` | No | No | Yes | Yes | Yes |
+| `declined` | No | No | Yes | Yes | Yes |
+
+Editor grants permit reading without model-level change permission. Queryset or
+scope filtering can still restrict which records an endpoint exposes. The current
+HTML detail policy also lets moderators read private records by direct URL even
+when those records are absent from their lists; this is not owner-only privacy.
 
 ## Action policy (UI + backend)
 
@@ -175,8 +188,10 @@ This table summarizes effective policy from `get_object_policy(...)` and
 | Action | Allowed actors | Required state/condition |
 |---|---|---|
 | Create (`create` and configured create-like actions) | Authenticated users with `add_<model>`; staff | Model add permission required |
-| Edit (owner path) | Owner | Not `published`, not `archived` |
-| Edit (moderator path, non-owner) | Moderator/Staff | Not private of another owner; for PATCH/PUT only `publication_status` may change |
+| Edit content (owner API path) | Owner | Not `published`, not `archived` |
+| Edit content (editor API path, non-owner) | Individual/group editor; staff exception | PATCH/PUT only; `change_<model>` required unless staff; not `published` or `archived`; payload must not contain `owner` or `publication_status` |
+| Edit content (HTML `can_edit`) | Owner or individual/group editor with `change_<model>`; staff | Update URL required; never `archived`; non-staff cannot edit `published` |
+| Edit status (moderator API path, non-owner) | Moderator/Staff | Not private of another owner; for PATCH/PUT only `publication_status` may change |
 | Delete | Owner/Staff | Owner: non-published non-archived states with delete URL. Staff: can delete across states (incl. archived) with delete URL |
 | Archive | Owner/Moderator/Staff | `published` and not `archived` |
 | Submit for review | Owner/Staff | `private` or `declined`, and not `archived` |
@@ -190,6 +205,31 @@ This table summarizes effective policy from `get_object_policy(...)` and
 | Add property | Owner/Staff | Not `archived` |
 | Export | Public + owner/staff private export | `published`/`archived` are public-exportable; otherwise authenticated owner/staff |
 | View review feedback | Owner | `declined` and not in `review_mode` |
+| Manage individual/group edit grants | Owner/Staff | Authenticated; object-scoped inspection/add/remove; editors or moderators alone cannot manage grants |
+| Transfer ownership | Owner/Staff | Authenticated; active new owner |
+
+### Shared edit access management
+
+- Owners and staff can inspect direct user grants and group grants separately in
+  the access dialog. They can grant or revoke either kind on that object.
+- Group grants target existing Django groups by name. They never create groups,
+  alter membership, or assign model permissions. Current and future group members
+  inherit the object's grant while they belong to the group.
+- A grant provides read access but does not itself assign `change_<model>`.
+  Non-staff editors need that permission for content editing and cannot edit
+  published or archived records. Grants do not confer ownership, moderation,
+  deletion, ownership transfer, or the right to manage grants.
+- Removing an individual grant does not remove inherited group access. Removing
+  a group's grant does not remove individual grants or other groups' grants.
+  Ownership and staff privileges remain independent. Success messages describe
+  the particular grant removed rather than claiming all access was revoked.
+- Leaving a group removes its inherited grant access on subsequent requests,
+  unless another grant or role still provides access. Editor checks are cached on
+  the user instance during a request, not as permanent per-user grants.
+- Ownership transfer preserves group grants, so the new owner can inspect and
+  revoke them; it does not change the groups' membership.
+- The model-level mutation helpers are trusted ORM utilities. Public access
+  actions enforce `has_manage_editors_permission` before calling them.
 
 ## Review workflow transitions
 
