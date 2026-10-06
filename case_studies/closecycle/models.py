@@ -252,6 +252,14 @@ class Showcase(NamedUserCreatedObject):
             return self._visible_scenarios
         return list(filter_queryset_for_user(self.scenarios.all(), user))
 
+    def visible_region(self, user):
+        """The region if ``user`` may read it, otherwise ``None``."""
+        if self.region_id is None:
+            return None
+        return filter_queryset_for_user(
+            Region.objects.filter(pk=self.region_id), user
+        ).first()
+
     def visible_catchment(self, user):
         """The catchment if ``user`` may read it, otherwise ``None``."""
         if self.catchment_id is None:

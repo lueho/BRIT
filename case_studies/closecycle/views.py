@@ -6,6 +6,7 @@ from maps.views import GeoDataSetPublishedFilteredMapView, MapMixin
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
+    ReviewItemDetailView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateWithInlinesView,
     UserCreatedObjectDetailView,
@@ -27,6 +28,7 @@ CHAIN_STAGES = (
     ("intermediate", "Intermediates", "fa-flask"),
     ("product", "Products", "fa-box-open"),
 )
+HEADLINE_RESULT_LIMIT = 4
 
 # ----------- Showcase CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -61,6 +63,10 @@ class ShowcaseCreateView(UserCreatedObjectCreateWithInlinesView):
 class ShowcaseDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Showcase
 
+    def get_region_feature_id(self):
+        region = self.object.visible_region(self.request.user)
+        return region.pk if region is not None else None
+
     def get_catchment_feature_id(self):
         catchment = self.object.visible_catchment(self.request.user)
         return catchment.pk if catchment is not None else None
@@ -73,6 +79,7 @@ class ShowcaseDetailView(MapMixin, UserCreatedObjectDetailView):
         scenarios = self.object.visible_scenarios(user)
         context.update(
             {
+                "visible_region": self.object.visible_region(user),
                 "visible_catchment": self.object.visible_catchment(user),
                 "material_links": material_links,
                 "process_chain": process_chain,
@@ -84,6 +91,16 @@ class ShowcaseDetailView(MapMixin, UserCreatedObjectDetailView):
             }
         )
         return context
+
+
+class ShowcaseReviewItemDetailView(ReviewItemDetailView):
+    """Render showcase moderation with the complete showcase detail context."""
+
+    model = Showcase
+    detail_view_class = ShowcaseDetailView
+
+
+ShowcaseReviewItemDetailView.register_for_model(Showcase)
 
 
 def chain_stages(material_links, process_chain):
@@ -117,14 +134,18 @@ def scenario_cards(scenarios):
     ).order_by("layer__scenario_id", "layer_id", "pk")
     for value in values.annotate(scenario_id=F("layer__scenario_id")):
         results[value.scenario_id].append(value)
-    return [
-        {
-            "scenario": scenario,
-            "evaluated": scenario.pk in evaluated,
-            "results": results.get(scenario.pk, []),
-        }
-        for scenario in scenarios
-    ]
+    cards = []
+    for scenario in scenarios:
+        values = results.get(scenario.pk, [])
+        cards.append(
+            {
+                "scenario": scenario,
+                "evaluated": scenario.pk in evaluated,
+                "results": values[:HEADLINE_RESULT_LIMIT],
+                "more_results": max(len(values) - HEADLINE_RESULT_LIMIT, 0),
+            }
+        )
+    return cards
 
 
 class ShowcaseUpdateView(UserCreatedObjectUpdateWithInlinesView):

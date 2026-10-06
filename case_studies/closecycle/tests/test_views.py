@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.db import connection, transaction
 from django.test import TestCase
@@ -275,6 +276,49 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
             response, reverse("scenario-result", kwargs={"pk": evaluated.pk})
         )
 
+    def test_scenario_cards_cap_headline_results(self):
+        showcase = self.published_object
+        feedstock = Material.objects.create(
+            name="Cap Feedstock", publication_status="published"
+        )
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Cap Algorithm",
+            geodataset=GeoDataset.objects.create(
+                name="Cap Dataset",
+                region=showcase.region,
+                publication_status="published",
+            ),
+        )
+        scenario = Scenario.objects.create(
+            name="Many Results Scenario",
+            region=showcase.region,
+            showcase=showcase,
+            publication_status="published",
+        )
+        layer = Layer.objects.create(
+            name="Cap layer",
+            geom_type="MultiPolygon",
+            table_name=f"result_cap_{scenario.pk}",
+            scenario=scenario,
+            feedstock=feedstock,
+            algorithm=algorithm,
+        )
+        for i in range(6):
+            LayerAggregatedValue.objects.create(
+                layer=layer, name=f"Value {i}", value=i, unit="Mg/a"
+            )
+        scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.client.get(self.get_detail_url(showcase.pk))
+
+        (card,) = response.context["scenario_cards"]
+        self.assertEqual(
+            ["Value 0", "Value 1", "Value 2", "Value 3"],
+            [value.name for value in card["results"]],
+        )
+        self.assertEqual(2, card["more_results"])
+        self.assertContains(response, "+2 more")
+
     def test_detail_view_does_not_query_per_scenario(self):
         showcase = self.published_object
         for i in range(3):
@@ -315,6 +359,78 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         self.assertEqual(
             showcase.catchment.pk, response.context["view"].get_catchment_feature_id()
         )
+
+    def test_detail_view_hides_private_region_from_anonymous_users(self):
+        owner = self.owner_user
+        showcase = self.published_object
+        original_region = showcase.region
+        showcase.region = Region.objects.create(
+            name="Secret Pilot Region", country="SE", owner=owner
+        )
+        showcase.save()
+        try:
+            response = self.client.get(self.get_detail_url(showcase.pk))
+            self.assertNotContains(response, "Secret Pilot Region")
+            self.assertIsNone(response.context["view"].get_region_feature_id())
+
+            self.client.force_login(owner)
+            response = self.client.get(self.get_detail_url(showcase.pk))
+            self.assertContains(response, "Secret Pilot Region")
+            self.assertEqual(
+                showcase.region_id, response.context["view"].get_region_feature_id()
+            )
+        finally:
+            showcase.region = original_region
+            showcase.save()
+
+    def test_in_review_showcase_links_owner_to_review_view(self):
+        showcase = Showcase.objects.create(
+            name="SC99 - Pending showcase",
+            owner=self.owner_user,
+            region=self.published_object.region,
+            publication_status="review",
+        )
+        review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(Showcase).pk,
+                "object_id": showcase.pk,
+            },
+        )
+
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(showcase.pk))
+
+        self.assertContains(response, review_url)
+        self.assertContains(response, "Review view")
+
+    def test_review_page_renders_showcase_detail_context(self):
+        showcase = self.published_object
+        showcase.showcase_materials.create(
+            material=Material.objects.create(
+                name="Review Input", publication_status="published"
+            ),
+            role="input",
+        )
+        review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(Showcase).pk,
+                "object_id": showcase.pk,
+            },
+        )
+
+        self.client.force_login(self.owner_user)
+        response = self.client.get(review_url)
+
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.context["review_mode"])
+        self.assertIn("map_config", response.context)
+        self.assertIn("scenario_cards", response.context)
+        self.assertEqual(
+            ["input"], [stage["key"] for stage in response.context["chain_stages"]]
+        )
+        self.assertContains(response, "Review Input")
 
 
 class ShowcaseGeoJSONVersionTestCase(TestCase):

@@ -30,16 +30,16 @@
           </div>
           <h1 class="sdv2-hero-title">{{ object.title }}</h1>
           <ul class="sdv2-hero-meta" aria-label="Showcase metadata">
-            {% if object.region %}
-              {% if object.region.country %}
+            {% if visible_region %}
+              {% if visible_region.country %}
                 <li>
                   <span class="sdv2-meta-label">Country</span>
-                  {{ object.region.country }}
+                  {{ visible_region.country }}
                 </li>
               {% endif %}
               <li>
                 <span class="sdv2-meta-label">Region</span>
-                <a href="{% url 'region-detail' object.region.pk %}">{{ object.region.name }}</a>
+                <a href="{% url 'region-detail' visible_region.pk %}">{{ visible_region.name }}</a>
               </li>
             {% endif %}
             {% if visible_catchment %}
@@ -62,7 +62,20 @@
                 <i class="fas fa-pen-to-square" aria-hidden="true"></i> Edit
               </a>
             {% endif %}
-            {% if policy.can_manage_editors or policy.can_delete or policy.can_submit_review and policy.is_private or policy.can_view_review_feedback %}
+            {% if policy.can_view_review_feedback %}
+              <a class="sdv2-btn sdv2-btn-ghost"
+                 href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                <i class="fas fa-clipboard-check" aria-hidden="true"></i> {{ policy.review_feedback_label }}
+              </a>
+            {% elif policy.is_in_review %}
+              {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+                <a class="sdv2-btn sdv2-btn-ghost"
+                   href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                  <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
+                </a>
+              {% endif %}
+            {% endif %}
+            {% if policy.can_manage_editors or policy.can_delete or policy.can_submit_review and policy.is_private %}
               <div class="dropdown">
                 <button class="sdv2-btn dropdown-toggle"
                         type="button"
@@ -80,14 +93,6 @@
                           <i class="fas fa-fw fa-paper-plane me-2" aria-hidden="true"></i>Submit for review
                         </button>
                       </form>
-                    </li>
-                  {% endif %}
-                  {% if policy.can_view_review_feedback %}
-                    <li>
-                      <a class="dropdown-item"
-                         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-                        <i class="fas fa-fw fa-clipboard-check me-2" aria-hidden="true"></i>{{ policy.review_feedback_label }}
-                      </a>
                     </li>
                   {% endif %}
                   {% if policy.can_manage_editors %}
@@ -184,6 +189,9 @@
                           </div>
                         {% endfor %}
                       </dl>
+                      {% if card.more_results %}
+                        <p class="csd-more-results text-muted small mb-0">+{{ card.more_results }} more on the results page</p>
+                      {% endif %}
                     {% endif %}
                     <footer class="csd-scenario-footer">
                       {% if card.evaluated %}
