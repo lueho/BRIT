@@ -88,6 +88,15 @@ class ScenarioTestCase(TestCase):
         self.scenario.scenariostatus.refresh_from_db()
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
 
+    def test_unsaved_region_edit_outside_update_fields_keeps_finished_status(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        self.scenario.region = Region.objects.create(name="Unsaved Region")
+        self.scenario.save(update_fields=["catchment_id"])
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.FINISHED)
+
     def test_scenario_metadata_edit_keeps_finished_status(self):
         self.scenario.set_status(ScenarioStatus.Status.FINISHED)
 
