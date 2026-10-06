@@ -375,6 +375,7 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             "data:text/html,test",
             "http://testserver/bibliography/sources/",
             "/\\external.example/",
+            "/bibliography/sources/1/modal/",
         ):
             with self.subTest(back=back):
                 self.client.logout()

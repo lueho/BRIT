@@ -1,7 +1,7 @@
 import logging
 import re
 from importlib import import_module
-from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
 from django import template
 from django.apps import apps
@@ -26,6 +26,15 @@ _LEGACY_SECTION_SEPARATOR_RE = re.compile(r"(?:\s*;\s*){2,}")
 _RETURN_PATH_PARAMS = frozenset({"back", "next", "return_to"})
 
 
+def _fully_unquoted(value, max_rounds=5):
+    for _ in range(max_rounds):
+        decoded = unquote(value)
+        if decoded == value:
+            break
+        value = decoded
+    return value
+
+
 @register.simple_tag(takes_context=True)
 def safe_back_url(context):
     request = context.get("request")
@@ -47,6 +56,10 @@ def safe_back_url(context):
         return ""
 
     if not is_safe:
+        return ""
+
+    # Modal endpoints render bare fragments; they are never a page to return to.
+    if "modal" in _fully_unquoted(urlsplit(back).path).split("/"):
         return ""
 
     # A value that itself carries return-path params is a leftover of the

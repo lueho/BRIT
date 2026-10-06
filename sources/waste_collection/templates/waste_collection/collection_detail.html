@@ -26,16 +26,16 @@
   <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
     {% block detail_header_primary_actions %}
       <div class="btn-group me-2" role="group">
-        {% with back_url=request.GET.back %}
-          {% if back_url %}
-            <a class="btn btn-sm btn-outline-secondary"
-               href="{{ back_url }}"
-               title="Back to results">
-              <i class="fas fa-arrow-left"></i>
-              <span class="d-none d-md-inline">Back to results</span>
-            </a>
-          {% endif %}
-        {% endwith %}
+        {% safe_back_url as back_url %}
+        {% if back_url %}
+          <a class="btn btn-sm btn-outline-secondary"
+             href="{{ back_url }}"
+             rel="nofollow"
+             title="Back to results">
+            <i class="fas fa-arrow-left"></i>
+            <span class="d-none d-md-inline">Back to results</span>
+          </a>
+        {% endif %}
         {% if not request.GET.review %}
           {% if object.list_url %}
             <a class="btn btn-sm btn-outline-secondary"
@@ -565,8 +565,9 @@
   {% include "object_management/manage_access_button.html" with object=object policy=policy %}
   {# Delete #}
   {% if policy.can_delete %}
+    {% safe_back_url as back_url %}
     <a class="btn btn-outline-danger modal-link w-100 mb-2"
-       href="{{ object.modal_delete_url }}{% if request.GET.back %}?next={{ request.GET.back|urlencode }}{% endif %}">
+       href="{{ object.modal_delete_url }}{% if back_url %}?next={{ back_url|urlencode }}{% endif %}">
       <i class="fas fa-trash"></i> Delete
     </a>
   {% endif %}
