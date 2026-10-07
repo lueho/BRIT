@@ -5,7 +5,9 @@ from django.http import HttpResponseRedirect
 
 from inventories.models import ScenarioStatus
 from layer_manager.models import LayerAggregatedValue
+from maps.models import Region
 from maps.views import GeoDataSetPublishedFilteredMapView, MapMixin
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -54,12 +56,21 @@ def _showcase_list_key(showcase):
     return (number is None, number or 0, code or "", showcase.title)
 
 
-def showcase_list_groups(showcases):
-    """``showcases`` grouped by the country of their region, in code order."""
+def showcase_list_groups(showcases, user):
+    """``showcases`` grouped by the country of their region, in code order.
+
+    Showcases whose region ``user`` may not read are listed under "Other".
+    """
     countries = dict(COUNTRY_CHOICES)
+    visible_regions = set(
+        filter_queryset_for_user(
+            Region.objects.filter(pk__in={s.region_id for s in showcases}), user
+        ).values_list("pk", flat=True)
+    )
     groups = {}
     for showcase in sorted(showcases, key=_showcase_list_key):
-        country = showcase.region.country if showcase.region else ""
+        visible = showcase.region_id in visible_regions
+        country = showcase.region.country if visible else ""
         groups.setdefault(countries.get(country, "Other"), []).append(showcase)
     return [
         {"country": country, "showcases": groups[country]}
@@ -98,7 +109,7 @@ class ShowcasePublishedMapView(GeoDataSetPublishedFilteredMapView):
             {
                 "closecycle_themes": [get_theme(key) for key in THEMES],
                 "showcase_count": len(showcases),
-                "showcase_groups": showcase_list_groups(showcases),
+                "showcase_groups": showcase_list_groups(showcases, self.request.user),
                 "pilot_region_role": PILOT_REGION_ROLE,
                 "pilot_boundary_note": PILOT_BOUNDARY_NOTE,
             }

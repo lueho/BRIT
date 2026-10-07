@@ -1020,3 +1020,89 @@ test("list clicks are delegated from the showcase list", () => {
     assert.ok(prevented);
     assert.deepEqual(calls.fetchSummaries.map(params => params.id), [12]);
 });
+
+function setupListSelection() {
+    const context = setup();
+    const views = [];
+    const pending = [];
+    context.sandbox.map.getZoom = () => 4;
+    context.sandbox.map.setView = (latlng, zoom) => views.push({ latlng, zoom });
+    context.sandbox.fetchFeaturesLayerSummary = (params, isCurrent = () => true) => {
+        pending.push({ params, isCurrent });
+        return Promise.resolve();
+    };
+    return { ...context, views, pending };
+}
+
+test("a list selection made before the markers load is applied once they have loaded", () => {
+    const { sandbox, calls, views } = setupListSelection();
+    sandbox.featuresLayer = null;
+
+    sandbox.selectShowcaseFromList(12);
+    assert.equal(views.length, 0);
+
+    const marker = makePointLayer({ id: 12, name: "SC14", lat: 58, lng: 13 });
+    sandbox.featuresLayer = makeFeatureGroup([marker]);
+    sandbox.layersLoaded();
+
+    assert.deepEqual(calls.selected, [marker]);
+    assert.deepEqual(views.map(view => view.latlng), [{ lat: 58, lng: 13 }]);
+});
+
+test("a map click replaces an earlier list selection that is still waiting for the markers", () => {
+    const { sandbox, views } = setupListSelection();
+    sandbox.featuresLayer = null;
+    sandbox.selectShowcaseFromList(12);
+
+    const other = makePointLayer({ id: 13, name: "SC15", lat: 55, lng: 14 });
+    const group = makeFeatureGroup([other]);
+    sandbox.featureClickHandler({ ...clickEvent, layer: other }, group);
+    sandbox.featuresLayer = makeFeatureGroup([
+        makePointLayer({ id: 12, name: "SC14", lat: 58, lng: 13 }),
+        other,
+    ]);
+    sandbox.layersLoaded();
+
+    assert.equal(views.length, 0);
+});
+
+test("only the latest showcase selection may render its summary", () => {
+    const { sandbox, pending } = setupListSelection();
+    sandbox.featuresLayer = makeFeatureGroup([]);
+
+    sandbox.selectShowcaseFromList(12);
+    sandbox.selectShowcaseFromList(13);
+
+    assert.deepEqual(pending.map(request => request.params.id), [12, 13]);
+    assert.equal(pending[0].isCurrent(), false);
+    assert.equal(pending[1].isCurrent(), true);
+
+    const first = makePointLayer({ id: 1, name: "A", region: "R" });
+    const second = makePointLayer({ id: 2, name: "B", region: "R" });
+    sandbox.featureClickHandler({ ...clickEvent, layer: first }, makeFeatureGroup([first, second]));
+    assert.equal(pending[1].isCurrent(), false);
+});
+
+test("the list marks only a single selected showcase as current", () => {
+    const { sandbox } = setupListSelection();
+    const button = {
+        dataset: { showcaseId: "12" },
+        attributes: {},
+        setAttribute(name, value) {
+            this.attributes[name] = value;
+        },
+        removeAttribute(name) {
+            delete this.attributes[name];
+        },
+    };
+    sandbox.document.querySelectorAll = selector =>
+        selector.includes("#showcase-list") ? [button] : [];
+
+    sandbox.renderSummaries({ summaries: [makeSummary({ id: 12 })] });
+    assert.equal(button.attributes["aria-current"], "true");
+
+    sandbox.renderSummaries({
+        summaries: [makeSummary({ id: 12 }), makeSummary({ id: 13 })],
+    });
+    assert.equal(button.attributes["aria-current"], undefined);
+});

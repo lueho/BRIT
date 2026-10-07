@@ -195,7 +195,7 @@ function renderSummaries(featureInfos) {
         });
     }
 
-    if (summaries.length === 1) markListSelection(summaries[0].id);
+    markListSelection(summaries.length === 1 ? summaries[0].id : null);
     document.querySelector('#info-card-body')?.classList.add('show');
 }
 
@@ -212,20 +212,39 @@ function markListSelection(id) {
     });
 }
 
-function selectShowcaseFromList(id) {
-    if (typeof featuresLayer !== 'undefined' && featuresLayer) {
-        resetFeatureStyles(featuresLayer);
-        const markers = [];
-        featuresLayer.eachLayer(layer => {
-            if (isMarkerLayer(layer) && layer.feature?.id === id) markers.push(layer);
-        });
-        markers.forEach(layer => selectFeature(layer));
-        if (markers.length) {
-            map.setView(markers[0].getLatLng(), Math.max(map.getZoom(), SHOWCASE_LIST_ZOOM));
-        }
+// The showcase picked from the list, applied again once the markers have
+// loaded. A selection on the map replaces it.
+let listSelection = null;
+// Only the summary of the latest selection may render.
+let summaryGeneration = 0;
+
+function fetchShowcaseSummary(id) {
+    const generation = ++summaryGeneration;
+    return fetchFeaturesLayerSummary({ id }, () => generation === summaryGeneration);
+}
+
+function focusShowcase(id) {
+    if (typeof featuresLayer === 'undefined' || !featuresLayer) return;
+    resetFeatureStyles(featuresLayer);
+    const markers = [];
+    featuresLayer.eachLayer(layer => {
+        if (isMarkerLayer(layer) && layer.feature?.id === id) markers.push(layer);
+    });
+    markers.forEach(layer => selectFeature(layer));
+    if (markers.length) {
+        map.setView(markers[0].getLatLng(), Math.max(map.getZoom(), SHOWCASE_LIST_ZOOM));
     }
+}
+
+function selectShowcaseFromList(id) {
+    listSelection = id;
+    focusShowcase(id);
     markListSelection(id);
-    fetchFeaturesLayerSummary({ id });
+    fetchShowcaseSummary(id);
+}
+
+function layersLoaded() {
+    if (listSelection !== null) focusShowcase(listSelection);
 }
 
 function initShowcaseList() {
@@ -299,6 +318,7 @@ function isMarkerLayer(layer) {
 const POINT_CLICK_TOLERANCE_PX = 10;
 
 function featureClickHandler(e, featureGroup) {
+    listSelection = null;
     resetFeatureStyles(featureGroup);
 
     const intersectingFeatures = new Map();
@@ -398,8 +418,10 @@ function featureClickHandler(e, featureGroup) {
         // If only one region, fetch and render the summary for that feature only
         const layers = intersectingFeatures.values().next().value;
         layers.forEach(layer => selectFeature(layer));
-        fetchFeaturesLayerSummary({ id: intersectingFeatures.keys().next().value });
+        fetchShowcaseSummary(intersectingFeatures.keys().next().value);
     } else {
+        summaryGeneration += 1;
+        markListSelection(null);
         // Select all overlapping features
         intersectingFeatures.forEach(layers => {
             layers.forEach(layer => selectFeature(layer));
@@ -449,7 +471,7 @@ async function handleShowcaseClick(id) {
     resetFeatureStyles(window.featureGroup);
     const layers = window.intersectingFeatures.get(id) || [];
     layers.forEach(layer => selectFeature(layer));
-    fetchFeaturesLayerSummary({ id: id });
+    fetchShowcaseSummary(id);
     map.closePopup();
 }
 

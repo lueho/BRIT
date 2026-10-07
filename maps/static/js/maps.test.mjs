@@ -542,3 +542,31 @@ test("map overlay toggles are silent on pages without an overlay", () => {
 
     assert.deepEqual(warnings, []);
 });
+
+test("cleanup re-enables the filter form before it writes the filters to the address bar", () => {
+    const { sandbox } = setup();
+    const order = [];
+    sandbox.unlockCustomElements = () => order.push("unlock");
+    sandbox.updateUrlSearchParams = () => order.push("url");
+
+    sandbox.cleanup();
+
+    assert.deepEqual(order, ["unlock", "url"]);
+});
+
+test("refreshMap calls the layersLoaded hook after fitting the bounds", async () => {
+    const { sandbox } = setup();
+    const order = [];
+    sandbox.setTimeout = () => 0;
+    sandbox.orderLayers = () => {};
+    sandbox.adjustMapBounds = () => order.push("bounds");
+    sandbox.layersLoaded = () => order.push("loaded");
+    sandbox.cleanup = () => {};
+    // setup() stubs refreshMap; evaluate the real one again.
+    vm.runInContext(source.match(/^function refreshMap[\s\S]*?^}$/m)[0], sandbox);
+
+    sandbox.refreshMap([Promise.resolve()], new URLSearchParams());
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.deepEqual(order, ["bounds", "loaded"]);
+});

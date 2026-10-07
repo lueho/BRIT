@@ -238,9 +238,9 @@ class ShowcaseThemeContextTest(TestCase):
             html=True,
         )
 
-    def _panel_showcase(self, name, country, **kwargs):
+    def _panel_showcase(self, name, country, region_status="published", **kwargs):
         region = Region.objects.create(
-            name=f"{name} region", country=country, publication_status="published"
+            name=f"{name} region", country=country, publication_status=region_status
         )
         return Showcase.objects.create(
             name=name,
@@ -274,6 +274,21 @@ class ShowcaseThemeContextTest(TestCase):
             content.index(f'data-showcase-id="{sc2.pk}"'),
             content.index(f'data-showcase-id="{sc14.pk}"'),
         )
+
+    def test_map_panel_does_not_reveal_the_country_of_a_private_region(self):
+        showcase = self._panel_showcase(
+            "SC5 \u2013 Private region", "SE", region_status="private"
+        )
+        response = self.client.get(reverse("Showcase"), {"scope": "published"})
+        content = response.content.decode()
+        listing = content[content.index('id="showcase-list"') :]
+        self.assertIn(f'data-showcase-id="{showcase.pk}"', listing)
+        self.assertIn("Other", listing)
+        self.assertNotIn("Sweden", listing)
+
+    def test_country_filter_defaults_to_all_countries(self):
+        choices = list(ShowcaseFilterSet().form.fields["country"].widget.choices)
+        self.assertEqual(("", "All countries"), choices[0])
 
     def test_map_panel_list_follows_the_filters(self):
         self.assign_theme()
