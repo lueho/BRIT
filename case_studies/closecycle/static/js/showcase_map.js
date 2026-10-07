@@ -195,11 +195,60 @@ function renderSummaries(featureInfos) {
         });
     }
 
+    if (summaries.length === 1) markListSelection(summaries[0].id);
     document.querySelector('#info-card-body')?.classList.add('show');
 }
 
+// Zoom level at which a showcase picked from the list is shown.
+const SHOWCASE_LIST_ZOOM = 9;
+
+function markListSelection(id) {
+    document.querySelectorAll('#showcase-list [data-showcase-id]').forEach(button => {
+        if (Number(button.dataset.showcaseId) === id) {
+            button.setAttribute('aria-current', 'true');
+        } else {
+            button.removeAttribute('aria-current');
+        }
+    });
+}
+
+function selectShowcaseFromList(id) {
+    if (typeof featuresLayer !== 'undefined' && featuresLayer) {
+        resetFeatureStyles(featuresLayer);
+        const markers = [];
+        featuresLayer.eachLayer(layer => {
+            if (isMarkerLayer(layer) && layer.feature?.id === id) markers.push(layer);
+        });
+        markers.forEach(layer => selectFeature(layer));
+        if (markers.length) {
+            map.setView(markers[0].getLatLng(), Math.max(map.getZoom(), SHOWCASE_LIST_ZOOM));
+        }
+    }
+    markListSelection(id);
+    fetchFeaturesLayerSummary({ id });
+}
+
+function initShowcaseList() {
+    document.getElementById('showcase-list')?.addEventListener('click', event => {
+        const button = event.target.closest('[data-showcase-id]');
+        if (!button) return;
+        event.preventDefault();
+        selectShowcaseFromList(Number(button.dataset.showcaseId));
+    });
+}
+document.addEventListener('DOMContentLoaded', initShowcaseList);
+
 function bindShowcaseFeature(feature, layer) {
     bindFeaturePopup(feature, layer);
+    const code = feature.properties?.code;
+    if (feature.properties?.feature_type === 'showcase' && code && typeof layer.bindTooltip === 'function') {
+        layer.bindTooltip(String(code), {
+            permanent: true,
+            direction: 'right',
+            offset: [6, 0],
+            className: 'csm-code-label',
+        });
+    }
     if (layer instanceof L.Polygon && typeof layer.on === 'function') {
         layer.on('add', () => layer.bringToBack());
     }

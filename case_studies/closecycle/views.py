@@ -1,3 +1,5 @@
+import re
+
 from django.db.models import F
 from django.http import HttpResponseRedirect
 
@@ -15,7 +17,7 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateWithInlinesView,
 )
 
-from .filters import ShowcaseFilterSet
+from .filters import COUNTRY_CHOICES, ShowcaseFilterSet
 from .forms import (
     ShowcaseMaterialInline,
     ShowcaseModelForm,
@@ -46,6 +48,25 @@ class ShowcasePrivateFilterView(PrivateObjectFilterView):
     filterset_class = ShowcaseFilterSet
 
 
+def _showcase_list_key(showcase):
+    code = showcase.code
+    number = int(re.sub(r"\D", "", code)) if code else None
+    return (number is None, number or 0, code or "", showcase.title)
+
+
+def showcase_list_groups(showcases):
+    """``showcases`` grouped by the country of their region, in code order."""
+    countries = dict(COUNTRY_CHOICES)
+    groups = {}
+    for showcase in sorted(showcases, key=_showcase_list_key):
+        country = showcase.region.country if showcase.region else ""
+        groups.setdefault(countries.get(country, "Other"), []).append(showcase)
+    return [
+        {"country": country, "showcases": groups[country]}
+        for country in sorted(groups, key=lambda name: (name == "Other", name))
+    ]
+
+
 class ShowcasePublishedMapView(GeoDataSetPublishedFilteredMapView):
     model = Showcase
     model_name = "Showcase"
@@ -72,9 +93,12 @@ class ShowcasePublishedMapView(GeoDataSetPublishedFilteredMapView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        showcases = list(self.object_list.select_related("region"))
         context.update(
             {
                 "closecycle_themes": [get_theme(key) for key in THEMES],
+                "showcase_count": len(showcases),
+                "showcase_groups": showcase_list_groups(showcases),
                 "pilot_region_role": PILOT_REGION_ROLE,
                 "pilot_boundary_note": PILOT_BOUNDARY_NOTE,
             }

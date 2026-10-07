@@ -727,3 +727,8 @@ class ShowcaseGeoJSONVersionTestCase(TestCase):
         from ..viewsets import ShowcaseViewSet
 
         self.assertIn("pilot-regions-v1", ShowcaseViewSet()._version_timestamp({}))
+
+    def test_version_timestamp_carries_code_label_schema_salt(self):
+        from ..viewsets import ShowcaseViewSet
+
+        self.assertIn("code-labels-v1", ShowcaseViewSet()._version_timestamp({}))
