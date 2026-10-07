@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AnonymousUser
+from django.db.models import QuerySet
 from django.urls import reverse
 from rest_framework import serializers
 from rest_framework.fields import CharField
@@ -33,6 +34,28 @@ def _request_user(serializer):
     # If no request or user, treat as anonymous (no permission)
     request = serializer.context.get("request")
     return request.user if request is not None else AnonymousUser()
+
+
+def visible_region_ids(showcases, user):
+    """IDs of the regions of ``showcases`` that ``user`` may read."""
+    if isinstance(showcases, QuerySet):
+        region_ids = showcases.values("region_id")
+    else:
+        region_ids = {s.region_id for s in showcases if s.region_id}
+    return set(
+        filter_queryset_for_user(
+            Region.objects.filter(pk__in=region_ids), user
+        ).values_list("pk", flat=True)
+    )
+
+
+def _visible_region_name(serializer, obj):
+    if obj.region_id is None:
+        return None
+    visible = serializer.context.get("visible_region_ids")
+    if visible is None:
+        visible = visible_region_ids([obj], _request_user(serializer))
+    return obj.region.name if obj.region_id in visible else None
 
 
 class ShowcaseContextMixin:
@@ -108,7 +131,10 @@ class ShowcaseModelSerializer(ShowcaseContextMixin, ModelSerializer):
 
 
 class ShowcaseFlatSerializer(ShowcaseContextMixin, ModelSerializer):
-    region = CharField(source="region.name", allow_null=True)
+    def get_region(self, obj):
+        return _visible_region_name(self, obj)
+
+    region = serializers.SerializerMethodField()
     theme = serializers.ReadOnlyField(source="theme_info")
     pilot_region = serializers.SerializerMethodField()
     url = serializers.SerializerMethodField()
@@ -209,7 +235,7 @@ class ShowcaseSummaryListSerializer(ModelSerializer):
 
 
 class ShowcaseGeoFeatureModelSerializer(BaseGeoFeatureModelSerializer):
-    region = CharField(source="region.name", allow_null=True)
+    region = serializers.SerializerMethodField()
     code = serializers.ReadOnlyField()
     theme = serializers.ReadOnlyField(source="theme_info")
     feature_type = serializers.SerializerMethodField()
@@ -238,6 +264,9 @@ class ShowcaseGeoFeatureModelSerializer(BaseGeoFeatureModelSerializer):
 
     def get_feature_type(self, obj):
         return "showcase"
+
+    def get_region(self, obj):
+        return _visible_region_name(self, obj)
 
 
 def _pilot_geometry(region):
@@ -271,9 +300,7 @@ def pilot_region_features(showcases, user):
         region.pk: region
         for region in filter_queryset_for_user(
             Region.objects.filter(
-                pk__in={
-                    s.region_id for s in showcases if s.region_id and not s.catchment_id
-                }
+                pk__in={s.region_id for s in showcases if s.region_id}
                 | {c.region_id for c in catchments.values() if c.region_id}
             ),
             user,
@@ -317,7 +344,9 @@ def pilot_region_features(showcases, user):
             {
                 "id": showcase.pk,
                 "name": showcase.name,
-                "region": showcase.region.name if showcase.region else None,
+                "region": regions[showcase.region_id].name
+                if showcase.region_id in regions
+                else None,
             }
         )
 

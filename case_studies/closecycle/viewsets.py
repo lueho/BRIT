@@ -31,6 +31,7 @@ from .serializers import (
     ShowcaseGeoFeatureModelSerializer,
     ShowcaseModelSerializer,
     pilot_region_features,
+    visible_region_ids,
 )
 
 
@@ -140,7 +141,12 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
             return rejection_response
 
         serializer = ShowcaseGeoFeatureModelSerializer(
-            queryset, many=True, context={"request": request}
+            queryset,
+            many=True,
+            context={
+                "request": request,
+                "visible_region_ids": visible_region_ids(queryset, request.user),
+            },
         )
         data = serializer.data
         pilots = pilot_region_features(queryset, request.user)
@@ -165,9 +171,9 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
             Response: The serialized summary of the Showcase instance.
         """
         queryset = self.filter_queryset(self.get_queryset())
-        serializer = ShowcaseFlatSerializer(
-            queryset, many=True, context=self.get_serializer_context()
-        )
+        context = self.get_serializer_context()
+        context["visible_region_ids"] = visible_region_ids(queryset, request.user)
+        serializer = ShowcaseFlatSerializer(queryset, many=True, context=context)
         return Response({"summaries": serializer.data})
 
 

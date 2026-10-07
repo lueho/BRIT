@@ -5,9 +5,7 @@ from django.http import HttpResponseRedirect
 
 from inventories.models import ScenarioStatus
 from layer_manager.models import LayerAggregatedValue
-from maps.models import Region
 from maps.views import GeoDataSetPublishedFilteredMapView, MapMixin
-from utils.object_management.permissions import filter_queryset_for_user
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -26,6 +24,7 @@ from .forms import (
     ShowcaseProcessInline,
 )
 from .models import Showcase, ShowcaseMaterial
+from .serializers import visible_region_ids
 from .themes import PILOT_BOUNDARY_NOTE, PILOT_REGION_ROLE, THEMES, get_theme
 
 CHAIN_STAGES = (
@@ -62,11 +61,7 @@ def showcase_list_groups(showcases, user):
     Showcases whose region ``user`` may not read are listed under "Other".
     """
     countries = dict(COUNTRY_CHOICES)
-    visible_regions = set(
-        filter_queryset_for_user(
-            Region.objects.filter(pk__in={s.region_id for s in showcases}), user
-        ).values_list("pk", flat=True)
-    )
+    visible_regions = visible_region_ids(showcases, user)
     groups = {}
     for showcase in sorted(showcases, key=_showcase_list_key):
         visible = showcase.region_id in visible_regions
@@ -105,11 +100,15 @@ class ShowcasePublishedMapView(GeoDataSetPublishedFilteredMapView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         showcases = list(self.object_list.select_related("region"))
+        groups = showcase_list_groups(showcases, self.request.user)
         context.update(
             {
                 "closecycle_themes": [get_theme(key) for key in THEMES],
                 "showcase_count": len(showcases),
-                "showcase_groups": showcase_list_groups(showcases, self.request.user),
+                "showcase_groups": groups,
+                "showcase_country_count": sum(
+                    1 for group in groups if group["country"] != "Other"
+                ),
                 "pilot_region_role": PILOT_REGION_ROLE,
                 "pilot_boundary_note": PILOT_BOUNDARY_NOTE,
             }

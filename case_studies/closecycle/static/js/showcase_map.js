@@ -243,7 +243,30 @@ function selectShowcaseFromList(id) {
     fetchShowcaseSummary(id);
 }
 
+// Showcases at the same location would print their code labels on top of
+// each other, so the first of them carries one label listing all codes.
+function mergeColocatedLabels() {
+    if (typeof featuresLayer === 'undefined' || !featuresLayer) return;
+    const locations = new Map();
+    featuresLayer.eachLayer(layer => {
+        if (!isMarkerLayer(layer) || !layer.feature?.properties?.code) return;
+        if (typeof layer.getTooltip !== 'function' || !layer.getTooltip()) return;
+        const { lat, lng } = layer.getLatLng();
+        const key = `${lat},${lng}`;
+        if (!locations.has(key)) locations.set(key, []);
+        locations.get(key).push(layer);
+    });
+    locations.forEach(layers => {
+        if (layers.length < 2) return;
+        const codes = [...new Set(layers.map(layer => String(layer.feature.properties.code)))]
+            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        layers[0].setTooltipContent(codes.join(' \u00b7 '));
+        layers.slice(1).forEach(layer => layer.unbindTooltip());
+    });
+}
+
 function layersLoaded() {
+    mergeColocatedLabels();
     if (listSelection !== null) focusShowcase(listSelection);
 }
 

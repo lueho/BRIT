@@ -169,6 +169,18 @@ class ShowcaseFlatSerializerTest(TestCase):
             reverse("showcase-detail", args=[self.showcase.pk]), data["url"]
         )
 
+    def test_private_region_name_hidden_from_readers_who_may_not_see_it(self):
+        region = Region.objects.create(name="Secret Region", owner=self.owner)
+        showcase = Showcase.objects.create(
+            name="Private region showcase",
+            region=region,
+            publication_status="published",
+        )
+        data = ShowcaseFlatSerializer(showcase, context=_context()).data
+        self.assertIsNone(data["region"])
+        data = ShowcaseFlatSerializer(showcase, context=_context(self.owner)).data
+        self.assertEqual("Secret Region", data["region"])
+
     def test_missing_region_serializes_as_null(self):
         showcase = Showcase.objects.create(
             name="No Region", publication_status="published"
@@ -316,6 +328,21 @@ class ShowcaseGeoFeatureModelSerializerTest(TestCase):
         )
         data = ShowcaseGeoFeatureModelSerializer(showcase).data
         self.assertEqual("SC14", data["properties"]["code"])
+
+    def test_private_region_name_hidden_from_readers_who_may_not_see_it(self):
+        owner = get_user_model().objects.create(username="geo_region_owner")
+        region = Region.objects.create(name="Secret Region", owner=owner)
+        showcase = Showcase.objects.create(
+            name="SC20 \u2013 Private region",
+            region=region,
+            publication_status="published",
+        )
+        anonymous = ShowcaseGeoFeatureModelSerializer(showcase, context=_context()).data
+        self.assertIsNone(anonymous["properties"]["region"])
+        owned = ShowcaseGeoFeatureModelSerializer(
+            showcase, context=_context(owner)
+        ).data
+        self.assertEqual("Secret Region", owned["properties"]["region"])
 
     def test_serializes_own_site_point(self):
         showcase = Showcase.objects.create(
@@ -575,6 +602,30 @@ class ShowcasePilotRegionGeoJSONTest(TestCase):
             self.hidden.pk,
             [entry["id"] for entry in pilot["properties"]["showcases"]],
         )
+
+    def test_private_region_name_hidden_from_markers_and_pilot_members(self):
+        showcase = Showcase.objects.create(
+            name="Private Region Member",
+            region=self.private_region,
+            catchment=self.catchment,
+            geom=Point(7, 7, srid=4326),
+            publication_status="published",
+        )
+        features = self._features()
+        point = next(f for f in self._points(features) if f["id"] == showcase.pk)
+        self.assertIsNone(point["properties"]["region"])
+        pilot = next(
+            f
+            for f in self._pilots(features)
+            if f["id"] == f"pilot-catchment-{self.catchment.pk}"
+        )
+        member = next(
+            entry
+            for entry in pilot["properties"]["showcases"]
+            if entry["id"] == showcase.pk
+        )
+        self.assertIsNone(member["region"])
+        self.assertNotIn("Private TBN Region", str(features))
 
     def test_id_filter_reduces_pilot_membership(self):
         features = self._features({"id": self.first.pk})

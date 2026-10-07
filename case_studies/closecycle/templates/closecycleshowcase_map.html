@@ -61,7 +61,7 @@
   </div>
   <section class="csm-list" aria-labelledby="csm-list-title">
     <h6 id="csm-list-title" class="csm-list-title">
-      {{ showcase_count }} showcase{{ showcase_count|pluralize }} in {{ showcase_groups|length }} countr{{ showcase_groups|length|pluralize:"y,ies" }}
+      {{ showcase_count }} showcase{{ showcase_count|pluralize }}{% if showcase_country_count %} in {{ showcase_country_count }} countr{{ showcase_country_count|pluralize:"y,ies" }}{% endif %}
     </h6>
     <div id="showcase-list">
       {% for group in showcase_groups %}
