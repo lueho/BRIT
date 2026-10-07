@@ -275,7 +275,8 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         response = self.client.get(self.get_detail_url(showcase.pk))
         self.assertContains(response, "Private Feedstock Sample")
 
-    def test_material_sample_groups_cap_samples_and_link_full_list(self):
+    def test_material_sample_groups_collapse_samples_beyond_the_cap(self):
+        """Every visible sample stays reachable, including the owner's private ones."""
         showcase = self.published_object
         material = Material.objects.create(
             name="Heavily Sampled", publication_status="published"
@@ -283,21 +284,25 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         showcase.showcase_materials.create(material=material, role="input")
         for i in range(7):
             Sample.objects.create(
-                name=f"Capped Sample {i}",
-                material=material,
-                publication_status="published",
+                name=f"Capped Sample {i}", material=material, owner=self.owner_user
             )
+        self.client.force_login(self.owner_user)
 
         response = self.client.get(self.get_detail_url(showcase.pk))
 
         group = response.context["material_sample_groups"][0]
-        self.assertEqual(5, len(group["samples"]))
-        self.assertEqual(7, group["samples_total"])
-        self.assertEqual(2, group["more_samples"])
-        self.assertContains(
-            response,
-            f"{reverse('sample-list')}?substrate_material={material.pk}",
+        self.assertEqual(
+            [f"Capped Sample {i}" for i in range(5)],
+            [sample.name for sample in group["samples"]],
         )
+        self.assertEqual(
+            ["Capped Sample 5", "Capped Sample 6"],
+            [sample.name for sample in group["more_samples"]],
+        )
+        self.assertContains(response, 'class="csd-more-samples"')
+        self.assertContains(response, "+2 more")
+        for sample in Sample.objects.filter(material=material):
+            self.assertContains(response, reverse("sample-detail", args=[sample.pk]))
 
     def test_detail_view_does_not_query_per_material_for_samples(self):
         showcase = self.published_object

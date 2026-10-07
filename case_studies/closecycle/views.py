@@ -2,7 +2,6 @@ from collections import defaultdict
 
 from django.db.models import F
 from django.http import HttpResponseRedirect
-from django.urls import reverse
 
 from inventories.models import ScenarioStatus
 from layer_manager.models import LayerAggregatedValue
@@ -169,11 +168,7 @@ def material_sample_groups(material_links, user):
             {
                 "material": material,
                 "samples": material_samples[:MATERIAL_SAMPLE_LIMIT],
-                "samples_total": len(material_samples),
-                "more_samples": max(len(material_samples) - MATERIAL_SAMPLE_LIMIT, 0),
-                "samples_list_url": (
-                    f"{reverse('sample-list')}?substrate_material={material.pk}"
-                ),
+                "more_samples": material_samples[MATERIAL_SAMPLE_LIMIT:],
                 "sample_series": sample_series[material.pk],
             }
         )

@@ -246,6 +246,11 @@
   margin: 1rem 0 0;
 }
 
+.csd-more-samples summary {
+  cursor: pointer;
+  color: var(--sdv2-text-muted);
+}
+
 @media (max-width: 991.98px) {
   .csd-overview {
     grid-template-columns: minmax(0, 1fr);

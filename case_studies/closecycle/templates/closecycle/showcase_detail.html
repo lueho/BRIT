@@ -300,7 +300,16 @@
                           {% endfor %}
                         </ul>
                         {% if group.more_samples %}
-                          <a class="small" href="{{ group.samples_list_url }}">+{{ group.more_samples }} more ({{ group.samples_total }} samples)</a>
+                          <details class="csd-more-samples">
+                            <summary class="small">+{{ group.more_samples|length }} more</summary>
+                            <ul class="list-unstyled mb-0 mt-1">
+                              {% for sample in group.more_samples %}
+                                <li class="mb-1">
+                                  <a href="{% url 'sample-detail' sample.id %}">{{ sample.name }}</a>
+                                </li>
+                              {% endfor %}
+                            </ul>
+                          </details>
                         {% endif %}
                       {% endif %}
                       {% if group.sample_series %}
