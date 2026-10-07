@@ -195,11 +195,79 @@ function renderSummaries(featureInfos) {
         });
     }
 
+    markListSelection(summaries.length === 1 ? summaries[0].id : null);
     document.querySelector('#info-card-body')?.classList.add('show');
 }
 
+// Zoom level at which a showcase picked from the list is shown.
+const SHOWCASE_LIST_ZOOM = 9;
+
+function markListSelection(id) {
+    document.querySelectorAll('#showcase-list [data-showcase-id]').forEach(button => {
+        if (Number(button.dataset.showcaseId) === id) {
+            button.setAttribute('aria-current', 'true');
+        } else {
+            button.removeAttribute('aria-current');
+        }
+    });
+}
+
+// The showcase picked from the list, applied again once the markers have
+// loaded. A selection on the map replaces it.
+let listSelection = null;
+// Only the summary of the latest selection may render.
+let summaryGeneration = 0;
+
+function fetchShowcaseSummary(id) {
+    const generation = ++summaryGeneration;
+    return fetchFeaturesLayerSummary({ id }, () => generation === summaryGeneration);
+}
+
+function focusShowcase(id) {
+    if (typeof featuresLayer === 'undefined' || !featuresLayer) return;
+    resetFeatureStyles(featuresLayer);
+    const markers = [];
+    featuresLayer.eachLayer(layer => {
+        if (isMarkerLayer(layer) && layer.feature?.id === id) markers.push(layer);
+    });
+    markers.forEach(layer => selectFeature(layer));
+    if (markers.length) {
+        map.setView(markers[0].getLatLng(), Math.max(map.getZoom(), SHOWCASE_LIST_ZOOM));
+    }
+}
+
+function selectShowcaseFromList(id) {
+    listSelection = id;
+    focusShowcase(id);
+    markListSelection(id);
+    fetchShowcaseSummary(id);
+}
+
+function layersLoaded() {
+    if (listSelection !== null) focusShowcase(listSelection);
+}
+
+function initShowcaseList() {
+    document.getElementById('showcase-list')?.addEventListener('click', event => {
+        const button = event.target.closest('[data-showcase-id]');
+        if (!button) return;
+        event.preventDefault();
+        selectShowcaseFromList(Number(button.dataset.showcaseId));
+    });
+}
+document.addEventListener('DOMContentLoaded', initShowcaseList);
+
 function bindShowcaseFeature(feature, layer) {
     bindFeaturePopup(feature, layer);
+    const code = feature.properties?.code;
+    if (feature.properties?.feature_type === 'showcase' && code && typeof layer.bindTooltip === 'function') {
+        layer.bindTooltip(String(code), {
+            permanent: true,
+            direction: 'right',
+            offset: [6, 0],
+            className: 'csm-code-label',
+        });
+    }
     if (layer instanceof L.Polygon && typeof layer.on === 'function') {
         layer.on('add', () => layer.bringToBack());
     }
@@ -250,6 +318,7 @@ function isMarkerLayer(layer) {
 const POINT_CLICK_TOLERANCE_PX = 10;
 
 function featureClickHandler(e, featureGroup) {
+    listSelection = null;
     resetFeatureStyles(featureGroup);
 
     const intersectingFeatures = new Map();
@@ -349,8 +418,10 @@ function featureClickHandler(e, featureGroup) {
         // If only one region, fetch and render the summary for that feature only
         const layers = intersectingFeatures.values().next().value;
         layers.forEach(layer => selectFeature(layer));
-        fetchFeaturesLayerSummary({ id: intersectingFeatures.keys().next().value });
+        fetchShowcaseSummary(intersectingFeatures.keys().next().value);
     } else {
+        summaryGeneration += 1;
+        markListSelection(null);
         // Select all overlapping features
         intersectingFeatures.forEach(layers => {
             layers.forEach(layer => selectFeature(layer));
@@ -400,7 +471,7 @@ async function handleShowcaseClick(id) {
     resetFeatureStyles(window.featureGroup);
     const layers = window.intersectingFeatures.get(id) || [];
     layers.forEach(layer => selectFeature(layer));
-    fetchFeaturesLayerSummary({ id: id });
+    fetchShowcaseSummary(id);
     map.closePopup();
 }
 

@@ -308,6 +308,15 @@ class ShowcaseGeoFeatureModelSerializerTest(TestCase):
     def _geometry(self, showcase):
         return ShowcaseGeoFeatureModelSerializer(showcase).data["geometry"]
 
+    def test_properties_carry_the_showcase_code_for_map_labels(self):
+        showcase = Showcase.objects.create(
+            name="SC14 \u2013 Grass to protein",
+            region=self.region,
+            publication_status="published",
+        )
+        data = ShowcaseGeoFeatureModelSerializer(showcase).data
+        self.assertEqual("SC14", data["properties"]["code"])
+
     def test_serializes_own_site_point(self):
         showcase = Showcase.objects.create(
             name="Site Showcase",

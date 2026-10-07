@@ -1,6 +1,10 @@
 {% extends "filtered_map.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% block style_sheets %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/showcase_map.min.css' %}">
+{% endblock style_sheets %}
 {% block map_card_header_actions %}
   <a class="btn btn-sm btn-outline-secondary"
      href="{% url 'showcase-list' %}"
@@ -41,7 +45,7 @@
     {{ filter.form.pilot_region|as_crispy_field }}
     {{ filter.form.country|as_crispy_field }}
     <div class="d-flex gap-2">
-      <button class="btn btn-sm btn-primary" type="submit">Apply filters</button>
+      <button class="btn btn-sm btn-primary submit-filter" type="submit">Filter</button>
       <a class="btn btn-sm btn-outline-secondary" href="{% url 'Showcase' %}">Reset</a>
     </div>
   </form>
@@ -49,8 +53,39 @@
 {% block filter_result_card %}
   <div id="pilot-region-context" hidden></div>
   <div id="summary-container">
-    <p>Select a showcase marker or pilot-region polygon to explore its theme, regional network and connections.</p>
+    <p class="csm-intro">
+      Each CLOSECYCLE showcase demonstrates how regional residues become bio-based products within a
+      Territorial Biorefinery Network. Select a showcase below or on the map to explore its theme,
+      processing chain and regional network.
+    </p>
   </div>
+  <section class="csm-list" aria-labelledby="csm-list-title">
+    <h6 id="csm-list-title" class="csm-list-title">
+      {{ showcase_count }} showcase{{ showcase_count|pluralize }} in {{ showcase_groups|length }} countr{{ showcase_groups|length|pluralize:"y,ies" }}
+    </h6>
+    <div id="showcase-list">
+      {% for group in showcase_groups %}
+        <h6 class="csm-list-country">{{ group.country }}</h6>
+        <ul class="csm-list-items">
+          {% for showcase in group.showcases %}
+            <li>
+              <button type="button" class="csm-list-item" data-showcase-id="{{ showcase.pk }}">
+                {% if showcase.theme_info %}
+                  <svg class="csm-theme-dot" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+                    <circle cx="5" cy="5" r="4" fill="{{ showcase.theme_info.color }}" />
+                  </svg>
+                {% endif %}
+                {% if showcase.code %}<span class="csm-code">{{ showcase.code }}</span>{% endif %}
+                <span class="csm-title">{{ showcase.title }}</span>
+              </button>
+            </li>
+          {% endfor %}
+        </ul>
+      {% empty %}
+        <p class="small text-muted">No showcases match these filters.</p>
+      {% endfor %}
+    </div>
+  </section>
 {% endblock filter_result_card %}
 {% block javascript %}
   {{ block.super }}
