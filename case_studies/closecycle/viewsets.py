@@ -23,6 +23,7 @@ from maps.throttling import GeoJSONAnonThrottle
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.viewsets import AutoPermModelViewSet
 
+from .filters import ShowcaseAPIFilterSet
 from .models import BiogasPlantsSweden, Showcase
 from .serializers import (
     BiogasPlantsSwedenSimpleModelSerializer,
@@ -37,6 +38,7 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     queryset = Showcase.objects.all()
     serializer_class = ShowcaseModelSerializer
     filterset_fields = ("id", "region__country")
+    filterset_class = ShowcaseAPIFilterSet
     geojson_throttle_classes = (GeoJSONAnonThrottle,)
     custom_permission_required = {
         "list": None,
@@ -53,7 +55,9 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         if self.action in ("geojson", "version"):
             return queryset
         connections = (
-            ("material_links", "process_links") if self.action == "summaries" else None
+            ("material_links", "process_links", "catchment")
+            if self.action == "summaries"
+            else None
         )
         return Showcase.prefetch_visible_connections(
             queryset, self.request.user, connections=connections
@@ -88,7 +92,7 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
             (Region, "catchment__region_id", "catchment__region__lastmodified_at"),
             (GeoPolygon, "catchment__region__borders_id", None),
         )
-        parts = [Cast("pk", CharField())]
+        parts = [Cast("pk", CharField()), Value("#"), Cast("theme", CharField())]
         for model, pk_ref, modified_ref in linked_rows:
             parts += [Value(":"), self._row_xmin(model, pk_ref)]
             if modified_ref:
@@ -108,7 +112,7 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         fingerprint = agg.get("pilot_fingerprint") or ""
         return ":".join(
             (
-                "pilot-regions-v1",
+                "pilot-regions-v1:theme-context-v1",
                 max_mod.isoformat() if max_mod else "",
                 hashlib.sha1(fingerprint.encode("utf-8")).hexdigest(),
             )

@@ -555,7 +555,7 @@ class ShowcasePilotRegionGeoJSONTest(TestCase):
             [entry["id"] for entry in pilot["properties"]["showcases"]],
         )
 
-        features = self._features(user=self.owner)
+        features = self._features({"scope": ""}, user=self.owner)
         self.assertIn(self.hidden.pk, [f["id"] for f in self._points(features)])
         pilot = next(
             f

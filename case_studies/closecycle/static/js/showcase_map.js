@@ -48,6 +48,71 @@ function appendListSection(container, heading, items, ordered) {
     container.appendChild(list);
 }
 
+function appendContextParagraph(container, text, className = '') {
+    if (typeof text !== 'string' || !text.trim()) return;
+    const paragraph = document.createElement('p');
+    paragraph.textContent = text;
+    paragraph.className = className;
+    paragraph.style.whiteSpace = 'pre-line';
+    container.appendChild(paragraph);
+}
+
+function appendThemeContext(container, theme) {
+    if (!theme || typeof theme.label !== 'string') return;
+    const heading = document.createElement('p');
+    heading.className = 'fw-semibold mb-1';
+    if (isSafeLocalUrl(theme.url)) {
+        const link = document.createElement('a');
+        link.href = theme.url;
+        link.textContent = `Theme: ${theme.label}`;
+        heading.appendChild(link);
+    } else {
+        heading.textContent = `Theme: ${theme.label}`;
+    }
+    container.appendChild(heading);
+    appendContextParagraph(container, theme.description, 'small text-muted');
+}
+
+function renderPilotRegions(regions) {
+    const container = document.getElementById('pilot-region-context');
+    if (!container) return;
+    container.textContent = '';
+    const pilots = new Map();
+    (regions || []).forEach(region => {
+        if (region && region.id !== undefined) pilots.set(region.id, region);
+    });
+    container.hidden = pilots.size === 0;
+    pilots.forEach(pilot => {
+        const section = document.createElement('section');
+        section.className = 'border rounded p-3 mb-3';
+        const heading = document.createElement('h5');
+        heading.textContent = 'Pilot region / TBN';
+        section.appendChild(heading);
+        const name = document.createElement('p');
+        name.className = 'fw-semibold';
+        if (isSafeLocalUrl(pilot.url)) {
+            const link = document.createElement('a');
+            link.href = pilot.url;
+            link.textContent = pilot.name;
+            name.appendChild(link);
+        } else {
+            name.textContent = pilot.name;
+        }
+        section.appendChild(name);
+        appendContextParagraph(section, pilot.role, 'small');
+        appendContextParagraph(section, pilot.description);
+        appendContextParagraph(section, pilot.boundary_note, 'small text-muted');
+        if (isSafeLocalUrl(pilot.showcases_url)) {
+            const link = document.createElement('a');
+            link.href = pilot.showcases_url;
+            link.textContent = 'Explore regional showcases';
+            section.appendChild(link);
+        }
+        container.appendChild(section);
+    });
+    if (pilots.size) showShowcaseSummaryTab();
+}
+
 function showShowcaseSummaryTab() {
     const tab = document.getElementById('summary-tab');
     if (tab && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
@@ -63,6 +128,7 @@ function renderSummaryContainer(summary, summary_container) {
     const heading = document.createElement('h5');
     heading.textContent = summary.name;
     summary_container.appendChild(heading);
+    appendThemeContext(summary_container, summary.theme);
 
     if (summary.region) {
         const region = document.createElement('p');
@@ -103,6 +169,7 @@ function renderSummaries(featureInfos) {
     }
 
     const summaries = featureInfos.summaries;
+    renderPilotRegions(summaries.map(summary => summary.pilot_region));
     if (summaries.length === 0) {
         const message = document.createElement('p');
         message.textContent = 'No showcases found.';
@@ -138,12 +205,23 @@ function bindShowcaseFeature(feature, layer) {
     }
 }
 
+function showcaseFeatureStyle(feature) {
+    const theme = feature.properties?.theme;
+    if (!theme || !/^#[0-9a-f]{6}$/i.test(theme.color)) return { ...featuresLayerStyle };
+    return {
+        ...featuresLayerStyle,
+        color: theme.color,
+        fillColor: theme.color,
+        fillOpacity: feature.properties.feature_type === 'pilot_region' ? 0.15 : 0.9,
+    };
+}
+
 function createFeaturesLayer(geoJson, geometryType) {
     return L.geoJson(geoJson, {
         pane: 'featuresPane',
         onEachFeature: bindShowcaseFeature,
-        style: featuresLayerStyle,
-        pointToLayer: (feature, latlng) => L.circleMarker(latlng, featuresLayerStyle),
+        style: showcaseFeatureStyle,
+        pointToLayer: (feature, latlng) => L.circleMarker(latlng, showcaseFeatureStyle(feature)),
     });
 }
 
@@ -255,6 +333,12 @@ function featureClickHandler(e, featureGroup) {
             addHitMarkers();
         }
     }
+
+    const selectedPilots = polygonLayers.filter(layer => {
+        const members = layer.feature.properties?.showcases || [];
+        return members.some(member => intersectingFeatures.has(member.id));
+    });
+    renderPilotRegions(selectedPilots.map(layer => layer.feature.properties.pilot_region));
 
     // Store intersecting features globally to access in handleShowcaseClick
     window.intersectingFeatures = intersectingFeatures;

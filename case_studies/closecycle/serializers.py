@@ -16,6 +16,7 @@ from maps.serializers import (
 from utils.object_management.permissions import filter_queryset_for_user
 
 from .models import BiogasPlantsSweden, ShowcaseMaterial
+from .themes import pilot_region_info
 
 
 class ShowcaseMaterialSerializer(ModelSerializer):
@@ -34,11 +35,19 @@ def _request_user(serializer):
     return request.user if request is not None else AnonymousUser()
 
 
-class ShowcaseModelSerializer(ModelSerializer):
+class ShowcaseContextMixin:
+    def get_pilot_region(self, obj):
+        catchment = obj.visible_catchment(_request_user(self))
+        return pilot_region_info(catchment) if catchment is not None else None
+
+
+class ShowcaseModelSerializer(ShowcaseContextMixin, ModelSerializer):
     """Showcase with its connections, limited to records the reader may see."""
 
     region = RegionModelSerializer()
     geom = GeometryField(allow_null=True, read_only=True)
+    theme_details = serializers.ReadOnlyField(source="theme_info")
+    pilot_region = serializers.SerializerMethodField()
     catchment = serializers.SerializerMethodField()
     showcase_materials = serializers.SerializerMethodField()
     process_chain = serializers.SerializerMethodField()
@@ -52,6 +61,9 @@ class ShowcaseModelSerializer(ModelSerializer):
             "id",
             "name",
             "geom",
+            "theme",
+            "theme_details",
+            "pilot_region",
             "region",
             "catchment",
             "description",
@@ -95,8 +107,10 @@ class ShowcaseModelSerializer(ModelSerializer):
         ]
 
 
-class ShowcaseFlatSerializer(ModelSerializer):
+class ShowcaseFlatSerializer(ShowcaseContextMixin, ModelSerializer):
     region = CharField(source="region.name", allow_null=True)
+    theme = serializers.ReadOnlyField(source="theme_info")
+    pilot_region = serializers.SerializerMethodField()
     url = serializers.SerializerMethodField()
     involved_processes = serializers.SerializerMethodField()
     input_materials = serializers.SerializerMethodField()
@@ -109,6 +123,8 @@ class ShowcaseFlatSerializer(ModelSerializer):
             "id",
             "name",
             "region",
+            "theme",
+            "pilot_region",
             "description",
             "url",
             "involved_processes",
@@ -194,6 +210,7 @@ class ShowcaseSummaryListSerializer(ModelSerializer):
 
 class ShowcaseGeoFeatureModelSerializer(BaseGeoFeatureModelSerializer):
     region = CharField(source="region.name", allow_null=True)
+    theme = serializers.ReadOnlyField(source="theme_info")
     feature_type = serializers.SerializerMethodField()
 
     class Meta:
@@ -203,6 +220,7 @@ class ShowcaseGeoFeatureModelSerializer(BaseGeoFeatureModelSerializer):
             "id",
             "name",
             "region",
+            "theme",
             "feature_type",
         ]
 
@@ -270,6 +288,7 @@ def pilot_region_features(showcases, user):
             key = f"pilot-catchment-{catchment.pk}"
             name = str(catchment)
             geometry = _pilot_geometry(region)
+            context = pilot_region_info(catchment)
         elif showcase.region_id:
             region = regions.get(showcase.region_id)
             if region is None:
@@ -277,11 +296,21 @@ def pilot_region_features(showcases, user):
             key = f"pilot-region-{region.pk}"
             name = str(region)
             geometry = _pilot_geometry(region)
+            context = None
         else:
             continue
         pilot = pilots.setdefault(
-            key, {"name": name, "geometry": geometry, "showcases": []}
+            key,
+            {
+                "name": name,
+                "geometry": geometry,
+                "showcases": [],
+                "themes": {},
+                "pilot_region": context,
+            },
         )
+        if showcase.theme_info:
+            pilot["themes"][showcase.theme] = showcase.theme_info
         pilot["showcases"].append(
             {
                 "id": showcase.pk,
@@ -300,6 +329,11 @@ def pilot_region_features(showcases, user):
                 "feature_type": "pilot_region",
                 "name": pilot["name"],
                 "region": pilot["name"],
+                "pilot_region": pilot["pilot_region"],
+                "themes": list(pilot["themes"].values()),
+                "theme": next(iter(pilot["themes"].values()))
+                if len(pilot["themes"]) == 1
+                else None,
                 "showcases": pilot["showcases"],
             },
         }

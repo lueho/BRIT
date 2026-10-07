@@ -1,24 +1,59 @@
 {% extends "filtered_map.html" %}
 {% load static %}
-
+{% load crispy_forms_tags %}
 {% block map_card_header_actions %}
-    <a class="btn btn-sm btn-outline-secondary"
-       href="{% url 'showcase-list' %}"
-       title="List">
-        <i class="fas fa-list-ul"></i>
-        <span class="d-none d-md-inline">List</span>
-    </a>
-    {{ block.super }}
+  <a class="btn btn-sm btn-outline-secondary"
+     href="{% url 'showcase-list' %}"
+     title="List">
+    <i class="fas fa-list-ul"></i>
+    <span class="d-none d-md-inline">List</span>
+  </a>
+  {{ block.super }}
 {% endblock map_card_header_actions %}
-
 {% block map_card_footer %}
+  <section class="w-100" aria-label="Themes and map legend">
+    <h6>Seven themes for closing regional material cycles</h6>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      {% for theme in closecycle_themes %}
+        <a class="btn btn-sm btn-outline-secondary{% if request.GET.theme == theme.key %} active{% endif %}"
+           href="{{ theme.url }}"
+           title="{{ theme.description }}">
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <circle cx="7" cy="7" r="5" fill="{{ theme.color }}" stroke="currentColor" />
+          </svg>
+          {{ theme.label }}
+        </a>
+      {% endfor %}
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'Showcase' %}">All themes</a>
+    </div>
+    <p class="small mb-2">
+      <strong>Markers:</strong> showcase installations or demonstrations.
+      <strong>Polygons:</strong> pilot-region context for regional stakeholder networks.
+    </p>
+    <p class="small mb-2">{{ pilot_region_role }}</p>
+    <p class="small text-muted mb-0">{{ pilot_boundary_note }}</p>
+  </section>
 {% endblock map_card_footer %}
-
 {% block filter_form_card %}
+  <form method="get">
+    <input type="hidden" name="scope" value="published">
+    {{ filter.form.theme|as_crispy_field }}
+    {{ filter.form.pilot_region|as_crispy_field }}
+    {{ filter.form.country|as_crispy_field }}
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-primary" type="submit">Apply filters</button>
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'Showcase' %}">Reset</a>
+    </div>
+  </form>
 {% endblock filter_form_card %}
-
+{% block filter_result_card %}
+  <div id="pilot-region-context" hidden></div>
+  <div id="summary-container">
+    <p>Select a showcase marker or pilot-region polygon to explore its theme, regional network and connections.</p>
+  </div>
+{% endblock filter_result_card %}
 {% block javascript %}
-    {{ block.super }}
-    <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
-    <script src="{% static 'js/showcase_map.min.js' %}"></script>
+  {{ block.super }}
+  <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
+  <script src="{% static 'js/showcase_map.min.js' %}"></script>
 {% endblock javascript %}

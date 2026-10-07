@@ -17,9 +17,16 @@ class ShowcaseProcessInline(admin.TabularInline):
 
 @admin.register(Showcase)
 class ShowcaseAdmin(admin.ModelAdmin):
-    list_display = ("name", "region", "catchment", "owner", "publication_status")
+    list_display = (
+        "name",
+        "theme",
+        "region",
+        "catchment",
+        "owner",
+        "publication_status",
+    )
     search_fields = ("name", "description")
-    list_filter = ("publication_status",)
+    list_filter = ("publication_status", "theme", "catchment")
     ordering = ("name",)
     autocomplete_fields = ("catchment", "samples", "sample_series")
     inlines = (ShowcaseMaterialInline, ShowcaseProcessInline)
