@@ -468,10 +468,38 @@ class SampleFilterTestCase(TestCase):
         component_group = MaterialComponentGroup.objects.create(
             name="Bob's component group", owner=bob, publication_status="published"
         )
+        unit, _ = Unit.objects.get_or_create(name="%")
         request = RequestFactory().get("/")
         request.user = alice
 
         for scope in ("private", "review"):
+            linked = Sample.objects.create(
+                name=f"Alice linked {scope} sample",
+                material=self.substrate_material,
+                owner=alice,
+                publication_status=scope,
+            )
+            Sample.objects.create(
+                name=f"Alice unlinked {scope} sample",
+                material=self.substrate_material,
+                owner=alice,
+                publication_status=scope,
+            )
+            linked.sample_groups.add(group)
+            MaterialPropertyValue.objects.create(
+                sample=linked,
+                property=prop,
+                average=Decimal("1"),
+                standard_deviation=Decimal("0"),
+            )
+            ComponentMeasurement.objects.create(
+                sample=linked,
+                group=component_group,
+                component=component,
+                unit=unit,
+                average=Decimal("1"),
+                standard_deviation=Decimal("0"),
+            )
             for field, value in (
                 ("sample_group", group.pk),
                 ("parameter", prop.pk),
@@ -481,10 +509,13 @@ class SampleFilterTestCase(TestCase):
                 with self.subTest(scope=scope, field=field):
                     filtr = SampleFilter(
                         data={"scope": scope, field: str(value)},
-                        queryset=Sample.objects.filter(owner=alice),
+                        queryset=Sample.objects.filter(
+                            owner=alice, publication_status=scope
+                        ),
                         request=request,
                     )
                     self.assertTrue(filtr.is_valid(), filtr.errors)
+                    self.assertEqual(list(filtr.qs), [linked])
 
 
 class SampleGroupFilterTestCase(TestCase):
