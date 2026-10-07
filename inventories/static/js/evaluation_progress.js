@@ -79,8 +79,11 @@ function initEvaluationProgress(root, {
         } catch {
             // A failed status request is retried on the next poll.
         }
-        if (result && !result.running) {
-            // The result page now shows the results or the failure.
+        const known = new Set(rows.map((row) => row.dataset.taskId));
+        const unlisted = result && Object.keys(result.tasks).some((taskId) => !known.has(taskId));
+        if (result && (!result.running || unlisted)) {
+            // The result page now shows the results or the failure, or the
+            // tasks that were registered after this page was rendered.
             reload();
             return;
         }

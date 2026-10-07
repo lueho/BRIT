@@ -143,3 +143,14 @@ test("polls instead of reloading when no tasks are registered yet", async () => 
 
     assert.equal(reloads.length, 1);
 });
+
+test("reloads to list tasks registered after the page was rendered", async () => {
+    const page = fakePage([]);
+    const { promise, scheduled, reloads } = run(page, [
+        { running: true, tasks: { a: "STARTED" } },
+    ]);
+    await promise;
+
+    assert.equal(reloads.length, 1);
+    assert.equal(scheduled.length, 0);
+});
