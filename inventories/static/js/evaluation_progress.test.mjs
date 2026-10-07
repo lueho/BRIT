@@ -4,6 +4,7 @@ import test from "node:test";
 import vm from "node:vm";
 
 const source = readFileSync(new URL("./evaluation_progress.js", import.meta.url), "utf8");
+const STATUS_URL = "/inventories/scenarios/8/evaluation-status/";
 
 function load() {
     const context = vm.createContext({});
@@ -27,11 +28,29 @@ function fakePage(taskIds) {
         "[data-progress-count]": count,
     };
     const root = {
-        dataset: { statusUrl: "/inventories/scenarios/evaluating/__task__/" },
+        dataset: { statusUrl: STATUS_URL },
         querySelectorAll: () => rows,
         querySelector: (selector) => elements[selector],
     };
     return { root, badges, progress, bar, count };
+}
+
+function run(page, replies) {
+    const { initEvaluationProgress } = load();
+    const requested = [];
+    const scheduled = [];
+    const reloads = [];
+    const promise = initEvaluationProgress(page.root, {
+        fetchJson: async (url) => {
+            requested.push(url);
+            const reply = replies.shift();
+            if (reply instanceof Error) throw reply;
+            return reply;
+        },
+        reload: () => reloads.push(true),
+        schedule: (callback) => scheduled.push(callback),
+    });
+    return { promise, requested, scheduled, reloads };
 }
 
 test("describeTaskStatus turns Celery states into readable labels", () => {
@@ -52,70 +71,75 @@ test("summarizeProgress counts succeeded and failed tasks as finished", () => {
     assert.deepEqual({ ...progress }, { finished: 2, total: 4, percent: 50, complete: false });
 });
 
-test("polls pending tasks until all are finished, then reloads", async () => {
-    const { initEvaluationProgress } = load();
+test("shows task progress from the scenario status while it is running", async () => {
     const page = fakePage(["a", "b"]);
-    const replies = { a: ["SUCCESS"], b: ["STARTED", "SUCCESS"] };
-    const requested = [];
-    const scheduled = [];
-    let reloaded = 0;
-    const reload = () => { reloaded += 1; };
-
-    await initEvaluationProgress(page.root, {
-        fetchJson: async (url) => {
-            requested.push(url);
-            const taskId = url.split("/").at(-2);
-            return { task_status: replies[taskId].shift() };
-        },
-        reload,
-        schedule: (callback) => scheduled.push(callback),
-    });
-
-    assert.deepEqual(requested, [
-        "/inventories/scenarios/evaluating/a/",
-        "/inventories/scenarios/evaluating/b/",
+    const { promise, requested, scheduled, reloads } = run(page, [
+        { running: true, tasks: { a: "SUCCESS", b: "STARTED" } },
     ]);
+    await promise;
+
+    assert.deepEqual(requested, [STATUS_URL]);
     assert.equal(page.badges.a.textContent, "Done");
     assert.equal(page.badges.b.className, "badge text-bg-info");
     assert.equal(page.bar.style.width, "50%");
     assert.equal(page.progress.attributes["aria-valuenow"], "1");
     assert.equal(page.count.textContent, "1 of 2 inventories calculated");
-    assert.notEqual(scheduled.at(-1), reload);
+    assert.equal(scheduled.length, 1);
+    assert.equal(reloads.length, 0);
+});
+
+test("waits for the results to be saved after all tasks are done", async () => {
+    const page = fakePage(["a"]);
+    const { promise, scheduled, reloads } = run(page, [
+        { running: true, tasks: { a: "SUCCESS" } },
+        { running: false, tasks: {} },
+    ]);
+    await promise;
+
+    assert.equal(page.bar.style.width, "100%");
+    assert.equal(page.count.textContent, "All inventories calculated. Saving the results…");
+    assert.equal(reloads.length, 0, "no reload while the scenario is still running");
 
     await scheduled.at(-1)();
 
-    assert.equal(requested.length, 3, "finished tasks are not polled again");
-    assert.equal(page.bar.style.width, "100%");
-    assert.equal(scheduled.at(-1), reload);
-    assert.equal(reloaded, 0);
+    assert.equal(reloads.length, 1);
+    assert.equal(page.badges.a.textContent, "Done", "finished tasks keep their state");
+});
+
+test("reloads once the scenario stops running, also for failed evaluations", async () => {
+    const page = fakePage(["a"]);
+    const { promise, reloads, scheduled } = run(page, [
+        { running: false, tasks: { a: "FAILURE" } },
+    ]);
+    await promise;
+
+    assert.equal(reloads.length, 1);
+    assert.equal(scheduled.length, 0);
 });
 
 test("keeps polling when a status request fails", async () => {
-    const { initEvaluationProgress } = load();
     const page = fakePage(["a"]);
-    const scheduled = [];
-
-    await initEvaluationProgress(page.root, {
-        fetchJson: async () => { throw new Error("offline"); },
-        reload: () => {},
-        schedule: (callback) => scheduled.push(callback),
-    });
+    const { promise, scheduled, reloads } = run(page, [new Error("offline")]);
+    await promise;
 
     assert.equal(page.badges.a.textContent, "Queued");
     assert.equal(page.count.textContent, "0 of 1 inventories calculated");
     assert.equal(scheduled.length, 1);
+    assert.equal(reloads.length, 0);
 });
 
-test("reloads to pick up tasks that are not registered yet", async () => {
-    const { initEvaluationProgress } = load();
+test("polls instead of reloading when no tasks are registered yet", async () => {
     const page = fakePage([]);
-    const scheduled = [];
-    const reload = () => {};
+    const { promise, requested, scheduled, reloads } = run(page, [
+        { running: true, tasks: {} },
+        { running: false, tasks: {} },
+    ]);
+    await promise;
 
-    await initEvaluationProgress(page.root, {
-        reload,
-        schedule: (callback, delay) => scheduled.push([callback, delay]),
-    });
+    assert.deepEqual(requested, [STATUS_URL]);
+    assert.equal(reloads.length, 0);
 
-    assert.deepEqual(scheduled, [[reload, 3000]]);
+    await scheduled.at(-1)();
+
+    assert.equal(reloads.length, 1);
 });

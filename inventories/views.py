@@ -17,7 +17,15 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
-from django.views.generic import CreateView, DetailView, TemplateView, View
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
+from django.views.generic import (
+    CreateView,
+    DetailView,
+    RedirectView,
+    TemplateView,
+    View,
+)
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
 from django_tomselect.autocompletes import AutocompleteModelView
@@ -1090,14 +1098,29 @@ class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
         return self.render_to_response(context)
 
 
-class ScenarioEvaluationProgressView(DetailView):
-    """
-    The page users land on if a scenario is being calculated. The progress of the evaluation is shown and upon
-    finishing the calculation, the user is redirected to the result page.
-    """
+class ScenarioEvaluationProgressView(RedirectView):
+    """The result page shows the progress, failure or results of a scenario."""
 
-    template_name = "evaluation_progress.html"
+    pattern_name = "scenario-result"
+
+
+@method_decorator(never_cache, name="dispatch")
+class ScenarioEvaluationStatusView(UserCreatedObjectDetailView):
+    """Whether a scenario is still evaluating, and the Celery state of each algorithm."""
+
     model = Scenario
+
+    def get(self, request, *args, **kwargs):
+        scenario = self.get_object()
+        tasks = RunningTask.objects.filter(scenario=scenario, algorithm__isnull=False)
+        return JsonResponse(
+            {
+                "running": scenario.status == ScenarioStatus.Status.RUNNING,
+                "tasks": {
+                    str(task.uuid): AsyncResult(str(task.uuid)).status for task in tasks
+                },
+            }
+        )
 
 
 class ScenarioResultDetailMapView(MapMixin, DetailView):

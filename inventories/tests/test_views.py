@@ -2273,6 +2273,68 @@ class ScenarioPresentationTestCase(TestCase):
     def detail(self):
         return self.client.get(reverse("scenario-detail", args=[self.scenario.pk]))
 
+    def evaluation_status(self, scenario=None):
+        scenario = scenario or self.scenario
+        return self.client.get(
+            reverse("scenario-evaluation-run-status", args=[scenario.pk])
+        )
+
+    @patch("inventories.views.AsyncResult")
+    def test_evaluation_status_reports_algorithm_tasks_to_anonymous_readers(
+        self, mock_async
+    ):
+        mock_async.return_value.status = "FAILURE"
+        mock_async.return_value.result = ValueError("invalid input")
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        task = RunningTask.objects.create(
+            scenario=self.scenario, algorithm=self.algorithm, uuid=uuid4()
+        )
+        RunningTask.objects.create(scenario=self.scenario, uuid=uuid4())
+
+        response = self.evaluation_status()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(), {"running": True, "tasks": {str(task.uuid): "FAILURE"}}
+        )
+        self.assertIn("no-cache", response.headers["Cache-Control"])
+
+    def test_evaluation_status_reports_when_the_scenario_has_stopped_running(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.evaluation_status()
+
+        self.assertEqual(response.json(), {"running": False, "tasks": {}})
+
+    def test_evaluation_status_of_private_scenario_is_hidden_from_others(self):
+        private = Scenario.objects.create(name="Private run", owner=self.owner)
+
+        response = self.evaluation_status(private)
+
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_progress_page_polls_the_scenario_evaluation_status(self):
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        response = self.result()
+
+        self.assertContains(
+            response,
+            f'data-status-url="'
+            f'{reverse("scenario-evaluation-run-status", args=[self.scenario.pk])}"',
+        )
+
+    def test_progress_url_opens_the_scenario_result_page(self):
+        response = self.client.get(
+            reverse("scenario-evaluation-progress", args=[self.scenario.pk])
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("scenario-result", args=[self.scenario.pk]),
+            fetch_redirect_response=False,
+        )
+
     def result(self):
         return self.client.get(reverse("scenario-result", args=[self.scenario.pk]))
 

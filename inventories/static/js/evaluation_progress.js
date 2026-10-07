@@ -1,8 +1,8 @@
 "use strict";
 
-// Polls the Celery state of every algorithm task of a running scenario
-// evaluation, shows it as a progress bar and reloads the page once all tasks
-// are finished, so the result (or failure) page replaces the progress page.
+// Polls the evaluation status of a running scenario, shows the Celery state of
+// each algorithm task as a progress bar and reloads the page once the scenario
+// has stopped running, so the result (or failure) page replaces it.
 
 const EVALUATION_TASK_STATES = {
     PENDING: { label: "Queued", tone: "secondary", finished: false },
@@ -33,6 +33,9 @@ function summarizeProgress(statuses, total) {
 }
 
 function progressMessage(progress) {
+    if (progress.complete) {
+        return "All inventories calculated. Saving the results…";
+    }
     return `${progress.finished} of ${progress.total} inventories calculated`;
 }
 
@@ -56,12 +59,6 @@ function initEvaluationProgress(root, {
     const count = root.querySelector("[data-progress-count]");
     const statuses = {};
 
-    if (rows.length === 0) {
-        // The tasks are not registered yet; look again shortly.
-        schedule(reload, 3000);
-        return Promise.resolve();
-    }
-
     function renderTask(row, status) {
         const state = describeTaskStatus(status);
         const badge = row.querySelector("[data-task-status]");
@@ -76,23 +73,28 @@ function initEvaluationProgress(root, {
     }
 
     async function poll() {
-        const pending = rows.filter(
-            (row) => !describeTaskStatus(statuses[row.dataset.taskId]).finished,
-        );
-        await Promise.all(pending.map(async (row) => {
-            const taskId = row.dataset.taskId;
-            const url = root.dataset.statusUrl.replace("__task__", encodeURIComponent(taskId));
-            try {
-                const result = await fetchJson(url);
-                statuses[taskId] = result.task_status;
-                renderTask(row, result.task_status);
-            } catch {
-                // A failed status request is retried on the next poll.
+        let result;
+        try {
+            result = await fetchJson(root.dataset.statusUrl);
+        } catch {
+            // A failed status request is retried on the next poll.
+        }
+        if (result && !result.running) {
+            // The result page now shows the results or the failure.
+            reload();
+            return;
+        }
+        for (const row of rows) {
+            const status = result && result.tasks[row.dataset.taskId];
+            if (status) {
+                statuses[row.dataset.taskId] = status;
+                renderTask(row, status);
             }
-        }));
-        const progress = summarizeProgress(statuses, rows.length);
-        renderProgress(progress);
-        schedule(progress.complete ? reload : poll, pollInterval);
+        }
+        if (rows.length) {
+            renderProgress(summarizeProgress(statuses, rows.length));
+        }
+        schedule(poll, pollInterval);
     }
 
     return poll();

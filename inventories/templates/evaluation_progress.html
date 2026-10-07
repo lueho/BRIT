@@ -17,7 +17,7 @@
       <section class="sdv2-section-panel sri-progress"
                aria-labelledby="sri-progress-title"
                data-evaluation-progress
-               data-status-url="{% url 'scenario-evaluation-status' task_id='__task__' %}">
+               data-status-url="{% url 'scenario-evaluation-run-status' object.pk %}">
         <h2 class="sdv2-section-title" id="sri-progress-title">
           <i class="fas fa-spinner fa-spin" aria-hidden="true"></i> We are evaluating this scenario now.
         </h2>
