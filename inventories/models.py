@@ -765,15 +765,39 @@ def block_running_scenario(sender, instance, **kwargs):
         scenario_status.save(update_fields=["status"])
 
 
+SCENARIO_EVALUATION_INPUT_FIELDS = ("region", "catchment")
+
+
+@receiver(pre_save, sender=Scenario)
+def detect_scenario_evaluation_input_change(
+    sender, instance, update_fields=None, **kwargs
+):
+    """Records whether a save changes a field that the evaluation depends on."""
+    if instance.pk is None:
+        return
+    names = SCENARIO_EVALUATION_INPUT_FIELDS
+    if update_fields is not None:
+        updated = set(update_fields)
+        names = [n for n in names if n in updated or f"{n}_id" in updated]
+    if not names:
+        instance._evaluation_inputs_changed = False
+        return
+    fields = [f"{name}_id" for name in names]
+    previous = Scenario.objects.filter(pk=instance.pk).values_list(*fields).first()
+    current = tuple(getattr(instance, field) for field in fields)
+    instance._evaluation_inputs_changed = previous != current
+
+
 @receiver(post_save, sender=Scenario)
 def manage_scenario_status(sender, instance, created, **kwargs):
     """
     Whenever a new Scenario instance is created, this creates a ScenarioStatus instance for it.
-    Whenever a Scenario instance has been edited, the status is changed to CHANGED.
+    Edits of the region or catchment invalidate the results and set the status to CHANGED.
+    Metadata edits such as name, description, showcase or publication status keep the results.
     """
     if created:
         ScenarioStatus.objects.create(scenario=instance)
-    else:
+    elif getattr(instance, "_evaluation_inputs_changed", True):
         instance.set_status(ScenarioStatus.Status.CHANGED)
 
 

@@ -81,6 +81,7 @@ class StreamingGeoJSONLoader {
             const cacheStatus = response.headers.get('X-Cache-Status') || 'UNKNOWN';
             const contentLength = parseInt(response.headers.get('Content-Length') || '0', 10);
             const dataVersion = response.headers.get('X-Data-Version') || null;
+            const cacheable = !/no-store/i.test(response.headers.get('Cache-Control') || '');
 
             console.log(`GeoJSON response: cache=${cacheStatus}, total=${totalCount}, contentLength=${contentLength}, version=${dataVersion}`);
 
@@ -88,12 +89,12 @@ class StreamingGeoJSONLoader {
             if (cacheStatus !== 'STREAM' || totalCount <= 100) {
                 const data = await response.json();
                 this.onProgress(totalCount, totalCount);
-                this.onComplete(data, dataVersion);
+                this.onComplete(data, dataVersion, cacheable);
                 return data;
             }
 
             // Streaming response - parse incrementally
-            return await this._parseStreamingResponse(response, totalCount, contentLength, dataVersion);
+            return await this._parseStreamingResponse(response, totalCount, contentLength, dataVersion, cacheable);
 
         } catch (error) {
             if (error.name === 'AbortError') {
@@ -105,7 +106,7 @@ class StreamingGeoJSONLoader {
         }
     }
 
-    async _parseStreamingResponse(response, totalCount, contentLength = 0, dataVersion = null) {
+    async _parseStreamingResponse(response, totalCount, contentLength = 0, dataVersion = null, cacheable = true) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
@@ -245,7 +246,7 @@ class StreamingGeoJSONLoader {
         };
 
         reportProgress(features.length);
-        this.onComplete(geojson, dataVersion);
+        this.onComplete(geojson, dataVersion, cacheable);
         return geojson;
     }
 }
@@ -433,16 +434,19 @@ async function fetchFeatureGeometriesWithProgress(params) {
                 incrementalFailed = true;
             }
         },
-        onComplete: async (geojson, version) => {
+        onComplete: async (geojson, version, cacheable = true) => {
             if (!isCurrent()) return;
             progressBar.hide();
 
-            // Cache the result with version for future validation
-            try {
-                await storeInIndexedDB(cacheKey, geojson, version);
-                await cleanupCache();
-            } catch (e) {
-                console.warn('Failed to cache GeoJSON:', e);
+            // Cache the result with version for future validation, unless the
+            // server marked it no-store (e.g. private data).
+            if (cacheable) {
+                try {
+                    await storeInIndexedDB(cacheKey, geojson, version);
+                    await cleanupCache();
+                } catch (e) {
+                    console.warn('Failed to cache GeoJSON:', e);
+                }
             }
             if (!isCurrent()) return;
 

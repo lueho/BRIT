@@ -55,17 +55,66 @@ class ScenarioTestCase(TestCase):
         scenario_status.failure_message = "calculation failed"
         scenario_status.save()
 
-    def test_scenario_edit_clears_failure_metadata(self):
+    def test_scenario_catchment_change_clears_failure_metadata(self):
         algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
         self.set_failed_status(algorithm)
 
-        self.scenario.name = "Updated Scenario"
+        self.scenario.catchment = Catchment.objects.create(
+            name="Other Catchment", region=self.scenario.region
+        )
         self.scenario.save()
 
         self.scenario.scenariostatus.refresh_from_db()
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
         self.assertIsNone(self.scenario.scenariostatus.failed_algorithm)
         self.assertEqual(self.scenario.scenariostatus.failure_message, "")
+
+    def test_scenario_region_change_marks_changed(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        self.scenario.region = Region.objects.create(name="Other Region")
+        self.scenario.save()
+
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+
+    def test_scenario_catchment_id_update_field_marks_changed(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        self.scenario.catchment_id = Catchment.objects.create(
+            name="Other Catchment", region=self.scenario.region
+        ).pk
+        self.scenario.save(update_fields=["catchment_id"])
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+
+    def test_unsaved_region_edit_outside_update_fields_keeps_finished_status(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        self.scenario.region = Region.objects.create(name="Unsaved Region")
+        self.scenario.save(update_fields=["catchment_id"])
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.FINISHED)
+
+    def test_scenario_metadata_edit_keeps_finished_status(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        self.scenario.name = "Renamed Scenario"
+        self.scenario.description = "New description"
+        self.scenario.save()
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.FINISHED)
+
+    def test_publishing_scenario_keeps_finished_status(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        self.scenario.publication_status = Scenario.STATUS_PUBLISHED
+        self.scenario.save(update_fields=["publication_status"])
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.FINISHED)
 
     def test_available_geodatasets_with_single_feedstock(self):
         feedstock = Material.objects.get(name="Feedstock 1")

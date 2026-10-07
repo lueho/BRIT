@@ -1334,6 +1334,17 @@ function resetFeatureStyles(featureGroup) {
     featureGroup.bringToBack();
 }
 
+// Leaflet guesses its default marker icon path from leaflet.css, which fails
+// for hashed static file names and yields page-relative marker-icon.png 404s.
+function configureDefaultIconPath() {
+    if (typeof L === 'undefined' || !L.Icon || !L.Icon.Default) return;
+    if (typeof L.Icon.Default.imagePath === 'string') return;
+    const script = document.querySelector('script[src*="/leaflet/leaflet."]');
+    if (!script || !script.src) return;
+    L.Icon.Default.imagePath = new URL('images/', script.src).href;
+}
+
 window.addEventListener("map:init", function (event) {
     map = event.detail.map;
+    configureDefaultIconPath();
 });

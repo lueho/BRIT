@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import re
@@ -5,7 +6,7 @@ import re
 from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Q
 from django.http import (
     Http404,
@@ -15,11 +16,12 @@ from django.http import (
     JsonResponse,
 )
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DetailView, TemplateView, View
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
 from django_tomselect.autocompletes import AutocompleteModelView
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -42,7 +44,7 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateView,
     get_tomselect_filter_value,
 )
-from utils.views import BreadcrumbContextMixin
+from utils.views import BreadcrumbContextMixin, build_breadcrumb_context
 
 from .evaluations import ScenarioResult
 from .exceptions import InvalidParameterValue
@@ -922,34 +924,74 @@ def download_scenario_summary(request, scenario_pk):
         return response
 
 
-class ResultMapAPI(APIView):
-    """REST API to get GeoJSON features from scenario result layers.
+def get_visible_result_layer(user, layer_name):
+    """Return the live result layer of a scenario the user may read, else 404."""
+    visible_scenarios = filter_queryset_for_user(Scenario.objects.all(), user)
+    return get_object_or_404(
+        Layer.objects.select_related("scenario"),
+        table_name=layer_name,
+        scenario__in=visible_scenarios,
+    )
 
-    Returns GeoJSON feature collection for Leaflet map rendering.
-    The layer_name parameter identifies the dynamically generated result table.
+
+def result_layer_version(layer):
+    """Fingerprint of the layer's feature rows and aggregates.
+
+    Recomputations replace the rows of the result table, so hashing their
+    content changes the token whenever any result value or geometry changes.
     """
+    table = connection.ops.quote_name(layer.get_feature_collection()._meta.db_table)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"SELECT md5(coalesce(string_agg(t::text, '|' ORDER BY t.id), '')) "  # noqa: S608
+            f"FROM {table} t"
+        )
+        features_digest = cursor.fetchone()[0]
+    aggregates = list(
+        layer.layeraggregatedvalue_set.order_by("pk").values_list(
+            "pk", "name", "value", "unit"
+        )
+    )
+    payload = json.dumps([layer.pk, features_digest, aggregates], default=str)
+    return hashlib.sha256(payload.encode()).hexdigest()[:32]
+
+
+def mark_private_result_uncacheable(response, layer):
+    """Keep layers of unpublished scenarios out of browser caches."""
+    if layer.scenario.publication_status != Scenario.STATUS_PUBLISHED:
+        response["Cache-Control"] = "private, no-store"
+    return response
+
+
+class ResultLayerGeoJSONAPI(APIView):
+    """GeoJSON feature collection of a scenario result layer for Leaflet maps."""
+
+    permission_classes = (AllowAny,)
 
     def get(self, request, layer_name):
-        try:
-            layer = Layer.objects.select_related("scenario").get(table_name=layer_name)
-        except Layer.DoesNotExist:
-            return Response({"error": "Layer not found"}, status=404)
-
+        layer = get_visible_result_layer(request.user, layer_name)
         feature_collection = layer.get_feature_collection()
-        features = feature_collection.objects.all()
+        meta = type(
+            "Meta", (BaseResultMapSerializer.Meta,), {"model": feature_collection}
+        )
+        serializer_class = type(
+            "ResultLayerSerializer", (BaseResultMapSerializer,), {"Meta": meta}
+        )
+        serializer = serializer_class(feature_collection.objects.all(), many=True)
+        response = Response(serializer.data)
+        response["X-Data-Version"] = result_layer_version(layer)
+        return mark_private_result_uncacheable(response, layer)
 
-        # Dynamically configure serializer for the result table model
-        serializer_class = BaseResultMapSerializer
-        serializer_class.Meta.model = feature_collection
 
-        serializer = serializer_class(features, many=True)
-        data = {
-            "catchment_id": layer.scenario.catchment_id,
-            "region_id": layer.scenario.region_id,
-            "geoJson": serializer.data,
-        }
+class ResultLayerVersionAPI(APIView):
+    """Version token used by maps.js to revalidate cached result geometries."""
 
-        return Response(data)
+    permission_classes = (AllowAny,)
+
+    def get(self, request, layer_name):
+        layer = get_visible_result_layer(request.user, layer_name)
+        response = Response({"version": result_layer_version(layer)})
+        return mark_private_result_uncacheable(response, layer)
 
 
 class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
@@ -1012,23 +1054,61 @@ class ScenarioResultDetailMapView(MapMixin, DetailView):
     template_name = "result_detail_map.html"
 
     def get_object(self, **kwargs):
-        scenario = get_object_or_404(Scenario, id=self.kwargs.get("pk"))
+        visible_scenarios = filter_queryset_for_user(
+            Scenario.objects.all(), self.request.user
+        )
+        scenario = get_object_or_404(visible_scenarios, id=self.kwargs.get("pk"))
         algorithm = get_object_or_404(
             InventoryAlgorithm, id=self.kwargs.get("algorithm_pk")
         )
         feedstock = get_object_or_404(Material, id=self.kwargs.get("feedstock_pk"))
         return get_object_or_404(
-            Layer, scenario=scenario, algorithm=algorithm, feedstock=feedstock
+            Layer.objects.select_related("scenario", "algorithm__geodataset"),
+            scenario=scenario,
+            algorithm=algorithm,
+            feedstock=feedstock,
         )
 
     def get_region_feature_id(self):
-        return self.object.algorithm.geodataset.region.id
+        return self.object.scenario.region_id
 
     def get_catchment_feature_id(self):
-        return self.object.scenario.catchment.id
+        return self.object.scenario.catchment_id
+
+    def get_features_feature_id(self):
+        return None
+
+    def get_features_geometries_url(self):
+        return reverse(
+            "data-result-layer", kwargs={"layer_name": self.object.table_name}
+        )
+
+    def get_override_params(self):
+        params = super().get_override_params()
+        params["load_features"] = True
+        params["features_layer_details_url_template"] = ""
+        params["features_layer_summary_url"] = ""
+        return params
 
     def get_map_title(self):
         return f"{self.object.scenario.name}: {self.object.algorithm.geodataset.name}"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        scenario = self.object.scenario
+        context.update(
+            build_breadcrumb_context(
+                module_label="Inventories",
+                module_url=reverse("inventories-explorer"),
+                section_label="Scenarios",
+                section_url=reverse("scenario-list"),
+                object_label=scenario.name,
+                object_url=reverse("scenario-result", kwargs={"pk": scenario.pk}),
+                action_label="Result map",
+                page_title=self.get_map_title(),
+            )
+        )
+        return context
 
 
 @login_required

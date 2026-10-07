@@ -7,7 +7,8 @@ from .views import (
     InventoryAlgorithmParametersAPIView,
     PrivateScenarioFilterView,
     PublishedScenarioFilterView,
-    ResultMapAPI,
+    ResultLayerGeoJSONAPI,
+    ResultLayerVersionAPI,
     ScenarioAddInventoryAlgorithmView,
     ScenarioAlgorithmConfigurationUpdateView,
     ScenarioAutocompleteView,
@@ -133,8 +134,13 @@ urlpatterns = [
         name="scenario-download-summary",
     ),
     path(
-        "ajax/result_layer/<layer_name>/",
-        ResultMapAPI.as_view(),
+        "ajax/result_layer/<layer_name>/geojson/",
+        ResultLayerGeoJSONAPI.as_view(),
         name="data-result-layer",
+    ),
+    path(
+        "ajax/result_layer/<layer_name>/version/",
+        ResultLayerVersionAPI.as_view(),
+        name="data-result-layer-version",
     ),
 ]
