@@ -570,3 +570,9 @@ test("refreshMap calls the layersLoaded hook after fitting the bounds", async ()
 
     assert.deepEqual(order, ["bounds", "loaded"]);
 });
+
+test("the minified build still calls the layersLoaded hook", () => {
+    const minified = readFileSync(new URL("./maps.min.js", import.meta.url), "utf8");
+    const calls = minified.replace(/function layersLoaded\(\)/g, "");
+    assert.match(calls, /layersLoaded\(\)/);
+});

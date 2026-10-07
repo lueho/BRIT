@@ -1074,6 +1074,8 @@ async function clickedFeature(event) {
 
 function layersLoaded() {
     // This is a hook for implementing behaviour once the map layers have loaded.
+    // It is not empty, because minification removes calls to empty functions.
+    return true;
 }
 
 // Query parameters that describe navigation or display state rather than a

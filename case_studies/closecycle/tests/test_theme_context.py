@@ -285,6 +285,7 @@ class ShowcaseThemeContextTest(TestCase):
         self.assertIn(f'data-showcase-id="{showcase.pk}"', listing)
         self.assertIn("Other", listing)
         self.assertNotIn("Sweden", listing)
+        self.assertContains(response, "2 showcases in 1 country")
 
     def test_country_filter_defaults_to_all_countries(self):
         choices = list(ShowcaseFilterSet().form.fields["country"].widget.choices)

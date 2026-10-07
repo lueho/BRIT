@@ -89,7 +89,7 @@ class StreamingGeoJSONLoader {
             if (cacheStatus !== 'STREAM' || totalCount <= 100) {
                 const data = await response.json();
                 this.onProgress(totalCount, totalCount);
-                this.onComplete(data, dataVersion, cacheable);
+                await this.onComplete(data, dataVersion, cacheable);
                 return data;
             }
 
@@ -246,7 +246,7 @@ class StreamingGeoJSONLoader {
         };
 
         reportProgress(features.length);
-        this.onComplete(geojson, dataVersion, cacheable);
+        await this.onComplete(geojson, dataVersion, cacheable);
         return geojson;
     }
 }

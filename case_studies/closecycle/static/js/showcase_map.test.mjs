@@ -1106,3 +1106,52 @@ test("the list marks only a single selected showcase as current", () => {
     });
     assert.equal(button.attributes["aria-current"], undefined);
 });
+
+function makeLabelledMarker({ id, code, lat = 58, lng = 13 }) {
+    const marker = makePointLayer({ id, name: code, lat, lng });
+    marker.feature.properties.code = code;
+    marker.tooltip = code;
+    marker.getTooltip = () => marker.tooltip;
+    marker.setTooltipContent = content => {
+        marker.tooltip = content;
+    };
+    marker.unbindTooltip = () => {
+        marker.tooltip = undefined;
+    };
+    return marker;
+}
+
+test("showcases at the same location share one label listing their codes", () => {
+    const { sandbox } = setupListSelection();
+    const sc15 = makeLabelledMarker({ id: 56, code: "SC15" });
+    const sc14 = makeLabelledMarker({ id: 12, code: "SC14" });
+    const sc16 = makeLabelledMarker({ id: 57, code: "SC16" });
+    const apart = makeLabelledMarker({ id: 3, code: "SC2", lat: 50, lng: 8 });
+    sandbox.featuresLayer = makeFeatureGroup([sc15, sc14, sc16, apart]);
+
+    sandbox.layersLoaded();
+    sandbox.layersLoaded();
+
+    const labels = [sc15, sc14, sc16].map(marker => marker.tooltip).filter(Boolean);
+    assert.deepEqual(labels, ["SC14 \u00b7 SC15 \u00b7 SC16"]);
+    assert.equal(apart.tooltip, "SC2");
+});
+
+test("pilot members whose region is hidden are not filed under the pilot's region", () => {
+    const { sandbox, calls, L } = setup();
+    const pilot = makePilotLayer({
+        L,
+        id: "pilot-catchment-9",
+        name: "Pilot Nine",
+        showcases: [
+            { id: 5, name: "Hidden anchor", region: null },
+            { id: 7, name: "Pilot member", region: "Pilot Nine" },
+        ],
+    });
+
+    sandbox.featureClickHandler({ latlng: { lng: 14, lat: 55 }, layer: pilot }, makeFeatureGroup([pilot]));
+
+    const headings = findAll(calls.openPopup[0].content, el => el.tagName === "STRONG")
+        .map(el => el.textContent);
+    assert.deepEqual(headings.sort(), ["No region", "Pilot Nine"]);
+});
