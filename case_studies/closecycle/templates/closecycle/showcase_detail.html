@@ -1,103 +1,299 @@
-{% extends "geo_detail_card.html" %}
+{% extends "base.html" %}
+{% load static %}
+{% load leaflet_tags %}
 {% load moderation_tags %}
 {% block title %}
   BRIT | CLOSECYCLE Showcase {{ object.name }}
 {% endblock title %}
-{% block detail_header %}
-  Showcase: {{ object.name }}
-{% endblock detail_header %}
-{% block detail_body %}
-  <p class="card-text">
-    <strong>Name:</strong>
-    <br>
-    {{ object.name }}
-  </p>
-  {% if object.country %}
-    <p class="card-text">
-      <strong>Country:</strong>
-      <br>
-      {{ object.country }}
-    </p>
-  {% endif %}
-  {% if object.theme_info %}
-    <section class="mb-3" aria-label="CLOSECYCLE theme">
-      <h5>Theme: <a href="{{ object.theme_info.url }}">{{ object.theme_info.label }}</a></h5>
-      <p>{{ object.theme_info.description }}</p>
-    </section>
-  {% endif %}
-  {% if visible_catchment %}
-    <section class="mb-3" aria-label="Pilot region and regional network">
-      <h5>Pilot region / Territorial Biorefinery Network (TBN)</h5>
-      <p><a href="{{ visible_catchment.get_absolute_url }}">{{ visible_catchment }}</a></p>
-      <p>{{ pilot_region_role }}</p>
-      {% if visible_catchment.description %}<p>{{ visible_catchment.description|linebreaksbr }}</p>{% endif %}
-      <p class="small text-muted">{{ pilot_boundary_note }}</p>
-      <a href="{% url 'Showcase' %}?pilot_region={{ visible_catchment.pk }}">Explore regional showcases</a>
-    </section>
-  {% endif %}
-  {% if object.description %}
-    <p class="card-text">
-      <strong>Description:</strong>
-      <br>
-      {{ object.description|markdown_to_html }}
-    </p>
-  {% endif %}
-  {% block additional_details %}
-    {% if process_chain %}
-      <hr>
-      <h5>Processing chain</h5>
-      <ol>
-        {% for proc in process_chain %}
-          <li>
-            <a href="{% url 'processes:processtype-detail' proc.id %}">{{ proc.name }}</a>
-          </li>
-        {% endfor %}
-      </ol>
-    {% endif %}
-    {% if material_links %}
-      <hr>
-      <h5>Materials</h5>
-      <ul>
-        {% for link in material_links %}
-          <li>
-            <a href="{% url 'material-detail' link.material_id %}">{{ link.material.name }}</a>
-            ({{ link.get_role_display }})
-          </li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-    {% if samples %}
-      <hr>
-      <h5>Samples</h5>
-      <ul>
-        {% for sample in samples %}
-          <li>
-            <a href="{% url 'sample-detail' sample.id %}">{{ sample.name }}</a>
-          </li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-    {% if sample_series %}
-      <hr>
-      <h5>Sample series</h5>
-      <ul>
-        {% for series in sample_series %}
-          <li>
-            <a href="{% url 'sampleseries-detail' series.id %}">{{ series.name }}</a>
-          </li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-    {% if scenarios %}
-      <hr>
-      <h5>Scenarios</h5>
-      <ul>
-        {% for scenario in scenarios %}
-          <li>
-            <a href="{% url 'scenario-detail' scenario.id %}">{{ scenario.name }}</a>
-          </li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-  {% endblock additional_details %}
-{% endblock detail_body %}
+{% block style_sheets %}
+  {{ block.super }}
+  {% leaflet_js %}
+  {% leaflet_css %}
+  <link href="{% static 'css/sample_detail_v2.min.css' %}" rel="stylesheet">
+  <link href="{% static 'css/showcase_detail.min.css' %}" rel="stylesheet">
+{% endblock style_sheets %}
+{% block content %}
+  {% object_policy object as policy %}
+  <div class="sdv2 csd">
+    <div class="sdv2-canvas sdv2-canvas-fluid">
+      {% if show_review_panel %}
+        <section class="sdv2-review-panel sdv2-section-panel"
+                 aria-label="Review workspace">
+          {% include "object_management/review_panel.html" with object=object %}
+        </section>
+      {% endif %}
+      <header class="sdv2-hero sdv2-surface sdv2-hero-no-media csd-hero">
+        <div class="sdv2-hero-identity">
+          <div class="sdv2-hero-kicker">
+            CLOSECYCLE showcase
+            {% if object.code %}<span class="csd-code">{{ object.code }}</span>{% endif %}
+          </div>
+          <h1 class="sdv2-hero-title">{{ object.title }}</h1>
+          <ul class="sdv2-hero-meta" aria-label="Showcase metadata">
+            {% if visible_region %}
+              {% if visible_region.country %}
+                <li>
+                  <span class="sdv2-meta-label">Country</span>
+                  {{ visible_region.country }}
+                </li>
+              {% endif %}
+              <li>
+                <span class="sdv2-meta-label">Region</span>
+                <a href="{% url 'region-detail' visible_region.pk %}">{{ visible_region.name }}</a>
+              </li>
+            {% endif %}
+            {% if object.theme_info %}
+              <li>
+                <span class="sdv2-meta-label">Theme</span>
+                <a href="{{ object.theme_info.url }}">{{ object.theme_info.label }}</a>
+              </li>
+            {% endif %}
+            {% if visible_catchment %}
+              <li>
+                <span class="sdv2-meta-label">Pilot region (TBN)</span>
+                <a href="{% url 'catchment-detail' visible_catchment.pk %}">{{ visible_catchment.name }}</a>
+              </li>
+            {% endif %}
+          </ul>
+        </div>
+        <div class="csd-hero-actions">
+          {% include "object_management/review_status_badge.html" with object=object %}
+          <a class="sdv2-btn" href="{{ object.public_map_url }}">
+            <i class="fas fa-map-location-dot" aria-hidden="true"></i> All showcases
+          </a>
+          {% if not review_mode %}
+            {% if policy.can_edit and object.update_url %}
+              <a class="sdv2-btn sdv2-btn-primary"
+                 href="{{ object.update_url }}?next={{ request|path_without_return_params|urlencode }}">
+                <i class="fas fa-pen-to-square" aria-hidden="true"></i> Edit
+              </a>
+            {% endif %}
+            {% if policy.can_view_review_feedback %}
+              <a class="sdv2-btn sdv2-btn-ghost"
+                 href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                <i class="fas fa-clipboard-check" aria-hidden="true"></i> {{ policy.review_feedback_label }}
+              </a>
+            {% elif policy.is_in_review %}
+              {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+                <a class="sdv2-btn sdv2-btn-ghost"
+                   href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                  <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
+                </a>
+              {% endif %}
+            {% endif %}
+            {% if policy.can_manage_editors or policy.can_delete or policy.can_submit_review and policy.is_private %}
+              <div class="dropdown">
+                <button class="sdv2-btn dropdown-toggle"
+                        type="button"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false">
+                  More actions
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  {% if policy.is_private and policy.can_submit_review %}
+                    <li>
+                      <form method="post"
+                            action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item">
+                          <i class="fas fa-fw fa-paper-plane me-2" aria-hidden="true"></i>Submit for review
+                        </button>
+                      </form>
+                    </li>
+                  {% endif %}
+                  {% if policy.can_manage_editors %}
+                    <li>
+                      <a class="dropdown-item modal-link"
+                         href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
+                        <i class="fas fa-fw fa-user-group me-2" aria-hidden="true"></i>Manage access
+                      </a>
+                    </li>
+                  {% endif %}
+                  {% if policy.can_delete and object.modal_delete_url %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                      <a class="dropdown-item text-danger modal-link"
+                         href="{{ object.modal_delete_url }}?next={{ request|path_without_return_params|urlencode }}">
+                        <i class="fas fa-fw fa-trash me-2" aria-hidden="true"></i>Delete showcase
+                      </a>
+                    </li>
+                  {% endif %}
+                </ul>
+              </div>
+            {% endif %}
+          {% endif %}
+        </div>
+      </header>
+      <div class="sdv2-layout sdv2-layout-full">
+        <main class="sdv2-main">
+          <div class="csd-overview">
+            <section class="sdv2-section-panel csd-map-panel" aria-label="Location">
+              <h2 class="sdv2-section-title">Location</h2>
+              <div class="csd-map">{% leaflet_map "main" %}</div>
+            </section>
+            {% if object.description %}
+              <section class="sdv2-section-panel sdv2-about" aria-label="About this showcase">
+                <h2 class="sdv2-section-title">About this showcase</h2>
+                <div class="sdv2-about-body">{{ object.description|markdown_to_html }}</div>
+              </section>
+            {% endif %}
+          </div>
+          {% if object.theme_info or visible_catchment %}
+            <section class="sdv2-section-panel" id="context" aria-label="Theme and pilot region">
+              <div class="csd-context">
+                {% if object.theme_info %}
+                  <div aria-label="CLOSECYCLE theme">
+                    <h2 class="sdv2-section-title">
+                      Theme: <a href="{{ object.theme_info.url }}">{{ object.theme_info.label }}</a>
+                    </h2>
+                    <p class="mb-0">{{ object.theme_info.description }}</p>
+                  </div>
+                {% endif %}
+                {% if visible_catchment %}
+                  <div aria-label="Pilot region and regional network">
+                    <h2 class="sdv2-section-title">Pilot region / Territorial Biorefinery Network (TBN)</h2>
+                    <p>
+                      <a href="{{ visible_catchment.get_absolute_url }}">{{ visible_catchment }}</a>
+                    </p>
+                    <p>{{ pilot_region_role }}</p>
+                    {% if visible_catchment.description %}<p>{{ visible_catchment.description|linebreaksbr }}</p>{% endif %}
+                    <p class="small text-muted">{{ pilot_boundary_note }}</p>
+                    <a class="sdv2-btn"
+                       href="{% url 'Showcase' %}?scope=published&amp;pilot_region={{ visible_catchment.pk }}">
+                      <i class="fas fa-layer-group" aria-hidden="true"></i> Explore regional showcases
+                    </a>
+                  </div>
+                {% endif %}
+              </div>
+            </section>
+          {% endif %}
+          {% if chain_stages %}
+            <section class="sdv2-section-panel" id="chain" aria-label="Processing chain">
+              <h2 class="sdv2-section-title">Processing chain</h2>
+              <ol class="csd-flow">
+                {% for stage in chain_stages %}
+                  <li class="csd-stage csd-stage-{{ stage.key }}">
+                    <div class="csd-stage-label">
+                      <i class="fas {{ stage.icon }}" aria-hidden="true"></i> {{ stage.label }}
+                    </div>
+                    <ul class="csd-stage-items">
+                      {% for item in stage.items %}
+                        <li>
+                          {% if stage.key == "process" %}
+                            <a class="csd-node"
+                               href="{% url 'processes:processtype-detail' item.id %}">
+                              {% if stage.items|length > 1 %}<span class="csd-step">{{ forloop.counter }}</span>{% endif %}
+                              {{ item.name }}
+                            </a>
+                          {% else %}
+                            <a class="csd-node" href="{% url 'material-detail' item.id %}">{{ item.name }}</a>
+                          {% endif %}
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </li>
+                {% endfor %}
+              </ol>
+            </section>
+          {% endif %}
+          {% if scenario_cards %}
+            <section class="sdv2-section-panel" id="scenarios" aria-label="Scenarios">
+              <h2 class="sdv2-section-title">Inventory scenarios</h2>
+              <div class="csd-scenarios">
+                {% for card in scenario_cards %}
+                  <article class="csd-scenario">
+                    <header class="csd-scenario-header">
+                      <h3 class="csd-scenario-title">
+                        <a href="{% url 'scenario-detail' card.scenario.pk %}">{{ card.scenario.name }}</a>
+                      </h3>
+                      {% if card.evaluated %}
+                        <span class="badge text-bg-success">Evaluated</span>
+                      {% elif card.status == 2 %}
+                        <span class="badge text-bg-info">
+                          <i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Evaluating…
+                        </span>
+                      {% elif card.status == 4 %}
+                        <span class="badge text-bg-danger">Evaluation failed</span>
+                      {% else %}
+                        <span class="badge text-bg-secondary">Not evaluated yet</span>
+                      {% endif %}
+                    </header>
+                    {% if card.results %}
+                      <dl class="csd-kpis">
+                        {% for value in card.results %}
+                          <div class="csd-kpi">
+                            <dt>
+                              {{ value.name }}
+                              {% if card.several_layers %}<span class="csd-kpi-feedstock">{{ value.layer.feedstock.name }}</span>{% endif %}
+                            </dt>
+                            <dd>
+                              <span class="csd-kpi-value">{{ value.value|floatformat:1 }}</span>
+                              {% if value.unit %}<span class="csd-kpi-unit">{{ value.unit }}</span>{% endif %}
+                            </dd>
+                          </div>
+                        {% endfor %}
+                      </dl>
+                      {% if card.more_results %}
+                        <p class="csd-more-results text-muted small mb-0">+{{ card.more_results }} more on the results page</p>
+                      {% endif %}
+                    {% endif %}
+                    <footer class="csd-scenario-footer">
+                      {% if card.evaluated %}
+                        <a class="sdv2-btn sdv2-btn-primary"
+                           href="{% url 'scenario-result' card.scenario.pk %}">
+                          <i class="fas fa-chart-column" aria-hidden="true"></i> Show results
+                        </a>
+                      {% endif %}
+                      <a class="sdv2-btn"
+                         href="{% url 'scenario-detail' card.scenario.pk %}">Scenario setup</a>
+                    </footer>
+                  </article>
+                {% endfor %}
+              </div>
+            </section>
+          {% endif %}
+          {% if samples or sample_series %}
+            <section class="sdv2-section-panel" id="samples" aria-label="Samples">
+              <h2 class="sdv2-section-title">Samples</h2>
+              <div class="csd-sample-lists">
+                {% if samples %}
+                  <div>
+                    <h3 class="csd-list-title">Samples</h3>
+                    <ul class="list-unstyled mb-0">
+                      {% for sample in samples %}
+                        <li class="mb-1">
+                          <a href="{% url 'sample-detail' sample.id %}">{{ sample.name }}</a>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                {% endif %}
+                {% if sample_series %}
+                  <div>
+                    <h3 class="csd-list-title">Sample series</h3>
+                    <ul class="list-unstyled mb-0">
+                      {% for series in sample_series %}
+                        <li class="mb-1">
+                          <a href="{% url 'sampleseries-detail' series.id %}">{{ series.name }}</a>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                {% endif %}
+              </div>
+            </section>
+          {% endif %}
+        </main>
+      </div>
+    </div>
+  </div>
+{% endblock content %}
+{% block javascript %}
+  {{ block.super }}
+  <script src="{% static 'js/maps.min.js' %}"></script>
+  {{ map_config|json_script:"mapConfig" }}
+  <script type="text/javascript" nonce="{{ csp_nonce }}">
+    const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
+    window.onload = () => loadMap(mapConfig);
+  </script>
+{% endblock javascript %}

@@ -517,3 +517,28 @@ test("map:init keeps an explicitly configured default icon path", () => {
 
     assert.equal(sandbox.L.Icon.Default.imagePath, "/custom/");
 });
+
+test("map refresh on a page without filter helpers logs no warnings", () => {
+    const { sandbox } = setup();
+    delete sandbox.lockFilter;
+    delete sandbox.unlockFilter;
+    delete sandbox.parseFilterParameters;
+    const warnings = [];
+    sandbox.console = { ...console, warn: (...args) => warnings.push(args) };
+
+    sandbox.prepareMapRefresh();
+    sandbox.cleanup();
+
+    assert.deepEqual(warnings, []);
+});
+
+test("map overlay toggles are silent on pages without an overlay", () => {
+    const { sandbox } = setup();
+    const warnings = [];
+    sandbox.console = { ...console, warn: (...args) => warnings.push(args) };
+
+    sandbox.showMapOverlay();
+    sandbox.hideMapOverlay();
+
+    assert.deepEqual(warnings, []);
+});

@@ -1,12 +1,16 @@
 from datetime import timedelta
 
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import MultiPolygon, Polygon
-from django.db import transaction
+from django.db import connection, transaction
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
-from maps.models import Catchment, GeoPolygon, Region
+from inventories.models import InventoryAlgorithm, Scenario, ScenarioStatus
+from layer_manager.models import Layer, LayerAggregatedValue
+from maps.models import Catchment, GeoDataset, GeoPolygon, Region
 from materials.models import Material
 from processes.models import Process
 from utils.tests.testcases import AbstractTestCases
@@ -176,6 +180,280 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         self.assertContains(response, "Private Detail Feedstock")
         self.assertContains(response, "Private Detail Step")
 
+    def test_detail_view_draws_processing_chain_by_stage(self):
+        showcase = self.published_object
+        for name, role in (
+            ("Chain Grass", "input"),
+            ("Chain Juice", "intermediate"),
+            ("Chain Protein", "product"),
+        ):
+            showcase.showcase_materials.create(
+                material=Material.objects.create(
+                    name=name, publication_status="published"
+                ),
+                role=role,
+            )
+        showcase.showcase_processes.create(
+            process=Process.objects.create(
+                name="Chain Pressing", publication_status="published"
+            ),
+            order=1,
+        )
+
+        response = self.client.get(self.get_detail_url(showcase.pk))
+
+        stages = [
+            (stage["key"], [item.name for item in stage["items"]])
+            for stage in response.context["chain_stages"]
+        ]
+        self.assertEqual(
+            [
+                ("input", ["Chain Grass"]),
+                ("process", ["Chain Pressing"]),
+                ("intermediate", ["Chain Juice"]),
+                ("product", ["Chain Protein"]),
+            ],
+            stages,
+        )
+        self.assertContains(response, 'class="csd-flow"')
+
+    def test_detail_view_omits_empty_chain_stages(self):
+        showcase = self.published_object
+        showcase.showcase_materials.create(
+            material=Material.objects.create(
+                name="Only Input", publication_status="published"
+            ),
+            role="input",
+        )
+
+        response = self.client.get(self.get_detail_url(showcase.pk))
+
+        self.assertEqual(
+            ["input"], [stage["key"] for stage in response.context["chain_stages"]]
+        )
+
+    def test_scenario_cards_show_headline_results_of_evaluated_scenarios(self):
+        showcase = self.published_object
+        feedstock = Material.objects.create(
+            name="Card Feedstock", publication_status="published"
+        )
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Card Algorithm",
+            geodataset=GeoDataset.objects.create(
+                name="Card Dataset",
+                region=showcase.region,
+                publication_status="published",
+            ),
+        )
+        evaluated = Scenario.objects.create(
+            name="Evaluated Card Scenario",
+            region=showcase.region,
+            showcase=showcase,
+            publication_status="published",
+        )
+        pending = Scenario.objects.create(
+            name="Pending Card Scenario",
+            region=showcase.region,
+            showcase=showcase,
+            publication_status="published",
+        )
+        for scenario in (evaluated, pending):
+            layer = Layer.objects.create(
+                name="Card layer",
+                geom_type="MultiPolygon",
+                table_name=f"result_card_{scenario.pk}",
+                scenario=scenario,
+                feedstock=feedstock,
+                algorithm=algorithm,
+            )
+            LayerAggregatedValue.objects.create(
+                layer=layer, name="Recovered protein", value=23.816, unit="Mg/a"
+            )
+        evaluated.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.client.get(self.get_detail_url(showcase.pk))
+
+        cards = {
+            card["scenario"].name: card for card in response.context["scenario_cards"]
+        }
+        self.assertTrue(cards["Evaluated Card Scenario"]["evaluated"])
+        self.assertEqual(
+            [("Recovered protein", 23.816, "Mg/a")],
+            [
+                (value.name, value.value, value.unit)
+                for value in cards["Evaluated Card Scenario"]["results"]
+            ],
+        )
+        self.assertFalse(cards["Pending Card Scenario"]["evaluated"])
+        self.assertEqual([], cards["Pending Card Scenario"]["results"])
+        self.assertContains(response, "23.8")
+        self.assertContains(
+            response, reverse("scenario-result", kwargs={"pk": evaluated.pk})
+        )
+
+    def test_scenario_cards_cap_headline_results(self):
+        showcase = self.published_object
+        feedstock = Material.objects.create(
+            name="Cap Feedstock", publication_status="published"
+        )
+        algorithm = InventoryAlgorithm.objects.create(
+            name="Cap Algorithm",
+            geodataset=GeoDataset.objects.create(
+                name="Cap Dataset",
+                region=showcase.region,
+                publication_status="published",
+            ),
+        )
+        scenario = Scenario.objects.create(
+            name="Many Results Scenario",
+            region=showcase.region,
+            showcase=showcase,
+            publication_status="published",
+        )
+        layer = Layer.objects.create(
+            name="Cap layer",
+            geom_type="MultiPolygon",
+            table_name=f"result_cap_{scenario.pk}",
+            scenario=scenario,
+            feedstock=feedstock,
+            algorithm=algorithm,
+        )
+        for i in range(6):
+            LayerAggregatedValue.objects.create(
+                layer=layer, name=f"Value {i}", value=i, unit="Mg/a"
+            )
+        scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.client.get(self.get_detail_url(showcase.pk))
+
+        (card,) = response.context["scenario_cards"]
+        self.assertEqual(
+            ["Value 0", "Value 1", "Value 2", "Value 3"],
+            [value.name for value in card["results"]],
+        )
+        self.assertEqual(2, card["more_results"])
+        self.assertContains(response, "+2 more")
+
+    def _card_layer(self, scenario, feedstock_name, prefix):
+        return Layer.objects.create(
+            name=f"{prefix} layer",
+            geom_type="MultiPolygon",
+            table_name=f"result_{prefix.lower()}_{scenario.pk}",
+            scenario=scenario,
+            feedstock=Material.objects.create(
+                name=feedstock_name, publication_status="published"
+            ),
+            algorithm=InventoryAlgorithm.objects.create(
+                name=f"{prefix} Algorithm",
+                geodataset=GeoDataset.objects.create(
+                    name=f"{prefix} Dataset",
+                    region=scenario.region,
+                    publication_status="published",
+                ),
+            ),
+        )
+
+    def test_scenario_cards_label_running_and_failed_scenarios(self):
+        showcase = self.published_object
+        expected = {
+            "Changed Scenario": (ScenarioStatus.Status.CHANGED, "Not evaluated yet"),
+            "Running Scenario": (ScenarioStatus.Status.RUNNING, "Evaluating"),
+            "Failed Scenario": (ScenarioStatus.Status.FAILED, "Evaluation failed"),
+        }
+        for name, (status, _label) in expected.items():
+            scenario = Scenario.objects.create(
+                name=name,
+                region=showcase.region,
+                showcase=showcase,
+                publication_status="published",
+            )
+            scenario.set_status(status)
+
+        response = self.client.get(self.get_detail_url(showcase.pk))
+
+        cards = {
+            card["scenario"].name: card for card in response.context["scenario_cards"]
+        }
+        for name, (status, label) in expected.items():
+            with self.subTest(name=name):
+                self.assertEqual(status, cards[name]["status"])
+                self.assertFalse(cards[name]["evaluated"])
+                self.assertContains(response, label)
+        self.assertNotContains(response, "Show results")
+
+    def test_scenario_cards_name_feedstock_when_scenario_has_several_layers(self):
+        showcase = self.published_object
+        scenario = Scenario.objects.create(
+            name="Two Feedstock Scenario",
+            region=showcase.region,
+            showcase=showcase,
+            publication_status="published",
+        )
+        for feedstock_name, prefix, value in (
+            ("Clover grass", "Grass", 20),
+            ("Wheat straw", "Straw", 35),
+        ):
+            LayerAggregatedValue.objects.create(
+                layer=self._card_layer(scenario, feedstock_name, prefix),
+                name="Total production",
+                value=value,
+                unit="Mg/a",
+            )
+        scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.client.get(self.get_detail_url(showcase.pk))
+
+        (card,) = response.context["scenario_cards"]
+        self.assertTrue(card["several_layers"])
+        self.assertContains(response, "Clover grass")
+        self.assertContains(response, "Wheat straw")
+
+    def test_scenario_cards_omit_feedstock_for_a_single_layer(self):
+        showcase = self.published_object
+        scenario = Scenario.objects.create(
+            name="Single Feedstock Scenario",
+            region=showcase.region,
+            showcase=showcase,
+            publication_status="published",
+        )
+        LayerAggregatedValue.objects.create(
+            layer=self._card_layer(scenario, "Lonely feedstock", "Single"),
+            name="Total production",
+            value=5,
+            unit="Mg/a",
+        )
+        scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.client.get(self.get_detail_url(showcase.pk))
+
+        (card,) = response.context["scenario_cards"]
+        self.assertFalse(card["several_layers"])
+        self.assertNotContains(response, 'class="csd-kpi-feedstock"')
+
+    def test_detail_view_does_not_query_per_scenario(self):
+        showcase = self.published_object
+        for i in range(3):
+            Scenario.objects.create(
+                name=f"Query Scenario {i}",
+                region=showcase.region,
+                showcase=showcase,
+                publication_status="published",
+            )
+        url = self.get_detail_url(showcase.pk)
+        self.client.get(url)
+        with CaptureQueriesContext(connection) as three:
+            self.client.get(url)
+        Scenario.objects.create(
+            name="Query Scenario 3",
+            region=showcase.region,
+            showcase=showcase,
+            publication_status="published",
+        )
+        with CaptureQueriesContext(connection) as four:
+            self.client.get(url)
+
+        self.assertEqual(len(three), len(four))
+
     def test_detail_map_omits_private_catchment_for_anonymous_users(self):
         owner = self.owner_user
         showcase = self.published_object
@@ -192,6 +470,78 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         self.assertEqual(
             showcase.catchment.pk, response.context["view"].get_catchment_feature_id()
         )
+
+    def test_detail_view_hides_private_region_from_anonymous_users(self):
+        owner = self.owner_user
+        showcase = self.published_object
+        original_region = showcase.region
+        showcase.region = Region.objects.create(
+            name="Secret Pilot Region", country="SE", owner=owner
+        )
+        showcase.save()
+        try:
+            response = self.client.get(self.get_detail_url(showcase.pk))
+            self.assertNotContains(response, "Secret Pilot Region")
+            self.assertIsNone(response.context["view"].get_region_feature_id())
+
+            self.client.force_login(owner)
+            response = self.client.get(self.get_detail_url(showcase.pk))
+            self.assertContains(response, "Secret Pilot Region")
+            self.assertEqual(
+                showcase.region_id, response.context["view"].get_region_feature_id()
+            )
+        finally:
+            showcase.region = original_region
+            showcase.save()
+
+    def test_in_review_showcase_links_owner_to_review_view(self):
+        showcase = Showcase.objects.create(
+            name="SC99 - Pending showcase",
+            owner=self.owner_user,
+            region=self.published_object.region,
+            publication_status="review",
+        )
+        review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(Showcase).pk,
+                "object_id": showcase.pk,
+            },
+        )
+
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(showcase.pk))
+
+        self.assertContains(response, review_url)
+        self.assertContains(response, "Review view")
+
+    def test_review_page_renders_showcase_detail_context(self):
+        showcase = self.published_object
+        showcase.showcase_materials.create(
+            material=Material.objects.create(
+                name="Review Input", publication_status="published"
+            ),
+            role="input",
+        )
+        review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(Showcase).pk,
+                "object_id": showcase.pk,
+            },
+        )
+
+        self.client.force_login(self.owner_user)
+        response = self.client.get(review_url)
+
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.context["review_mode"])
+        self.assertIn("map_config", response.context)
+        self.assertIn("scenario_cards", response.context)
+        self.assertEqual(
+            ["input"], [stage["key"] for stage in response.context["chain_stages"]]
+        )
+        self.assertContains(response, "Review Input")
 
 
 class ShowcaseGeoJSONVersionTestCase(TestCase):
