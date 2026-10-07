@@ -218,7 +218,26 @@ def inventories_for_template(config):
     ]
 
 
-class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
+class ScenarioMapMixin(MapMixin):
+    """Draws only the scenario's region and catchment that the user may read."""
+
+    def _visible_feature_id(self, model, pk):
+        if pk is None:
+            return None
+        return (
+            filter_queryset_for_user(model.objects.filter(pk=pk), self.request.user)
+            .values_list("pk", flat=True)
+            .first()
+        )
+
+    def get_region_feature_id(self):
+        return self._visible_feature_id(Region, self.object.region_id)
+
+    def get_catchment_feature_id(self):
+        return self._visible_feature_id(Catchment, self.object.catchment_id)
+
+
+class ScenarioDetailView(ScenarioMapMixin, UserCreatedObjectDetailView):
     """Summary of the Scenario with complete configuration. Page for final review, which also contains the
     'run' button."""
 
@@ -1037,7 +1056,7 @@ class ResultLayerVersionAPI(APIView):
         return mark_private_result_uncacheable(response, layer)
 
 
-class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
+class ScenarioResultView(ScenarioMapMixin, UserCreatedObjectDetailView):
     """
     View with summaries of the results of each algorithm and a total summary.
     """

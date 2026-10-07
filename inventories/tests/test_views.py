@@ -2273,6 +2273,31 @@ class ScenarioPresentationTestCase(TestCase):
     def detail(self):
         return self.client.get(reverse("scenario-detail", args=[self.scenario.pk]))
 
+    def test_detail_map_draws_the_published_region_and_catchment(self):
+        response = self.detail()
+
+        view = response.context["view"]
+        self.assertEqual(view.get_region_feature_id(), self.scenario.region_id)
+        self.assertEqual(view.get_catchment_feature_id(), self.scenario.catchment_id)
+
+    def test_detail_map_skips_private_region_and_catchment_of_others(self):
+        region = Region.objects.create(name="Private region", owner=self.owner)
+        catchment = Catchment.objects.create(
+            name="Private catchment",
+            region=region,
+            parent_region=region,
+            owner=self.owner,
+        )
+        Scenario.objects.filter(pk=self.scenario.pk).update(
+            region=region, catchment=catchment
+        )
+
+        response = self.detail()
+
+        view = response.context["view"]
+        self.assertIsNone(view.get_region_feature_id())
+        self.assertIsNone(view.get_catchment_feature_id())
+
     def evaluation_status(self, scenario=None):
         scenario = scenario or self.scenario
         return self.client.get(
