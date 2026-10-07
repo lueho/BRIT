@@ -7,8 +7,9 @@ build:
 release:
   image: web
   command:
-    - python manage.py migrate --noinput
-    - python manage.py collectstatic --noinput
+    # Heroku runs only the first entry of this list, so all release steps
+    # must stay in one shell command.
+    - python manage.py migrate --noinput && python manage.py collectstatic --noinput
 run:
   # Container deploys don't get WEB_CONCURRENCY, so gunicorn defaulted to a
   # single sync worker: one slow request queued everything behind it until

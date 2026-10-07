@@ -76,6 +76,31 @@ class ProductionWebMemoryTests(SimpleTestCase):
         self.assertEqual(self.arguments.max_requests_jitter, 100)
 
 
+class ProductionReleasePhaseTests(SimpleTestCase):
+    def release_commands(self):
+        deployment = (Path(settings.BASE_DIR) / "heroku.yml").read_text()
+        release = deployment.split("\nrelease:\n", 1)[1].split("\nrun:\n", 1)[0]
+        return [
+            line.strip()[2:]
+            for line in release.splitlines()
+            if line.strip().startswith("- ")
+        ]
+
+    def test_release_runs_migrations_and_collectstatic_in_one_command(self):
+        # Heroku runs only the first entry of a release command list, so a
+        # second entry such as collectstatic would silently never run.
+        commands = self.release_commands()
+        self.assertEqual(len(commands), 1, commands)
+        steps = [shlex.split(step) for step in commands[0].split("&&")]
+        self.assertEqual(
+            steps,
+            [
+                ["python", "manage.py", "migrate", "--noinput"],
+                ["python", "manage.py", "collectstatic", "--noinput"],
+            ],
+        )
+
+
 class ProductionStoragesTests(SimpleTestCase):
     def test_staticfiles_overrides_base_storages_without_mutating(self):
         environment = os.environ.copy()
