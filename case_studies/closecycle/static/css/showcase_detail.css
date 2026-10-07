@@ -235,6 +235,17 @@
   color: var(--sdv2-text-muted);
 }
 
+.csd-list-subtitle {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--sdv2-text-muted);
+}
+
+.csd-sample-note {
+  margin: 1rem 0 0;
+}
+
 @media (max-width: 991.98px) {
   .csd-overview {
     grid-template-columns: minmax(0, 1fr);

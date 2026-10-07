@@ -252,9 +252,10 @@
               </div>
             </section>
           {% endif %}
-          {% if samples or sample_series %}
+          {% if samples or sample_series or material_sample_groups %}
             <section class="sdv2-section-panel" id="samples" aria-label="Samples">
               <h2 class="sdv2-section-title">Samples</h2>
+              {% if samples or sample_series %}
               <div class="csd-sample-lists">
                 {% if samples %}
                   <div>
@@ -281,6 +282,41 @@
                   </div>
                 {% endif %}
               </div>
+              {% endif %}
+              {% if material_sample_groups %}
+                <p class="csd-sample-note text-muted small">Samples and sample series of the materials in this processing chain.</p>
+                <div class="csd-sample-lists">
+                  {% for group in material_sample_groups %}
+                    <div>
+                      <h3 class="csd-list-title">
+                        <a href="{% url 'material-detail' group.material.id %}">{{ group.material.name }}</a>
+                      </h3>
+                      {% if group.samples %}
+                        <ul class="list-unstyled mb-0">
+                          {% for sample in group.samples %}
+                            <li class="mb-1">
+                              <a href="{% url 'sample-detail' sample.id %}">{{ sample.name }}</a>
+                            </li>
+                          {% endfor %}
+                        </ul>
+                        {% if group.more_samples %}
+                          <a class="small" href="{{ group.samples_list_url }}">+{{ group.more_samples }} more ({{ group.samples_total }} samples)</a>
+                        {% endif %}
+                      {% endif %}
+                      {% if group.sample_series %}
+                        <h4 class="csd-list-subtitle">Sample series</h4>
+                        <ul class="list-unstyled mb-0">
+                          {% for series in group.sample_series %}
+                            <li class="mb-1">
+                              <a href="{% url 'sampleseries-detail' series.id %}">{{ series.name }}</a>
+                            </li>
+                          {% endfor %}
+                        </ul>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                </div>
+              {% endif %}
             </section>
           {% endif %}
         </main>
