@@ -68,6 +68,21 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
                     )
             self.assertContains(response, f'data-formset-id="{prefix}"', count=1)
 
+    def test_create_and_update_forms_load_leaflet_for_the_location_widget(self):
+        """The geometry widget needs Leaflet and leaflet-draw on the page."""
+        pages = (
+            (self.user_with_add_perm, self.get_create_url()),
+            (self.owner_user, self.get_update_url(self.unpublished_object.pk)),
+        )
+        for user, url in pages:
+            with self.subTest(url=url):
+                self.client.force_login(user)
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "leaflet/leaflet.js")
+                self.assertContains(response, "leaflet-draw/leaflet.draw.min.js")
+                self.assertContains(response, "leaflet/leaflet.forms.js")
+
     def test_create_view_post_with_inline_materials_and_processes(self):
         """Creating a showcase can attach material and process links inline."""
         self.client.force_login(self.user_with_add_perm)

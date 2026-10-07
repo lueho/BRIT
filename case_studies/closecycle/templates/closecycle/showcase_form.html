@@ -1,0 +1,7 @@
+{% extends "formsets_card.html" %}
+{% load leaflet_tags %}
+{% block style_sheets %}
+  {{ block.super }}
+  {% leaflet_js plugins="ALL" %}
+  {% leaflet_css plugins="ALL" %}
+{% endblock style_sheets %}
