@@ -13,7 +13,9 @@ from inventories.models import (
     InventoryAlgorithmParameterValue,
     Scenario,
     ScenarioInventoryConfiguration,
+    ScenarioStatus,
 )
+from layer_manager.models import Layer
 from maps.models import (
     Catchment,
     GeoDataset,
@@ -171,6 +173,115 @@ class SetupSotasenDemoInventoryTestCase(TestCase):
                 parameter=parameters["crude_protein_fraction"]
             ).value,
             0.20,
+        )
+
+    def test_value_names_do_not_embed_the_citation(self):
+        """The UI appends ` (source)` to option labels, so names must not
+        repeat the citation. Only study-reported values cite Thomas 2025;
+        demo assumptions are marked as such."""
+        self.run_command()
+
+        values = InventoryAlgorithmParameterValue.objects.filter(
+            parameter__inventory_algorithm__function_name="sotasen_grass_to_protein"
+        )
+        for value in values:
+            self.assertNotIn("Thomas 2025", value.name)
+        self.assertEqual(
+            {
+                v.value: v.source
+                for v in values.filter(
+                    parameter__short_name="protein_recovery_fraction"
+                )
+            },
+            {
+                0.04: "Thomas 2025",
+                0.12: "Demo assumption",
+                0.20: "Thomas 2025",
+                0.42: "Thomas 2025",
+            },
+        )
+
+    def test_rerun_does_not_demote_published_scenario(self):
+        self.run_command()
+        scenario = Scenario.objects.get(
+            name="Sötåsen grass-to-protein demo (Thomas 2025)"
+        )
+        scenario.publication_status = "published"
+        scenario.save()
+
+        self.run_command()
+
+        scenario.refresh_from_db()
+        self.assertEqual(scenario.publication_status, "published")
+
+    def _create_result_layer(self, scenario):
+        return Layer.objects.create(
+            name="Sötåsen result",
+            geom_type="MultiPolygon",
+            table_name=f"result_of_scenario_{scenario.pk}_sotasen_test",
+            scenario=scenario,
+            feedstock=self.material,
+            algorithm=InventoryAlgorithm.objects.get(
+                function_name="sotasen_grass_to_protein"
+            ),
+        )
+
+    def test_rerun_resetting_custom_configuration_removes_stale_results(self):
+        self.run_command()
+        scenario = Scenario.objects.get(
+            name="Sötåsen grass-to-protein demo (Thomas 2025)"
+        )
+        benchmark = InventoryAlgorithmParameterValue.objects.get(
+            parameter__short_name="protein_recovery_fraction", value=0.42
+        )
+        ScenarioInventoryConfiguration.objects.filter(
+            scenario=scenario,
+            inventory_parameter__short_name="protein_recovery_fraction",
+        ).update(inventory_value=benchmark)
+        self._create_result_layer(scenario)
+        scenario.publication_status = "published"
+        scenario.save()
+        scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        out = self.run_command()
+
+        self.assertFalse(Layer.objects.filter(scenario=scenario).exists())
+        self.assertIn("Removed: stale result layers", out)
+        scenario.refresh_from_db()
+        scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(scenario.publication_status, "published")
+        self.assertEqual(scenario.scenariostatus.status, ScenarioStatus.Status.CHANGED)
+        self.assertEqual(
+            ScenarioInventoryConfiguration.objects.get(
+                scenario=scenario,
+                inventory_parameter__short_name="protein_recovery_fraction",
+            ).inventory_value.value,
+            0.12,
+        )
+
+    def test_rerun_with_default_configuration_keeps_results(self):
+        self.run_command()
+        scenario = Scenario.objects.get(
+            name="Sötåsen grass-to-protein demo (Thomas 2025)"
+        )
+        config_ids = set(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=scenario
+            ).values_list("id", flat=True)
+        )
+        layer = self._create_result_layer(scenario)
+
+        out = self.run_command()
+
+        self.assertTrue(Layer.objects.filter(pk=layer.pk).exists())
+        self.assertNotIn("stale result layers", out)
+        self.assertEqual(
+            set(
+                ScenarioInventoryConfiguration.objects.filter(
+                    scenario=scenario
+                ).values_list("id", flat=True)
+            ),
+            config_ids,
         )
 
     def test_scenario_configuration_uses_defaults(self):

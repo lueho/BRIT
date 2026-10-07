@@ -1,6 +1,6 @@
 """Set up the Sötåsen grass-to-protein demo inventory.
 
-Creates (or updates) the private objects needed to evaluate the Sötåsen
+Creates (or updates) the objects needed to evaluate the Sötåsen
 grass-to-protein demo scenario against production reference objects:
 
 - an InventoryAlgorithm linked to GeoDataset 49 ("Sötåsen Agricultural Land
@@ -9,12 +9,15 @@ grass-to-protein demo scenario against production reference objects:
 - the three required algorithm parameters (dry matter yield, crude protein
   fraction, protein recovery fraction) with their selectable values and
   defaults;
-- a private Scenario "Sötåsen grass-to-protein demo (Thomas 2025)" for region
+- a Scenario "Sötåsen grass-to-protein demo (Thomas 2025)" for region
   30994 (Töreboda) and catchment 31106 (Töreboda (1473)), configured with the
   material as feedstock and the default parameter values.
 
-The command is atomic and idempotent. It never publishes objects or submits
-them for review. It fails before writing anything if a referenced production
+New objects are created private. On re-runs, the scenario keeps its current
+publication status; if its region, catchment or configuration had drifted from
+the defaults, its result layers are deleted so a published scenario never shows
+results that no longer match its configuration. The command is atomic and
+idempotent. It never publishes objects or submits them for review. It fails before writing anything if a referenced production
 object is missing or does not match the expected name/type.
 
 Usage::
@@ -22,6 +25,8 @@ Usage::
     python manage.py setup_sotasen_demo_inventory --owner <username>
     python manage.py setup_sotasen_demo_inventory --owner <username> --dry-run
 """
+
+from collections import Counter
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
@@ -56,6 +61,7 @@ ALGORITHM_NAME = "Sötåsen grass-to-protein"
 ALGORITHM_MODULE = "sources.sotasen.inventory.algorithms"
 ALGORITHM_FUNCTION = "sotasen_grass_to_protein"
 SCENARIO_NAME = "Sötåsen grass-to-protein demo (Thomas 2025)"
+DEMO_ASSUMPTION_SOURCE = "Demo assumption"
 
 ALGORITHM_DESCRIPTION = (
     "Estimates annual grassland biomass and recovered protein production for "
@@ -94,11 +100,11 @@ PARAMETERS = (
         ),
         "values": [
             {
-                "name": "9.0 t DM/ha/a (demo assumption)",
+                "name": "9.0 t DM/ha/a",
                 "type": NUMERIC,
                 "value": 9.0,
                 "default": True,
-                "source": SOURCE_CITATION_KEY,
+                "source": DEMO_ASSUMPTION_SOURCE,
                 "description": "Demo assumption for the Sötåsen showcase.",
             },
         ],
@@ -114,11 +120,11 @@ PARAMETERS = (
         ),
         "values": [
             {
-                "name": "0.20 (20% CP, demo assumption)",
+                "name": "0.20 (20% CP)",
                 "type": NUMERIC,
                 "value": 0.20,
                 "default": True,
-                "source": SOURCE_CITATION_KEY,
+                "source": DEMO_ASSUMPTION_SOURCE,
                 "description": "Demo assumption for the Sötåsen showcase.",
             },
         ],
@@ -143,11 +149,11 @@ PARAMETERS = (
                 "description": "Lower endpoint of the recovery range observed in the project.",
             },
             {
-                "name": "12% (midpoint demo assumption)",
+                "name": "12% (midpoint)",
                 "type": SELECTION,
                 "value": 0.12,
                 "default": True,
-                "source": SOURCE_CITATION_KEY,
+                "source": DEMO_ASSUMPTION_SOURCE,
                 "description": (
                     "Midpoint demo assumption; not a measured mean of the "
                     "observed 4-20% recovery range."
@@ -162,7 +168,7 @@ PARAMETERS = (
                 "description": "Upper endpoint of the recovery range observed in the project.",
             },
             {
-                "name": "42% (literature benchmark, Thomas 2025)",
+                "name": "42% (literature benchmark)",
                 "type": SELECTION,
                 "value": 0.42,
                 "default": False,
@@ -175,7 +181,10 @@ PARAMETERS = (
 
 
 class Command(BaseCommand):
-    help = "Create/update the private Sötåsen grass-to-protein demo inventory objects."
+    help = (
+        "Create/update the Sötåsen grass-to-protein demo inventory objects "
+        "(created private; re-runs keep the scenario's publication status)."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -286,10 +295,18 @@ class Command(BaseCommand):
             references["geodataset"], references["material"], references["source"]
         )
         parameters = self._ensure_parameters(algorithm)
-        scenario = self._ensure_scenario(
+        scenario, inputs_changed = self._ensure_scenario(
             owner, references["region"], references["catchment"]
         )
-        self._ensure_scenario_configuration(scenario, references["material"], algorithm)
+        configuration_changed = self._ensure_scenario_configuration(
+            scenario, references["material"], algorithm
+        )
+        if (inputs_changed or configuration_changed) and scenario.layer_set(
+            manager="all_objects"
+        ).exists():
+            scenario.delete_result_layers()
+            scenario.set_status(ScenarioStatus.Status.CHANGED)
+            self._log("Removed", f"stale result layers of Scenario '{scenario}'")
         self._validate_configuration(scenario, parameters)
 
     def _ensure_algorithm(self, geodataset, material, source):
@@ -406,17 +423,20 @@ class Command(BaseCommand):
                 "publication_status": Scenario.STATUS_PRIVATE,
             },
         )
+        inputs_changed = False
         if not created:
             # The related status row must exist before save() triggers the
             # post_save signal that flips the scenario status to CHANGED.
             ScenarioStatus.objects.get_or_create(scenario=scenario)
+            inputs_changed = (
+                scenario.region_id != region.id or scenario.catchment_id != catchment.id
+            )
             scenario.region = region
             scenario.catchment = catchment
             scenario.description = SCENARIO_DESCRIPTION
-            scenario.publication_status = Scenario.STATUS_PRIVATE
             scenario.save()
         self._log("Created" if created else "Updated", f"Scenario '{scenario}'")
-        return scenario
+        return scenario, inputs_changed
 
     def _ensure_scenario_configuration(self, scenario, material, algorithm):
         existing = ScenarioInventoryConfiguration.objects.filter(
@@ -424,14 +444,34 @@ class Command(BaseCommand):
             feedstock=material,
             inventory_algorithm=algorithm,
         )
-        if existing.exists():
-            existing.delete()
+        current = Counter(
+            existing.values_list(
+                "geodataset_id",
+                "sample_series_id",
+                "inventory_parameter_id",
+                "inventory_value_id",
+            )
+        )
+        desired = Counter(
+            (algorithm.geodataset_id, None, parameter.id, value.id)
+            for parameter, values in algorithm.default_values().items()
+            for value in values
+        )
+        if current == desired:
+            self._log(
+                "Unchanged",
+                f"Scenario '{scenario}' configuration for feedstock "
+                f"'{material}' and algorithm '{algorithm}'",
+            )
+            return False
+        existing.delete()
         scenario.add_inventory_algorithm(feedstock=material, algorithm=algorithm)
         self._log(
             "Configured",
             f"Scenario '{scenario}' with feedstock '{material}' "
             f"and algorithm '{algorithm}'",
         )
+        return True
 
     @staticmethod
     def _validate_configuration(scenario, parameters):
