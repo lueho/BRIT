@@ -397,6 +397,24 @@ class InventoryRunSerializationTests(TestCase):
         self.assertTrue(started)
         run_inventory_task.delay.assert_called_once_with(self.scenario.pk)
 
+    @patch("inventories.tasks.AsyncResult")
+    @patch("inventories.tasks.run_inventory")
+    def test_start_inventory_run_forgets_finished_tasks_of_the_earlier_run(
+        self, run_inventory_task, async_result
+    ):
+        async_result.return_value.state = "FAILURE"
+        mark_inventory_failed.run(self.scenario.pk, self.algorithm.pk, "failed")
+        self.create_running_task()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            started = start_inventory_run(self.scenario.pk)
+
+        self.assertTrue(started)
+        self.assertFalse(RunningTask.objects.filter(scenario=self.scenario).exists())
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertFalse(start_inventory_run(self.scenario.pk))
+        run_inventory_task.delay.assert_called_once_with(self.scenario.pk)
+
     @patch("inventories.tasks.Layer.delete", autospec=True)
     def test_finalize_inventory_prunes_only_layers_outside_the_run(self, delete_layer):
         kept_layer = self.create_layer(self.algorithm)
