@@ -1,4 +1,5 @@
 import re
+from collections import defaultdict
 
 from django.db.models import F
 from django.http import HttpResponseRedirect
@@ -6,6 +7,8 @@ from django.http import HttpResponseRedirect
 from inventories.models import ScenarioStatus
 from layer_manager.models import LayerAggregatedValue
 from maps.views import GeoDataSetPublishedFilteredMapView, MapMixin
+from materials.models import Sample, SampleSeries
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -34,6 +37,7 @@ CHAIN_STAGES = (
     ("product", "Products", "fa-box-open"),
 )
 HEADLINE_RESULT_LIMIT = 4
+MATERIAL_SAMPLE_LIMIT = 5
 
 # ----------- Showcase CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -151,6 +155,7 @@ class ShowcaseDetailView(MapMixin, UserCreatedObjectDetailView):
                 "chain_stages": chain_stages(material_links, process_chain),
                 "samples": self.object.visible_samples(user),
                 "sample_series": self.object.visible_sample_series(user),
+                "material_sample_groups": material_sample_groups(material_links, user),
                 "scenarios": scenarios,
                 "scenario_cards": scenario_cards(scenarios),
             }
@@ -166,6 +171,41 @@ class ShowcaseReviewItemDetailView(ReviewItemDetailView):
 
 
 ShowcaseReviewItemDetailView.register_for_model(Showcase)
+
+
+def _visible_by_material(model, materials, user):
+    queryset = filter_queryset_for_user(
+        model.objects.filter(material__in=materials), user
+    )
+    by_material = defaultdict(list)
+    for item in queryset.only("id", "name", "material_id").order_by("name", "pk"):
+        by_material[item.material_id].append(item)
+    return by_material
+
+
+def material_sample_groups(material_links, user):
+    """Visible samples and sample series of each showcase material, in chain order."""
+    materials = list(
+        {link.material_id: link.material for link in material_links}.values()
+    )
+    if not materials:
+        return []
+    samples = _visible_by_material(Sample, materials, user)
+    sample_series = _visible_by_material(SampleSeries, materials, user)
+    groups = []
+    for material in materials:
+        material_samples = samples[material.pk]
+        if not material_samples and not sample_series[material.pk]:
+            continue
+        groups.append(
+            {
+                "material": material,
+                "samples": material_samples[:MATERIAL_SAMPLE_LIMIT],
+                "more_samples": material_samples[MATERIAL_SAMPLE_LIMIT:],
+                "sample_series": sample_series[material.pk],
+            }
+        )
+    return groups
 
 
 def chain_stages(material_links, process_chain):

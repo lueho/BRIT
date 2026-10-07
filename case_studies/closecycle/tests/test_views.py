@@ -11,7 +11,7 @@ from django.utils import timezone
 from inventories.models import InventoryAlgorithm, Scenario, ScenarioStatus
 from layer_manager.models import Layer, LayerAggregatedValue
 from maps.models import Catchment, GeoDataset, GeoPolygon, Region
-from materials.models import Material
+from materials.models import Material, Sample, SampleSeries
 from processes.models import Process
 from utils.tests.testcases import AbstractTestCases
 
@@ -231,6 +231,108 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         self.assertEqual(
             ["input"], [stage["key"] for stage in response.context["chain_stages"]]
         )
+
+    def test_detail_view_lists_visible_samples_of_showcase_materials(self):
+        showcase = self.published_object
+        sampled = Material.objects.create(
+            name="Sampled Feedstock", publication_status="published"
+        )
+        unsampled = Material.objects.create(
+            name="Unsampled Product", publication_status="published"
+        )
+        showcase.showcase_materials.create(material=sampled, role="input")
+        showcase.showcase_materials.create(material=sampled, role="product")
+        showcase.showcase_materials.create(material=unsampled, role="product")
+        Sample.objects.create(
+            name="Public Feedstock Sample",
+            material=sampled,
+            publication_status="published",
+        )
+        Sample.objects.create(
+            name="Private Feedstock Sample", material=sampled, owner=self.owner_user
+        )
+        SampleSeries.objects.create(
+            name="Public Feedstock Series",
+            material=sampled,
+            publication_status="published",
+        )
+
+        response = self.client.get(self.get_detail_url(showcase.pk))
+
+        groups = response.context["material_sample_groups"]
+        self.assertEqual([sampled], [group["material"] for group in groups])
+        self.assertEqual(
+            ["Public Feedstock Sample"], [s.name for s in groups[0]["samples"]]
+        )
+        self.assertEqual(
+            ["Public Feedstock Series"], [s.name for s in groups[0]["sample_series"]]
+        )
+        self.assertContains(response, 'id="samples"')
+        self.assertContains(response, "Public Feedstock Sample")
+        self.assertNotContains(response, "Private Feedstock Sample")
+
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(showcase.pk))
+        self.assertContains(response, "Private Feedstock Sample")
+
+    def test_material_sample_groups_collapse_samples_beyond_the_cap(self):
+        """Every visible sample stays reachable, including the owner's private ones."""
+        showcase = self.published_object
+        material = Material.objects.create(
+            name="Heavily Sampled", publication_status="published"
+        )
+        showcase.showcase_materials.create(material=material, role="input")
+        for i in range(7):
+            Sample.objects.create(
+                name=f"Capped Sample {i}", material=material, owner=self.owner_user
+            )
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(self.get_detail_url(showcase.pk))
+
+        group = response.context["material_sample_groups"][0]
+        self.assertEqual(
+            [f"Capped Sample {i}" for i in range(5)],
+            [sample.name for sample in group["samples"]],
+        )
+        self.assertEqual(
+            ["Capped Sample 5", "Capped Sample 6"],
+            [sample.name for sample in group["more_samples"]],
+        )
+        self.assertContains(response, 'class="csd-more-samples"')
+        self.assertContains(response, "+2 more")
+        for sample in Sample.objects.filter(material=material):
+            self.assertContains(response, reverse("sample-detail", args=[sample.pk]))
+
+    def test_detail_view_does_not_query_per_material_for_samples(self):
+        showcase = self.published_object
+
+        def add_sampled_material(i):
+            material = Material.objects.create(
+                name=f"Query Material {i}", publication_status="published"
+            )
+            showcase.showcase_materials.create(material=material, role="input")
+            Sample.objects.create(
+                name=f"Query Sample {i}",
+                material=material,
+                publication_status="published",
+            )
+            SampleSeries.objects.create(
+                name=f"Query Series {i}",
+                material=material,
+                publication_status="published",
+            )
+
+        add_sampled_material(0)
+        url = self.get_detail_url(showcase.pk)
+        self.client.get(url)
+        with CaptureQueriesContext(connection) as one:
+            self.client.get(url)
+        add_sampled_material(1)
+        with CaptureQueriesContext(connection) as two:
+            self.client.get(url)
+
+        self.assertEqual(len(one), len(two))
 
     def test_scenario_cards_show_headline_results_of_evaluated_scenarios(self):
         showcase = self.published_object
