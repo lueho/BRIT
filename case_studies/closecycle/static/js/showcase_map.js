@@ -401,7 +401,7 @@ function featureClickHandler(e, featureGroup) {
                     addShowcase(
                         entry.id,
                         entry.name,
-                        entry.region || properties.region,
+                        'region' in entry ? entry.region : properties.region,
                         [layer, ...(markerLayers.get(entry.id) || [])]
                     );
                 }

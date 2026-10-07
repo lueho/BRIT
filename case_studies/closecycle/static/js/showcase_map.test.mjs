@@ -1136,3 +1136,22 @@ test("showcases at the same location share one label listing their codes", () =>
     assert.deepEqual(labels, ["SC14 \u00b7 SC15 \u00b7 SC16"]);
     assert.equal(apart.tooltip, "SC2");
 });
+
+test("pilot members whose region is hidden are not filed under the pilot's region", () => {
+    const { sandbox, calls, L } = setup();
+    const pilot = makePilotLayer({
+        L,
+        id: "pilot-catchment-9",
+        name: "Pilot Nine",
+        showcases: [
+            { id: 5, name: "Hidden anchor", region: null },
+            { id: 7, name: "Pilot member", region: "Pilot Nine" },
+        ],
+    });
+
+    sandbox.featureClickHandler({ latlng: { lng: 14, lat: 55 }, layer: pilot }, makeFeatureGroup([pilot]));
+
+    const headings = findAll(calls.openPopup[0].content, el => el.tagName === "STRONG")
+        .map(el => el.textContent);
+    assert.deepEqual(headings.sort(), ["No region", "Pilot Nine"]);
+});
