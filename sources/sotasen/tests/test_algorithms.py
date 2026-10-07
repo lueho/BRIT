@@ -410,8 +410,14 @@ class SotasenGrassToProteinLocalRelationTestCase(TestCase):
         self.assertEqual(len(layer.as_dict()["aggregated_results"]), 4)
         self.client.force_login(scenario.owner)
         response = self.client.get(reverse("scenario-result", args=[scenario.pk]))
-        self.assertContains(response, "Grassland area: 0 ha")
-        self.assertContains(response, "Recovered protein: 0 Mg/a")
+        for name, unit in (("Grassland area", "ha"), ("Recovered protein", "Mg/a")):
+            self.assertContains(
+                response,
+                f'<div class="sri-kpi"><dt>{name}</dt><dd>'
+                '<span class="sri-kpi-value">0</span>'
+                f'<span class="sri-kpi-unit">{unit}</span></dd></div>',
+                html=True,
+            )
 
     def test_end_to_end_with_real_adapter(self):
         result = InventoryAlgorithms.sotasen_grass_to_protein(
