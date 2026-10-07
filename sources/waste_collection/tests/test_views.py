@@ -2475,7 +2475,7 @@ class CollectionVersionLinkVisibilityTestCase(TestCase):
 
 
 class CollectionStatYearIndicatorTestCase(TestCase):
-    """The detail page flags statistics whose year lies outside the valid period."""
+    """Multi-year statistics are a feature: only the CPV detail page flags them."""
 
     @classmethod
     def setUpTestData(cls):
@@ -2507,23 +2507,15 @@ class CollectionStatYearIndicatorTestCase(TestCase):
             reverse("collection-detail", kwargs={"pk": self.collection.pk})
         )
 
-    def test_detail_flags_stat_year_before_valid_from(self):
-        self._cpv(2019)
+    def test_detail_does_not_flag_stat_years_outside_period(self):
+        for year in (2019, 2021, 2023):
+            self._cpv(year)
         response = self._get_detail()
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "outside the collection validity period")
-
-    def test_detail_flags_stat_year_after_valid_until(self):
-        self._cpv(2023)
-        response = self._get_detail()
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "outside the collection validity period")
-
-    def test_detail_does_not_flag_stat_year_within_period(self):
-        self._cpv(2021)
-        response = self._get_detail()
-        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "(2019)")
+        self.assertContains(response, "(2023)")
         self.assertNotContains(response, "outside the collection validity period")
+        self.assertNotContains(response, "fa-triangle-exclamation")
 
     def test_cpv_detail_flags_out_of_period_year(self):
         cpv = self._cpv(2015)
