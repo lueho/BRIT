@@ -2307,7 +2307,12 @@ class ScenarioPresentationTestCase(TestCase):
             feedstock=self.feedstock,
             algorithm=self.algorithm,
             results={
-                "features": [],
+                "features": [
+                    {
+                        "geom": MultiPolygon(Polygon(((0, 0), (0, 1), (1, 1), (0, 0)))),
+                        "yield": 9.0,
+                    }
+                ],
                 "aggregated_values": [
                     {"name": "Total production", "value": 992.4, "unit": "Mg/a"},
                     {"name": "Recovered protein", "value": 23.8, "unit": "Mg/a"},
