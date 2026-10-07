@@ -227,6 +227,79 @@ class ShowcaseThemeContextTest(TestCase):
         self.assertEqual(["published"], query["scope"])
         self.assertEqual([str(self.pilot.pk)], query["pilot_region"])
 
+    def test_map_filter_button_keeps_filters_in_the_address_bar(self):
+        response = self.client.get(reverse("Showcase"), {"scope": "published"})
+        # maps.js reads the filters from the form of the ``.submit-filter``
+        # button when it rewrites the address bar after loading.
+        self.assertContains(
+            response,
+            '<button class="btn btn-sm btn-primary submit-filter" type="submit">'
+            "Filter</button>",
+            html=True,
+        )
+
+    def _panel_showcase(self, name, country, region_status="published", **kwargs):
+        region = Region.objects.create(
+            name=f"{name} region", country=country, publication_status=region_status
+        )
+        return Showcase.objects.create(
+            name=name,
+            region=region,
+            geom=Point(14, 58, srid=4326),
+            publication_status=kwargs.pop("publication_status", "published"),
+            owner=self.owner,
+            **kwargs,
+        )
+
+    def test_map_panel_lists_published_showcases_by_country_and_code(self):
+        sc14 = self._panel_showcase("SC14 \u2013 Grass to protein", "SE")
+        sc2 = self._panel_showcase("SC2 \u2013 Biogas", "SE")
+        hidden = self._panel_showcase(
+            "SC99 \u2013 Unpublished", "SE", publication_status="private"
+        )
+        response = self.client.get(reverse("Showcase"), {"scope": "published"})
+        self.assertContains(response, 'id="showcase-list"')
+        self.assertContains(response, f'data-showcase-id="{sc14.pk}"')
+        self.assertContains(response, f'data-showcase-id="{self.showcase.pk}"')
+        self.assertNotContains(response, f'data-showcase-id="{hidden.pk}"')
+        self.assertNotContains(response, "Unpublished")
+        self.assertContains(response, '<span class="csm-code">SC14</span>', html=True)
+        self.assertContains(response, "3 showcases in 2 countries")
+        content = response.content.decode()
+        list_start = content.index('id="showcase-list"')
+        self.assertLess(
+            content.index("France", list_start), content.index("Sweden", list_start)
+        )
+        self.assertLess(
+            content.index(f'data-showcase-id="{sc2.pk}"'),
+            content.index(f'data-showcase-id="{sc14.pk}"'),
+        )
+
+    def test_map_panel_does_not_reveal_the_country_of_a_private_region(self):
+        showcase = self._panel_showcase(
+            "SC5 \u2013 Private region", "SE", region_status="private"
+        )
+        response = self.client.get(reverse("Showcase"), {"scope": "published"})
+        content = response.content.decode()
+        listing = content[content.index('id="showcase-list"') :]
+        self.assertIn(f'data-showcase-id="{showcase.pk}"', listing)
+        self.assertIn("Other", listing)
+        self.assertNotIn("Sweden", listing)
+
+    def test_country_filter_defaults_to_all_countries(self):
+        choices = list(ShowcaseFilterSet().form.fields["country"].widget.choices)
+        self.assertEqual(("", "All countries"), choices[0])
+
+    def test_map_panel_list_follows_the_filters(self):
+        self.assign_theme()
+        other = self._panel_showcase("SC3 \u2013 Other theme", "SE")
+        response = self.client.get(
+            reverse("Showcase"), {"scope": "published", "theme": "apple_chain"}
+        )
+        self.assertContains(response, f'data-showcase-id="{self.showcase.pk}"')
+        self.assertNotContains(response, f'data-showcase-id="{other.pk}"')
+        self.assertContains(response, "1 showcase in 1 country")
+
     def test_map_without_scope_redirects_to_published_scope(self):
         self.client.force_login(self.owner)
         response = self.client.get(

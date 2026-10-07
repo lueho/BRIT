@@ -47,6 +47,9 @@ def start_inventory_run(scenario_id):
             and not running_tasks
         ):
             return False
+        # The earlier run is over; a queued run is pending until run_inventory
+        # registers its own tasks, so the progress page doesn't show the old ones.
+        RunningTask.objects.filter(id__in=[task.id for task in running_tasks]).delete()
         _set_running(scenario_status)
         transaction.on_commit(partial(run_inventory.delay, scenario_id))
     return True

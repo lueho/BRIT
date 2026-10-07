@@ -1,70 +1,138 @@
 {% extends 'base.html' %}
+{% load static %}
+{% load leaflet_tags %}
 {% load moderation_tags %}
-
 {% block title %}BRIT | Inventories | {{ object.name }}{% endblock %}
-
+{% block style_sheets %}
+  {{ block.super }}
+  {% leaflet_js %}
+  {% leaflet_css %}
+  <link href="{% static 'css/sample_detail_v2.min.css' %}" rel="stylesheet">
+  <link href="{% static 'css/scenario_detail.min.css' %}" rel="stylesheet">
+{% endblock style_sheets %}
 {% block content %}
-    {% object_policy object as policy %}
-
-    <div class="row mb-4">
-        <div class="col col-12 col-lg-3">
-            {% include 'scenario_detail_card.html' %}
-            {% include 'scenario_evaluation_card.html' %}
-        </div>
-        <div class="col col-12 col-lg-9">
-            {% for feedstock, algos in config.items %}
-                {% for algo, parameters in algos.items %}
-                    <div class="row mb-4">
-                        <div class="col">
-                            <div class="card shadow">
-                                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                                    <h5 class="mb-0">Inventory {{ forloop.parentloop.counter }}</h5>
-                                </div>
-                                <div class="card-body">
-                                    <p class="card-text"><strong>Feedstock</strong>: {{ feedstock.name }}</p>
-                                    <p class="card-text"><strong>Dataset</strong>: {{ algo.geodataset }}</p>
-                                    <p class="card-text"><strong>Algorithm</strong>: {{ algo.name }}</p>
-                                    <p class="card-text"><strong>Settings</strong>:</p>
-                                    <ul>
-                                        {% for parameter, value in parameters.items %}
-                                            <li>{{ parameter.descriptive_name }}: {{ value }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                                <div class="card-footer">
-                                    {% if policy.can_edit %}
-                                        <a href="{% url 'scenario-update-config' scenario.id feedstock.id algo.id %}" class="me-3">
-                                            <i class="fas fa-fw fa-edit"></i> Edit
-                                        </a>
-                                        <a href="{% url 'scenario-remove-algorithm' scenario.id feedstock.id algo.id %}"
-                                           class="me-3">
-                                            <i class="fas fa-fw fa-trash"></i> Remove from configuration
-                                        </a>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                {% endfor %}
-            {% endfor %}
-
-            {% if policy.can_edit %}
-                <div class="row">
-                    <div class="col">
-                        <div class="card border-left-primary border">
-                            <div class="card-header bg-body-tertiary border-bottom-0 py-3"></div>
-                            <div class="card-body">
-                                <a href="{% url 'scenario-add-configuration' scenario.id %}">
-                                    <i class="fas fa-fw fa-plus"></i> Add inventory
-                                </a>
-                            </div>
-                            <div class="card-footer"></div>
-                        </div>
-                    </div>
-                </div>
+  {% object_policy object as policy %}
+  <div class="sdv2 sri">
+    <div class="sdv2-canvas sdv2-canvas-fluid">
+      {% include "inventories/includes/scenario_hero.html" with page="detail" %}
+      <section class="sdv2-section-panel sri-status sri-status-{{ object.status }}" aria-label="Evaluation">
+        {% if object.status == 1 %}
+          <div>
+            <h2 class="sdv2-section-title">This scenario is not evaluated, yet.</h2>
+            <p class="mb-0">The evaluation runs every inventory below on the scenario's region and stores the results.</p>
+          </div>
+          {% if policy.can_edit %}
+            {% include "inventories/includes/retry_form.html" with label="Start evaluation" %}
+          {% endif %}
+        {% elif object.status == 2 %}
+          <div>
+            <h2 class="sdv2-section-title"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i> The evaluation is still running.</h2>
+            <p class="mb-0">The results appear as soon as every inventory has been calculated.</p>
+          </div>
+          <a class="sdv2-btn sdv2-btn-primary" href="{% url 'scenario-result' object.pk %}">Follow progress</a>
+        {% elif object.status == 3 %}
+          <div>
+            <h2 class="sdv2-section-title">The results are ready!</h2>
+            <p class="mb-0">See the totals per inventory, charts and result maps.</p>
+          </div>
+          <a class="sdv2-btn sdv2-btn-primary" href="{% url 'scenario-result' object.pk %}">Open results</a>
+        {% elif object.status == 4 %}
+          <div>
+            <h2 class="sdv2-section-title">The evaluation failed.</h2>
+            {% if object.scenariostatus.failed_algorithm %}
+              <p class="mb-0">Failed algorithm: {{ object.scenariostatus.failed_algorithm }}</p>
             {% endif %}
-
+            {% if policy.can_edit and object.scenariostatus.failure_message %}
+              <p class="mb-0 sri-failure-message">{{ object.scenariostatus.failure_message }}</p>
+            {% endif %}
+          </div>
+          {% if policy.can_edit %}
+            {% include "inventories/includes/retry_form.html" with label="Retry evaluation" %}
+          {% endif %}
+        {% endif %}
+      </section>
+      <div class="sri-overview">
+        <section class="sdv2-section-panel" aria-label="Region">
+          <h2 class="sdv2-section-title">Region</h2>
+          <div class="sri-map">{% leaflet_map "main" %}</div>
+        </section>
+        {% if object.description %}
+          <section class="sdv2-section-panel sdv2-about" aria-label="About this scenario">
+            <h2 class="sdv2-section-title">About this scenario</h2>
+            <div class="sdv2-about-body">{{ object.description|markdown_to_html }}</div>
+          </section>
+        {% endif %}
+      </div>
+      <section class="sri-inventories" aria-labelledby="sri-inventories-title">
+        <div class="sri-section-header">
+          <h2 class="sdv2-section-title" id="sri-inventories-title">Inventories</h2>
+          {% if policy.can_edit %}
+            <a class="sdv2-btn" href="{% url 'scenario-add-configuration' object.pk %}"><i class="fas fa-plus" aria-hidden="true"></i> Add inventory</a>
+          {% endif %}
         </div>
+        {% for inventory in inventories %}
+          <article class="sdv2-section-panel sri-inventory">
+            <header class="sri-inventory-header">
+              <div>
+                <div class="sri-inventory-kicker">Inventory {{ forloop.counter }}</div>
+                <h3 class="sri-inventory-title">
+                  {{ inventory.feedstock.name }}
+                  <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                  {{ inventory.algorithm.name }}
+                </h3>
+                <div class="sri-inventory-dataset">Dataset: {{ inventory.algorithm.geodataset }}</div>
+              </div>
+              {% if policy.can_edit %}
+                <div class="sri-inventory-actions">
+                  <a class="sdv2-btn sdv2-btn-sm" href="{% url 'scenario-update-config' object.pk inventory.feedstock.pk inventory.algorithm.pk %}"><i class="fas fa-pen-to-square" aria-hidden="true"></i> Edit</a>
+                  <a class="sdv2-btn sdv2-btn-sm sdv2-btn-ghost" href="{% url 'scenario-remove-algorithm' object.pk inventory.feedstock.pk inventory.algorithm.pk %}"><i class="fas fa-trash" aria-hidden="true"></i> Remove</a>
+                </div>
+              {% endif %}
+            </header>
+            {% if inventory.parameters %}
+              <div class="sri-table-wrap">
+                <table class="sdv2-properties-table sri-parameters">
+                  <thead>
+                    <tr>
+                      <th scope="col">Parameter</th>
+                      <th scope="col" class="sdv2-num">Value</th>
+                      <th scope="col">Unit</th>
+                      <th scope="col">Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for parameter, value in inventory.parameters %}
+                      <tr>
+                        <th scope="row">{{ parameter.descriptive_name }}</th>
+                        {% if value.type == 1 %}
+                          <td class="sdv2-num">{{ value.value|floatformat:"-3g" }}</td>
+                        {% else %}
+                          <td>{{ value.name }}</td>
+                        {% endif %}
+                        <td>{{ parameter.unit|default:"" }}</td>
+                        <td>{{ value.source|default:"—" }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <p class="sri-muted mb-0">This inventory has no parameters.</p>
+            {% endif %}
+          </article>
+        {% empty %}
+          <div class="sdv2-section-panel sri-muted">No inventories have been added to this scenario yet.</div>
+        {% endfor %}
+      </section>
     </div>
-
-{% endblock %}
+  </div>
+{% endblock content %}
+{% block javascript %}
+  {{ block.super }}
+  <script src="{% static 'js/maps.min.js' %}"></script>
+  {{ map_config|json_script:"mapConfig" }}
+  <script nonce="{{ csp_nonce }}">
+    const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
+    window.onload = () => loadMap(mapConfig);
+  </script>
+{% endblock javascript %}

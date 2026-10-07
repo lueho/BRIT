@@ -7,7 +7,7 @@ from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db import connection, transaction
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.http import (
     Http404,
     HttpResponse,
@@ -17,7 +17,15 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
-from django.views.generic import CreateView, DetailView, TemplateView, View
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
+from django.views.generic import (
+    CreateView,
+    DetailView,
+    RedirectView,
+    TemplateView,
+    View,
+)
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
 from django_tomselect.autocompletes import AutocompleteModelView
@@ -25,8 +33,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from layer_manager.models import Layer
-from maps.models import GeoDataset
+from layer_manager.models import Layer, LayerAggregatedValue
+from maps.models import Catchment, GeoDataset, Region
 from maps.serializers import BaseResultMapSerializer
 from maps.views import GeoDataSetAutocompleteView, MapMixin
 from materials.models import Material, SampleSeries
@@ -177,7 +185,59 @@ class ScenarioCreateView(UserCreatedObjectCreateView):
     permission_required = "inventories.add_scenario"
 
 
-class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
+def scenario_presentation_context(scenario, user):
+    """Region, catchment and showcase of ``scenario`` that ``user`` may read."""
+
+    def visible(model, pk):
+        if pk is None:
+            return None
+        return filter_queryset_for_user(model.objects.filter(pk=pk), user).first()
+
+    showcase_model = Scenario._meta.get_field("showcase").related_model
+    return {
+        "visible_region": visible(Region, scenario.region_id),
+        "visible_catchment": visible(Catchment, scenario.catchment_id),
+        "visible_showcase": visible(showcase_model, scenario.showcase_id),
+    }
+
+
+def inventories_for_template(config):
+    """Flatten ``Scenario.configuration_for_template()`` into one entry per inventory."""
+    return [
+        {
+            "feedstock": feedstock,
+            "algorithm": algorithm,
+            "parameters": [
+                (parameter, value)
+                for parameter, value in parameters.items()
+                if parameter is not None
+            ],
+        }
+        for feedstock, algorithms in config.items()
+        for algorithm, parameters in algorithms.items()
+    ]
+
+
+class ScenarioMapMixin(MapMixin):
+    """Draws only the scenario's region and catchment that the user may read."""
+
+    def _visible_feature_id(self, model, pk):
+        if pk is None:
+            return None
+        return (
+            filter_queryset_for_user(model.objects.filter(pk=pk), self.request.user)
+            .values_list("pk", flat=True)
+            .first()
+        )
+
+    def get_region_feature_id(self):
+        return self._visible_feature_id(Region, self.object.region_id)
+
+    def get_catchment_feature_id(self):
+        return self._visible_feature_id(Catchment, self.object.catchment_id)
+
+
+class ScenarioDetailView(ScenarioMapMixin, UserCreatedObjectDetailView):
     """Summary of the Scenario with complete configuration. Page for final review, which also contains the
     'run' button."""
 
@@ -191,7 +251,9 @@ class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
         self.config = self.object.configuration_for_template()
         context = self.get_context_data(object=self.object)
         context["config"] = self.config
+        context["inventories"] = inventories_for_template(self.config)
         context["allow_edit"] = self.allow_edit
+        context.update(scenario_presentation_context(self.object, request.user))
         return self.render_to_response(context)
 
     def post(self, request, *args, **kwargs):
@@ -994,7 +1056,7 @@ class ResultLayerVersionAPI(APIView):
         return mark_private_result_uncacheable(response, layer)
 
 
-class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
+class ScenarioResultView(ScenarioMapMixin, UserCreatedObjectDetailView):
     """
     View with summaries of the results of each algorithm and a total summary.
     """
@@ -1006,15 +1068,30 @@ class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
         context = super().get_context_data(**kwargs)
         scenario = self.object
         result = ScenarioResult(scenario)
-        context["layers"] = [layer.as_dict() for layer in result.layers]
+        context["result_layers"] = (
+            result.layers.select_related("feedstock", "algorithm__geodataset")
+            .prefetch_related(
+                Prefetch(
+                    "layeraggregatedvalue_set",
+                    queryset=LayerAggregatedValue.objects.order_by("pk"),
+                )
+            )
+            .order_by("pk")
+        )
         context["charts"] = result.get_charts()
+        context.update(scenario_presentation_context(scenario, self.request.user))
         return context
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
         if scenario.status == ScenarioStatus.Status.RUNNING:
-            context = {"scenario": scenario, "task_list": {"tasks": []}}
+            context = {
+                "object": scenario,
+                "scenario": scenario,
+                "task_list": {"tasks": []},
+                **scenario_presentation_context(scenario, request.user),
+            }
             for task in RunningTask.objects.filter(
                 scenario=scenario, algorithm__isnull=False
             ).select_related("algorithm"):
@@ -1030,20 +1107,39 @@ class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
             return render(
                 request,
                 "evaluation_failed.html",
-                {"scenario": scenario},
+                {
+                    "object": scenario,
+                    "scenario": scenario,
+                    **scenario_presentation_context(scenario, request.user),
+                },
             )
         context = self.get_context_data()
         return self.render_to_response(context)
 
 
-class ScenarioEvaluationProgressView(DetailView):
-    """
-    The page users land on if a scenario is being calculated. The progress of the evaluation is shown and upon
-    finishing the calculation, the user is redirected to the result page.
-    """
+class ScenarioEvaluationProgressView(RedirectView):
+    """The result page shows the progress, failure or results of a scenario."""
 
-    template_name = "evaluation_progress.html"
+    pattern_name = "scenario-result"
+
+
+@method_decorator(never_cache, name="dispatch")
+class ScenarioEvaluationStatusView(UserCreatedObjectDetailView):
+    """Whether a scenario is still evaluating, and the Celery state of each algorithm."""
+
     model = Scenario
+
+    def get(self, request, *args, **kwargs):
+        scenario = self.get_object()
+        tasks = RunningTask.objects.filter(scenario=scenario, algorithm__isnull=False)
+        return JsonResponse(
+            {
+                "running": scenario.status == ScenarioStatus.Status.RUNNING,
+                "tasks": {
+                    str(task.uuid): AsyncResult(str(task.uuid)).status for task in tasks
+                },
+            }
+        )
 
 
 class ScenarioResultDetailMapView(MapMixin, DetailView):

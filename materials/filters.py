@@ -438,21 +438,21 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
         self.filters["substrate_material"].queryset = Material.objects.filter(
             sampled_substrate_material_q(substrate_category)
         ).distinct()
-        self.filters["parameter"].queryset = self.scoped_choice_queryset(
+        # Properties, components, groups and geography are shared reference
+        # data: a private or in-review sample may point to a published object
+        # of another owner, so the list scope must not narrow these choices.
+        self.filters["parameter"].queryset = self.visible_choice_queryset(
             MaterialProperty.objects.all()
         )
-        self.filters["raw_parameter"].queryset = self.scoped_choice_queryset(
+        self.filters["raw_parameter"].queryset = self.visible_choice_queryset(
             MaterialComponent.objects.all()
         )
-        self.filters["component_group"].queryset = self.scoped_choice_queryset(
+        self.filters["component_group"].queryset = self.visible_choice_queryset(
             MaterialComponentGroup.objects.all()
         )
-        self.filters["sample_group"].queryset = self.scoped_choice_queryset(
+        self.filters["sample_group"].queryset = self.visible_choice_queryset(
             SampleGroup.objects.all()
         )
-        # Geography is shared reference data: a private sample may point to a
-        # published region or site of another owner, so the list scope must not
-        # narrow these choices.
         self.filters["region"].queryset = self.visible_choice_queryset(
             Region.objects.all()
         )

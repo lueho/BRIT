@@ -25,7 +25,7 @@ class ShowcaseFilterSet(UserCreatedObjectScopedFilterSet):
         field_name="region__country",
         lookup_expr="exact",
         label="Country",
-        widget=Select(choices=COUNTRY_CHOICES),
+        widget=Select(choices=(("", "All countries"), *COUNTRY_CHOICES)),
     )
     theme = ChoiceFilter(choices=THEME_CHOICES, label="Theme")
     pilot_region = ModelChoiceFilter(

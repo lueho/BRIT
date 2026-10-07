@@ -350,6 +350,7 @@ function refreshMap(promises, filterParameters, timeLimit = 120000) {
             promiseIsPending = false;
             orderLayers();
             adjustMapBounds(filterParameters);
+            layersLoaded();
         })
         .catch(error => {
             promiseIsPending = false;
@@ -374,11 +375,6 @@ function updateUrlSearchParams() {
 }
 
 function cleanup() {
-    try {
-        updateUrlSearchParams();
-    } catch (error) {
-        console.warn('URL search parameters were not updated:', error);
-    }
     hideLoadingIndicator();
     if (typeof unlockFilter === 'function') {
         try {
@@ -391,6 +387,12 @@ function cleanup() {
         unlockCustomElements();
     } catch (error) {
         console.warn('Custom elements were not unlocked', error);
+    }
+    // Disabled form controls are not serialized, so this runs after unlocking.
+    try {
+        updateUrlSearchParams();
+    } catch (error) {
+        console.warn('URL search parameters were not updated:', error);
     }
 }
 
@@ -1068,6 +1070,10 @@ function updateUrls(feature_id) {
 
 async function clickedFeature(event) {
     // This is a hook for implementing behaviour when a feature is clicked.
+}
+
+function layersLoaded() {
+    // This is a hook for implementing behaviour once the map layers have loaded.
 }
 
 // Query parameters that describe navigation or display state rather than a

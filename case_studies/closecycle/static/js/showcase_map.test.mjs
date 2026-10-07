@@ -949,3 +949,160 @@ test("summary refresh clears previous pilot context when the selected showcase h
     sandbox.renderSummaries({ summaries: [makeSummary({ pilot_region: null })] });
     assert.equal(elements["pilot-region-context"].hidden, true);
 });
+
+test("showcase points carry a permanent code label", () => {
+    const { sandbox } = setup({ loadShared: true });
+    sandbox.mapConfig.regionLayerStyle = {};
+    sandbox.mapConfig.catchmentLayerStyle = {};
+    sandbox.mapConfig.featuresLayerStyle = { radius: 4 };
+    sandbox.initializeRenderers();
+    const layer = sandbox.createFeaturesLayer(null, "Point");
+    const tooltips = [];
+    const makeMarker = properties =>
+        addLayerBehaviors({
+            feature: { id: 1, properties },
+            getLatLng: () => ({ lat: 1, lng: 2 }),
+            bindPopup() {},
+            bindTooltip(content, options) {
+                tooltips.push({ content, options });
+            },
+        });
+
+    layer.options.onEachFeature(
+        { id: 1, properties: { feature_type: "showcase", code: "SC14" } },
+        makeMarker({ feature_type: "showcase", code: "SC14" })
+    );
+    layer.options.onEachFeature(
+        { id: 2, properties: { feature_type: "showcase", code: null } },
+        makeMarker({ feature_type: "showcase", code: null })
+    );
+
+    assert.equal(tooltips.length, 1);
+    assert.equal(tooltips[0].content, "SC14");
+    assert.equal(tooltips[0].options.permanent, true);
+});
+
+test("list selection highlights the showcase marker, zooms to it and loads its summary", () => {
+    const { sandbox, calls } = setup();
+    const views = [];
+    sandbox.map.getZoom = () => 4;
+    sandbox.map.setView = (latlng, zoom) => views.push({ latlng, zoom });
+    const marker = makePointLayer({ id: 12, name: "SC14", lat: 58, lng: 13 });
+    const other = makePointLayer({ id: 13, name: "SC15", lat: 50, lng: 10 });
+    sandbox.featuresLayer = makeFeatureGroup([marker, other]);
+
+    sandbox.selectShowcaseFromList(12);
+
+    assert.deepEqual(calls.selected, [marker]);
+    assert.equal(views.length, 1);
+    assert.deepEqual(views[0].latlng, { lat: 58, lng: 13 });
+    assert.ok(views[0].zoom > 4);
+    assert.deepEqual(calls.fetchSummaries.map(params => params.id), [12]);
+});
+
+test("list clicks are delegated from the showcase list", () => {
+    const { sandbox, elements, documentListeners, calls } = setup();
+    elements["showcase-list"] = makeElement("ul");
+    sandbox.featuresLayer = makeFeatureGroup([]);
+    (documentListeners.DOMContentLoaded || []).forEach(callback => callback());
+
+    const button = { dataset: { showcaseId: "12" } };
+    let prevented = false;
+    elements["showcase-list"].listeners.click.forEach(callback =>
+        callback({
+            target: { closest: selector => (selector === "[data-showcase-id]" ? button : null) },
+            preventDefault() {
+                prevented = true;
+            },
+        })
+    );
+
+    assert.ok(prevented);
+    assert.deepEqual(calls.fetchSummaries.map(params => params.id), [12]);
+});
+
+function setupListSelection() {
+    const context = setup();
+    const views = [];
+    const pending = [];
+    context.sandbox.map.getZoom = () => 4;
+    context.sandbox.map.setView = (latlng, zoom) => views.push({ latlng, zoom });
+    context.sandbox.fetchFeaturesLayerSummary = (params, isCurrent = () => true) => {
+        pending.push({ params, isCurrent });
+        return Promise.resolve();
+    };
+    return { ...context, views, pending };
+}
+
+test("a list selection made before the markers load is applied once they have loaded", () => {
+    const { sandbox, calls, views } = setupListSelection();
+    sandbox.featuresLayer = null;
+
+    sandbox.selectShowcaseFromList(12);
+    assert.equal(views.length, 0);
+
+    const marker = makePointLayer({ id: 12, name: "SC14", lat: 58, lng: 13 });
+    sandbox.featuresLayer = makeFeatureGroup([marker]);
+    sandbox.layersLoaded();
+
+    assert.deepEqual(calls.selected, [marker]);
+    assert.deepEqual(views.map(view => view.latlng), [{ lat: 58, lng: 13 }]);
+});
+
+test("a map click replaces an earlier list selection that is still waiting for the markers", () => {
+    const { sandbox, views } = setupListSelection();
+    sandbox.featuresLayer = null;
+    sandbox.selectShowcaseFromList(12);
+
+    const other = makePointLayer({ id: 13, name: "SC15", lat: 55, lng: 14 });
+    const group = makeFeatureGroup([other]);
+    sandbox.featureClickHandler({ ...clickEvent, layer: other }, group);
+    sandbox.featuresLayer = makeFeatureGroup([
+        makePointLayer({ id: 12, name: "SC14", lat: 58, lng: 13 }),
+        other,
+    ]);
+    sandbox.layersLoaded();
+
+    assert.equal(views.length, 0);
+});
+
+test("only the latest showcase selection may render its summary", () => {
+    const { sandbox, pending } = setupListSelection();
+    sandbox.featuresLayer = makeFeatureGroup([]);
+
+    sandbox.selectShowcaseFromList(12);
+    sandbox.selectShowcaseFromList(13);
+
+    assert.deepEqual(pending.map(request => request.params.id), [12, 13]);
+    assert.equal(pending[0].isCurrent(), false);
+    assert.equal(pending[1].isCurrent(), true);
+
+    const first = makePointLayer({ id: 1, name: "A", region: "R" });
+    const second = makePointLayer({ id: 2, name: "B", region: "R" });
+    sandbox.featureClickHandler({ ...clickEvent, layer: first }, makeFeatureGroup([first, second]));
+    assert.equal(pending[1].isCurrent(), false);
+});
+
+test("the list marks only a single selected showcase as current", () => {
+    const { sandbox } = setupListSelection();
+    const button = {
+        dataset: { showcaseId: "12" },
+        attributes: {},
+        setAttribute(name, value) {
+            this.attributes[name] = value;
+        },
+        removeAttribute(name) {
+            delete this.attributes[name];
+        },
+    };
+    sandbox.document.querySelectorAll = selector =>
+        selector.includes("#showcase-list") ? [button] : [];
+
+    sandbox.renderSummaries({ summaries: [makeSummary({ id: 12 })] });
+    assert.equal(button.attributes["aria-current"], "true");
+
+    sandbox.renderSummaries({
+        summaries: [makeSummary({ id: 12 }), makeSummary({ id: 13 })],
+    });
+    assert.equal(button.attributes["aria-current"], undefined);
+});

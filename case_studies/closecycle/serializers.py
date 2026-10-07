@@ -210,6 +210,7 @@ class ShowcaseSummaryListSerializer(ModelSerializer):
 
 class ShowcaseGeoFeatureModelSerializer(BaseGeoFeatureModelSerializer):
     region = CharField(source="region.name", allow_null=True)
+    code = serializers.ReadOnlyField()
     theme = serializers.ReadOnlyField(source="theme_info")
     feature_type = serializers.SerializerMethodField()
 
@@ -219,6 +220,7 @@ class ShowcaseGeoFeatureModelSerializer(BaseGeoFeatureModelSerializer):
         fields = [
             "id",
             "name",
+            "code",
             "region",
             "theme",
             "feature_type",

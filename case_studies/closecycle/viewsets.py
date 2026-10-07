@@ -112,7 +112,7 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         fingerprint = agg.get("pilot_fingerprint") or ""
         return ":".join(
             (
-                "pilot-regions-v1:theme-context-v1",
+                "pilot-regions-v1:theme-context-v1:code-labels-v1",
                 max_mod.isoformat() if max_mod else "",
                 hashlib.sha1(fingerprint.encode("utf-8")).hexdigest(),
             )

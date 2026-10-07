@@ -453,6 +453,70 @@ class SampleFilterTestCase(TestCase):
                 self.assertTrue(filtr.is_valid(), filtr.errors)
                 self.assertEqual(list(filtr.qs), [sample])
 
+    def test_non_published_scopes_keep_published_reference_choices(self):
+        alice = User.objects.create(username="ref_filter_alice")
+        bob = User.objects.create(username="ref_filter_bob")
+        group = SampleGroup.objects.create(
+            name="Bob's published group", owner=bob, publication_status="published"
+        )
+        prop = MaterialProperty.objects.create(
+            name="Bob's property", owner=bob, publication_status="published"
+        )
+        component = MaterialComponent.objects.create(
+            name="Bob's component", owner=bob, publication_status="published"
+        )
+        component_group = MaterialComponentGroup.objects.create(
+            name="Bob's component group", owner=bob, publication_status="published"
+        )
+        unit, _ = Unit.objects.get_or_create(name="%")
+        request = RequestFactory().get("/")
+        request.user = alice
+
+        for scope in ("private", "review"):
+            linked = Sample.objects.create(
+                name=f"Alice linked {scope} sample",
+                material=self.substrate_material,
+                owner=alice,
+                publication_status=scope,
+            )
+            Sample.objects.create(
+                name=f"Alice unlinked {scope} sample",
+                material=self.substrate_material,
+                owner=alice,
+                publication_status=scope,
+            )
+            linked.sample_groups.add(group)
+            MaterialPropertyValue.objects.create(
+                sample=linked,
+                property=prop,
+                average=Decimal("1"),
+                standard_deviation=Decimal("0"),
+            )
+            ComponentMeasurement.objects.create(
+                sample=linked,
+                group=component_group,
+                component=component,
+                unit=unit,
+                average=Decimal("1"),
+                standard_deviation=Decimal("0"),
+            )
+            for field, value in (
+                ("sample_group", group.pk),
+                ("parameter", prop.pk),
+                ("raw_parameter", component.pk),
+                ("component_group", component_group.pk),
+            ):
+                with self.subTest(scope=scope, field=field):
+                    filtr = SampleFilter(
+                        data={"scope": scope, field: str(value)},
+                        queryset=Sample.objects.filter(
+                            owner=alice, publication_status=scope
+                        ),
+                        request=request,
+                    )
+                    self.assertTrue(filtr.is_valid(), filtr.errors)
+                    self.assertEqual(list(filtr.qs), [linked])
+
 
 class SampleGroupFilterTestCase(TestCase):
     @classmethod

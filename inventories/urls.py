@@ -15,6 +15,7 @@ from .views import (
     ScenarioCreateView,
     ScenarioDetailView,
     ScenarioEvaluationProgressView,
+    ScenarioEvaluationStatusView,
     ScenarioGeoDataSetAutocompleteView,
     ScenarioInventoryAlgorithmAutocompleteView,
     ScenarioModalDeleteView,
@@ -117,6 +118,11 @@ urlpatterns = [
         "scenarios/<int:pk>/evaluating/",
         ScenarioEvaluationProgressView.as_view(),
         name="scenario-evaluation-progress",
+    ),
+    path(
+        "scenarios/<int:pk>/evaluation-status/",
+        ScenarioEvaluationStatusView.as_view(),
+        name="scenario-evaluation-run-status",
     ),
     path(
         "scenarios/evaluating/<str:task_id>/",
