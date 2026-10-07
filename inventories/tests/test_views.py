@@ -2212,3 +2212,170 @@ class ScenarioCatchmentSelectorTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         names = {item["name"] for item in response.json()["results"]}
         self.assertEqual(names, {"Region Catchment"})
+
+
+class ScenarioPresentationTestCase(TestCase):
+    """Scenario, progress and result pages present a scenario for a live demo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner")
+        cls.owner.user_permissions.add(
+            Permission.objects.get(codename="change_scenario")
+        )
+        region = Region.objects.create(name="Demo Region", publication_status="published")
+        catchment = Catchment.objects.create(
+            name="Demo Catchment",
+            region=region,
+            parent_region=region,
+            publication_status="published",
+        )
+        cls.feedstock = Material.objects.create(
+            name="Clover grass", publication_status="published"
+        )
+        geodataset = GeoDataset.objects.create(
+            name="Grassland", region=region, publication_status="published"
+        )
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="Grassland protein", geodataset=geodataset
+        )
+        cls.algorithm.feedstocks.add(cls.feedstock)
+        parameter = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="Protein recovery", short_name="recovery", unit="%"
+        )
+        parameter.inventory_algorithm.add(cls.algorithm)
+        value = InventoryAlgorithmParameterValue.objects.create(
+            name="Default recovery",
+            parameter=parameter,
+            value=12.0,
+            source="Thomas 2025",
+            default=True,
+        )
+        cls.scenario = Scenario.objects.create(
+            name="Grass to protein",
+            description="Turns **clover grass** into protein.",
+            owner=cls.owner,
+            region=region,
+            catchment=catchment,
+            publication_status="published",
+        )
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=cls.scenario,
+            feedstock=cls.feedstock,
+            geodataset=geodataset,
+            inventory_algorithm=cls.algorithm,
+            inventory_parameter=parameter,
+            inventory_value=value,
+        )
+
+    def detail(self):
+        return self.client.get(reverse("scenario-detail", args=[self.scenario.pk]))
+
+    def result(self):
+        return self.client.get(reverse("scenario-result", args=[self.scenario.pk]))
+
+    def test_detail_renders_description_as_markdown(self):
+        response = self.detail()
+
+        self.assertContains(response, "Turns <strong>clover grass</strong> into protein.")
+
+    def test_detail_lists_parameters_with_value_unit_and_source(self):
+        response = self.detail()
+
+        self.assertContains(response, '<th scope="row">Protein recovery</th>', html=True)
+        self.assertContains(response, '<td class="sdv2-num">12</td>', html=True)
+        self.assertContains(response, "<td>%</td>", html=True)
+        self.assertContains(response, "<td>Thomas 2025</td>", html=True)
+
+    def test_detail_offers_results_as_primary_action_once_evaluated(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.detail()
+
+        self.assertContains(
+            response,
+            f'<a class="sdv2-btn sdv2-btn-primary" '
+            f'href="{reverse("scenario-result", args=[self.scenario.pk])}">'
+            '<i class="fas fa-chart-column" aria-hidden="true"></i> Show results</a>',
+            html=True,
+        )
+
+    def test_result_page_shows_aggregated_values_as_tiles(self):
+        Layer.objects.create_or_replace(
+            name="Protein layer",
+            scenario=self.scenario,
+            feedstock=self.feedstock,
+            algorithm=self.algorithm,
+            results={
+                "features": [],
+                "aggregated_values": [
+                    {"name": "Total production", "value": 992.4, "unit": "Mg/a"},
+                    {"name": "Recovered protein", "value": 23.8, "unit": "Mg/a"},
+                ],
+            },
+        )
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.result()
+
+        self.assertContains(
+            response,
+            '<div class="sri-kpi"><dt>Recovered protein</dt><dd>'
+            '<span class="sri-kpi-value">23.8</span>'
+            '<span class="sri-kpi-unit">Mg/a</span></dd></div>',
+            html=True,
+        )
+        self.assertContains(response, '<span class="sri-kpi-value">992.4</span>')
+
+    def test_result_page_loads_chart_js_from_own_static_files(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.result()
+
+        self.assertContains(response, "lib/chartjs/Chart.min.js")
+        self.assertNotContains(response, "cdnjs.cloudflare.com/ajax/libs/Chart.js")
+
+    def test_progress_page_shows_progress_bar_over_all_algorithm_tasks(self):
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        RunningTask.objects.create(
+            scenario=self.scenario, algorithm=self.algorithm, uuid=uuid4()
+        )
+
+        response = self.result()
+
+        self.assertContains(response, 'role="progressbar"')
+        self.assertContains(response, 'aria-valuemax="1"')
+        self.assertContains(response, "js/evaluation_progress.min.js")
+        self.assertContains(response, "Grassland protein")
+
+    def test_failed_page_lets_editors_retry_and_explains_failure(self):
+        private = Scenario.objects.create(
+            name="Private run", owner=self.owner, region=self.scenario.region
+        )
+        private.set_status(ScenarioStatus.Status.FAILED)
+        private.scenariostatus.failed_algorithm = self.algorithm
+        private.scenariostatus.failure_message = "Division by zero"
+        private.scenariostatus.save()
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse("scenario-result", args=[private.pk]))
+
+        self.assertContains(response, "The evaluation failed.")
+        self.assertContains(response, "Grassland protein")
+        self.assertContains(response, "Division by zero")
+        self.assertContains(
+            response,
+            f'<form method="post" action="{reverse("scenario-detail", args=[private.pk])}">',
+        )
+        self.assertContains(response, "Retry evaluation")
+
+    def test_failed_page_hides_retry_and_details_from_readers(self):
+        self.scenario.set_status(ScenarioStatus.Status.FAILED)
+        self.scenario.scenariostatus.failure_message = "Division by zero"
+        self.scenario.scenariostatus.save()
+
+        response = self.result()
+
+        self.assertContains(response, "The evaluation failed.")
+        self.assertNotContains(response, "Retry evaluation")
+        self.assertNotContains(response, "Division by zero")
