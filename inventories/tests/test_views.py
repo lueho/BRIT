@@ -2223,7 +2223,9 @@ class ScenarioPresentationTestCase(TestCase):
         cls.owner.user_permissions.add(
             Permission.objects.get(codename="change_scenario")
         )
-        region = Region.objects.create(name="Demo Region", publication_status="published")
+        region = Region.objects.create(
+            name="Demo Region", publication_status="published"
+        )
         catchment = Catchment.objects.create(
             name="Demo Catchment",
             region=region,
@@ -2277,12 +2279,16 @@ class ScenarioPresentationTestCase(TestCase):
     def test_detail_renders_description_as_markdown(self):
         response = self.detail()
 
-        self.assertContains(response, "Turns <strong>clover grass</strong> into protein.")
+        self.assertContains(
+            response, "Turns <strong>clover grass</strong> into protein."
+        )
 
     def test_detail_lists_parameters_with_value_unit_and_source(self):
         response = self.detail()
 
-        self.assertContains(response, '<th scope="row">Protein recovery</th>', html=True)
+        self.assertContains(
+            response, '<th scope="row">Protein recovery</th>', html=True
+        )
         self.assertContains(response, '<td class="sdv2-num">12</td>', html=True)
         self.assertContains(response, "<td>%</td>", html=True)
         self.assertContains(response, "<td>Thomas 2025</td>", html=True)
