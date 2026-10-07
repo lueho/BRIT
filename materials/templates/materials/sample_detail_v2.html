@@ -953,8 +953,7 @@
 {% endblock content %}
 {% block javascript %}
   {{ charts|json_script:"charts" }}
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js"
-          crossorigin="anonymous"></script>
+  <script src="{% static 'lib/chartjs/Chart.min.js' %}"></script>
   <script nonce="{{ csp_nonce }}">
     (function () {
       const raw = document.getElementById("charts");
