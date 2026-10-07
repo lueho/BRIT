@@ -208,6 +208,12 @@
                       </h3>
                       {% if card.evaluated %}
                         <span class="badge text-bg-success">Evaluated</span>
+                      {% elif card.status == 2 %}
+                        <span class="badge text-bg-info">
+                          <i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Evaluating…
+                        </span>
+                      {% elif card.status == 4 %}
+                        <span class="badge text-bg-danger">Evaluation failed</span>
                       {% else %}
                         <span class="badge text-bg-secondary">Not evaluated yet</span>
                       {% endif %}
@@ -216,7 +222,10 @@
                       <dl class="csd-kpis">
                         {% for value in card.results %}
                           <div class="csd-kpi">
-                            <dt>{{ value.name }}</dt>
+                            <dt>
+                              {{ value.name }}
+                              {% if card.several_layers %}<span class="csd-kpi-feedstock">{{ value.layer.feedstock.name }}</span>{% endif %}
+                            </dt>
                             <dd>
                               <span class="csd-kpi-value">{{ value.value|floatformat:1 }}</span>
                               {% if value.unit %}<span class="csd-kpi-unit">{{ value.unit }}</span>{% endif %}

@@ -160,9 +160,13 @@ def scenario_cards(scenarios):
         if status == ScenarioStatus.Status.FINISHED
     }
     results = {pk: [] for pk in evaluated}
-    values = LayerAggregatedValue.objects.filter(
-        layer__scenario_id__in=evaluated, layer__staged=False
-    ).order_by("layer__scenario_id", "layer_id", "pk")
+    values = (
+        LayerAggregatedValue.objects.filter(
+            layer__scenario_id__in=evaluated, layer__staged=False
+        )
+        .select_related("layer__feedstock")
+        .order_by("layer__scenario_id", "layer_id", "pk")
+    )
     for value in values.annotate(scenario_id=F("layer__scenario_id")):
         results[value.scenario_id].append(value)
     cards = []
@@ -171,7 +175,9 @@ def scenario_cards(scenarios):
         cards.append(
             {
                 "scenario": scenario,
+                "status": statuses.get(scenario.pk),
                 "evaluated": scenario.pk in evaluated,
+                "several_layers": len({value.layer_id for value in values}) > 1,
                 "results": values[:HEADLINE_RESULT_LIMIT],
                 "more_results": max(len(values) - HEADLINE_RESULT_LIMIT, 0),
             }
