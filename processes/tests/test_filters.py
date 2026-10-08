@@ -106,6 +106,52 @@ class ProcessFilterTestCase(TestCase):
         )
         self.assertEqual(filterset.qs.count(), 2)
 
+    def test_filter_by_exact_material_matches_inputs_and_outputs(self):
+        straw = Material.objects.create(
+            name="Straw", owner=self.owner, publication_status="published"
+        )
+        straw_pellets = Material.objects.create(
+            name="Straw pellets", owner=self.owner, publication_status="published"
+        )
+        ProcessMaterial.objects.create(
+            process=self.process1, material=straw, role="input"
+        )
+        ProcessMaterial.objects.create(
+            process=self.process1, material=straw, role="output"
+        )
+        ProcessMaterial.objects.create(
+            process=self.process2, material=straw, role="output"
+        )
+        ProcessMaterial.objects.create(
+            process=self.process3, material=straw_pellets, role="input"
+        )
+
+        filterset = ProcessFilter(
+            data={"material": straw.pk}, queryset=Process.objects.all()
+        )
+
+        self.assertTrue(filterset.is_valid())
+        self.assertEqual(
+            sorted(filterset.qs.values_list("pk", flat=True)),
+            sorted([self.process1.pk, self.process2.pk]),
+        )
+
+    def test_material_filter_choices_exclude_invisible_materials(self):
+        hidden = Material.objects.create(
+            name="Hidden straw", owner=self.owner, publication_status="private"
+        )
+        request = RequestFactory().get("/")
+        request.user = get_user_model().objects.create(username="material-viewer")
+
+        filterset = ProcessFilter(
+            data={"material": hidden.pk},
+            queryset=Process.objects.all(),
+            request=request,
+        )
+
+        self.assertFalse(filterset.is_valid())
+        self.assertIn("material", filterset.errors)
+
     def test_categories_filter_is_removed_when_no_categories_are_visible(self):
         """A scoped queryset with no visible categories must not render a
         label-only filter widget."""

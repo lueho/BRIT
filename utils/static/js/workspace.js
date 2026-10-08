@@ -359,6 +359,13 @@
                     return;
                 }
                 this.replaceSummary(active, data.html);
+                if (typeof data.progress_html === "string") {
+                    this.root.querySelectorAll("[data-workspace-progress]").forEach((progress) => {
+                        const fragment = this.fragment(data.progress_html);
+                        this.stripScripts(fragment);
+                        progress.replaceChildren(fragment);
+                    });
+                }
                 if (data.title) {
                     document.title = `BRIT · ${data.title}`;
                     this.root.querySelectorAll("[data-workspace-title]").forEach((title) => { title.textContent = data.title; });

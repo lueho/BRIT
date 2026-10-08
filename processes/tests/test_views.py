@@ -4,6 +4,7 @@ Comprehensive tests for all CRUD views following BRIT testing patterns.
 """
 
 import re
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -2517,3 +2518,201 @@ class ProcessDetailOrderingAndGroupingTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["bibliography_sources"], [source_b, source_a])
+
+
+class ProcessContributorMotivationViewsTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user_model = get_user_model()
+        cls.participant = user_model.objects.create_user(username="workshop-author")
+        cls.participant.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="processes",
+                codename__in=["add_process", "change_process"],
+            )
+        )
+        cls.feed_material = Material.objects.create(
+            name="Motivation feedstock",
+            owner=cls.participant,
+            publication_status="published",
+        )
+        cls.product_material = Material.objects.create(
+            name="Motivation product",
+            owner=cls.participant,
+            publication_status="published",
+        )
+
+    def setUp(self):
+        self.client.force_login(self.participant)
+        self.process = Process.objects.create(
+            owner=self.participant,
+            name="Motivation draft",
+            short_description="Recorded during the workshop",
+        )
+
+    def detail_url(self, process=None, mode=None):
+        url = reverse(
+            "processes:process-detail", kwargs={"pk": (process or self.process).pk}
+        )
+        return f"{url}?mode={mode}" if mode else url
+
+    def section_url(self, section):
+        url = reverse("processes:process-update", kwargs={"pk": self.process.pk})
+        return f"{url}?section={section}"
+
+    @staticmethod
+    def material_payload(material):
+        return {
+            "process_materials-TOTAL_FORMS": "1",
+            "process_materials-INITIAL_FORMS": "0",
+            "process_materials-0-material": str(material.pk),
+            "process_materials-0-quantity_value": "",
+            "process_materials-0-quantity_unit": "",
+        }
+
+    def test_reading_view_credits_creator(self):
+        response = self.client.get(self.detail_url())
+
+        self.assertContains(response, "Contributed by")
+        self.assertContains(response, "workshop-author")
+
+    def test_published_reading_view_credits_creator_for_anonymous_visitors(self):
+        Process.objects.filter(pk=self.process.pk).update(
+            publication_status="published"
+        )
+        self.client.logout()
+
+        response = self.client.get(self.detail_url())
+
+        self.assertContains(response, "Contributed by")
+        self.assertContains(response, "workshop-author")
+
+    def test_reading_view_shows_last_update(self):
+        Process.objects.filter(pk=self.process.pk).update(
+            lastmodified_at=datetime(2026, 3, 14, 9, 30, tzinfo=UTC)
+        )
+
+        response = self.client.get(self.detail_url())
+
+        self.assertContains(response, "Last updated")
+        self.assertContains(response, "2026-03-14")
+
+    def test_section_save_refreshes_last_update(self):
+        stale = datetime(2020, 1, 1, tzinfo=UTC)
+        Process.objects.filter(pk=self.process.pk).update(lastmodified_at=stale)
+
+        self.client.post(
+            self.section_url("inputs"),
+            self.material_payload(self.feed_material),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.process.refresh_from_db()
+        self.assertGreater(self.process.lastmodified_at, stale)
+
+    def test_edit_mode_shows_progress_and_suggests_inputs_first(self):
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        self.assertEqual(response.context["section_progress"]["filled"], 1)
+        self.assertEqual(
+            response.context["section_progress"]["total"], len(PROCESS_SECTIONS)
+        )
+        self.assertContains(response, "data-workspace-progress")
+        self.assertContains(
+            response, f"1 of {len(PROCESS_SECTIONS)} sections have content"
+        )
+        self.assertContains(response, 'href="#workspace-section-inputs"')
+
+    def test_progress_suggests_outputs_after_inputs(self):
+        ProcessMaterial.objects.create(
+            process=self.process, material=self.feed_material, role="input"
+        )
+
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        self.assertEqual(response.context["section_progress"]["filled"], 2)
+        self.assertEqual(response.context["section_progress"]["next"]["key"], "outputs")
+
+    def test_progress_does_not_require_short_description_after_core_flow(self):
+        Process.objects.filter(pk=self.process.pk).update(short_description="")
+        for role, material in (
+            ("input", self.feed_material),
+            ("output", self.product_material),
+        ):
+            ProcessMaterial.objects.create(
+                process=self.process, material=material, role=role
+            )
+
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        progress = response.context["section_progress"]
+        self.assertEqual(progress["filled"], 2)
+        self.assertEqual(progress["next"]["key"], "overview")
+
+    def test_progress_counts_overview_with_category_but_no_short_description(self):
+        Process.objects.filter(pk=self.process.pk).update(short_description="")
+        self.process.categories.add(
+            ProcessCategory.objects.create(
+                name="Motivation category",
+                owner=self.participant,
+                publication_status="published",
+            )
+        )
+
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        progress = response.context["section_progress"]
+        self.assertEqual(progress["filled"], 1)
+        self.assertEqual(progress["next"]["key"], "inputs")
+
+    def test_overview_suggestion_mentions_short_description_or_category(self):
+        Process.objects.filter(pk=self.process.pk).update(short_description="")
+        for role, material in (
+            ("input", self.feed_material),
+            ("output", self.product_material),
+        ):
+            ProcessMaterial.objects.create(
+                process=self.process, material=material, role=role
+            )
+
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        self.assertContains(response, "add a short description or a category.")
+
+    def test_progress_counts_optional_enrichment_sections(self):
+        ProcessMaterial.objects.create(
+            process=self.process, material=self.feed_material, role="input"
+        )
+        ProcessMaterial.objects.create(
+            process=self.process, material=self.product_material, role="output"
+        )
+        ProcessOperatingParameter.objects.create(
+            process=self.process, parameter="temperature", nominal_value=40
+        )
+        Process.objects.filter(pk=self.process.pk).update(mechanism="Mixing")
+
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        progress = response.context["section_progress"]
+        self.assertEqual(progress["filled"], 5)
+        self.assertEqual(progress["next"]["key"], "references")
+
+    def test_section_save_returns_refreshed_progress(self):
+        response = self.client.post(
+            self.section_url("inputs"),
+            self.material_payload(self.feed_material),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        payload = response.json()
+        self.assertTrue(payload["saved"])
+        self.assertIn(
+            f"2 of {len(PROCESS_SECTIONS)} sections have content",
+            payload["progress_html"],
+        )
+        self.assertIn('href="#workspace-section-outputs"', payload["progress_html"])
+
+    def test_reading_view_has_no_progress_hint(self):
+        response = self.client.get(self.detail_url())
+
+        self.assertNotContains(response, "data-workspace-progress")

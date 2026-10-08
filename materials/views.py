@@ -29,6 +29,7 @@ from django.views.generic.detail import SingleObjectMixin
 
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
+from processes.models import Process
 from utils.file_export.views import (
     GenericUserCreatedObjectExportView,
     SingleObjectFileExportView,
@@ -367,6 +368,23 @@ class MaterialDetailView(UserCreatedObjectDetailView):
         ).count()
         context["related_samples_list_url"] = (
             f"{reverse('sample-list')}?substrate_material={self.object.pk}"
+        )
+        processes = filter_queryset_for_user(
+            Process.objects.filter(
+                pk__in=self.object.process_materials.values("process_id")
+            ),
+            user,
+        ).order_by("name", "pk")
+        (
+            context["related_processes"],
+            context["related_processes_total"],
+            context["related_processes_more"],
+        ) = _capped_related(processes)
+        context["related_processes_published_total"] = processes.filter(
+            publication_status="published"
+        ).count()
+        context["related_processes_list_url"] = (
+            f"{reverse('processes:process-list')}?material={self.object.pk}"
         )
         return context
 

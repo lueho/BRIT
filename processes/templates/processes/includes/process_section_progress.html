@@ -1,0 +1,10 @@
+<p class="mb-0">
+  <strong>{{ section_progress.filled }} of {{ section_progress.total }} sections have content.</strong>
+  {% if section_progress.next %}
+    Suggested next:
+    <a href="#workspace-section-{{ section_progress.next.key }}">{{ section_progress.next.label }}</a>
+    — {{ section_progress.next.hint }}
+  {% else %}
+    Every section has content. Thank you — revisit it whenever something changes.
+  {% endif %}
+</p>
