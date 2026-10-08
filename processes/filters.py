@@ -8,10 +8,7 @@ from django import forms
 
 from utils.filters import UserCreatedObjectScopedFilterSet
 from utils.object_management.models import STATUS_CHOICES
-from utils.object_management.permissions import (
-    apply_scope_filter,
-    filter_queryset_for_user,
-)
+from utils.object_management.permissions import filter_queryset_for_user
 
 from .models import Process, ProcessCategory, ProcessMaterial
 
@@ -112,15 +109,6 @@ class ProcessFilter(UserCreatedObjectScopedFilterSet):
         if request and hasattr(request, "user"):
             category_queryset = filter_queryset_for_user(
                 category_queryset, request.user
-            )
-
-        scope_value = None
-        if hasattr(self, "data") and self.data:
-            scope_value = self.data.get("scope")
-
-        if scope_value:
-            category_queryset = apply_scope_filter(
-                category_queryset, scope_value, user=getattr(request, "user", None)
             )
 
         # Drop the categories filter entirely when the scoped queryset is

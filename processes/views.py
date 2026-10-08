@@ -10,7 +10,7 @@ from django.db.models import Prefetch
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
-from django.views.generic import ListView, TemplateView
+from django.views.generic import ListView, RedirectView, TemplateView
 
 from bibliography.models import Source
 from materials.models import Material
@@ -58,7 +58,8 @@ from .models import (
     ProcessOperatingParameter,
     ProcessSource,
 )
-from .querysets import with_process_count, with_published_process_count
+from .navigation import discovery_context
+from .querysets import with_published_process_count
 
 # ==============================================================================
 # Helper Views
@@ -138,6 +139,17 @@ class ProcessDashboardView(BreadcrumbContextMixin, TemplateView):
         return context
 
 
+class ProcessDiscoveryRedirectView(RedirectView):
+    """Redirect legacy dashboard/explorer URLs to the category catalogue."""
+
+    permanent = False
+
+    def get_redirect_url(self, *args, **kwargs):
+        url = reverse("processes:processcategory-list")
+        query = self.request.GET.urlencode()
+        return f"{url}?{query}" if query else url
+
+
 # ==============================================================================
 # ProcessCategory CRUD
 # ==============================================================================
@@ -169,13 +181,24 @@ class ProcessCategoryPublishedListView(PublishedObjectListView):
     """List published ProcessCategory objects."""
 
     model = ProcessCategory
-    template_name = "processes/processcategory_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
+    template_name = "processes/processcategory_catalogue.html"
+    dashboard_url = None
     context_object_name = "categories"
     paginate_by = 20
+    ordering = ["name", "id"]
 
     def get_queryset(self):
-        return with_published_process_count(super().get_queryset())
+        queryset = super().get_queryset()
+        query = (self.request.GET.get("category_q") or "").strip()
+        if query:
+            queryset = queryset.filter(name__icontains=query)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["category_q"] = (self.request.GET.get("category_q") or "").strip()
+        context["discovery_scope"] = discovery_context(self.request)["scope"]
+        return context
 
 
 class ProcessCategoryPrivateListView(PrivateObjectListView):
@@ -183,12 +206,9 @@ class ProcessCategoryPrivateListView(PrivateObjectListView):
 
     model = ProcessCategory
     template_name = "processes/processcategory_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
+    dashboard_url = None
     context_object_name = "categories"
     paginate_by = 20
-
-    def get_queryset(self):
-        return with_process_count(super().get_queryset())
 
 
 class ProcessCategoryReviewListView(ReviewObjectListView):
@@ -196,12 +216,9 @@ class ProcessCategoryReviewListView(ReviewObjectListView):
 
     model = ProcessCategory
     template_name = "processes/processcategory_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
+    dashboard_url = None
     context_object_name = "categories"
     paginate_by = 20
-
-    def get_queryset(self):
-        return with_process_count(super().get_queryset())
 
 
 class ProcessCategoryDetailView(UserCreatedObjectDetailView):
@@ -218,13 +235,17 @@ class ProcessCategoryDetailView(UserCreatedObjectDetailView):
         process_queryset = filter_queryset_for_user(
             self.object.processes.all(), self.request.user
         )
+        nav = discovery_context(self.request)
+        if nav["explicit"]:
+            data = nav["filters"].copy()
+            data["scope"] = nav["scope"]
+            process_queryset = ProcessFilter(
+                data=data, queryset=process_queryset, request=self.request
+            ).qs
         category_queryset = filter_queryset_for_user(
             ProcessCategory.objects.filter(processes__in=process_queryset),
             self.request.user,
         )
-        process_count_status = None
-        if self.object.publication_status == "published":
-            process_count_status = "published"
         processes = process_queryset.select_related("owner").prefetch_related(
             "authors",
             Prefetch(
@@ -235,10 +256,9 @@ class ProcessCategoryDetailView(UserCreatedObjectDetailView):
             ),
         )
         context["processes"] = processes
-        context["related_categories"] = with_process_count(
-            category_queryset.exclude(pk=self.object.pk).distinct(),
-            publication_status=process_count_status,
-        ).order_by("name")
+        context["related_categories"] = (
+            category_queryset.exclude(pk=self.object.pk).distinct().order_by("name")
+        )
         return context
 
 
@@ -344,7 +364,8 @@ class ProcessFilterViewMixin:
 
     model = Process
     template_name = "processes/process_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
+    dashboard_url = None
+    breadcrumb_module_url = reverse_lazy("processes:process-list")
     context_object_name = "processes"
     filterset_class = ProcessFilter
     paginate_by = 20
@@ -490,6 +511,14 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             else []
         )
         context["section_anchors"] = self._build_section_anchors(context)
+        section_url = context.get("breadcrumb_section_url")
+        if callable(section_url):
+            section_url = section_url()
+        if section_url is not None and section_url == context.get(
+            "breadcrumb_module_url"
+        ):
+            context.pop("breadcrumb_section_label", None)
+            context.pop("breadcrumb_section_url", None)
 
         return context
 

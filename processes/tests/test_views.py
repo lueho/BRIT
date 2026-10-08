@@ -627,41 +627,37 @@ class ProcessMaintenanceViewsTestCase(TestCase):
         self.assertGreater(row.order, 0)
 
 
-class ProcessDashboardViewTestCase(ViewWithPermissionsTestCase):
-    """Test the processes dashboard view."""
+class ProcessDiscoveryRedirectTestCase(TestCase):
+    """Legacy dashboard/explorer URLs redirect to the category catalogue."""
 
-    def test_get_http_200_ok_for_anonymous(self):
-        """Anonymous users can access the dashboard."""
+    def test_dashboard_redirects_to_category_catalogue(self):
         response = self.client.get(reverse("processes:dashboard"))
-        self.assertEqual(200, response.status_code)
 
-    def test_get_http_200_ok_for_authenticated(self):
-        """Authenticated users can access the dashboard."""
-        self.client.force_login(self.member)
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertEqual(200, response.status_code)
-
-    def test_total_categories_reflects_user_visibility(self):
-        """The dashboard counter must use the same read policy as the lists
-        and autocomplete, so user-visible unpublished categories are counted."""
-        ProcessCategory.objects.create(
-            name="Published Category",
-            owner=self.owner,
-            publication_status="published",
-        )
-        ProcessCategory.objects.create(name="Member Category", owner=self.member)
-        ProcessCategory.objects.create(name="Outsider Category", owner=self.outsider)
-
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertEqual(1, response.context["total_categories"])
-
-        self.client.force_login(self.member)
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertEqual(2, response.context["total_categories"])
+        self.assertEqual(302, response.status_code)
         self.assertEqual(
-            {"Published Category", "Member Category"},
-            {category.name for category in response.context["categories_with_counts"]},
+            reverse("processes:processcategory-list"), response["Location"]
         )
+
+    def test_explorer_redirects_to_category_catalogue(self):
+        response = self.client.get(reverse("processes:processes-explorer"))
+        self.assertEqual(302, response.status_code)
+        self.assertEqual(
+            reverse("processes:processcategory-list"), response["Location"]
+        )
+
+    def test_redirects_preserve_query_params(self):
+        for url_name in ("processes:dashboard", "processes:processes-explorer"):
+            with self.subTest(url_name=url_name):
+                response = self.client.get(
+                    reverse(url_name), {"scope": "review", "name": "digestion"}
+                )
+                self.assertEqual(302, response.status_code)
+                location = response["Location"]
+                self.assertTrue(
+                    location.startswith(f"{reverse('processes:processcategory-list')}?")
+                )
+                self.assertIn("scope=review", location)
+                self.assertIn("name=digestion", location)
 
 
 # ==============================================================================
@@ -680,7 +676,8 @@ class ProcessCategoryCRUDViewsTestCase(
 
     model = ProcessCategory
 
-    view_dashboard_name = "processes:dashboard"
+    dashboard_view = False
+
     view_create_name = "processes:processcategory-create"
     view_modal_create_name = "processes:processcategory-create-modal"
     view_published_list_name = "processes:processcategory-list"
@@ -797,8 +794,8 @@ class ProcessCategoryCRUDViewsTestCase(
         self.assertContains(response, "Pilot-scale process equipment.")
         self.assertContains(response, "Image: BRIT team, CC BY 4.0.")
 
-    def test_list_shows_published_process_count(self):
-        """Category list should count published processes assigned to the category."""
+    def test_list_shows_categories_without_process_counts(self):
+        """The category catalogue lists categories without discovery counters."""
         published_process = Process.objects.create(
             name="Published category process",
             owner=self.owner_user,
@@ -816,7 +813,8 @@ class ProcessCategoryCRUDViewsTestCase(
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Published Test Category")
-        self.assertContains(response, "1 process")
+        self.assertNotContains(response, "1 process<")
+        self.assertNotContains(response, "2 processes")
 
     def test_private_detail_shows_private_processes(self):
         """Private category detail should show associated private processes."""
@@ -833,7 +831,7 @@ class ProcessCategoryCRUDViewsTestCase(
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Processes in This Category (1)")
+        self.assertContains(response, "Processes in This Category")
         self.assertContains(response, "Private category process")
 
 
@@ -866,7 +864,7 @@ class ProcessListEmptyStateTestCase(ViewWithPermissionsTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No items match your current filters.")
+        self.assertContains(response, "No processes match your current filters.")
         self.assertContains(response, ">Reset filters</a>")
 
 
@@ -894,7 +892,8 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
     model = Process
 
-    view_dashboard_name = "processes:dashboard"
+    dashboard_view = False
+
     view_create_name = "processes:process-create"
     view_modal_create_name = "processes:process-create-modal"
     view_published_list_name = "processes:process-list"
@@ -1926,44 +1925,6 @@ class ProcessCategoryReviewDetailTestCase(ViewWithPermissionsTestCase):
         self.assertNotContains(response, "No processes in this category yet.")
 
 
-class ProcessDashboardVisibilityTestCase(ViewWithPermissionsTestCase):
-    """Dashboard counters must use the same read policy as the lists."""
-
-    member_permissions = ["add_process"]
-
-    def test_total_processes_reflects_user_visibility(self):
-        Process.objects.create(
-            name="Published Process",
-            owner=self.owner,
-            publication_status="published",
-        )
-        Process.objects.create(name="Member Process", owner=self.member)
-        Process.objects.create(name="Outsider Process", owner=self.outsider)
-
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertEqual(1, response.context["total_processes"])
-
-        self.client.force_login(self.member)
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertEqual(2, response.context["total_processes"])
-
-    def test_quick_actions_hidden_for_anonymous(self):
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, reverse("processes:process-create"))
-
-    def test_quick_actions_hidden_without_add_permission(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertNotContains(response, reverse("processes:process-create"))
-        self.assertNotContains(response, reverse("processes:processcategory-create"))
-
-    def test_quick_actions_visible_with_add_permission(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertContains(response, reverse("processes:process-create"))
-
-
 class ProcessFilterViewQuerysetTests(TestCase):
     def test_filter_views_share_the_queryset_mixin(self):
         """The three process filter views share one queryset so related-object
@@ -2086,24 +2047,28 @@ class ProcessWorkshopJourneyViewsTestCase(TestCase):
             review_response, "<strong>Processes in review</strong>", html=True
         )
 
-    def test_detail_nav_links_back_to_owned_list_for_authenticated_users(self):
+    def test_detail_nav_shows_compact_discovery_links_for_all_readers(self):
         published = Process.objects.create(
             name="Published workshop process",
             owner=self.moderator,
             publication_status="published",
         )
         url = reverse("processes:process-detail", kwargs={"pk": published.pk})
-        owned_url = f"{reverse('processes:process-list-owned')}?scope=private"
+        catalogue_url = reverse("processes:processcategory-list")
 
-        response = self.client.get(url)
-        self.assertContains(response, f'href="{owned_url}"')
-        self.assertContains(response, "My processes")
-
-        self.client.logout()
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "My processes")
-        self.assertNotContains(response, reverse("processes:process-list-owned"))
+        for user in (self.participant, None):
+            with self.subTest(user=user):
+                if user is None:
+                    self.client.logout()
+                else:
+                    self.client.force_login(user)
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, f'href="{catalogue_url}?scope=published"')
+                self.assertContains(response, "Categories")
+                self.assertNotContains(response, "processes-explorer")
+                self.assertNotContains(response, "Explorer")
+                self.assertNotContains(response, "My processes")
 
     def test_edit_workspace_jump_nav_matches_rendered_sections(self):
         process = self.create_draft()
