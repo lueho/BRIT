@@ -424,7 +424,7 @@ def _process_detail_prefetches(user):
 PROCESS_SECTION_NEXT_STEPS = {
     "inputs": "add a material that goes into the process.",
     "outputs": "add a material the process produces.",
-    "overview": "add a short description.",
+    "overview": "add a short description or a category.",
     "technology": "describe how the process works.",
     "parameters": "add typical operating conditions.",
     "references": "credit the sources and people behind this process.",

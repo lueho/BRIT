@@ -2649,6 +2649,36 @@ class ProcessContributorMotivationViewsTestCase(TestCase):
         self.assertEqual(progress["filled"], 2)
         self.assertEqual(progress["next"]["key"], "overview")
 
+    def test_progress_counts_overview_with_category_but_no_short_description(self):
+        Process.objects.filter(pk=self.process.pk).update(short_description="")
+        self.process.categories.add(
+            ProcessCategory.objects.create(
+                name="Motivation category",
+                owner=self.participant,
+                publication_status="published",
+            )
+        )
+
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        progress = response.context["section_progress"]
+        self.assertEqual(progress["filled"], 1)
+        self.assertEqual(progress["next"]["key"], "inputs")
+
+    def test_overview_suggestion_mentions_short_description_or_category(self):
+        Process.objects.filter(pk=self.process.pk).update(short_description="")
+        for role, material in (
+            ("input", self.feed_material),
+            ("output", self.product_material),
+        ):
+            ProcessMaterial.objects.create(
+                process=self.process, material=material, role=role
+            )
+
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        self.assertContains(response, "add a short description or a category.")
+
     def test_progress_counts_optional_enrichment_sections(self):
         ProcessMaterial.objects.create(
             process=self.process, material=self.feed_material, role="input"
