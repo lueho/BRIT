@@ -144,6 +144,15 @@
             return url;
         }
 
+        isTrustedMedia(value, kind) {
+            try {
+                this.trustedMediaURL(value, kind);
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
         loadAsset(element, kind) {
             const url = this.trustedMediaURL(element.getAttribute(kind === "script" ? "src" : "href"), kind);
             if (media.has(url.href)) return media.get(url.href);
@@ -182,7 +191,12 @@
                 // Stylesheets only affect appearance; a failed request must not
                 // keep the editor scripts below from loading.
                 await Promise.allSettled(Array.from(template.content.querySelectorAll('link[rel="stylesheet"]'), (link) => this.loadAsset(link, "style")));
-                for (const script of template.content.querySelectorAll("script[src]")) await this.loadAsset(script, "script");
+                for (const script of template.content.querySelectorAll("script[src]")) {
+                    // Proxies such as Cloudflare inject their own scripts into the
+                    // markup; they are not editor dependencies, so skip them.
+                    if (!this.isTrustedMedia(script.getAttribute("src"), "script")) continue;
+                    await this.loadAsset(script, "script");
+                }
                 template.remove();
             }
         }
