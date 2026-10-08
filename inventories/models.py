@@ -4,6 +4,7 @@ import pkgutil
 from celery.result import AsyncResult
 from celery.states import READY_STATES
 from django.contrib.auth.models import User
+from django.contrib.gis.db.models.functions import Intersection
 from django.core.validators import RegexValidator
 from django.db import models, transaction
 from django.db.models.query import QuerySet
@@ -19,6 +20,8 @@ from materials.models import Material, SampleSeries
 from utils.object_management.models import NamedUserCreatedObject
 
 from .exceptions import BlockedRunningScenario
+
+REGION_COVERAGE_THRESHOLD = 0.99
 
 
 class InventoryAlgorithm(models.Model):
@@ -396,7 +399,9 @@ class Scenario(NamedUserCreatedObject):
     def compatible_geodatasets(self, queryset=None):
         """
         Returns the geodatasets that can feed this scenario: those of the scenario region itself and those whose
-        region spatially encloses it (e.g. a country-wide dataset for a municipality scenario).
+        region covers it (e.g. a country-wide dataset for a municipality scenario). A region covers the scenario
+        region when it overlaps at least REGION_COVERAGE_THRESHOLD of its area, which tolerates small border
+        mismatches between geometries from different sources.
         """
         if queryset is None:
             queryset = GeoDataset.objects.all()
@@ -404,10 +409,20 @@ class Scenario(NamedUserCreatedObject):
             return queryset.none()
         match = models.Q(region_id=self.region_id)
         region_geom = self.region.geom
-        if region_geom is not None and not region_geom.empty:
-            point = region_geom.point_on_surface
-            point.srid = region_geom.srid
-            match |= models.Q(region__borders__geom__contains=point)
+        if region_geom is not None and not region_geom.empty and region_geom.area > 0:
+            covering_regions = (
+                Region.objects.filter(borders__geom__intersects=region_geom)
+                .annotate(
+                    overlap=models.Func(
+                        Intersection("borders__geom", region_geom),
+                        function="ST_Area",
+                        output_field=models.FloatField(),
+                    )
+                )
+                .filter(overlap__gte=region_geom.area * REGION_COVERAGE_THRESHOLD)
+                .values("pk")
+            )
+            match |= models.Q(region__in=covering_regions)
         return queryset.filter(match)
 
     def evaluated_geodatasets(

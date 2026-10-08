@@ -915,6 +915,20 @@ class ScenarioEnclosingRegionGeodatasetTestCase(TestCase):
         self.assertIn(self.country_dataset, datasets)
         self.assertNotIn(self.elsewhere_dataset, datasets)
 
+    def test_partially_overlapping_region_is_not_compatible(self):
+        partial = _region_with_borders("Partial", _square(2.5, 2.5, 3))
+        partial_dataset = GeoDataset.objects.create(
+            name="Partial dataset", region=partial
+        )
+        self.assertNotIn(partial_dataset, self.scenario.compatible_geodatasets())
+
+    def test_region_with_minor_border_mismatch_is_compatible(self):
+        shifted = _region_with_borders("Shifted", _square(2.01, 2, 2))
+        shifted_dataset = GeoDataset.objects.create(
+            name="Shifted dataset", region=shifted
+        )
+        self.assertIn(shifted_dataset, self.scenario.compatible_geodatasets())
+
     def test_scenario_without_region_borders_matches_exact_region_only(self):
         region = Region.objects.create(name="No borders")
         own_dataset = GeoDataset.objects.create(name="Own dataset", region=region)
