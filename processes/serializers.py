@@ -204,9 +204,7 @@ class ScopedRelatedObjectsMixin:
     def _visible_material_links(self, obj):
         visible = self._visible_pks(Material)
         return [
-            link
-            for link in obj.process_materials.all()
-            if link.material_id in visible
+            link for link in obj.process_materials.all() if link.material_id in visible
         ]
 
 
@@ -342,9 +340,7 @@ class ProcessDetailSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerial
         """Get list of input materials."""
         visible = self._visible_pks(Material)
         return [
-            {"id": m.id, "name": m.name}
-            for m in obj.input_materials
-            if m.pk in visible
+            {"id": m.id, "name": m.name} for m in obj.input_materials if m.pk in visible
         ]
 
     def get_output_materials(self, obj):

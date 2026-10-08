@@ -2385,6 +2385,89 @@ class ProcessCategoryModalDeleteRedirectTestCase(ViewWithPermissionsTestCase):
             f"{reverse('processes:processcategory-list-owned')}?scope=private",
         )
 
+    def test_delete_with_absolute_next_to_own_detail_redirects_to_scoped_list(self):
+        self.client.force_login(self.owner)
+        detail_url = f"http://testserver{self.category.get_absolute_url()}?tab=info"
+        response = self.client.post(
+            self.category.modal_delete_url, {"next": detail_url}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            f"{reverse('processes:processcategory-list-owned')}?scope=private",
+        )
+
+    def test_delete_with_unrelated_next_redirects_there(self):
+        other = ProcessCategory.objects.create(name="Survivor", owner=self.owner)
+        self.client.force_login(self.owner)
+        next_url = f"http://testserver{other.get_absolute_url()}"
+        response = self.client.post(self.category.modal_delete_url, {"next": next_url})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], next_url)
+
+
+class ListRowNavigationTestCase(ViewWithPermissionsTestCase):
+    """Clickable list rows must not navigate when a nested control is used."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.process = Process.objects.create(name="Row process", owner=cls.owner)
+        cls.category = ProcessCategory.objects.create(
+            name="Row category", owner=cls.owner
+        )
+
+    def _row_handlers(self, response):
+        html = response.content.decode()
+        return re.findall(r'<tr tabindex="0"[^>]*>', html)
+
+    def test_rows_ignore_clicks_and_keys_from_nested_controls(self):
+        self.client.force_login(self.owner)
+        for url in (
+            reverse("processes:process-list-owned"),
+            reverse("processes:processcategory-list-owned"),
+        ):
+            with self.subTest(url=url):
+                response = self.client.get(url, {"scope": "private"})
+                self.assertEqual(response.status_code, 200)
+                rows = self._row_handlers(response)
+                self.assertEqual(len(rows), 1)
+                row = rows[0]
+                self.assertIn(
+                    "onclick=\"if(!event.target.closest('a,button,input,select,"
+                    "textarea,label,form,.dropdown-menu'))",
+                    row,
+                )
+                self.assertIn('onkeydown="if(event.target===this&&', row)
+                self.assertNotIn('onclick="window.location', row)
+
+
+class ProcessDashboardRecentOrderingTestCase(TestCase):
+    def test_recent_processes_are_most_recently_modified_first(self):
+        from django.contrib.auth.models import AnonymousUser
+        from django.test import RequestFactory
+        from django.utils import timezone
+
+        from ..views import ProcessDashboardView
+
+        owner = get_user_model().objects.create(username="dash-owner")
+        older = Process.objects.create(
+            name="AAA older", owner=owner, publication_status="published"
+        )
+        newer = Process.objects.create(
+            name="ZZZ newer", owner=owner, publication_status="published"
+        )
+        Process.objects.filter(pk=older.pk).update(
+            lastmodified_at=timezone.now() - timezone.timedelta(days=2)
+        )
+        Process.objects.filter(pk=newer.pk).update(lastmodified_at=timezone.now())
+        request = RequestFactory().get("/")
+        request.user = AnonymousUser()
+        view = ProcessDashboardView()
+        view.setup(request)
+        context = view.get_context_data()
+        self.assertEqual([newer, older], list(context["recent_processes"]))
+
 
 class ProcessDetailOrderingAndGroupingTestCase(ViewWithPermissionsTestCase):
     """Stable parameter grouping and editor-defined bibliography order."""

@@ -32,4 +32,3 @@ def with_process_count(queryset, publication_status=None, user=None):
             Value(0),
         )
     )
-

@@ -409,9 +409,7 @@ class ProcessAPIVisibilityAndOrderingTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_private_category_hidden_in_process_payload(self):
-        response = self.client.get(
-            f"/processes/api/processes/{self.process.pk}/"
-        )
+        response = self.client.get(f"/processes/api/processes/{self.process.pk}/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         names = {category["name"] for category in response.data["categories"]}
         self.assertIn("API Published Category", names)
@@ -419,17 +417,13 @@ class ProcessAPIVisibilityAndOrderingTestCase(APITestCase):
 
     def test_owner_sees_private_category_in_process_payload(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(
-            f"/processes/api/processes/{self.process.pk}/"
-        )
+        response = self.client.get(f"/processes/api/processes/{self.process.pk}/")
         names = {category["name"] for category in response.data["categories"]}
         self.assertIn("API Private Category", names)
 
     def test_nested_categories_have_consistent_shape(self):
         """Nested categories never carry the annotation-only process_count."""
-        response = self.client.get(
-            f"/processes/api/processes/{self.process.pk}/"
-        )
+        response = self.client.get(f"/processes/api/processes/{self.process.pk}/")
         for category in response.data["categories"]:
             self.assertNotIn("process_count", category)
 
@@ -476,9 +470,7 @@ class ProcessAPIVisibilityAndOrderingTestCase(APITestCase):
             role=ProcessMaterial.Role.INPUT,
         )
 
-        response = self.client.get(
-            f"/processes/api/processes/{self.process.pk}/"
-        )
+        response = self.client.get(f"/processes/api/processes/{self.process.pk}/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         source_titles = {s.get("title") for s in response.data["sources"]}
         self.assertNotIn("API Secret Source", source_titles)

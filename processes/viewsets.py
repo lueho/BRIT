@@ -132,9 +132,7 @@ class ProcessViewSet(UserCreatedObjectViewSet):
                 ),
                 Prefetch(
                     "sources",
-                    queryset=filter_queryset_for_user(
-                        Source.objects.all(), user
-                    ),
+                    queryset=filter_queryset_for_user(Source.objects.all(), user),
                 ),
             )
         elif self.action == "retrieve":
@@ -163,9 +161,7 @@ class ProcessViewSet(UserCreatedObjectViewSet):
                 "info_resources",
                 Prefetch(
                     "sources",
-                    queryset=filter_queryset_for_user(
-                        Source.objects.all(), user
-                    ),
+                    queryset=filter_queryset_for_user(Source.objects.all(), user),
                 ),
             )
 
@@ -185,9 +181,9 @@ class ProcessViewSet(UserCreatedObjectViewSet):
         """Get all materials (inputs and outputs) for this process."""
         process = self.get_object()
         visible = set(
-            filter_queryset_for_user(
-                Material.objects.all(), request.user
-            ).values_list("pk", flat=True)
+            filter_queryset_for_user(Material.objects.all(), request.user).values_list(
+                "pk", flat=True
+            )
         )
         return Response(
             {
@@ -242,9 +238,9 @@ class ProcessViewSet(UserCreatedObjectViewSet):
         """Get all literature sources referenced by this process."""
         process = self.get_object()
         visible = set(
-            filter_queryset_for_user(
-                Source.objects.all(), request.user
-            ).values_list("pk", flat=True)
+            filter_queryset_for_user(Source.objects.all(), request.user).values_list(
+                "pk", flat=True
+            )
         )
         sources = [
             {

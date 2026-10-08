@@ -4,6 +4,8 @@ Provides complete CRUD operations for all process-related models following
 BRIT conventions and patterns from utils.object_management.views.
 """
 
+from urllib.parse import urlsplit
+
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Prefetch, prefetch_related_objects
@@ -85,9 +87,11 @@ class ProcessDashboardView(BreadcrumbContextMixin, TemplateView):
         context["total_categories"] = visible_categories.count()
 
         # Recent processes
-        context["recent_processes"] = visible_processes.select_related(
-            "owner"
-        ).prefetch_related("categories")[:5]
+        context["recent_processes"] = (
+            visible_processes.select_related("owner")
+            .prefetch_related("categories")
+            .order_by("-lastmodified_at")[:5]
+        )
 
         # Categories with process counts
         context["categories_with_counts"] = with_process_count(
@@ -263,7 +267,9 @@ def _scoped_list_delete_success_url(view):
     object's own detail page, which no longer exists after deletion.
     """
     next_url = get_safe_next_url(view.request)
-    if next_url and not next_url.startswith(view.object.get_absolute_url()):
+    if next_url and not urlsplit(next_url).path.startswith(
+        view.object.get_absolute_url()
+    ):
         return next_url
     if view.object.publication_status == "published":
         return f"{view.model.public_list_url()}?scope=published"

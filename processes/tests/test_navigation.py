@@ -230,6 +230,19 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         )
         self.assertContains(response, f'href="{expected.replace("&", "&amp;")}"')
 
+    def test_catalogue_ignores_process_scope_and_name_filters(self):
+        """Process discovery params (review scope, process name) must not
+        restrict the published category cards."""
+        self.client.force_login(self.moderator)
+        response = self.client.get(
+            reverse("processes:processcategory-list"),
+            {"scope": "review", "name": "dig"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            {self.category, self.other_category}, set(response.context["categories"])
+        )
+
     def test_catalogue_about_link_replaces_category_selection(self):
         """About this category must scope to the clicked category, not carry
         a previously selected category into the detail gallery."""

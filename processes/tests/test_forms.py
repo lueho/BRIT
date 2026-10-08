@@ -9,7 +9,6 @@ from materials.models import Material
 from utils.properties.models import Unit
 
 from ..forms import (
-    ProcessAuthorInlineForm,
     ProcessAuthorSectionForm,
     ProcessCategoryModalModelForm,
     ProcessCategoryModelForm,

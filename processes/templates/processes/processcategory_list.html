@@ -23,8 +23,8 @@
 {% block list_table_row %}
 <tr tabindex="0"
     role="link"
-    onclick="window.location='{% detail_or_review_url object use_back=True %}'"
-    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.location='{% detail_or_review_url object use_back=True %}'}">
+    onclick="if(!event.target.closest('a,button,input,select,textarea,label,form,.dropdown-menu')){window.location='{% detail_or_review_url object use_back=True %}'}"
+    onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();window.location='{% detail_or_review_url object use_back=True %}'}">
     {% include "object_management/bulk_select_td.html" %}
     <td>
         <a href="{% detail_or_review_url object use_back=True %}"
