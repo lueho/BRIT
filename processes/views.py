@@ -6,13 +6,13 @@ BRIT conventions and patterns from utils.object_management.views.
 
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Prefetch
+from django.db.models import Prefetch, prefetch_related_objects
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
-from django.views.generic import ListView, TemplateView
+from django.views.generic import RedirectView, TemplateView
 
-from bibliography.models import Source
+from bibliography.models import Author, Source
 from materials.models import Material
 from utils.forms import workspace_section_formsets
 from utils.object_management.models import ReviewAction
@@ -23,12 +23,10 @@ from utils.object_management.permissions import (
 from utils.object_management.views import (
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
-    PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
     ReviewItemDetailView,
     ReviewObjectFilterView,
-    ReviewObjectListMixin,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
@@ -38,9 +36,9 @@ from utils.object_management.views import (
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
 )
-from utils.views import BreadcrumbContextMixin
+from utils.views import BreadcrumbContextMixin, get_safe_next_url
 
-from .filters import ProcessFilter
+from .filters import ProcessCategoryFilter, ProcessFilter
 from .forms import (
     PROCESS_SECTIONS,
     ProcessCategoryModalModelForm,
@@ -58,34 +56,8 @@ from .models import (
     ProcessOperatingParameter,
     ProcessSource,
 )
-from .querysets import with_process_count, with_published_process_count
-
-# ==============================================================================
-# Helper Views
-# ==============================================================================
-
-
-class ReviewObjectListView(ReviewObjectListMixin, ListView):
-    """
-    List view for objects in review (for moderators).
-    Combines ReviewObjectListMixin with ListView functionality.
-    """
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "list_type": self.list_type,
-                "scope": "review",
-            }
-        )
-        return context
-
-    def get_template_names(self):
-        template_names = super().get_template_names()
-        template_names.append("simple_list_card.html")
-        return template_names
-
+from .navigation import discovery_context
+from .querysets import with_process_count
 
 # ==============================================================================
 # Dashboard
@@ -118,8 +90,8 @@ class ProcessDashboardView(BreadcrumbContextMixin, TemplateView):
         ).prefetch_related("categories")[:5]
 
         # Categories with process counts
-        context["categories_with_counts"] = with_published_process_count(
-            visible_categories
+        context["categories_with_counts"] = with_process_count(
+            visible_categories, publication_status="published", user=user
         ).order_by("-process_count")[:10]
 
         # User's private processes if authenticated
@@ -136,6 +108,17 @@ class ProcessDashboardView(BreadcrumbContextMixin, TemplateView):
             context["can_add_processcategory"] = False
 
         return context
+
+
+class ProcessDiscoveryRedirectView(RedirectView):
+    """Redirect legacy dashboard/explorer URLs to the category catalogue."""
+
+    permanent = False
+
+    def get_redirect_url(self, *args, **kwargs):
+        url = reverse("processes:processcategory-list")
+        query = self.request.GET.urlencode()
+        return f"{url}?{query}" if query else url
 
 
 # ==============================================================================
@@ -165,43 +148,53 @@ class ProcessCategoryModalCreateView(UserCreatedObjectModalCreateView):
     permission_required = "processes.add_processcategory"
 
 
-class ProcessCategoryPublishedListView(PublishedObjectListView):
-    """List published ProcessCategory objects."""
+class ProcessCategoryListViewMixin:
+    """Shared class attributes for the process category list scopes."""
 
     model = ProcessCategory
     template_name = "processes/processcategory_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
+    dashboard_url = None
     context_object_name = "categories"
+    filterset_class = ProcessCategoryFilter
     paginate_by = 20
 
+
+class ProcessCategoryPublishedListView(
+    ProcessCategoryListViewMixin, PublishedObjectListView
+):
+    """Public catalogue of published ProcessCategory objects.
+
+    The ``category_q`` query parameter drives the category-name search; the
+    process discovery scope carried in ``scope`` never restricts the category
+    publication state.
+    """
+
+    template_name = "processes/processcategory_catalogue.html"
+
     def get_queryset(self):
-        return with_published_process_count(super().get_queryset())
+        queryset = super().get_queryset()
+        query = (self.request.GET.get("category_q") or "").strip()
+        if query:
+            queryset = queryset.filter(name__icontains=query)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["category_q"] = (self.request.GET.get("category_q") or "").strip()
+        context["discovery_scope"] = discovery_context(self.request)["scope"]
+        return context
 
 
-class ProcessCategoryPrivateListView(PrivateObjectListView):
+class ProcessCategoryPrivateListView(
+    ProcessCategoryListViewMixin, PrivateObjectFilterView
+):
     """List user's private ProcessCategory objects."""
 
-    model = ProcessCategory
-    template_name = "processes/processcategory_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
-    context_object_name = "categories"
-    paginate_by = 20
 
-    def get_queryset(self):
-        return with_process_count(super().get_queryset())
-
-
-class ProcessCategoryReviewListView(ReviewObjectListView):
+class ProcessCategoryReviewListView(
+    ProcessCategoryListViewMixin, ReviewObjectFilterView
+):
     """List ProcessCategory objects in review status for moderators."""
-
-    model = ProcessCategory
-    template_name = "processes/processcategory_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
-    context_object_name = "categories"
-    paginate_by = 20
-
-    def get_queryset(self):
-        return with_process_count(super().get_queryset())
 
 
 class ProcessCategoryDetailView(UserCreatedObjectDetailView):
@@ -218,27 +211,22 @@ class ProcessCategoryDetailView(UserCreatedObjectDetailView):
         process_queryset = filter_queryset_for_user(
             self.object.processes.all(), self.request.user
         )
+        nav = discovery_context(self.request)
+        if nav["explicit"]:
+            data = nav["filters"].copy()
+            data["scope"] = nav["scope"]
+            process_queryset = ProcessFilter(
+                data=data, queryset=process_queryset, request=self.request
+            ).qs
         category_queryset = filter_queryset_for_user(
             ProcessCategory.objects.filter(processes__in=process_queryset),
             self.request.user,
         )
-        process_count_status = None
-        if self.object.publication_status == "published":
-            process_count_status = "published"
-        processes = process_queryset.select_related("owner").prefetch_related(
-            "authors",
-            Prefetch(
-                "categories",
-                queryset=filter_queryset_for_user(
-                    ProcessCategory.objects.all(), self.request.user
-                ),
-            ),
-        )
+        processes = process_queryset.select_related("owner")
         context["processes"] = processes
-        context["related_categories"] = with_process_count(
-            category_queryset.exclude(pk=self.object.pk).distinct(),
-            publication_status=process_count_status,
-        ).order_by("name")
+        context["related_categories"] = (
+            category_queryset.exclude(pk=self.object.pk).distinct().order_by("name")
+        )
         return context
 
 
@@ -268,10 +256,29 @@ class ProcessCategoryModalUpdateView(UserCreatedObjectModalUpdateView):
     form_class = ProcessCategoryModalModelForm
 
 
+def _scoped_list_delete_success_url(view):
+    """Redirect target after modal deletion of a user-created object.
+
+    Honors a ``next`` parameter unless it points back at the deleted
+    object's own detail page, which no longer exists after deletion.
+    """
+    next_url = get_safe_next_url(view.request)
+    if next_url and not next_url.startswith(view.object.get_absolute_url()):
+        return next_url
+    if view.object.publication_status == "published":
+        return f"{view.model.public_list_url()}?scope=published"
+    if view.object.publication_status == "review":
+        return f"{view.model.review_list_url()}?scope=review"
+    return f"{view.model.private_list_url()}?scope=private"
+
+
 class ProcessCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
     """Delete a ProcessCategory."""
 
     model = ProcessCategory
+
+    def get_success_url(self):
+        return _scoped_list_delete_success_url(self)
 
 
 class ProcessCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -285,6 +292,14 @@ class ProcessCategoryOptions(OwnedObjectModelSelectOptionsView):
     """Provide ProcessCategory options for select fields."""
 
     model = ProcessCategory
+    permission_required = set()
+
+    def get_queryset(self):
+        # Same policy as the category autocomplete: readable by the user and
+        # not archived (archived categories cannot be newly selected).
+        return filter_queryset_for_user(
+            super().get_queryset(), self.request.user
+        ).exclude(publication_status=ProcessCategory.STATUS_ARCHIVED)
 
 
 # ==============================================================================
@@ -330,12 +345,10 @@ def _process_list_queryset(queryset, user):
     private category names do not leak into list rows.
     """
     return queryset.select_related("owner").prefetch_related(
-        "authors",
         Prefetch(
             "categories",
             queryset=filter_queryset_for_user(ProcessCategory.objects.all(), user),
         ),
-        "process_materials__material",
     )
 
 
@@ -344,7 +357,8 @@ class ProcessFilterViewMixin:
 
     model = Process
     template_name = "processes/process_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
+    dashboard_url = None
+    breadcrumb_module_url = reverse_lazy("processes:process-list")
     context_object_name = "processes"
     filterset_class = ProcessFilter
     paginate_by = 20
@@ -365,6 +379,42 @@ class ProcessReviewFilterView(ProcessFilterViewMixin, ReviewObjectFilterView):
     """List Process objects in review status for moderators."""
 
 
+def _process_detail_prefetches(user):
+    """Prefetch lookups for the process detail views.
+
+    Related user-created objects are prefetch-filtered by the read policy so
+    private/in-review objects owned by others never reach the template.
+    """
+    return (
+        Prefetch(
+            "categories",
+            queryset=filter_queryset_for_user(ProcessCategory.objects.all(), user),
+        ),
+        Prefetch(
+            "process_authors",
+            queryset=ProcessAuthor.objects.select_related("author").filter(
+                author__in=filter_queryset_for_user(Author.objects.all(), user)
+            ),
+        ),
+        Prefetch(
+            "process_materials",
+            queryset=ProcessMaterial.objects.select_related(
+                "material", "quantity_unit"
+            ),
+        ),
+        Prefetch(
+            "operating_parameters",
+            queryset=ProcessOperatingParameter.objects.select_related("unit"),
+        ),
+        "links",
+        "info_resources",
+        Prefetch(
+            "process_sources",
+            queryset=ProcessSource.objects.select_related("source"),
+        ),
+    )
+
+
 class ProcessDetailView(UserCreatedObjectDetailView):
     """Display Process details with all related information."""
 
@@ -372,42 +422,11 @@ class ProcessDetailView(UserCreatedObjectDetailView):
     template_name = "processes/process_detail.html"
 
     def get_queryset(self):
-        # Optimize queries with prefetch. Related user-created objects are
-        # prefetch-filtered by the read policy so private/in-review objects
-        # owned by others never reach the template.
-        user = self.request.user
         return (
             super()
             .get_queryset()
             .select_related("owner")
-            .prefetch_related(
-                Prefetch(
-                    "categories",
-                    queryset=filter_queryset_for_user(
-                        ProcessCategory.objects.all(), user
-                    ),
-                ),
-                Prefetch(
-                    "process_authors",
-                    queryset=ProcessAuthor.objects.select_related("author"),
-                ),
-                Prefetch(
-                    "process_materials",
-                    queryset=ProcessMaterial.objects.select_related(
-                        "material", "quantity_unit"
-                    ),
-                ),
-                Prefetch(
-                    "operating_parameters",
-                    queryset=ProcessOperatingParameter.objects.select_related("unit"),
-                ),
-                "links",
-                "info_resources",
-                Prefetch(
-                    "process_sources",
-                    queryset=ProcessSource.objects.select_related("source"),
-                ),
-            )
+            .prefetch_related(*_process_detail_prefetches(self.request.user))
         )
 
     def get_context_data(self, **kwargs):
@@ -419,17 +438,25 @@ class ProcessDetailView(UserCreatedObjectDetailView):
         )
         if context["edit_mode_enabled"]:
             context["process_policy"] = policy
+            section_links = {
+                key: self.object._material_links_for_role(section["role"])
+                for key, section in PROCESS_SECTIONS.items()
+                if "role" in section
+            }
+            visible_material_ids = self._visible_material_ids(
+                {link.material_id for links in section_links.values() for link in links}
+            )
             context["maintenance_sections"] = [
                 {
                     "key": key,
                     "label": section["label"],
                     "url": f"{self.object.update_url}?section={key}",
                     "summary_template": "processes/includes/process_section_summary.html",
-                    "material_links": self.object._material_links_for_role(
-                        section["role"]
-                    )
-                    if "role" in section
-                    else [],
+                    "material_links": [
+                        link
+                        for link in section_links.get(key, [])
+                        if link.material_id in visible_material_ids
+                    ],
                 }
                 for key, section in PROCESS_SECTIONS.items()
             ]
@@ -439,13 +466,9 @@ class ProcessDetailView(UserCreatedObjectDetailView):
         # user cannot read so private material names do not leak.
         input_links = self.object._material_links_for_role(ProcessMaterial.Role.INPUT)
         output_links = self.object._material_links_for_role(ProcessMaterial.Role.OUTPUT)
-        material_ids = {link.material_id for link in input_links} | {
-            link.material_id for link in output_links
-        }
-        visible_material_ids = set(
-            filter_queryset_for_user(
-                Material.objects.filter(pk__in=material_ids), self.request.user
-            ).values_list("pk", flat=True)
+        visible_material_ids = self._visible_material_ids(
+            {link.material_id for link in input_links}
+            | {link.material_id for link in output_links}
         )
         context["input_materials"] = [
             link for link in input_links if link.material_id in visible_material_ids
@@ -454,13 +477,11 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             link for link in output_links if link.material_id in visible_material_ids
         ]
 
-        # Group parameters by type
+        # Group parameters by type, keyed by the stable parameter value so
+        # the template lookup does not depend on the display language.
         params_by_type = {}
         for param in self.object.operating_parameters.all():
-            param_type = param.get_parameter_display()
-            if param_type not in params_by_type:
-                params_by_type[param_type] = []
-            params_by_type[param_type].append(param)
+            params_by_type.setdefault(param.parameter, []).append(param)
         context["parameters_by_type"] = params_by_type
         context["operating_parameters"] = [
             param
@@ -469,7 +490,18 @@ class ProcessDetailView(UserCreatedObjectDetailView):
         ]
         context["process_links"] = list(self.object.links.all())
         context["process_info_resources"] = list(self.object.info_resources.all())
-        context["process_authors"] = self.object.ordered_authors()
+        # Drop authors the current user cannot read so private contributor
+        # names and contact emails do not leak on published processes.
+        process_authors = self.object.ordered_authors()
+        author_ids = {link.author_id for link in process_authors}
+        visible_author_ids = set(
+            filter_queryset_for_user(
+                Author.objects.filter(pk__in=author_ids), self.request.user
+            ).values_list("pk", flat=True)
+        )
+        context["process_authors"] = [
+            link for link in process_authors if link.author_id in visible_author_ids
+        ]
         sources = self.object.sources_ordered()
         visible_source_ids = set(
             filter_queryset_for_user(
@@ -477,10 +509,11 @@ class ProcessDetailView(UserCreatedObjectDetailView):
                 self.request.user,
             ).values_list("pk", flat=True)
         )
-        context["bibliography_sources"] = sorted(
-            (s for s in sources if s.pk in visible_source_ids),
-            key=lambda source: (source.abbreviation or source.title or "").casefold(),
-        )
+        # Keep the explicit order maintained in the workspace formset;
+        # re-sorting alphabetically would hide the editor's ordering.
+        context["bibliography_sources"] = [
+            s for s in sources if s.pk in visible_source_ids
+        ]
         context["process_policy"] = policy
         # The timeline only feeds the review banner, which renders solely for
         # 'review' and 'declined' objects; skip the query otherwise.
@@ -490,8 +523,24 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             else []
         )
         context["section_anchors"] = self._build_section_anchors(context)
+        section_url = context.get("breadcrumb_section_url")
+        if callable(section_url):
+            section_url = section_url()
+        if section_url is not None and section_url == context.get(
+            "breadcrumb_module_url"
+        ):
+            context.pop("breadcrumb_section_label", None)
+            context.pop("breadcrumb_section_url", None)
 
         return context
+
+    def _visible_material_ids(self, material_ids):
+        """Pks of linked materials the current user may read."""
+        return set(
+            filter_queryset_for_user(
+                Material.objects.filter(pk__in=material_ids), self.request.user
+            ).values_list("pk", flat=True)
+        )
 
     def _build_review_timeline(self):
         try:
@@ -526,7 +575,7 @@ class ProcessDetailView(UserCreatedObjectDetailView):
             or context["input_materials"]
             or context["output_materials"]
             or context["parameters_by_type"].get(
-                ProcessOperatingParameter.Parameter.YIELD.label
+                ProcessOperatingParameter.Parameter.YIELD
             )
         ):
             anchors.append({"id": "facts", "name": "At a glance"})
@@ -547,6 +596,14 @@ class ProcessReviewItemDetailView(ReviewItemDetailView):
     """Render process moderation with the complete process detail context."""
 
     model = Process
+
+    def get_object(self, queryset=None):
+        # The registry path resolves the object without a queryset; apply the
+        # detail view's policy-filtered prefetches so related objects respect
+        # the requesting reviewer's read policy.
+        obj = super().get_object(queryset)
+        prefetch_related_objects([obj], *_process_detail_prefetches(self.request.user))
+        return obj
 
     def _resolve_base_template(self):
         return "processes/process_detail.html"
@@ -663,9 +720,18 @@ class ProcessUpdateView(UserCreatedObjectUpdateView):
         if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
             context = {"object": self.object, "section": self.section}
             if "role" in self.section:
-                context["material_links"] = self.object._material_links_for_role(
-                    self.section["role"]
+                links = self.object._material_links_for_role(self.section["role"])
+                visible_material_ids = set(
+                    filter_queryset_for_user(
+                        Material.objects.filter(
+                            pk__in={link.material_id for link in links}
+                        ),
+                        self.request.user,
+                    ).values_list("pk", flat=True)
                 )
+                context["material_links"] = [
+                    link for link in links if link.material_id in visible_material_ids
+                ]
             return JsonResponse(
                 {
                     "section": self.section["key"],
@@ -697,11 +763,7 @@ class ProcessModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Process
 
     def get_success_url(self):
-        if self.object.publication_status == "published":
-            return f"{self.model.public_list_url()}?scope=published"
-        if self.object.publication_status == "review":
-            return f"{self.model.review_list_url()}?scope=review"
-        return f"{self.model.private_list_url()}?scope=private"
+        return _scoped_list_delete_success_url(self)
 
 
 class ProcessAutocompleteView(UserCreatedObjectAutocompleteView):

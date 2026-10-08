@@ -2,7 +2,6 @@
 {% load static %}
 {% load custom_tags %}
 {% load moderation_tags %}
-{% object_policy object as process_policy %}
 {% block title %}
   BRIT · {{ object.name }}
 {% endblock title %}
@@ -167,7 +166,7 @@
       {% if object.supplementary_document %}
         <div class="sdv2-hero-provenance">
           <a href="{{ object.supplementary_document_download_url }}" class="sdv2-btn">
-            <i class="fas fa-file-pdf" aria-hidden="true"></i> Download PDF version
+            <i class="fas fa-file-pdf" aria-hidden="true"></i> Download supplementary PDF
           </a>
         </div>
       {% endif %}
@@ -210,7 +209,7 @@
     {# ─── Main column ─── #}
     <div class="sdv2-layout sdv2-layout-full">
       <main class="sdv2-main">
-        {% if object.mechanism or operating_parameters or parameters_by_type.Yield or input_materials or output_materials %}
+        {% if object.mechanism or operating_parameters or parameters_by_type.yield or input_materials or output_materials %}
           <section class="sdv2-section-panel sdv2-anchor-target"
                    id="facts"
                    aria-label="Process at a glance">
@@ -251,12 +250,12 @@
                   </dd>
                 </div>
               {% endif %}
-              {% if parameters_by_type.Yield %}
+              {% if parameters_by_type.yield %}
                 <div>
                   <dt>Yield</dt>
                   <dd>
                     <ul class="list-unstyled mb-0">
-                      {% for param in parameters_by_type.Yield %}
+                      {% for param in parameters_by_type.yield %}
                         <li class="mb-1">
                           {% if param.name %}<span class="fw-semibold">{{ param.name }}:</span>{% endif %}
                           {% if param.nominal_value is not None %}

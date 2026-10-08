@@ -34,36 +34,38 @@
               {# View toggle (List / Featured / Map) – peer representations of the same dataset. #}
               {% include "partials/representation_switcher.html" %}
               {# Scope toggle – visible for authenticated users and only for UserCreatedObject models #}
-              {% if user.is_authenticated and object_list.model|is_user_created %}
-                <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
-                  <a class="btn btn-outline-secondary {% if list_type == 'published' %}active disabled{% endif %}"
-                     role="button"
-                     title="Show published items"
-                     aria-pressed="{% if list_type == 'published' %}true{% else %}false{% endif %}"
-                     {% if list_type == 'published' %}aria-disabled="true" tabindex="-1"{% endif %}
-                     href="{{ public_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
-                    Published
-                  </a>
-                  <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
-                     role="button"
-                     title="Show only my items"
-                     aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
-                     {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
-                     href="{{ private_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
-                    Mine
-                  </a>
-                  {% if user|can_moderate:object_list.model and review_representation_url %}
-                    <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
+              {% block scope_toggle %}
+                {% if user.is_authenticated and object_list.model|is_user_created %}
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
+                    <a class="btn btn-outline-secondary {% if list_type == 'published' %}active disabled{% endif %}"
                        role="button"
-                       title="Show items pending review"
-                       aria-pressed="{% if list_type == 'review' %}true{% else %}false{% endif %}"
-                       {% if list_type == 'review' %}aria-disabled="true" tabindex="-1"{% endif %}
-                       href="{{ review_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review">
-                      Review
+                       title="Show published items"
+                       aria-pressed="{% if list_type == 'published' %}true{% else %}false{% endif %}"
+                       {% if list_type == 'published' %}aria-disabled="true" tabindex="-1"{% endif %}
+                       href="{{ public_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
+                      Published
                     </a>
-                  {% endif %}
-                </div>
-              {% endif %}
+                    <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
+                       role="button"
+                       title="Show only my items"
+                       aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
+                       {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
+                       href="{{ private_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
+                      Mine
+                    </a>
+                    {% if user|can_moderate:object_list.model and review_representation_url %}
+                      <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
+                         role="button"
+                         title="Show items pending review"
+                         aria-pressed="{% if list_type == 'review' %}true{% else %}false{% endif %}"
+                         {% if list_type == 'review' %}aria-disabled="true" tabindex="-1"{% endif %}
+                         href="{{ review_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review">
+                        Review
+                      </a>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              {% endblock scope_toggle %}
               {% if dashboard_url %}
                 <a class="btn btn-sm btn-outline-secondary"
                    href="{{ dashboard_url }}"

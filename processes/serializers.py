@@ -5,9 +5,11 @@ Provides REST API serializers for all process-related models.
 
 from rest_framework import serializers
 
+from bibliography.models import Author, Source
 from bibliography.serializers import SourceModelSerializer
 from materials.models import Material
 from materials.serializers import MaterialAPISerializer
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import Unit
 from utils.properties.serializers import UnitModelSerializer
 
@@ -44,6 +46,19 @@ class ProcessCategorySerializer(serializers.ModelSerializer):
             "created_at",
             "lastmodified_at",
         ]
+
+
+class ProcessCategoryReferenceSerializer(serializers.ModelSerializer):
+    """Category nested inside process payloads.
+
+    ``process_count`` is only annotated on category viewset querysets, so the
+    nested representation deliberately omits it to keep the response shape
+    stable regardless of which queryset produced the objects.
+    """
+
+    class Meta:
+        model = ProcessCategory
+        fields = ["id", "name", "description", "publication_status"]
 
 
 class ProcessMaterialAPISerializer(serializers.ModelSerializer):
@@ -162,11 +177,44 @@ class ProcessInfoResourceSerializer(serializers.ModelSerializer):
         read_only_fields = ["process", "target_url"]
 
 
-class ProcessListSerializer(serializers.ModelSerializer):
+class ScopedRelatedObjectsMixin:
+    """Hide related objects the requesting user may not read.
+
+    ``_visible_pks`` resolves the readable pk set per related model once per
+    request; viewsets share it across serialized rows via the
+    ``visible_pks_cache`` context key.
+    """
+
+    def _visible_pks(self, model):
+        cache = self.context.get("visible_pks_cache")
+        if cache is None:
+            cache = getattr(self, "_visible_pks_cache", None)
+            if cache is None:
+                cache = self._visible_pks_cache = {}
+        key = model._meta.label_lower
+        if key not in cache:
+            request = self.context.get("request")
+            cache[key] = set(
+                filter_queryset_for_user(
+                    model.objects.all(), getattr(request, "user", None)
+                ).values_list("pk", flat=True)
+            )
+        return cache[key]
+
+    def _visible_material_links(self, obj):
+        visible = self._visible_pks(Material)
+        return [
+            link
+            for link in obj.process_materials.all()
+            if link.material_id in visible
+        ]
+
+
+class ProcessListSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerializer):
     """Simplified serializer for Process list views."""
 
-    categories = ProcessCategorySerializer(many=True, read_only=True)
-    sources = SourceModelSerializer(many=True, read_only=True)
+    categories = serializers.SerializerMethodField()
+    sources = serializers.SerializerMethodField()
     authors = serializers.SerializerMethodField()
     owner_name = serializers.CharField(source="owner.username", read_only=True)
 
@@ -194,22 +242,35 @@ class ProcessListSerializer(serializers.ModelSerializer):
             "lastmodified_at",
         ]
 
+    def get_categories(self, obj):
+        visible = self._visible_pks(ProcessCategory)
+        return ProcessCategoryReferenceSerializer(
+            [c for c in obj.categories.all() if c.pk in visible], many=True
+        ).data
+
+    def get_sources(self, obj):
+        visible = self._visible_pks(Source)
+        return SourceModelSerializer(
+            [s for s in obj.sources.all() if s.pk in visible], many=True
+        ).data
+
     def get_authors(self, obj):
         """Get author ids in explicit process author order."""
 
-        return [author.pk for author in obj.authors_ordered()]
+        visible = self._visible_pks(Author)
+        return [a.pk for a in obj.authors_ordered() if a.pk in visible]
 
 
-class ProcessDetailSerializer(serializers.ModelSerializer):
+class ProcessDetailSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerializer):
     """Comprehensive serializer for Process detail views."""
 
-    categories = ProcessCategorySerializer(many=True, read_only=True)
-    sources = SourceModelSerializer(many=True, read_only=True)
+    categories = serializers.SerializerMethodField()
+    sources = serializers.SerializerMethodField()
     authors = serializers.SerializerMethodField()
     owner_name = serializers.CharField(source="owner.username", read_only=True)
 
     # Related objects
-    process_materials = ProcessMaterialAPISerializer(many=True, read_only=True)
+    process_materials = serializers.SerializerMethodField()
     operating_parameters = ProcessOperatingParameterSerializer(
         many=True, read_only=True
     )
@@ -254,15 +315,43 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
             "lastmodified_at",
         ]
 
+    def get_categories(self, obj):
+        visible = self._visible_pks(ProcessCategory)
+        return ProcessCategoryReferenceSerializer(
+            [c for c in obj.categories.all() if c.pk in visible], many=True
+        ).data
+
+    def get_sources(self, obj):
+        visible = self._visible_pks(Source)
+        return SourceModelSerializer(
+            [s for s in obj.sources.all() if s.pk in visible], many=True
+        ).data
+
     def get_authors(self, obj):
         """Get author ids in explicit process author order."""
 
-        return [author.pk for author in obj.authors_ordered()]
+        visible = self._visible_pks(Author)
+        return [a.pk for a in obj.authors_ordered() if a.pk in visible]
+
+    def get_process_materials(self, obj):
+        return ProcessMaterialAPISerializer(
+            self._visible_material_links(obj), many=True, context=self.context
+        ).data
 
     def get_input_materials(self, obj):
         """Get list of input materials."""
-        return [{"id": m.id, "name": m.name} for m in obj.input_materials]
+        visible = self._visible_pks(Material)
+        return [
+            {"id": m.id, "name": m.name}
+            for m in obj.input_materials
+            if m.pk in visible
+        ]
 
     def get_output_materials(self, obj):
         """Get list of output materials."""
-        return [{"id": m.id, "name": m.name} for m in obj.output_materials]
+        visible = self._visible_pks(Material)
+        return [
+            {"id": m.id, "name": m.name}
+            for m in obj.output_materials
+            if m.pk in visible
+        ]

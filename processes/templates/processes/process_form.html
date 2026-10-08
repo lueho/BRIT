@@ -5,7 +5,6 @@
 {% endblock title %}
 {% block breadcrumbs %}
   <li class="breadcrumb-item"><a href="{% url 'home' %}">BRIT</a></li>
-  <li class="breadcrumb-item"><a href="{% url 'processes:dashboard' %}">Processes</a></li>
   <li class="breadcrumb-item"><a href="{% url 'processes:process-list' %}">Processes</a></li>
   {% if object %}<li class="breadcrumb-item"><a href="{{ object.get_absolute_url }}?mode=edit">{{ object.name }}</a></li>{% endif %}
   <li class="breadcrumb-item active" aria-current="page">{% if section %}{{ section.label }}{% else %}New process{% endif %}</li>

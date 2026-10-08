@@ -1,8 +1,12 @@
 {% extends "detail_with_options.html" %}
 {% load moderation_tags %}
+{% load process_navigation %}
 {% block title %}
     BRIT | Process Category: {{ object.name }}
 {% endblock title %}
+{% block detail_nav %}
+    {% process_discovery_nav "categories" %}
+{% endblock detail_nav %}
 {% block detail_body %}
     <dl class="row">
         <dt class="col-sm-3">Name</dt>
@@ -26,15 +30,14 @@
         </dd>
     </dl>
     <hr class="my-4">
-    <h6 class="mb-3">Related Categories ({{ related_categories.count }})</h6>
+    <h6 class="mb-3">Related Categories</h6>
     {% if related_categories %}
         <div class="list-group mb-4">
             {% for category in related_categories %}
-                <a href="{% url 'processes:processcategory-detail' category.pk %}"
+                <a href="{% process_category_about_url category %}"
                    class="list-group-item list-group-item-action">
                     <div class="d-flex w-100 justify-content-between">
                         <h6 class="mb-1">{{ category.name }}</h6>
-                        <small>{{ category.process_count }} process{{ category.process_count|pluralize:"es" }}</small>
                     </div>
                     <p class="mb-1">{{ category.description|default:"No description provided"|truncatewords:15 }}</p>
                 </a>
@@ -44,12 +47,12 @@
         <p class="text-muted">No related categories found.</p>
     {% endif %}
     <hr class="my-4">
-    <h6 class="mb-3">Processes in This Category ({{ processes.count }})</h6>
+    <h6 class="mb-3">Processes in This Category</h6>
     {% if processes %}
         <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
             {% for process in processes %}
                 <div class="col">
-                    <a href="{% detail_or_review_url process %}"
+                    <a href="{% detail_or_review_url process use_back=True %}"
                        class="card h-100 text-decoration-none text-reset">
                         {% if process.image %}
                             <img src="{{ process.image.url }}"

@@ -57,7 +57,12 @@ def validate_internal_or_external_url(value: str) -> None:
     parsed = urlparse(candidate)
     if parsed.scheme in {"http", "https"} and parsed.netloc:
         return
-    if not parsed.scheme and candidate.startswith("/") and " " not in candidate:
+    if (
+        not parsed.scheme
+        and candidate.startswith("/")
+        and not candidate.startswith("//")
+        and " " not in candidate
+    ):
         return
     raise ValidationError(
         _("Provide either an absolute http(s) URL or a root-relative path."),
