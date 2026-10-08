@@ -387,11 +387,28 @@ class Scenario(NamedUserCreatedObject):
         elif feedstocks is None and feedstock is not None:
             feedstocks = Material.objects.filter(id=feedstock.id)
 
-        return GeoDataset.objects.filter(
-            id__in=InventoryAlgorithm.objects.filter(
-                feedstocks__in=feedstocks, geodataset__region=self.region
-            ).values("geodataset")
+        return self.compatible_geodatasets().filter(
+            id__in=InventoryAlgorithm.objects.filter(feedstocks__in=feedstocks).values(
+                "geodataset"
+            )
         )
+
+    def compatible_geodatasets(self, queryset=None):
+        """
+        Returns the geodatasets that can feed this scenario: those of the scenario region itself and those whose
+        region spatially encloses it (e.g. a country-wide dataset for a municipality scenario).
+        """
+        if queryset is None:
+            queryset = GeoDataset.objects.all()
+        if self.region_id is None:
+            return queryset.none()
+        match = models.Q(region_id=self.region_id)
+        region_geom = self.region.geom
+        if region_geom is not None and not region_geom.empty:
+            point = region_geom.point_on_surface
+            point.srid = region_geom.srid
+            match |= models.Q(region__borders__geom__contains=point)
+        return queryset.filter(match)
 
     def evaluated_geodatasets(
         self, feedstock: Material = None, feedstocks: QuerySet = None
@@ -434,7 +451,7 @@ class Scenario(NamedUserCreatedObject):
         elif geodatasets is None and geodataset is not None:
             geodatasets = GeoDataset.objects.filter(id=geodataset.id)
 
-        geodatasets = geodatasets.filter(region=self.region)
+        geodatasets = self.compatible_geodatasets(geodatasets)
 
         return InventoryAlgorithm.objects.filter(
             feedstocks__in=feedstocks, geodataset__in=geodatasets
@@ -459,7 +476,7 @@ class Scenario(NamedUserCreatedObject):
 
     def default_inventory_algorithms(self):
         return InventoryAlgorithm.objects.filter(
-            geodataset__region=self.region, default=True
+            geodataset__in=self.compatible_geodatasets(), default=True
         )
 
     def inventory_algorithm_config(self, algorithm, feedstock):

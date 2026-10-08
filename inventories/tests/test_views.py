@@ -2477,3 +2477,99 @@ class ScenarioPresentationTestCase(TestCase):
         self.assertContains(response, "The evaluation failed.")
         self.assertNotContains(response, "Retry evaluation")
         self.assertNotContains(response, "Division by zero")
+
+
+class ScenarioEnclosingRegionDatasetViewsTestCase(TestCase):
+    """Datasets of a region enclosing the scenario region are offered by the
+    geodataset dropdown and accepted by the generic add flow."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from maps.models import GeoPolygon
+
+        def square(x0, y0, size):
+            x1, y1 = x0 + size, y0 + size
+            return MultiPolygon(
+                Polygon(((x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0))),
+                srid=4326,
+            )
+
+        def region(name, geom):
+            return Region.objects.create(
+                name=name,
+                borders=GeoPolygon.objects.create(geom=geom),
+                publication_status="published",
+            )
+
+        cls.owner = User.objects.create_user(username="enc-owner", password="pass")
+        cls.owner.user_permissions.add(
+            Permission.objects.get(codename="change_scenario")
+        )
+        country = region("Enc Country", square(0, 0, 10))
+        municipality = region("Enc Municipality", square(2, 2, 2))
+        elsewhere = region("Enc Elsewhere", square(20, 20, 2))
+        catchment = Catchment.objects.create(
+            name="Enc Catchment",
+            region=municipality,
+            parent_region=municipality,
+            publication_status="published",
+        )
+        cls.scenario = Scenario.objects.create(
+            name="Enc Scenario",
+            owner=cls.owner,
+            region=municipality,
+            catchment=catchment,
+        )
+        cls.feedstock = Material.objects.create(name="Enc Material")
+        cls.country_dataset = GeoDataset.objects.create(
+            name="Enc Country Points",
+            region=country,
+            model_name="NantesGreenhouses",
+            publication_status="published",
+        )
+        cls.elsewhere_dataset = GeoDataset.objects.create(
+            name="Enc Elsewhere Points",
+            region=elsewhere,
+            model_name="NantesGreenhouses",
+            publication_status="published",
+        )
+
+    def test_autocomplete_offers_dataset_of_enclosing_region(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("scenario-geodataset-autocomplete"),
+            {"f": f"'scenario__scenario_id={self.scenario.id}'"},
+        )
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(self.country_dataset.id, ids)
+        self.assertNotIn(self.elsewhere_dataset.id, ids)
+
+    def _post_generic(self, geodataset):
+        self.client.force_login(self.owner)
+        return self.client.post(
+            reverse("scenario-add-configuration", kwargs={"pk": self.scenario.pk}),
+            {
+                "feedstock": self.feedstock.pk,
+                "geodataset": geodataset.pk,
+                "generic_function": "count_based_production",
+            },
+        )
+
+    def test_generic_add_accepts_dataset_of_enclosing_region(self):
+        response = self._post_generic(self.country_dataset)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario, geodataset=self.country_dataset
+            ).exists()
+        )
+
+    def test_generic_add_rejects_dataset_of_disjoint_region(self):
+        response = self._post_generic(self.elsewhere_dataset)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario
+            ).exists()
+        )
