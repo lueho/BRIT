@@ -157,6 +157,13 @@ def _normalized_scope(scope, user):
     return scope
 
 
+def _request_route(request):
+    match = getattr(request, "resolver_match", None)
+    if match is None:
+        return None
+    return f"{match.namespace}:{match.url_name}" if match.namespace else match.url_name
+
+
 def discovery_context(request):
     """Resolve the active process-discovery scope and filters for ``request``.
 
@@ -189,6 +196,9 @@ def discovery_context(request):
                 if scope not in PROCESS_SCOPES:
                     scope = _ROUTE_SCOPES.get(route)
 
+    if scope is None:
+        scope = _ROUTE_SCOPES.get(_request_route(request))
+
     scope = _normalized_scope(scope, getattr(request, "user", None))
     if scope is None:
         scope = "published"
@@ -208,13 +218,22 @@ def process_scope_url(scope, filters=None):
     return f"{reverse(_SCOPE_LIST_ROUTES[scope])}?{params.urlencode()}"
 
 
-def scope_switch_url(request, scope, base_url=None, keep_category_q=False):
+def scope_switch_url(
+    request, scope, base_url=None, keep_category_q=False, filters=None
+):
     """Scope-switch URL keeping filters but dropping ``publication_status``.
 
     ``base_url`` defaults to the process list for ``scope``; the category
     pages pass their own path so switching scope stays on the same page.
+    ``filters`` defaults to the request's own filter parameters; pass the
+    resolved discovery filters to keep filters recovered from ``back``/``next``.
     """
-    filters = _filtered_query(request.GET) if request else QueryDict(mutable=True)
+    if filters is not None:
+        filters = filters.copy()
+    elif request:
+        filters = _filtered_query(request.GET)
+    else:
+        filters = QueryDict(mutable=True)
     filters.pop("publication_status", None)
     filters["scope"] = scope
     if keep_category_q:
