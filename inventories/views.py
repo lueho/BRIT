@@ -495,9 +495,9 @@ class ScenarioAddInventoryAlgorithmView(
             request.POST.get("geodataset"),
             queryset=filter_queryset_for_user(GeoDataset.objects.all(), request.user),
         )
-        if geodataset.region_id != scenario.region_id:
+        if not scenario.compatible_geodatasets().filter(pk=geodataset.pk).exists():
             return HttpResponseBadRequest(
-                "The geodataset does not belong to the scenario region."
+                "The geodataset does not cover the scenario region."
             )
         if function_name not in InventoryAlgorithms.generic_functions(geodataset):
             return HttpResponseBadRequest(
@@ -768,13 +768,14 @@ class ScenarioRemoveInventoryAlgorithmView(
 
 
 class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
-    """GeoDataset autocomplete scoped to a scenario's region.
+    """GeoDataset autocomplete scoped to datasets covering a scenario's region.
 
     The widget passes the scenario id via either ``filter_by`` or
     ``exclude_by`` and an optional feedstock id via ``filter_by``. With a
     feedstock, datasets already configured for that feedstock's material in
-    the scenario are excluded. Without one, every dataset in the region is
-    offered — generic algorithms work on any dataset.
+    the scenario are excluded. Without one, every dataset of the scenario
+    region or of a region enclosing it is offered — generic algorithms work
+    on any dataset.
     """
 
     def apply_filters(self, queryset):
@@ -791,7 +792,7 @@ class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
         except Scenario.DoesNotExist:
             return GeoDataset.objects.none()
 
-        queryset = queryset.filter(region=scenario.region)
+        queryset = scenario.compatible_geodatasets(queryset)
 
         if feedstock_id:
             try:

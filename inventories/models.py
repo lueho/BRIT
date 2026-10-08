@@ -4,6 +4,7 @@ import pkgutil
 from celery.result import AsyncResult
 from celery.states import READY_STATES
 from django.contrib.auth.models import User
+from django.contrib.gis.db.models.functions import Intersection
 from django.core.validators import RegexValidator
 from django.db import models, transaction
 from django.db.models.query import QuerySet
@@ -19,6 +20,8 @@ from materials.models import Material, SampleSeries
 from utils.object_management.models import NamedUserCreatedObject
 
 from .exceptions import BlockedRunningScenario
+
+REGION_COVERAGE_THRESHOLD = 0.99
 
 
 class InventoryAlgorithm(models.Model):
@@ -387,11 +390,40 @@ class Scenario(NamedUserCreatedObject):
         elif feedstocks is None and feedstock is not None:
             feedstocks = Material.objects.filter(id=feedstock.id)
 
-        return GeoDataset.objects.filter(
-            id__in=InventoryAlgorithm.objects.filter(
-                feedstocks__in=feedstocks, geodataset__region=self.region
-            ).values("geodataset")
+        return self.compatible_geodatasets().filter(
+            id__in=InventoryAlgorithm.objects.filter(feedstocks__in=feedstocks).values(
+                "geodataset"
+            )
         )
+
+    def compatible_geodatasets(self, queryset=None):
+        """
+        Returns the geodatasets that can feed this scenario: those of the scenario region itself and those whose
+        region covers it (e.g. a country-wide dataset for a municipality scenario). A region covers the scenario
+        region when it overlaps at least REGION_COVERAGE_THRESHOLD of its area, which tolerates small border
+        mismatches between geometries from different sources.
+        """
+        if queryset is None:
+            queryset = GeoDataset.objects.all()
+        if self.region_id is None:
+            return queryset.none()
+        match = models.Q(region_id=self.region_id)
+        region_geom = self.region.geom
+        if region_geom is not None and not region_geom.empty and region_geom.area > 0:
+            covering_regions = (
+                Region.objects.filter(borders__geom__intersects=region_geom)
+                .annotate(
+                    overlap=models.Func(
+                        Intersection("borders__geom", region_geom),
+                        function="ST_Area",
+                        output_field=models.FloatField(),
+                    )
+                )
+                .filter(overlap__gte=region_geom.area * REGION_COVERAGE_THRESHOLD)
+                .values("pk")
+            )
+            match |= models.Q(region__in=covering_regions)
+        return queryset.filter(match)
 
     def evaluated_geodatasets(
         self, feedstock: Material = None, feedstocks: QuerySet = None
@@ -434,7 +466,7 @@ class Scenario(NamedUserCreatedObject):
         elif geodatasets is None and geodataset is not None:
             geodatasets = GeoDataset.objects.filter(id=geodataset.id)
 
-        geodatasets = geodatasets.filter(region=self.region)
+        geodatasets = self.compatible_geodatasets(geodatasets)
 
         return InventoryAlgorithm.objects.filter(
             feedstocks__in=feedstocks, geodataset__in=geodatasets
@@ -459,7 +491,7 @@ class Scenario(NamedUserCreatedObject):
 
     def default_inventory_algorithms(self):
         return InventoryAlgorithm.objects.filter(
-            geodataset__region=self.region, default=True
+            geodataset__in=self.compatible_geodatasets(), default=True
         )
 
     def inventory_algorithm_config(self, algorithm, feedstock):
