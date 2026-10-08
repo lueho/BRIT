@@ -306,6 +306,54 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
                 )
                 self.assertNotContains(response, "process-list-review")
 
+    def test_category_management_lists_without_scope_keep_route_scope(self):
+        superuser = User.objects.create_superuser(username="nav-superuser")
+        for user, url_name, process_url_name, scope in (
+            (
+                self.owner,
+                "processes:processcategory-list-owned",
+                "processes:process-list-owned",
+                "private",
+            ),
+            (
+                superuser,
+                "processes:processcategory-list-review",
+                "processes:process-list-review",
+                "review",
+            ),
+        ):
+            with self.subTest(url_name=url_name):
+                self.client.force_login(user)
+                response = self.client.get(reverse(url_name))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(
+                    response,
+                    f'href="{reverse(process_url_name)}?scope={scope}"',
+                )
+                self.assertContains(
+                    response,
+                    f'href="{reverse("processes:processcategory-list")}?scope={scope}"',
+                )
+
+    def test_create_form_breadcrumbs_link_processes_to_process_list(self):
+        superuser = User.objects.create_superuser(username="nav-form-superuser")
+        self.client.force_login(superuser)
+        for url_name in (
+            "processes:process-create",
+            "processes:processcategory-create",
+        ):
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name))
+                self.assertEqual(response.status_code, 200)
+                self.assertNotContains(
+                    response, f'href="{reverse("processes:dashboard")}"'
+                )
+                self.assertContains(
+                    response,
+                    f'<a href="{reverse("processes:process-list")}">Processes</a>',
+                    count=1,
+                )
+
     def test_category_chip_is_independent_anchor_filtering_current_list(self):
         response = self.client.get(
             reverse("processes:process-list"),
@@ -410,6 +458,17 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
             f'href="{reverse("processes:process-list-owned")}'
             f'?name=dig&amp;categories={self.category.pk}&amp;scope=private"',
         )
+
+    def test_category_scope_switch_keeps_filters_recovered_from_back(self):
+        url = reverse(
+            "processes:processcategory-detail", kwargs={"pk": self.category.pk}
+        )
+        back = f"{reverse('processes:process-list')}?scope=published&name=Pyro"
+        self.client.force_login(self.owner)
+        response = self.client.get(url, {"back": back})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{url}?name=Pyro&amp;scope=private"')
+        self.assertContains(response, f'href="{url}?name=Pyro&amp;scope=published"')
 
     def test_unknown_return_route_is_ignored(self):
         url = reverse("processes:process-detail", kwargs={"pk": self.process.pk})

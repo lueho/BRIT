@@ -44,11 +44,18 @@ def _nav_context(context, section):
         item: process_scope_url(item, filters) for item in PROCESS_SCOPES
     }
     if section == "processes" or request is None:
-        scope_urls = {item: scope_switch_url(request, item) for item in PROCESS_SCOPES}
+        scope_urls = {
+            item: scope_switch_url(request, item, filters=filters)
+            for item in PROCESS_SCOPES
+        }
     else:
         scope_urls = {
             item: scope_switch_url(
-                request, item, base_url=request.path, keep_category_q=True
+                request,
+                item,
+                base_url=request.path,
+                keep_category_q=True,
+                filters=filters,
             )
             for item in PROCESS_SCOPES
         }
