@@ -380,6 +380,12 @@ class MaterialDetailView(UserCreatedObjectDetailView):
             context["related_processes_total"],
             context["related_processes_more"],
         ) = _capped_related(processes)
+        context["related_processes_published_total"] = processes.filter(
+            publication_status="published"
+        ).count()
+        context["related_processes_list_url"] = (
+            f"{reverse('processes:process-list')}?material={self.object.pk}"
+        )
         return context
 
 

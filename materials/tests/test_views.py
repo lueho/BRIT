@@ -10075,6 +10075,14 @@ class MaterialDetailUsedInProcessesTestCase(TestCase):
         )
         self.assertEqual(response.context["related_processes_total"], 1)
 
+    def test_section_links_to_published_processes_list_filtered_by_material(self):
+        response = self.get_detail()
+
+        list_url = f"{reverse('processes:process-list')}?material={self.material.pk}"
+        self.assertEqual(response.context["related_processes_list_url"], list_url)
+        self.assertEqual(response.context["related_processes_published_total"], 1)
+        self.assertContains(response, f'href="{list_url}"')
+
     def test_process_owner_also_sees_own_private_process(self):
         self.client.force_login(self.drafter)
 
