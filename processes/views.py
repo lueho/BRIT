@@ -421,6 +421,55 @@ def _process_detail_prefetches(user):
     )
 
 
+PROCESS_SECTION_NEXT_STEPS = {
+    "inputs": "add a material that goes into the process.",
+    "outputs": "add a material the process produces.",
+    "overview": "add a short description.",
+    "technology": "describe how the process works.",
+    "parameters": "add typical operating conditions.",
+    "references": "credit the sources and people behind this process.",
+    "resources": "link documents or websites with more detail.",
+    "image": "add a picture of the process.",
+}
+
+
+def process_section_progress(process):
+    """Count sections with saved content and suggest the next one to fill."""
+    has_content = {
+        "overview": bool(process.short_description) or process.categories.exists(),
+        "image": bool(process.image),
+        "technology": bool(
+            process.mechanism or process.description or process.process_technology
+        ),
+        "inputs": process.process_materials.filter(
+            role=ProcessMaterial.Role.INPUT
+        ).exists(),
+        "outputs": process.process_materials.filter(
+            role=ProcessMaterial.Role.OUTPUT
+        ).exists(),
+        "parameters": process.operating_parameters.exists(),
+        "references": process.process_authors.exists()
+        or process.process_sources.exists(),
+        "resources": bool(process.supplementary_document)
+        or process.links.exists()
+        or process.info_resources.exists(),
+    }
+    next_key = next(
+        (key for key in PROCESS_SECTION_NEXT_STEPS if not has_content[key]), None
+    )
+    return {
+        "filled": sum(has_content[key] for key in PROCESS_SECTIONS),
+        "total": len(PROCESS_SECTIONS),
+        "next": {
+            "key": next_key,
+            "label": PROCESS_SECTIONS[next_key]["label"],
+            "hint": PROCESS_SECTION_NEXT_STEPS[next_key],
+        }
+        if next_key
+        else None,
+    }
+
+
 class ProcessDetailView(UserCreatedObjectDetailView):
     """Display Process details with all related information."""
 
@@ -466,6 +515,7 @@ class ProcessDetailView(UserCreatedObjectDetailView):
                 }
                 for key, section in PROCESS_SECTIONS.items()
             ]
+            context["section_progress"] = process_section_progress(self.object)
             return context
 
         # Organize materials by role, dropping links to materials the current
@@ -749,6 +799,11 @@ class ProcessUpdateView(UserCreatedObjectUpdateView):
                     "html": render_to_string(
                         "processes/includes/process_section_summary.html",
                         context,
+                        request=self.request,
+                    ),
+                    "progress_html": render_to_string(
+                        "processes/includes/process_section_progress.html",
+                        {"section_progress": process_section_progress(self.object)},
                         request=self.request,
                     ),
                 }

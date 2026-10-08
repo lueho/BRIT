@@ -114,6 +114,18 @@ test("title saves update the hero and browser title", async () => {
     assert.equal(fixture.document.title, "BRIT · Renamed process");
 });
 
+test("successful saves refresh the section progress hint", async () => {
+    const fixture = setup(async () => ({ ok: true, status: 200, json: async () => ({ section: "overview", saved: true, html: "New summary", progress_html: "<p>2 of 8 sections have content.</p>" }) }));
+    const progress = element({ replaceChildren(fragment) { this.replaced = fragment; } });
+    fixture.root.querySelectorAll = (selector) => selector === "[data-workspace-progress]" ? [progress] : [];
+    activate(fixture);
+    fixture.workspace.replaceSummary = () => {};
+    fixture.workspace.fragment = (html) => ({ html });
+    fixture.workspace.stripScripts = (fragment) => { fragment.stripped = true; };
+    await fixture.workspace.save();
+    assert.deepEqual(progress.replaced, { html: "<p>2 of 8 sections have content.</p>", stripped: true });
+});
+
 test("failed opening retains the summary and offers a normal page fallback", async () => {
     const fixture = setup();
     await fixture.workspace.open(fixture.link);

@@ -10022,3 +10022,69 @@ class SampleListFilterByGroupTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "List member sample")
         self.assertNotContains(response, "List other sample")
+
+
+class MaterialDetailUsedInProcessesTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from processes.models import Process, ProcessMaterial
+
+        user_model = get_user_model()
+        cls.owner = user_model.objects.create_user(username="material-owner")
+        cls.drafter = user_model.objects.create_user(username="process-drafter")
+        cls.material = Material.objects.create(
+            name="Shared straw", owner=cls.owner, publication_status="published"
+        )
+        cls.unused_material = Material.objects.create(
+            name="Unused straw", owner=cls.owner, publication_status="published"
+        )
+        cls.published_process = Process.objects.create(
+            name="Published pulping", owner=cls.owner, publication_status="published"
+        )
+        cls.private_process = Process.objects.create(
+            name="Private pelleting", owner=cls.drafter, publication_status="private"
+        )
+        ProcessMaterial.objects.create(
+            process=cls.published_process, material=cls.material, role="input"
+        )
+        ProcessMaterial.objects.create(
+            process=cls.published_process, material=cls.material, role="output"
+        )
+        ProcessMaterial.objects.create(
+            process=cls.private_process, material=cls.material, role="output"
+        )
+
+    def get_detail(self, material=None):
+        return self.client.get(
+            reverse("material-detail", kwargs={"pk": (material or self.material).pk})
+        )
+
+    def test_anonymous_visitor_sees_only_published_processes(self):
+        response = self.get_detail()
+
+        self.assertContains(response, "Used in processes")
+        self.assertContains(
+            response,
+            reverse(
+                "processes:process-detail", kwargs={"pk": self.published_process.pk}
+            ),
+        )
+        self.assertNotContains(response, "Private pelleting")
+        self.assertEqual(
+            list(response.context["related_processes"]), [self.published_process]
+        )
+        self.assertEqual(response.context["related_processes_total"], 1)
+
+    def test_process_owner_also_sees_own_private_process(self):
+        self.client.force_login(self.drafter)
+
+        response = self.get_detail()
+
+        self.assertContains(response, "Private pelleting")
+        self.assertEqual(response.context["related_processes_total"], 2)
+
+    def test_unused_material_shows_empty_state(self):
+        response = self.get_detail(self.unused_material)
+
+        self.assertContains(response, "Used in processes")
+        self.assertContains(response, "No process uses this material yet.")
