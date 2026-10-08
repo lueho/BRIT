@@ -54,6 +54,11 @@ class URLValidationTestCase(TestCase):
         with self.assertRaises(ValidationError):
             validate_internal_or_external_url("/path with spaces")
 
+    def test_rejects_protocol_relative_urls(self):
+        """Protocol-relative URLs point off-site and must not pass as internal."""
+        with self.assertRaises(ValidationError):
+            validate_internal_or_external_url("//evil.example.com/path")
+
     def test_accepts_empty_value(self):
         """Empty values should be accepted (for optional fields)."""
         validate_internal_or_external_url("")

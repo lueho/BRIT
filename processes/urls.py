@@ -12,10 +12,14 @@ app_name = "processes"
 
 urlpatterns = [
     # Dashboard
-    path("dashboard/", views.ProcessDashboardView.as_view(), name="dashboard"),
+    path(
+        "dashboard/",
+        views.ProcessDiscoveryRedirectView.as_view(),
+        name="dashboard",
+    ),
     path(
         "explorer/",
-        views.ProcessDashboardView.as_view(),
+        views.ProcessDiscoveryRedirectView.as_view(),
         name="processes-explorer",
     ),
     # ProcessCategory URLs

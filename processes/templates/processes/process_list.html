@@ -1,13 +1,16 @@
 {% extends "filtered_list.html" %}
 {% load crispy_forms_tags %}
+{% load custom_tags %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
+{% load process_navigation %}
 
 {% block title %}
     BRIT | Processes
 {% endblock title %}
 
 {% block list_intro %}
+    {% process_discovery_nav "processes" %}
     <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
          role="region"
          aria-label="Module introduction">
@@ -44,49 +47,121 @@
     {% endif %}
 {% endblock list_primary_actions %}
 
+{% block scope_toggle %}
+    {% if user.is_authenticated %}
+        <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
+            <a class="btn btn-outline-secondary {% if list_type == 'published' %}active disabled{% endif %}"
+               role="button"
+               title="Show published items"
+               aria-pressed="{% if list_type == 'published' %}true{% else %}false{% endif %}"
+               {% if list_type == 'published' %}aria-disabled="true" tabindex="-1"{% endif %}
+               href="{% process_scope_switch_url 'published' %}">
+                Published
+            </a>
+            <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
+               role="button"
+               title="Show only my items"
+               aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
+               {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
+               href="{% process_scope_switch_url 'private' %}">
+                Mine
+            </a>
+            {% if user|can_moderate:object_list.model and review_representation_url %}
+                <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
+                   role="button"
+                   title="Show items pending review"
+                   aria-pressed="{% if list_type == 'review' %}true{% else %}false{% endif %}"
+                   {% if list_type == 'review' %}aria-disabled="true" tabindex="-1"{% endif %}
+                   href="{% process_scope_switch_url 'review' %}">
+                    Review
+                </a>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock scope_toggle %}
+
 {% block list_table %}
+    {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
+        {% include "object_management/bulk_access_toolbar.html" %}
+    {% endif %}
     <div class="collection-list-min-height">
         <div class="table-responsive">
             <table class="table modern-table">
                 <thead>
                     <tr>
+                        {% include "object_management/bulk_select_th.html" %}
                         <th>Process</th>
                         {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
                     {% for object in object_list %}
-                        <tr>
+                        <tr tabindex="0"
+                            role="link"
+                            onclick="if(!event.target.closest('a,button,input,select,textarea,label,form,.dropdown-menu')){window.location='{% detail_or_review_url object use_back=True %}'}"
+                            onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();window.location='{% detail_or_review_url object use_back=True %}'}">
+                            {% include "object_management/bulk_select_td.html" %}
                             <td data-label="Process" class="ps-3">
                                 <a href="{% detail_or_review_url object use_back=True %}"
                                    class="text-decoration-none"
                                    aria-label="View details of {{ object.name }}">
                                     <strong class="d-block">{{ object.name }}</strong>
-                                    <span class="text-muted small">
-                                        {% for category in object.categories.all %}
-                                            {{ category.name }}
-                                            {% if not forloop.last %},{% endif %}
-                                        {% empty %}
-                                            Uncategorized
-                                        {% endfor %}
-                                        {% if object.mechanism %}· {{ object.mechanism }}{% endif %}
-                                    </span>
                                     {% if object.short_description %}
                                         <span class="text-muted small d-block">{{ object.short_description|truncatewords:18 }}</span>
                                     {% endif %}
                                 </a>
+                                <span class="text-muted small">
+                                    {% for category in object.categories.all %}
+                                        <a class="badge text-bg-light border text-decoration-none"
+                                           onclick="event.stopPropagation()"
+                                           onkeydown="event.stopPropagation()"
+                                           href="{% process_category_filter_url category %}">{{ category.name }}</a>
+                                    {% empty %}
+                                        Uncategorized
+                                    {% endfor %}
+                                    {% if object.mechanism %}· {{ object.mechanism }}{% endif %}
+                                </span>
                             </td>
                             {% if object_list.model|is_user_created %}
                                 <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
                             {% endif %}
                         </tr>
                     {% empty %}
-                        {% if not user.is_authenticated %}
-                            {% include "includes/list_empty_state.html" with hint="Log in to create new processes." %}
-                        {% elif create_permission in perms or user.is_staff %}
-                            {% include "includes/list_empty_state.html" with hint="Create your first process to get started." %}
+                        {% has_active_filters as filters_active %}
+                        {% if not filters_active %}
+                            {% if list_type == 'published' %}
+                                <tr>
+                                    <td colspan="2" class="text-center text-muted py-4">
+                                        <div class="mb-2">
+                                            <i class="fas fa-inbox me-1"></i> No published processes yet.
+                                        </div>
+                                        {% if not user.is_authenticated %}
+                                            <div class="small mb-2">Log in to create new processes.</div>
+                                        {% elif create_permission in perms or user.is_staff %}
+                                            <div class="small mb-2">Create your first process to get started.</div>
+                                        {% endif %}
+                                        {% if user|can_moderate:object_list.model %}
+                                            <a href="{% url 'processes:process-list-review' %}?scope=review">Browse processes in review</a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% elif not user.is_authenticated %}
+                                {% include "includes/list_empty_state.html" with hint="Log in to create new processes." %}
+                            {% elif create_permission in perms or user.is_staff %}
+                                {% include "includes/list_empty_state.html" with hint="Create your first process to get started." %}
+                            {% else %}
+                                {% include "includes/list_empty_state.html" %}
+                            {% endif %}
                         {% else %}
-                            {% include "includes/list_empty_state.html" %}
+                            <tr>
+                                <td colspan="2" class="text-center text-muted py-4">
+                                    <div class="mb-2">
+                                        <i class="fas fa-filter me-1"></i> No processes match your current filters.
+                                        <a class="ms-2"
+                                           href="{% if list_type == 'private' %}{{ private_representation_url }}?scope=private{% elif list_type == 'review' %}{{ review_representation_url }}?scope=review{% else %}{{ public_representation_url }}?scope=published{% endif %}">Reset filters</a>
+                                    </div>
+                                </td>
+                            </tr>
                         {% endif %}
                     {% endfor %}
                 </tbody>
