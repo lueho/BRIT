@@ -1,4 +1,4 @@
-{% extends "simple_list_card.html" %}
+{% extends "filtered_list.html" %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 {% load process_navigation %}
@@ -12,6 +12,7 @@
 {% block list_table_head %}
 <thead>
     <tr>
+        {% include "object_management/bulk_select_th.html" %}
         <th>Name</th>
         <th>Description</th>
         {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
@@ -20,9 +21,13 @@
 {% endblock %}
 
 {% block list_table_row %}
-<tr>
+<tr tabindex="0"
+    role="link"
+    onclick="if(!event.target.closest('a,button,input,select,textarea,label,form,.dropdown-menu')){window.location='{% detail_or_review_url object use_back=True %}'}"
+    onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();window.location='{% detail_or_review_url object use_back=True %}'}">
+    {% include "object_management/bulk_select_td.html" %}
     <td>
-        <a href="{% detail_or_review_url object %}"
+        <a href="{% detail_or_review_url object use_back=True %}"
            aria-label="View details of {{ object.name }}">{{ object.name }}</a>
     </td>
     <td>{{ object.description|truncatewords:15 }}</td>

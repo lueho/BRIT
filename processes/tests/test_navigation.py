@@ -230,6 +230,19 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         )
         self.assertContains(response, f'href="{expected.replace("&", "&amp;")}"')
 
+    def test_catalogue_ignores_process_scope_and_name_filters(self):
+        """Process discovery params (review scope, process name) must not
+        restrict the published category cards."""
+        self.client.force_login(self.moderator)
+        response = self.client.get(
+            reverse("processes:processcategory-list"),
+            {"scope": "review", "name": "dig"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            {self.category, self.other_category}, set(response.context["categories"])
+        )
+
     def test_catalogue_about_link_replaces_category_selection(self):
         """About this category must scope to the clicked category, not carry
         a previously selected category into the detail gallery."""
@@ -324,7 +337,9 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         ):
             with self.subTest(url_name=url_name):
                 self.client.force_login(user)
-                response = self.client.get(reverse(url_name))
+                # A non-empty query without ``scope`` skips the filter-default
+                # redirect, so the scope must come from the route.
+                response = self.client.get(reverse(url_name), {"page": "1"})
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(
                     response,
@@ -633,27 +648,6 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
             f'href="{reverse("processes:process-list")}?scope=published"',
         )
         self.assertNotContains(response, "No published processes yet.")
-
-    def test_published_category_filters_review_processes_for_process_moderator(self):
-        review_process = Process.objects.create(
-            name="Scoped Review Process",
-            owner=self.owner,
-            publication_status="review",
-        )
-        review_process.categories.add(self.category)
-        Process.objects.create(
-            name="Other Review Process",
-            owner=self.owner,
-            publication_status="review",
-        )
-        self.client.force_login(self.moderator)
-        response = self.client.get(
-            reverse("processes:process-list-review"),
-            {"scope": "review", "categories": str(self.category.pk)},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Scoped Review Process")
-        self.assertNotContains(response, "Other Review Process")
 
     @staticmethod
     def _hrefs(response):

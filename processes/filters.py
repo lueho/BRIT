@@ -13,7 +13,7 @@ from utils.object_management.permissions import filter_queryset_for_user
 from .models import Process, ProcessCategory, ProcessMaterial
 
 
-class ProcessCategoryFilter(django_filters.FilterSet):
+class ProcessCategoryFilter(UserCreatedObjectScopedFilterSet):
     """Filter for ProcessCategory list views."""
 
     name = django_filters.CharFilter(
@@ -31,7 +31,7 @@ class ProcessCategoryFilter(django_filters.FilterSet):
 
     class Meta:
         model = ProcessCategory
-        fields = ["name", "publication_status"]
+        fields = ["scope", "name", "publication_status"]
 
 
 class ProcessFilter(UserCreatedObjectScopedFilterSet):

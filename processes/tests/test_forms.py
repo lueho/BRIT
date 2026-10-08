@@ -9,17 +9,17 @@ from materials.models import Material
 from utils.properties.models import Unit
 
 from ..forms import (
-    ProcessAuthorFormSet,
-    ProcessAuthorInlineForm,
+    ProcessAuthorSectionForm,
     ProcessCategoryModalModelForm,
     ProcessCategoryModelForm,
     ProcessMaintenanceForm,
+    ProcessMaterialInlineForm,
     ProcessModalModelForm,
     ProcessModelForm,
-    ProcessSourceFormSet,
-    ProcessSourceInlineForm,
-    build_process_material_formset,
-    build_process_operating_parameter_formset,
+    ProcessOperatingParameterInlineForm,
+    ProcessQuickCreateForm,
+    ProcessSectionFormSet,
+    ProcessSourceSectionForm,
 )
 from ..models import (
     Process,
@@ -99,8 +99,8 @@ class ProcessFormTestCase(TestCase):
         formset_class = inlineformset_factory(
             Process,
             ProcessAuthor,
-            form=ProcessAuthorInlineForm,
-            formset=ProcessAuthorFormSet,
+            form=ProcessAuthorSectionForm,
+            formset=ProcessSectionFormSet,
             extra=0,
             can_delete=True,
         )
@@ -134,8 +134,8 @@ class ProcessFormTestCase(TestCase):
         formset_class = inlineformset_factory(
             Process,
             ProcessSource,
-            form=ProcessSourceInlineForm,
-            formset=ProcessSourceFormSet,
+            form=ProcessSourceSectionForm,
+            formset=ProcessSectionFormSet,
             extra=0,
             can_delete=True,
         )
@@ -288,6 +288,38 @@ class ProcessFormTestCase(TestCase):
             [archived_category], list(edit_form.cleaned_data["categories"])
         )
 
+    def test_archived_categories_rejected_in_maintenance_and_quick_create(self):
+        """Workspace maintenance and quick-create forms share the archived rule."""
+        owner = get_user_model().objects.create(username="workspace_owner")
+        archived_category = ProcessCategory.objects.create(
+            name="Archived Category",
+            owner=owner,
+            publication_status=ProcessCategory.STATUS_ARCHIVED,
+        )
+        request = RequestFactory().post("/")
+        request.user = owner
+
+        quick_create_form = ProcessQuickCreateForm(
+            data={
+                "name": "Quick Process",
+                "short_description": "Quick description",
+                "categories": [archived_category.pk],
+            },
+            request=request,
+        )
+        self.assertFalse(quick_create_form.is_valid())
+        self.assertIn("categories", quick_create_form.errors)
+
+        maintenance_form = ProcessMaintenanceForm(
+            data={
+                "name": "Maintained Process",
+                "categories": [archived_category.pk],
+            },
+            request=request,
+        )
+        self.assertFalse(maintenance_form.is_valid())
+        self.assertIn("categories", maintenance_form.errors)
+
 
 class ProcessMaterialFormSetTestCase(TestCase):
     """Test ProcessMaterial inline formset."""
@@ -305,7 +337,13 @@ class ProcessMaterialFormSetTestCase(TestCase):
             owner=self.owner,
             publication_status="published",
         )
-        self.formset_class = build_process_material_formset()
+        self.formset_class = inlineformset_factory(
+            Process,
+            ProcessMaterial,
+            form=ProcessMaterialInlineForm,
+            extra=1,
+            can_delete=True,
+        )
 
     def test_valid_formset(self):
         """Valid formset data should be valid."""
@@ -360,7 +398,13 @@ class ProcessOperatingParameterFormSetTestCase(TestCase):
             owner=self.owner,
             publication_status="published",
         )
-        self.formset_class = build_process_operating_parameter_formset()
+        self.formset_class = inlineformset_factory(
+            Process,
+            ProcessOperatingParameter,
+            form=ProcessOperatingParameterInlineForm,
+            extra=1,
+            can_delete=True,
+        )
 
     def test_valid_formset(self):
         """Valid formset data should be valid."""
