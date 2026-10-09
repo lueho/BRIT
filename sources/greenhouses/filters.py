@@ -12,10 +12,6 @@ from django_tomselect.widgets import TomSelectModelWidget
 from maps.models import Catchment
 from sources.greenhouses.models import Culture, Greenhouse, NantesGreenhouses
 from utils.filters import BaseCrispyFilterSet, UserCreatedObjectScopedFilterSet
-from utils.object_management.permissions import (
-    apply_scope_filter,
-    filter_queryset_for_user,
-)
 
 HEATING_CHOICES = (
     ("", "All"),
@@ -76,7 +72,7 @@ class GreenhouseTypeFilter(UserCreatedObjectScopedFilterSet):
 class CultureListFilter(UserCreatedObjectScopedFilterSet):
     name = ModelChoiceFilter(
         queryset=Culture.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Culture Name",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -88,26 +84,9 @@ class CultureListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = Culture.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            Culture.objects.all(), selected_field="name"
+        )
 
     class Meta:
         model = Culture

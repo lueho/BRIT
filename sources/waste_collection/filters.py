@@ -38,7 +38,6 @@ from utils.filters import (
     UserCreatedObjectScopedFilterSet,
 )
 from utils.object_management.permissions import (
-    apply_scope_filter,
     filter_queryset_for_user,
 )
 from utils.widgets import NullableRangeSliderWidget
@@ -71,7 +70,7 @@ class CollectionCatchmentFilterSet(UserCreatedObjectScopedFilterSet):
 class CollectionSystemListFilter(UserCreatedObjectScopedFilterSet):
     name = ModelChoiceFilter(
         queryset=CollectionSystem.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="System Name",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -83,26 +82,9 @@ class CollectionSystemListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = CollectionSystem.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            CollectionSystem.objects.all(), selected_field="name"
+        )
 
     class Meta:
         model = CollectionSystem
@@ -112,7 +94,7 @@ class CollectionSystemListFilter(UserCreatedObjectScopedFilterSet):
 class WasteCategoryListFilter(UserCreatedObjectScopedFilterSet):
     name = ModelChoiceFilter(
         queryset=WasteCategory.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Category Name",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -124,26 +106,9 @@ class WasteCategoryListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = WasteCategory.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            WasteCategory.objects.all(), selected_field="name"
+        )
 
     class Meta:
         model = WasteCategory
@@ -153,7 +118,7 @@ class WasteCategoryListFilter(UserCreatedObjectScopedFilterSet):
 class WasteComponentListFilter(UserCreatedObjectScopedFilterSet):
     name = ModelChoiceFilter(
         queryset=WasteComponent.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Component Name",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -165,26 +130,9 @@ class WasteComponentListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = WasteComponent.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            WasteComponent.objects.all(), selected_field="name"
+        )
 
     class Meta:
         model = WasteComponent
@@ -194,7 +142,7 @@ class WasteComponentListFilter(UserCreatedObjectScopedFilterSet):
 class FeeSystemListFilter(UserCreatedObjectScopedFilterSet):
     name = ModelChoiceFilter(
         queryset=FeeSystem.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Fee System Name",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -206,26 +154,9 @@ class FeeSystemListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = FeeSystem.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            FeeSystem.objects.all(), selected_field="name"
+        )
 
     class Meta:
         model = FeeSystem
@@ -235,7 +166,7 @@ class FeeSystemListFilter(UserCreatedObjectScopedFilterSet):
 class CollectionFrequencyListFilter(UserCreatedObjectScopedFilterSet):
     name = ModelChoiceFilter(
         queryset=CollectionFrequency.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Frequency Name",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -247,26 +178,9 @@ class CollectionFrequencyListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = CollectionFrequency.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            CollectionFrequency.objects.all(), selected_field="name"
+        )
 
     class Meta:
         model = CollectionFrequency
