@@ -146,7 +146,7 @@ class SourceFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.filters["title"].queryset = self.scoped_choice_queryset(
-            Source.objects.all()
+            Source.objects.all(), selected_field="title"
         )
         # Authors and licences have their own publication status, so a private
         # source may cite a published author. Restrict by visibility only.
