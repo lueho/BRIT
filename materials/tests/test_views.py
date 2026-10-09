@@ -103,6 +103,24 @@ class BaseMaterialProxyAutocompleteViewTestCase(TestCase):
         self.assertNotIn(self.material.name, names)
 
 
+class MaterialListNameWidgetSelectionTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.material = Material.objects.create(
+            name="Grass from nature reserve",
+            publication_status="published",
+        )
+
+    def test_selected_material_renders_when_list_search_does_not_match_it(self):
+        response = self.client.get(
+            reverse("material-list"),
+            {"q": "grass clippings", "scope": "published", "name": self.material.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f"allOptions['{self.material.pk}']")
+
+
 class SampleSubstrateMaterialAutocompleteViewTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
