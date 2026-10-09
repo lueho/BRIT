@@ -256,6 +256,12 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
         except ValidationError:
             return None
 
+    def filter_selected_object(self, queryset, name, value):
+        """Match the selected object itself, not other objects sharing its name."""
+        if value:
+            return queryset.filter(pk=value.pk)
+        return queryset
+
     def _apply_shared_field_visibility(self):
         if "publication_status" not in self.filters:
             return

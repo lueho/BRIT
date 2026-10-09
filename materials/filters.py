@@ -50,7 +50,7 @@ class MaterialListFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilte
 
     name = ModelChoiceFilter(
         queryset=Material.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Material Name",
         empty_label="All",
         widget=TomSelectModelWidget(
@@ -100,7 +100,7 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
     sortable_fields = {"name": "name"}
     name = ModelChoiceFilter(
         queryset=MaterialComponent.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Component Name",
         empty_label="All",
         widget=TomSelectModelWidget(
@@ -269,7 +269,7 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
 
     name = ModelChoiceFilter(
         queryset=Sample.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Sample Name",
         help_text="Select a specific sample by name.",
         empty_label="All",

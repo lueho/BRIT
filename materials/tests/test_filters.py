@@ -866,3 +866,61 @@ class MaterialListFilterSelectedNameAcrossScopesTestCase(TestCase):
 
         self.assertFalse(filtr.form.is_valid())
         self.assertIn("name", filtr.form.errors)
+
+    def test_selection_does_not_match_same_named_object_in_other_scope(self):
+        Material.objects.create(
+            name=self.published.name,
+            owner=self.user,
+            publication_status="review",
+        )
+
+        filtr = self._filter({"scope": "review", "name": self.published.pk})
+
+        self.assertTrue(filtr.form.is_valid(), filtr.form.errors)
+        self.assertEqual(list(filtr.qs), [])
+
+    def test_component_selection_does_not_match_same_named_component(self):
+        published = MaterialComponent.objects.create(
+            name="Shared component name",
+            owner=self.other_user,
+            publication_status="published",
+        )
+        MaterialComponent.objects.create(
+            name=published.name,
+            owner=self.user,
+            publication_status="review",
+        )
+        request = RequestFactory().get("/", {"scope": "review", "name": published.pk})
+        request.user = self.user
+
+        filtr = MaterialComponentListFilter(
+            data=request.GET,
+            queryset=MaterialComponent.objects.all(),
+            request=request,
+        )
+
+        self.assertTrue(filtr.form.is_valid(), filtr.form.errors)
+        self.assertEqual(list(filtr.qs), [])
+
+    def test_sample_selection_does_not_match_same_named_sample(self):
+        published = Sample.objects.create(
+            name="Shared sample name",
+            material=self.published,
+            owner=self.other_user,
+            publication_status="published",
+        )
+        Sample.objects.create(
+            name=published.name,
+            material=self.published,
+            owner=self.user,
+            publication_status="review",
+        )
+        request = RequestFactory().get("/", {"scope": "review", "name": published.pk})
+        request.user = self.user
+
+        filtr = SampleFilter(
+            data=request.GET, queryset=Sample.objects.all(), request=request
+        )
+
+        self.assertTrue(filtr.form.is_valid(), filtr.form.errors)
+        self.assertEqual(list(filtr.qs), [])
