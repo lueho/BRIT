@@ -10,13 +10,19 @@ from distributions.models import TemporalDistribution, Timestep
 from maps.models import Region
 from materials.models import MaterialCategory
 from utils.properties.models import Property
+from utils.tests.testcases import ScopedSelectionFilterTestMixin
 
 from ..filters import (
     CollectionFilterSet,
+    CollectionFrequencyListFilter,
     CollectionsPerYearFilter,
+    CollectionSystemListFilter,
     CollectorFilter,
     ConnectionRateFilter,
+    FeeSystemListFilter,
     SpecWasteCollectedFilter,
+    WasteCategoryListFilter,
+    WasteComponentListFilter,
     WasteFlyerFilter,
 )
 from ..models import (
@@ -26,7 +32,10 @@ from ..models import (
     CollectionFrequency,
     CollectionPropertyValue,
     CollectionSeason,
+    CollectionSystem,
     Collector,
+    FeeSystem,
+    WasteCategory,
     WasteComponent,
     WasteFlyer,
 )
@@ -1004,3 +1013,43 @@ class CollectorFilterTestCase(TestCase):
     def test_filter_form_has_no_formtags(self):
         filtr = CollectorFilter(queryset=Collector.objects.all())
         self.assertFalse(filtr.form.helper.form_tag)
+
+
+class CollectionSystemListFilterScopedSelectionTestCase(
+    ScopedSelectionFilterTestMixin, TestCase
+):
+    filterset_class = CollectionSystemListFilter
+    model = CollectionSystem
+
+
+class WasteCategoryListFilterScopedSelectionTestCase(
+    ScopedSelectionFilterTestMixin, TestCase
+):
+    filterset_class = WasteCategoryListFilter
+    model = WasteCategory
+
+
+class WasteComponentListFilterScopedSelectionTestCase(
+    ScopedSelectionFilterTestMixin, TestCase
+):
+    filterset_class = WasteComponentListFilter
+    model = WasteComponent
+
+    @classmethod
+    def setUpTestData(cls):
+        MaterialCategory.objects.get_or_create(name="Biowaste component")
+        super().setUpTestData()
+
+
+class FeeSystemListFilterScopedSelectionTestCase(
+    ScopedSelectionFilterTestMixin, TestCase
+):
+    filterset_class = FeeSystemListFilter
+    model = FeeSystem
+
+
+class CollectionFrequencyListFilterScopedSelectionTestCase(
+    ScopedSelectionFilterTestMixin, TestCase
+):
+    filterset_class = CollectionFrequencyListFilter
+    model = CollectionFrequency

@@ -811,3 +811,116 @@ class MaterialListFilterFreeTextSearchTestCase(TestCase):
 
         self.assertNotIn(self.compost, filtr.qs)
         self.assertNotIn(self.sludge, filtr.qs)
+
+
+class MaterialListFilterSelectedNameAcrossScopesTestCase(TestCase):
+    """A material picked in one scope stays a valid selection in another."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(username="scope-toggle-user")
+        cls.other_user = User.objects.create_user(username="scope-toggle-other")
+        cls.published = Material.objects.create(
+            name="Grass from nature reserve",
+            owner=cls.other_user,
+            publication_status="published",
+        )
+        cls.own_review = Material.objects.create(
+            name="Own grass in review",
+            owner=cls.user,
+            publication_status="review",
+        )
+        cls.foreign_private = Material.objects.create(
+            name="Foreign private grass",
+            owner=cls.other_user,
+            publication_status="private",
+        )
+
+    def _filter(self, data):
+        request = RequestFactory().get("/materials/materials/review/", data)
+        request.user = self.user
+        return MaterialListFilter(
+            data=request.GET, queryset=Material.objects.all(), request=request
+        )
+
+    def test_published_selection_is_valid_in_review_scope(self):
+        filtr = self._filter({"scope": "review", "name": self.published.pk})
+
+        self.assertTrue(filtr.form.is_valid(), filtr.form.errors)
+        self.assertEqual(list(filtr.qs), [])
+
+    def test_review_selection_still_filters_review_scope(self):
+        filtr = self._filter({"scope": "review", "name": self.own_review.pk})
+
+        self.assertTrue(filtr.form.is_valid(), filtr.form.errors)
+        self.assertEqual(list(filtr.qs), [self.own_review])
+
+    def test_invisible_selection_stays_invalid(self):
+        filtr = self._filter({"scope": "review", "name": self.foreign_private.pk})
+
+        self.assertFalse(filtr.form.is_valid())
+        self.assertIn("name", filtr.form.errors)
+
+    def test_non_numeric_selection_stays_invalid(self):
+        filtr = self._filter({"scope": "review", "name": "abc"})
+
+        self.assertFalse(filtr.form.is_valid())
+        self.assertIn("name", filtr.form.errors)
+
+    def test_selection_does_not_match_same_named_object_in_other_scope(self):
+        Material.objects.create(
+            name=self.published.name,
+            owner=self.user,
+            publication_status="review",
+        )
+
+        filtr = self._filter({"scope": "review", "name": self.published.pk})
+
+        self.assertTrue(filtr.form.is_valid(), filtr.form.errors)
+        self.assertEqual(list(filtr.qs), [])
+
+    def test_component_selection_does_not_match_same_named_component(self):
+        published = MaterialComponent.objects.create(
+            name="Shared component name",
+            owner=self.other_user,
+            publication_status="published",
+        )
+        MaterialComponent.objects.create(
+            name=published.name,
+            owner=self.user,
+            publication_status="review",
+        )
+        request = RequestFactory().get("/", {"scope": "review", "name": published.pk})
+        request.user = self.user
+
+        filtr = MaterialComponentListFilter(
+            data=request.GET,
+            queryset=MaterialComponent.objects.all(),
+            request=request,
+        )
+
+        self.assertTrue(filtr.form.is_valid(), filtr.form.errors)
+        self.assertEqual(list(filtr.qs), [])
+
+    def test_sample_selection_does_not_match_same_named_sample(self):
+        published = Sample.objects.create(
+            name="Shared sample name",
+            material=self.published,
+            owner=self.other_user,
+            publication_status="published",
+        )
+        Sample.objects.create(
+            name=published.name,
+            material=self.published,
+            owner=self.user,
+            publication_status="review",
+        )
+        request = RequestFactory().get("/", {"scope": "review", "name": published.pk})
+        request.user = self.user
+
+        filtr = SampleFilter(
+            data=request.GET, queryset=Sample.objects.all(), request=request
+        )
+
+        self.assertTrue(filtr.form.is_valid(), filtr.form.errors)
+        self.assertEqual(list(filtr.qs), [])

@@ -2,7 +2,7 @@ from abc import ABC
 
 from django.conf import settings
 from django.contrib.auth.models import Permission
-from django.test import Client, TestCase
+from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -1351,3 +1351,71 @@ class AbstractTestCases:
             self.assertRedirects(
                 response, self.get_delete_success_url(publication_status="private")
             )
+
+
+class ScopedSelectionFilterTestMixin:
+    """Selections carried across list scopes stay valid and match only themselves.
+
+    Mix into a ``TestCase`` and set ``filterset_class`` and ``model``. The list
+    scope toggle keeps other query parameters, so a pk picked in one scope is
+    submitted again with another scope.
+    """
+
+    filterset_class = None
+    model = None
+    field = "name"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        slug = cls.__name__.lower()
+        cls.scope_user = User.objects.create_user(username=f"scope-{slug}")
+        cls.scope_other = User.objects.create_user(username=f"scope-other-{slug}")
+        cls.published_choice = cls.create_choice(
+            "Shared scope name", cls.scope_other, "published"
+        )
+        cls.same_name_review = cls.create_choice(
+            "Shared scope name", cls.scope_user, "review"
+        )
+        cls.foreign_private = cls.create_choice(
+            "Foreign private choice", cls.scope_other, "private"
+        )
+
+    @classmethod
+    def create_choice(cls, name, owner, publication_status):
+        return cls.model.objects.create(
+            name=name, owner=owner, publication_status=publication_status
+        )
+
+    def build_filter(self, data):
+        request = RequestFactory().get("/", data)
+        request.user = self.scope_user
+        return self.filterset_class(
+            data=request.GET,
+            queryset=self.filterset_class._meta.model.objects.all(),
+            request=request,
+        )
+
+    def test_selection_from_other_scope_is_valid_and_matches_only_itself(self):
+        filtr = self.build_filter(
+            {"scope": "review", self.field: self.published_choice.pk}
+        )
+
+        self.assertTrue(filtr.form.is_valid(), filtr.form.errors)
+        self.assertEqual(list(filtr.qs), [])
+
+    def test_selection_in_its_own_scope_matches_itself(self):
+        filtr = self.build_filter(
+            {"scope": "review", self.field: self.same_name_review.pk}
+        )
+
+        self.assertTrue(filtr.form.is_valid(), filtr.form.errors)
+        self.assertEqual(list(filtr.qs), [self.same_name_review])
+
+    def test_invisible_selection_is_rejected(self):
+        filtr = self.build_filter(
+            {"scope": "review", self.field: self.foreign_private.pk}
+        )
+
+        self.assertFalse(filtr.form.is_valid())
+        self.assertIn(self.field, filtr.form.errors)
