@@ -3073,6 +3073,14 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
         for attr, value in saved.items():
             setattr(cls, attr, value)
 
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        # Widgets render preselected options through this view with the page
+        # request; that page's own ``q`` must not filter the selected objects.
+        match = getattr(request, "resolver_match", None)
+        if getattr(getattr(match, "func", None), "view_class", None) is not type(self):
+            self.query = ""
+
     def hook_queryset(self, queryset):
         qs = filter_queryset_for_user(queryset, self.request.user)
         try:

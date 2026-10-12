@@ -4,8 +4,9 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from utils.object_management.models import User
+from utils.tests.testcases import ScopedSelectionFilterTestMixin
 
-from ..filters import AuthorFilterSet, SourceFilter
+from ..filters import AuthorFilterSet, LicenceListFilter, SourceFilter
 from ..models import Author, Licence, Source, SourceAuthor
 
 
@@ -364,3 +365,10 @@ class SourceFilterScopeTestCase(TestCase):
         fs = SourceFilter(queryset=Source.objects.none())
         for name in ("author", "licence"):
             self.assertFalse(fs.filters[name].field.widget.filter_by)
+
+
+class LicenceListFilterScopedSelectionTestCase(
+    ScopedSelectionFilterTestMixin, TestCase
+):
+    filterset_class = LicenceListFilter
+    model = Licence

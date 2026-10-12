@@ -1,4 +1,5 @@
 from crispy_forms.helper import FormHelper
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.forms import HiddenInput
 from django_filters import CharFilter, ChoiceFilter, FilterSet, RangeFilter
@@ -211,13 +212,19 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
             return None
         return None
 
-    def scoped_choice_queryset(self, queryset):
+    def scoped_choice_queryset(self, queryset, selected_field=None):
         """Restrict *queryset* to what the request user may see in the active scope.
 
         Intended for ``ModelChoiceFilter`` dropdowns of related objects:
         ``filter_queryset_for_user`` removes objects outside the user's
         visibility, then ``apply_scope_filter`` aligns the choices with the
         selected list scope (published/private/review).
+
+        With *selected_field*, the object currently submitted for that filter
+        stays a valid choice if the user may see it, even outside the active
+        scope. Switching scope keeps the other query parameters, so a
+        selection made in one scope must not turn into "Select a valid
+        choice" in another; the list then just shows no matches.
 
         Reads the scope from ``self.data`` only. ``self.form`` must not be
         touched here: accessing it inside ``__init__`` builds and caches the
@@ -229,8 +236,30 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
             queryset = filter_queryset_for_user(queryset, user)
         data = getattr(self, "data", None)
         scope_value = data.get("scope") if data else None
-        if scope_value:
-            queryset = apply_scope_filter(queryset, scope_value, user=user)
+        if not scope_value:
+            return queryset
+        scoped = apply_scope_filter(queryset, scope_value, user=user)
+        selected_pk = self._selected_choice_pk(queryset.model, selected_field)
+        if selected_pk is None:
+            return scoped
+        return queryset.filter(Q(pk__in=scoped.values("pk")) | Q(pk=selected_pk))
+
+    def _selected_choice_pk(self, model, field_name):
+        data = getattr(self, "data", None)
+        if not field_name or not data:
+            return None
+        value = data.get(field_name)
+        if value in (None, ""):
+            return None
+        try:
+            return model._meta.pk.to_python(value)
+        except ValidationError:
+            return None
+
+    def filter_selected_object(self, queryset, name, value):
+        """Match the selected object itself, not other objects sharing its name."""
+        if value:
+            return queryset.filter(pk=value.pk)
         return queryset
 
     def _apply_shared_field_visibility(self):
