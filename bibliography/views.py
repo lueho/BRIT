@@ -61,7 +61,7 @@ from .tasks import check_source_url, check_source_urls
 
 
 class BibliographyExplorerView(BreadcrumbContextMixin, TemplateView):
-    template_name = "bibliography_dashboard.html"
+    template_name = "bibliography_explorer.html"
     breadcrumb_module_label = "Bibliography"
     breadcrumb_page_title = "Bibliography"
 
@@ -87,21 +87,21 @@ class BibliographyExplorerView(BreadcrumbContextMixin, TemplateView):
 class AuthorPublishedListView(PublishedObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
 class AuthorPrivateListView(PrivateObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
 class AuthorReviewListView(ReviewObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
@@ -189,19 +189,19 @@ class AuthorAutocompleteView(UserCreatedObjectAutocompleteView):
 class LicencePublishedListView(PublishedObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class LicencePrivateListView(PrivateObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class LicenceReviewListView(ReviewObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class LicenceCreateView(UserCreatedObjectCreateView):
@@ -251,7 +251,7 @@ class SourcePublishedFilterView(PublishedObjectFilterView):
         "citation_key"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class SourcePrivateFilterView(PrivateObjectFilterView):
@@ -260,7 +260,7 @@ class SourcePrivateFilterView(PrivateObjectFilterView):
         "citation_key"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class SourceReviewFilterView(ReviewObjectFilterView):
@@ -269,7 +269,7 @@ class SourceReviewFilterView(ReviewObjectFilterView):
         "citation_key"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class SourceCreateView(UserCreatedObjectCreateWithInlinesView):

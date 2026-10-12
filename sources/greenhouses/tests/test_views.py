@@ -21,7 +21,7 @@ class NantesGreenhousesViewSetTestCase(SimpleTestCase):
 
 
 class CultureCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
-    dashboard_view = False
+    explorer_view = False
     add_scope_query_param_to_list_urls = True
 
     model = Culture
@@ -55,7 +55,7 @@ class CultureCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
 
 class GreenhouseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
-    dashboard_view = False
+    explorer_view = False
     public_list_view = False
     add_scope_query_param_to_list_urls = True
 
@@ -73,7 +73,7 @@ class GreenhouseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
 
 class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
-    dashboard_view = False
+    explorer_view = False
     public_list_view = False
     private_list_view = False
     create_view = False  # TODO: Check whether a create view is necessary

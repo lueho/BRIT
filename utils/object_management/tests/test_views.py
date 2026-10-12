@@ -1445,7 +1445,7 @@ class BreadcrumbContractViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            f'<a href="{reverse("properties-dashboard")}">Properties</a>',
+            f'<a href="{reverse("properties-explorer")}">Properties</a>',
             html=True,
         )
         self.assertContains(

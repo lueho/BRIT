@@ -629,22 +629,22 @@ class ProcessMaintenanceViewsTestCase(TestCase):
         self.assertGreater(row.order, 0)
 
 
-class ProcessDashboardViewTestCase(ViewWithPermissionsTestCase):
-    """Test the processes dashboard view."""
+class ProcessExplorerViewTestCase(ViewWithPermissionsTestCase):
+    """Test the processes explorer view."""
 
     def test_get_http_200_ok_for_anonymous(self):
-        """Anonymous users can access the dashboard."""
-        response = self.client.get(reverse("processes:dashboard"))
+        """Anonymous users can access the explorer."""
+        response = self.client.get(reverse("processes:explorer"))
         self.assertEqual(200, response.status_code)
 
     def test_get_http_200_ok_for_authenticated(self):
-        """Authenticated users can access the dashboard."""
+        """Authenticated users can access the explorer."""
         self.client.force_login(self.member)
-        response = self.client.get(reverse("processes:dashboard"))
+        response = self.client.get(reverse("processes:explorer"))
         self.assertEqual(200, response.status_code)
 
     def test_total_categories_reflects_user_visibility(self):
-        """The dashboard counter must use the same read policy as the lists
+        """The explorer counter must use the same read policy as the lists
         and autocomplete, so user-visible unpublished categories are counted."""
         ProcessCategory.objects.create(
             name="Published Category",
@@ -654,11 +654,11 @@ class ProcessDashboardViewTestCase(ViewWithPermissionsTestCase):
         ProcessCategory.objects.create(name="Member Category", owner=self.member)
         ProcessCategory.objects.create(name="Outsider Category", owner=self.outsider)
 
-        response = self.client.get(reverse("processes:dashboard"))
+        response = self.client.get(reverse("processes:explorer"))
         self.assertEqual(1, response.context["total_categories"])
 
         self.client.force_login(self.member)
-        response = self.client.get(reverse("processes:dashboard"))
+        response = self.client.get(reverse("processes:explorer"))
         self.assertEqual(2, response.context["total_categories"])
         self.assertEqual(
             {"Published Category", "Member Category"},
@@ -682,7 +682,7 @@ class ProcessCategoryCRUDViewsTestCase(
 
     model = ProcessCategory
 
-    view_dashboard_name = "processes:dashboard"
+    view_explorer_name = "processes:explorer"
     view_create_name = "processes:processcategory-create"
     view_modal_create_name = "processes:processcategory-create-modal"
     view_published_list_name = "processes:processcategory-list"
@@ -896,7 +896,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
     model = Process
 
-    view_dashboard_name = "processes:dashboard"
+    view_explorer_name = "processes:explorer"
     view_create_name = "processes:process-create"
     view_modal_create_name = "processes:process-create-modal"
     view_published_list_name = "processes:process-list"
@@ -1860,8 +1860,8 @@ class ProcessCategoryDetailVisibilityTestCase(ViewWithPermissionsTestCase):
         self.assertNotContains(response, "Own Secret Process")
 
 
-class ProcessDashboardVisibilityTestCase(ViewWithPermissionsTestCase):
-    """Dashboard counters must use the same read policy as the lists."""
+class ProcessExplorerVisibilityTestCase(ViewWithPermissionsTestCase):
+    """Explorer counters must use the same read policy as the lists."""
 
     member_permissions = ["add_process"]
 
@@ -1874,27 +1874,27 @@ class ProcessDashboardVisibilityTestCase(ViewWithPermissionsTestCase):
         Process.objects.create(name="Member Process", owner=self.member)
         Process.objects.create(name="Outsider Process", owner=self.outsider)
 
-        response = self.client.get(reverse("processes:dashboard"))
+        response = self.client.get(reverse("processes:explorer"))
         self.assertEqual(1, response.context["total_processes"])
 
         self.client.force_login(self.member)
-        response = self.client.get(reverse("processes:dashboard"))
+        response = self.client.get(reverse("processes:explorer"))
         self.assertEqual(2, response.context["total_processes"])
 
     def test_quick_actions_hidden_for_anonymous(self):
-        response = self.client.get(reverse("processes:dashboard"))
+        response = self.client.get(reverse("processes:explorer"))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, reverse("processes:process-create"))
 
     def test_quick_actions_hidden_without_add_permission(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse("processes:dashboard"))
+        response = self.client.get(reverse("processes:explorer"))
         self.assertNotContains(response, reverse("processes:process-create"))
         self.assertNotContains(response, reverse("processes:processcategory-create"))
 
     def test_quick_actions_visible_with_add_permission(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse("processes:dashboard"))
+        response = self.client.get(reverse("processes:explorer"))
         self.assertContains(response, reverse("processes:process-create"))
 
 

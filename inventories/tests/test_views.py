@@ -39,7 +39,7 @@ from ..views import (
 
 
 class ScenarioCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
-    dashboard_view = False
+    explorer_view = False
 
     model = Scenario
 
@@ -275,7 +275,7 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
 class ScenarioResultCRUDViewsTestCase(
     AbstractTestCases.UserCreatedObjectCRUDViewTestCase
 ):
-    dashboard_view = False
+    explorer_view = False
     create_view = False
     public_list_view = False
     private_list_view = False

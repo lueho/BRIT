@@ -53,7 +53,7 @@ from ..views import DETAIL_RELATED_LIMIT, SampleSubstrateMaterialQuickCreateView
 User = get_user_model()
 
 
-class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
+class MaterialExplorerViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "change_material"
 
     def test_get_http_200_ok_for_anonymous(self):
@@ -769,7 +769,7 @@ class MaterialCategoryCRUDViewsTestCase(
 
     model = MaterialCategory
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialcategory-create"
     view_modal_create_name = "materialcategory-create-modal"
     view_published_list_name = "materialcategory-list"
@@ -796,7 +796,7 @@ class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
 
     model = Material
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "material-create"
     view_modal_create_name = "material-create-modal"
     view_published_list_name = "material-list"
@@ -833,7 +833,7 @@ class MaterialComponentCRUDViewsTestCase(
 
     model = MaterialComponent
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialcomponent-create"
     view_modal_create_name = "materialcomponent-create-modal"
     view_published_list_name = "materialcomponent-list"
@@ -870,7 +870,7 @@ class MaterialComponentGroupCRUDViewsTestCase(
 
     model = MaterialComponentGroup
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialcomponentgroup-create"
     view_modal_create_name = "materialcomponentgroup-create-modal"
     view_published_list_name = "materialcomponentgroup-list"
@@ -907,7 +907,7 @@ class MaterialPropertyCRUDViewsTestCase(
 
     model = MaterialProperty
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialproperty-create"
     view_modal_create_name = "materialproperty-create-modal"
     view_published_list_name = "materialproperty-list"
@@ -1971,7 +1971,7 @@ class AnalyticalMethodCRUDViewsTestCase(
 
     model = AnalyticalMethod
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "analyticalmethod-create"
     view_published_list_name = "analyticalmethod-list"
     view_private_list_name = "analyticalmethod-list-owned"
@@ -2102,7 +2102,7 @@ class SampleSeriesCRUDViewsTestCase(
 
     model = SampleSeries
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "sampleseries-create"
     view_modal_create_name = "sampleseries-create-modal"
     view_published_list_name = "sampleseries-list"
@@ -2989,7 +2989,7 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
     model = Sample
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "sample-create"
     view_modal_create_name = "sample-create-modal"
     view_published_list_name = "sample-list"
@@ -3219,8 +3219,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="published"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3238,8 +3238,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="published"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3257,8 +3257,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="private"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3276,8 +3276,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="private"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -4429,7 +4429,7 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
     model = Composition
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "composition-create"
     view_modal_create_name = "composition-create-modal"
     view_detail_name = "composition-detail"
@@ -9565,7 +9565,7 @@ class SampleGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
     model = SampleGroup
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "samplegroup-create"
     view_modal_create_name = "samplegroup-create-modal"
     view_published_list_name = "samplegroup-list"

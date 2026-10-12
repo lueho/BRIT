@@ -88,14 +88,14 @@ class ReviewObjectListView(ReviewObjectListMixin, ListView):
 
 
 # ==============================================================================
-# Dashboard
+# Explorer
 # ==============================================================================
 
 
-class ProcessDashboardView(BreadcrumbContextMixin, TemplateView):
-    """Main dashboard for the processes module."""
+class ProcessExplorerView(BreadcrumbContextMixin, TemplateView):
+    """Explorer for the processes module."""
 
-    template_name = "processes/dashboard.html"
+    template_name = "processes/explorer.html"
     breadcrumb_module_label = "Processes"
     breadcrumb_page_title = "Processes"
 
@@ -170,7 +170,7 @@ class ProcessCategoryPublishedListView(PublishedObjectListView):
 
     model = ProcessCategory
     template_name = "processes/processcategory_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
+    explorer_url = reverse_lazy("processes:explorer")
     context_object_name = "categories"
     paginate_by = 20
 
@@ -183,7 +183,7 @@ class ProcessCategoryPrivateListView(PrivateObjectListView):
 
     model = ProcessCategory
     template_name = "processes/processcategory_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
+    explorer_url = reverse_lazy("processes:explorer")
     context_object_name = "categories"
     paginate_by = 20
 
@@ -196,7 +196,7 @@ class ProcessCategoryReviewListView(ReviewObjectListView):
 
     model = ProcessCategory
     template_name = "processes/processcategory_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
+    explorer_url = reverse_lazy("processes:explorer")
     context_object_name = "categories"
     paginate_by = 20
 
@@ -351,7 +351,7 @@ class ProcessFilterViewMixin:
 
     model = Process
     template_name = "processes/process_list.html"
-    dashboard_url = reverse_lazy("processes:dashboard")
+    explorer_url = reverse_lazy("processes:explorer")
     context_object_name = "processes"
     filterset_class = ProcessFilter
     paginate_by = 20

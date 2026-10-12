@@ -49,7 +49,7 @@ from .views import (
     LocationPrivateListView,
     LocationPublishedListView,
     LocationUpdateView,
-    MapsDashboardView,
+    MapsExplorerView,
     NutsAndLauCatchmentPedigreeAPI,
     NutsRegionAutocompleteView,
     NutsRegionLevel0AutocompleteView,
@@ -78,7 +78,7 @@ from .views import (
 )
 
 urlpatterns = [
-    path("explorer/", MapsDashboardView.as_view(), name="maps-dashboard"),
+    path("explorer/", MapsExplorerView.as_view(), name="maps-explorer"),
     path("list/", GeoDataSetPublishedGalleryView.as_view(), name="maps_list"),
     path(
         "geodatasets/gallery/",

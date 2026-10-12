@@ -148,7 +148,7 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 
     model = Collector
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collector-create"
     view_modal_create_name = "collector-create-modal"
     view_published_list_name = "collector-list"
@@ -356,7 +356,7 @@ class CollectionSystemCRUDViewsTestCase(
 
     model = CollectionSystem
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collectionsystem-create"
     view_modal_create_name = "collectionsystem-create-modal"
     view_published_list_name = "collectionsystem-list"
@@ -385,7 +385,7 @@ class WasteCategoryCRUDViewsTestCase(
 
     model = WasteCategory
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "wastecategory-create"
     view_modal_create_name = "wastecategory-create-modal"
     view_published_list_name = "wastecategory-list"
@@ -414,7 +414,7 @@ class WasteComponentCRUDViewsTestCase(
 
     model = WasteComponent
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "wastecomponent-create"
     view_modal_create_name = "wastecomponent-create-modal"
     view_published_list_name = "wastecomponent-list"
@@ -453,7 +453,7 @@ class FeeSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     model = FeeSystem
     add_scope_query_param_to_list_urls = True
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "feesystem-create"
     view_published_list_name = "feesystem-list"
     view_private_list_name = "feesystem-list-owned"
@@ -478,7 +478,7 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     model = WasteFlyer
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_published_list_name = "wasteflyer-list"
     view_private_list_name = "wasteflyer-list-owned"
     view_detail_name = "wasteflyer-detail"
@@ -570,7 +570,7 @@ class CollectionFrequencyCRUDViewsTestCase(
 
     model = CollectionFrequency
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collectionfrequency-create"
     view_published_list_name = "collectionfrequency-list"
     view_private_list_name = "collectionfrequency-list-owned"
@@ -785,7 +785,7 @@ class CollectionPropertyValueCRUDViewsTestCase(
 
     model = CollectionPropertyValue
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collectionpropertyvalue-create"
     view_detail_name = "collectionpropertyvalue-detail"
     view_update_name = "collectionpropertyvalue-update"
@@ -1017,7 +1017,7 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
 
     model = AggregatedCollectionPropertyValue
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "aggregatedcollectionpropertyvalue-create"
     view_detail_name = "aggregatedcollectionpropertyvalue-detail"
     view_update_name = "aggregatedcollectionpropertyvalue-update"
@@ -1189,7 +1189,7 @@ class CollectionCatchmentCRUDViewsTestCase(
     model = CollectionCatchment
     model_add_permission = "add_collectioncatchment"
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_published_list_name = "collectioncatchment-list"
     view_private_list_name = "collectioncatchment-list-owned"
     view_create_name = "collectioncatchment-create"
@@ -1426,7 +1426,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     model = Collection
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collection-create"
     view_published_list_name = "collection-list"
     view_private_list_name = "collection-list-owned"

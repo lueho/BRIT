@@ -33,7 +33,7 @@ class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
     model = Author
 
-    view_dashboard_name = "bibliography-explorer"
+    view_explorer_name = "bibliography-explorer"
     view_create_name = "author-create"
     view_modal_create_name = "author-create-modal"
     view_published_list_name = "author-list"
@@ -291,7 +291,7 @@ class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
     model = Licence
 
-    view_dashboard_name = "bibliography-explorer"
+    view_explorer_name = "bibliography-explorer"
     view_create_name = "licence-create"
     view_modal_create_name = "licence-create-modal"
     view_published_list_name = "licence-list"
@@ -313,12 +313,12 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     model = Source
     add_scope_query_param_to_list_urls = True
 
-    view_dashboard_name = "bibliography-explorer"
+    view_explorer_name = "bibliography-explorer"
 
     modal_detail_view = True
     modal_create_view = True
 
-    view_dashboard_name = "bibliography-explorer"
+    view_explorer_name = "bibliography-explorer"
     view_create_name = "source-create"
     view_modal_create_name = "source-create-modal"
     view_published_list_name = "source-list"
