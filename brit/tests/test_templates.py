@@ -876,3 +876,50 @@ class BreadcrumbRailGlobalStylingAssetTests(SimpleTestCase):
         match = re.search(r"\.atlas-shell\s*\{([^}]*)\}", css)
         self.assertIsNotNone(match, ".atlas-shell rule not found in waste_atlas.css")
         self.assertNotIn("margin-top", match.group(1))
+
+
+class BritThemeDerivedColorAssetTests(SimpleTestCase):
+    """Bootstrap defaults derived from ``$primary`` must use the BRIT palette.
+
+    Component states such as active pagination links, nav pills, dropdown items
+    and focus rings are computed from ``$primary`` when Bootstrap's variables
+    load. If those defaults are evaluated before the BRIT overrides, they keep
+    Bootstrap blue (``#0d6efd``) even though ``--bs-primary`` is BRIT green.
+    """
+
+    BOOTSTRAP_BLUE_HEX = "#0d6efd"
+    BOOTSTRAP_BLUE_RGB = "13, 110, 253"
+
+    def _read_asset(self, relative_path):
+        asset_path = Path(settings.BASE_DIR) / "brit" / "static" / relative_path
+        self.assertTrue(
+            asset_path.exists(),
+            f"Expected static asset {asset_path} to exist",
+        )
+        return asset_path.read_text(encoding="utf-8")
+
+    def test_component_active_states_use_brit_primary(self):
+        css = self._read_asset("css/brit-theme.css")
+
+        for declaration in (
+            "--bs-pagination-active-bg: #4B7156",
+            "--bs-nav-pills-link-active-bg: #4B7156",
+            "--bs-dropdown-link-active-bg: #4B7156",
+            "--bs-list-group-active-bg: #4B7156",
+            "--bs-progress-bar-bg: #4B7156",
+            "--bs-link-color: #4B7156",
+        ):
+            with self.subTest(declaration=declaration):
+                self.assertIn(declaration, css)
+
+    def test_no_derived_bootstrap_blue_remains(self):
+        for path in ("css/brit-theme.css", "css/brit-theme.min.css"):
+            css = (
+                self._read_asset(path)
+                .replace("--bs-blue: #0d6efd", "")
+                .replace("--bs-blue:#0d6efd", "")
+            )
+            with self.subTest(path=path):
+                self.assertNotIn(self.BOOTSTRAP_BLUE_HEX, css.lower())
+                self.assertNotIn(self.BOOTSTRAP_BLUE_RGB, css)
+                self.assertNotIn("13,110,253", css)

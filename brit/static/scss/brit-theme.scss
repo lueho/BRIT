@@ -3,14 +3,21 @@
 // 1. Include functions first (so you can manipulate colors, SVGs, calc, etc)
 @import "../lib/bootstrap/scss/functions";
 
-// 2. Include any default variable overrides here
+// 2. Include any default variable overrides here. These must not import
+// Bootstrap's variables themselves, or its derived defaults are evaluated
+// before the overrides apply.
 @import "variables/colors.scss";
-@import "variables/navigation.scss";
 @import "variables/spacing.scss";
 
 // 3. Include remainder of required Bootstrap stylesheets (including any separate color mode stylesheets)
 @import "../lib/bootstrap/scss/variables";
 @import "../lib/bootstrap/scss/variables-dark";
+
+// 3a. Overrides that reference Bootstrap variables (grays, $white, $body-color)
+@import "variables/navigation.scss";
+
+// Set form label color to body text color instead of the default
+$form-label-color: $body-color;
 
 // 4. Include any default map overrides here
 @import "theme-colors";
