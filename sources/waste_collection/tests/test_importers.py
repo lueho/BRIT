@@ -31,30 +31,43 @@ from utils.tests.testrunner import serial_test
 
 @serial_test
 class CollectionImporterConcurrencyTests(TransactionTestCase):
+    _TEARDOWN_MODELS = (
+        ReviewAction,
+        Collection,
+        WasteFlyer,
+        Source,
+        CollectionCountOptions,
+        CollectionFrequency,
+        Period,
+        Collector,
+        CollectionCatchment,
+        CollectionSystem,
+        WasteCategory,
+        Timestep,
+        TemporalDistribution,
+        User,
+    )
+
     def _fixture_teardown(self):
-        """Delete the objects these tests can create instead of flushing.
+        """Delete the objects these tests created instead of flushing.
 
         The default TransactionTestCase teardown TRUNCATEs every table in the
         database, which costs ~60s per test on this stack. These tests only
-        write a bounded set of objects, so removing them directly restores the
-        same isolation without the flush.
+        write a bounded set of objects, so removing the rows added since
+        ``setUp`` restores the same isolation without the flush and keeps
+        seeded reference data (``ensure_initial_data``) for later tests.
         """
-        ReviewAction.objects.all().delete()
-        Collection.objects.all().delete()
-        WasteFlyer.objects.all().delete()
-        Source.objects.all().delete()
-        CollectionCountOptions.objects.all().delete()
-        CollectionFrequency.objects.all().delete()
-        Period.objects.all().delete()
-        Collector.objects.all().delete()
-        CollectionCatchment.objects.all().delete()
-        CollectionSystem.objects.all().delete()
-        WasteCategory.objects.all().delete()
-        Timestep.objects.all().delete()
-        TemporalDistribution.objects.all().delete()
-        User.objects.filter(username="concurrent-importer").delete()
+        preexisting = getattr(self, "_preexisting_pks", None)
+        if preexisting is None:
+            return
+        for model in self._TEARDOWN_MODELS:
+            model.objects.exclude(pk__in=preexisting[model]).delete()
 
     def setUp(self):
+        self._preexisting_pks = {
+            model: set(model.objects.values_list("pk", flat=True))
+            for model in self._TEARDOWN_MODELS
+        }
         default_owner, _ = User.objects.get_or_create(
             username=settings.DEFAULT_OBJECT_OWNER_USERNAME
         )
@@ -225,6 +238,21 @@ class ImporterTeardownScopeTests(TestCase):
         case._fixture_teardown()
         self.assertTrue(MaterialCategory.objects.filter(pk=marker.pk).exists())
 
+    def test_fixture_teardown_preserves_rows_that_existed_before_the_test(self):
+        """Seeded reference data (e.g. ensure_initial_data distributions) must
+        survive for later serial tests."""
+        seeded_user = User.objects.create(username="seeded-before-test")
+        seeded = TemporalDistribution.objects.create(
+            name="Seeded distribution", owner=seeded_user
+        )
+        case = CollectionImporterConcurrencyTests(
+            "test_concurrent_collector_creation_by_name"
+        )
+        case.setUp()
+        case._fixture_teardown()
+        self.assertTrue(TemporalDistribution.objects.filter(pk=seeded.pk).exists())
+        self.assertTrue(User.objects.filter(pk=seeded_user.pk).exists())
+
     def test_fixture_teardown_removes_objects_the_tests_create(self):
         case = CollectionImporterConcurrencyTests(
             "test_concurrent_collector_creation_by_name"
@@ -243,4 +271,8 @@ class ImporterTeardownScopeTests(TestCase):
             WasteCategory.objects.filter(name="Concurrent category").exists()
         )
         self.assertFalse(User.objects.filter(username="concurrent-importer").exists())
-        self.assertFalse(Period.objects.filter(pk=case.season.pk).exists())
+        for model, pks in case._preexisting_pks.items():
+            with self.subTest(model=model.__name__):
+                self.assertSetEqual(
+                    set(model.objects.values_list("pk", flat=True)), pks
+                )

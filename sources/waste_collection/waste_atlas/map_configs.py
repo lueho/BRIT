@@ -3,10 +3,10 @@
 from collections.abc import Mapping
 
 from django.core.cache import cache
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
-from .caching import delete_scoped, scoped_cache_key
+from utils.transaction_scope import delete_scoped, scoped_cache_key
 
 
 def no_data_color():
@@ -29,7 +29,7 @@ class DatabaseMapConfigurations(Mapping):
     ``__getitem__`` runs on every map render, so lookups are cached in the
     default cache and invalidated by the ``WasteAtlasMapConfiguration``
     ``post_save``/``post_delete`` receivers below. Keys are scoped to the
-    current transaction (see ``caching.scoped_cache_key``), so values written
+    current transaction (see ``utils.transaction_scope.scoped_cache_key``), so values written
     inside a rolled-back block cannot leak. The pickle boundary gives every
     caller an independent copy, matching the previous per-query JSON
     deserialization.
@@ -91,7 +91,19 @@ class DatabaseMapConfigurations(Mapping):
 MAP_CONFIGS = DatabaseMapConfigurations()
 
 
+@receiver(pre_save, sender="waste_atlas.WasteAtlasMapConfiguration")
+def capture_previous_map_configuration_key(sender, instance, **kwargs):
+    """Keys are editable, so a rename must also invalidate the old key."""
+    instance._previous_configuration_key = (
+        sender.objects.filter(pk=instance.pk).values_list("key", flat=True).first()
+        if instance.pk
+        else None
+    )
+
+
 @receiver(post_save, sender="waste_atlas.WasteAtlasMapConfiguration")
 @receiver(post_delete, sender="waste_atlas.WasteAtlasMapConfiguration")
 def invalidate_map_configuration_cache(sender, instance, **kwargs):
-    delete_scoped(cache, MAP_CONFIGS._cache_key(instance.key))
+    keys = {instance.key, getattr(instance, "_previous_configuration_key", None)}
+    for key in keys - {None}:
+        delete_scoped(cache, MAP_CONFIGS._cache_key(key))

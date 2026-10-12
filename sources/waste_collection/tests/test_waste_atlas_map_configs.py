@@ -810,3 +810,12 @@ class MapConfigurationLookupCachingTests(TestCase):
         WasteAtlasMapConfiguration.objects.get(key="collection_system").delete()
         with self.assertRaises(KeyError):
             MAP_CONFIGS["collection_system"]
+
+    def test_renamed_configuration_drops_the_old_key(self):
+        MAP_CONFIGS["collection_system"]
+        stored = WasteAtlasMapConfiguration.objects.get(key="collection_system")
+        stored.key = "collection_system_renamed"
+        stored.save()
+        with self.assertRaises(KeyError):
+            MAP_CONFIGS["collection_system"]
+        self.assertIsInstance(MAP_CONFIGS["collection_system_renamed"], dict)

@@ -5,7 +5,8 @@ from django.db import models
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
-from .caching import delete_scoped, scoped_cache_key
+from utils.transaction_scope import delete_scoped, scoped_cache_key
+
 from .legend import AUTO, COLUMN_FLOW, EXPORT_LEGEND_ITEM_FLOW_CHOICES
 
 HEX_COLOR_VALIDATOR = RegexValidator(
@@ -288,7 +289,7 @@ class WasteAtlasRenderingSettings(models.Model):
         The singleton is read on every map render, so the row is cached in the
         default cache; ``save()`` (and ``post_delete`` for queryset deletes,
         which bypass the ``delete()`` guard) invalidate it. Keys are scoped to
-        the current transaction (see ``caching.scoped_cache_key``), so values
+        the current transaction (see ``utils.transaction_scope.scoped_cache_key``), so values
         written inside a rolled-back block cannot leak. Caching the pickled
         instance gives every caller an independent copy.
         """

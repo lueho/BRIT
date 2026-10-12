@@ -84,16 +84,14 @@ def capture_previous_collection_publication_status(sender, instance, **kwargs):
         instance._previous_publication_status = None
         return
 
-    # UserCreatedObject.from_db records the persisted status; only fall back
-    # to a query when it is unknown (e.g. manually constructed instances).
-    previous_status = getattr(instance, "_loaded_publication_status", None)
-    if previous_status is None:
-        previous_status = (
-            sender.objects.filter(pk=instance.pk)
-            .values_list("publication_status", flat=True)
-            .first()
-        )
-    instance._previous_publication_status = previous_status
+    # Read the persisted status at save time: the status recorded when the
+    # instance was loaded can be stale (e.g. published by another worker), and
+    # a stale private status would skip invalidating published GeoJSON.
+    instance._previous_publication_status = (
+        sender.objects.filter(pk=instance.pk)
+        .values_list("publication_status", flat=True)
+        .first()
+    )
 
 
 @receiver(post_save, sender=Collection)

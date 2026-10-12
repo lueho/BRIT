@@ -97,6 +97,32 @@ class InvalidateCollectionCacheSignalTestCase(TestCase):
         mock_warmup.assert_not_called()
 
     @patch("sources.waste_collection.signals.clear_geojson_cache_pattern")
+    @patch("sources.waste_collection.signals._schedule_cache_warmup")
+    def test_cache_cleared_when_stale_instance_updates_published_row(
+        self, mock_warmup, mock_clear
+    ):
+        """The persisted status may have changed since the instance was loaded
+        (e.g. published by another worker)."""
+        stale = Collection.objects.get(pk=self.private_collection.pk)
+        Collection.objects.filter(pk=stale.pk).update(publication_status="published")
+        stale.description = "Updated description"
+        stale.save(update_fields=["description"])
+
+        mock_clear.assert_called_once_with("collection_geojson:*")
+
+    @patch("sources.waste_collection.signals.clear_geojson_cache_pattern")
+    @patch("sources.waste_collection.signals._schedule_cache_warmup")
+    def test_cache_cleared_when_stale_full_save_unpublishes_row(
+        self, mock_warmup, mock_clear
+    ):
+        stale = Collection.objects.get(pk=self.private_collection.pk)
+        Collection.objects.filter(pk=stale.pk).update(publication_status="published")
+        stale.description = "Updated description"
+        stale.save()
+
+        mock_clear.assert_called_once_with("collection_geojson:*")
+
+    @patch("sources.waste_collection.signals.clear_geojson_cache_pattern")
     def test_cache_not_cleared_on_valid_until_update(self, mock_clear):
         """Verify cache is NOT cleared for valid_until updates."""
         self.published_collection.valid_until = date(2024, 12, 31)

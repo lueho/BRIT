@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 
 from ..models import CRUDUrlsMixin
+from ..transaction_scope import current_scope, scope_is_active
 
 
 def _default_owner_username():
@@ -40,16 +41,19 @@ def get_default_owner():
 
 # The owner field default runs on every ownerless UserCreatedObject
 # instantiation; the pk is cached per username and cleared by the User
-# post_save/post_delete/post_migrate receivers in signals.py.
+# post_save/post_delete/post_migrate receivers in signals.py. Each entry is
+# only reused while the atomic blocks it was read in are still open, so a pk
+# read inside a rolled-back transaction is never served afterwards.
 _default_owner_pk_cache = {}
 
 
 def get_default_owner_pk():
     username = _default_owner_username()
-    pk = _default_owner_pk_cache.get(username)
-    if pk is None:
-        pk = get_default_owner().pk
-        _default_owner_pk_cache[username] = pk
+    entry = _default_owner_pk_cache.get(username)
+    if entry is not None and scope_is_active(entry[1]):
+        return entry[0]
+    pk = get_default_owner().pk
+    _default_owner_pk_cache[username] = (pk, current_scope())
     return pk
 
 
