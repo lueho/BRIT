@@ -15,12 +15,15 @@ from django.db import connection, transaction
 def _block_token(index, block, savepoint_ids):
     # Tokens are random so that workers sharing one cache backend never mint
     # the same scope. ``@transaction.atomic`` reuses one Atomic object per
-    # decorated function, so a nested block also gets a new token whenever
-    # it is re-entered under a different savepoint.
+    # decorated function, so a token is only reused while both its savepoint
+    # and the connection's ``run_on_commit`` list are unchanged: Django
+    # replaces that list on every commit, rollback and savepoint rollback,
+    # which also covers outermost and ``savepoint=False`` blocks.
     savepoint_id = savepoint_ids[index - 1] if 0 < index <= len(savepoint_ids) else None
+    hooks = connection.run_on_commit
     stamp = getattr(block, "_cache_scope_stamp", None)
-    if stamp is None or stamp[1] != savepoint_id:
-        stamp = (uuid.uuid4().hex, savepoint_id)
+    if stamp is None or stamp[1] != savepoint_id or stamp[2] is not hooks:
+        stamp = (uuid.uuid4().hex, savepoint_id, hooks)
         block._cache_scope_stamp = stamp
     return stamp[0]
 

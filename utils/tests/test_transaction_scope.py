@@ -2,7 +2,7 @@ import importlib
 
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from django.db import transaction
+from django.db import DEFAULT_DB_ALIAS, connections, transaction
 from django.test import TestCase
 
 from utils import transaction_scope
@@ -29,6 +29,23 @@ class ScopedCacheKeyTests(TestCase):
             first = transaction_scope.scoped_cache_key("probe")
         with block:
             second = transaction_scope.scoped_cache_key("probe")
+        self.assertNotEqual(first, second)
+
+    def test_reused_outermost_block_gets_a_fresh_scope(self):
+        """An outermost block has no savepoint id, so re-entering the same
+        Atomic must still mint a new scope once the first transaction ended."""
+        original = connections[DEFAULT_DB_ALIAS]
+        fresh = connections.create_connection(DEFAULT_DB_ALIAS)
+        connections[DEFAULT_DB_ALIAS] = fresh
+        try:
+            block = transaction.atomic()
+            with block:
+                first = transaction_scope.scoped_cache_key("probe")
+            with block:
+                second = transaction_scope.scoped_cache_key("probe")
+        finally:
+            connections[DEFAULT_DB_ALIAS] = original
+            fresh.close()
         self.assertNotEqual(first, second)
 
     def test_delete_scoped_drops_shared_key_again_after_commit(self):
