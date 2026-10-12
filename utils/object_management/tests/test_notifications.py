@@ -1,4 +1,4 @@
-"""Tests for owner e-mail notifications on review actions."""
+"""Tests for review-action e-mail notifications to owners and commenters."""
 
 import smtplib
 from unittest import mock
@@ -6,12 +6,14 @@ from unittest import mock
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core import mail
+from django.db.models.signals import post_save
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from factory.django import mute_signals
 
 from sources.waste_collection.models import Collection
 from utils.object_management.models import ReviewAction, UserCreatedObject
-from utils.object_management.tasks import send_review_action_owner_notification
+from utils.object_management.tasks import send_review_action_notifications
 
 
 class ReviewOwnerNotificationTests(TestCase):
@@ -177,7 +179,7 @@ class ReviewOwnerNotificationTests(TestCase):
         )
         with (
             mock.patch.object(
-                send_review_action_owner_notification,
+                send_review_action_notifications,
                 "delay",
                 side_effect=ConnectionError("broker down"),
             ),
@@ -194,12 +196,12 @@ class ReviewOwnerNotificationTests(TestCase):
             self.collection.transfer_ownership(new_owner)
 
         self.assertTrue(
-            any("Could not queue owner notification" in line for line in logs.output)
+            any("Could not queue notifications" in line for line in logs.output)
         )
         self.assertEqual(len(mail.outbox), 0)
 
     def test_notification_task_retries_transient_mail_errors(self):
-        task = send_review_action_owner_notification
+        task = send_review_action_notifications
         self.assertIn(smtplib.SMTPException, task.autoretry_for)
         self.assertIn(OSError, task.autoretry_for)
         self.assertGreater(task.max_retries, 0)
@@ -224,3 +226,140 @@ class ReviewOwnerNotificationTests(TestCase):
         self.assertTrue(any("No Site row" in line for line in logs.output))
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("http://brit.example.org", mail.outbox[0].body)
+
+
+class ReviewParticipantNotificationTests(TestCase):
+    """Users who commented on an object are notified about later actions."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(
+            username="owner", email="owner@example.com"
+        )
+        cls.moderator = User.objects.create_user(
+            username="moderator", email="moderator@example.com"
+        )
+        cls.commenter = User.objects.create_user(
+            username="commenter", email="commenter@example.com"
+        )
+        content_type = ContentType.objects.get_for_model(Collection)
+        permission, _ = Permission.objects.get_or_create(
+            codename="can_moderate_collection",
+            content_type=content_type,
+            defaults={"name": "Can moderate collections"},
+        )
+        cls.moderator.user_permissions.add(permission)
+        cls.commenter.user_permissions.add(permission)
+        cls.collection = Collection.objects.create(
+            name="Participated Collection",
+            owner=cls.owner,
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+        )
+        cls.content_type_id = content_type.id
+
+    def _action_url(self, name, obj=None):
+        return reverse(
+            f"object_management:{name}",
+            kwargs={
+                "content_type_id": self.content_type_id,
+                "object_id": (obj or self.collection).id,
+            },
+        )
+
+    def _post(self, *args, **kwargs):
+        """POST and execute on_commit callbacks (notification enqueue)."""
+        with self.captureOnCommitCallbacks(execute=True):
+            return self.client.post(*args, **kwargs)
+
+    def _add_comment(self, user, text, obj=None):
+        """Record a past comment without triggering a notification."""
+        with mute_signals(post_save):
+            ReviewAction.objects.create(
+                content_type_id=self.content_type_id,
+                object_id=(obj or self.collection).id,
+                user=user,
+                action=ReviewAction.ACTION_COMMENT,
+                comment=text,
+            )
+
+    @staticmethod
+    def _recipients():
+        return {message.to[0] for message in mail.outbox}
+
+    def test_new_comment_notifies_owner_and_past_commenter(self):
+        self._add_comment(self.commenter, "Earlier feedback.")
+        self.client.force_login(self.moderator)
+        response = self._post(
+            self._action_url("add_review_comment"),
+            data={"message": "Thanks for the update."},
+        )
+        self.assertEqual(response.status_code, 302)
+
+        self.assertEqual(self._recipients(), {self.owner.email, self.commenter.email})
+        commenter_mail = next(m for m in mail.outbox if m.to == [self.commenter.email])
+        self.assertIn("Thanks for the update.", commenter_mail.body)
+
+    def test_status_change_notifies_past_commenter(self):
+        self._add_comment(self.commenter, "Earlier feedback.")
+        self.client.force_login(self.moderator)
+        response = self._post(self._action_url("approve_item"))
+        self.assertEqual(response.status_code, 302)
+
+        self.assertEqual(self._recipients(), {self.owner.email, self.commenter.email})
+
+    def test_actor_is_not_notified(self):
+        self._add_comment(self.commenter, "Earlier feedback.")
+        self.client.force_login(self.owner)
+        response = self._post(
+            self._action_url("add_review_comment"),
+            data={"message": "Updated, thanks."},
+        )
+        self.assertEqual(response.status_code, 302)
+
+        self.assertEqual(self._recipients(), {self.commenter.email})
+
+    def test_owner_commenter_receives_single_notification(self):
+        self._add_comment(self.owner, "Note to self.")
+        self.client.force_login(self.moderator)
+        self._post(
+            self._action_url("add_review_comment"),
+            data={"message": "Looks fine."},
+        )
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.owner.email])
+
+    def test_commenter_without_email_is_skipped(self):
+        emailless = User.objects.create_user(username="emailless")
+        emailless.user_permissions.add(
+            Permission.objects.get(codename="can_moderate_collection")
+        )
+        self._add_comment(emailless, "No address.")
+        self.client.force_login(self.moderator)
+        self._post(self._action_url("add_review_comment"), data={"message": "Ping."})
+
+        self.assertEqual(self._recipients(), {self.owner.email})
+
+    def test_commenter_without_review_access_is_skipped(self):
+        staffer = User.objects.create_user(
+            username="staffer", email="staffer@example.com", is_staff=True
+        )
+        self._add_comment(staffer, "Staff feedback.")
+        staffer.is_staff = False
+        staffer.save(update_fields=["is_staff"])
+        self.client.force_login(self.moderator)
+        self._post(self._action_url("add_review_comment"), data={"message": "Ping."})
+
+        self.assertEqual(self._recipients(), {self.owner.email})
+
+    def test_commenter_on_other_object_is_not_notified(self):
+        other = Collection.objects.create(
+            name="Other Collection",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+        )
+        self._add_comment(self.commenter, "Other item.", obj=other)
+        self.client.force_login(self.moderator)
+        self._post(self._action_url("add_review_comment"), data={"message": "Ping."})
+
+        self.assertEqual(self._recipients(), {self.owner.email})

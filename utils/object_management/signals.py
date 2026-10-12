@@ -349,42 +349,44 @@ except Exception:
 
 
 @receiver(post_save, sender="object_management.ReviewAction")
-def enqueue_owner_review_notification(sender, instance, created, **kwargs):
-    """Queue an owner notification e-mail for a newly created ReviewAction.
+def enqueue_review_notifications(sender, instance, created, **kwargs):
+    """Queue notification e-mails for a newly created ReviewAction.
 
     Runs after the surrounding transaction commits so asynchronous workers
-    can see the action row. The recipient is captured now so that an
-    ownership transfer before delivery does not redirect the notification;
-    the remaining eligibility checks (object still exists, recipient differs
-    from the actor, recipient has an e-mail address) happen when sending.
+    can see the action row. The owner is captured now so that an ownership
+    transfer before delivery does not redirect their notification; past
+    commenters are resolved when sending. The remaining eligibility checks
+    (object still exists, recipient differs from the actor, recipient has
+    an e-mail address, recipient can open the review page) happen per
+    recipient when sending.
     """
     if not created:
         return
 
     action_pk = instance.pk
-    recipient = getattr(instance.content_object, "owner", None)
-    recipient_id = recipient.pk if recipient is not None else None
+    owner = getattr(instance.content_object, "owner", None)
+    owner_id = owner.pk if owner is not None else None
 
     def _enqueue():
         try:
-            from .tasks import send_review_action_owner_notification
+            from .tasks import send_review_action_notifications
 
-            send_review_action_owner_notification.delay(action_pk, recipient_id)
+            send_review_action_notifications.delay(action_pk, owner_id)
         except Exception:
             # Broker unavailable: fall back to sending in-process so the
             # notification is not lost silently.
             logger.warning(
-                "Could not queue owner notification for ReviewAction %s; "
+                "Could not queue notifications for ReviewAction %s; "
                 "sending synchronously.",
                 action_pk,
             )
             try:
-                from .notifications import notify_owner_of_review_action
+                from .notifications import notify_review_participants
 
-                notify_owner_of_review_action(instance, recipient=recipient)
+                notify_review_participants(instance, owner=owner)
             except Exception:
                 logger.exception(
-                    "Owner notification for ReviewAction %s failed.", action_pk
+                    "Review notifications for ReviewAction %s failed.", action_pk
                 )
 
     transaction.on_commit(_enqueue)
