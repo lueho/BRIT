@@ -1,6 +1,8 @@
 import json
+import tempfile
 
-from django.test import SimpleTestCase
+from django.core.management import call_command
+from django.test import SimpleTestCase, override_settings
 from storages.backends.s3boto3 import S3ManifestStaticStorage
 
 from brit.storages import StaticStorage
@@ -49,3 +51,25 @@ class StaticStorageCacheBustingTests(SimpleTestCase):
                 "hash": storage.manifest_hash,
             },
         )
+
+
+class CollectstaticManifestTests(SimpleTestCase):
+    """Smoke test for the production collectstatic path.
+
+    Production uses S3ManifestStaticStorage, whose manifest post-processing
+    resolves and hashes every url(...) reference in shipped CSS. A vendored
+    stylesheet that references files we did not ship (e.g. a missing font
+    format) fails at release time. Running collectstatic with the local
+    ManifestStaticFilesStorage exercises the same code path without S3.
+    """
+
+    def test_collectstatic_resolves_all_css_url_references(self):
+        storages = {
+            "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+            "staticfiles": {
+                "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
+            },
+        }
+        with tempfile.TemporaryDirectory() as static_root:
+            with override_settings(STATIC_ROOT=static_root, STORAGES=storages):
+                call_command("collectstatic", "--no-input", verbosity=0)
