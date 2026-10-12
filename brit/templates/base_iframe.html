@@ -23,8 +23,8 @@
     <!-- Custom fonts for this template (self-hosted) -->
     <link rel="stylesheet" href="{% static 'lib/fontawesome/css/all.min.css' %}">
     <link href="{% static 'lib/nunito/nunito.css' %}" rel="stylesheet">
-    <!-- Bootstrap CSS (self-hosted) -->
-    <link href="{% static 'lib/bootstrap/css/bootstrap.min.css' %}" rel="stylesheet">
+    <!-- Bootstrap is compiled into brit-theme (scss/brit-theme.scss imports the
+         full component set), so no separate bootstrap.min.css is needed. -->
     <link href="{% static 'css/brit-theme.min.css' %}" rel="stylesheet">
     {% block style_sheets %}
     {% endblock style_sheets %}

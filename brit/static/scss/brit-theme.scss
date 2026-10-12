@@ -3,14 +3,21 @@
 // 1. Include functions first (so you can manipulate colors, SVGs, calc, etc)
 @import "../lib/bootstrap/scss/functions";
 
-// 2. Include any default variable overrides here
+// 2. Include any default variable overrides here. These must not import
+// Bootstrap's variables themselves, or its derived defaults are evaluated
+// before the overrides apply.
 @import "variables/colors.scss";
-@import "variables/navigation.scss";
 @import "variables/spacing.scss";
 
 // 3. Include remainder of required Bootstrap stylesheets (including any separate color mode stylesheets)
 @import "../lib/bootstrap/scss/variables";
 @import "../lib/bootstrap/scss/variables-dark";
+
+// 3a. Overrides that reference Bootstrap variables (grays, $white, $body-color)
+@import "variables/navigation.scss";
+
+// Set form label color to body text color instead of the default
+$form-label-color: $body-color;
 
 // 4. Include any default map overrides here
 @import "theme-colors";
@@ -20,15 +27,41 @@
 @import "../lib/bootstrap/scss/mixins";
 @import "../lib/bootstrap/scss/root";
 
-// 6. Include any other optional stylesheet partials as desired; list below is not inclusive of all available stylesheets
+// 6. Include all Bootstrap component partials (same set and order as
+// bootstrap.scss) so every component compiles against the theme's variables.
+// This replaces the separately shipped bootstrap.min.css.
 @import "../lib/bootstrap/scss/utilities";
 @import "../lib/bootstrap/scss/reboot";
 @import "../lib/bootstrap/scss/type";
 @import "../lib/bootstrap/scss/images";
 @import "../lib/bootstrap/scss/containers";
 @import "../lib/bootstrap/scss/grid";
-@import "../lib/bootstrap/scss/helpers";
+@import "../lib/bootstrap/scss/tables";
+@import "../lib/bootstrap/scss/forms";
 @import "../lib/bootstrap/scss/buttons";
+@import "../lib/bootstrap/scss/transitions";
+@import "../lib/bootstrap/scss/dropdown";
+@import "../lib/bootstrap/scss/button-group";
+@import "../lib/bootstrap/scss/nav";
+@import "../lib/bootstrap/scss/navbar";
+@import "../lib/bootstrap/scss/card";
+@import "../lib/bootstrap/scss/accordion";
+@import "../lib/bootstrap/scss/breadcrumb";
+@import "../lib/bootstrap/scss/pagination";
+@import "../lib/bootstrap/scss/badge";
+@import "../lib/bootstrap/scss/alert";
+@import "../lib/bootstrap/scss/progress";
+@import "../lib/bootstrap/scss/list-group";
+@import "../lib/bootstrap/scss/close";
+@import "../lib/bootstrap/scss/toasts";
+@import "../lib/bootstrap/scss/modal";
+@import "../lib/bootstrap/scss/tooltip";
+@import "../lib/bootstrap/scss/popover";
+@import "../lib/bootstrap/scss/carousel";
+@import "../lib/bootstrap/scss/spinners";
+@import "../lib/bootstrap/scss/offcanvas";
+@import "../lib/bootstrap/scss/placeholders";
+@import "../lib/bootstrap/scss/helpers";
 
 // 7. Optionally include utilities API last to generate classes based on the Sass map in `_utilities.scss`
 @import "../lib/bootstrap/scss/utilities/api";

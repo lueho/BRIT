@@ -20,12 +20,11 @@
       {% endblock title %}
     </title>
     {% include "partials/_analytics.html" %}
-    <!-- Bootstrap CSS (self-hosted; must load before brit-theme overrides) -->
-    <link href="{% static 'lib/bootstrap/css/bootstrap.min.css' %}" rel="stylesheet">
     <!-- Custom fonts for this template (self-hosted) -->
     <link rel="stylesheet" href="{% static 'lib/fontawesome/css/all.min.css' %}">
     <link href="{% static 'lib/nunito/nunito.css' %}" rel="stylesheet">
-    <!-- Our custom theme (must be loaded AFTER Bootstrap to override styles) -->
+    <!-- Custom theme — includes a full Bootstrap 5.3.6 build compiled with
+         BRIT variable overrides (see scss/brit-theme.scss) -->
     <link href="{% static 'css/brit-theme.min.css' %}" rel="stylesheet">
     <!-- Shared styles for filtered list/map sidebars and tabs -->
     <link href="{% static 'css/filtered-list.min.css' %}" rel="stylesheet">
