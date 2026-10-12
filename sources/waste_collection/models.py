@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from bibliography.models import Source
-from distributions.models import Period, TemporalDistribution
+from distributions.models import Period
 from maps.models import Catchment
 from materials.models import Material, MaterialCategory, MaterialManager, Sample
 from utils.object_management.models import (
@@ -22,7 +22,6 @@ from utils.object_management.models import (
     UserCreatedObject,
     UserCreatedObjectManager,
     UserCreatedObjectQuerySet,
-    get_default_owner,
 )
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import PropertyValue
@@ -159,10 +158,25 @@ def check_url_valid(sender, instance, created, **kwargs):
 
 class CollectionSeasonManager(UserCreatedObjectManager):
     def get_queryset(self):
-        distribution = TemporalDistribution.objects.get(
-            owner=get_default_owner(), name="Months of the year"
+        # Filter by join instead of fetching owner and distribution eagerly:
+        # get_queryset runs on every CollectionSeason.objects access, so those
+        # two lookups cost two queries each time.
+        username = getattr(settings, "DEFAULT_OBJECT_OWNER_USERNAME", None)
+        if not username:
+            username = getattr(settings, "ADMIN_USERNAME", None)
+        if not username:
+            raise RuntimeError(
+                "Neither DEFAULT_OBJECT_OWNER_USERNAME in settings "
+                "nor ADMIN_USERNAME env var is set."
+            )
+        return (
+            super()
+            .get_queryset()
+            .filter(
+                distribution__name="Months of the year",
+                distribution__owner__username=username,
+            )
         )
-        return super().get_queryset().filter(distribution=distribution)
 
 
 class CollectionSeason(Period):

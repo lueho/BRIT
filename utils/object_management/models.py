@@ -11,13 +11,10 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 
 from ..models import CRUDUrlsMixin
+from ..transaction_scope import current_scope, scope_is_active
 
 
-def get_default_owner():
-    """
-    Returns the default owner User instance, using DEFAULT_OBJECT_OWNER_USERNAME or ADMIN_USERNAME.
-    Raises RuntimeError if the user does not exist.
-    """
+def _default_owner_username():
     username = getattr(settings, "DEFAULT_OBJECT_OWNER_USERNAME", None)
     if not username:
         username = getattr(settings, "ADMIN_USERNAME", None)
@@ -25,6 +22,15 @@ def get_default_owner():
         raise RuntimeError(
             "Neither DEFAULT_OBJECT_OWNER_USERNAME in settings nor ADMIN_USERNAME env var is set."
         )
+    return username
+
+
+def get_default_owner():
+    """
+    Returns the default owner User instance, using DEFAULT_OBJECT_OWNER_USERNAME or ADMIN_USERNAME.
+    Raises RuntimeError if the user does not exist.
+    """
+    username = _default_owner_username()
     try:
         return User.objects.get(username=username)
     except User.DoesNotExist as err:
@@ -33,8 +39,22 @@ def get_default_owner():
         ) from err
 
 
+# The owner field default runs on every ownerless UserCreatedObject
+# instantiation; the pk is cached per username and cleared by the User
+# post_save/post_delete/post_migrate receivers in signals.py. Each entry is
+# only reused while the atomic blocks it was read in are still open, so a pk
+# read inside a rolled-back transaction is never served afterwards.
+_default_owner_pk_cache = {}
+
+
 def get_default_owner_pk():
-    return get_default_owner().pk
+    username = _default_owner_username()
+    entry = _default_owner_pk_cache.get(username)
+    if entry is not None and scope_is_active(entry[1]):
+        return entry[0]
+    pk = get_default_owner().pk
+    _default_owner_pk_cache[username] = (pk, current_scope())
+    return pk
 
 
 STATUS_CHOICES = (
@@ -369,6 +389,24 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         indexes = [
             models.Index(fields=["publication_status"]),
         ]
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        try:
+            index = field_names.index("publication_status")
+        except ValueError:
+            # Deferred load: the persisted status is unknown and signal
+            # handlers must fall back to conservative behaviour.
+            pass
+        else:
+            instance._loaded_publication_status = values[index]
+        return instance
+
+    def refresh_from_db(self, using=None, fields=None):
+        super().refresh_from_db(using=using, fields=fields)
+        if fields is None or "publication_status" in fields:
+            self._loaded_publication_status = self.publication_status
 
     def _lock_and_validate_transition(self, expected_statuses, error_message):
         current_status = (
