@@ -170,8 +170,12 @@ everyone who previously commented on the object, via a `post_save` signal
 (`enqueue_review_notifications` in `signals.py`). The signal captures the
 owner at review time and passes their user id to the Celery task
 `send_review_action_notifications` (`tasks.py`), so an ownership transfer
-before delivery does not redirect the owner notification; past commenters
-are resolved from `ReviewAction` rows at delivery time. Recipients who can
+before delivery does not redirect the owner notification (if that owner was
+deleted meanwhile, only past commenters are notified). Past commenters are
+users with a comment that precedes the action; later comments do not
+qualify. The task fans out one `send_review_action_notification_to_user`
+task per recipient, and only that delivery task retries transient mail
+errors, so a failure for one recipient never resends to the others. Recipients who can
 no longer open the review detail page (they are neither the current owner
 nor a moderator) are skipped rather than sent an unusable link.
 Sending is deferred to `transaction.on_commit`; if the broker is

@@ -3,6 +3,7 @@
 import smtplib
 from unittest import mock
 
+from celery.exceptions import Retry
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core import mail
@@ -13,7 +14,10 @@ from factory.django import mute_signals
 
 from sources.waste_collection.models import Collection
 from utils.object_management.models import ReviewAction, UserCreatedObject
-from utils.object_management.tasks import send_review_action_notifications
+from utils.object_management.tasks import (
+    send_review_action_notification_to_user,
+    send_review_action_notifications,
+)
 
 
 class ReviewOwnerNotificationTests(TestCase):
@@ -201,7 +205,7 @@ class ReviewOwnerNotificationTests(TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_notification_task_retries_transient_mail_errors(self):
-        task = send_review_action_notifications
+        task = send_review_action_notification_to_user
         self.assertIn(smtplib.SMTPException, task.autoretry_for)
         self.assertIn(OSError, task.autoretry_for)
         self.assertGreater(task.max_retries, 0)
@@ -363,3 +367,77 @@ class ReviewParticipantNotificationTests(TestCase):
         self._post(self._action_url("add_review_comment"), data={"message": "Ping."})
 
         self.assertEqual(self._recipients(), {self.owner.email})
+
+    def _create_action(self, user, action=ReviewAction.ACTION_COMMENT, text=""):
+        with mute_signals(post_save):
+            return ReviewAction.objects.create(
+                content_type_id=self.content_type_id,
+                object_id=self.collection.id,
+                user=user,
+                action=action,
+                comment=text,
+            )
+
+    def test_deleted_captured_owner_does_not_fall_back_to_current_owner(self):
+        self._add_comment(self.commenter, "Earlier feedback.")
+        action = self._create_action(self.moderator, text="Please add a source.")
+        missing_owner_id = User.objects.order_by("-pk").first().pk + 1000
+
+        with self.assertLogs("utils.object_management.tasks", level="WARNING") as logs:
+            send_review_action_notifications.delay(action.pk, missing_owner_id)
+
+        self.assertTrue(any("no longer exists" in line for line in logs.output))
+        self.assertEqual(self._recipients(), {self.commenter.email})
+
+    def test_later_commenter_is_not_notified_about_earlier_action(self):
+        action = self._create_action(self.moderator, text="First feedback.")
+        self._add_comment(self.commenter, "Joined later.")
+
+        send_review_action_notifications.delay(action.pk, self.owner.pk)
+
+        self.assertEqual(self._recipients(), {self.owner.email})
+
+    def test_mail_retry_does_not_resend_to_delivered_recipients(self):
+        self._add_comment(self.commenter, "Earlier feedback.")
+        action = self._create_action(self.moderator, text="Ping.")
+        with mock.patch.object(
+            send_review_action_notification_to_user, "delay"
+        ) as deliver:
+            queued = send_review_action_notifications.delay(
+                action.pk, self.owner.pk
+            ).get()
+
+        self.assertEqual(queued, 2)
+        self.assertEqual(len(mail.outbox), 0)
+        deliveries = [call.args for call in deliver.call_args_list]
+        self.assertCountEqual(
+            deliveries,
+            [(action.pk, self.owner.pk), (action.pk, self.commenter.pk)],
+        )
+        self.assertFalse(getattr(send_review_action_notifications, "autoretry_for", ()))
+
+        real_send_mail = mail.send_mail
+
+        def flaky_send_mail(subject, body, from_email, recipient_list, **kwargs):
+            if recipient_list == [self.commenter.email] and not failed:
+                failed.append(True)
+                raise smtplib.SMTPException("temporary failure")
+            return real_send_mail(subject, body, from_email, recipient_list, **kwargs)
+
+        failed = []
+        with mock.patch(
+            "utils.object_management.notifications.send_mail",
+            side_effect=flaky_send_mail,
+        ):
+            for args in deliveries:
+                try:
+                    send_review_action_notification_to_user.apply(args=args).get()
+                except Retry:
+                    retry_args = args
+            send_review_action_notification_to_user.apply(args=retry_args).get()
+
+        self.assertTrue(failed)
+        self.assertEqual(
+            sorted(message.to[0] for message in mail.outbox),
+            sorted([self.owner.email, self.commenter.email]),
+        )
