@@ -1,6 +1,7 @@
 from django.forms.widgets import (
     ClearableFileInput,
     HiddenInput,
+    Media,
     SelectMultiple,
 )
 from django_filters.widgets import SuffixedMultiWidget
@@ -301,9 +302,23 @@ class SourceListWidget(SelectMultiple):
         # Get all values for this field name (multiple selection)
         return data.getlist(name)
 
-    class Media:
-        css = {"all": ("utils/css/source_list_widget.min.css",)}
-        js = ("utils/js/source_list_widget.js",)
+    @property
+    def media(self):
+        """
+        Include the TomSelect library alongside this widget's own assets.
+
+        ``source_list_widget.js`` calls ``new TomSelect(...)``, which is only
+        defined by ``django-tomselect.js``. Without it the whole widget
+        initialisation fails on forms that have no other django_tomselect
+        field (e.g. AnalyticalMethodModelForm). Reusing the package widget's
+        media keeps paths consistent with its minification/framework config,
+        and forms.Media merging dedupes it on forms that already load it.
+        """
+        own = Media(
+            css={"all": ("utils/css/source_list_widget.min.css",)},
+            js=("utils/js/source_list_widget.js",),
+        )
+        return TomSelectModelMultipleWidget().media + own
 
 
 class WorkspaceDocumentInput(ClearableFileInput):

@@ -1,7 +1,11 @@
 from django.forms.widgets import HiddenInput
 from django.test import TestCase
 
-from ..widgets import NullableRangeSliderWidget, RangeSliderWidget
+from ..widgets import (
+    NullableRangeSliderWidget,
+    RangeSliderWidget,
+    SourceListWidget,
+)
 
 
 class RangeSliderWidgetTestCase(TestCase):
@@ -65,3 +69,19 @@ class NullableRangeSliderWidgetTestCase(TestCase):
         self.assertEqual(context["widget"]["attrs"]["data-cur_min"], 0)
         self.assertEqual(context["widget"]["attrs"]["data-cur_max"], 100)
         self.assertEqual(context["widget"]["attrs"]["data-cur_is_null"], "true")
+
+
+class SourceListWidgetTestCase(TestCase):
+    def test_media_includes_tomselect_library(self):
+        """The widget must ship the TomSelect library itself.
+
+        ``source_list_widget.js`` calls ``new TomSelect(...)``, which is only
+        defined by ``django-tomselect.js``. On forms without another
+        django_tomselect widget (e.g. AnalyticalMethodModelForm) the library
+        was never loaded, so widget initialisation died on a ReferenceError
+        and neither the search input nor the "Add source" button worked.
+        """
+        media = str(SourceListWidget().media)
+        self.assertIn("django_tomselect/js/django-tomselect", media)
+        self.assertIn("utils/js/source_list_widget.js", media)
+        self.assertIn("vendor/tom-select/css/tom-select", media)

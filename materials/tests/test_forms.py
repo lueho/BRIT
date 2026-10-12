@@ -17,6 +17,7 @@ from utils.properties.models import Unit
 
 from ..forms import (
     AddCompositionModalForm,
+    AnalyticalMethodModelForm,
     ComponentGroupModelForm,
     ComponentMeasurementModelForm,
     ComponentModelForm,
@@ -37,6 +38,19 @@ from ..models import (
     SampleSeries,
     get_sample_substrate_category_name,
 )
+
+
+class AnalyticalMethodModelFormTestCase(TestCase):
+    def test_form_media_includes_tomselect_library(self):
+        """Regression test: the sources widget needs window.TomSelect.
+
+        This form has no django_tomselect field, so without the SourceListWidget
+        shipping the library itself, the "add source" UI was dead (issue
+        reported for analyticalmethod 397).
+        """
+        media = str(AnalyticalMethodModelForm().media)
+        self.assertIn("django_tomselect/js/django-tomselect", media)
+        self.assertIn("utils/js/source_list_widget.js", media)
 
 
 class AddComponentGroupModalModelFormTestCase(TestCase):
