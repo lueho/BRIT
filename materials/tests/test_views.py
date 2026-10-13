@@ -5,6 +5,7 @@ from unittest.mock import patch
 from urllib.parse import quote
 from uuid import uuid4
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
@@ -101,6 +102,24 @@ class BaseMaterialProxyAutocompleteViewTestCase(TestCase):
         names = [item["name"] for item in response.json()["results"]]
         self.assertIn(self.component.name, names)
         self.assertNotIn(self.material.name, names)
+
+
+class MaterialListNameWidgetSelectionTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.material = Material.objects.create(
+            name="Grass from nature reserve",
+            publication_status="published",
+        )
+
+    def test_selected_material_renders_when_list_search_does_not_match_it(self):
+        response = self.client.get(
+            reverse("material-list"),
+            {"q": "grass clippings", "scope": "published", "name": self.material.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f"allOptions['{self.material.pk}']")
 
 
 class SampleSubstrateMaterialAutocompleteViewTestCase(TestCase):
@@ -3748,6 +3767,54 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         new = self.sample.component_measurements.get(component=self.moisture)
         self.assertEqual(list(new.sources.all()), [self.source])
 
+    def test_measurements_post_changes_group_of_existing_row(self):
+        other_group = MaterialComponentGroup.objects.create(
+            owner=self.editor,
+            name="Carbohydrates",
+            publication_status="published",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(self.measurement.pk),
+                        group=str(other_group.pk),
+                        component=str(self.moisture.pk),
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(response.json()["saved"])
+        self.measurement.refresh_from_db()
+        self.assertEqual(self.measurement.group, other_group)
+        self.assertEqual(self.measurement.component, self.moisture)
+
+    def test_measurements_post_rejects_change_to_inaccessible_group(self):
+        locked = MaterialComponentGroup.objects.create(
+            owner=self.editor,
+            name="Locked group",
+            publication_status="private",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(self.measurement.pk), group=str(locked.pk)
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.measurement.refresh_from_db()
+        self.assertEqual(self.measurement.group, self.group)
+
     def test_measurements_post_invalid_rows_roll_back_everything(self):
         response = self.client.post(
             self.section_url("measurements"),
@@ -5176,6 +5243,57 @@ class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
         self.assertLess(
             reordered_content.index(f'id="group-{self.organic_group.pk}"'),
             reordered_content.index(f'id="group-{self.chemical_group.pk}"'),
+        )
+
+    def test_order_down_creates_settings_with_measured_basis(self):
+        dry_matter = MaterialComponent.objects.create(
+            owner=self.member,
+            name="Dry Matter",
+            publication_status="published",
+        )
+        volatile_solids = MaterialComponent.objects.create(
+            owner=self.member,
+            name="Volatile Solids",
+            publication_status="published",
+        )
+        self.sample.component_measurements.filter(group=self.chemical_group).update(
+            basis_component=dry_matter
+        )
+        organic_measurements = self.sample.component_measurements.filter(
+            group=self.organic_group
+        ).order_by("id")
+        organic_measurements.filter(pk=organic_measurements[0].pk).update(
+            basis_component=dry_matter
+        )
+        organic_measurements.filter(pk=organic_measurements[1].pk).update(
+            basis_component=volatile_solids
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "derived-composition-order-down",
+                kwargs={"sample_pk": self.sample.pk, "group_pk": self.organic_group.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        settings_by_group = {
+            composition.group_id: composition.fractions_of
+            for composition in self.sample.compositions.all()
+        }
+        self.assertEqual(settings_by_group[self.chemical_group.pk], dry_matter)
+        self.assertEqual(
+            settings_by_group[self.organic_group.pk],
+            MaterialComponent.objects.default(),
+        )
+
+        detail_response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        self.assertNotContains(
+            detail_response,
+            "The configured composition basis differs from the measurement basis.",
         )
 
     def test_order_down_redirects_to_next_url(self):
@@ -7827,9 +7945,11 @@ class MaterialsReviewDetailAccessTests(TestCase):
         response = self.client.get(self._review_detail_url(self.review_sample))
         self.assertEqual(response.status_code, 403)
 
-    def test_anonymous_cannot_access_review_detail(self):
-        response = self.client.get(self._review_detail_url(self.review_sample))
-        self.assertEqual(response.status_code, 403)
+    def test_anonymous_is_redirected_to_login_for_review_detail(self):
+        url = self._review_detail_url(self.review_sample)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"{settings.LOGIN_URL}?next={url}")
 
 
 class SampleDetailTemplateReviewUITests(TestCase):
@@ -9923,3 +10043,77 @@ class SampleListFilterByGroupTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "List member sample")
         self.assertNotContains(response, "List other sample")
+
+
+class MaterialDetailUsedInProcessesTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from processes.models import Process, ProcessMaterial
+
+        user_model = get_user_model()
+        cls.owner = user_model.objects.create_user(username="material-owner")
+        cls.drafter = user_model.objects.create_user(username="process-drafter")
+        cls.material = Material.objects.create(
+            name="Shared straw", owner=cls.owner, publication_status="published"
+        )
+        cls.unused_material = Material.objects.create(
+            name="Unused straw", owner=cls.owner, publication_status="published"
+        )
+        cls.published_process = Process.objects.create(
+            name="Published pulping", owner=cls.owner, publication_status="published"
+        )
+        cls.private_process = Process.objects.create(
+            name="Private pelleting", owner=cls.drafter, publication_status="private"
+        )
+        ProcessMaterial.objects.create(
+            process=cls.published_process, material=cls.material, role="input"
+        )
+        ProcessMaterial.objects.create(
+            process=cls.published_process, material=cls.material, role="output"
+        )
+        ProcessMaterial.objects.create(
+            process=cls.private_process, material=cls.material, role="output"
+        )
+
+    def get_detail(self, material=None):
+        return self.client.get(
+            reverse("material-detail", kwargs={"pk": (material or self.material).pk})
+        )
+
+    def test_anonymous_visitor_sees_only_published_processes(self):
+        response = self.get_detail()
+
+        self.assertContains(response, "Used in processes")
+        self.assertContains(
+            response,
+            reverse(
+                "processes:process-detail", kwargs={"pk": self.published_process.pk}
+            ),
+        )
+        self.assertNotContains(response, "Private pelleting")
+        self.assertEqual(
+            list(response.context["related_processes"]), [self.published_process]
+        )
+        self.assertEqual(response.context["related_processes_total"], 1)
+
+    def test_section_links_to_published_processes_list_filtered_by_material(self):
+        response = self.get_detail()
+
+        list_url = f"{reverse('processes:process-list')}?material={self.material.pk}"
+        self.assertEqual(response.context["related_processes_list_url"], list_url)
+        self.assertEqual(response.context["related_processes_published_total"], 1)
+        self.assertContains(response, f'href="{list_url}"')
+
+    def test_process_owner_also_sees_own_private_process(self):
+        self.client.force_login(self.drafter)
+
+        response = self.get_detail()
+
+        self.assertContains(response, "Private pelleting")
+        self.assertEqual(response.context["related_processes_total"], 2)
+
+    def test_unused_material_shows_empty_state(self):
+        response = self.get_detail(self.unused_material)
+
+        self.assertContains(response, "Used in processes")
+        self.assertContains(response, "No process uses this material yet.")

@@ -84,12 +84,9 @@ def capture_previous_collection_publication_status(sender, instance, **kwargs):
         instance._previous_publication_status = None
         return
 
-    update_fields = kwargs.get("update_fields")
-    if update_fields and "publication_status" not in update_fields:
-        # publication_status cannot change in this save call
-        instance._previous_publication_status = instance.publication_status
-        return
-
+    # Read the persisted status at save time: the status recorded when the
+    # instance was loaded can be stale (e.g. published by another worker), and
+    # a stale private status would skip invalidating published GeoJSON.
     instance._previous_publication_status = (
         sender.objects.filter(pk=instance.pk)
         .values_list("publication_status", flat=True)

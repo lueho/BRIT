@@ -1,0 +1,207 @@
+/* Inventory scenario detail, result, progress and failure pages.
+   Builds on the shared sample_detail_v2 (sdv2) design tokens. */
+
+.sri-hero-actions,
+.sri-status-actions,
+.sri-inventory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sri-hero-actions form,
+.sri-status form {
+  margin: 0;
+}
+
+.sri-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  border-left: 4px solid var(--sdv2-border-strong);
+}
+
+.sri-status .sdv2-section-title {
+  margin-bottom: 0.25rem;
+}
+
+.sri-status-2 {
+  border-left-color: #0dcaf0;
+}
+
+.sri-status-3 {
+  border-left-color: var(--sdv2-accent-derived);
+}
+
+.sri-status-4 {
+  border-left-color: var(--sdv2-accent-danger);
+}
+
+.sri-failure-message {
+  font-family: var(--sdv2-font-mono);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
+
+.sri-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.sri-overview > :only-child {
+  grid-column: 1 / -1;
+}
+
+.sri-map {
+  height: 22rem;
+  margin-top: 0.75rem;
+  border-radius: var(--sdv2-radius);
+  overflow: hidden;
+  position: relative;
+  z-index: 0;
+}
+
+.sri-map .leaflet-container {
+  height: 100%;
+}
+
+.sri-section-header,
+.sri-inventory-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sri-section-header {
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.sri-inventory,
+.sri-result {
+  margin-bottom: 1.25rem;
+}
+
+.sri-inventory-kicker {
+  color: var(--sdv2-text-subtle);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sri-inventory-title {
+  margin: 0.15rem 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.sri-inventory-title .fa-arrow-right {
+  margin: 0 0.35rem;
+  color: var(--sdv2-text-subtle);
+  font-size: 0.85em;
+}
+
+.sri-inventory-dataset,
+.sri-muted {
+  color: var(--sdv2-text-muted);
+}
+
+.sri-table-wrap {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.sri-parameters {
+  min-width: 0;
+}
+
+.sri-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+}
+
+.sri-kpi {
+  padding: 0.9rem 1rem;
+  border-radius: var(--sdv2-radius);
+  background: var(--sdv2-accent-derived-soft);
+}
+
+.sri-kpi dt {
+  color: var(--sdv2-text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.sri-kpi dd {
+  margin: 0.25rem 0 0;
+}
+
+.sri-kpi-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.sri-kpi-unit {
+  margin-left: 0.35rem;
+  color: var(--sdv2-text-muted);
+  font-size: 1rem;
+}
+
+.sri-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 30rem), 1fr));
+  gap: 1.25rem;
+}
+
+.sri-chart .chart-bar {
+  margin-top: 0.75rem;
+}
+
+.sri-progress .progress {
+  height: 1.25rem;
+  margin-top: 1rem;
+}
+
+.sri-progress .progress-bar {
+  width: 0;
+  transition: width 0.4s ease;
+}
+
+.sri-progress-count {
+  margin: 0.5rem 0 1rem;
+  color: var(--sdv2-text-muted);
+}
+
+.sri-tasks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sri-tasks li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--sdv2-border);
+}
+
+@media (max-width: 991.98px) {
+  .sri-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

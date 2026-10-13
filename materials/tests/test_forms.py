@@ -17,6 +17,7 @@ from utils.properties.models import Unit
 
 from ..forms import (
     AddCompositionModalForm,
+    AnalyticalMethodModelForm,
     ComponentGroupModelForm,
     ComponentMeasurementModelForm,
     ComponentModelForm,
@@ -37,6 +38,19 @@ from ..models import (
     SampleSeries,
     get_sample_substrate_category_name,
 )
+
+
+class AnalyticalMethodModelFormTestCase(TestCase):
+    def test_form_media_includes_tomselect_library(self):
+        """Regression test: the sources widget needs window.TomSelect.
+
+        This form has no django_tomselect field, so without the SourceListWidget
+        shipping the library itself, the "add source" UI was dead (issue
+        reported for analyticalmethod 397).
+        """
+        media = str(AnalyticalMethodModelForm().media)
+        self.assertIn("django_tomselect/js/django-tomselect", media)
+        self.assertIn("utils/js/source_list_widget.js", media)
 
 
 class AddComponentGroupModalModelFormTestCase(TestCase):
@@ -243,6 +257,21 @@ class ComponentMeasurementModelFormTestCase(TestCase):
         self.assertIn(g_per_kg, queryset)
         self.assertNotIn(mg_per_l, queryset)
         self.assertNotIn(volume_percent, queryset)
+
+    def test_bound_form_rejects_submitted_unit_outside_weight_fraction_units(self):
+        user = User.objects.create_user(username="unit-submitter")
+        mg_per_l = Unit.objects.create(
+            name="mg/L", symbol="mg/L", publication_status="published"
+        )
+        request = RequestFactory().post("/")
+        request.user = user
+        data = QueryDict(mutable=True)
+        data.update({"unit": str(mg_per_l.pk)})
+
+        form = ComponentMeasurementModelForm(data=data, request=request)
+
+        self.assertFalse(form.is_valid())
+        self.assertTrue(form.has_error("unit", code="invalid_choice"))
 
 
 class SampleModelFormTestCase(TestCase):
@@ -581,6 +610,31 @@ class SampleModelFormTestCase(TestCase):
         saved = form.save()
         self.assertEqual(saved.series, series)
         self.assertEqual(saved.material, series_material)
+
+    def test_sampling_section_rejects_foreign_published_sample_group(self):
+        other = User.objects.create_user(username="sg-other")
+        foreign = SampleGroup.objects.create(
+            name="Foreign group", owner=other, publication_status="published"
+        )
+        with mute_signals(post_save):
+            sample = Sample.objects.create(
+                name="Grouped sample",
+                owner=self.owner,
+                material=self.substrate_material,
+                standalone=True,
+            )
+        data = QueryDict(mutable=True)
+        data.update({"standalone": "on"})
+        data.setlist("sample_groups", [str(foreign.pk)])
+        form = SampleMaintenanceForm(
+            data=data,
+            instance=sample,
+            fields=("standalone", "sample_groups"),
+            request=self._build_request(self.owner),
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("sample_groups", form.errors)
 
     def test_material_field_sets_help_text_and_quick_create_url(self):
         form = SampleModelForm(request=self._build_request(self.owner))
@@ -925,6 +979,26 @@ class SampleModelFormSampleGroupsTestCase(TestCase):
 
         self.assertCountEqual(
             sample.sample_groups.all(), [self.group2, self.foreign_published_group]
+        )
+
+    def test_maintenance_form_preselects_editable_groups_on_reopen(self):
+        sample = Sample.objects.create(
+            name="Grouped sample",
+            material=self.material,
+            owner=self.owner,
+            standalone=True,
+        )
+        sample.sample_groups.add(self.group1, self.foreign_published_group)
+        form = SampleMaintenanceForm(
+            instance=sample,
+            fields=("standalone", "sample_groups"),
+            request=self._request(self.owner),
+        )
+
+        self.assertCountEqual(form.initial["sample_groups"], [self.group1])
+        self.assertEqual(
+            form.fields["sample_groups"].workspace_options,
+            [{"value": str(self.group1.pk), "label": self.group1.name}],
         )
 
 

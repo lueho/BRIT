@@ -1,7 +1,9 @@
 """Tests for sources.waste_collection.tasks."""
 
+import json
+import zlib
 from datetime import timedelta
-from unittest.mock import ANY, Mock, PropertyMock, call, patch
+from unittest.mock import ANY, Mock, patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -115,6 +117,20 @@ class CleanupOrphanedWasteFlyersScheduleTestCase(SimpleTestCase):
 
 
 class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
+    @staticmethod
+    def queryset(mock_collection, count):
+        queryset = mock_collection.objects.filter.return_value.select_related.return_value.annotate.return_value
+        queryset.aggregate.return_value = {
+            "cnt": count,
+            "min_id": 1,
+            "max_id": count,
+            "max_mod": None,
+            "max_region_mod": None,
+            "num_points": 0,
+        }
+        return queryset
+
+    @patch("sources.waste_collection.tasks.cache_rendered_geojson", return_value=True)
     @patch("sources.waste_collection.tasks.get_geojson_cache")
     @patch(
         "sources.waste_collection.tasks.build_collection_cache_key",
@@ -128,15 +144,10 @@ class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
         mock_serializer,
         mock_build_cache_key,
         mock_get_cache,
+        mock_render,
     ):
-        filtered_qs = Mock()
-        selected_qs = Mock()
-        annotated_qs = Mock()
-        mock_collection.objects.filter.return_value = filtered_qs
-        filtered_qs.select_related.return_value = selected_qs
-        selected_qs.annotate.return_value = annotated_qs
-        mock_serializer.return_value.data = {"features": [1, 2, 3]}
-
+        queryset = self.queryset(mock_collection, 3)
+        mock_get_cache.return_value.has_key.return_value = False
         with patch(
             "sources.waste_collection.tasks.exclude_published_predecessors",
             side_effect=lambda queryset: queryset,
@@ -145,24 +156,25 @@ class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
 
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["features_count"], 3)
-        self.assertEqual(result["cache_key"], "collection_geojson:key")
+        self.assertTrue(
+            result["cache_key"].startswith("collection_geojson:key:json:v2:")
+        )
         mock_collection.objects.filter.assert_called_once_with(
             publication_status="published"
         )
-        mock_serializer.assert_called_once_with(annotated_qs, many=True)
+        mock_serializer.assert_not_called()
         mock_build_cache_key.assert_called_once_with(scope="published")
-        self.assertEqual(
-            mock_get_cache.return_value.set.call_args_list,
-            [
-                call(
-                    "collection_geojson:key",
-                    {"features": [1, 2, 3]},
-                    timeout=ANY,
-                ),
-                call("collection_geojson:key:count", 3, timeout=ANY),
-            ],
+        mock_render.assert_called_once_with(
+            mock_get_cache.return_value,
+            result["cache_key"],
+            queryset,
+            mock_serializer,
+            "simplified_geom",
+            timeout=ANY,
+            geometry_defer_field="catchment__region__borders__geom",
         )
 
+    @patch("sources.waste_collection.tasks.cache_rendered_geojson", return_value=True)
     @patch("sources.waste_collection.tasks.get_geojson_cache")
     @patch(
         "sources.waste_collection.tasks.build_collection_cache_key",
@@ -176,22 +188,18 @@ class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
         mock_serializer,
         mock_build_cache_key,
         mock_get_cache,
+        mock_render,
     ):
         """The versioned key must be computed before the queryset is serialized.
 
         Otherwise a write landing between serialization and the version query
         stores stale geometry under the current dataset version.
         """
-        filtered_qs = Mock()
-        filtered_qs.select_related.return_value.annotate.return_value = Mock()
-        mock_collection.objects.filter.return_value = filtered_qs
-        data_access = PropertyMock(return_value={"features": []})
-        type(mock_serializer.return_value).data = data_access
-
+        self.queryset(mock_collection, 0)
+        mock_get_cache.return_value.has_key.return_value = False
         order = Mock()
         order.attach_mock(mock_build_cache_key, "build_collection_cache_key")
-        order.attach_mock(data_access, "data")
-
+        order.attach_mock(mock_render, "render")
         with patch(
             "sources.waste_collection.tasks.exclude_published_predecessors",
             side_effect=lambda queryset: queryset,
@@ -200,11 +208,8 @@ class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
 
         self.assertEqual(result["status"], "success")
         self.assertEqual(
-            order.mock_calls,
-            [
-                call.build_collection_cache_key(scope="published"),
-                call.data(),
-            ],
+            [event[0] for event in order.mock_calls],
+            ["build_collection_cache_key", "render"],
         )
 
 
@@ -231,12 +236,15 @@ class WasteCollectionGeoJSONWarmTaskQuerysetTestCase(TestCase):
         predecessor = Collection.objects.create(name="Old version", **fields)
         successor = Collection.objects.create(name="Current version", **fields)
         successor.predecessors.add(predecessor)
+        mock_get_cache.return_value.has_key.return_value = False
 
         result = warm_collection_geojson_cache.run()
 
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["features_count"], 1)
         payload = mock_get_cache.return_value.set.call_args_list[0].args[1]
+        self.assertIsInstance(payload, bytes)
+        payload = json.loads(zlib.decompress(payload))
         self.assertEqual(
             [feature["properties"]["id"] for feature in payload["features"]],
             [successor.pk],

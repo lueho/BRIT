@@ -1,4 +1,3 @@
-import hashlib
 import json
 
 from django.conf import settings
@@ -12,7 +11,15 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .utils import set_geojson_cache_payload
+from .utils import (
+    GEOJSON_MAX_BUFFERED_POINTS,
+    geojson_version_aggregates,
+    geojson_version_token,
+    iter_geojson_features,
+    iter_rendered_geojson,
+    rendered_geojson_cache_key,
+    set_geojson_cache_payload,
+)
 
 # Threshold for switching to streaming response (number of features)
 STREAMING_THRESHOLD = 1000
@@ -147,6 +154,8 @@ class CachedGeoJSONMixin:
     # throttles.
     geojson_throttle_classes = None
     geojson_throttled_actions = ("geojson", "version")
+    geojson_geometry_field = None
+    geojson_point_field = None
 
     def get_throttles(self):
         if (
@@ -236,12 +245,9 @@ class CachedGeoJSONMixin:
         ``cnt`` doubles as the feature count for the current request, so that
         key must stay intact. Override to add related-model dependencies.
         """
-        return {
-            "cnt": Count("pk"),
-            "max_mod": Max("lastmodified_at"),
-            "min_id": Min("pk"),
-            "max_id": Max("pk"),
-        }
+        return geojson_version_aggregates(
+            self.geojson_point_field or self.geojson_geometry_field
+        )
 
     def _version_timestamp(self, agg):
         """Change indicator used in the version token for an aggregate result.
@@ -257,11 +263,7 @@ class CachedGeoJSONMixin:
         return agg.get("max_xmin") or 0
 
     def _version_token(self, agg):
-        cnt = agg.get("cnt") or 0
-        min_id = agg.get("min_id") or 0
-        max_id = agg.get("max_id") or 0
-        base = f"{cnt}:{self._version_timestamp(agg)}:{min_id}:{max_id}"
-        return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
+        return geojson_version_token(agg, self._version_timestamp(agg))
 
     @staticmethod
     def _xmin_queryset(queryset):
@@ -303,7 +305,11 @@ class CachedGeoJSONMixin:
                     RawSQL("xmin::text::bigint", [], output_field=BigIntegerField())
                 ),
             )
-        stats = {"count": agg.get("cnt") or 0, "version": self._version_token(agg)}
+        stats = {
+            "count": agg.get("cnt") or 0,
+            "version": self._version_token(agg),
+            "num_points": agg.get("num_points") or 0,
+        }
         # Memoize per request: get_cache_key() implementations that embed the
         # dataset version and the geojson() stats path share one aggregate.
         self._dataset_stats = (request, stats)
@@ -379,6 +385,27 @@ class CachedGeoJSONMixin:
         )
         serializer_class = get_serializer_class()
 
+        if self.geojson_geometry_field:
+            chunks = iter_geojson_features(
+                queryset,
+                serializer_class,
+                self.geojson_geometry_field,
+                context={"request": self.request},
+                geometry_defer_field=self.geojson_point_field,
+            )
+            buffer = bytearray()
+            try:
+                for chunk in chunks:
+                    buffer.extend(chunk)
+                    if len(buffer) >= STREAM_CHUNK_BYTES:
+                        yield bytes(buffer)
+                        buffer.clear()
+                if buffer:
+                    yield bytes(buffer)
+            finally:
+                chunks.close()
+            return
+
         parts = ['{"type": "FeatureCollection", "features": [']
         parts_size = len(parts[0])
 
@@ -426,6 +453,15 @@ class CachedGeoJSONMixin:
         response["Cache-Control"] = "no-cache"  # Always validate
         return response
 
+    def _unbounded_geojson_rejection(self, request, count, bbox):
+        return get_unbounded_geojson_rejection_response(
+            request,
+            count,
+            bbox=bbox,
+            bounded_query_params=get_view_geojson_bounded_query_params(self),
+            max_features=self.max_unbounded_geojson_features,
+        )
+
     @action(detail=False, methods=["get"])
     def geojson(self, request, *args, **kwargs):
         # Ensure ViewSet implements get_cache_key or adapt as needed
@@ -440,8 +476,39 @@ class CachedGeoJSONMixin:
         cache_key = self.get_cache_key(request)
         geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
 
+        geometry_heavy = False
+        if self.geojson_geometry_field:
+            stats = self.get_dataset_stats(request)
+            geometry_heavy = stats["num_points"] > GEOJSON_MAX_BUFFERED_POINTS
+            rejection_response = self._unbounded_geojson_rejection(
+                request, stats["count"], bbox
+            )
+            if rejection_response is not None:
+                return rejection_response
+            if not use_stream and not bbox:
+                rendered_key = rendered_geojson_cache_key(cache_key, stats["version"])
+                payload = (
+                    geojson_cache.has_key(rendered_key)
+                    if request.method == "HEAD"
+                    else geojson_cache.get(rendered_key)
+                )
+                if payload:
+                    response = StreamingHttpResponse(
+                        ()
+                        if request.method == "HEAD"
+                        else iter_rendered_geojson(payload),
+                        content_type="application/json",
+                    )
+                    response["X-Cache-Status"] = "HIT"
+                    response["X-Total-Count"] = str(stats["count"])
+                    response["X-Data-Version"] = stats["version"]
+                    response["Access-Control-Expose-Headers"] = (
+                        "X-Total-Count, X-Cache-Status, X-Data-Version"
+                    )
+                    return response
+
         # Try cache first (unless streaming is explicitly requested)
-        if not use_stream and not bbox:
+        if not use_stream and not bbox and not geometry_heavy:
             if request.method == "HEAD":
                 head_response = self._cached_geojson_head(
                     request, geojson_cache, cache_key
@@ -467,20 +534,16 @@ class CachedGeoJSONMixin:
         # Cache miss or streaming requested - count and version share one query
         stats = self.get_dataset_stats(request)
         count = stats["count"]
-        rejection_response = get_unbounded_geojson_rejection_response(
-            request,
-            count,
-            bbox=bbox,
-            bounded_query_params=get_view_geojson_bounded_query_params(self),
-            max_features=self.max_unbounded_geojson_features,
-        )
+        rejection_response = self._unbounded_geojson_rejection(request, count, bbox)
         if rejection_response is not None:
             return rejection_response
 
         data_version = stats["version"]
 
         if request.method == "HEAD":
-            is_streaming = STREAMING_ENABLED and count > STREAMING_THRESHOLD
+            is_streaming = STREAMING_ENABLED and (
+                count > STREAMING_THRESHOLD or geometry_heavy
+            )
             response = StreamingHttpResponse(
                 (),
                 content_type=(
@@ -500,7 +563,7 @@ class CachedGeoJSONMixin:
         queryset = self.get_geojson_queryset_with_bbox(request)
 
         # Use streaming for large datasets to prevent memory issues
-        if STREAMING_ENABLED and count > STREAMING_THRESHOLD:
+        if STREAMING_ENABLED and (count > STREAMING_THRESHOLD or geometry_heavy):
             response = StreamingHttpResponse(
                 self._stream_geojson(queryset),
                 content_type="application/geo+json",

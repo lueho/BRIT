@@ -5,10 +5,6 @@ from django_tomselect.widgets import TomSelectModelWidget
 
 from bibliography.models import Source
 from utils.filters import BaseCrispyFilterSet, UserCreatedObjectScopedFilterSet
-from utils.object_management.permissions import (
-    apply_scope_filter,
-    filter_queryset_for_user,
-)
 
 from .models import (
     GIS_SOURCE_MODELS,
@@ -196,33 +192,12 @@ class GeoDataSetFilterSet(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-
-        region_queryset = Region.objects.all()
-        source_queryset = Source.objects.all()
-        if request and hasattr(request, "user"):
-            region_queryset = filter_queryset_for_user(region_queryset, request.user)
-            source_queryset = filter_queryset_for_user(source_queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            region_queryset = apply_scope_filter(
-                region_queryset, scope_value, user=getattr(request, "user", None)
-            )
-            source_queryset = apply_scope_filter(
-                source_queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["region"].queryset = region_queryset
-        self.filters["source"].queryset = source_queryset
+        self.filters["region"].queryset = self.scoped_choice_queryset(
+            Region.objects.all(), selected_field="region"
+        )
+        self.filters["source"].queryset = self.scoped_choice_queryset(
+            Source.objects.all(), selected_field="source"
+        )
 
     class Meta:
         model = GeoDataset
@@ -232,7 +207,7 @@ class GeoDataSetFilterSet(UserCreatedObjectScopedFilterSet):
 class LocationListFilter(UserCreatedObjectScopedFilterSet):
     name = ModelChoiceFilter(
         queryset=Location.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Location Name",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -244,26 +219,9 @@ class LocationListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = Location.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            Location.objects.all(), selected_field="name"
+        )
 
     class Meta:
         model = Location
@@ -273,7 +231,7 @@ class LocationListFilter(UserCreatedObjectScopedFilterSet):
 class AttributeListFilter(UserCreatedObjectScopedFilterSet):
     name = ModelChoiceFilter(
         queryset=Attribute.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Attribute Name",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -285,26 +243,9 @@ class AttributeListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = Attribute.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            Attribute.objects.all(), selected_field="name"
+        )
 
     class Meta:
         model = Attribute

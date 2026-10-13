@@ -1,5 +1,15 @@
-from django.db.models import BigIntegerField, Max, OuterRef, Subquery
+import hashlib
+
+from django.db.models import (
+    BigIntegerField,
+    CharField,
+    OuterRef,
+    StringAgg,
+    Subquery,
+    Value,
+)
 from django.db.models.expressions import RawSQL
+from django.db.models.functions import Cast, Concat
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -8,17 +18,20 @@ from maps.mixins import (
     get_unbounded_geojson_rejection_response,
     get_view_geojson_bounded_query_params,
 )
-from maps.models import GeoPolygon
+from maps.models import Catchment, GeoPolygon, Region
 from maps.throttling import GeoJSONAnonThrottle
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.viewsets import AutoPermModelViewSet
 
+from .filters import ShowcaseAPIFilterSet
 from .models import BiogasPlantsSweden, Showcase
 from .serializers import (
     BiogasPlantsSwedenSimpleModelSerializer,
     ShowcaseFlatSerializer,
     ShowcaseGeoFeatureModelSerializer,
     ShowcaseModelSerializer,
+    pilot_region_features,
+    visible_region_ids,
 )
 
 
@@ -26,6 +39,7 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     queryset = Showcase.objects.all()
     serializer_class = ShowcaseModelSerializer
     filterset_fields = ("id", "region__country")
+    filterset_class = ShowcaseAPIFilterSet
     geojson_throttle_classes = (GeoJSONAnonThrottle,)
     custom_permission_required = {
         "list": None,
@@ -38,45 +52,70 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     def get_queryset(self):
         queryset = filter_queryset_for_user(
             super().get_queryset(), self.request.user
-        ).select_related("region")
+        ).select_related("region__borders")
         if self.action in ("geojson", "version"):
             return queryset
         connections = (
-            ("material_links", "process_links") if self.action == "summaries" else None
+            ("material_links", "process_links", "catchment")
+            if self.action == "summaries"
+            else None
         )
         return Showcase.prefetch_visible_connections(
             queryset, self.request.user, connections=connections
         )
 
-    def _version_aggregates(self):
-        """Showcase GeoJSON serializes the related Region's name and borders,
-        so the version also tracks the Region modification time and the
-        newest transaction id of the border rows, which are edited in place
-        and carry no timestamp of their own."""
-        borders_xmin = (
-            GeoPolygon.objects.filter(pk=OuterRef("region__borders_id"))
-            .annotate(
-                row_xmin=RawSQL(
-                    "xmin::text::bigint", [], output_field=BigIntegerField()
+    @staticmethod
+    def _row_xmin(model, pk_ref):
+        """Transaction id of the ``model`` row at ``pk_ref`` as text."""
+        return Cast(
+            Subquery(
+                model.objects.filter(pk=OuterRef(pk_ref))
+                .annotate(
+                    row_xmin=RawSQL(
+                        "xmin::text::bigint", [], output_field=BigIntegerField()
+                    )
                 )
-            )
-            .values("row_xmin")[:1]
+                .values("row_xmin")[:1]
+            ),
+            CharField(),
         )
+
+    def _version_aggregates(self):
+        """Showcase GeoJSON also serializes the linked catchments, regions and
+        their borders as pilot polygons. Max aggregates over those rows miss
+        edits to any row but the newest one, so the version fingerprints
+        every linked row by its modification time and its transaction id, which
+        changes on each update however the row was written."""
+        linked_rows = (
+            (Region, "region_id", "region__lastmodified_at"),
+            (GeoPolygon, "region__borders_id", None),
+            (Catchment, "catchment_id", "catchment__lastmodified_at"),
+            (Region, "catchment__region_id", "catchment__region__lastmodified_at"),
+            (GeoPolygon, "catchment__region__borders_id", None),
+        )
+        parts = [Cast("pk", CharField()), Value("#"), Cast("theme", CharField())]
+        for model, pk_ref, modified_ref in linked_rows:
+            parts += [Value(":"), self._row_xmin(model, pk_ref)]
+            if modified_ref:
+                parts += [Value("@"), Cast(modified_ref, CharField())]
         return {
             **super()._version_aggregates(),
-            "max_region_mod": Max("region__lastmodified_at"),
-            "max_borders_xmin": Max(Subquery(borders_xmin)),
+            "pilot_fingerprint": StringAgg(
+                Concat(*parts, output_field=CharField()),
+                Value(";"),
+                order_by="pk",
+            ),
         }
 
     def _version_timestamp(self, agg):
-        # Full-precision timestamps, so edits within one second still rotate.
+        # Full-precision timestamp, so edits within one second still rotate.
         max_mod = agg.get("max_mod")
-        region_mod = agg.get("max_region_mod")
+        fingerprint = agg.get("pilot_fingerprint") or ""
         return ":".join(
             (
+                "pilot-regions-v1:theme-context-v1:code-labels-v1",
                 max_mod.isoformat() if max_mod else "",
-                region_mod.isoformat() if region_mod else "",
-                str(agg.get("max_borders_xmin") or 0),
+                hashlib.sha1(fingerprint.encode("utf-8")).hexdigest(),
             )
         )
 
@@ -102,9 +141,18 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
             return rejection_response
 
         serializer = ShowcaseGeoFeatureModelSerializer(
-            queryset, many=True, context={"request": request}
+            queryset,
+            many=True,
+            context={
+                "request": request,
+                "visible_region_ids": visible_region_ids(queryset, request.user),
+            },
         )
-        response = Response(serializer.data)
+        data = serializer.data
+        pilots = pilot_region_features(queryset, request.user)
+        if pilots:
+            data = {**data, "features": pilots + list(data["features"])}
+        response = Response(data)
         # Lets the client's IndexedDB cache revalidate via the version action.
         response["X-Data-Version"] = self.get_dataset_version(request)
         response["Access-Control-Expose-Headers"] = "X-Data-Version"
@@ -123,9 +171,9 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
             Response: The serialized summary of the Showcase instance.
         """
         queryset = self.filter_queryset(self.get_queryset())
-        serializer = ShowcaseFlatSerializer(
-            queryset, many=True, context=self.get_serializer_context()
-        )
+        context = self.get_serializer_context()
+        context["visible_region_ids"] = visible_region_ids(queryset, request.user)
+        serializer = ShowcaseFlatSerializer(queryset, many=True, context=context)
         return Response({"summaries": serializer.data})
 
 

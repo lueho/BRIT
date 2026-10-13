@@ -114,6 +114,18 @@ test("title saves update the hero and browser title", async () => {
     assert.equal(fixture.document.title, "BRIT · Renamed process");
 });
 
+test("successful saves refresh the section progress hint", async () => {
+    const fixture = setup(async () => ({ ok: true, status: 200, json: async () => ({ section: "overview", saved: true, html: "New summary", progress_html: "<p>2 of 8 sections have content.</p>" }) }));
+    const progress = element({ replaceChildren(fragment) { this.replaced = fragment; } });
+    fixture.root.querySelectorAll = (selector) => selector === "[data-workspace-progress]" ? [progress] : [];
+    activate(fixture);
+    fixture.workspace.replaceSummary = () => {};
+    fixture.workspace.fragment = (html) => ({ html });
+    fixture.workspace.stripScripts = (fragment) => { fragment.stripped = true; };
+    await fixture.workspace.save();
+    assert.deepEqual(progress.replaced, { html: "<p>2 of 8 sections have content.</p>", stripped: true });
+});
+
 test("failed opening retains the summary and offers a normal page fallback", async () => {
     const fixture = setup();
     await fixture.workspace.open(fixture.link);
@@ -543,7 +555,7 @@ test("a failed stylesheet does not block editor script loading", async () => {
     };
     const template = element({
         content: element({
-            querySelectorAll: (selector) => selector === 'link[rel="stylesheet"]' ? [element()] : [element()],
+            querySelectorAll: (selector) => selector === 'link[rel="stylesheet"]' ? [element()] : [element({ getAttribute: () => "/static/django_tomselect/js/django-tomselect.min.js" })],
         }),
         remove() { removed = true; },
     });
@@ -551,6 +563,24 @@ test("a failed stylesheet does not block editor script loading", async () => {
     await workspace.loadMedia(fragment);
     assert.deepEqual(requested, ["style", "script"]);
     assert.equal(removed, true);
+});
+
+test("scripts injected by a proxy are skipped instead of aborting editor media", async () => {
+    const { workspace } = setup();
+    const requested = [];
+    workspace.loadAsset = async (node) => { requested.push(node.getAttribute("src")); };
+    const script = (src) => element({ getAttribute: () => src });
+    const scripts = [
+        script("/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"),
+        script("/static/django_tomselect/js/django-tomselect.min.js"),
+    ];
+    const template = element({
+        content: element({ querySelectorAll: (selector) => selector === "script[src]" ? scripts : [] }),
+        remove() { },
+    });
+    const fragment = element({ querySelector: () => element(), querySelectorAll: () => [template] });
+    await workspace.loadMedia(fragment);
+    assert.deepEqual(requested, ["/static/django_tomselect/js/django-tomselect.min.js"]);
 });
 
 test("one failing select does not abort widget initialization for the rest", () => {

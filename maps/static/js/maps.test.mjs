@@ -338,6 +338,69 @@ function fakeBounds(tag) {
     return { tag, isValid: () => true };
 }
 
+function setupFeatureRendering() {
+    const { sandbox, window } = setup();
+    const map = { removeLayer() {} };
+    window.listeners["map:init"]({ detail: { map } });
+    const calls = { created: [], added: [], batches: [] };
+    sandbox.L = {
+        geoJson(data, options) {
+            calls.created.push({ data, options });
+            return {
+                on() {},
+                addTo(target) { calls.added.push(target); },
+                addData(features) { calls.batches.push(features); },
+            };
+        },
+    };
+    return { sandbox, calls, map };
+}
+
+const locatedFeature = {
+    type: "Feature",
+    id: 2,
+    geometry: { type: "Point", coordinates: [14, 55] },
+    properties: {},
+};
+const unlocatedFeature = { type: "Feature", id: 1, geometry: null, properties: {} };
+
+test("renderFeatures ignores null geometries before and after located points", () => {
+    const { sandbox, calls, map } = setupFeatureRendering();
+    const geoJson = {
+        type: "FeatureCollection",
+        features: [unlocatedFeature, locatedFeature, unlocatedFeature],
+    };
+
+    sandbox.renderFeatures(geoJson);
+
+    assert.deepEqual(Array.from(calls.created[0].data.features), [locatedFeature]);
+    assert.equal(typeof calls.created[0].options.pointToLayer, "function");
+    assert.deepEqual(calls.added, [map]);
+    assert.equal(geoJson.features.length, 3);
+});
+
+test("renderFeatures leaves no layer for an all-null collection", () => {
+    const { sandbox, calls } = setupFeatureRendering();
+    sandbox.renderFeatures({ type: "FeatureCollection", features: [unlocatedFeature] });
+    assert.equal(calls.created.length, 0);
+    assert.equal(vm.runInContext("featuresLayer", sandbox), null);
+});
+
+test("addFeatureBatch skips null geometry batches and filters mixed batches", () => {
+    const { sandbox, calls, map } = setupFeatureRendering();
+    assert.equal(sandbox.addFeatureBatch([unlocatedFeature]), false);
+    assert.equal(calls.created.length, 0);
+    assert.equal(sandbox.addFeatureBatch([unlocatedFeature, locatedFeature]), true);
+    assert.equal(sandbox.addFeatureBatch([locatedFeature, unlocatedFeature]), true);
+    assert.equal(sandbox.addFeatureBatch([unlocatedFeature]), false);
+    assert.equal(calls.created.length, 1);
+    assert.equal(typeof calls.created[0].options.pointToLayer, "function");
+    assert.deepEqual(calls.added, [map]);
+    assert.deepEqual(calls.batches.map(batch => Array.from(batch)), [
+        [locatedFeature], [locatedFeature],
+    ]);
+});
+
 function fakeLayer(bounds) {
     return {
         addTo() {},
@@ -424,4 +487,92 @@ test("loadLayers forwards the filter parameters to refreshMap", async () => {
     await new Promise((r) => setImmediate(r));
 
     assert.equal(seen?.get("name"), "oak");
+});
+
+test("map:init points Leaflet's default icon path at the leaflet static dir", () => {
+    const { sandbox, window } = setup();
+    sandbox.L = { Icon: { Default: {} } };
+    sandbox.document.querySelector = (selector) => (
+        selector === 'script[src*="/leaflet/leaflet."]'
+            ? { src: "https://cdn.example/static/leaflet/leaflet.25c3da10cb19.js" }
+            : null
+    );
+
+    window.listeners["map:init"]({ detail: { map: {} } });
+
+    assert.equal(
+        sandbox.L.Icon.Default.imagePath,
+        "https://cdn.example/static/leaflet/images/",
+    );
+});
+
+test("map:init keeps an explicitly configured default icon path", () => {
+    const { sandbox, window } = setup();
+    sandbox.L = { Icon: { Default: { imagePath: "/custom/" } } };
+    sandbox.document.querySelector = () => ({
+        src: "https://cdn.example/static/leaflet/leaflet.js",
+    });
+
+    window.listeners["map:init"]({ detail: { map: {} } });
+
+    assert.equal(sandbox.L.Icon.Default.imagePath, "/custom/");
+});
+
+test("map refresh on a page without filter helpers logs no warnings", () => {
+    const { sandbox } = setup();
+    delete sandbox.lockFilter;
+    delete sandbox.unlockFilter;
+    delete sandbox.parseFilterParameters;
+    const warnings = [];
+    sandbox.console = { ...console, warn: (...args) => warnings.push(args) };
+
+    sandbox.prepareMapRefresh();
+    sandbox.cleanup();
+
+    assert.deepEqual(warnings, []);
+});
+
+test("map overlay toggles are silent on pages without an overlay", () => {
+    const { sandbox } = setup();
+    const warnings = [];
+    sandbox.console = { ...console, warn: (...args) => warnings.push(args) };
+
+    sandbox.showMapOverlay();
+    sandbox.hideMapOverlay();
+
+    assert.deepEqual(warnings, []);
+});
+
+test("cleanup re-enables the filter form before it writes the filters to the address bar", () => {
+    const { sandbox } = setup();
+    const order = [];
+    sandbox.unlockCustomElements = () => order.push("unlock");
+    sandbox.updateUrlSearchParams = () => order.push("url");
+
+    sandbox.cleanup();
+
+    assert.deepEqual(order, ["unlock", "url"]);
+});
+
+test("refreshMap calls the layersLoaded hook after fitting the bounds", async () => {
+    const { sandbox } = setup();
+    const order = [];
+    sandbox.setTimeout = () => 0;
+    sandbox.orderLayers = () => {};
+    sandbox.adjustMapBounds = () => order.push("bounds");
+    sandbox.layersLoaded = () => order.push("loaded");
+    sandbox.cleanup = () => {};
+    // setup() stubs refreshMap; evaluate the real one again.
+    vm.runInContext(source.match(/^function refreshMap[\s\S]*?^}$/m)[0], sandbox);
+
+    sandbox.refreshMap([Promise.resolve()], new URLSearchParams());
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.deepEqual(order, ["bounds", "loaded"]);
+});
+
+test("the minified build still calls the layersLoaded hook", () => {
+    const minified = readFileSync(new URL("./maps.min.js", import.meta.url), "utf8");
+    const calls = minified.replace(/function layersLoaded\(\)/g, "");
+    assert.match(calls, /layersLoaded\(\)/);
 });

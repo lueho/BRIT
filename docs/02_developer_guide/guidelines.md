@@ -96,6 +96,10 @@ Run tests inside Docker with the dedicated test settings.
 docker compose exec web python manage.py test --keepdb --noinput --settings=brit.settings.testrunner --parallel 4
 ```
 
+`--parallel` counts worker processes; postgres, redis and the dev server
+need cores too, so pick a number below your host's CPU count. On a 4-core
+machine `--parallel 2` or `3` is usually faster than `4` (CI uses `2`).
+
 ### Targeted test runs
 
 ```sh

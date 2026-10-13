@@ -642,7 +642,8 @@ class InventoryExecutionIntegrationTests(TestCase):
             layer.layeraggregatedvalue_set.filter(name="Total area").exists()
         )
         self.assertIn("productionPerFeedstockBarChart", charts)
-        self.assertIn("seasonalFeedstockBarChart", charts)
+        # Park residues have no seasonal distribution, so no empty chart is shown.
+        self.assertNotIn("seasonalFeedstockBarChart", charts)
 
     def test_nantes_greenhouse_inventory_example_runs_end_to_end(self):
         region, _catchment, scenario = self.create_region_and_catchment(

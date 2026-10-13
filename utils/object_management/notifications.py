@@ -3,8 +3,10 @@
 import logging
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 from django.core.mail import send_mail
+from django.db.models import Q
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.text import capfirst
@@ -68,22 +70,85 @@ def _can_open_review_link(user, obj):
     return user.pk == obj.owner_id or user_is_moderator_for_model(user, obj.__class__)
 
 
-def notify_owner_of_review_action(action, recipient=None):
-    """Send a notification e-mail to the object owner for a review action.
+_CURRENT_OWNER = object()
 
-    ``recipient`` is the user who owned the object when the action was
+
+def _review_participants(action, owner):
+    """Return notification candidates for ``action``.
+
+    Candidates are the object's owner (the user captured by the post-save
+    signal when the action was created) plus every distinct user who
+    commented on the object before ``action``. Comments made after the
+    action do not qualify, even when delivery lags behind them. Duplicates
+    are removed; the actor is filtered out here and again per-recipient
+    when sending.
+    """
+    recipients = []
+    seen = set()
+    if owner is not None:
+        recipients.append(owner)
+        seen.add(owner.pk)
+    commenter_ids = (
+        ReviewAction.objects.filter(
+            content_type_id=action.content_type_id,
+            object_id=action.object_id,
+            action=ReviewAction.ACTION_COMMENT,
+        )
+        .filter(
+            Q(created_at__lt=action.created_at)
+            | Q(created_at=action.created_at, pk__lt=action.pk)
+        )
+        .exclude(user_id=action.user_id)
+        .values_list("user_id", flat=True)
+        .distinct()
+    )
+    for user in User.objects.filter(pk__in=commenter_ids).order_by("pk"):
+        if user.pk not in seen:
+            seen.add(user.pk)
+            recipients.append(user)
+    return recipients
+
+
+def review_notification_recipients(action, owner=_CURRENT_OWNER):
+    """Return the users to notify about ``action``.
+
+    ``owner`` is the user who owned the object when the action was
     created; the post-save signal captures it so an ownership transfer
-    between enqueue and delivery does not redirect the notification. When
-    omitted, the object's current owner is used.
-
-    Only actions performed by someone other than the recipient trigger an
-    e-mail. A former owner who can no longer open the review detail page
-    (ownership transferred before delivery) is skipped. Returns True when
-    an e-mail was sent.
+    between enqueue and delivery does not redirect the notification. Pass
+    ``None`` when the captured owner no longer exists so that only past
+    commenters are returned. When omitted, the object's current owner is
+    used. Past commenters are resolved from ``ReviewAction`` rows.
     """
     obj = action.content_object
-    if recipient is None:
-        recipient = getattr(obj, "owner", None) if obj is not None else None
+    if obj is None:
+        return []
+    if owner is _CURRENT_OWNER:
+        owner = getattr(obj, "owner", None)
+    return _review_participants(action, owner)
+
+
+def notify_review_participants(action, owner=_CURRENT_OWNER):
+    """E-mail the owner and past commenters about a review action in-process.
+
+    See ``review_notification_recipients`` for the meaning of ``owner``.
+    Returns the number of e-mails sent.
+    """
+    sent = 0
+    for recipient in review_notification_recipients(action, owner):
+        if send_review_action_notification(action, recipient):
+            sent += 1
+    return sent
+
+
+def send_review_action_notification(action, recipient):
+    """Send a review notification e-mail for ``action`` to ``recipient``.
+
+    Only actions performed by someone other than the recipient trigger an
+    e-mail. Recipients who can no longer open the review detail page (e.g.
+    a former owner after an ownership transfer) are skipped. Returns True
+    when an e-mail was sent.
+    """
+    obj = action.content_object
     if (
         obj is None
         or recipient is None
@@ -100,7 +165,7 @@ def notify_owner_of_review_action(action, recipient=None):
     if not _can_open_review_link(recipient, obj):
         logger.info(
             "Skipping review notification for %s %s (action=%s): recipient %s "
-            "no longer owns the object.",
+            "cannot open the review page.",
             action.content_type.model,
             action.object_id,
             action.action,
@@ -112,6 +177,7 @@ def notify_owner_of_review_action(action, recipient=None):
         "action": action,
         "actor": action.user,
         "recipient": recipient,
+        "is_owner": recipient.pk == obj.owner_id,
         "object": obj,
         "object_name": getattr(obj, "name", None) or str(obj),
         "object_verbose_name": capfirst(obj._meta.verbose_name),

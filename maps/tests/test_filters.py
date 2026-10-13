@@ -1,10 +1,16 @@
 from django.contrib.auth.models import AnonymousUser, User
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 
 from bibliography.models import Source
+from utils.tests.testcases import ScopedSelectionFilterTestMixin
 
-from ..filters import CatchmentFilterSet, GeoDataSetFilterSet
-from ..models import Catchment, GeoDataset, Region
+from ..filters import (
+    AttributeListFilter,
+    CatchmentFilterSet,
+    GeoDataSetFilterSet,
+    LocationListFilter,
+)
+from ..models import Attribute, Catchment, GeoDataset, Location, Region
 
 
 class CatchmentFilterTestCase(TestCase):
@@ -92,3 +98,55 @@ class GeoDataSetFilterTestCase(TestCase):
     def test_filter_form_has_no_formtags(self):
         filtr = GeoDataSetFilterSet(queryset=GeoDataset.objects.all())
         self.assertFalse(filtr.form.helper.form_tag)
+
+
+class LocationListFilterScopedSelectionTestCase(
+    ScopedSelectionFilterTestMixin, TestCase
+):
+    filterset_class = LocationListFilter
+    model = Location
+
+
+class AttributeListFilterScopedSelectionTestCase(
+    ScopedSelectionFilterTestMixin, TestCase
+):
+    filterset_class = AttributeListFilter
+    model = Attribute
+
+    @classmethod
+    def create_choice(cls, name, owner, publication_status):
+        return Attribute.objects.create(
+            name=name, unit="t", owner=owner, publication_status=publication_status
+        )
+
+
+class GeoDataSetFilterSetScopedSelectionTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(username="geodataset-scope-user")
+        cls.region = Region.objects.create(
+            name="Published scope region",
+            country="DE",
+            owner=cls.user,
+            publication_status="published",
+        )
+        cls.source = Source.objects.create(
+            title="Published scope source",
+            owner=cls.user,
+            publication_status="published",
+        )
+
+    def _filter(self, data):
+        request = RequestFactory().get("/", data)
+        request.user = self.user
+        return GeoDataSetFilterSet(
+            data=request.GET, queryset=GeoDataset.objects.all(), request=request
+        )
+
+    def test_published_region_and_source_stay_valid_in_review_scope(self):
+        filtr = self._filter(
+            {"scope": "review", "region": self.region.pk, "source": self.source.pk}
+        )
+
+        self.assertTrue(filtr.form.is_valid(), filtr.form.errors)
+        self.assertEqual(list(filtr.qs), [])

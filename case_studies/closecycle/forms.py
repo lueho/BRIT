@@ -5,6 +5,7 @@ from django_tomselect.forms import (
     TomSelectModelMultipleChoiceField,
 )
 from extra_views import InlineFormSetFactory
+from leaflet.forms.widgets import LeafletWidget
 
 from maps.views import CatchmentAutocompleteView
 from materials.models import Material, Sample, SampleSeries
@@ -28,7 +29,7 @@ class ShowcaseModelForm(SimpleModelForm):
             filter_by=("region", CatchmentAutocompleteView.IN_REGION_LOOKUP),
             label_field="name",
         ),
-        label="Catchment",
+        label="Pilot region / Territorial Biorefinery Network (TBN)",
         required=False,
     )
     samples = TomSelectModelMultipleChoiceField(
@@ -48,12 +49,15 @@ class ShowcaseModelForm(SimpleModelForm):
         model = Showcase
         fields = (
             "name",
+            "theme",
+            "geom",
             "region",
             "catchment",
             "description",
             "samples",
             "sample_series",
         )
+        widgets = {"geom": LeafletWidget()}
 
 
 class ShowcaseMaterialInlineForm(forms.ModelForm):

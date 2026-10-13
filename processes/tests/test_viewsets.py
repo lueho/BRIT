@@ -7,6 +7,7 @@ from django.contrib.auth.models import Permission
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from bibliography.models import Source
 from materials.models import Material
 from utils.properties.models import Unit
 
@@ -139,6 +140,9 @@ class ProcessViewSetTestCase(APITestCase):
         response = self.client.get("/processes/api/processes/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
+        for process_data in response.data:
+            self.assertNotIn("parent", process_data)
+            self.assertNotIn("parent_name", process_data)
 
     def test_retrieve_process(self):
         """API should retrieve a single process with full details."""
@@ -147,6 +151,8 @@ class ProcessViewSetTestCase(APITestCase):
         self.assertEqual(response.data["name"], "Pyrolysis")
         self.assertIn("input_materials", response.data)
         self.assertIn("output_materials", response.data)
+        self.assertNotIn("parent", response.data)
+        self.assertNotIn("parent_name", response.data)
 
     def test_search_processes(self):
         """API should support searching processes."""
@@ -194,21 +200,12 @@ class ProcessViewSetTestCase(APITestCase):
         self.assertIn("Thermal Decomposition", response.data)
         self.assertIn("Partial Oxidation", response.data)
 
-    def test_variants_action(self):
-        """API should return process variants."""
-        Process.objects.create(
-            name="Fast Pyrolysis",
-            parent=self.process1,
-            owner=self.owner,
-            publication_status="published",
-        )
-
+    def test_variants_endpoint_is_removed(self):
+        """Process variants were removed; the endpoint must return 404."""
         response = self.client.get(
             f"/processes/api/processes/{self.process1.pk}/variants/"
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["name"], "Fast Pyrolysis")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 class ProcessAPIPermissionsTestCase(APITestCase):
@@ -333,7 +330,7 @@ class ProcessAPIPermissionsTestCase(APITestCase):
         self.assertEqual(self.private_process.name, "Private Process")
 
     def test_anonymous_can_read_detail_actions_on_published_process(self):
-        for suffix in ("materials", "parameters", "variants", "sources"):
+        for suffix in ("materials", "parameters", "sources"):
             response = self.client.get(
                 f"/processes/api/processes/{self.published_process.pk}/{suffix}/"
             )
@@ -371,3 +368,115 @@ class ProcessAPIPermissionsTestCase(APITestCase):
             f"/processes/api/processes/{self.private_process.pk}/"
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class ProcessAPIVisibilityAndOrderingTestCase(APITestCase):
+    """Regression tests: read policy on related objects and valid ordering."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create(username="api_owner2")
+        cls.outsider = get_user_model().objects.create(username="api_outsider")
+
+        cls.process = Process.objects.create(
+            name="Published API Process",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.published_category = ProcessCategory.objects.create(
+            name="API Published Category",
+            owner=cls.outsider,
+            publication_status="published",
+        )
+        cls.private_category = ProcessCategory.objects.create(
+            name="API Private Category", owner=cls.outsider
+        )
+        cls.process.categories.add(cls.published_category, cls.private_category)
+
+    def test_ordering_by_lastmodified_at_is_accepted(self):
+        """The field is named lastmodified_at; updated_at must not be needed."""
+        response = self.client.get(
+            "/processes/api/processes/?ordering=-lastmodified_at"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response = self.client.get(
+            "/processes/api/categories/?ordering=lastmodified_at"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_unknown_ordering_field_is_ignored_not_500(self):
+        response = self.client.get("/processes/api/processes/?ordering=updated_at")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_private_category_hidden_in_process_payload(self):
+        response = self.client.get(f"/processes/api/processes/{self.process.pk}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {category["name"] for category in response.data["categories"]}
+        self.assertIn("API Published Category", names)
+        self.assertNotIn("API Private Category", names)
+
+    def test_owner_sees_private_category_in_process_payload(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(f"/processes/api/processes/{self.process.pk}/")
+        names = {category["name"] for category in response.data["categories"]}
+        self.assertIn("API Private Category", names)
+
+    def test_nested_categories_have_consistent_shape(self):
+        """Nested categories never carry the annotation-only process_count."""
+        response = self.client.get(f"/processes/api/processes/{self.process.pk}/")
+        for category in response.data["categories"]:
+            self.assertNotIn("process_count", category)
+
+    def test_category_list_payload_includes_process_count(self):
+        response = self.client.get("/processes/api/categories/")
+        for category in response.data:
+            self.assertIn("process_count", category)
+
+    def test_category_processes_action_scoped_to_requester(self):
+        private_process = Process.objects.create(
+            name="Private API Process", owner=self.owner
+        )
+        private_process.categories.add(self.published_category)
+        published_process = Process.objects.create(
+            name="Visible API Process",
+            owner=self.owner,
+            publication_status="published",
+        )
+        published_process.categories.add(self.published_category)
+
+        url = f"/processes/api/categories/{self.published_category.pk}/processes/"
+
+        response = self.client.get(url)
+        names = {p["name"] for p in response.data}
+        self.assertIn("Visible API Process", names)
+        self.assertNotIn("Private API Process", names)
+
+        self.client.force_login(self.owner)
+        response = self.client.get(url)
+        names = {p["name"] for p in response.data}
+        self.assertIn("Private API Process", names)
+
+    def test_private_source_and_material_hidden_in_process_payload(self):
+        secret_source = Source.objects.create(
+            title="API Secret Source", owner=self.outsider
+        )
+        self.process.sources.add(secret_source)
+        secret_material = Material.objects.create(
+            name="API Secret Material", owner=self.outsider
+        )
+        ProcessMaterial.objects.create(
+            process=self.process,
+            material=secret_material,
+            role=ProcessMaterial.Role.INPUT,
+        )
+
+        response = self.client.get(f"/processes/api/processes/{self.process.pk}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        source_titles = {s.get("title") for s in response.data["sources"]}
+        self.assertNotIn("API Secret Source", source_titles)
+        material_names = {
+            m["material"]["name"] for m in response.data["process_materials"]
+        }
+        self.assertNotIn("API Secret Material", material_names)
+        input_ids = {m["id"] for m in response.data["input_materials"]}
+        self.assertNotIn(secret_material.pk, input_ids)

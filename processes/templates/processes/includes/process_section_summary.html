@@ -4,8 +4,6 @@
     <dt>Short description</dt><dd>{{ object.short_description|default:'Not added yet.'|linebreaksbr }}</dd>
     <dt>Categories</dt>
     <dd>{% for category in object.categories.all %}<a href="{{ category.get_absolute_url }}">{{ category.name }}</a>{% if not forloop.last %}, {% endif %}{% empty %}Not added yet.{% endfor %}</dd>
-    <dt>Parent process</dt>
-    <dd>{% if object.parent %}<a href="{{ object.parent.get_absolute_url }}">{{ object.parent.name }}</a>{% else %}Not added yet.{% endif %}</dd>
   </dl>
 {% elif section.key == 'technology' %}
   <dl class="mb-0">

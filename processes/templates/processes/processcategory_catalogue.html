@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load custom_tags %}
+{% load moderation_tags %}
+{% load process_navigation %}
+{% block title %}BRIT | Process Categories{% endblock %}
+{% block content %}
+  {% process_discovery_nav "categories" %}
+  <div class="row">
+    <div class="col-lg-8">
+      <div class="card shadow mb-3">
+        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <h5 class="mb-0">Process categories</h5>
+            <form method="get" class="d-flex gap-2" role="search">
+              <input type="hidden" name="scope" value="{{ discovery_scope }}">
+              {% process_filter_params as filter_params %}
+              {% for key, values in filter_params.lists %}
+                {% for value in values %}
+                  <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endfor %}
+              {% endfor %}
+              <input type="search"
+                     name="category_q"
+                     class="form-control form-control-sm"
+                     placeholder="Search by category name..."
+                     value="{{ category_q }}"
+                     aria-label="Search categories by name">
+              <button type="submit" class="btn btn-sm btn-primary">Search</button>
+            </form>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="row row-cols-1 row-cols-md-2 g-3">
+            {% for category in categories %}
+              <div class="col">
+                <div class="card h-100">
+                  <div class="card-body">
+                    <h6 class="card-title">{{ category.name }}</h6>
+                    <p class="card-text text-muted small">
+                      {{ category.description|default:"No description provided."|truncatewords:20 }}
+                    </p>
+                  </div>
+                  <div class="card-footer d-flex gap-2">
+                    {% process_category_filter_url category as view_processes_url %}
+                    {% process_category_about_url category as about_url %}
+                    <a class="btn btn-sm btn-outline-primary"
+                       href="{{ view_processes_url }}">View processes</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ about_url }}">About this category</a>
+                  </div>
+                </div>
+              </div>
+            {% empty %}
+              <div class="col">
+                {% if category_q %}
+                  <p class="text-muted mb-0">
+                    No categories match "{{ category_q }}".
+                    {% process_categories_url as reset_url %}
+                    <a href="{{ reset_url }}">Reset search</a>
+                  </p>
+                {% else %}
+                  <p class="text-muted mb-0">No categories published yet.</p>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+          {% include "partials/_pagination.html" %}
+        </div>
+        <div class="card-footer d-flex flex-wrap gap-2">
+          {% if user.is_authenticated %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{% url 'processes:processcategory-list-owned' %}?scope=private">My categories</a>
+          {% endif %}
+          {% if user|can_moderate:object_list.model %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{% url 'processes:processcategory-list-review' %}?scope=review">Categories in review</a>
+          {% endif %}
+          {% if create_permission in perms or user.is_staff %}
+            <a class="btn btn-sm btn-outline-success"
+               href="{% url 'processes:processcategory-create' %}">Add category</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock content %}

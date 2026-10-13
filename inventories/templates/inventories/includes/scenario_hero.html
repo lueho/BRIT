@@ -1,0 +1,76 @@
+{% load moderation_tags %}
+<header class="sdv2-hero sdv2-surface sdv2-hero-no-media sri-hero">
+  <div class="sdv2-hero-identity">
+    <div class="sdv2-hero-kicker">
+      Inventory scenario
+      {% if object.status == 1 %}
+        <span class="badge text-bg-secondary">Not evaluated yet</span>
+      {% elif object.status == 2 %}
+        <span class="badge text-bg-info"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Evaluating…</span>
+      {% elif object.status == 3 %}
+        <span class="badge text-bg-success">Evaluated</span>
+      {% elif object.status == 4 %}
+        <span class="badge text-bg-danger">Evaluation failed</span>
+      {% endif %}
+    </div>
+    <h1 class="sdv2-hero-title">{{ object.name }}</h1>
+    <ul class="sdv2-hero-meta" aria-label="Scenario metadata">
+      {% if visible_region %}
+        <li>
+          <span class="sdv2-meta-label">Region</span>
+          <a href="{% url 'region-detail' visible_region.pk %}">{{ visible_region.name }}</a>
+        </li>
+      {% endif %}
+      {% if visible_catchment %}
+        <li>
+          <span class="sdv2-meta-label">Catchment</span>
+          <a href="{% url 'catchment-detail' visible_catchment.pk %}">{{ visible_catchment.name }}</a>
+        </li>
+      {% endif %}
+      {% if visible_showcase %}
+        <li>
+          <span class="sdv2-meta-label">CLOSECYCLE showcase</span>
+          <a href="{% url 'showcase-detail' visible_showcase.pk %}">{{ visible_showcase.name }}</a>
+        </li>
+      {% endif %}
+    </ul>
+  </div>
+  <div class="sri-hero-actions">
+    {% if page == "detail" %}
+      {% if object.status == 3 %}
+        <a class="sdv2-btn sdv2-btn-primary" href="{% url 'scenario-result' object.pk %}"><i class="fas fa-chart-column" aria-hidden="true"></i> Show results</a>
+      {% elif object.status == 2 %}
+        <a class="sdv2-btn sdv2-btn-primary" href="{% url 'scenario-result' object.pk %}"><i class="fas fa-spinner" aria-hidden="true"></i> Follow progress</a>
+      {% endif %}
+    {% else %}
+      <a class="sdv2-btn" href="{% url 'scenario-detail' object.pk %}"><i class="fas fa-sliders" aria-hidden="true"></i> Scenario settings</a>
+    {% endif %}
+    {% if page == "detail" and policy.can_edit %}
+      <a class="sdv2-btn" href="{% url 'scenario-update' object.pk %}?next={{ request.path|urlencode }}"><i class="fas fa-pen-to-square" aria-hidden="true"></i> Edit</a>
+    {% endif %}
+    <div class="dropdown">
+      <button class="sdv2-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">More</button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li>
+          <a class="dropdown-item" href="{% url 'scenario-list' %}"><i class="fas fa-fw fa-list me-2" aria-hidden="true"></i>Public scenarios</a>
+        </li>
+        {% if user.is_authenticated %}
+          <li>
+            <a class="dropdown-item" href="{% url 'scenario-list-owned' %}"><i class="fas fa-fw fa-list me-2" aria-hidden="true"></i>My scenarios</a>
+          </li>
+        {% endif %}
+        {% if policy.is_owner or policy.is_staff %}
+          <li>
+            <a class="dropdown-item" href="{% url 'scenario-download-summary' object.pk %}"><i class="fas fa-fw fa-file-arrow-down me-2" aria-hidden="true"></i>Download definition file</a>
+          </li>
+        {% endif %}
+        {% if policy.can_delete %}
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <a class="dropdown-item text-danger modal-link" href="{% url 'scenario-delete-modal' object.pk %}"><i class="fas fa-fw fa-trash me-2" aria-hidden="true"></i>Delete scenario</a>
+          </li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</header>

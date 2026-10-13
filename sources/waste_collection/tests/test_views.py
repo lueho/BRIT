@@ -2475,7 +2475,7 @@ class CollectionVersionLinkVisibilityTestCase(TestCase):
 
 
 class CollectionStatYearIndicatorTestCase(TestCase):
-    """The detail page flags statistics whose year lies outside the valid period."""
+    """Multi-year statistics are a feature: only the CPV detail page flags them."""
 
     @classmethod
     def setUpTestData(cls):
@@ -2507,23 +2507,15 @@ class CollectionStatYearIndicatorTestCase(TestCase):
             reverse("collection-detail", kwargs={"pk": self.collection.pk})
         )
 
-    def test_detail_flags_stat_year_before_valid_from(self):
-        self._cpv(2019)
+    def test_detail_does_not_flag_stat_years_outside_period(self):
+        for year in (2019, 2021, 2023):
+            self._cpv(year)
         response = self._get_detail()
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "outside the collection validity period")
-
-    def test_detail_flags_stat_year_after_valid_until(self):
-        self._cpv(2023)
-        response = self._get_detail()
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "outside the collection validity period")
-
-    def test_detail_does_not_flag_stat_year_within_period(self):
-        self._cpv(2021)
-        response = self._get_detail()
-        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "(2019)")
+        self.assertContains(response, "(2023)")
         self.assertNotContains(response, "outside the collection validity period")
+        self.assertNotContains(response, "fa-triangle-exclamation")
 
     def test_cpv_detail_flags_out_of_period_year(self):
         cpv = self._cpv(2015)
@@ -4792,6 +4784,29 @@ class WasteAtlasMapViewsTestCase(TestCase):
                 response = self.client.get(reverse(page["name"]))
                 self.assertIsNotNone(self._map_config(response))
 
+    def test_repeated_page_render_skips_cached_selector_fragments(self):
+        """The ~600-entry selector/tree loops are fragment-cached: a second
+        render of the same page must not evaluate them again."""
+        from django.core.cache import cache
+        from django.template.defaulttags import ForNode
+
+        cache.clear()
+        url = reverse("waste-atlas-germany-collection-system-map")
+        renders = []
+
+        original_render = ForNode.render
+
+        def counting_render(node, context):
+            renders.append(node)
+            return original_render(node, context)
+
+        with patch.object(ForNode, "render", counting_render):
+            self.client.get(url)
+            first_pass = len(renders)
+            renders.clear()
+            self.client.get(url)
+        self.assertLess(len(renders), first_pass)
+
     def test_region_property_map_does_not_link_to_an_unrelated_collection(self):
         response = self.client.get(
             reverse("waste-atlas-germany-population-density-map")
@@ -7004,3 +7019,44 @@ class CollectionImporterBinConfigurationTestCase(TestCase):
         col.refresh_from_db()
         self.assertEqual(col.established, 2010)
         col.delete()
+
+
+class CollectionDetailBackLinkTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.collection = Collection.objects.create(
+            name="BackLinkCollection", publication_status="published"
+        )
+        cls.collector = Collector.objects.create(
+            name="BackLinkCollector", publication_status="published"
+        )
+
+    def detail_urls(self):
+        return (
+            reverse("collection-detail", kwargs={"pk": self.collection.pk}),
+            reverse("collector-detail", kwargs={"pk": self.collector.pk}),
+        )
+
+    def test_back_link_to_result_list_is_shown(self):
+        list_url = reverse("collection-list") + "?scope=published"
+        for detail_url in self.detail_urls():
+            with self.subTest(detail_url=detail_url):
+                response = self.client.get(detail_url, {"back": list_url})
+
+                self.assertContains(response, "Back to results")
+                self.assertContains(
+                    response, f'href="{list_url.replace("&", "&amp;")}"'
+                )
+
+    def test_unsafe_or_modal_back_link_is_hidden(self):
+        for detail_url in self.detail_urls():
+            for back in (
+                f"{detail_url}modal/",
+                "https://evil.example/x",
+                "javascript:alert(1)",
+            ):
+                with self.subTest(detail_url=detail_url, back=back):
+                    response = self.client.get(detail_url, {"back": back})
+
+                    self.assertNotContains(response, "Back to results")
+                    self.assertNotContains(response, "?next=javascript")

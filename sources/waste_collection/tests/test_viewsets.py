@@ -138,6 +138,73 @@ class CollectionViewSetTestCase(APITestCase):
         request.user = user or self.regular_user
         return self.viewset.get_cache_key(request)
 
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-limit-default",
+            },
+            "geojson": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-limit-data",
+                "TIMEOUT": 86400,
+            },
+        }
+    )
+    def test_rendered_cache_hit_keeps_unbounded_request_limit(self):
+        from sources.waste_collection.tasks import warm_collection_geojson_cache
+
+        warm_collection_geojson_cache.run()
+        url = reverse("api-waste-collection-geojson")
+        with patch.object(CollectionViewSet, "max_unbounded_geojson_features", 0):
+            unbounded = self.client.get(url, REMOTE_ADDR="10.9.8.2")
+            bounded = self.client.get(
+                url, {"id": self.published_collection.pk}, REMOTE_ADDR="10.9.8.2"
+            )
+
+        self.assertEqual(unbounded.status_code, 400)
+        self.assertEqual(unbounded["X-Cache-Status"], "REJECT")
+        self.assertEqual(bounded.status_code, 200)
+
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-default",
+            },
+            "geojson": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-data",
+                "TIMEOUT": 86400,
+            },
+        }
+    )
+    def test_rendered_public_cache_does_not_cross_scope_boundaries(self):
+        from sources.waste_collection.tasks import warm_collection_geojson_cache
+
+        warm_collection_geojson_cache.run()
+        url = reverse("api-waste-collection-geojson")
+        published = self.client.get(url, {"scope": "published"}, REMOTE_ADDR="10.9.8.1")
+        self.assertEqual(published.status_code, 200)
+        self.assertEqual(published["X-Cache-Status"], "HIT")
+        self.assertFalse(hasattr(published, "data"))
+        ids = {
+            feature["properties"]["id"]
+            for feature in json.loads(b"".join(published.streaming_content))["features"]
+        }
+        self.assertEqual(
+            ids, {self.published_collection.pk, self.other_user_published_collection.pk}
+        )
+        self.client.force_authenticate(user=self.regular_user)
+        private = self.client.get(url, {"scope": "private"}, REMOTE_ADDR="10.9.8.1")
+        self.assertEqual(private.status_code, 200)
+        ids = {feature["properties"]["id"] for feature in private.json()["features"]}
+        self.assertIn(self.private_collection.pk, ids)
+        self.assertNotIn(self.other_user_private_collection.pk, ids)
+        self.client.force_authenticate(user=None)
+        denied = self.client.get(url, {"scope": "private"}, REMOTE_ADDR="10.9.8.1")
+        self.assertIn(denied.status_code, (401, 403))
+
     def test_geojson_endpoint_with_published_scope(self):
         """Should return only published collections for 'published' scope."""
         self.client.force_login(self.regular_user)
@@ -476,6 +543,37 @@ class CollectionViewSetTestCase(APITestCase):
         self.assertIn("action=list", logs.output[0])
         self.assertIn("serializer=CollectionResearchSerializer", logs.output[0])
         self.assertIn("result_count=2", logs.output[0])
+
+    def test_list_endpoint_slow_log_threshold_comes_from_settings(self):
+        """The threshold is configurable so test settings can raise it instead
+        of absorbing timing-dependent warnings under parallel contention."""
+        self.client.force_login(self.regular_user)
+
+        with (
+            override_settings(COLLECTION_LIST_SLOW_LOG_THRESHOLD_SECONDS=0),
+            self.assertLogs(
+                "sources.waste_collection.viewsets", level="WARNING"
+            ) as logs,
+        ):
+            response = self.client.get(
+                reverse("api-waste-collection-list"), {"page_size": 1}
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("slow_collection_list_api", logs.output[0])
+
+    def test_list_endpoint_raised_threshold_stays_quiet(self):
+        self.client.force_login(self.regular_user)
+
+        with (
+            override_settings(COLLECTION_LIST_SLOW_LOG_THRESHOLD_SECONDS=600),
+            self.assertNoLogs("sources.waste_collection.viewsets", level="WARNING"),
+        ):
+            response = self.client.get(
+                reverse("api-waste-collection-list"), {"page_size": 1}
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_list_non_public_scope_requires_authentication(self):
         response = self.client.get(

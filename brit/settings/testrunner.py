@@ -82,6 +82,12 @@ CACHES = {
 
 AUTO_ENQUEUE_URL_CHECKS = False
 
+# Keep the production slow-request diagnostic for the collection list API, but
+# raise the threshold so it does not emit timing-dependent warnings under
+# parallel test contention. The warning itself is exercised by tests that set
+# the threshold explicitly.
+COLLECTION_LIST_SLOW_LOG_THRESHOLD_SECONDS = 60.0
+
 # Use local filesystem storage in tests to avoid S3 dependencies.
 MEDIA_ROOT = Path("/tmp/brit-test-media")
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)

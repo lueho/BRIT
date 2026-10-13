@@ -1,18 +1,23 @@
 from django.contrib.auth.models import AnonymousUser
+from django.db.models import QuerySet
 from django.urls import reverse
 from rest_framework import serializers
 from rest_framework.fields import CharField
 from rest_framework.serializers import ModelSerializer
+from rest_framework_gis.fields import GeometryField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from case_studies.closecycle.models import Showcase
+from maps.models import Catchment, Region
 from maps.serializers import (
     BaseGeoFeatureModelSerializer,
-    PolygonSerializer,
     RegionModelSerializer,
+    get_nested_attr,
 )
+from utils.object_management.permissions import filter_queryset_for_user
 
 from .models import BiogasPlantsSweden, ShowcaseMaterial
+from .themes import pilot_region_info
 
 
 class ShowcaseMaterialSerializer(ModelSerializer):
@@ -31,10 +36,41 @@ def _request_user(serializer):
     return request.user if request is not None else AnonymousUser()
 
 
-class ShowcaseModelSerializer(ModelSerializer):
+def visible_region_ids(showcases, user):
+    """IDs of the regions of ``showcases`` that ``user`` may read."""
+    if isinstance(showcases, QuerySet):
+        region_ids = showcases.values("region_id")
+    else:
+        region_ids = {s.region_id for s in showcases if s.region_id}
+    return set(
+        filter_queryset_for_user(
+            Region.objects.filter(pk__in=region_ids), user
+        ).values_list("pk", flat=True)
+    )
+
+
+def _visible_region_name(serializer, obj):
+    if obj.region_id is None:
+        return None
+    visible = serializer.context.get("visible_region_ids")
+    if visible is None:
+        visible = visible_region_ids([obj], _request_user(serializer))
+    return obj.region.name if obj.region_id in visible else None
+
+
+class ShowcaseContextMixin:
+    def get_pilot_region(self, obj):
+        catchment = obj.visible_catchment(_request_user(self))
+        return pilot_region_info(catchment) if catchment is not None else None
+
+
+class ShowcaseModelSerializer(ShowcaseContextMixin, ModelSerializer):
     """Showcase with its connections, limited to records the reader may see."""
 
     region = RegionModelSerializer()
+    geom = GeometryField(allow_null=True, read_only=True)
+    theme_details = serializers.ReadOnlyField(source="theme_info")
+    pilot_region = serializers.SerializerMethodField()
     catchment = serializers.SerializerMethodField()
     showcase_materials = serializers.SerializerMethodField()
     process_chain = serializers.SerializerMethodField()
@@ -47,6 +83,10 @@ class ShowcaseModelSerializer(ModelSerializer):
         fields = [
             "id",
             "name",
+            "geom",
+            "theme",
+            "theme_details",
+            "pilot_region",
             "region",
             "catchment",
             "description",
@@ -90,8 +130,13 @@ class ShowcaseModelSerializer(ModelSerializer):
         ]
 
 
-class ShowcaseFlatSerializer(ModelSerializer):
-    region = CharField(source="region.name", allow_null=True)
+class ShowcaseFlatSerializer(ShowcaseContextMixin, ModelSerializer):
+    def get_region(self, obj):
+        return _visible_region_name(self, obj)
+
+    region = serializers.SerializerMethodField()
+    theme = serializers.ReadOnlyField(source="theme_info")
+    pilot_region = serializers.SerializerMethodField()
     url = serializers.SerializerMethodField()
     involved_processes = serializers.SerializerMethodField()
     input_materials = serializers.SerializerMethodField()
@@ -104,6 +149,8 @@ class ShowcaseFlatSerializer(ModelSerializer):
             "id",
             "name",
             "region",
+            "theme",
+            "pilot_region",
             "description",
             "url",
             "involved_processes",
@@ -188,18 +235,142 @@ class ShowcaseSummaryListSerializer(ModelSerializer):
 
 
 class ShowcaseGeoFeatureModelSerializer(BaseGeoFeatureModelSerializer):
-    region = CharField(source="region.name")
+    region = serializers.SerializerMethodField()
+    code = serializers.ReadOnlyField()
+    theme = serializers.ReadOnlyField(source="theme_info")
+    feature_type = serializers.SerializerMethodField()
 
     class Meta:
         model = Showcase
         geo_field = "geom"
-        attr_path = "region.borders"
-        geo_serializer_class = PolygonSerializer
         fields = [
             "id",
             "name",
+            "code",
             "region",
+            "theme",
+            "feature_type",
         ]
+
+    def get_geom(self, obj):
+        geom = obj.geom
+        if geom is None:
+            borders = get_nested_attr(obj, "region.borders")
+            if borders is not None and borders.geom:
+                geom = borders.geom.centroid
+        if geom is None:
+            return None
+        return GeometryField().to_representation(geom)
+
+    def get_feature_type(self, obj):
+        return "showcase"
+
+    def get_region(self, obj):
+        return _visible_region_name(self, obj)
+
+
+def _pilot_geometry(region):
+    borders = getattr(region, "borders", None)
+    geom = getattr(borders, "geom", None)
+    if geom is None or geom.empty:
+        return None
+    return geom
+
+
+def pilot_region_features(showcases, user):
+    """GeoJSON features for the TBN pilot regions of ``showcases``.
+
+    Each visible catchment shared by the showcases contributes a single
+    MultiPolygon feature listing its associated showcases. Showcases without
+    a catchment fall back to their visible region. A showcase linked to a
+    catchment the user may not see contributes no pilot region at all, so a
+    private catchment's geometry is never exposed.
+    """
+    showcases = list(showcases)
+    catchments = {
+        catchment.pk: catchment
+        for catchment in filter_queryset_for_user(
+            Catchment.objects.filter(
+                pk__in={s.catchment_id for s in showcases if s.catchment_id}
+            ),
+            user,
+        ).select_related("region__borders")
+    }
+    regions = {
+        region.pk: region
+        for region in filter_queryset_for_user(
+            Region.objects.filter(
+                pk__in={s.region_id for s in showcases if s.region_id}
+                | {c.region_id for c in catchments.values() if c.region_id}
+            ),
+            user,
+        ).select_related("borders")
+    }
+
+    pilots = {}
+    for showcase in showcases:
+        if showcase.catchment_id:
+            catchment = catchments.get(showcase.catchment_id)
+            region = catchment and regions.get(catchment.region_id)
+            if region is None:
+                continue
+            key = f"pilot-catchment-{catchment.pk}"
+            name = str(catchment)
+            geometry = _pilot_geometry(region)
+            context = pilot_region_info(catchment)
+        elif showcase.region_id:
+            region = regions.get(showcase.region_id)
+            if region is None:
+                continue
+            key = f"pilot-region-{region.pk}"
+            name = str(region)
+            geometry = _pilot_geometry(region)
+            context = None
+        else:
+            continue
+        pilot = pilots.setdefault(
+            key,
+            {
+                "name": name,
+                "geometry": geometry,
+                "showcases": [],
+                "themes": {},
+                "pilot_region": context,
+            },
+        )
+        if showcase.theme_info:
+            pilot["themes"][showcase.theme] = showcase.theme_info
+        pilot["showcases"].append(
+            {
+                "id": showcase.pk,
+                "name": showcase.name,
+                "region": regions[showcase.region_id].name
+                if showcase.region_id in regions
+                else None,
+            }
+        )
+
+    geometry_field = GeometryField()
+    return [
+        {
+            "type": "Feature",
+            "id": key,
+            "geometry": geometry_field.to_representation(pilot["geometry"]),
+            "properties": {
+                "feature_type": "pilot_region",
+                "name": pilot["name"],
+                "region": pilot["name"],
+                "pilot_region": pilot["pilot_region"],
+                "themes": list(pilot["themes"].values()),
+                "theme": next(iter(pilot["themes"].values()))
+                if len(pilot["themes"]) == 1
+                else None,
+                "showcases": pilot["showcases"],
+            },
+        }
+        for key, pilot in pilots.items()
+        if pilot["geometry"] is not None
+    ]
 
 
 class BiogasPlantsSwedenSimpleModelSerializer(serializers.ModelSerializer):

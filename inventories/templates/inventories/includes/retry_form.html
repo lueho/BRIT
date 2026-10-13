@@ -1,0 +1,6 @@
+<form method="post" action="{% url 'scenario-detail' object.pk %}">
+  {% csrf_token %}
+  <button type="submit" name="run" class="sdv2-btn sdv2-btn-primary">
+    <i class="fas fa-play" aria-hidden="true"></i> {{ label }}
+  </button>
+</form>

@@ -9,16 +9,17 @@ from materials.models import Material
 from utils.properties.models import Unit
 
 from ..forms import (
-    ProcessAuthorFormSet,
-    ProcessAuthorInlineForm,
+    ProcessAuthorSectionForm,
     ProcessCategoryModalModelForm,
     ProcessCategoryModelForm,
+    ProcessMaintenanceForm,
+    ProcessMaterialInlineForm,
     ProcessModalModelForm,
     ProcessModelForm,
-    ProcessSourceFormSet,
-    ProcessSourceInlineForm,
-    build_process_material_formset,
-    build_process_operating_parameter_formset,
+    ProcessOperatingParameterInlineForm,
+    ProcessQuickCreateForm,
+    ProcessSectionFormSet,
+    ProcessSourceSectionForm,
 )
 from ..models import (
     Process,
@@ -98,8 +99,8 @@ class ProcessFormTestCase(TestCase):
         formset_class = inlineformset_factory(
             Process,
             ProcessAuthor,
-            form=ProcessAuthorInlineForm,
-            formset=ProcessAuthorFormSet,
+            form=ProcessAuthorSectionForm,
+            formset=ProcessSectionFormSet,
             extra=0,
             can_delete=True,
         )
@@ -133,8 +134,8 @@ class ProcessFormTestCase(TestCase):
         formset_class = inlineformset_factory(
             Process,
             ProcessSource,
-            form=ProcessSourceInlineForm,
-            formset=ProcessSourceFormSet,
+            form=ProcessSourceSectionForm,
+            formset=ProcessSectionFormSet,
             extra=0,
             can_delete=True,
         )
@@ -163,6 +164,40 @@ class ProcessFormTestCase(TestCase):
         )
         self.assertFalse(form.is_valid())
         self.assertIn("name", form.errors)
+
+    def test_process_forms_have_no_parent_field(self):
+        """Processes are grouped by categories; forms must not offer a parent."""
+        self.assertNotIn("parent", ProcessModelForm().fields)
+        self.assertNotIn("parent", ProcessModelForm.Meta.fields)
+        self.assertNotIn("parent", ProcessMaintenanceForm().fields)
+        self.assertNotIn("parent", ProcessMaintenanceForm.Meta.fields)
+        self.assertNotIn("parent", ProcessModalModelForm().fields)
+
+    def test_multiple_categories_are_saved(self):
+        """A process can be saved with more than one category."""
+        owner = get_user_model().objects.create(username="multi_owner")
+        self.category.publication_status = "published"
+        self.category.owner = owner
+        self.category.save()
+        second_category = ProcessCategory.objects.create(
+            name="Second Category",
+            owner=owner,
+            publication_status="published",
+        )
+        request = RequestFactory().post("/")
+        request.user = owner
+        form = ProcessMaintenanceForm(
+            data={
+                "name": "Multi Category Process",
+                "categories": [self.category.pk, second_category.pk],
+            },
+            request=request,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        process = form.save()
+        self.assertEqual(
+            {self.category, second_category}, set(process.categories.all())
+        )
 
     def test_modal_form_valid(self):
         """Modal form should work with minimal data."""
@@ -253,6 +288,38 @@ class ProcessFormTestCase(TestCase):
             [archived_category], list(edit_form.cleaned_data["categories"])
         )
 
+    def test_archived_categories_rejected_in_maintenance_and_quick_create(self):
+        """Workspace maintenance and quick-create forms share the archived rule."""
+        owner = get_user_model().objects.create(username="workspace_owner")
+        archived_category = ProcessCategory.objects.create(
+            name="Archived Category",
+            owner=owner,
+            publication_status=ProcessCategory.STATUS_ARCHIVED,
+        )
+        request = RequestFactory().post("/")
+        request.user = owner
+
+        quick_create_form = ProcessQuickCreateForm(
+            data={
+                "name": "Quick Process",
+                "short_description": "Quick description",
+                "categories": [archived_category.pk],
+            },
+            request=request,
+        )
+        self.assertFalse(quick_create_form.is_valid())
+        self.assertIn("categories", quick_create_form.errors)
+
+        maintenance_form = ProcessMaintenanceForm(
+            data={
+                "name": "Maintained Process",
+                "categories": [archived_category.pk],
+            },
+            request=request,
+        )
+        self.assertFalse(maintenance_form.is_valid())
+        self.assertIn("categories", maintenance_form.errors)
+
 
 class ProcessMaterialFormSetTestCase(TestCase):
     """Test ProcessMaterial inline formset."""
@@ -270,7 +337,13 @@ class ProcessMaterialFormSetTestCase(TestCase):
             owner=self.owner,
             publication_status="published",
         )
-        self.formset_class = build_process_material_formset()
+        self.formset_class = inlineformset_factory(
+            Process,
+            ProcessMaterial,
+            form=ProcessMaterialInlineForm,
+            extra=1,
+            can_delete=True,
+        )
 
     def test_valid_formset(self):
         """Valid formset data should be valid."""
@@ -325,7 +398,13 @@ class ProcessOperatingParameterFormSetTestCase(TestCase):
             owner=self.owner,
             publication_status="published",
         )
-        self.formset_class = build_process_operating_parameter_formset()
+        self.formset_class = inlineformset_factory(
+            Process,
+            ProcessOperatingParameter,
+            form=ProcessOperatingParameterInlineForm,
+            extra=1,
+            can_delete=True,
+        )
 
     def test_valid_formset(self):
         """Valid formset data should be valid."""

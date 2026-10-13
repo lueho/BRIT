@@ -8,17 +8,15 @@ from django import forms
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
+from materials.models import Material
 from utils.filters import UserCreatedObjectScopedFilterSet
 from utils.object_management.models import STATUS_CHOICES
-from utils.object_management.permissions import (
-    apply_scope_filter,
-    filter_queryset_for_user,
-)
+from utils.object_management.permissions import filter_queryset_for_user
 
 from .models import Process, ProcessCategory, ProcessMaterial
 
 
-class ProcessCategoryFilter(django_filters.FilterSet):
+class ProcessCategoryFilter(UserCreatedObjectScopedFilterSet):
     """Filter for ProcessCategory list views."""
 
     name = django_filters.CharFilter(
@@ -36,7 +34,7 @@ class ProcessCategoryFilter(django_filters.FilterSet):
 
     class Meta:
         model = ProcessCategory
-        fields = ["name", "publication_status"]
+        fields = ["scope", "name", "publication_status"]
 
 
 class ProcessFilter(UserCreatedObjectScopedFilterSet):
@@ -67,26 +65,6 @@ class ProcessFilter(UserCreatedObjectScopedFilterSet):
         ),
     )
 
-    has_parent = django_filters.BooleanFilter(
-        field_name="parent",
-        lookup_expr="isnull",
-        exclude=True,
-        label="Has Parent Process",
-        widget=forms.NullBooleanSelect(attrs={"class": "form-select"}),
-    )
-
-    parent = django_filters.ModelChoiceFilter(
-        queryset=Process.objects.none(),
-        label="Parent Process",
-        empty_label="All",
-        widget=TomSelectModelWidget(
-            config=TomSelectConfig(
-                url="processes:process-autocomplete",
-                filter_by=("scope", "name"),
-            )
-        ),
-    )
-
     publication_status = django_filters.ChoiceFilter(
         choices=[("", "All")] + list(STATUS_CHOICES),
         label="Publication Status",
@@ -94,6 +72,17 @@ class ProcessFilter(UserCreatedObjectScopedFilterSet):
     )
 
     # Material-based filtering
+    material = django_filters.ModelChoiceFilter(
+        queryset=Material.objects.none(),
+        method="filter_by_material",
+        label="Material",
+        help_text="Show processes that use this material as input or output.",
+        empty_label="All",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="material-autocomplete")
+        ),
+    )
+
     input_material = django_filters.CharFilter(
         method="filter_by_input_material",
         label="Input Material",
@@ -123,36 +112,25 @@ class ProcessFilter(UserCreatedObjectScopedFilterSet):
             "name",
             "categories",
             "mechanism",
-            "parent",
+            "material",
             "publication_status",
         ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         request = getattr(self, "request", None)
-        queryset = Process.objects.all()
         category_queryset = ProcessCategory.objects.all()
 
+        material_queryset = Material.objects.filter(publication_status="published")
+
         if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
             category_queryset = filter_queryset_for_user(
                 category_queryset, request.user
             )
-
-        scope_value = None
-        if hasattr(self, "data") and self.data:
-            scope_value = self.data.get("scope")
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
+            material_queryset = filter_queryset_for_user(
+                Material.objects.all(), request.user
             )
-            category_queryset = apply_scope_filter(
-                category_queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        parent_qs = queryset.filter(parent__isnull=True)
-        self.filters["parent"].queryset = parent_qs
+        self.filters["material"].queryset = material_queryset
 
         # Drop the categories filter entirely when the scoped queryset is
         # empty so the form does not render a label-only filter widget.
@@ -165,11 +143,15 @@ class ProcessFilter(UserCreatedObjectScopedFilterSet):
         # accessing self.form). Sync ModelChoiceFilter querysets to the form fields so
         # validation uses the correct queryset regardless of instantiation order.
         if "_form" in self.__dict__ and self._form is not None:
-            self._form.fields["parent"].queryset = parent_qs
+            self._form.fields["material"].queryset = material_queryset
             if "categories" in self.filters:
                 self._form.fields["categories"].queryset = category_queryset
             else:
                 self._form.fields.pop("categories", None)
+
+    def filter_by_material(self, queryset, name, value):
+        """Filter processes that use a specific material in any role."""
+        return queryset.filter(process_materials__material=value).distinct()
 
     def filter_by_input_material(self, queryset, name, value):
         """Filter processes that have a specific material as input."""

@@ -166,27 +166,29 @@ def clear_moderation_cache_on_save(sender, instance, **kwargs):
             current_status = getattr(instance, "publication_status", None)
             if current_status == "review":
                 _clear_moderator_caches()
+            instance._loaded_publication_status = current_status
             return
 
         # For updates, check if publication_status changed to/from 'review'
-        # We need to detect status changes by checking the update_fields or
-        # comparing with the database value
         update_fields = kwargs.get("update_fields")
 
         # If update_fields is specified and doesn't include publication_status, skip
         if update_fields is not None and "publication_status" not in update_fields:
             return
 
-        # Check current status - if it's 'review' or was 'review', clear cache
+        # UserCreatedObject.from_db records the persisted status on
+        # _loaded_publication_status, so a review transition can be detected
+        # without an extra query. When the persisted status is unknown
+        # (manually constructed instance), fall back to clearing.
         current_status = getattr(instance, "publication_status", None)
-        if current_status == "review":
+        previous_status = getattr(instance, "_loaded_publication_status", None)
+        if (
+            current_status == "review"
+            or previous_status == "review"
+            or previous_status is None
+        ):
             _clear_moderator_caches()
-        else:
-            # The status might have changed FROM 'review' to something else
-            # We can't easily detect this without tracking, so clear cache
-            # when update_fields includes publication_status
-            if update_fields is None or "publication_status" in update_fields:
-                _clear_moderator_caches()
+        instance._loaded_publication_status = current_status
 
     except Exception:
         # Be defensive - if cache clearing fails, don't break the save operation
@@ -212,8 +214,12 @@ def clear_moderation_cache_on_delete(sender, instance, **kwargs):
         ):
             return
 
-        # Only clear cache if the deleted object was in review status
-        deleted_status = getattr(instance, "publication_status", None)
+        # Only clear cache if the deleted object was in review status.
+        # Prefer the persisted status recorded by from_db over the in-memory
+        # value, which may have been mutated without saving.
+        deleted_status = getattr(instance, "_loaded_publication_status", None)
+        if deleted_status is None:
+            deleted_status = getattr(instance, "publication_status", None)
         if deleted_status == "review":
             _clear_moderator_caches()
 
@@ -226,7 +232,11 @@ def clear_moderation_cache_on_delete(sender, instance, **kwargs):
 def delete_editor_grants_on_delete(sender, instance, **kwargs):
     """Remove editor grants pointing at a deleted UserCreatedObject instance."""
     try:
-        from utils.object_management.models import ObjectEditorGrant, UserCreatedObject
+        from utils.object_management.models import (
+            ObjectEditorGrant,
+            ObjectGroupEditorGrant,
+            UserCreatedObject,
+        )
 
         if not (
             isinstance(sender, type)
@@ -236,6 +246,7 @@ def delete_editor_grants_on_delete(sender, instance, **kwargs):
             return
 
         ObjectEditorGrant.for_object(instance).delete()
+        ObjectGroupEditorGrant.for_object(instance).delete()
     except Exception:
         # Be defensive - if grant cleanup fails, don't break the delete operation
         pass
@@ -349,42 +360,63 @@ except Exception:
 
 
 @receiver(post_save, sender="object_management.ReviewAction")
-def enqueue_owner_review_notification(sender, instance, created, **kwargs):
-    """Queue an owner notification e-mail for a newly created ReviewAction.
+def enqueue_review_notifications(sender, instance, created, **kwargs):
+    """Queue notification e-mails for a newly created ReviewAction.
 
     Runs after the surrounding transaction commits so asynchronous workers
-    can see the action row. The recipient is captured now so that an
-    ownership transfer before delivery does not redirect the notification;
-    the remaining eligibility checks (object still exists, recipient differs
-    from the actor, recipient has an e-mail address) happen when sending.
+    can see the action row. The owner is captured now so that an ownership
+    transfer before delivery does not redirect their notification; past
+    commenters are resolved when sending. The remaining eligibility checks
+    (object still exists, recipient differs from the actor, recipient has
+    an e-mail address, recipient can open the review page) happen per
+    recipient when sending.
     """
     if not created:
         return
 
     action_pk = instance.pk
-    recipient = getattr(instance.content_object, "owner", None)
-    recipient_id = recipient.pk if recipient is not None else None
+    owner = getattr(instance.content_object, "owner", None)
+    owner_id = owner.pk if owner is not None else None
 
     def _enqueue():
         try:
-            from .tasks import send_review_action_owner_notification
+            from .tasks import send_review_action_notifications
 
-            send_review_action_owner_notification.delay(action_pk, recipient_id)
+            send_review_action_notifications.delay(action_pk, owner_id)
         except Exception:
             # Broker unavailable: fall back to sending in-process so the
             # notification is not lost silently.
             logger.warning(
-                "Could not queue owner notification for ReviewAction %s; "
+                "Could not queue notifications for ReviewAction %s; "
                 "sending synchronously.",
                 action_pk,
             )
             try:
-                from .notifications import notify_owner_of_review_action
+                from .notifications import notify_review_participants
 
-                notify_owner_of_review_action(instance, recipient=recipient)
+                notify_review_participants(instance, owner=owner)
             except Exception:
                 logger.exception(
-                    "Owner notification for ReviewAction %s failed.", action_pk
+                    "Review notifications for ReviewAction %s failed.", action_pk
                 )
 
     transaction.on_commit(_enqueue)
+
+
+@receiver(post_save, sender="auth.User")
+@receiver(post_delete, sender="auth.User")
+def clear_default_owner_pk_cache_on_user_change(sender, **kwargs):
+    """User writes may change which row resolves as the default owner; the
+    cache is tiny, so clearing it wholesale is simpler than tracking which
+    username changed."""
+    from utils.object_management.models import _default_owner_pk_cache
+
+    _default_owner_pk_cache.clear()
+
+
+@receiver(post_migrate)
+def clear_default_owner_pk_cache_on_migrate(sender, **kwargs):
+    """Flushes and fixture reloads can recreate the owner under a different pk."""
+    from utils.object_management.models import _default_owner_pk_cache
+
+    _default_owner_pk_cache.clear()

@@ -2167,6 +2167,113 @@ class GeoJSONCachingTests(TestCase):
 
 
 @serial_test
+class LargeGeometryMemoryTests(TestCase):
+    def setUp(self):
+        self.cache = caches[settings.GEOJSON_CACHE]
+        self.cache.clear()
+        self.addCleanup(self.cache.clear)
+        self.region = Region(name="Large geometry")
+        self.region.geom = MultiPolygon(
+            Polygon(((0, 0), (1, 0), (1, 1), (0, 1), (0, 0)))
+        )
+        self.region.save()
+        self.url = reverse("api-region-geojson")
+
+    def test_single_complex_geometry_streams_without_loading_geos_objects(self):
+        with (
+            patch("maps.mixins.GEOJSON_MAX_BUFFERED_POINTS", 4, create=True),
+            CaptureQueriesContext(connection) as queries,
+        ):
+            response = self.client.get(self.url, {"id": self.region.pk})
+            self.assertTrue(response.streaming)
+            data = json.loads(b"".join(response.streaming_content))
+        self.assertEqual(response["X-Cache-Status"], "STREAM")
+        self.assertEqual(len(data["features"]), 1)
+        self.assertEqual(data["features"][0]["geometry"]["type"], "MultiPolygon")
+        geom_column = f'"{GeoPolygon._meta.db_table}"."geom"::bytea'
+        self.assertFalse(any(geom_column in q["sql"] for q in queries))
+        self.assertTrue(any("ST_AsGeoJSON" in q["sql"] for q in queries))
+
+    def test_large_head_does_not_serialize_geometry(self):
+        with (
+            patch("maps.mixins.GEOJSON_MAX_BUFFERED_POINTS", 4, create=True),
+            patch.object(
+                Region, "from_db", side_effect=AssertionError("loaded region")
+            ),
+        ):
+            response = self.client.head(self.url, {"id": self.region.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Cache-Status"], "STREAM")
+
+    def test_warmed_large_payload_is_served_without_coordinate_deserialization(self):
+        from maps.cache_warmup import warm_region_geojson_cache
+
+        with patch("maps.cache_warmup.GEOJSON_MAX_BUFFERED_POINTS", 4):
+            warm_region_geojson_cache()
+        with (
+            patch("maps.mixins.GEOJSON_MAX_BUFFERED_POINTS", 4),
+            patch.object(
+                RegionViewSet,
+                "get_geojson_serializer_class",
+                side_effect=AssertionError,
+            ),
+        ):
+            response = self.client.get(self.url, {"id": self.region.pk})
+            head = self.client.head(self.url, {"id": self.region.pk})
+        self.assertEqual(response["X-Cache-Status"], "HIT")
+        self.assertEqual(head["X-Cache-Status"], "HIT")
+        self.assertEqual(
+            json.loads(b"".join(response.streaming_content))["features"][0][
+                "properties"
+            ]["name"],
+            self.region.name,
+        )
+        self.assertEqual(head["X-Total-Count"], "1")
+
+    def test_rendered_cache_is_not_reused_after_data_version_changes(self):
+        from maps.cache_warmup import warm_region_geojson_cache
+
+        with patch("maps.cache_warmup.GEOJSON_MAX_BUFFERED_POINTS", 4):
+            warm_region_geojson_cache()
+        Region.objects.filter(pk=self.region.pk).update(
+            name="Changed geometry metadata",
+            lastmodified_at=timezone.now() + timedelta(days=1),
+        )
+        with patch("maps.mixins.GEOJSON_MAX_BUFFERED_POINTS", 4):
+            response = self.client.get(self.url, {"id": self.region.pk})
+            self.assertEqual(response["X-Cache-Status"], "STREAM")
+            data = json.loads(b"".join(response.streaming_content))
+        self.assertEqual(
+            data["features"][0]["properties"]["name"], "Changed geometry metadata"
+        )
+
+    def test_rendered_cache_is_not_reused_after_schema_version_changes(self):
+        from maps.cache_warmup import warm_region_geojson_cache
+
+        with patch("maps.cache_warmup.GEOJSON_MAX_BUFFERED_POINTS", 4):
+            warm_region_geojson_cache()
+        with (
+            patch("maps.mixins.GEOJSON_MAX_BUFFERED_POINTS", 4),
+            patch("maps.utils.GEOJSON_RENDERED_SCHEMA_VERSION", 3),
+        ):
+            response = self.client.get(self.url, {"id": self.region.pk})
+            self.assertEqual(response["X-Cache-Status"], "STREAM")
+            json.loads(b"".join(response.streaming_content))
+
+    def test_legacy_large_cache_is_not_deserialized(self):
+        key = get_region_cache_key(region_id=self.region.pk)
+        self.cache.set(key, {"features": ["legacy oversized payload"]})
+        with (
+            patch("maps.mixins.GEOJSON_MAX_BUFFERED_POINTS", 4, create=True),
+            patch.object(self.cache, "get", wraps=self.cache.get) as cache_get,
+        ):
+            response = self.client.get(self.url, {"id": self.region.pk})
+            self.assertTrue(response.streaming)
+            json.loads(b"".join(response.streaming_content))
+        self.assertNotIn(key, [call.args[0] for call in cache_get.call_args_list])
+
+
+@serial_test
 class StreamingGeoJSONTests(TestCase):
     """Tests for streaming GeoJSON response validity."""
 

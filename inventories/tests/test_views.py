@@ -5,10 +5,12 @@ from uuid import uuid4
 
 from django.contrib.auth.models import AnonymousUser, Permission
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils.html import escapejs
 
+from layer_manager.models import Layer
 from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material
 from utils.object_management.models import User
@@ -1581,6 +1583,89 @@ class ScenarioDetailRunAuthorizationTests(TestCase):
         self.assertContains(response, 'name="run"')
 
 
+class ScenarioInventoryEditLinkTests(TestCase):
+    """The per-inventory "Edit" link follows policy.can_edit: staff see it
+    even on published scenarios, owners only on unpublished ones."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner", password="pass")
+        cls.owner.user_permissions.add(
+            Permission.objects.get(codename="change_scenario")
+        )
+        cls.staff = User.objects.create_user(
+            username="staff", password="pass", is_staff=True
+        )
+        region = Region.objects.create(name="R", publication_status="published")
+        catchment = Catchment.objects.create(
+            name="C",
+            region=region,
+            parent_region=region,
+            publication_status="published",
+        )
+        cls.published_scenario = Scenario.objects.create(
+            name="Published",
+            owner=cls.owner,
+            region=region,
+            catchment=catchment,
+            publication_status="published",
+        )
+        cls.private_scenario = Scenario.objects.create(
+            name="Private", owner=cls.owner, region=region, catchment=catchment
+        )
+        feedstock = Material.objects.create(name="M", owner=cls.owner)
+        geodataset = GeoDataset.objects.create(name="G", owner=cls.owner, region=region)
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="A", geodataset=geodataset
+        )
+        cls.algorithm.feedstocks.add(feedstock)
+        cls.feedstock = feedstock
+        for scenario in (cls.published_scenario, cls.private_scenario):
+            ScenarioInventoryConfiguration.objects.create(
+                scenario=scenario,
+                feedstock=feedstock,
+                geodataset=geodataset,
+                inventory_algorithm=cls.algorithm,
+            )
+
+    def edit_url(self, scenario):
+        return reverse(
+            "scenario-update-config",
+            kwargs={
+                "scenario_pk": scenario.pk,
+                "feedstock_pk": self.feedstock.pk,
+                "algorithm_pk": self.algorithm.pk,
+            },
+        )
+
+    def detail(self, scenario):
+        return self.client.get(reverse("scenario-detail", kwargs={"pk": scenario.pk}))
+
+    def test_staff_sees_edit_link_on_published_scenario(self):
+        self.client.force_login(self.staff)
+
+        response = self.detail(self.published_scenario)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.edit_url(self.published_scenario))
+
+    def test_owner_does_not_see_edit_link_on_published_scenario(self):
+        self.client.force_login(self.owner)
+
+        response = self.detail(self.published_scenario)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, self.edit_url(self.published_scenario))
+
+    def test_owner_sees_edit_link_on_private_scenario(self):
+        self.client.force_login(self.owner)
+
+        response = self.detail(self.private_scenario)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.edit_url(self.private_scenario))
+
+
 # ----------- Missing-object lookups must return 404, not 500 ----------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -1844,6 +1929,228 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class ScenarioResultMapTestCase(TestCase):
+    """The result map and its GeoJSON endpoints show the stored result layer
+    to everyone who may read the scenario, and to nobody else."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner")
+        cls.other_user = User.objects.create_user(username="other")
+        cls.region = Region.objects.create(
+            name="Result Region", publication_status="published"
+        )
+        cls.catchment = Catchment.objects.create(
+            name="Result Catchment",
+            region=cls.region,
+            parent_region=cls.region,
+            publication_status="published",
+        )
+        cls.feedstock = Material.objects.create(
+            name="Result Feedstock", publication_status="published"
+        )
+        geodataset = GeoDataset.objects.create(
+            name="Result Dataset", region=cls.region, publication_status="published"
+        )
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="Result Algorithm", geodataset=geodataset
+        )
+        cls.published_scenario = Scenario.objects.create(
+            name="Published Result Scenario",
+            owner=cls.owner,
+            region=cls.region,
+            catchment=cls.catchment,
+            publication_status="published",
+        )
+        cls.private_scenario = Scenario.objects.create(
+            name="Private Result Scenario",
+            owner=cls.owner,
+            region=cls.region,
+            catchment=cls.catchment,
+        )
+
+    def setUp(self):
+        self.published_layer = self.create_layer(self.published_scenario)
+        self.private_layer = self.create_layer(self.private_scenario)
+
+    def create_layer(self, scenario, total=100.0, yields=(12.5,)):
+        layer, _ = Layer.objects.create_or_replace(
+            name="Result layer",
+            scenario=scenario,
+            feedstock=self.feedstock,
+            algorithm=self.algorithm,
+            results={
+                "features": [
+                    {
+                        "geom": MultiPolygon(
+                            Polygon(((i, 0), (i, 1), (i + 1, 1), (i, 0)))
+                        ),
+                        "yield": value,
+                    }
+                    for i, value in enumerate(yields)
+                ],
+                "aggregated_values": [
+                    {"name": "Total production", "value": total, "unit": "Mg/a"}
+                ],
+            },
+        )
+        return layer
+
+    def map_url(self, scenario):
+        return reverse(
+            "scenario-result-map",
+            kwargs={
+                "pk": scenario.pk,
+                "algorithm_pk": self.algorithm.pk,
+                "feedstock_pk": self.feedstock.pk,
+            },
+        )
+
+    def geojson_url(self, layer):
+        return reverse("data-result-layer", kwargs={"layer_name": layer.table_name})
+
+    def version_url(self, layer):
+        return reverse(
+            "data-result-layer-version", kwargs={"layer_name": layer.table_name}
+        )
+
+    def test_result_map_of_private_scenario_is_hidden_from_other_users(self):
+        response = self.client.get(self.map_url(self.private_scenario))
+        self.assertEqual(response.status_code, 404)
+
+        self.client.force_login(self.other_user)
+        response = self.client.get(self.map_url(self.private_scenario))
+        self.assertEqual(response.status_code, 404)
+
+    def test_owner_sees_result_map_of_private_scenario(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(self.map_url(self.private_scenario))
+        self.assertEqual(response.status_code, 200)
+
+    def test_result_map_loads_result_layer_features(self):
+        response = self.client.get(self.map_url(self.published_scenario))
+
+        self.assertEqual(response.status_code, 200)
+        map_config = response.context["map_config"]
+        self.assertTrue(map_config["loadFeatures"])
+        self.assertEqual(
+            map_config["featuresLayerGeometriesUrl"],
+            self.geojson_url(self.published_layer),
+        )
+
+    def test_result_map_sidebar_shows_result_cards_without_filter_tabs(self):
+        response = self.client.get(self.map_url(self.published_scenario))
+
+        self.assertNotContains(response, 'id="filters-tab"')
+        self.assertContains(response, "Source information")
+        self.assertContains(response, "Total production")
+
+    def test_result_map_breadcrumbs_lead_back_to_scenario_results(self):
+        response = self.client.get(self.map_url(self.published_scenario))
+
+        self.assertEqual(response.context["breadcrumb_module_label"], "Inventories")
+        self.assertEqual(response.context["breadcrumb_section_label"], "Scenarios")
+        self.assertEqual(
+            response.context["breadcrumb_object_label"], self.published_scenario.name
+        )
+        self.assertEqual(
+            response.context["breadcrumb_object_url"],
+            reverse("scenario-result", kwargs={"pk": self.published_scenario.pk}),
+        )
+        self.assertEqual(response.context["breadcrumb_action_label"], "Result map")
+
+    def test_anonymous_user_gets_geojson_of_published_result_layer(self):
+        response = self.client.get(self.geojson_url(self.published_layer))
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["type"], "FeatureCollection")
+        self.assertEqual(len(data["features"]), 1)
+        self.assertEqual(data["features"][0]["properties"]["yield"], 12.5)
+        self.assertTrue(response.headers.get("X-Data-Version"))
+
+    def test_geojson_of_private_result_layer_is_hidden_from_other_users(self):
+        for url in (
+            self.geojson_url(self.private_layer),
+            self.version_url(self.private_layer),
+        ):
+            self.client.logout()
+            self.assertEqual(self.client.get(url).status_code, 404)
+            self.client.force_login(self.other_user)
+            self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_owner_gets_geojson_of_private_result_layer(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(self.geojson_url(self.private_layer))
+        self.assertEqual(response.status_code, 200)
+
+    def test_unknown_result_layer_returns_404(self):
+        response = self.client.get(
+            reverse("data-result-layer", kwargs={"layer_name": "missing"})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_version_changes_when_results_are_recomputed(self):
+        geojson_response = self.client.get(self.geojson_url(self.published_layer))
+        version = self.client.get(self.version_url(self.published_layer)).json()[
+            "version"
+        ]
+        self.assertEqual(version, geojson_response.headers["X-Data-Version"])
+
+        self.create_layer(self.published_scenario, total=200.0)
+
+        new_version = self.client.get(self.version_url(self.published_layer)).json()[
+            "version"
+        ]
+        self.assertNotEqual(new_version, version)
+
+    def test_version_changes_when_feature_values_change_with_same_totals(self):
+        self.create_layer(self.published_scenario, yields=(10.0, 12.0))
+        version = self.client.get(self.version_url(self.published_layer)).json()[
+            "version"
+        ]
+
+        self.create_layer(self.published_scenario, yields=(12.0, 10.0))
+
+        new_version = self.client.get(self.version_url(self.published_layer)).json()[
+            "version"
+        ]
+        self.assertNotEqual(new_version, version)
+
+    def test_private_result_layer_responses_are_not_cacheable(self):
+        self.client.force_login(self.owner)
+        for url in (
+            self.geojson_url(self.private_layer),
+            self.version_url(self.private_layer),
+        ):
+            response = self.client.get(url)
+            self.assertIn("no-store", response.headers.get("Cache-Control", ""))
+
+    def test_published_result_layer_responses_are_cacheable(self):
+        response = self.client.get(self.geojson_url(self.published_layer))
+        self.assertNotIn("no-store", response.headers.get("Cache-Control", ""))
+
+    def test_result_page_links_to_result_map(self):
+        self.published_scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.client.get(
+            reverse("scenario-result", kwargs={"pk": self.published_scenario.pk})
+        )
+
+        self.assertContains(response, self.map_url(self.published_scenario))
+
+    def test_result_page_omits_seasonal_chart_without_seasonal_data(self):
+        self.published_scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.client.get(
+            reverse("scenario-result", kwargs={"pk": self.published_scenario.pk})
+        )
+
+        self.assertIn("productionPerFeedstockBarChart", response.context["charts"])
+        self.assertNotIn("seasonalFeedstockBarChart", response.context["charts"])
+        self.assertNotContains(response, "Seasonal distribution of feedstocks")
+
+
 class ScenarioCatchmentSelectorTestCase(TestCase):
     """The scenario form's catchment selector offers the catchments of the
     region chosen in the region selector."""
@@ -1905,3 +2212,364 @@ class ScenarioCatchmentSelectorTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         names = {item["name"] for item in response.json()["results"]}
         self.assertEqual(names, {"Region Catchment"})
+
+
+class ScenarioPresentationTestCase(TestCase):
+    """Scenario, progress and result pages present a scenario for a live demo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner")
+        cls.owner.user_permissions.add(
+            Permission.objects.get(codename="change_scenario")
+        )
+        region = Region.objects.create(
+            name="Demo Region", publication_status="published"
+        )
+        catchment = Catchment.objects.create(
+            name="Demo Catchment",
+            region=region,
+            parent_region=region,
+            publication_status="published",
+        )
+        cls.feedstock = Material.objects.create(
+            name="Clover grass", publication_status="published"
+        )
+        geodataset = GeoDataset.objects.create(
+            name="Grassland", region=region, publication_status="published"
+        )
+        cls.algorithm = InventoryAlgorithm.objects.create(
+            name="Grassland protein", geodataset=geodataset
+        )
+        cls.algorithm.feedstocks.add(cls.feedstock)
+        parameter = InventoryAlgorithmParameter.objects.create(
+            descriptive_name="Protein recovery", short_name="recovery", unit="%"
+        )
+        parameter.inventory_algorithm.add(cls.algorithm)
+        value = InventoryAlgorithmParameterValue.objects.create(
+            name="Default recovery",
+            parameter=parameter,
+            value=12.0,
+            source="Thomas 2025",
+            default=True,
+        )
+        cls.scenario = Scenario.objects.create(
+            name="Grass to protein",
+            description="Turns **clover grass** into protein.",
+            owner=cls.owner,
+            region=region,
+            catchment=catchment,
+            publication_status="published",
+        )
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=cls.scenario,
+            feedstock=cls.feedstock,
+            geodataset=geodataset,
+            inventory_algorithm=cls.algorithm,
+            inventory_parameter=parameter,
+            inventory_value=value,
+        )
+
+    def detail(self):
+        return self.client.get(reverse("scenario-detail", args=[self.scenario.pk]))
+
+    def test_detail_map_draws_the_published_region_and_catchment(self):
+        response = self.detail()
+
+        view = response.context["view"]
+        self.assertEqual(view.get_region_feature_id(), self.scenario.region_id)
+        self.assertEqual(view.get_catchment_feature_id(), self.scenario.catchment_id)
+
+    def test_detail_map_skips_private_region_and_catchment_of_others(self):
+        region = Region.objects.create(name="Private region", owner=self.owner)
+        catchment = Catchment.objects.create(
+            name="Private catchment",
+            region=region,
+            parent_region=region,
+            owner=self.owner,
+        )
+        Scenario.objects.filter(pk=self.scenario.pk).update(
+            region=region, catchment=catchment
+        )
+
+        response = self.detail()
+
+        view = response.context["view"]
+        self.assertIsNone(view.get_region_feature_id())
+        self.assertIsNone(view.get_catchment_feature_id())
+
+    def evaluation_status(self, scenario=None):
+        scenario = scenario or self.scenario
+        return self.client.get(
+            reverse("scenario-evaluation-run-status", args=[scenario.pk])
+        )
+
+    @patch("inventories.views.AsyncResult")
+    def test_evaluation_status_reports_algorithm_tasks_to_anonymous_readers(
+        self, mock_async
+    ):
+        mock_async.return_value.status = "FAILURE"
+        mock_async.return_value.result = ValueError("invalid input")
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        task = RunningTask.objects.create(
+            scenario=self.scenario, algorithm=self.algorithm, uuid=uuid4()
+        )
+        RunningTask.objects.create(scenario=self.scenario, uuid=uuid4())
+
+        response = self.evaluation_status()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(), {"running": True, "tasks": {str(task.uuid): "FAILURE"}}
+        )
+        self.assertIn("no-cache", response.headers["Cache-Control"])
+
+    def test_evaluation_status_reports_when_the_scenario_has_stopped_running(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.evaluation_status()
+
+        self.assertEqual(response.json(), {"running": False, "tasks": {}})
+
+    def test_evaluation_status_of_private_scenario_is_hidden_from_others(self):
+        private = Scenario.objects.create(name="Private run", owner=self.owner)
+
+        response = self.evaluation_status(private)
+
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_progress_page_polls_the_scenario_evaluation_status(self):
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+
+        response = self.result()
+
+        self.assertContains(
+            response,
+            f'data-status-url="'
+            f'{reverse("scenario-evaluation-run-status", args=[self.scenario.pk])}"',
+        )
+
+    def test_progress_url_opens_the_scenario_result_page(self):
+        response = self.client.get(
+            reverse("scenario-evaluation-progress", args=[self.scenario.pk])
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("scenario-result", args=[self.scenario.pk]),
+            fetch_redirect_response=False,
+        )
+
+    def result(self):
+        return self.client.get(reverse("scenario-result", args=[self.scenario.pk]))
+
+    def test_detail_renders_description_as_markdown(self):
+        response = self.detail()
+
+        self.assertContains(
+            response, "Turns <strong>clover grass</strong> into protein."
+        )
+
+    def test_detail_lists_parameters_with_value_unit_and_source(self):
+        response = self.detail()
+
+        self.assertContains(
+            response, '<th scope="row">Protein recovery</th>', html=True
+        )
+        self.assertContains(response, '<td class="sdv2-num">12</td>', html=True)
+        self.assertContains(response, "<td>%</td>", html=True)
+        self.assertContains(response, "<td>Thomas 2025</td>", html=True)
+
+    def test_detail_offers_results_as_primary_action_once_evaluated(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.detail()
+
+        self.assertContains(
+            response,
+            f'<a class="sdv2-btn sdv2-btn-primary" '
+            f'href="{reverse("scenario-result", args=[self.scenario.pk])}">'
+            '<i class="fas fa-chart-column" aria-hidden="true"></i> Show results</a>',
+            html=True,
+        )
+
+    def test_result_page_shows_aggregated_values_as_tiles(self):
+        Layer.objects.create_or_replace(
+            name="Protein layer",
+            scenario=self.scenario,
+            feedstock=self.feedstock,
+            algorithm=self.algorithm,
+            results={
+                "features": [
+                    {
+                        "geom": MultiPolygon(Polygon(((0, 0), (0, 1), (1, 1), (0, 0)))),
+                        "yield": 9.0,
+                    }
+                ],
+                "aggregated_values": [
+                    {"name": "Total production", "value": 992.4, "unit": "Mg/a"},
+                    {"name": "Recovered protein", "value": 23.8, "unit": "Mg/a"},
+                ],
+            },
+        )
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.result()
+
+        self.assertContains(
+            response,
+            '<div class="sri-kpi"><dt>Recovered protein</dt><dd>'
+            '<span class="sri-kpi-value">23.8</span>'
+            '<span class="sri-kpi-unit">Mg/a</span></dd></div>',
+            html=True,
+        )
+        self.assertContains(response, '<span class="sri-kpi-value">992.4</span>')
+
+    def test_result_page_loads_chart_js_from_own_static_files(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        response = self.result()
+
+        self.assertContains(response, "lib/chartjs/Chart.min.js")
+        self.assertNotContains(response, "cdnjs.cloudflare.com/ajax/libs/Chart.js")
+
+    def test_progress_page_shows_progress_bar_over_all_algorithm_tasks(self):
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        RunningTask.objects.create(
+            scenario=self.scenario, algorithm=self.algorithm, uuid=uuid4()
+        )
+
+        response = self.result()
+
+        self.assertContains(response, 'role="progressbar"')
+        self.assertContains(response, 'aria-valuemax="1"')
+        self.assertContains(response, "js/evaluation_progress.min.js")
+        self.assertContains(response, "Grassland protein")
+
+    def test_failed_page_lets_editors_retry_and_explains_failure(self):
+        private = Scenario.objects.create(
+            name="Private run", owner=self.owner, region=self.scenario.region
+        )
+        private.set_status(ScenarioStatus.Status.FAILED)
+        private.scenariostatus.failed_algorithm = self.algorithm
+        private.scenariostatus.failure_message = "Division by zero"
+        private.scenariostatus.save()
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse("scenario-result", args=[private.pk]))
+
+        self.assertContains(response, "The evaluation failed.")
+        self.assertContains(response, "Grassland protein")
+        self.assertContains(response, "Division by zero")
+        self.assertContains(
+            response,
+            f'<form method="post" action="{reverse("scenario-detail", args=[private.pk])}">',
+        )
+        self.assertContains(response, "Retry evaluation")
+
+    def test_failed_page_hides_retry_and_details_from_readers(self):
+        self.scenario.set_status(ScenarioStatus.Status.FAILED)
+        self.scenario.scenariostatus.failure_message = "Division by zero"
+        self.scenario.scenariostatus.save()
+
+        response = self.result()
+
+        self.assertContains(response, "The evaluation failed.")
+        self.assertNotContains(response, "Retry evaluation")
+        self.assertNotContains(response, "Division by zero")
+
+
+class ScenarioEnclosingRegionDatasetViewsTestCase(TestCase):
+    """Datasets of a region enclosing the scenario region are offered by the
+    geodataset dropdown and accepted by the generic add flow."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from maps.models import GeoPolygon
+
+        def square(x0, y0, size):
+            x1, y1 = x0 + size, y0 + size
+            return MultiPolygon(
+                Polygon(((x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0))),
+                srid=4326,
+            )
+
+        def region(name, geom):
+            return Region.objects.create(
+                name=name,
+                borders=GeoPolygon.objects.create(geom=geom),
+                publication_status="published",
+            )
+
+        cls.owner = User.objects.create_user(username="enc-owner", password="pass")
+        cls.owner.user_permissions.add(
+            Permission.objects.get(codename="change_scenario")
+        )
+        country = region("Enc Country", square(0, 0, 10))
+        municipality = region("Enc Municipality", square(2, 2, 2))
+        elsewhere = region("Enc Elsewhere", square(20, 20, 2))
+        catchment = Catchment.objects.create(
+            name="Enc Catchment",
+            region=municipality,
+            parent_region=municipality,
+            publication_status="published",
+        )
+        cls.scenario = Scenario.objects.create(
+            name="Enc Scenario",
+            owner=cls.owner,
+            region=municipality,
+            catchment=catchment,
+        )
+        cls.feedstock = Material.objects.create(name="Enc Material")
+        cls.country_dataset = GeoDataset.objects.create(
+            name="Enc Country Points",
+            region=country,
+            model_name="NantesGreenhouses",
+            publication_status="published",
+        )
+        cls.elsewhere_dataset = GeoDataset.objects.create(
+            name="Enc Elsewhere Points",
+            region=elsewhere,
+            model_name="NantesGreenhouses",
+            publication_status="published",
+        )
+
+    def test_autocomplete_offers_dataset_of_enclosing_region(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("scenario-geodataset-autocomplete"),
+            {"f": f"'scenario__scenario_id={self.scenario.id}'"},
+        )
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(self.country_dataset.id, ids)
+        self.assertNotIn(self.elsewhere_dataset.id, ids)
+
+    def _post_generic(self, geodataset):
+        self.client.force_login(self.owner)
+        return self.client.post(
+            reverse("scenario-add-configuration", kwargs={"pk": self.scenario.pk}),
+            {
+                "feedstock": self.feedstock.pk,
+                "geodataset": geodataset.pk,
+                "generic_function": "count_based_production",
+            },
+        )
+
+    def test_generic_add_accepts_dataset_of_enclosing_region(self):
+        response = self._post_generic(self.country_dataset)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario, geodataset=self.country_dataset
+            ).exists()
+        )
+
+    def test_generic_add_rejects_dataset_of_disjoint_region(self):
+        response = self._post_generic(self.elsewhere_dataset)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(
+                scenario=self.scenario
+            ).exists()
+        )

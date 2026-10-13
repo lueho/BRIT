@@ -55,17 +55,66 @@ class ScenarioTestCase(TestCase):
         scenario_status.failure_message = "calculation failed"
         scenario_status.save()
 
-    def test_scenario_edit_clears_failure_metadata(self):
+    def test_scenario_catchment_change_clears_failure_metadata(self):
         algorithm = InventoryAlgorithm.objects.get(name="Test Algorithm")
         self.set_failed_status(algorithm)
 
-        self.scenario.name = "Updated Scenario"
+        self.scenario.catchment = Catchment.objects.create(
+            name="Other Catchment", region=self.scenario.region
+        )
         self.scenario.save()
 
         self.scenario.scenariostatus.refresh_from_db()
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
         self.assertIsNone(self.scenario.scenariostatus.failed_algorithm)
         self.assertEqual(self.scenario.scenariostatus.failure_message, "")
+
+    def test_scenario_region_change_marks_changed(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        self.scenario.region = Region.objects.create(name="Other Region")
+        self.scenario.save()
+
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+
+    def test_scenario_catchment_id_update_field_marks_changed(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        self.scenario.catchment_id = Catchment.objects.create(
+            name="Other Catchment", region=self.scenario.region
+        ).pk
+        self.scenario.save(update_fields=["catchment_id"])
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.CHANGED)
+
+    def test_unsaved_region_edit_outside_update_fields_keeps_finished_status(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        self.scenario.region = Region.objects.create(name="Unsaved Region")
+        self.scenario.save(update_fields=["catchment_id"])
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.FINISHED)
+
+    def test_scenario_metadata_edit_keeps_finished_status(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        self.scenario.name = "Renamed Scenario"
+        self.scenario.description = "New description"
+        self.scenario.save()
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.FINISHED)
+
+    def test_publishing_scenario_keeps_finished_status(self):
+        self.scenario.set_status(ScenarioStatus.Status.FINISHED)
+
+        self.scenario.publication_status = Scenario.STATUS_PUBLISHED
+        self.scenario.save(update_fields=["publication_status"])
+
+        self.scenario.scenariostatus.refresh_from_db()
+        self.assertEqual(self.scenario.status, ScenarioStatus.Status.FINISHED)
 
     def test_available_geodatasets_with_single_feedstock(self):
         feedstock = Material.objects.get(name="Feedstock 1")
@@ -813,3 +862,93 @@ class MaterialFeedstockContractTestCase(TestCase):
         plan = self.scenario.inventory_execution_plan()
         self.assertEqual(plan[0]["kwargs"]["feedstock_id"], self.material.pk)
         self.assertNotIn("sample_series_id", plan[0]["kwargs"])
+
+
+def _square(x0, y0, size):
+    from django.contrib.gis.geos import MultiPolygon, Polygon
+
+    x1, y1 = x0 + size, y0 + size
+    return MultiPolygon(
+        Polygon(((x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0))), srid=4326
+    )
+
+
+def _region_with_borders(name, geom):
+    from maps.models import GeoPolygon
+
+    return Region.objects.create(
+        name=name, borders=GeoPolygon.objects.create(geom=geom)
+    )
+
+
+class ScenarioEnclosingRegionGeodatasetTestCase(TestCase):
+    """A dataset attached to a region that spatially encloses the scenario
+    region (e.g. a country-wide dataset for a municipality scenario) is
+    offered to the scenario like a dataset of the scenario region itself."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.feedstock = Material.objects.create(name="Enclosing feedstock")
+        country = _region_with_borders("Country", _square(0, 0, 10))
+        municipality = _region_with_borders("Municipality", _square(2, 2, 2))
+        elsewhere = _region_with_borders("Elsewhere", _square(20, 20, 2))
+        cls.scenario = Scenario.objects.create(
+            name="Municipality scenario", region=municipality
+        )
+        cls.country_dataset = GeoDataset.objects.create(
+            name="Country dataset", region=country
+        )
+        cls.elsewhere_dataset = GeoDataset.objects.create(
+            name="Elsewhere dataset", region=elsewhere
+        )
+        cls.country_algorithm = InventoryAlgorithm.objects.create(
+            name="Country algorithm", geodataset=cls.country_dataset, default=True
+        )
+        cls.country_algorithm.feedstocks.add(cls.feedstock)
+        elsewhere_algorithm = InventoryAlgorithm.objects.create(
+            name="Elsewhere algorithm", geodataset=cls.elsewhere_dataset, default=True
+        )
+        elsewhere_algorithm.feedstocks.add(cls.feedstock)
+
+    def test_compatible_geodatasets_include_enclosing_region(self):
+        datasets = self.scenario.compatible_geodatasets()
+        self.assertIn(self.country_dataset, datasets)
+        self.assertNotIn(self.elsewhere_dataset, datasets)
+
+    def test_partially_overlapping_region_is_not_compatible(self):
+        partial = _region_with_borders("Partial", _square(2.5, 2.5, 3))
+        partial_dataset = GeoDataset.objects.create(
+            name="Partial dataset", region=partial
+        )
+        self.assertNotIn(partial_dataset, self.scenario.compatible_geodatasets())
+
+    def test_region_with_minor_border_mismatch_is_compatible(self):
+        shifted = _region_with_borders("Shifted", _square(2.01, 2, 2))
+        shifted_dataset = GeoDataset.objects.create(
+            name="Shifted dataset", region=shifted
+        )
+        self.assertIn(shifted_dataset, self.scenario.compatible_geodatasets())
+
+    def test_scenario_without_region_borders_matches_exact_region_only(self):
+        region = Region.objects.create(name="No borders")
+        own_dataset = GeoDataset.objects.create(name="Own dataset", region=region)
+        scenario = Scenario.objects.create(name="Borderless", region=region)
+        self.assertQuerySetEqual(scenario.compatible_geodatasets(), [own_dataset])
+
+    def test_available_geodatasets_include_enclosing_region(self):
+        self.assertQuerySetEqual(
+            self.scenario.available_geodatasets(feedstock=self.feedstock),
+            [self.country_dataset],
+        )
+
+    def test_available_inventory_algorithms_include_enclosing_region(self):
+        self.assertQuerySetEqual(
+            self.scenario.available_inventory_algorithms(feedstock=self.feedstock),
+            [self.country_algorithm],
+        )
+        self.assertIn(self.feedstock, self.scenario.available_feedstocks())
+
+    def test_default_configuration_uses_enclosing_region_defaults(self):
+        self.assertQuerySetEqual(
+            self.scenario.default_inventory_algorithms(), [self.country_algorithm]
+        )

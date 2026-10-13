@@ -1,5 +1,6 @@
 {% extends "waste_atlas/shell_base.html" %}
 {% load static %}
+{% load cache %}
 {% block title %}
    Waste Atlas — Map overview
 {% endblock title %}
@@ -49,6 +50,7 @@
                </div>
             </div>
          </div>
+         {% cache 3600 atlas_directory directory_selected_region atlas_urlconf %}
          <ul class="nav atlas-region-tabs" id="atlas-region-tabs" role="tablist">
             {% for group in directory_region_groups %}
                <li class="nav-item" role="presentation">
@@ -108,6 +110,7 @@
                </div>
             {% endfor %}
          </div>
+         {% endcache %}
       </section>
 {% endblock atlas_workspace %}
 {% block atlas_page_javascript %}

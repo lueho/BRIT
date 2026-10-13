@@ -24,7 +24,6 @@
           {% endif %}
         </a>
       {% endif %}
-      {% user_in_group user "process-team" as can_view_processes %}
       <div class="sb-sidenav-menu-heading">Tools</div>
       <a class="nav-link{% nav_active 'maps' %}" href="{% url 'maps_list' %}">
         <div class="sb-nav-link-icon">
@@ -44,7 +43,7 @@
         </div>
         <span class="sb-nav-link-text">Sources</span>
       </a>
-      {% if can_view_processes %}
+      {% if perms.processes.access_app_feature %}
         <a class="nav-link{% nav_active 'processes' %}" href="{% url 'processes:process-list' %}">
           <div class="sb-nav-link-icon">
             <i class="fas fa-flask"></i>

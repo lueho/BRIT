@@ -1,3 +1,4 @@
+{% load cache %}
 <div class="atlas-tree-head">
   <label class="visually-hidden" for="atlas-tree-filter">Filter maps</label>
   <input id="atlas-tree-filter"
@@ -7,6 +8,7 @@
          placeholder="Filter maps…">
 </div>
 <div class="atlas-tree-scroll">
+  {% cache 3600 atlas_shell_tree atlas_tree_overview_active directory_selected_region atlas_map_set atlas_active_theme atlas_urlconf %}
   <a class="atlas-tree-overview-link{% if atlas_tree_overview_active %} atlas-tree-link--active{% endif %}"
      href="{% url 'waste-atlas-overview' %}">
     <i class="fas fa-th-list"></i> All maps
@@ -43,4 +45,5 @@
       {% endfor %}
     </details>
   {% endfor %}
+  {% endcache %}
 </div>

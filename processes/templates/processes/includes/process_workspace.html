@@ -25,6 +25,9 @@
       <a class="sdv2-anchor-chip" href="#workspace-section-{{ section.key }}">{{ section.label }}</a>
     {% endfor %}
   </nav>
+  <div class="small mb-2" data-workspace-progress>
+    {% include "processes/includes/process_section_progress.html" %}
+  </div>
   <p class="small text-muted mb-3" data-workspace-status role="status" aria-live="polite" aria-atomic="true">Choose a section to edit.</p>
   {% include "utils/includes/workspace_sections.html" %}
 </div>

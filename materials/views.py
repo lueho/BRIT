@@ -29,6 +29,7 @@ from django.views.generic.detail import SingleObjectMixin
 
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
+from processes.models import Process
 from utils.file_export.views import (
     GenericUserCreatedObjectExportView,
     SingleObjectFileExportView,
@@ -367,6 +368,23 @@ class MaterialDetailView(UserCreatedObjectDetailView):
         ).count()
         context["related_samples_list_url"] = (
             f"{reverse('sample-list')}?substrate_material={self.object.pk}"
+        )
+        processes = filter_queryset_for_user(
+            Process.objects.filter(
+                pk__in=self.object.process_materials.values("process_id")
+            ),
+            user,
+        ).order_by("name", "pk")
+        (
+            context["related_processes"],
+            context["related_processes_total"],
+            context["related_processes_more"],
+        ) = _capped_related(processes)
+        context["related_processes_published_total"] = processes.filter(
+            publication_status="published"
+        ).count()
+        context["related_processes_list_url"] = (
+            f"{reverse('processes:process-list')}?material={self.object.pk}"
         )
         return context
 
@@ -2344,19 +2362,32 @@ def ensure_derived_composition_settings(sample, owner):
     for composition in sample.compositions.order_by("order", "id"):
         composition_settings_by_group.setdefault(composition.group_id, composition)
 
-    default_component = MaterialComponent.objects.default()
-    for measurement in sample.component_measurements.select_related("group").order_by(
-        "group__name", "group_id", "id"
-    ):
+    other_component = MaterialComponent.objects.other()
+    groups = {}
+    bases_by_group = defaultdict(set)
+    for measurement in sample.component_measurements.select_related(
+        "group", "component"
+    ).order_by("group__name", "group_id", "id"):
         if measurement.group_id in composition_settings_by_group:
             continue
-        composition_settings_by_group[measurement.group_id] = (
-            Composition.objects.create(
-                owner=owner,
-                sample=sample,
-                group=measurement.group,
-                fractions_of=default_component,
-            )
+        groups.setdefault(measurement.group_id, measurement.group)
+        if (
+            measurement.component_id != other_component.pk
+            and not measurement.component.is_aggregate
+        ):
+            bases_by_group[measurement.group_id].add(measurement.basis_component_id)
+
+    default_component = MaterialComponent.objects.default()
+    for group_id, group in groups.items():
+        bases = bases_by_group[group_id]
+        fractions_of_id = (
+            next(iter(bases)) if len(bases) == 1 and None not in bases else None
+        )
+        composition_settings_by_group[group_id] = Composition.objects.create(
+            owner=owner,
+            sample=sample,
+            group=group,
+            fractions_of_id=fractions_of_id or default_component.pk,
         )
 
     return composition_settings_by_group

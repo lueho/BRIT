@@ -11,16 +11,16 @@
 {% block detail_header_actions %}
     <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
         <div class="btn-group me-2" role="group">
-            {% with back_url=request.GET.back %}
-                {% if back_url %}
-                    <a class="btn btn-sm btn-outline-secondary"
-                       href="{{ back_url }}"
-                       title="Back to results">
-                        <i class="fas fa-arrow-left"></i>
-                        <span class="d-none d-md-inline">Back to results</span>
-                    </a>
-                {% endif %}
-            {% endwith %}
+            {% safe_back_url as back_url %}
+            {% if back_url %}
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="{{ back_url }}"
+                   rel="nofollow"
+                   title="Back to results">
+                    <i class="fas fa-arrow-left"></i>
+                    <span class="d-none d-md-inline">Back to results</span>
+                </a>
+            {% endif %}
             {% if back_collection %}
                 <a class="btn btn-sm btn-outline-secondary"
                    href="{{ back_collection.get_absolute_url }}"

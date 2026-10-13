@@ -1,10 +1,19 @@
 import hashlib
 import json
+import zlib
+from contextlib import closing
 from importlib import import_module
+from io import BytesIO
+from threading import BoundedSemaphore
 
 from django.conf import settings
+from django.contrib.gis.db.models.functions import AsGeoJSON, NumPoints
 from django.core.cache import caches
 from django.core.cache.backends.base import DEFAULT_TIMEOUT
+from django.db import connections
+from django.db.models import Count, Max, Min, Sum
+from rest_framework.serializers import ReadOnlyField
+from rest_framework.utils.encoders import JSONEncoder
 
 INITIALIZATION_DEPENDENCIES = ["users", "utils.properties"]
 
@@ -336,6 +345,148 @@ def set_geojson_cache_payload(cache, cache_key, data, timeout=DEFAULT_TIMEOUT):
     cache.set(cache_key, data, timeout=timeout)
     if isinstance(data, dict) and "features" in data:
         cache.set(f"{cache_key}:count", len(data["features"]), timeout=timeout)
+
+
+GEOJSON_MAX_BUFFERED_POINTS = 100_000
+GEOJSON_MAX_RENDERED_CACHE_BYTES = 8 * 1024 * 1024
+GEOJSON_RENDERED_SCHEMA_VERSION = 2
+GEOJSON_RENDER_SLOTS = BoundedSemaphore(2)
+GEOJSON_MAX_DB_RESULT_BYTES = 1024 * 1024
+
+
+def geojson_version_aggregates(geometry_field=None):
+    aggregates = {
+        "cnt": Count("pk"),
+        "max_mod": Max("lastmodified_at"),
+        "min_id": Min("pk"),
+        "max_id": Max("pk"),
+    }
+    if geometry_field:
+        aggregates["num_points"] = Sum(NumPoints(geometry_field))
+    return aggregates
+
+
+def geojson_version_token(aggregates, timestamp=None):
+    if timestamp is None:
+        modified = aggregates.get("max_mod")
+        timestamp = (
+            int(modified.timestamp()) if modified else aggregates.get("max_xmin", 0)
+        )
+    signature = (
+        f"{aggregates.get('cnt') or 0}:{timestamp or 0}:"
+        f"{aggregates.get('min_id') or 0}:{aggregates.get('max_id') or 0}"
+    )
+    return hashlib.sha1(signature.encode("utf-8")).hexdigest()[:12]
+
+
+def rendered_geojson_cache_key(cache_key, dataset_version):
+    return f"{cache_key}:json:v{GEOJSON_RENDERED_SCHEMA_VERSION}:{dataset_version}"
+
+
+def iter_geojson_features(
+    queryset, serializer_class, geometry_field, context=None, geometry_defer_field=None
+):
+    annotated = queryset.annotate(
+        _rendered_geometry=AsGeoJSON(geometry_field, precision=15)
+    )
+    if geometry_field in queryset.query.annotations:
+        annotated = annotated.alias(
+            **{geometry_field: queryset.query.annotations[geometry_field]}
+        )
+    annotated = annotated.defer(
+        geometry_defer_field or geometry_field
+    ).prefetch_related(None)
+    serializer = serializer_class(context=context or {})
+    serializer.fields[serializer.Meta.geo_field] = ReadOnlyField(
+        source="_rendered_geometry"
+    )
+    yield b'{"type":"FeatureCollection","features":['
+    first = True
+    release_connection = False
+    with GEOJSON_RENDER_SLOTS:
+        try:
+            with closing(annotated.iterator(chunk_size=1)) as rows:
+                for obj in rows:
+                    release_connection = release_connection or (
+                        len(obj._rendered_geometry or "") > GEOJSON_MAX_DB_RESULT_BYTES
+                    )
+                    feature = serializer.to_representation(obj)
+                    geometry = feature.pop("geometry") or "null"
+                    if not first:
+                        yield b","
+                    first = False
+                    yield (
+                        json.dumps(
+                            feature,
+                            cls=JSONEncoder,
+                            ensure_ascii=False,
+                            allow_nan=False,
+                        ).encode("utf-8")[:-1]
+                        + b',"geometry":'
+                    )
+                    for offset in range(0, len(geometry), 65536):
+                        yield geometry[offset : offset + 65536].encode("utf-8")
+                    yield b"}"
+        finally:
+            connection = connections[annotated.db]
+            if release_connection and not connection.in_atomic_block:
+                connection.close()
+    yield b"]}"
+
+
+def _compressed_geojson_chunks(chunks):
+    compressor = zlib.compressobj()
+    for chunk in chunks:
+        yield compressor.compress(chunk)
+    yield compressor.flush()
+
+
+def iter_rendered_geojson(payload, chunk_size=65536):
+    decoder = zlib.decompressobj()
+    for offset in range(0, len(payload), chunk_size):
+        compressed = payload[offset : offset + chunk_size]
+        while compressed:
+            decoded = decoder.decompress(compressed, chunk_size)
+            if decoded:
+                yield decoded
+            compressed = decoder.unconsumed_tail
+    while decoded := decoder.decompress(b"", chunk_size):
+        yield decoded
+    if not decoder.eof:
+        raise ValueError("Incomplete cached GeoJSON payload")
+
+
+def cache_rendered_geojson(
+    cache,
+    cache_key,
+    queryset,
+    serializer_class,
+    geometry_field,
+    timeout=DEFAULT_TIMEOUT,
+    geometry_defer_field=None,
+):
+    oversized_key = f"{cache_key}:oversized:{GEOJSON_MAX_RENDERED_CACHE_BYTES}"
+    if cache.has_key(cache_key) or cache.has_key(oversized_key):
+        return False
+    with (
+        BytesIO() as buffer,
+        closing(
+            iter_geojson_features(
+                queryset,
+                serializer_class,
+                geometry_field,
+                geometry_defer_field=geometry_defer_field,
+            )
+        ) as chunks,
+    ):
+        for chunk in _compressed_geojson_chunks(chunks):
+            if buffer.tell() + len(chunk) > GEOJSON_MAX_RENDERED_CACHE_BYTES:
+                cache.set(oversized_key, True, timeout=timeout)
+                return False
+            buffer.write(chunk)
+        cache.set(cache_key, buffer.getvalue(), timeout=timeout)
+    cache.set(f"{cache_key}:count", queryset.count(), timeout=timeout)
+    return True
 
 
 def get_or_set_cache(cache_key, data_generator_func, timeout=None):

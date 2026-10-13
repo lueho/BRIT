@@ -132,6 +132,12 @@ class UserCreatedObjectPermission(permissions.BasePermission):
                 )
                 and "publication_status" not in payload
                 and "owner" not in payload
+                and (
+                    user.is_staff
+                    or user.has_perm(
+                        f"{obj._meta.app_label}.change_{obj._meta.model_name}"
+                    )
+                )
             ):
                 return True
 
@@ -240,7 +246,7 @@ class UserCreatedObjectPermission(permissions.BasePermission):
 
         from django.contrib.contenttypes.models import ContentType
 
-        from .models import ObjectEditorGrant
+        from .models import editor_grant_object_ids
 
         try:
             content_type = ContentType.objects.get_for_model(obj.__class__)
@@ -250,9 +256,7 @@ class UserCreatedObjectPermission(permissions.BasePermission):
                 user._editor_grant_cache = cache
             if content_type.pk not in cache:
                 cache[content_type.pk] = set(
-                    ObjectEditorGrant.objects.filter(
-                        content_type=content_type, editor=user
-                    ).values_list("object_id", flat=True)
+                    editor_grant_object_ids(obj.__class__, user)
                 )
             return obj.pk in cache[content_type.pk]
         except Exception:
@@ -765,17 +769,10 @@ def apply_scope_filter(queryset, scope: str | None, user=None):
 
 def _editor_grant_filter(model, user):
     """Q filter matching objects the user holds an editor grant for."""
-    from django.contrib.contenttypes.models import ContentType
-
-    from .models import ObjectEditorGrant
+    from .models import editor_grant_object_ids
 
     try:
-        return Q(
-            pk__in=ObjectEditorGrant.objects.filter(
-                content_type=ContentType.objects.get_for_model(model),
-                editor=user,
-            ).values("object_id")
-        )
+        return Q(pk__in=editor_grant_object_ids(model, user))
     except Exception:
         return Q(pk__in=[])
 

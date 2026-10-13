@@ -375,6 +375,7 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             "data:text/html,test",
             "http://testserver/bibliography/sources/",
             "/\\external.example/",
+            "/bibliography/sources/1/modal/",
         ):
             with self.subTest(back=back):
                 self.client.logout()
@@ -572,6 +573,19 @@ class SourceReviewListRegressionTest(ViewWithPermissionsTestCase):
             [(f"{reverse('source-list-review')}?scope=review", 302)],
         )
         self.assertContains(response, self.review_source.title)
+
+    def test_row_action_dropdown_escapes_table_scroll_container(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(reverse("source-list-review"), {"scope": "review"})
+
+        self.assertContains(response, self.review_source.title)
+        self.assertContains(
+            response,
+            """data-bs-popper-config='{"strategy":"fixed"}'""",
+            html=False,
+        )
+        self.assertNotContains(response, 'data-bs-container="body"', html=False)
 
     def test_private_list_uses_dedicated_review_route_for_scope_toggle(self):
         self.client.force_login(self.member)

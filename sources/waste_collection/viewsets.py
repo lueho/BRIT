@@ -1,11 +1,12 @@
 import logging
 import time
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import connection, transaction
-from django.db.models import F, Prefetch, Q
+from django.db.models import F, Max, Prefetch, Q
 from django.urls import reverse
 from django.utils import timezone
 from django_filters import rest_framework as rf_filters
@@ -115,16 +116,25 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     queryset = Collection.objects.all()
     serializer_class = CollectionFlatSerializer
     geojson_serializer_class = WasteCollectionGeometrySerializer
+    geojson_geometry_field = "simplified_geom"
+    geojson_point_field = "catchment__region__borders__geom"
     filter_backends = (CollectionDjangoFilterBackend,)
     filterset_class = CollectionFilterSet
     pagination_class = CollectionListPagination
-    collection_list_slow_log_threshold_seconds = 1.0
+    # ``None`` falls back to ``COLLECTION_LIST_SLOW_LOG_THRESHOLD_SECONDS``
+    # (default 1.0) so deployments and tests can tune the threshold.
+    collection_list_slow_log_threshold_seconds = None
     requires_add_permission_actions = {
         "create_collection",
         "create_new_version",
         "create_collection_property_value",
         "create_aggregated_collection_property_value",
     }
+
+    def _slow_log_threshold_seconds(self):
+        if self.collection_list_slow_log_threshold_seconds is not None:
+            return self.collection_list_slow_log_threshold_seconds
+        return getattr(settings, "COLLECTION_LIST_SLOW_LOG_THRESHOLD_SECONDS", 1.0)
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -172,6 +182,21 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             "catchment__region__lauregion__nuts_parent__parent__parent__parent",
         ]
         return queryset.select_related(*nuts_ancestry).order_by("pk")
+
+    def _version_aggregates(self):
+        return {
+            **super()._version_aggregates(),
+            "max_region_mod": Max("catchment__region__lastmodified_at"),
+        }
+
+    def _version_timestamp(self, aggregates):
+        timestamp = super()._version_timestamp(aggregates)
+        region_modified = aggregates.get("max_region_mod")
+        return (
+            max(timestamp, int(region_modified.timestamp()))
+            if region_modified
+            else timestamp
+        )
 
     def get_geojson_queryset(self):
         """Return optimized queryset for GeoJSON with simplified geometry.
@@ -323,7 +348,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             response["Cache-Control"] = "private, no-store"
 
         duration_seconds = time.perf_counter() - started_at
-        if duration_seconds >= self.collection_list_slow_log_threshold_seconds:
+        if duration_seconds >= self._slow_log_threshold_seconds():
             data = response.data
             result_count = None
             total_count = None

@@ -163,27 +163,32 @@ Objects can be in one of five publication states:
 
 Moderators cannot approve or reject their own submissions. This ensures independent review.
 
-### Owner Notifications
+### Review Notifications
 
-Creating a `ReviewAction` queues an e-mail to the object's owner via a
-`post_save` signal (`enqueue_owner_review_notification` in `signals.py`).
-The signal captures the owner at review time and passes their user id to
-the Celery task `send_review_action_owner_notification` (`tasks.py`), so an
-ownership transfer before delivery does not redirect the notification. If
-the captured owner can no longer open the review detail page at delivery
-time (they are neither the current owner nor a moderator), the e-mail is
-skipped rather than sending an unusable link.
+Creating a `ReviewAction` queues e-mails to the object's owner and to
+everyone who previously commented on the object, via a `post_save` signal
+(`enqueue_review_notifications` in `signals.py`). The signal captures the
+owner at review time and passes their user id to the Celery task
+`send_review_action_notifications` (`tasks.py`), so an ownership transfer
+before delivery does not redirect the owner notification (if that owner was
+deleted meanwhile, only past commenters are notified). Past commenters are
+users with a comment that precedes the action; later comments do not
+qualify. The task fans out one `send_review_action_notification_to_user`
+task per recipient, and only that delivery task retries transient mail
+errors, so a failure for one recipient never resends to the others. Recipients who can
+no longer open the review detail page (they are neither the current owner
+nor a moderator) are skipped rather than sent an unusable link.
 Sending is deferred to `transaction.on_commit`; if the broker is
 unavailable the signal falls back to sending synchronously. Transient mail
 delivery failures are retried with backoff (up to 3 retries).
 
-Owners are only notified about actions performed by other users (e.g.
+Users are only notified about actions performed by other users (e.g.
 moderator approval, decline, or comments); their own actions send nothing.
-Owners without an e-mail address are skipped. The e-mail contains a link to
-the object's review detail page, which owners can always access. Links use
-the configured `Site`; if no `Site` row exists for `SITE_ID` (e.g. on a
-fresh production deployment), the domain falls back to `CANONICAL_HOST` or
-the first `ALLOWED_HOSTS` entry. The link scheme is `https` when
+Recipients without an e-mail address are skipped. The e-mail contains a
+link to the object's review detail page. Links use the configured `Site`;
+if no `Site` row exists for `SITE_ID` (e.g. on a fresh production
+deployment), the domain falls back to `CANONICAL_HOST` or the first
+`ALLOWED_HOSTS` entry. The link scheme is `https` when
 `SECURE_SSL_REDIRECT` is enabled.
 
 ## Views and ViewSets

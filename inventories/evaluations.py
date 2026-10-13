@@ -137,7 +137,8 @@ class ScenarioResult:
         )
         for ds in self.seasonal_production_per_component():
             chart.add_dataset(ds)
-        charts.update({"seasonalFeedstockBarChart": chart.as_old_dict()})
+        if chart.data:
+            charts.update({"seasonalFeedstockBarChart": chart.as_old_dict()})
 
         return charts
 

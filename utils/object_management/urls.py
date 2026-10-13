@@ -88,6 +88,16 @@ urlpatterns = [
         name="remove_editor",
     ),
     path(
+        "add-editor-group/<int:content_type_id>/<int:object_id>/",
+        views.AddEditorGroupView.as_view(),
+        name="add_editor_group",
+    ),
+    path(
+        "remove-editor-group/<int:content_type_id>/<int:object_id>/",
+        views.RemoveEditorGroupView.as_view(),
+        name="remove_editor_group",
+    ),
+    path(
         "bulk-manage-access/",
         views.BulkManageAccessView.as_view(),
         name="bulk_manage_access",

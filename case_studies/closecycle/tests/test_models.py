@@ -306,3 +306,23 @@ class ShowcaseVisibleConnectionsTestCase(TestCase):
                     self.assert_connections(
                         showcase, user, include_private=include_private
                     )
+
+
+class ShowcaseCodeTestCase(TestCase):
+    def test_code_and_title_split_coded_name(self):
+        showcase = Showcase(name="SC14 – Farm-based green biorefinery")
+
+        self.assertEqual(showcase.code, "SC14")
+        self.assertEqual(showcase.title, "Farm-based green biorefinery")
+
+    def test_code_accepts_letter_suffix_and_hyphen(self):
+        showcase = Showcase(name="SC07a - Composting of nature residues")
+
+        self.assertEqual(showcase.code, "SC07a")
+        self.assertEqual(showcase.title, "Composting of nature residues")
+
+    def test_uncoded_name_has_no_code(self):
+        showcase = Showcase(name="Regional composting")
+
+        self.assertIsNone(showcase.code)
+        self.assertEqual(showcase.title, "Regional composting")

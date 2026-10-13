@@ -88,7 +88,9 @@ function controlledResponse(payload, chunkSize, { failAfterChunks = Infinity } =
 }
 
 function makeSandbox(responsesByUrl, { cached = {} } = {}) {
-  const calls = { batches: [], resets: 0, rendered: [], errors: [], progressVisible: false };
+  const calls = {
+    batches: [], resets: 0, rendered: [], errors: [], stored: [], progressVisible: false,
+  };
   const element = () => ({
     dataset: {},
     textContent: "",
@@ -118,7 +120,7 @@ function makeSandbox(responsesByUrl, { cached = {} } = {}) {
     buildUrl(base, params) { return `${base}?${params.toString()}`; },
     normalizeUrl(url) { return url; },
     async getFromIndexedDB(key) { return cached[key] || null; },
-    async storeInIndexedDB() {},
+    async storeInIndexedDB(key) { calls.stored.push(key); },
     async cleanupCache() {},
     orderLayers() {},
     displayErrorMessage(error) { calls.errors.push(error); },
@@ -288,4 +290,32 @@ test("a rejected unbounded request reports the feature count and asks for a filt
   assert.equal(calls.errors.length, 1);
   assert.match(calls.errors[0].message, /63,?394/);
   assert.match(calls.errors[0].message, /filter/i);
+});
+
+function jsonResponse(payload, extraHeaders = {}) {
+  const headers = { "X-Total-Count": "1", "X-Data-Version": "v1", ...extraHeaders };
+  return {
+    response: {
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: { get: (name) => headers[name] ?? null },
+      json: async () => payload,
+    },
+  };
+}
+
+test("no-store responses are rendered but not written to the IndexedDB cache", async () => {
+  const geojson = { type: "FeatureCollection", features: makeFeatures(1, "P") };
+  const { sandbox, calls } = makeSandbox({
+    "/geom?f=private": jsonResponse(geojson, { "Cache-Control": "private, no-store" }),
+    "/geom?f=public": jsonResponse(geojson),
+  });
+
+  await sandbox.fetchFeatureGeometriesWithProgress({ f: "private" });
+  await sandbox.fetchFeatureGeometriesWithProgress({ f: "public" });
+  await settle();
+
+  assert.equal(calls.rendered.length, 2);
+  assert.deepEqual(calls.stored, ["/geom?f=public"]);
 });

@@ -4,6 +4,7 @@ from typing import get_type_hints
 from unittest.mock import patch
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
@@ -543,6 +544,20 @@ class ReviewDetailAccessTests(TestCase):
         self.client.force_login(self.other)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 403)
+
+    def test_anonymous_is_redirected_to_login(self):
+        """Anonymous visitors (e.g. following a notification e-mail link or a
+        mail-scanner prefetch) are sent to the login page like on every other
+        restricted page instead of receiving a hard 403."""
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={"content_type_id": self.ct_id, "object_id": self.obj_review.id},
+        )
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"{settings.LOGIN_URL}?next={url}")
 
     def test_review_detail_renders_markdown_comments(self):
         """Markdown comments are rendered as HTML in the review panel."""

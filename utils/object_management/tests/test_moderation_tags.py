@@ -178,6 +178,25 @@ class SafeBackUrlTagTests(SimpleTestCase):
 
                 self.assertEqual(url, "")
 
+    def test_back_url_to_modal_fragment_is_dropped(self):
+        for modal_path in (
+            "/materials/componentgroups/5/modal/",
+            "/object_management/modal/approve/1/2/",
+            "/materials/componentgroups/5/mo%64al/",
+            "/materials/componentgroups/5/mo%2564al/",
+        ):
+            with self.subTest(modal_path=modal_path):
+                url = self.back_url(
+                    "/materials/componentgroups/5/?back=" + quote(modal_path, safe="")
+                )
+
+                self.assertEqual(url, "")
+
+    def test_back_url_with_modal_in_query_only_is_returned(self):
+        url = self.back_url("/x/?back=" + quote("/materials/samples/?q=modal", safe=""))
+
+        self.assertEqual(url, "/materials/samples/?q=modal")
+
     def test_long_ordinary_filtered_back_url_is_returned(self):
         filters = urlencode(
             [("scope", "published")]

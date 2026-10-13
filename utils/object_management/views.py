@@ -114,7 +114,7 @@ DEFAULT_BREADCRUMB_MODULES = {
     "inventories": {"label": "Inventories", "url_name": "inventories-explorer"},
     "maps": {"label": "Maps", "url_name": "maps-explorer"},
     "materials": {"label": "Materials", "url_name": "materials-explorer"},
-    "processes": {"label": "Processes", "url_name": "processes:explorer"},
+    "processes": {"label": "Processes", "url_name": "processes:process-list"},
     "properties": {"label": "Properties", "url_name": "properties-explorer"},
     "sources": {"label": "Sources", "url_name": "sources-explorer"},
     "utils": {"label": "Utilities", "url_name": "utils-explorer"},
@@ -1373,6 +1373,22 @@ class BaseObjectAccessActionView(LoginRequiredMixin, UserPassesTestMixin, View):
         except User.DoesNotExist:
             return None
 
+    def _resolve_group(self, name, *, trim=False):
+        from django.contrib.auth.models import Group
+
+        group = Group.objects.filter(name=name).first()
+        if group is None and trim:
+            group = Group.objects.filter(name=name.strip()).first()
+        return group
+
+    def _resolve_group_id(self, group_id):
+        from django.contrib.auth.models import Group
+
+        try:
+            return Group.objects.filter(pk=group_id).first()
+        except (TypeError, ValueError):
+            return None
+
 
 class TransferOwnershipView(BaseObjectAccessActionView):
     """Transfer ownership of a UserCreatedObject to another user."""
@@ -1449,7 +1465,7 @@ class AddEditorView(BaseObjectAccessActionView):
             return HttpResponseRedirect(self.get_success_url())
         messages.success(
             request,
-            f"{user.username} can now edit this {obj._meta.verbose_name}.",
+            f"Added a direct edit grant for {user.username} on this {obj._meta.verbose_name}.",
         )
         return HttpResponseRedirect(self.get_success_url())
 
@@ -1471,7 +1487,50 @@ class RemoveEditorView(BaseObjectAccessActionView):
         obj.remove_editor(user)
         messages.success(
             request,
-            f"{user.username} can no longer edit this {obj._meta.verbose_name}.",
+            f"Removed the direct edit grant for {user.username} on this {obj._meta.verbose_name}.",
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class AddEditorGroupView(BaseObjectAccessActionView):
+    permission_method = "has_manage_editors_permission"
+    permission_denied_message = (
+        "You don't have permission to manage group edit access for this item."
+    )
+
+    def post(self, request, *args, **kwargs):
+        obj = self.get_object()
+        group = self._resolve_group(request.POST.get("group") or "", trim=True)
+        if group is None:
+            messages.error(request, "The specified group does not exist.")
+            return HttpResponseRedirect(self.get_success_url())
+        obj.add_editor_group(group, granted_by=request.user)
+        messages.success(
+            request,
+            f"Added an edit grant for group {group.name} on this {obj._meta.verbose_name}.",
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class RemoveEditorGroupView(BaseObjectAccessActionView):
+    permission_method = "has_manage_editors_permission"
+    permission_denied_message = (
+        "You don't have permission to manage group edit access for this item."
+    )
+
+    def post(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if "group_id" in request.POST:
+            group = self._resolve_group_id(request.POST.get("group_id"))
+        else:
+            group = self._resolve_group(request.POST.get("group") or "")
+        if group is None:
+            messages.error(request, "The specified group does not exist.")
+            return HttpResponseRedirect(self.get_success_url())
+        obj.remove_editor_group(group)
+        messages.success(
+            request,
+            f"Removed the edit grant for group {group.name} on this {obj._meta.verbose_name}.",
         )
         return HttpResponseRedirect(self.get_success_url())
 
@@ -1491,6 +1550,7 @@ class ManageAccessModalView(BaseObjectAccessActionView):
             "object": obj,
             "modal_title": f"Manage access for {obj._meta.verbose_name}",
             "editors": obj.editors.order_by("username"),
+            "editor_groups": obj.editor_groups.order_by("name"),
             "next_url": request.GET.get("next"),
             "content_type_id": self.kwargs.get("content_type_id"),
             "object_id": self.kwargs.get("object_id"),
@@ -1509,6 +1569,15 @@ class ManageAccessModalView(BaseObjectAccessActionView):
             return HttpResponse(status=204)
         if "new_owner" in request.POST:
             return TransferOwnershipView.as_view()(request, *args, **kwargs)
+        actions = {
+            "add_editor": AddEditorView,
+            "remove_editor": RemoveEditorView,
+            "add_editor_group": AddEditorGroupView,
+            "remove_editor_group": RemoveEditorGroupView,
+        }
+        action_view = actions.get(request.POST.get("access_action"))
+        if action_view is not None:
+            return action_view.as_view()(request, *args, **kwargs)
         return HttpResponseNotAllowed(["GET", "POST"])
 
 
@@ -1568,8 +1637,8 @@ class BulkManageAccessView(LoginRequiredMixin, View):
                 skipped += 1
 
         label = {
-            "add_editor": f"Granted edit access to {target_user.username}",
-            "remove_editor": f"Revoked edit access from {target_user.username}",
+            "add_editor": f"Added direct editor grants for {target_user.username}",
+            "remove_editor": f"Removed direct editor grants for {target_user.username}",
             "transfer_ownership": f"Transferred ownership to {target_user.username}",
         }[action]
         if applied:
@@ -2441,6 +2510,9 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
 
     template_name = "object_management/review_detail_wrapper.html"
     detail_view_class = None
+    permission_denied_message = (
+        "You do not have permission to access the review details page."
+    )
     _model_view_registry = {}
 
     @classmethod
@@ -2511,9 +2583,7 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             return super().dispatch(request, *args, **kwargs)
 
         if not user_is_moderator_for_model(request.user, obj.__class__):
-            raise PermissionDenied(
-                "You do not have permission to access the review details page."
-            )
+            return self.handle_no_permission()
         return super().dispatch(request, *args, **kwargs)
 
     def _resolve_base_template(self):
@@ -3003,6 +3073,14 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
         super().__init_subclass__(**kwargs)
         for attr, value in saved.items():
             setattr(cls, attr, value)
+
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        # Widgets render preselected options through this view with the page
+        # request; that page's own ``q`` must not filter the selected objects.
+        match = getattr(request, "resolver_match", None)
+        if getattr(getattr(match, "func", None), "view_class", None) is not type(self):
+            self.query = ""
 
     def hook_queryset(self, queryset):
         qs = filter_queryset_for_user(queryset, self.request.user)

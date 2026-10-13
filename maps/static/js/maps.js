@@ -272,21 +272,13 @@ function hideLoadingIndicator() {
 }
 
 function showMapOverlay() {
-    try {
-        const overlay = document.getElementById('map-overlay');
-        overlay.classList.add('map-overlay-visible');
-    } catch (error) {
-        console.warn('Map overlay could not be shown:', error);
-    }
+    const overlay = document.getElementById('map-overlay');
+    if (overlay) overlay.classList.add('map-overlay-visible');
 }
 
 function hideMapOverlay() {
-    try {
-        const overlay = document.getElementById('map-overlay');
-        overlay.classList.remove('map-overlay-visible');
-    } catch (error) {
-        console.warn('Map overlay could not be hidden:', error);
-    }
+    const overlay = document.getElementById('map-overlay');
+    if (overlay) overlay.classList.remove('map-overlay-visible');
 }
 
 function displayErrorMessage(error) {
@@ -333,10 +325,12 @@ function prepareMapRefresh() {
     } catch (error) {
         console.warn('Custom elements were not locked', error);
     }
-    try {
-        lockFilter();
-    } catch (error) {
-        console.warn('Filter was not locked', error);
+    if (typeof lockFilter === 'function') {
+        try {
+            lockFilter();
+        } catch (error) {
+            console.warn('Filter was not locked', error);
+        }
     }
     showLoadingIndicator();
 }
@@ -356,6 +350,7 @@ function refreshMap(promises, filterParameters, timeLimit = 120000) {
             promiseIsPending = false;
             orderLayers();
             adjustMapBounds(filterParameters);
+            layersLoaded();
         })
         .catch(error => {
             promiseIsPending = false;
@@ -372,6 +367,7 @@ function refreshMap(promises, filterParameters, timeLimit = 120000) {
 }
 
 function updateUrlSearchParams() {
+    if (typeof parseFilterParameters !== 'function') return;
     const params = parseFilterParameters();
     const url = new URL(window.location);
     url.search = params.toString();
@@ -379,21 +375,24 @@ function updateUrlSearchParams() {
 }
 
 function cleanup() {
-    try {
-        updateUrlSearchParams();
-    } catch (error) {
-        console.warn('URL search parameters were not updated:', error);
-    }
     hideLoadingIndicator();
-    try {
-        unlockFilter();
-    } catch (error) {
-        console.warn('Filter was not unlocked', error);
+    if (typeof unlockFilter === 'function') {
+        try {
+            unlockFilter();
+        } catch (error) {
+            console.warn('Filter was not unlocked', error);
+        }
     }
     try {
         unlockCustomElements();
     } catch (error) {
         console.warn('Custom elements were not unlocked', error);
+    }
+    // Disabled form controls are not serialized, so this runs after unlocking.
+    try {
+        updateUrlSearchParams();
+    } catch (error) {
+        console.warn('URL search parameters were not updated:', error);
     }
 }
 
@@ -715,12 +714,13 @@ function resetFeaturesLayer() {
  * false when the caller should fall back to renderFeatures.
  */
 function addFeatureBatch(features) {
-    if (!features || features.length === 0) {
+    const locatedFeatures = (features || []).filter(feature => feature.geometry != null);
+    if (locatedFeatures.length === 0) {
         return false;
     }
 
     if (!featuresLayer) {
-        featuresLayer = createFeaturesLayer(null, features[0].geometry.type);
+        featuresLayer = createFeaturesLayer(null, locatedFeatures[0].geometry.type);
         if (!featuresLayer) {
             return false;
         }
@@ -728,7 +728,7 @@ function addFeatureBatch(features) {
         featuresLayer.addTo(map);
     }
 
-    featuresLayer.addData(features);
+    featuresLayer.addData(locatedFeatures);
     return true;
 }
 
@@ -736,13 +736,14 @@ function renderFeatures(geoJson) {
 
     resetFeaturesLayer();
 
-    if (!geoJson || !geoJson.features || geoJson.features.length === 0) {
+    const locatedFeatures = (geoJson?.features || []).filter(feature => feature.geometry != null);
+    if (locatedFeatures.length === 0) {
         console.warn('The provided GeoJSON object is empty or does not contain any features.');
         return;
     }
 
-    const geometryType = geoJson.features[0].geometry.type;
-    featuresLayer = createFeaturesLayer(geoJson, geometryType);
+    const geometryType = locatedFeatures[0].geometry.type;
+    featuresLayer = createFeaturesLayer({ ...geoJson, features: locatedFeatures }, geometryType);
     if (!featuresLayer) {
         console.warn('Unsupported feature geometry type:', geometryType);
         return;
@@ -1071,6 +1072,12 @@ async function clickedFeature(event) {
     // This is a hook for implementing behaviour when a feature is clicked.
 }
 
+function layersLoaded() {
+    // This is a hook for implementing behaviour once the map layers have loaded.
+    // It is not empty, because minification removes calls to empty functions.
+    return true;
+}
+
 // Query parameters that describe navigation or display state rather than a
 // constraint on the dataset. They do not count as meaningful filters for the
 // unfiltered-load guard on maps flagged as large.
@@ -1332,6 +1339,17 @@ function resetFeatureStyles(featureGroup) {
     featureGroup.bringToBack();
 }
 
+// Leaflet guesses its default marker icon path from leaflet.css, which fails
+// for hashed static file names and yields page-relative marker-icon.png 404s.
+function configureDefaultIconPath() {
+    if (typeof L === 'undefined' || !L.Icon || !L.Icon.Default) return;
+    if (typeof L.Icon.Default.imagePath === 'string') return;
+    const script = document.querySelector('script[src*="/leaflet/leaflet."]');
+    if (!script || !script.src) return;
+    L.Icon.Default.imagePath = new URL('images/', script.src).href;
+}
+
 window.addEventListener("map:init", function (event) {
     map = event.detail.map;
+    configureDefaultIconPath();
 });

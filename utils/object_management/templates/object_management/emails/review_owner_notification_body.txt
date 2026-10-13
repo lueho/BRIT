@@ -1,6 +1,6 @@
 {% load i18n %}Hello {{ recipient.username }},
 
-your {{ object_verbose_name|lower }} "{{ object_name }}" {{ summary }} (by {{ actor.username }}).
+{% if is_owner %}your{% else %}the{% endif %} {{ object_verbose_name|lower }} "{{ object_name }}" {{ summary }} (by {{ actor.username }}).
 {% if action.comment %}
 Comment: "{{ action.comment }}"
 {% endif %}
