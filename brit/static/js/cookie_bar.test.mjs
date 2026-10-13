@@ -33,22 +33,26 @@ test("passes options through to showCookieBar", async () => {
     assert.equal(warnings.length, 0);
 });
 
-test("retries once after the rate-limit window when the status load fails", async () => {
+test("retries after the burst window, then after the minute window", async () => {
     const { window, scheduled, warnings } = setup();
     let attempts = 0;
-    const show = () => { attempts += 1; return attempts === 1 ? rateLimited() : Promise.resolve(); };
+    const show = () => { attempts += 1; return attempts < 3 ? rateLimited() : Promise.resolve(); };
 
     const done = window.startCookieBar(show, {});
     await new Promise((resolve) => setImmediate(resolve));
-
     assert.equal(attempts, 1);
-    assert.equal(scheduled.length, 1);
-    assert.ok(scheduled[0].delay > 5000, "retry must wait past the 5 s burst window");
+    assert.ok(scheduled[0].delay > 5000, "first retry must wait past the 5 s burst window");
 
     scheduled[0].callback();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(attempts, 2);
+    assert.ok(scheduled[1].delay >= 60000, "second retry must wait out the minute window");
+
+    scheduled[1].callback();
     await done;
 
-    assert.equal(attempts, 2);
+    assert.equal(attempts, 3);
+    assert.equal(scheduled.length, 2);
     assert.equal(warnings.length, 0);
 });
 
@@ -58,11 +62,13 @@ test("gives up with a warning instead of an uncaught rejection", async () => {
     const show = () => { attempts += 1; return rateLimited(); };
 
     const done = window.startCookieBar(show, {});
-    await new Promise((resolve) => setImmediate(resolve));
-    scheduled[0].callback();
+    for (let i = 0; i < 2; i++) {
+        await new Promise((resolve) => setImmediate(resolve));
+        scheduled[i].callback();
+    }
     await done;
 
-    assert.equal(attempts, 2);
-    assert.equal(scheduled.length, 1);
+    assert.equal(attempts, 3);
+    assert.equal(scheduled.length, 2);
     assert.equal(warnings.length, 1);
 });

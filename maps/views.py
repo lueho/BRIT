@@ -97,7 +97,7 @@ from .models import (
     RegionProperty,
 )
 from .signals import clear_geojson_cache_pattern
-from .throttling import GeoJSONAnonThrottle
+from .throttling import SessionViewGeoJSONAnonThrottle
 from .validation import RegionCompositionError, validate_region_composition
 
 # Query parameters that are navigation/control hints rather than dataset
@@ -966,7 +966,7 @@ class GeoDataSetRuntimeFeatureGeoJSONView(
 ):
     authentication_classes = [SessionAuthentication]
     permission_classes = []
-    throttle_classes = [GeoJSONAnonThrottle]
+    throttle_classes = [SessionViewGeoJSONAnonThrottle]
 
     def get(self, request, *args, **kwargs):
         adapter = self.get_runtime_adapter()
