@@ -114,7 +114,7 @@ DEFAULT_BREADCRUMB_MODULES = {
     "inventories": {"label": "Inventories", "url_name": "inventories-explorer"},
     "maps": {"label": "Maps", "url_name": "maps-explorer"},
     "materials": {"label": "Materials", "url_name": "materials-explorer"},
-    "processes": {"label": "Processes", "url_name": "processes:process-list"},
+    "processes": {"label": "Processes", "url_name": "processes:explorer"},
     "properties": {"label": "Properties", "url_name": "properties-explorer"},
     "sources": {"label": "Sources", "url_name": "sources-explorer"},
     "utils": {"label": "Utilities", "url_name": "utils-explorer"},

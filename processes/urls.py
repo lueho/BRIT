@@ -4,6 +4,7 @@ Provides comprehensive URL routing for all CRUD operations following BRIT patter
 """
 
 from django.urls import include, path
+from django.views.generic import RedirectView
 
 from . import download_views, views
 from .router import router
@@ -11,12 +12,12 @@ from .router import router
 app_name = "processes"
 
 urlpatterns = [
-    # Legacy explorer paths redirect to the category catalogue
-    path("dashboard/", views.ProcessDiscoveryRedirectView.as_view()),
+    path("explorer/", views.ProcessExplorerView.as_view(), name="explorer"),
     path(
-        "explorer/",
-        views.ProcessDiscoveryRedirectView.as_view(),
-        name="explorer",
+        "dashboard/",
+        RedirectView.as_view(
+            pattern_name="processes:explorer", permanent=True, query_string=True
+        ),
     ),
     # ProcessCategory URLs
     path(

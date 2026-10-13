@@ -628,36 +628,201 @@ class ProcessMaintenanceViewsTestCase(TestCase):
         self.assertGreater(row.order, 0)
 
 
-class ProcessDiscoveryRedirectTestCase(TestCase):
-    """Legacy dashboard/explorer URLs redirect to the category catalogue."""
+class ProcessExplorerViewTestCase(TestCase):
+    """The Processes explorer follows the shared module explorer pattern."""
 
-    def test_dashboard_redirects_to_category_catalogue(self):
-        response = self.client.get("/processes/dashboard/")
-        self.assertEqual(302, response.status_code)
-        self.assertEqual(
-            reverse("processes:processcategory-list"), response["Location"]
+    @classmethod
+    def setUpTestData(cls):
+        User = get_user_model()
+        cls.owner = User.objects.create_user(username="explorer-owner")
+        cls.moderator = User.objects.create_user(username="explorer-moderator")
+        cls.moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="processes",
+                codename="can_moderate_process",
+            )
+        )
+        cls.category = ProcessCategory.objects.create(
+            name="Thermochemical", owner=cls.owner, publication_status="published"
+        )
+        ProcessCategory.objects.create(
+            name="Hidden private category",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.published = Process.objects.create(
+            name="Published pyrolysis",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.published.categories.add(cls.category)
+        cls.private = Process.objects.create(
+            name="Private gasification",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.private.categories.add(cls.category)
+        Process.objects.create(
+            name="Pending torrefaction",
+            owner=cls.owner,
+            publication_status="review",
         )
 
-    def test_explorer_redirects_to_category_catalogue(self):
+    def test_explorer_renders_shared_card_pattern(self):
         response = self.client.get(reverse("processes:explorer"))
-        self.assertEqual(302, response.status_code)
-        self.assertEqual(
-            reverse("processes:processcategory-list"), response["Location"]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "processes/explorer.html")
+        self.assertContains(response, "Processes Explorer")
+        self.assertContains(response, "explorer-card")
+        self.assertContains(response, "explorer-section-heading")
+        self.assertContains(response, reverse("processes:process-list"))
+        self.assertContains(response, reverse("processes:processcategory-list"))
+
+    def test_counts_cover_published_objects_only(self):
+        response = self.client.get(reverse("processes:explorer"))
+
+        self.assertEqual(response.context["process_count"], 1)
+        self.assertEqual(response.context["category_count"], 1)
+
+    def test_top_categories_count_published_processes_and_link_to_list(self):
+        response = self.client.get(reverse("processes:explorer"))
+
+        categories = list(response.context["top_categories"])
+        self.assertEqual(categories, [self.category])
+        self.assertEqual(categories[0].process_count, 1)
+        self.assertContains(
+            response,
+            escape(
+                f"{reverse('processes:process-list')}"
+                f"?categories={self.category.pk}&scope=published"
+            ),
+        )
+        self.assertNotContains(response, "Hidden private category")
+
+    def test_recent_processes_hide_unpublished_processes(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("processes:explorer"))
+
+        self.assertEqual(list(response.context["recent_processes"]), [self.published])
+        self.assertContains(response, "Published pyrolysis")
+
+    def test_anonymous_sees_no_personal_or_review_cards(self):
+        response = self.client.get(reverse("processes:explorer"))
+
+        self.assertNotContains(response, reverse("processes:process-list-owned"))
+        self.assertNotContains(response, reverse("processes:process-list-review"))
+        self.assertNotContains(response, reverse("processes:process-create"))
+
+    def test_owner_sees_own_processes_card(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("processes:explorer"))
+
+        self.assertEqual(response.context["my_process_count"], 3)
+        self.assertContains(
+            response, f"{reverse('processes:process-list-owned')}?scope=private"
+        )
+        self.assertNotContains(response, reverse("processes:process-list-review"))
+
+    def test_own_processes_count_matches_private_list_with_editor_grants(self):
+        from django.contrib.contenttypes.models import ContentType
+
+        from utils.object_management.models import ObjectEditorGrant
+
+        shared = Process.objects.create(
+            name="Shared hydrothermal carbonisation",
+            owner=self.moderator,
+            publication_status="private",
+        )
+        ObjectEditorGrant.objects.create(
+            content_type=ContentType.objects.get_for_model(Process),
+            object_id=shared.pk,
+            editor=self.owner,
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse("processes:explorer"))
+        private_list = self.client.get(
+            reverse("processes:process-list-owned"), {"scope": "private"}
         )
 
-    def test_redirects_preserve_query_params(self):
-        for url in ("/processes/dashboard/", reverse("processes:explorer")):
-            with self.subTest(url=url):
-                response = self.client.get(
-                    url, {"scope": "review", "name": "digestion"}
+        self.assertEqual(response.context["my_process_count"], 4)
+        self.assertEqual(
+            response.context["my_process_count"],
+            private_list.context["paginator"].count,
+        )
+
+    def test_moderator_sees_review_card(self):
+        self.client.force_login(self.moderator)
+        response = self.client.get(reverse("processes:explorer"))
+
+        self.assertEqual(response.context["review_count"], 1)
+        self.assertContains(
+            response, f"{reverse('processes:process-list-review')}?scope=review"
+        )
+
+    def test_add_actions_require_permissions(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("processes:explorer"))
+        self.assertNotContains(response, reverse("processes:process-create"))
+
+        self.owner.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="processes", codename="add_process"
+            )
+        )
+        self.owner = get_user_model().objects.get(pk=self.owner.pk)
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("processes:explorer"))
+        self.assertContains(response, reverse("processes:process-create"))
+        self.assertNotContains(response, reverse("processes:processcategory-create"))
+
+    def test_explorer_uses_module_label_in_title_and_breadcrumb(self):
+        response = self.client.get(reverse("processes:explorer"))
+
+        self.assertContains(response, "BRIT | Processes")
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Processes</li>',
+            html=True,
+        )
+
+    def test_list_breadcrumb_module_links_to_explorer(self):
+        response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+
+        self.assertContains(
+            response,
+            f'<a href="{reverse("processes:explorer")}">Processes</a>',
+            html=True,
+        )
+
+    def test_legacy_dashboard_permanently_redirects_to_explorer(self):
+        response = self.client.get("/processes/dashboard/", {"scope": "published"})
+
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(
+            response["Location"], f"{reverse('processes:explorer')}?scope=published"
+        )
+
+    def test_list_views_link_back_to_explorer(self):
+        self.client.force_login(self.owner)
+        for url_name, scope in (
+            ("processes:process-list", "published"),
+            ("processes:processcategory-list", "published"),
+            ("processes:processcategory-list-owned", "private"),
+        ):
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name), {"scope": scope})
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(
+                    response,
+                    f'<a class="btn btn-sm btn-outline-secondary" '
+                    f'href="{reverse("processes:explorer")}" title="Open Explorer">'
+                    f'<i class="fas fa-table-cells-large"></i> Explorer</a>',
+                    html=True,
                 )
-                self.assertEqual(302, response.status_code)
-                location = response["Location"]
-                self.assertTrue(
-                    location.startswith(f"{reverse('processes:processcategory-list')}?")
-                )
-                self.assertIn("scope=review", location)
-                self.assertIn("name=digestion", location)
 
 
 # ==============================================================================
@@ -677,7 +842,7 @@ class ProcessCategoryCRUDViewsTestCase(
 
     model = ProcessCategory
 
-    explorer_view = False
+    view_explorer_name = "processes:explorer"
 
     view_create_name = "processes:processcategory-create"
     view_modal_create_name = "processes:processcategory-create-modal"
@@ -893,7 +1058,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
     model = Process
 
-    explorer_view = False
+    view_explorer_name = "processes:explorer"
 
     view_create_name = "processes:process-create"
     view_modal_create_name = "processes:process-create-modal"
@@ -2084,8 +2249,6 @@ class ProcessWorkshopJourneyViewsTestCase(TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, f'href="{catalogue_url}?scope=published"')
                 self.assertContains(response, "Categories")
-                self.assertNotContains(response, reverse("processes:explorer"))
-                self.assertNotContains(response, "Explorer")
                 self.assertNotContains(response, "My processes")
 
     def test_edit_workspace_jump_nav_matches_rendered_sections(self):
@@ -2443,7 +2606,7 @@ class ListRowNavigationTestCase(ViewWithPermissionsTestCase):
                 self.assertNotIn('onclick="window.location', row)
 
 
-class ProcessDashboardRecentOrderingTestCase(TestCase):
+class ProcessExplorerRecentOrderingTestCase(TestCase):
     def test_recent_processes_are_most_recently_modified_first(self):
         from django.contrib.auth.models import AnonymousUser
         from django.test import RequestFactory

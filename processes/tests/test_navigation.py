@@ -40,7 +40,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         )
         cls.process.categories.add(cls.category, cls.other_category)
 
-    def test_process_lists_show_discovery_nav_without_explorer(self):
+    def test_process_lists_show_discovery_nav_and_explorer_link(self):
         for url_name, params in (
             ("processes:process-list", {"scope": "published"}),
             ("processes:process-list-owned", {"scope": "private"}),
@@ -55,7 +55,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
                     f'href="{reverse("processes:processcategory-list")}'
                     f'?scope={params["scope"]}"',
                 )
-                self.assertNotContains(response, "Explorer")
+                self.assertContains(response, f'href="{reverse("processes:explorer")}"')
 
         self.client.force_login(self.moderator)
         response = self.client.get(
@@ -66,7 +66,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
             response,
             f'href="{reverse("processes:processcategory-list")}?scope=review"',
         )
-        self.assertNotContains(response, "Explorer")
+        self.assertContains(response, f'href="{reverse("processes:explorer")}"')
 
     def test_anonymous_nav_has_no_review_or_mine_links(self):
         response = self.client.get(reverse("processes:processcategory-list"))
@@ -148,7 +148,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         self.assertContains(response, "View processes")
         self.assertContains(response, "About this category")
         self.assertNotContains(response, "process_count")
-        self.assertNotContains(response, "Explorer")
+        self.assertContains(response, f'href="{reverse("processes:explorer")}"')
 
     def test_catalogue_search_filters_by_name_only(self):
         response = self.client.get(
@@ -350,7 +350,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
                     f'href="{reverse("processes:processcategory-list")}?scope={scope}"',
                 )
 
-    def test_create_form_breadcrumbs_link_processes_to_process_list(self):
+    def test_create_form_breadcrumbs_link_processes_to_explorer(self):
         superuser = User.objects.create_superuser(username="nav-form-superuser")
         self.client.force_login(superuser)
         for url_name in (
@@ -360,12 +360,9 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
             with self.subTest(url_name=url_name):
                 response = self.client.get(reverse(url_name))
                 self.assertEqual(response.status_code, 200)
-                self.assertNotContains(
-                    response, f'href="{reverse("processes:explorer")}"'
-                )
                 self.assertContains(
                     response,
-                    f'<a href="{reverse("processes:process-list")}">Processes</a>',
+                    f'<a href="{reverse("processes:explorer")}">Processes</a>',
                     count=1,
                 )
 

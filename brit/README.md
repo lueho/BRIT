@@ -78,7 +78,7 @@ The legacy `object` / `header` / `title` / `breadcrumb_page_title` fallback chai
 | `inventories` | Inventories | `inventories-explorer` | — |
 | `maps` | Maps | `maps-explorer` | — |
 | `materials` | Materials | `materials-explorer` | — |
-| `processes` | Processes | `processes:process-list` | — |
+| `processes` | Processes | `processes:explorer` | — |
 | `properties` | Properties | `properties-explorer` | — |
 | `sources` | Sources | `sources-explorer` | — |
 | `utils` | Utilities | `utils-explorer` | — |
