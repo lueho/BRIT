@@ -1132,32 +1132,6 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
         self.assertEqual(Source.objects.count(), 0)
 
-    def test_post_returns_ids_of_authors_created_by_the_request(self):
-        add_author_permission = Permission.objects.get(codename="add_author")
-        self.member.user_permissions.add(add_author_permission)
-        self.client.force_login(self.member)
-        existing = Author.objects.create(
-            owner=self.member, first_names="Grace", last_names="Hopper"
-        )
-
-        response = self.client.post(
-            reverse("source-quick-create"),
-            data=json.dumps(
-                {
-                    "title": "Inline source",
-                    "authors": [
-                        {"id": existing.pk},
-                        {"first_names": "Ada", "last_names": "Lovelace"},
-                    ],
-                }
-            ),
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 201)
-        created = Author.objects.get(last_names="Lovelace")
-        self.assertEqual(response.json()["created_author_ids"], [created.pk])
-
     def test_post_http_201_creates_source_with_new_organisation_author(self):
         add_author_permission = Permission.objects.get(codename="add_author")
         self.member.user_permissions.add(add_author_permission)
@@ -1251,56 +1225,107 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Source.objects.filter(pk=source.pk).exists())
 
-    def test_delete_removes_unreferenced_authors_created_with_the_source(self):
-        self.client.force_login(self.member)
-        source = Source.objects.create(owner=self.member, title="To delete")
-        new_author = Author.objects.create(
-            owner=self.member, first_names="Ada", last_names="Lovelace"
-        )
-        shared_author = Author.objects.create(
-            owner=self.member, first_names="Grace", last_names="Hopper"
-        )
-        published_author = Author.objects.create(
-            owner=self.member,
-            first_names="Alan",
-            last_names="Turing",
-            publication_status="published",
-        )
-        foreign_author = Author.objects.create(
-            owner=self.outsider, first_names="Edsger", last_names="Dijkstra"
-        )
-        for position, author in enumerate(
-            (new_author, shared_author, published_author, foreign_author), start=1
-        ):
-            source.sourceauthors.create(author=author, position=position)
-        other_source = Source.objects.create(owner=self.member, title="Keeps Hopper")
-        other_source.sourceauthors.create(author=shared_author, position=1)
-
-        response = self.client.delete(
+    def _quick_create_with_authors(self, authors, title="Inline source"):
+        response = self.client.post(
             reverse("source-quick-create"),
-            data=json.dumps(
-                {
-                    "id": source.pk,
-                    "author_ids": [
-                        new_author.pk,
-                        shared_author.pk,
-                        published_author.pk,
-                        foreign_author.pk,
-                        "not-a-number",
-                    ],
-                }
-            ),
+            data=json.dumps({"title": title, "authors": authors}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201)
+        return response.json()
+
+    def _quick_delete(self, payload):
+        return self.client.delete(
+            reverse("source-quick-create"),
+            data=json.dumps(payload),
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(Source.objects.filter(pk=source.pk).exists())
-        self.assertFalse(Author.objects.filter(pk=new_author.pk).exists())
-        self.assertTrue(Author.objects.filter(pk=shared_author.pk).exists())
-        self.assertTrue(Author.objects.filter(pk=published_author.pk).exists())
-        self.assertTrue(Author.objects.filter(pk=foreign_author.pk).exists())
+    def test_delete_with_cleanup_token_removes_authors_created_with_source(self):
+        self.member.user_permissions.add(Permission.objects.get(codename="add_author"))
+        self.client.force_login(self.member)
+        existing = Author.objects.create(
+            owner=self.member, first_names="Grace", last_names="Hopper"
+        )
+        created = self._quick_create_with_authors(
+            [{"id": existing.pk}, {"first_names": "Ada", "last_names": "Lovelace"}]
+        )
 
-    def test_delete_keeps_authors_when_no_author_ids_are_sent(self):
+        response = self._quick_delete(
+            {
+                "id": created["id"],
+                "author_cleanup_token": created["author_cleanup_token"],
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Source.objects.filter(pk=created["id"]).exists())
+        self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
+        self.assertTrue(Author.objects.filter(pk=existing.pk).exists())
+
+    def test_delete_keeps_created_authors_still_used_by_a_source_or_process(self):
+        from processes.models import Process, ProcessAuthor
+
+        self.member.user_permissions.add(Permission.objects.get(codename="add_author"))
+        self.client.force_login(self.member)
+        created = self._quick_create_with_authors(
+            [
+                {"first_names": "Ada", "last_names": "Lovelace"},
+                {"first_names": "Grace", "last_names": "Hopper"},
+            ]
+        )
+        other_source = Source.objects.create(owner=self.member, title="Other")
+        other_source.sourceauthors.create(
+            author=Author.objects.get(last_names="Lovelace"), position=1
+        )
+        process = Process.objects.create(name="Process", owner=self.member)
+        ProcessAuthor.objects.create(
+            process=process, author=Author.objects.get(last_names="Hopper")
+        )
+
+        response = self._quick_delete(
+            {
+                "id": created["id"],
+                "author_cleanup_token": created["author_cleanup_token"],
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Source.objects.filter(pk=created["id"]).exists())
+        self.assertTrue(Author.objects.filter(last_names="Lovelace").exists())
+        self.assertTrue(Author.objects.filter(last_names="Hopper").exists())
+
+    def test_delete_ignores_author_ids_without_a_matching_cleanup_token(self):
+        self.member.user_permissions.add(Permission.objects.get(codename="add_author"))
+        self.client.force_login(self.member)
+        first = self._quick_create_with_authors(
+            [{"first_names": "Ada", "last_names": "Lovelace"}], title="First"
+        )
+        second = Source.objects.create(owner=self.member, title="Second")
+        unrelated = Author.objects.create(
+            owner=self.member, first_names="Grace", last_names="Hopper"
+        )
+
+        forged = self._quick_delete(
+            {
+                "id": second.pk,
+                "author_ids": [unrelated.pk],
+                "author_cleanup_token": first["author_cleanup_token"],
+            }
+        )
+        tampered = self._quick_delete(
+            {"id": first["id"], "author_cleanup_token": "not-a-valid-token"}
+        )
+
+        self.assertEqual(forged.status_code, 200)
+        self.assertEqual(tampered.status_code, 200)
+        self.assertFalse(
+            Source.objects.filter(pk__in=[first["id"], second.pk]).exists()
+        )
+        self.assertTrue(Author.objects.filter(pk=unrelated.pk).exists())
+        self.assertTrue(Author.objects.filter(last_names="Lovelace").exists())
+
+    def test_delete_keeps_authors_when_no_cleanup_token_is_sent(self):
         self.client.force_login(self.member)
         source = Source.objects.create(owner=self.member, title="To delete")
         author = Author.objects.create(

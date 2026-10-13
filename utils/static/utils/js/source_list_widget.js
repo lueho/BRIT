@@ -343,12 +343,13 @@ function initAuthorTomSelect(authorInput) {
 
 /**
  * Delete a quick-created source from the database via the quick-create endpoint.
- * ``authorIds`` lists the authors that were created together with the source,
- * so the server can remove them too when nothing else references them.
+ * ``authorCleanupToken`` is the signed token returned when the source was
+ * quick-created; it lets the server also remove the authors created with it
+ * while nothing else references them.
  * Silently ignores failures (e.g. network errors) since the source may already
  * have been saved as part of the parent form.
  */
-async function deleteQuickCreatedSource(sourceId, quickCreateUrl, authorIds = []) {
+async function deleteQuickCreatedSource(sourceId, quickCreateUrl, authorCleanupToken = '') {
     if (!sourceId || !quickCreateUrl) {
         return;
     }
@@ -360,7 +361,7 @@ async function deleteQuickCreatedSource(sourceId, quickCreateUrl, authorIds = []
                 'X-CSRFToken': getCookie('csrftoken'),
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify({ id: sourceId, author_ids: authorIds })
+            body: JSON.stringify({ id: sourceId, author_cleanup_token: authorCleanupToken })
         });
     } catch (_) {
         // Silently ignore network errors — the source will remain but that is
@@ -417,8 +418,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // Track sources created via quick-create in this widget session, mapped
-        // to the author IDs created with them, so both can be deleted if the
-        // user removes the source before saving.
+        // to their author cleanup token, so the source and the authors created
+        // with it can be deleted if the user removes the source before saving.
         const quickCreatedSources = new Map();
 
         // --- Author TomSelect for the create-new-source section ---
@@ -440,14 +441,14 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         // --- Helper: add a source to the visible list and hidden select ---
-        function addSourceToWidget(sourceId, sourceLabel, isQuickCreated, createdAuthorIds = []) {
+        function addSourceToWidget(sourceId, sourceLabel, isQuickCreated, authorCleanupToken = '') {
             // Guard against duplicates
             if (targetSelect.querySelector(`option[value="${sourceId}"]`)) {
                 return;
             }
 
             if (isQuickCreated) {
-                quickCreatedSources.set(String(sourceId), createdAuthorIds);
+                quickCreatedSources.set(String(sourceId), authorCleanupToken);
             }
 
             clearFeedback(feedbackElement);
@@ -571,7 +572,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     String(createdSource.id),
                     optionLabel,
                     true,
-                    createdSource.created_author_ids || []
+                    createdSource.author_cleanup_token || ''
                 );
 
                 // Clear the create-new-source form
@@ -608,9 +609,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // If this was quick-created in this session, delete it from the DB
                 if (quickCreatedSources.has(sourceId) && quickCreateUrl) {
-                    const createdAuthorIds = quickCreatedSources.get(sourceId);
+                    const authorCleanupToken = quickCreatedSources.get(sourceId);
                     quickCreatedSources.delete(sourceId);
-                    deleteQuickCreatedSource(sourceId, quickCreateUrl, createdAuthorIds);
+                    deleteQuickCreatedSource(sourceId, quickCreateUrl, authorCleanupToken);
                 }
 
                 // Remove from hidden select

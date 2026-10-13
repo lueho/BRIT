@@ -3,9 +3,10 @@ import json
 from celery.result import AsyncResult
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import ProtectedError, Q, RestrictedError
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
@@ -468,6 +469,8 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
     """
 
     permission_required = "bibliography.add_source"
+    author_cleanup_salt = "bibliography.source-quick-create.author-cleanup"
+    author_cleanup_max_age = 60 * 60 * 24
 
     @staticmethod
     def _normalize_name_part(value):
@@ -629,7 +632,14 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 "title": source.title,
                 "text": formatted_label,
                 "label": formatted_label,
-                "created_author_ids": created_author_ids,
+                "author_cleanup_token": signing.dumps(
+                    {
+                        "source": source.pk,
+                        "user": request.user.pk,
+                        "authors": created_author_ids,
+                    },
+                    salt=self.author_cleanup_salt,
+                ),
             },
             status=201,
         )
@@ -642,9 +652,10 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         this endpoint.  This prevents orphaned records when the user removes a
         just-created source from the widget before saving the parent form.
 
-        ``author_ids`` may list the authors the quick-create call inserted for
-        this source; those owned by the requesting user that are still private
-        and no longer referenced by any source are deleted as well.
+        ``author_cleanup_token`` is the signed token returned when the source
+        was quick-created.  The authors that call inserted for this source are
+        deleted as well while they are still private and no longer referenced
+        by any source or process.
         """
         try:
             payload = json.loads(request.body.decode("utf-8") or "{}")
@@ -666,25 +677,52 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 status=403,
             )
 
-        author_ids = []
-        raw_author_ids = payload.get("author_ids")
-        if isinstance(raw_author_ids, list):
-            for raw_author_id in raw_author_ids:
-                try:
-                    author_ids.append(int(raw_author_id))
-                except (TypeError, ValueError):
-                    continue
+        created_author_ids = self._created_author_ids_from_token(
+            payload.get("author_cleanup_token"), source, request.user
+        )
 
         with transaction.atomic():
+            linked_author_ids = list(
+                source.sourceauthors.filter(
+                    author_id__in=created_author_ids
+                ).values_list("author_id", flat=True)
+            )
             source.delete()
-            if author_ids:
-                Author.objects.filter(
-                    pk__in=author_ids,
-                    owner=request.user,
-                    publication_status=Author.STATUS_PRIVATE,
-                    sourceauthors__isnull=True,
-                ).delete()
+            orphaned_authors = Author.objects.filter(
+                pk__in=linked_author_ids,
+                owner=request.user,
+                publication_status=Author.STATUS_PRIVATE,
+                sourceauthors__isnull=True,
+                process_author_links__isnull=True,
+            )
+            for author in orphaned_authors:
+                try:
+                    with transaction.atomic():
+                        author.delete()
+                except (ProtectedError, RestrictedError):
+                    continue
         return JsonResponse({"deleted": True}, status=200)
+
+    def _created_author_ids_from_token(self, token, source, user):
+        """Return the author IDs a valid cleanup token issued for ``source`` lists."""
+        if not isinstance(token, str) or not token:
+            return []
+        try:
+            data = signing.loads(
+                token,
+                salt=self.author_cleanup_salt,
+                max_age=self.author_cleanup_max_age,
+            )
+        except signing.BadSignature:
+            return []
+        if not isinstance(data, dict):
+            return []
+        if data.get("source") != source.pk or data.get("user") != user.pk:
+            return []
+        author_ids = data.get("authors")
+        if not isinstance(author_ids, list):
+            return []
+        return [author_id for author_id in author_ids if isinstance(author_id, int)]
 
 
 class SourceCreateAPIView(APIView):

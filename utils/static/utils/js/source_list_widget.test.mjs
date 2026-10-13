@@ -140,7 +140,7 @@ test("authorOptionToMetadata sends existing authors by id only", () => {
     assert.equal(sandbox.authorOptionToMetadata(null), null);
 });
 
-test("deleteQuickCreatedSource sends the authors created with the source", async () => {
+test("deleteQuickCreatedSource sends the author cleanup token", async () => {
     const requests = [];
     const sandbox = {
         console,
@@ -158,12 +158,12 @@ test("deleteQuickCreatedSource sends the authors created with the source", async
     };
     vm.runInNewContext(source, sandbox);
 
-    await sandbox.deleteQuickCreatedSource("7", "/quick-create/", [11, 12]);
+    await sandbox.deleteQuickCreatedSource("7", "/quick-create/", "signed-token");
 
     assert.equal(requests.length, 1);
     assert.equal(requests[0].init.method, "DELETE");
     assert.deepEqual(JSON.parse(requests[0].init.body), {
         id: "7",
-        author_ids: [11, 12],
+        author_cleanup_token: "signed-token",
     });
 });
