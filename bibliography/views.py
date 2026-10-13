@@ -587,11 +587,11 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     status=400,
                 )
 
-        authors, author_error = self._resolve_authors(request, payload)
-        if author_error is not None:
-            return author_error
-
         with transaction.atomic():
+            authors, author_error = self._resolve_authors(request, payload)
+            if author_error is not None:
+                return author_error
+
             source = Source.objects.create(
                 owner=request.user,
                 title=title,

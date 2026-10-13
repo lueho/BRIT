@@ -120,16 +120,16 @@ function clearFeedback(feedbackElement) {
 }
 
 /**
- * Parse a typed author string into first and last names.
+ * Parse a typed author string into first and last names for a person.
  *
  * Rules:
- *  - If the input contains a comma: everything before the first comma is
- *    last_names, everything after is first_names.  This is the standard
- *    bibliographic "Last, First" format.
- *  - If there is NO comma: the entire string is treated as an organization
- *    name.  The backend creates an author_type="organization" record.
+ *  - "Last, First" (comma): everything before the first comma is last_names,
+ *    everything after is first_names.  This is the standard bibliographic
+ *    format.
+ *  - "First Last" (no comma): the last word becomes last_names, the rest
+ *    first_names.  A single word is stored as last_names only.
  */
-function parseAuthorInput(rawInput) {
+function parsePersonName(rawInput) {
     const trimmedInput = (rawInput || '').trim();
     if (!trimmedInput) {
         return null;
@@ -145,50 +145,83 @@ function parseAuthorInput(rawInput) {
         return { first_names: firstNames, last_names: lastNames };
     }
 
-    return { author_type: 'organization', organization_name: trimmedInput };
+    const tokens = trimmedInput.split(/\s+/);
+    const lastNames = tokens.pop();
+    return { first_names: tokens.join(' '), last_names: lastNames };
+}
+
+function personDisplayName(parsed) {
+    return parsed.first_names
+        ? parsed.last_names + ', ' + parsed.first_names
+        : parsed.last_names;
 }
 
 /**
- * Create a new author from typed input and return the created author payload.
+ * Build the explicit "create" dropdown options for a typed author name.
+ *
+ * Rather than silently guessing the author type, the user picks one of these
+ * options.  The new author is not written to the database here: the chosen
+ * option becomes a pending chip and is only persisted together with the
+ * source when "Add source" is clicked.
  */
-async function createAuthorFromInput(authorInput, quickCreateUrl, feedbackElement) {
-    const parsedName = parseAuthorInput(authorInput);
-    if (!parsedName) {
-        showFeedback(
-            feedbackElement,
-            'Author needs at least a name. Use "Last, First" for persons or type a name for organizations.'
-        );
-        return null;
-    }
-    if (!parsedName.last_names && !parsedName.organization_name) {
-        showFeedback(
-            feedbackElement,
-            'Author needs at least a name. Use "Last, First" for persons or type a name for organizations.'
-        );
-        return null;
+function buildAuthorCreateOptions(rawInput) {
+    const trimmedInput = (rawInput || '').trim();
+    if (!trimmedInput) {
+        return [];
     }
 
-    const response = await fetch(quickCreateUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken'),
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify(parsedName)
+    const options = [];
+    const person = parsePersonName(trimmedInput);
+    if (person) {
+        const displayName = personDisplayName(person);
+        options.push({
+            id: 'pending-person:' + trimmedInput,
+            author_type: 'person',
+            first_names: person.first_names,
+            last_names: person.last_names,
+            label: displayName,
+            create_label: 'Create person "' + displayName + '"',
+            pending: true
+        });
+    }
+
+    options.push({
+        id: 'pending-organization:' + trimmedInput,
+        author_type: 'organization',
+        organization_name: trimmedInput,
+        label: trimmedInput,
+        create_label: 'Create organization "' + trimmedInput + '"',
+        pending: true
     });
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-        showFeedback(
-            feedbackElement,
-            payload.error || 'Could not create author. Please try again.'
-        );
+    return options;
+}
+
+/**
+ * Map a selected author TomSelect option to the payload sent to the
+ * source quick-create endpoint.
+ *
+ * Pending options (freshly typed names) carry the author fields and no id —
+ * the endpoint creates the author transactionally with the source.  Options
+ * from the autocomplete reference existing authors and only send their id.
+ */
+function authorOptionToMetadata(option) {
+    if (!option) {
         return null;
     }
-
-    clearFeedback(feedbackElement);
-    return payload;
+    if (option.pending) {
+        if (option.author_type === 'organization') {
+            return {
+                author_type: 'organization',
+                organization_name: option.organization_name || ''
+            };
+        }
+        return {
+            first_names: option.first_names || '',
+            last_names: option.last_names || ''
+        };
+    }
+    return { id: String(option.id) };
 }
 
 /**
@@ -235,14 +268,17 @@ async function createSourceFromInput(title, quickCreateUrl, feedbackElement, met
 
 /**
  * Initialize author TomSelect for optional source metadata input.
+ *
+ * The dropdown always offers explicit "Create person" / "Create organization"
+ * options for the typed name.  Selecting one adds a pending chip — the author
+ * record is only created server-side when the source itself is saved.
  */
-function initAuthorTomSelect(authorInput, feedbackElement) {
+function initAuthorTomSelect(authorInput) {
     if (!authorInput) {
         return null;
     }
 
     const authorAutocompleteUrl = authorInput.dataset.authorAutocompleteUrl;
-    const authorQuickCreateUrl = authorInput.dataset.authorQuickCreateUrl;
 
     if (!authorAutocompleteUrl) {
         return null;
@@ -252,33 +288,6 @@ function initAuthorTomSelect(authorInput, feedbackElement) {
         authorInput.tomselect.destroy();
     }
 
-    const createAuthorHandler = authorQuickCreateUrl ? function (userInput, callback) {
-        createAuthorFromInput(userInput, authorQuickCreateUrl, feedbackElement)
-            .then(createdAuthor => {
-                if (!createdAuthor || !createdAuthor.id) {
-                    callback();
-                    return;
-                }
-
-                callback({
-                    id: String(createdAuthor.id),
-                    first_names: createdAuthor.first_names || '',
-                    last_names: createdAuthor.last_names || '',
-                    author_type: createdAuthor.author_type || '',
-                    organization_name: createdAuthor.organization_name || '',
-                    label: createdAuthor.label || createdAuthor.text || userInput,
-                    text: createdAuthor.text || createdAuthor.label || userInput
-                });
-            })
-            .catch(() => {
-                showFeedback(
-                    feedbackElement,
-                    'Could not create author. Please try again.'
-                );
-                callback();
-            });
-    } : false;
-
     return new TomSelect(authorInput, {
         valueField: 'id',
         labelField: 'label',
@@ -286,28 +295,33 @@ function initAuthorTomSelect(authorInput, feedbackElement) {
         maxItems: null,
         maxOptions: 25,
         loadThrottle: 300,
-        create: createAuthorHandler,
+        create: false,
         persist: false,
-        createFilter: function (userInput) {
-            return !!(userInput && userInput.trim());
-        },
         load: function (query, callback) {
-            const url = authorAutocompleteUrl + (query ? '?q=' + encodeURIComponent(query) : '');
+            const createOptions = buildAuthorCreateOptions(query);
+            const url = authorAutocompleteUrl + '?q=' + encodeURIComponent(query);
             fetch(url)
                 .then(response => response.json())
                 .then(data => {
-                    callback(data.results || data);
+                    callback((data.results || data).concat(createOptions));
                 })
                 .catch(() => {
-                    callback();
+                    callback(createOptions);
                 });
         },
         render: {
             option: function (data, escape) {
+                if (data.pending) {
+                    return '<div class="option create">' + escape(data.create_label || data.label || '') + '</div>';
+                }
                 return '<div class="option">' + escape(data.label || data.text || '') + '</div>';
             },
             item: function (data, escape) {
-                return '<div>' + escape(data.label || data.text || '') + '</div>';
+                const label = escape(data.label || data.text || '');
+                if (data.pending) {
+                    return '<div>' + label + ' <span class="badge text-bg-secondary">new ' + escape(data.author_type || 'author') + '</span></div>';
+                }
+                return '<div>' + label + '</div>';
             }
         },
         placeholder: authorInput.getAttribute('placeholder') || 'Add authors...',
@@ -397,7 +411,7 @@ document.addEventListener('DOMContentLoaded', function () {
             input.tomselect.destroy();
         }
 
-        const authorTomSelect = initAuthorTomSelect(authorsInput, feedbackElement);
+        const authorTomSelect = initAuthorTomSelect(authorsInput);
 
         const buildAuthorMetadata = function () {
             if (!authorTomSelect || !authorTomSelect.items.length) {
@@ -405,20 +419,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             return authorTomSelect.items
                 .map(function (authorId) {
-                    const option = authorTomSelect.options[authorId];
-                    if (!option) {
-                        return null;
-                    }
-                    const metadata = {
-                        id: String(authorId),
-                        first_names: option.first_names || '',
-                        last_names: option.last_names || ''
-                    };
-                    if (option.author_type === 'organization') {
-                        metadata.author_type = 'organization';
-                        metadata.organization_name = option.organization_name || option.label || '';
-                    }
-                    return metadata;
+                    return authorOptionToMetadata(authorTomSelect.options[authorId]);
                 })
                 .filter(Boolean);
         };

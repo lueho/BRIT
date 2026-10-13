@@ -1067,6 +1067,34 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(created_author.first_names, "Ada")
         self.assertEqual(created_author.last_names, "Lovelace")
 
+    def test_failed_source_creation_does_not_leave_orphan_authors(self):
+        """Inline authors must not persist when the source create fails."""
+        add_author_permission = Permission.objects.get(codename="add_author")
+        self.member.user_permissions.add(add_author_permission)
+        self.client.force_login(self.member)
+
+        with patch.object(Source.objects, "create") as mock_create:
+            mock_create.side_effect = RuntimeError("simulated failure")
+            with (
+                self.assertLogs("django.request", level="ERROR"),
+                self.assertRaises(RuntimeError),
+            ):
+                self.client.post(
+                    reverse("source-quick-create"),
+                    data=json.dumps(
+                        {
+                            "title": "Inline source",
+                            "authors": [
+                                {"first_names": "Ada", "last_names": "Lovelace"}
+                            ],
+                        }
+                    ),
+                    content_type="application/json",
+                )
+
+        self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
+        self.assertEqual(Source.objects.count(), 0)
+
     def test_post_http_201_creates_source_with_new_organisation_author(self):
         add_author_permission = Permission.objects.get(codename="add_author")
         self.member.user_permissions.add(add_author_permission)
@@ -1097,6 +1125,42 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(created_author.author_type, "organization")
         self.assertEqual(
             created_author.organization_name, "European Environment Agency"
+        )
+
+    def test_post_http_201_creates_source_with_mixed_new_authors(self):
+        add_author_permission = Permission.objects.get(codename="add_author")
+        self.member.user_permissions.add(add_author_permission)
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps(
+                {
+                    "title": "Inline source",
+                    "authors": [
+                        {"first_names": "Ada", "last_names": "Lovelace"},
+                        {
+                            "author_type": "organization",
+                            "organization_name": "European Environment Agency",
+                        },
+                    ],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        source = Source.objects.get(pk=response.json()["id"])
+        self.assertEqual(source.sourceauthors.count(), 2)
+
+        person_author = source.sourceauthors.get(position=1).author
+        self.assertEqual(person_author.author_type, "person")
+        self.assertEqual(person_author.last_names, "Lovelace")
+
+        organisation_author = source.sourceauthors.get(position=2).author
+        self.assertEqual(organisation_author.author_type, "organization")
+        self.assertEqual(
+            organisation_author.organization_name, "European Environment Agency"
         )
 
     def test_delete_http_302_redirect_to_login_for_anonymous(self):
