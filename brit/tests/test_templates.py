@@ -958,6 +958,24 @@ class MapsExplorerTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "explorer-card")
 
+    def test_nuts_count_covers_only_the_current_vintage(self):
+        from maps.models import NutsRegion, NutsVintage
+
+        other_vintage = NutsVintage.objects.create(year=2024)
+        for vintage in (NutsVintage.default(), other_vintage):
+            NutsRegion.objects.create(
+                name="Deutschland",
+                nuts_id="DE",
+                levl_code=0,
+                cntr_code="DE",
+                version=vintage,
+                publication_status=NutsRegion.STATUS_PUBLISHED,
+            )
+
+        response = self.client.get(reverse("maps-explorer"))
+
+        self.assertEqual(response.context["nuts_count"], 1)
+
 
 class SidebarNavigationTests(TestCase):
     """Sidebar module entries point at primary lists and mark the active

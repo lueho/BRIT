@@ -393,7 +393,9 @@ class MapsExplorerView(BreadcrumbContextMixin, TemplateView):
         context["region_count"] = Region.objects.filter(**published).count()
         context["catchment_count"] = Catchment.objects.filter(**published).count()
         context["location_count"] = Location.objects.filter(**published).count()
-        context["nuts_count"] = NutsRegion.objects.filter(**published).count()
+        context["nuts_count"] = (
+            NutsRegion.objects.in_vintage().filter(**published).count()
+        )
         return context
 
 
