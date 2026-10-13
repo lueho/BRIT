@@ -470,7 +470,6 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
     permission_required = "bibliography.add_source"
     author_cleanup_salt = "bibliography.source-quick-create.author-cleanup"
-    author_cleanup_max_age = 60 * 60 * 24
 
     @staticmethod
     def _normalize_name_part(value):
@@ -682,14 +681,9 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         )
 
         with transaction.atomic():
-            linked_author_ids = list(
-                source.sourceauthors.filter(
-                    author_id__in=created_author_ids
-                ).values_list("author_id", flat=True)
-            )
             source.delete()
             orphaned_authors = Author.objects.filter(
-                pk__in=linked_author_ids,
+                pk__in=created_author_ids,
                 owner=request.user,
                 publication_status=Author.STATUS_PRIVATE,
                 sourceauthors__isnull=True,
@@ -708,11 +702,7 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         if not isinstance(token, str) or not token:
             return []
         try:
-            data = signing.loads(
-                token,
-                salt=self.author_cleanup_salt,
-                max_age=self.author_cleanup_max_age,
-            )
+            data = signing.loads(token, salt=self.author_cleanup_salt)
         except signing.BadSignature:
             return []
         if not isinstance(data, dict):

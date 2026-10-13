@@ -1,7 +1,9 @@
 import json
+import time
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission
+from django.core import signing
 from django.db.models.signals import post_save
 from django.urls import reverse
 from django.utils.html import escape
@@ -1262,6 +1264,45 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertFalse(Source.objects.filter(pk=created["id"]).exists())
         self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
         self.assertTrue(Author.objects.filter(pk=existing.pk).exists())
+
+    def test_delete_with_cleanup_token_removes_created_author_unlinked_meanwhile(self):
+        self.member.user_permissions.add(Permission.objects.get(codename="add_author"))
+        self.client.force_login(self.member)
+        created = self._quick_create_with_authors(
+            [{"first_names": "Ada", "last_names": "Lovelace"}]
+        )
+        SourceAuthor.objects.filter(source_id=created["id"]).delete()
+
+        response = self._quick_delete(
+            {
+                "id": created["id"],
+                "author_cleanup_token": created["author_cleanup_token"],
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
+
+    def test_delete_accepts_cleanup_token_older_than_a_day(self):
+        self.member.user_permissions.add(Permission.objects.get(codename="add_author"))
+        self.client.force_login(self.member)
+        three_days_ago = signing.b62_encode(int(time.time()) - 3 * 86400)
+        with patch.object(
+            signing.TimestampSigner, "timestamp", return_value=three_days_ago
+        ):
+            created = self._quick_create_with_authors(
+                [{"first_names": "Ada", "last_names": "Lovelace"}]
+            )
+
+        response = self._quick_delete(
+            {
+                "id": created["id"],
+                "author_cleanup_token": created["author_cleanup_token"],
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
 
     def test_delete_keeps_created_authors_still_used_by_a_source_or_process(self):
         from processes.models import Process, ProcessAuthor
