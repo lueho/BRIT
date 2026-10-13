@@ -1415,6 +1415,58 @@ class CollectionListQueryTestCase(TestCase):
         self.assertTrue(index["R"]["active"])
         self.assertFalse(index["B"]["enabled"])
 
+    def test_review_route_applies_letter_filter_and_index(self):
+        moderator = User.objects.create_user(username="letter-moderator")
+        moderator.user_permissions.add(
+            Permission.objects.get_or_create(
+                codename="can_moderate_collection",
+                content_type=ContentType.objects.get_for_model(Collection),
+                defaults={"name": "Can moderate collections"},
+            )[0]
+        )
+        river, zebra = Collection.objects.bulk_create(
+            [
+                Collection(
+                    name=name,
+                    owner=self.other_owner,
+                    publication_status="review",
+                    valid_from=date(2024, 1, 1),
+                    catchment=self.catchment,
+                    collector=self.collector,
+                    waste_category=self.category,
+                    collection_system=self.system,
+                )
+                for name in ("River collection", "Zebra collection")
+            ]
+        )
+        self.client.force_login(moderator)
+
+        response = self.client.get(
+            reverse("collection-list-review"), {"scope": "review", "letter": "R"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result_pks = {obj.pk for obj in response.context["object_list"]}
+        self.assertIn(river.pk, result_pks)
+        self.assertNotIn(zebra.pk, result_pks)
+        index = {entry["letter"]: entry for entry in response.context["letter_index"]}
+        self.assertTrue(index["R"]["active"])
+        self.assertTrue(index["Z"]["enabled"])
+
+    def test_filter_form_carries_active_letter(self):
+        response = self.client.get(
+            reverse("collection-list"), {"scope": "published", "letter": "R"}
+        )
+
+        self.assertContains(
+            response, '<input type="hidden" name="letter" value="R">', html=True
+        )
+
+    def test_filter_form_has_no_letter_input_without_active_letter(self):
+        response = self.client.get(reverse("collection-list"), {"scope": "published"})
+
+        self.assertNotContains(response, 'name="letter"')
+
     def test_explicit_ordering_is_preserved(self):
         page = self.get_page(
             views.CollectionPublishedListView, ordering=("-valid_from", "-id")

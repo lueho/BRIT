@@ -252,6 +252,7 @@
                   {% block filter_body %}
                     <form method="get">
                       {% crispy filter.form %}
+                      {% include "partials/letter_index_input.html" %}
                       <div class="d-flex justify-content-end gap-2 mt-2">
                         <button id="btn-filter"
                                 class="btn btn-sm btn-primary submit-filter"

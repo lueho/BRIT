@@ -1757,7 +1757,7 @@ class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Collection
 
 
-class CollectionReviewFilterView(ReviewObjectFilterView):
+class CollectionReviewFilterView(CollectionListMixin, ReviewObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
     dashboard_url = reverse_lazy("wastecollection-explorer")

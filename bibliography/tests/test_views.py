@@ -414,6 +414,15 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
         self.assertContains(response, 'aria-label="Filter by first letter"')
 
+    def test_list_filter_form_carries_active_letter(self):
+        response = self.client.get(
+            reverse("source-list"), {"scope": "published", "letter": "Z"}
+        )
+
+        self.assertContains(
+            response, '<input type="hidden" name="letter" value="Z">', html=True
+        )
+
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
