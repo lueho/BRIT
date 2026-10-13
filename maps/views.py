@@ -13,7 +13,8 @@ from django.views import View
 from django.views.generic import DetailView, TemplateView
 from django.views.generic.edit import FormMixin
 from django_filters.views import FilterView
-from rest_framework.exceptions import NotFound, ParseError
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from rest_framework.exceptions import AuthenticationFailed, NotFound, ParseError
 from rest_framework.views import APIView, Response
 
 from maps.mixins import (
@@ -96,6 +97,7 @@ from .models import (
     RegionProperty,
 )
 from .signals import clear_geojson_cache_pattern
+from .throttling import GeoJSONAnonThrottle
 from .validation import RegionCompositionError, validate_region_composition
 
 # Query parameters that are navigation/control hints rather than dataset
@@ -962,8 +964,22 @@ class GeoDataSetRuntimeFeatureDetailView(
 class GeoDataSetRuntimeFeatureGeoJSONView(
     GeoDataSetRuntimePermissionMixin, UserPassesTestMixin, APIView
 ):
-    authentication_classes = []
+    authentication_classes = [SessionAuthentication]
     permission_classes = []
+    throttle_classes = [GeoJSONAnonThrottle]
+
+    def dispatch(self, request, *args, **kwargs):
+        # The visibility check in UserPassesTestMixin runs before DRF
+        # authentication, so resolve a valid token user first. Invalid tokens
+        # stay anonymous rather than turning public datasets into 401s.
+        if not request.user.is_authenticated and "HTTP_AUTHORIZATION" in request.META:
+            try:
+                token_auth = TokenAuthentication().authenticate(request)
+            except AuthenticationFailed:
+                token_auth = None
+            if token_auth is not None:
+                request.user = token_auth[0]
+        return super().dispatch(request, *args, **kwargs)
 
     def get(self, request, *args, **kwargs):
         adapter = self.get_runtime_adapter()
