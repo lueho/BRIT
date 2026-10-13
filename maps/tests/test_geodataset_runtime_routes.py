@@ -2,6 +2,8 @@ import json
 from unittest.mock import patch
 
 from django.contrib.admin.sites import AdminSite
+from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
 from django.test import TestCase
@@ -226,6 +228,34 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
     def tearDown(self):
         with connection.cursor() as cursor:
             cursor.execute(f"DROP TABLE IF EXISTS public.{self.relation_name}")
+
+    def _get_features_with_geojson_rate(self, rate, *remote_addrs):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        url = reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk})
+        with patch(
+            "rest_framework.throttling.SimpleRateThrottle.THROTTLE_RATES",
+            {"geojson_anon": rate},
+        ):
+            return [self.client.get(url, REMOTE_ADDR=addr) for addr in remote_addrs]
+
+    def test_feature_geojson_throttles_anonymous_subnet_together(self):
+        first, second = self._get_features_with_geojson_rate(
+            "1/minute", "202.46.62.65", "202.46.62.117"
+        )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)
+
+    def test_feature_geojson_throttle_skips_session_users(self):
+        user = User.objects.create_user(username="geodataset-map-user")
+        self.client.force_login(user)
+
+        responses = self._get_features_with_geojson_rate(
+            "1/minute", "202.46.62.65", "202.46.62.65"
+        )
+
+        self.assertEqual([r.status_code for r in responses], [200, 200])
 
     def test_runtime_adapter_resolves_local_relation_runtime(self):
         adapter = get_dataset_runtime_adapter(self.dataset)

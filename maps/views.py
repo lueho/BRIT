@@ -13,6 +13,7 @@ from django.views import View
 from django.views.generic import DetailView, TemplateView
 from django.views.generic.edit import FormMixin
 from django_filters.views import FilterView
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.views import APIView, Response
 
@@ -96,6 +97,7 @@ from .models import (
     RegionProperty,
 )
 from .signals import clear_geojson_cache_pattern
+from .throttling import GeoJSONAnonThrottle
 from .validation import RegionCompositionError, validate_region_composition
 
 # Query parameters that are navigation/control hints rather than dataset
@@ -962,8 +964,9 @@ class GeoDataSetRuntimeFeatureDetailView(
 class GeoDataSetRuntimeFeatureGeoJSONView(
     GeoDataSetRuntimePermissionMixin, UserPassesTestMixin, APIView
 ):
-    authentication_classes = []
+    authentication_classes = [SessionAuthentication]
     permission_classes = []
+    throttle_classes = [GeoJSONAnonThrottle]
 
     def get(self, request, *args, **kwargs):
         adapter = self.get_runtime_adapter()

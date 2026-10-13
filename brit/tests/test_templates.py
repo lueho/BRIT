@@ -145,7 +145,8 @@ class CookieConsentTemplateHardeningTests(TestCase):
         html = render_to_string("partials/_cookie_bar.html", {"request": request})
 
         self.assertIn("cookiebar.module.js", html)
-        self.assertIn("showCookieBar({", html)
+        self.assertIn("startCookieBar(showCookieBar, {", html)
+        self.assertIn("js/cookie_bar.min.js", html)
         self.assertNotIn("legacyShowCookieBar", html)
         self.assertNotIn("cookiebar.js", html)
 
