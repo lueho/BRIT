@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
@@ -102,7 +103,8 @@ class CollectionCountOptionsReviewDetailTests(TestCase):
 
     def test_review_detail_remains_restricted(self):
         response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"{settings.LOGIN_URL}?next={self.url}")
         self.client.force_login(self.outsider)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 403)

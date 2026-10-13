@@ -5,6 +5,7 @@ from unittest.mock import patch
 from urllib.parse import quote
 from uuid import uuid4
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
@@ -7944,9 +7945,11 @@ class MaterialsReviewDetailAccessTests(TestCase):
         response = self.client.get(self._review_detail_url(self.review_sample))
         self.assertEqual(response.status_code, 403)
 
-    def test_anonymous_cannot_access_review_detail(self):
-        response = self.client.get(self._review_detail_url(self.review_sample))
-        self.assertEqual(response.status_code, 403)
+    def test_anonymous_is_redirected_to_login_for_review_detail(self):
+        url = self._review_detail_url(self.review_sample)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"{settings.LOGIN_URL}?next={url}")
 
 
 class SampleDetailTemplateReviewUITests(TestCase):

@@ -2510,6 +2510,9 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
 
     template_name = "object_management/review_detail_wrapper.html"
     detail_view_class = None
+    permission_denied_message = (
+        "You do not have permission to access the review details page."
+    )
     _model_view_registry = {}
 
     @classmethod
@@ -2580,9 +2583,7 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             return super().dispatch(request, *args, **kwargs)
 
         if not user_is_moderator_for_model(request.user, obj.__class__):
-            raise PermissionDenied(
-                "You do not have permission to access the review details page."
-            )
+            return self.handle_no_permission()
         return super().dispatch(request, *args, **kwargs)
 
     def _resolve_base_template(self):
