@@ -724,6 +724,34 @@ class ProcessExplorerViewTestCase(TestCase):
         )
         self.assertNotContains(response, reverse("processes:process-list-review"))
 
+    def test_own_processes_count_matches_private_list_with_editor_grants(self):
+        from django.contrib.contenttypes.models import ContentType
+
+        from utils.object_management.models import ObjectEditorGrant
+
+        shared = Process.objects.create(
+            name="Shared hydrothermal carbonisation",
+            owner=self.moderator,
+            publication_status="private",
+        )
+        ObjectEditorGrant.objects.create(
+            content_type=ContentType.objects.get_for_model(Process),
+            object_id=shared.pk,
+            editor=self.owner,
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse("processes:explorer"))
+        private_list = self.client.get(
+            reverse("processes:process-list-owned"), {"scope": "private"}
+        )
+
+        self.assertEqual(response.context["my_process_count"], 4)
+        self.assertEqual(
+            response.context["my_process_count"],
+            private_list.context["paginator"].count,
+        )
+
     def test_moderator_sees_review_card(self):
         self.client.force_login(self.moderator)
         response = self.client.get(reverse("processes:explorer"))

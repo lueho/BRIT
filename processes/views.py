@@ -19,6 +19,7 @@ from materials.models import Material
 from utils.forms import workspace_section_formsets
 from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import (
+    apply_scope_filter,
     filter_queryset_for_user,
     get_object_policy,
     user_is_moderator_for_model,
@@ -105,11 +106,13 @@ class ProcessExplorerView(BreadcrumbContextMixin, TemplateView):
         context["categories_url"] = categories_url("published")
 
         if user.is_authenticated:
-            context["my_process_count"] = Process.objects.filter(owner=user).count()
+            context["my_process_count"] = apply_scope_filter(
+                Process.objects.all(), "private", user=user
+            ).count()
             context["my_processes_url"] = process_scope_url("private")
         if user_is_moderator_for_model(user, Process):
-            context["review_count"] = Process.objects.filter(
-                publication_status="review"
+            context["review_count"] = apply_scope_filter(
+                Process.objects.all(), "review", user=user
             ).count()
             context["review_processes_url"] = process_scope_url("review")
         context["can_add_process"] = user.has_perm("processes.add_process")
