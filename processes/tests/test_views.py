@@ -807,14 +807,22 @@ class ProcessExplorerViewTestCase(TestCase):
         )
 
     def test_list_views_link_back_to_explorer(self):
-        for url_name in (
-            "processes:process-list",
-            "processes:processcategory-list",
+        self.client.force_login(self.owner)
+        for url_name, scope in (
+            ("processes:process-list", "published"),
+            ("processes:processcategory-list", "published"),
+            ("processes:processcategory-list-owned", "private"),
         ):
             with self.subTest(url_name=url_name):
-                response = self.client.get(reverse(url_name), {"scope": "published"})
+                response = self.client.get(reverse(url_name), {"scope": scope})
                 self.assertEqual(response.status_code, 200)
-                self.assertContains(response, f'href="{reverse("processes:explorer")}"')
+                self.assertContains(
+                    response,
+                    f'<a class="btn btn-sm btn-outline-secondary" '
+                    f'href="{reverse("processes:explorer")}" title="Open Explorer">'
+                    f'<i class="fas fa-table-cells-large"></i> Explorer</a>',
+                    html=True,
+                )
 
 
 # ==============================================================================
