@@ -475,13 +475,17 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         return " ".join(str(value or "").split())
 
     def _resolve_authors(self, request, payload):
-        """Resolve payload authors to Author objects preserving payload order."""
+        """Resolve payload authors to Author objects preserving payload order.
+
+        Returns ``(authors, created_author_ids, error_response)``.
+        """
         raw_authors = payload.get("authors", [])
         if not isinstance(raw_authors, list):
-            return [], None
+            return [], [], None
 
         resolved_authors = []
         resolved_ids = set()
+        created_author_ids = []
 
         for raw_author in raw_authors:
             if not isinstance(raw_author, dict):
@@ -510,14 +514,18 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
                     if author is None:
                         if not request.user.has_perm("bibliography.add_author"):
-                            return [], JsonResponse(
-                                {
-                                    "error": (
-                                        "You need permission to create authors "
-                                        "for inline source creation."
-                                    )
-                                },
-                                status=403,
+                            return (
+                                [],
+                                [],
+                                JsonResponse(
+                                    {
+                                        "error": (
+                                            "You need permission to create authors "
+                                            "for inline source creation."
+                                        )
+                                    },
+                                    status=403,
+                                ),
                             )
 
                         author = Author.objects.create(
@@ -525,6 +533,7 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                             author_type="organization",
                             organization_name=organization_name,
                         )
+                        created_author_ids.append(author.pk)
                 else:
                     first_names = self._normalize_name_part(
                         raw_author.get("first_names")
@@ -540,14 +549,18 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
                     if author is None:
                         if not request.user.has_perm("bibliography.add_author"):
-                            return [], JsonResponse(
-                                {
-                                    "error": (
-                                        "You need permission to create authors "
-                                        "for inline source creation."
-                                    )
-                                },
-                                status=403,
+                            return (
+                                [],
+                                [],
+                                JsonResponse(
+                                    {
+                                        "error": (
+                                            "You need permission to create authors "
+                                            "for inline source creation."
+                                        )
+                                    },
+                                    status=403,
+                                ),
                             )
 
                         author = Author.objects.create(
@@ -555,12 +568,13 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                             first_names=first_names,
                             last_names=last_names,
                         )
+                        created_author_ids.append(author.pk)
 
             if author and author.pk not in resolved_ids:
                 resolved_authors.append(author)
                 resolved_ids.add(author.pk)
 
-        return resolved_authors, None
+        return resolved_authors, created_author_ids, None
 
     def post(self, request, *args, **kwargs):
         """Create a Source from a JSON payload and return option data as JSON."""
@@ -588,8 +602,11 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 )
 
         with transaction.atomic():
-            authors, author_error = self._resolve_authors(request, payload)
+            authors, created_author_ids, author_error = self._resolve_authors(
+                request, payload
+            )
             if author_error is not None:
+                transaction.set_rollback(True)
                 return author_error
 
             source = Source.objects.create(
@@ -612,6 +629,7 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 "title": source.title,
                 "text": formatted_label,
                 "label": formatted_label,
+                "created_author_ids": created_author_ids,
             },
             status=201,
         )
@@ -623,6 +641,10 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         been published (i.e. still in draft/private state) may be deleted via
         this endpoint.  This prevents orphaned records when the user removes a
         just-created source from the widget before saving the parent form.
+
+        ``author_ids`` may list the authors the quick-create call inserted for
+        this source; those owned by the requesting user that are still private
+        and no longer referenced by any source are deleted as well.
         """
         try:
             payload = json.loads(request.body.decode("utf-8") or "{}")
@@ -644,7 +666,24 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 status=403,
             )
 
-        source.delete()
+        author_ids = []
+        raw_author_ids = payload.get("author_ids")
+        if isinstance(raw_author_ids, list):
+            for raw_author_id in raw_author_ids:
+                try:
+                    author_ids.append(int(raw_author_id))
+                except (TypeError, ValueError):
+                    continue
+
+        with transaction.atomic():
+            source.delete()
+            if author_ids:
+                Author.objects.filter(
+                    pk__in=author_ids,
+                    owner=request.user,
+                    publication_status=Author.STATUS_PRIVATE,
+                    sourceauthors__isnull=True,
+                ).delete()
         return JsonResponse({"deleted": True}, status=200)
 
 

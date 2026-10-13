@@ -150,6 +150,14 @@ function parsePersonName(rawInput) {
     return { first_names: tokens.join(' '), last_names: lastNames };
 }
 
+/**
+ * Mirror the server-side ``author_name_has_letter`` rule: names without any
+ * letter are skipped by the quick-create endpoint, so never offer them.
+ */
+function authorNameHasLetter(value) {
+    return /\p{L}/u.test(value || '');
+}
+
 function personDisplayName(parsed) {
     return parsed.first_names
         ? parsed.last_names + ', ' + parsed.first_names
@@ -172,7 +180,7 @@ function buildAuthorCreateOptions(rawInput) {
 
     const options = [];
     const person = parsePersonName(trimmedInput);
-    if (person) {
+    if (person && authorNameHasLetter(person.last_names)) {
         const displayName = personDisplayName(person);
         options.push({
             id: 'pending-person:' + trimmedInput,
@@ -183,6 +191,10 @@ function buildAuthorCreateOptions(rawInput) {
             create_label: 'Create person "' + displayName + '"',
             pending: true
         });
+    }
+
+    if (!authorNameHasLetter(trimmedInput)) {
+        return options;
     }
 
     options.push({
@@ -331,10 +343,12 @@ function initAuthorTomSelect(authorInput) {
 
 /**
  * Delete a quick-created source from the database via the quick-create endpoint.
+ * ``authorIds`` lists the authors that were created together with the source,
+ * so the server can remove them too when nothing else references them.
  * Silently ignores failures (e.g. network errors) since the source may already
  * have been saved as part of the parent form.
  */
-async function deleteQuickCreatedSource(sourceId, quickCreateUrl) {
+async function deleteQuickCreatedSource(sourceId, quickCreateUrl, authorIds = []) {
     if (!sourceId || !quickCreateUrl) {
         return;
     }
@@ -346,7 +360,7 @@ async function deleteQuickCreatedSource(sourceId, quickCreateUrl) {
                 'X-CSRFToken': getCookie('csrftoken'),
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify({ id: sourceId })
+            body: JSON.stringify({ id: sourceId, author_ids: authorIds })
         });
     } catch (_) {
         // Silently ignore network errors — the source will remain but that is
@@ -402,9 +416,10 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        // Track IDs of sources created via quick-create in this widget session
-        // so we can delete them if the user removes them before saving.
-        const quickCreatedIds = new Set();
+        // Track sources created via quick-create in this widget session, mapped
+        // to the author IDs created with them, so both can be deleted if the
+        // user removes the source before saving.
+        const quickCreatedSources = new Map();
 
         // --- Author TomSelect for the create-new-source section ---
         if (input.tomselect) {
@@ -425,14 +440,14 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         // --- Helper: add a source to the visible list and hidden select ---
-        function addSourceToWidget(sourceId, sourceLabel, isQuickCreated) {
+        function addSourceToWidget(sourceId, sourceLabel, isQuickCreated, createdAuthorIds = []) {
             // Guard against duplicates
             if (targetSelect.querySelector(`option[value="${sourceId}"]`)) {
                 return;
             }
 
             if (isQuickCreated) {
-                quickCreatedIds.add(String(sourceId));
+                quickCreatedSources.set(String(sourceId), createdAuthorIds);
             }
 
             clearFeedback(feedbackElement);
@@ -552,7 +567,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     createdSource.title ||
                     title;
 
-                addSourceToWidget(String(createdSource.id), optionLabel, true);
+                addSourceToWidget(
+                    String(createdSource.id),
+                    optionLabel,
+                    true,
+                    createdSource.created_author_ids || []
+                );
 
                 // Clear the create-new-source form
                 if (newTitleInput) {
@@ -587,9 +607,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 const sourceId = String(removeBtn.dataset.value);
 
                 // If this was quick-created in this session, delete it from the DB
-                if (quickCreatedIds.has(sourceId) && quickCreateUrl) {
-                    quickCreatedIds.delete(sourceId);
-                    deleteQuickCreatedSource(sourceId, quickCreateUrl);
+                if (quickCreatedSources.has(sourceId) && quickCreateUrl) {
+                    const createdAuthorIds = quickCreatedSources.get(sourceId);
+                    quickCreatedSources.delete(sourceId);
+                    deleteQuickCreatedSource(sourceId, quickCreateUrl, createdAuthorIds);
                 }
 
                 // Remove from hidden select

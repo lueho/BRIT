@@ -103,6 +103,20 @@ test("buildAuthorCreateOptions returns nothing for blank input", () => {
     assert.equal(sandbox.buildAuthorCreateOptions("  ").length, 0);
 });
 
+test("buildAuthorCreateOptions skips letterless organization and surname choices", () => {
+    const { sandbox } = setup();
+    assert.equal(sandbox.buildAuthorCreateOptions("30.379").length, 0);
+
+    const options = sandbox.buildAuthorCreateOptions("Ada 70");
+    assert.equal(options.length, 1);
+    assert.equal(options[0].author_type, "organization");
+    assert.equal(options[0].organization_name, "Ada 70");
+
+    const [person] = sandbox.buildAuthorCreateOptions("Ørsted");
+    assert.equal(person.author_type, "person");
+    assert.equal(person.last_names, "Ørsted");
+});
+
 test("authorOptionToMetadata sends pending authors without an id", () => {
     const { sandbox } = setup();
     const [person, organization] = sandbox.buildAuthorCreateOptions("Herbert Test");
@@ -124,4 +138,32 @@ test("authorOptionToMetadata sends existing authors by id only", () => {
         { id: "42" }
     );
     assert.equal(sandbox.authorOptionToMetadata(null), null);
+});
+
+test("deleteQuickCreatedSource sends the authors created with the source", async () => {
+    const requests = [];
+    const sandbox = {
+        console,
+        document: {
+            cookie: "csrftoken=abc",
+            addEventListener() {},
+            querySelectorAll() {
+                return [];
+            },
+        },
+        fetch: async (url, init) => {
+            requests.push({ url, init });
+            return { ok: true };
+        },
+    };
+    vm.runInNewContext(source, sandbox);
+
+    await sandbox.deleteQuickCreatedSource("7", "/quick-create/", [11, 12]);
+
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].init.method, "DELETE");
+    assert.deepEqual(JSON.parse(requests[0].init.body), {
+        id: "7",
+        author_ids: [11, 12],
+    });
 });
