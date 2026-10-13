@@ -11,16 +11,12 @@ from .router import router
 app_name = "processes"
 
 urlpatterns = [
-    # Dashboard
-    path(
-        "dashboard/",
-        views.ProcessDiscoveryRedirectView.as_view(),
-        name="dashboard",
-    ),
+    # Legacy explorer paths redirect to the category catalogue
+    path("dashboard/", views.ProcessDiscoveryRedirectView.as_view()),
     path(
         "explorer/",
         views.ProcessDiscoveryRedirectView.as_view(),
-        name="processes-explorer",
+        name="explorer",
     ),
     # ProcessCategory URLs
     path(

@@ -62,14 +62,14 @@ from .navigation import discovery_context
 from .querysets import with_process_count
 
 # ==============================================================================
-# Dashboard
+# Explorer
 # ==============================================================================
 
 
-class ProcessDashboardView(BreadcrumbContextMixin, TemplateView):
-    """Main dashboard for the processes module."""
+class ProcessExplorerView(BreadcrumbContextMixin, TemplateView):
+    """Explorer for the processes module."""
 
-    template_name = "processes/dashboard.html"
+    template_name = "processes/explorer.html"
     breadcrumb_module_label = "Processes"
     breadcrumb_page_title = "Processes"
 
@@ -157,7 +157,7 @@ class ProcessCategoryListViewMixin:
 
     model = ProcessCategory
     template_name = "processes/processcategory_list.html"
-    dashboard_url = None
+    explorer_url = None
     context_object_name = "categories"
     filterset_class = ProcessCategoryFilter
     paginate_by = 20
@@ -363,7 +363,7 @@ class ProcessFilterViewMixin:
 
     model = Process
     template_name = "processes/process_list.html"
-    dashboard_url = None
+    explorer_url = None
     breadcrumb_module_url = reverse_lazy("processes:process-list")
     context_object_name = "processes"
     filterset_class = ProcessFilter

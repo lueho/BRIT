@@ -361,7 +361,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
                 response = self.client.get(reverse(url_name))
                 self.assertEqual(response.status_code, 200)
                 self.assertNotContains(
-                    response, f'href="{reverse("processes:dashboard")}"'
+                    response, f'href="{reverse("processes:explorer")}"'
                 )
                 self.assertContains(
                     response,

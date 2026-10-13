@@ -632,24 +632,24 @@ class ProcessDiscoveryRedirectTestCase(TestCase):
     """Legacy dashboard/explorer URLs redirect to the category catalogue."""
 
     def test_dashboard_redirects_to_category_catalogue(self):
-        response = self.client.get(reverse("processes:dashboard"))
+        response = self.client.get("/processes/dashboard/")
         self.assertEqual(302, response.status_code)
         self.assertEqual(
             reverse("processes:processcategory-list"), response["Location"]
         )
 
     def test_explorer_redirects_to_category_catalogue(self):
-        response = self.client.get(reverse("processes:processes-explorer"))
+        response = self.client.get(reverse("processes:explorer"))
         self.assertEqual(302, response.status_code)
         self.assertEqual(
             reverse("processes:processcategory-list"), response["Location"]
         )
 
     def test_redirects_preserve_query_params(self):
-        for url_name in ("processes:dashboard", "processes:processes-explorer"):
-            with self.subTest(url_name=url_name):
+        for url in ("/processes/dashboard/", reverse("processes:explorer")):
+            with self.subTest(url=url):
                 response = self.client.get(
-                    reverse(url_name), {"scope": "review", "name": "digestion"}
+                    url, {"scope": "review", "name": "digestion"}
                 )
                 self.assertEqual(302, response.status_code)
                 location = response["Location"]
@@ -677,7 +677,7 @@ class ProcessCategoryCRUDViewsTestCase(
 
     model = ProcessCategory
 
-    dashboard_view = False
+    explorer_view = False
 
     view_create_name = "processes:processcategory-create"
     view_modal_create_name = "processes:processcategory-create-modal"
@@ -893,7 +893,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
     model = Process
 
-    dashboard_view = False
+    explorer_view = False
 
     view_create_name = "processes:process-create"
     view_modal_create_name = "processes:process-create-modal"
@@ -2084,7 +2084,7 @@ class ProcessWorkshopJourneyViewsTestCase(TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, f'href="{catalogue_url}?scope=published"')
                 self.assertContains(response, "Categories")
-                self.assertNotContains(response, "processes-explorer")
+                self.assertNotContains(response, reverse("processes:explorer"))
                 self.assertNotContains(response, "Explorer")
                 self.assertNotContains(response, "My processes")
 
@@ -2449,7 +2449,7 @@ class ProcessDashboardRecentOrderingTestCase(TestCase):
         from django.test import RequestFactory
         from django.utils import timezone
 
-        from ..views import ProcessDashboardView
+        from ..views import ProcessExplorerView
 
         owner = get_user_model().objects.create(username="dash-owner")
         older = Process.objects.create(
@@ -2464,7 +2464,7 @@ class ProcessDashboardRecentOrderingTestCase(TestCase):
         Process.objects.filter(pk=newer.pk).update(lastmodified_at=timezone.now())
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        view = ProcessDashboardView()
+        view = ProcessExplorerView()
         view.setup(request)
         context = view.get_context_data()
         self.assertEqual([newer, older], list(context["recent_processes"]))

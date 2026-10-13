@@ -267,7 +267,7 @@ class ModelSelectOptionsView(ListView):
         )
 
 
-class UtilsDashboardView(BreadcrumbContextMixin, TemplateView):
-    template_name = "utils_dashboard.html"
+class UtilsExplorerView(BreadcrumbContextMixin, TemplateView):
+    template_name = "utils_explorer.html"
     breadcrumb_module_label = "Utilities"
     breadcrumb_page_title = "Utilities"
