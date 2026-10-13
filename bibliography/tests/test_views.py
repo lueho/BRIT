@@ -1265,7 +1265,7 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
         self.assertTrue(Author.objects.filter(pk=existing.pk).exists())
 
-    def test_delete_with_cleanup_token_removes_created_author_unlinked_meanwhile(self):
+    def test_delete_keeps_created_author_unlinked_from_source_beforehand(self):
         self.member.user_permissions.add(Permission.objects.get(codename="add_author"))
         self.client.force_login(self.member)
         created = self._quick_create_with_authors(
@@ -1281,7 +1281,7 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
+        self.assertTrue(Author.objects.filter(last_names="Lovelace").exists())
 
     def test_delete_accepts_cleanup_token_older_than_a_day(self):
         self.member.user_permissions.add(Permission.objects.get(codename="add_author"))

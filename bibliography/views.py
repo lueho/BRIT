@@ -681,9 +681,14 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         )
 
         with transaction.atomic():
+            linked_author_ids = list(
+                source.sourceauthors.filter(
+                    author_id__in=created_author_ids
+                ).values_list("author_id", flat=True)
+            )
             source.delete()
             orphaned_authors = Author.objects.filter(
-                pk__in=created_author_ids,
+                pk__in=linked_author_ids,
                 owner=request.user,
                 publication_status=Author.STATUS_PRIVATE,
                 sourceauthors__isnull=True,
