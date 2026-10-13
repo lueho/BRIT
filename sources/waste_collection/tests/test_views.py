@@ -1376,6 +1376,45 @@ class CollectionListQueryTestCase(TestCase):
 
         self.assertEqual(actual, [obj.pk for obj in self.published[:20]])
 
+    def test_letter_filter_narrows_list_to_matching_initials(self):
+        # bulk_create keeps the explicit name; save() would auto-generate it.
+        zebra = Collection.objects.bulk_create(
+            [
+                Collection(
+                    name="Zebra collection",
+                    owner=self.owner,
+                    publication_status="published",
+                    valid_from=date(2024, 2, 1),
+                    catchment=self.catchment,
+                    collector=self.collector,
+                    waste_category=self.category,
+                    collection_system=self.system,
+                )
+            ]
+        )[0]
+
+        page = self.get_page(views.CollectionPublishedListView, data={"letter": "Z"})
+        self.assertEqual(page.paginator.count, 1)
+        self.assertEqual([obj.pk for obj in page.object_list], [zebra.pk])
+
+        page = self.get_page(views.CollectionPublishedListView, data={"letter": "R"})
+        self.assertEqual(page.paginator.count, 25)
+
+    def test_letter_index_is_exposed_and_marks_active_letter(self):
+        request = RequestFactory().get(
+            "/collections/", {"scope": "published", "letter": "R"}
+        )
+        request.user = AnonymousUser()
+        response = views.CollectionPublishedListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        index = {
+            entry["letter"]: entry for entry in response.context_data["letter_index"]
+        }
+        self.assertTrue(index["R"]["enabled"])
+        self.assertTrue(index["R"]["active"])
+        self.assertFalse(index["B"]["enabled"])
+
     def test_explicit_ordering_is_preserved(self):
         page = self.get_page(
             views.CollectionPublishedListView, ordering=("-valid_from", "-id")
@@ -1398,11 +1437,11 @@ class CollectionListQueryTestCase(TestCase):
                 self.assertEqual(obj.collection_system.name, "List system")
 
     @override_settings(GOOGLE_ANALYTICS_KEY="")
-    def test_anonymous_list_renders_with_nine_queries(self):
+    def test_anonymous_list_renders_with_ten_queries(self):
         request = RequestFactory().get("/collections/", {"scope": "published"})
         request.user = AnonymousUser()
 
-        with self.assertNumQueries(9):
+        with self.assertNumQueries(10):
             response = views.CollectionPublishedListView.as_view()(request)
             response.render()
 

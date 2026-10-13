@@ -102,6 +102,9 @@
                 </div>
               {% endif %}
             {% endblock active_filters %}
+            {% block list_letter_index %}
+              {% include "partials/letter_index.html" %}
+            {% endblock list_letter_index %}
             {% block list_table %}
               {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
                 {% include "object_management/bulk_access_toolbar.html" %}

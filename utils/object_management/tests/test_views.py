@@ -17,6 +17,7 @@ from django.core.exceptions import (
 from django.db import DatabaseError, connection
 from django.db.models.signals import post_save, pre_save
 from django.http import HttpResponse, HttpResponseRedirect
+from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import NoReverseMatch, reverse
@@ -60,6 +61,7 @@ from utils.object_management.views import (
     WithdrawFromReviewView,
 )
 from utils.properties.models import Property, Unit
+from utils.views import LetterIndexMixin
 
 from ..views import (
     FilterDefaultsMixin,
@@ -1093,6 +1095,163 @@ class PublishedObjectsFilterViewTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context_data["filter"].data, {"name": ["Other name"]})
+
+
+class MockLetterIndexFilterView(LetterIndexMixin, PublishedObjectFilterView):
+    model = Property
+    filterset_class = MockFilterSet
+
+
+class LetterIndexMixinTestCase(TestCase):
+    """Tests for the opt-in A-Z 'starts with' navigation on filtered lists."""
+
+    ALL_NAMES = {"Alpha", "alpine", "Beta", "Gamma", "7eleven"}
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="letter-index-owner")
+        for name in cls.ALL_NAMES:
+            Property.objects.create(
+                name=name, owner=cls.owner, publication_status="published"
+            )
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.view_callable = MockLetterIndexFilterView.as_view()
+
+    def get_response(self, query="?letter=", **view_kwargs):
+        request = self.factory.get(f"/properties/{query}")
+        request.user = AnonymousUser()
+        callable_ = (
+            MockLetterIndexFilterView.as_view(**view_kwargs)
+            if view_kwargs
+            else self.view_callable
+        )
+        return callable_(request)
+
+    def names_of(self, response):
+        return {obj.name for obj in response.context_data["object_list"]}
+
+    def index_of(self, response):
+        return {
+            entry["letter"]: entry for entry in response.context_data["letter_index"]
+        }
+
+    @staticmethod
+    def published_names(**filters):
+        return set(
+            Property.objects.filter(publication_status="published")
+            .filter(**filters)
+            .values_list("name", flat=True)
+        )
+
+    def expected_enabled_letters(self, **filters):
+        initials = set()
+        for name in self.published_names(**filters):
+            initial = (name[:1] or "").upper()
+            initials.add(initial if initial.isascii() and initial.isalpha() else "#")
+        return initials
+
+    def enabled_letters(self, response):
+        return {
+            entry["letter"]
+            for entry in response.context_data["letter_index"]
+            if entry["enabled"]
+        }
+
+    def test_no_letter_returns_all_objects(self):
+        response = self.get_response()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.names_of(response), self.published_names())
+        self.assertIsNone(response.context_data["letter_active"])
+
+    def test_letter_filters_objects_case_insensitively(self):
+        for letter in ("A", "a"):
+            with self.subTest(letter=letter):
+                response = self.get_response(f"?letter={letter}")
+                self.assertEqual(self.names_of(response), {"Alpha", "alpine"})
+                self.assertEqual(response.context_data["letter_active"], "A")
+
+    def test_hash_letter_selects_names_with_non_letter_initials(self):
+        response = self.get_response("?letter=%23")
+        self.assertEqual(self.names_of(response), {"7eleven"})
+        self.assertEqual(response.context_data["letter_active"], "#")
+
+    def test_letter_with_no_matches_returns_empty_list(self):
+        response = self.get_response("?letter=Q")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.names_of(response), set())
+
+    def test_invalid_letter_params_are_ignored(self):
+        for query in ("?letter=AB", "?letter=1", "?letter=*", "?letter=++"):
+            with self.subTest(query=query):
+                response = self.get_response(query)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(self.names_of(response), self.published_names())
+                self.assertIsNone(response.context_data["letter_active"])
+
+    def test_letter_index_flags_letters_with_and_without_results(self):
+        response = self.get_response()
+        index = self.index_of(response)
+
+        self.assertEqual(len(index), 27)
+        self.assertEqual(
+            self.enabled_letters(response), self.expected_enabled_letters()
+        )
+        for entry in index.values():
+            self.assertFalse(entry["active"])
+
+    def test_letter_index_marks_active_letter(self):
+        response = self.get_response("?letter=b")
+        index = self.index_of(response)
+
+        self.assertEqual(response.context_data["letter_active"], "B")
+        self.assertTrue(index["B"]["active"])
+        self.assertTrue(index["B"]["enabled"])
+        self.assertFalse(index["A"]["active"])
+
+    def test_letter_index_reflects_other_active_filters(self):
+        response = self.get_response("?name=alp")
+
+        self.assertTrue(self.index_of(response)["A"]["enabled"])
+        self.assertEqual(
+            self.enabled_letters(response),
+            self.expected_enabled_letters(name__icontains="alp"),
+        )
+
+    def test_letter_filter_combines_with_other_filters(self):
+        response = self.get_response("?name=a&letter=B")
+        self.assertEqual(self.names_of(response), {"Beta"})
+
+    def test_letter_filter_applies_before_pagination(self):
+        response = self.get_response("?letter=A", paginate_by=1)
+
+        self.assertEqual(response.context_data["paginator"].count, 2)
+        self.assertEqual(len(response.context_data["object_list"]), 1)
+        self.assertEqual(self.names_of(response), {"Alpha"})
+
+    def test_letter_index_partial_links_preserve_filters_and_drop_page(self):
+        request = self.factory.get("/properties/?name=x&page=3&letter=A")
+        context = {
+            "letter_active": "B",
+            "letter_index": [
+                {"letter": "A", "enabled": True, "active": False},
+                {"letter": "B", "enabled": True, "active": True},
+                {"letter": "C", "enabled": False, "active": False},
+            ],
+        }
+        html = render_to_string("partials/letter_index.html", context, request=request)
+
+        self.assertIn('href="?name=x&amp;letter=B"', html)
+        self.assertIn('href="?name=x"', html)  # 'All' clears letter and page
+        self.assertNotIn("page=3", html)
+        # Disabled letters are not links
+        self.assertIn('<span class="page-link">C</span>', html)
+
+    def test_letter_index_partial_renders_nothing_without_index(self):
+        request = self.factory.get("/properties/")
+        html = render_to_string("partials/letter_index.html", {}, request=request)
+        self.assertEqual(html.strip(), "")
 
 
 class OwnerReviewFeedbackQueryTests(TestCase):
