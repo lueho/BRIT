@@ -284,6 +284,54 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
 
         self.assertEqual([r.status_code for r in responses], [200, 429])
 
+    def _make_private_dataset_owned_by(self, owner):
+        self.dataset.publication_status = "private"
+        self.dataset.owner = owner
+        self.dataset.save(update_fields=["publication_status", "owner"])
+
+    def _get_private_features(self, **extra):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        return self.client.get(
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk}),
+            **extra,
+        )
+
+    def test_feature_geojson_serves_private_dataset_to_owner_token(self):
+        owner = User.objects.create_user(username="geodataset-private-owner")
+        token = Token.objects.create(user=owner)
+        self._make_private_dataset_owned_by(owner)
+
+        response = self._get_private_features(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        self.assertEqual(response.status_code, 200)
+        names = {
+            feature["properties"]["name"]
+            for feature in json.loads(b"".join(response.streaming_content))["features"]
+        }
+        self.assertEqual(names, {"Local feature A", "Local feature B"})
+
+    def test_feature_geojson_hides_private_dataset_from_other_token(self):
+        self._make_private_dataset_owned_by(
+            User.objects.create_user(username="geodataset-private-owner")
+        )
+        token = Token.objects.create(
+            user=User.objects.create_user(username="geodataset-other-user")
+        )
+
+        response = self._get_private_features(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_feature_geojson_hides_private_dataset_from_invalid_token(self):
+        self._make_private_dataset_owned_by(
+            User.objects.create_user(username="geodataset-private-owner")
+        )
+
+        response = self._get_private_features(HTTP_AUTHORIZATION="Token invalid")
+
+        self.assertNotEqual(response.status_code, 200)
+
     def test_runtime_adapter_resolves_local_relation_runtime(self):
         adapter = get_dataset_runtime_adapter(self.dataset)
 

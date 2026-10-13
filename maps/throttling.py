@@ -18,8 +18,6 @@ example, loosened on a network where many real users share a CGNAT block).
 import ipaddress
 
 from django.conf import settings
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.throttling import AnonRateThrottle
 
 from brit.client_ip import get_client_ip
@@ -86,20 +84,3 @@ class GeoJSONAnonThrottle(TrustedClientIPMixin, AnonRateThrottle):
 
         ident = get_subnet_ident(self.get_ident(request))
         return self.cache_format % {"scope": self.scope, "ident": ident}
-
-
-class SessionViewGeoJSONAnonThrottle(GeoJSONAnonThrottle):
-    """GeoJSON throttle for views that authenticate sessions only.
-
-    Valid DRF-token clients are exempt as they are from the site-wide
-    anonymous limit, without the view rejecting invalid tokens with 401.
-    """
-
-    def get_cache_key(self, request, view):
-        if "HTTP_AUTHORIZATION" in request.META:
-            try:
-                if TokenAuthentication().authenticate(request) is not None:
-                    return None
-            except AuthenticationFailed:
-                pass
-        return super().get_cache_key(request, view)
