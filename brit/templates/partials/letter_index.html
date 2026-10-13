@@ -1,0 +1,22 @@
+{% load custom_tags %}
+{% if letter_index %}
+<nav aria-label="Filter by first letter" class="mb-2">
+    <ul class="pagination pagination-sm flex-wrap mb-0">
+        <li class="page-item {% if not letter_active %}active{% endif %}">
+            <a class="page-link"
+               href="?{% param_replace letter="" page="" %}">All</a>
+        </li>
+        {% for item in letter_index %}
+            <li class="page-item{% if item.active %} active{% elif not item.enabled %} disabled{% endif %}">
+                {% if item.enabled %}
+                    <a class="page-link"
+                       href="?{% param_replace letter=item.letter page="" %}"
+                       aria-label="Show names starting with {{ item.letter }}">{{ item.letter }}</a>
+                {% else %}
+                    <span class="page-link">{{ item.letter }}</span>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+</nav>
+{% endif %}

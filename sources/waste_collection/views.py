@@ -126,7 +126,7 @@ from utils.object_management.views import (
     WithdrawFromReviewModalView,
     WithdrawFromReviewView,
 )
-from utils.views import BreadcrumbContextMixin
+from utils.views import BreadcrumbContextMixin, LetterIndexMixin
 
 logger = logging.getLogger(__name__)
 
@@ -1118,7 +1118,7 @@ class CollectionCatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionListMixin:
+class CollectionListMixin(LetterIndexMixin):
     """Mixin providing optimized queryset for Collection list views."""
 
     ordering = ("name", "id")
@@ -1757,7 +1757,7 @@ class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Collection
 
 
-class CollectionReviewFilterView(ReviewObjectFilterView):
+class CollectionReviewFilterView(CollectionListMixin, ReviewObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
     explorer_url = reverse_lazy("wastecollection-explorer")

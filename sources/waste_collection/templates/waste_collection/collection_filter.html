@@ -86,6 +86,7 @@
 {% block filters_pane_body %}
     <form method="get">
         {% crispy filter.form %}
+        {% include "partials/letter_index_input.html" %}
         <div class="d-flex justify-content-end gap-2 mt-2">
             <button id="btn-filter" class="btn btn-primary submit-filter" type="submit">Filter</button>
             <a class="btn btn-outline-secondary"

@@ -34,7 +34,7 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateWithInlinesView,
 )
 from utils.permissions import HasModelPermission
-from utils.views import BreadcrumbContextMixin
+from utils.views import BreadcrumbContextMixin, LetterIndexMixin
 
 from .filters import AuthorFilterSet, LicenceListFilter, SourceFilter
 from .forms import (
@@ -245,7 +245,11 @@ class LicenceAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SourcePublishedFilterView(PublishedObjectFilterView):
+class SourceLetterIndexMixin(LetterIndexMixin):
+    letter_field = "citation_key"
+
+
+class SourcePublishedFilterView(SourceLetterIndexMixin, PublishedObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
         "citation_key"
@@ -254,7 +258,7 @@ class SourcePublishedFilterView(PublishedObjectFilterView):
     explorer_url = reverse_lazy("bibliography-explorer")
 
 
-class SourcePrivateFilterView(PrivateObjectFilterView):
+class SourcePrivateFilterView(SourceLetterIndexMixin, PrivateObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
         "citation_key"
@@ -263,7 +267,7 @@ class SourcePrivateFilterView(PrivateObjectFilterView):
     explorer_url = reverse_lazy("bibliography-explorer")
 
 
-class SourceReviewFilterView(ReviewObjectFilterView):
+class SourceReviewFilterView(SourceLetterIndexMixin, ReviewObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
         "citation_key"

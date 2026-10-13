@@ -390,6 +390,39 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
                 self.assertContains(response, "All sources")
                 self.assertContains(response, "Bibliography explorer")
 
+    def test_list_letter_filter_narrows_by_citation_key(self):
+        zeta = Source.objects.create(
+            owner=self.owner_user,
+            publication_status="published",
+            title="Zeta source",
+            citation_key="ZETA",
+            type="online",
+            url="https://zeta.example.org",
+        )
+
+        response = self.client.get(
+            reverse("source-list"), {"scope": "published", "letter": "Z"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result_pks = {obj.pk for obj in response.context["object_list"]}
+        self.assertIn(zeta.pk, result_pks)
+        self.assertNotIn(self.published_object.pk, result_pks)
+
+    def test_list_renders_letter_index(self):
+        response = self.client.get(reverse("source-list"), {"scope": "published"})
+
+        self.assertContains(response, 'aria-label="Filter by first letter"')
+
+    def test_list_filter_form_carries_active_letter(self):
+        response = self.client.get(
+            reverse("source-list"), {"scope": "published", "letter": "Z"}
+        )
+
+        self.assertContains(
+            response, '<input type="hidden" name="letter" value="Z">', html=True
+        )
+
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
