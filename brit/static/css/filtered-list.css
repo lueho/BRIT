@@ -29,6 +29,23 @@
   overflow-y: visible;
 }
 
+/* Letter index: recolor the stock-Bootstrap pagination states to the BRIT
+ * primary palette. The pagination component ships in the CDN bootstrap.css,
+ * so its compiled --bs-pagination-* literals ignore the theme's --bs-primary;
+ * overriding the custom properties here keeps the active/hover states green. */
+.letter-index .pagination {
+  --bs-pagination-active-color: var(--bs-white);
+  --bs-pagination-active-bg: var(--bs-primary);
+  --bs-pagination-active-border-color: var(--bs-primary);
+  --bs-pagination-hover-color: var(--bs-primary);
+  --bs-pagination-hover-bg: rgba(var(--bs-primary-rgb), .08);
+  --bs-pagination-hover-border-color: rgba(var(--bs-primary-rgb), .35);
+}
+
+.letter-index .page-link:focus-visible {
+  box-shadow: 0 0 0 .15rem rgba(var(--bs-primary-rgb), .25);
+}
+
 /* Sidebar tabs: improve visual appeal and mobile behavior */
 .sidebar-tabs {
   gap: .5rem;
