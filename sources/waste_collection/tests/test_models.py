@@ -59,7 +59,9 @@ class InitialDataTestCase(TestCase):
 class WasteComponentManagerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        category = MaterialCategory.objects.create(name="Biowaste component")
+        category, _ = MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.waste_component = WasteComponent.objects.create(name="Kitchen waste")
         cls.material_component = MaterialComponent.objects.create(name="Carbon")
         cls.material_component.categories.add(category)

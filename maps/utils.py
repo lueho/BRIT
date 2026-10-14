@@ -15,7 +15,7 @@ from django.db.models import Count, Max, Min, Sum
 from rest_framework.serializers import ReadOnlyField
 from rest_framework.utils.encoders import JSONEncoder
 
-INITIALIZATION_DEPENDENCIES = ["users", "utils.properties"]
+INITIALIZATION_DEPENDENCIES = ["object_management", "properties"]
 
 
 def ensure_initial_data(stdout=None):
@@ -142,17 +142,16 @@ def ensure_initial_data(stdout=None):
     )
     if map_config_created:
         log("Created Default Map Configuration")
+        # Ensure layers are set
+        default_map_config.layers.set(
+            [
+                default_region_layer,
+                default_catchment_layer,
+                default_feature_layer,
+            ]
+        )
+        log("Set layers for Default Map Configuration")
     created["default_map_configuration"] = map_config_created
-
-    # Ensure layers are set
-    default_map_config.layers.set(
-        [
-            default_region_layer,
-            default_catchment_layer,
-            default_feature_layer,
-        ]
-    )
-    log("Set layers for Default Map Configuration")
 
 
 def _generate_filter_key_part(filters=None):

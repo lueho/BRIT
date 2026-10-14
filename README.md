@@ -12,6 +12,31 @@ https://brit.bioresource-tools.net.
 This instance contains the data and case studies from the projects FLEXIBI and SOILCOM as well as other data produced 
 by the BIEM research group.
 
+## Local setup
+
+BRIT runs entirely in Docker. To start a development instance from a fresh
+clone, copy the environment template and start the Compose stack:
+
+```sh
+cp brit/settings/.env.example brit/settings/.env
+docker compose up --build
+```
+
+Replace the development placeholders in the new `.env` before starting. On
+first start, a one-shot `init` service migrates the database and seeds the
+required initial data automatically (equivalent to running
+`python manage.py bootstrap_database`), so no database snapshot is needed. To
+log in as the admin named by `ADMIN_USERNAME`, set `ADMIN_PASSWORD` in
+`brit/settings/.env` before the first start or assign a password afterwards:
+
+```sh
+docker compose exec web python manage.py changepassword admin
+```
+
+Use `createsuperuser` only for a different admin username. See the
+[Developer Guide](docs/02_developer_guide/guidelines.md#local-development) for
+details.
+
 BRIT is under constant development. Please feel free to leave any kind of feedback at
 [info@bioresource-tools.net](mailto:info@bioresource-tools.net)
 

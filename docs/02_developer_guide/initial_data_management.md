@@ -10,7 +10,10 @@ Each app defines an idempotent `ensure_initial_data()` function in its `utils.py
 BRIT uses Django’s AppConfig registry to discover and execute each installed app’s `ensure_initial_data()` hook. This removes the need for manual imports and prevents circular dependencies.
 
 ## Dependency Management & Sequencing
-Apps declare `INITIALIZATION_DEPENDENCIES` to express ordering (e.g., materials → distributions). The management command resolves these dependencies before invoking initialization routines. Credentials for superuser creation come from environment variables (`ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`).
+Apps declare `INITIALIZATION_DEPENDENCIES` to express ordering (e.g., materials → distributions). Dependencies must be labels of installed apps; unknown labels and circular dependencies abort with an error. The management command resolves these dependencies before invoking initialization routines. Credentials for superuser creation come from environment variables (`ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`).
+
+## Bootstrapping a Fresh Database
+`python manage.py bootstrap_database` provisions a completely empty database: it migrates `auth`, seeds `users` and `object_management`, migrates and seeds `properties`, then applies all remaining migrations and runs every discovered initializer. The staged order exists because the legacy `materials` migration requires the default owner and the default unit to already exist. The command is idempotent, safe on existing databases, and runs automatically via the `init` service when the local Compose stack starts. The user that owns default objects comes from `DEFAULT_OBJECT_OWNER_USERNAME` and falls back to `ADMIN_USERNAME` when unset.
 
 ## Simplification & Refactor Lessons
 Key refactor steps included:

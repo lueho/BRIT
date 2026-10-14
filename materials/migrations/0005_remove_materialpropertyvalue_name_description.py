@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("bibliography", "0003_alter_author_publication_status_and_more"),
+        ("bibliography", "0001_squashed_0012"),
         ("materials", "0004_alter_materialproperty_options_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]

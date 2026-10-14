@@ -306,8 +306,10 @@ class CollectionModelFormTestCase(TestCase):
         cls.waste_category = WasteCategory.objects.create(
             name="Category", publication_status="published"
         )
-        cls.material_group = MaterialCategory.objects.create(
-            name="Biowaste component", publication_status="published"
+        cls.material_group, _ = MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed Material 1", publication_status="published"
@@ -944,7 +946,9 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         collector = Collector.objects.create(name="Collector")
         cls.collection_system = CollectionSystem.objects.create(name="System")
         cls.waste_category = WasteCategory.objects.create(name="Category")
-        material_group = MaterialCategory.objects.create(name="Biowaste component")
+        material_group, _ = MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         material1 = WasteComponent.objects.create(name="Material 1")
         material1.categories.add(material_group)
         material2 = WasteComponent.objects.create(name="Material 2")

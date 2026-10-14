@@ -1,6 +1,7 @@
 from django.core.exceptions import ObjectDoesNotExist
 
 from distributions.models import Period, TemporalDistribution, Timestep
+from materials.models import MaterialCategory
 from utils.object_management.models import get_default_owner
 
 from .models import (
@@ -10,11 +11,17 @@ from .models import (
     CollectionSeason,
 )
 
-INITIALIZATION_DEPENDENCIES = ["distributions"]
+INITIALIZATION_DEPENDENCIES = ["distributions", "materials"]
 
 
 def ensure_initial_data(stdout=None):
     owner = get_default_owner()
+
+    MaterialCategory.objects.get_or_create(
+        owner=owner,
+        name="Biowaste component",
+        defaults={"publication_status": "published"},
+    )
 
     try:
         distribution = TemporalDistribution.objects.get(

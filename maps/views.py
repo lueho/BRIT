@@ -2,12 +2,13 @@ from types import SimpleNamespace
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
-from django.core.exceptions import BadRequest, ImproperlyConfigured
+from django.core.exceptions import BadRequest
 from django.db import transaction
 from django.db.models import Q, Subquery, Value
 from django.db.models.functions import Coalesce, NullIf
 from django.forms import formset_factory
 from django.http import Http404, JsonResponse, StreamingHttpResponse
+from django.template.response import TemplateResponse
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.views import View
 from django.views.generic import DetailView, TemplateView
@@ -572,9 +573,7 @@ class GeoDataSetRuntimePermissionMixin:
                 .get(pk=dataset_pk)
             )
         except GeoDataset.DoesNotExist as err:
-            raise ImproperlyConfigured(
-                f"No GeoDataset with pk {dataset_pk} found."
-            ) from err
+            raise Http404(f"No GeoDataset with pk {dataset_pk} found.") from err
         return self._dataset
 
     def add_current_query_params(self, url):
@@ -676,6 +675,7 @@ class GeoDataSetRuntimePermissionMixin:
 class FilteredMapMixin(MapMixin):
     model_name = None  # TODO: Remove this for pk
     template_name = "filtered_map.html"
+    dataset_unavailable_template_name = "maps/dataset_unavailable.html"
 
     def get_features_feature_id(self):
         # Filtered maps show the whole (filtered) features layer, not a single
@@ -684,31 +684,30 @@ class FilteredMapMixin(MapMixin):
 
     def get_dataset(self):
         dataset_pk = self.kwargs.get("pk")
+        queryset = GeoDataset.objects.select_related(
+            "region", "map_configuration", "runtime_configuration"
+        ).prefetch_related("sources", "column_policies")
         if dataset_pk is not None:
             try:
-                return (
-                    GeoDataset.objects.select_related(
-                        "region", "map_configuration", "runtime_configuration"
-                    )
-                    .prefetch_related("sources", "column_policies")
-                    .get(pk=dataset_pk)
-                )
+                return queryset.get(pk=dataset_pk)
             except GeoDataset.DoesNotExist as err:
-                raise ImproperlyConfigured(
-                    f"No GeoDataset with pk {dataset_pk} found."
-                ) from err
-        try:
-            return (
-                GeoDataset.objects.select_related(
-                    "region", "map_configuration", "runtime_configuration"
+                raise Http404(f"No GeoDataset with pk {dataset_pk} found.") from err
+        return queryset.get(model_name=self.model_name)
+
+    def get(self, request, *args, **kwargs):
+        if self.kwargs.get("pk") is None and self.model_name:
+            try:
+                self.get_dataset()
+            except GeoDataset.DoesNotExist:
+                return TemplateResponse(
+                    request,
+                    self.dataset_unavailable_template_name,
+                    {
+                        "map_title": self.get_map_title(),
+                        "model_name": self.model_name,
+                    },
                 )
-                .prefetch_related("sources", "column_policies")
-                .get(model_name=self.model_name)
-            )
-        except GeoDataset.DoesNotExist as err:
-            raise ImproperlyConfigured(
-                f"No GeoDataset with model_name {self.model_name} found."
-            ) from err
+        return super().get(request, *args, **kwargs)
 
     def get_region_feature_id(self):
         return self.get_dataset().region_id
@@ -1348,14 +1347,18 @@ class CatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
         return super().filter_by_lookup(queryset, lookup, value)
 
     def get_region(self):
-        return GeoDataset.objects.get(model_name=self.geodataset_model_name).region
+        try:
+            return GeoDataset.objects.get(model_name=self.geodataset_model_name).region
+        except GeoDataset.DoesNotExist:
+            return None
 
     def get_queryset(self):
         queryset = super().get_queryset()
         if self.geodataset_model_name:
-            queryset = queryset.filter(
-                region__borders__geom__within=self.get_region().geom
-            )
+            region = self.get_region()
+            if region is None:
+                return queryset.none()
+            queryset = queryset.filter(region__borders__geom__within=region.geom)
         return queryset
 
 

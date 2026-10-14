@@ -22,6 +22,7 @@ from utils.object_management.models import (
     UserCreatedObject,
     UserCreatedObjectManager,
     UserCreatedObjectQuerySet,
+    get_default_owner,
 )
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import PropertyValue
@@ -113,7 +114,9 @@ class WasteComponent(Material):
 @receiver(post_save, sender=WasteComponent)
 def add_material_category(sender, instance, created, **kwargs):
     if created:
-        category = MaterialCategory.objects.get(name="Biowaste component")
+        category = MaterialCategory.objects.get(
+            name="Biowaste component", owner=get_default_owner()
+        )
         instance.categories.add(category)
         instance.save()
 
