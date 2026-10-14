@@ -14,14 +14,22 @@ from utils.object_management.permissions import (
 from .models import Author, Licence, Source
 
 
-class AuthorFilterSet(UserCreatedObjectScopedFilterSet):
+class AuthorFilterSet(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
+    search_placeholder = "Search by name or organization ..."
+    search_fields = (
+        "last_names",
+        "first_names",
+        "organization_name",
+        "organization_abbreviation",
+    )
+
     last_names = CharFilter(lookup_expr="icontains")
     first_names = CharFilter(lookup_expr="icontains")
     organization_name = CharFilter(lookup_expr="icontains")
 
     class Meta:
         model = Author
-        fields = ("scope", "last_names", "first_names", "organization_name")
+        fields = ("scope", "q", "last_names", "first_names", "organization_name")
 
 
 class LicenceListFilter(UserCreatedObjectScopedFilterSet):
