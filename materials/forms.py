@@ -68,7 +68,7 @@ class MaterialCategoryModalModelForm(ModalModelFormMixin, MaterialCategoryModelF
 class MaterialModelForm(SimpleModelForm):
     class Meta:
         model = Material
-        fields = ("name", "description", "categories")
+        fields = ("name", "abbreviation", "description", "categories")
 
 
 class MaterialModalModelForm(ModalModelFormMixin, MaterialModelForm):
@@ -103,7 +103,14 @@ class ComponentModelForm(SimpleModelForm):
 
     class Meta:
         model = MaterialComponent
-        fields = ("name", "description", "comparable_component", "is_aggregate")
+        fields = (
+            "name",
+            "abbreviation",
+            "description",
+            "categories",
+            "comparable_component",
+            "is_aggregate",
+        )
 
 
 class ComponentModalModelForm(ModalModelFormMixin, ComponentModelForm):
