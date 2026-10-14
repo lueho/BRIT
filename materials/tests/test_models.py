@@ -1209,8 +1209,12 @@ class SampleAuthorTestCase(TestCase):
         self.assertEqual(str(link), f"{self.sample}: {author}")
 
     def _attribute(self, sample):
-        first = Author.objects.create(first_names="Ada", last_names="First")
-        second = Author.objects.create(first_names="Bea", last_names="Second")
+        first = Author.objects.create(
+            first_names="Ada", last_names="First", publication_status="published"
+        )
+        second = Author.objects.create(
+            first_names="Bea", last_names="Second", publication_status="published"
+        )
         SampleAuthor.objects.create(sample=sample, author=second, position=2)
         SampleAuthor.objects.create(sample=sample, author=first, position=1)
         return [first, second]
@@ -1226,6 +1230,23 @@ class SampleAuthorTestCase(TestCase):
             [link.position for link in duplicate.ordered_authors()], [1, 2]
         )
         self.assertEqual(self.sample.authors_ordered(), authors)
+
+    def test_duplicate_skips_authors_hidden_from_creator(self):
+        public = Author.objects.create(
+            last_names="Public", publication_status="published"
+        )
+        private = Author.objects.create(last_names="Private", owner=self.owner)
+        SampleAuthor.objects.create(sample=self.sample, author=private, position=1)
+        SampleAuthor.objects.create(sample=self.sample, author=public, position=2)
+        outsider = User.objects.create(username="sample-author-outsider-copier")
+
+        duplicate = self.sample.duplicate(outsider)
+
+        self.assertEqual(duplicate.authors_ordered(), [public])
+        self.assertEqual([link.position for link in duplicate.ordered_authors()], [1])
+        self.assertEqual(
+            self.sample.duplicate(self.owner).authors_ordered(), [private, public]
+        )
 
     def test_series_duplicate_copies_sample_authors(self):
         series = SampleSeries.objects.create(

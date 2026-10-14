@@ -1266,10 +1266,10 @@ class Sample(NamedUserCreatedObject):
                 measurement.duplicate(creator, sample=duplicate)
 
             SampleAuthor.objects.bulk_create(
-                SampleAuthor(
-                    sample=duplicate, author_id=link.author_id, position=link.position
+                SampleAuthor(sample=duplicate, author_id=link.author_id, position=index)
+                for index, link in enumerate(
+                    self.visible_ordered_authors(creator), start=1
                 )
-                for link in self.ordered_authors()
             )
 
             return duplicate
