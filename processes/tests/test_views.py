@@ -2502,6 +2502,19 @@ class ProcessListBulkAccessTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, 'id="bulk-access-form"')
         self.assertContains(response, 'name="items"')
 
+    def test_private_list_places_bulk_toolbar_in_options_pane(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("processes:process-list-owned"), {"scope": "private"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        pane_start = content.index('id="options-pane"')
+        pane_end = content.index('id="learning-pane"')
+        self.assertIn('id="bulk-access-form"', content[pane_start:pane_end])
+        self.assertNotIn('id="bulk-access-form"', content[:pane_start])
+
     def test_rows_are_keyboard_navigable(self):
         Process.objects.create(
             name="Keyboard target",

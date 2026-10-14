@@ -81,9 +81,6 @@
 {% endblock scope_toggle %}
 
 {% block list_table %}
-    {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
-        {% include "object_management/bulk_access_toolbar.html" %}
-    {% endif %}
     <div class="collection-list-min-height">
         <div class="table-responsive">
             <table class="table modern-table">
@@ -171,7 +168,16 @@
 {% endblock list_table %}
 
 {% block options_tab_button %}
+    {% if list_type == 'private' %}{{ block.super }}{% endif %}
 {% endblock options_tab_button %}
 
 {% block options_tab_pane %}
+    {% if list_type == 'private' %}{{ block.super }}{% endif %}
 {% endblock options_tab_pane %}
+
+{% block options_pane_body %}
+    {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
+        <p class="text-muted small mb-1">Manage access for selected items</p>
+        {% include "object_management/bulk_access_toolbar.html" %}
+    {% endif %}
+{% endblock options_pane_body %}
