@@ -315,6 +315,12 @@ class CollectionModelFormTestCase(TestCase):
             name="Allowed Material 1", publication_status="published"
         )
         cls.allowed_material_1.categories.add(cls.material_group)
+        other_owner = User.objects.create(username="other-owner")
+        cls.allowed_material_1.categories.add(
+            MaterialCategory.objects.create(
+                owner=other_owner, name="Biowaste component"
+            )
+        )
         cls.allowed_material_2 = WasteComponent.objects.create(
             name="Allowed Material 2", publication_status="published"
         )
@@ -392,6 +398,21 @@ class CollectionModelFormTestCase(TestCase):
         cls.collection.predecessors.set(
             [cls.predecessor_collection_1, cls.predecessor_collection_2]
         )
+
+    def test_material_choices_list_component_only_once(self):
+        form = CollectionModelForm(instance=self.collection)
+        for field_name in ("allowed_materials", "forbidden_materials"):
+            with self.subTest(field_name=field_name):
+                field = form.fields[field_name]
+                self.assertEqual(
+                    field.queryset.filter(pk=self.allowed_material_1.pk).count(), 1
+                )
+                matching_choices = [
+                    choice
+                    for choice in field.choices
+                    if str(choice[0]) == str(self.allowed_material_1.pk)
+                ]
+                self.assertEqual(len(matching_choices), 1)
 
     def test_form_errors(self):
         data = {"connection_rate_year": 123}

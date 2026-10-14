@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from unittest.mock import patch
 
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db.models import signals
 from django.test import TestCase
@@ -72,6 +73,52 @@ class WasteComponentManagerTestCase(TestCase):
             self.material_component.pk,
             WasteComponent.objects.values_list("pk", flat=True),
         )
+
+    def test_component_with_same_named_categories_is_listed_once(self):
+        other_owner = User.objects.create(username="other-owner")
+        other_category = MaterialCategory.objects.create(
+            owner=other_owner, name="Biowaste component"
+        )
+        self.waste_component.categories.add(other_category)
+        self.assertEqual(
+            self.waste_component.categories.filter(name="Biowaste component").count(),
+            2,
+        )
+        self.assertEqual(
+            list(
+                WasteComponent.objects.filter(pk=self.waste_component.pk).values_list(
+                    "pk", flat=True
+                )
+            ),
+            [self.waste_component.pk],
+        )
+        self.assertEqual(
+            WasteComponent.objects.filter(pk=self.waste_component.pk).count(), 1
+        )
+        self.assertEqual(
+            WasteComponent.objects.get(pk=self.waste_component.pk),
+            self.waste_component,
+        )
+
+    def test_component_classified_only_by_other_owner_is_listed_once(self):
+        other_owner = User.objects.create(username="other-owner")
+        other_category = MaterialCategory.objects.create(
+            owner=other_owner, name="Biowaste component"
+        )
+        material = Material.objects.create(
+            name="Legacy classified material", type="material"
+        )
+        material.categories.add(other_category)
+        self.assertEqual(
+            list(
+                WasteComponent.objects.filter(pk=material.pk).values_list(
+                    "pk", flat=True
+                )
+            ),
+            [material.pk],
+        )
+        self.assertEqual(material.categories.count(), 1)
+        self.assertFalse(material.categories.filter(owner=get_default_owner()).exists())
 
 
 class CollectionCatchmentTestCase(TestCase):

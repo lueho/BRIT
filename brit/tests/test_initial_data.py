@@ -371,11 +371,17 @@ class FullInitialDataSeedingTests(TestCase):
             "sources-explorer",
             "wastecollection-explorer",
             "materials-explorer",
-            "maps-dashboard",
         ):
             with self.subTest(url_name=url_name):
                 response = self.client.get(reverse(url_name))
                 self.assertEqual(response.status_code, 200)
+
+    def test_maps_explorer_renders_without_domain_data(self):
+        call_command("ensure_initial_data", stdout=io.StringIO())
+
+        response = self.client.get("/maps/explorer/")
+
+        self.assertEqual(response.status_code, 200)
 
 
 class CookieConsentInitialDataTests(TestCase):

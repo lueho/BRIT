@@ -101,7 +101,12 @@ class WasteCategory(NamedUserCreatedObject):
 
 class WasteComponentManager(MaterialManager):
     def get_queryset(self):
-        return super().get_queryset().filter(categories__name="Biowaste component")
+        return (
+            super()
+            .get_queryset()
+            .filter(categories__name="Biowaste component")
+            .distinct()
+        )
 
 
 class WasteComponent(Material):
