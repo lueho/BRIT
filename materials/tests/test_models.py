@@ -1208,6 +1208,61 @@ class SampleAuthorTestCase(TestCase):
         link = SampleAuthor.objects.create(sample=self.sample, author=author)
         self.assertEqual(str(link), f"{self.sample}: {author}")
 
+    def _attribute(self, sample):
+        first = Author.objects.create(first_names="Ada", last_names="First")
+        second = Author.objects.create(first_names="Bea", last_names="Second")
+        SampleAuthor.objects.create(sample=sample, author=second, position=2)
+        SampleAuthor.objects.create(sample=sample, author=first, position=1)
+        return [first, second]
+
+    def test_duplicate_copies_ordered_authors(self):
+        authors = self._attribute(self.sample)
+        creator = User.objects.create(username="sample-author-duplicator")
+
+        duplicate = self.sample.duplicate(creator)
+
+        self.assertEqual(duplicate.authors_ordered(), authors)
+        self.assertEqual(
+            [link.position for link in duplicate.ordered_authors()], [1, 2]
+        )
+        self.assertEqual(self.sample.authors_ordered(), authors)
+
+    def test_series_duplicate_copies_sample_authors(self):
+        series = SampleSeries.objects.create(
+            name="Attributed series", material=self.material, owner=self.owner
+        )
+        sample = Sample.objects.create(
+            name="Series sample",
+            material=self.material,
+            series=series,
+            owner=self.owner,
+        )
+        authors = self._attribute(sample)
+        creator = User.objects.create(username="series-author-duplicator")
+
+        duplicate = series.duplicate(creator)
+
+        self.assertEqual(
+            duplicate.samples.get(name=f"{sample.name} (copy)").authors_ordered(),
+            authors,
+        )
+
+    def test_visible_ordered_authors_hide_private_authors(self):
+        published = Author.objects.create(
+            last_names="Published", publication_status="published"
+        )
+        private = Author.objects.create(last_names="Private", owner=self.owner)
+        SampleAuthor.objects.create(sample=self.sample, author=private, position=1)
+        SampleAuthor.objects.create(sample=self.sample, author=published, position=2)
+        outsider = User.objects.create(username="sample-author-outsider")
+
+        def visible(user):
+            return [link.author for link in self.sample.visible_ordered_authors(user)]
+
+        self.assertEqual(visible(None), [published])
+        self.assertEqual(visible(outsider), [published])
+        self.assertEqual(visible(self.owner), [private, published])
+
 
 class SampleGeoReferenceTestCase(TestCase):
     """

@@ -226,8 +226,12 @@ class SampleMeasurementsXLSXRendererTestCase(TestCase):
         sample = Sample.objects.create(
             name="Contributor Sample", material=material, owner=owner
         )
-        first = Author.objects.create(first_names="Saskia", last_names="Hertel")
-        second = Author.objects.create(first_names="Steffen", last_names="Walk")
+        first = Author.objects.create(
+            first_names="Saskia", last_names="Hertel", publication_status="published"
+        )
+        second = Author.objects.create(
+            first_names="Steffen", last_names="Walk", publication_status="published"
+        )
         SampleAuthor.objects.create(sample=sample, author=second, position=2)
         SampleAuthor.objects.create(sample=sample, author=first, position=1)
 
@@ -237,6 +241,34 @@ class SampleMeasurementsXLSXRendererTestCase(TestCase):
         )._build_metadata_values()
 
         self.assertEqual(metadata["Entry done by:"], "Hertel, Saskia; Walk, Steffen")
+
+    def test_entry_done_by_omits_authors_hidden_from_export_user(self):
+        owner = User.objects.create(username="private-author-owner")
+        requester = User.objects.create(username="export-requester")
+        material = Material.objects.create(name="Private Contributor Material")
+        sample = Sample.objects.create(
+            name="Private Contributor Sample",
+            material=material,
+            owner=owner,
+            publication_status="published",
+        )
+        public = Author.objects.create(
+            first_names="Saskia", last_names="Hertel", publication_status="published"
+        )
+        private = Author.objects.create(last_names="Secretauthor", owner=owner)
+        SampleAuthor.objects.create(sample=sample, author=private, position=1)
+        SampleAuthor.objects.create(sample=sample, author=public, position=2)
+
+        def entry_done_by(user):
+            return SampleMeasurementsXLSXRenderer(
+                sample=sample,
+                measurements=sample.component_measurements.all(),
+                user=user,
+            )._build_metadata_values()["Entry done by:"]
+
+        self.assertEqual(entry_done_by(None), "Hertel, Saskia")
+        self.assertEqual(entry_done_by(requester), "Hertel, Saskia")
+        self.assertEqual(entry_done_by(owner), "Secretauthor; Hertel, Saskia")
 
     def test_entry_done_by_is_blank_without_contributors(self):
         owner = User.objects.create(username="lonely-owner")

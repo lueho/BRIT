@@ -45,7 +45,7 @@
   </ul>
 {% elif section.key == 'contributors' %}
   <ul class="list-unstyled mb-0">
-    {% for link in object.sample_authors.all %}
+    {% for link in sample_authors %}
       <li class="mb-2">
         <span class="fw-semibold">{{ link.author }}</span>
         {% if link.author.institution %}<span>({{ link.author.institution }})</span>{% endif %}

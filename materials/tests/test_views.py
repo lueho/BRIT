@@ -3546,6 +3546,37 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertEqual(link.author, author)
         self.assertEqual(link.position, 1)
 
+    def test_contributors_summary_hides_authors_not_visible_to_editor(self):
+        secret = Author.objects.create(
+            last_names="Secretauthor",
+            contact_email="secret-summary-author@example.com",
+            owner=self.other,
+        )
+        SampleAuthor.objects.create(sample=self.sample, author=secret, position=1)
+        author = Author.objects.create(
+            last_names="Visibleauthor", owner=self.owner, publication_status="published"
+        )
+        response = self.client.post(
+            self.section_url("contributors"),
+            {
+                "sample_authors-TOTAL_FORMS": "1",
+                "sample_authors-INITIAL_FORMS": "0",
+                "sample_authors-0-author": str(author.pk),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        html = response.json()["html"]
+        self.assertIn("Visibleauthor", html)
+        self.assertNotIn("Secretauthor", html)
+        self.assertNotIn("secret-summary-author@example.com", html)
+
+        workspace = self.client.get(f"{self.sample.get_absolute_url()}?mode=edit")
+        self.assertContains(workspace, "Visibleauthor")
+        self.assertNotContains(workspace, "Secretauthor")
+        self.assertNotContains(workspace, "secret-summary-author@example.com")
+
     def test_contributors_reject_author_not_visible_to_editor(self):
         locked = Author.objects.create(last_names="Locked", owner=self.other)
         response = self.client.post(

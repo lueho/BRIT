@@ -27,7 +27,6 @@ from django.utils.translation import gettext
 from django.views.generic import RedirectView, TemplateView, View
 from django.views.generic.detail import SingleObjectMixin
 
-from bibliography.models import Author
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
 from processes.models import Process
@@ -1885,18 +1884,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
             component_measurements
         )
         primary_source = self.object.sources.first()
-        # Drop authors the current user cannot read so private contributor
-        # names and contact emails do not leak on published samples.
-        sample_authors = self.object.ordered_authors()
-        author_ids = {link.author_id for link in sample_authors}
-        visible_author_ids = set(
-            filter_queryset_for_user(
-                Author.objects.filter(pk__in=author_ids), self.request.user
-            ).values_list("pk", flat=True)
-        )
-        sample_authors = [
-            link for link in sample_authors if link.author_id in visible_author_ids
-        ]
+        sample_authors = self.object.visible_ordered_authors(self.request.user)
         review_timeline = self._build_review_timeline()
         related = self._build_related_samples(limit=8)
 
@@ -2167,7 +2155,13 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
                     "message": message,
                     "html": render_to_string(
                         "materials/includes/sample_section_summary.html",
-                        {"object": self.object, "section": self.section},
+                        {
+                            "object": self.object,
+                            "section": self.section,
+                            "sample_authors": self.object.visible_ordered_authors(
+                                self.request.user
+                            ),
+                        },
                         request=self.request,
                     ),
                 }

@@ -209,7 +209,7 @@ class SampleMeasurementsXLSXRenderer:
             else "",
             "DOI": "; ".join(s.doi for s in sample_sources if s.doi) or "",
             "Entry done by:": "; ".join(
-                str(link.author) for link in sample.ordered_authors()
+                str(link.author) for link in sample.visible_ordered_authors(self.user)
             ),
         }
 

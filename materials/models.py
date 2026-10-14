@@ -20,6 +20,7 @@ from utils.object_management.models import (
     UserCreatedObjectQuerySet,
     get_default_owner,
 )
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import (
     NumericMeasurementMixin,
     PropertyBase,
@@ -1064,6 +1065,17 @@ class Sample(NamedUserCreatedObject):
     def authors_ordered(self):
         return [link.author for link in self.ordered_authors()]
 
+    def visible_ordered_authors(self, user):
+        """Ordered author links whose author ``user`` may read."""
+        links = list(self.ordered_authors())
+        visible_ids = set(
+            filter_queryset_for_user(
+                Author.objects.filter(pk__in={link.author_id for link in links}),
+                user,
+            ).values_list("pk", flat=True)
+        )
+        return [link for link in links if link.author_id in visible_ids]
+
     @property
     def group_ids(self):
         """
@@ -1252,6 +1264,13 @@ class Sample(NamedUserCreatedObject):
 
             for measurement in self.component_measurements.all():
                 measurement.duplicate(creator, sample=duplicate)
+
+            SampleAuthor.objects.bulk_create(
+                SampleAuthor(
+                    sample=duplicate, author_id=link.author_id, position=link.position
+                )
+                for link in self.ordered_authors()
+            )
 
             return duplicate
 
