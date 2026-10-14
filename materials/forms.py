@@ -65,17 +65,17 @@ class MaterialCategoryModalModelForm(ModalModelFormMixin, MaterialCategoryModelF
     pass
 
 
-class MaterialModelForm(SimpleModelForm):
+class MaterialModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     class Meta:
         model = Material
-        fields = ("name", "description", "categories")
+        fields = ("name", "abbreviation", "description", "categories")
 
 
 class MaterialModalModelForm(ModalModelFormMixin, MaterialModelForm):
     pass
 
 
-class ComponentModelForm(SimpleModelForm):
+class ComponentModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     comparable_component = TomSelectModelChoiceField(
         queryset=MaterialComponent.objects.all(),
         required=False,
@@ -103,7 +103,14 @@ class ComponentModelForm(SimpleModelForm):
 
     class Meta:
         model = MaterialComponent
-        fields = ("name", "description", "comparable_component", "is_aggregate")
+        fields = (
+            "name",
+            "abbreviation",
+            "description",
+            "categories",
+            "comparable_component",
+            "is_aggregate",
+        )
 
 
 class ComponentModalModelForm(ModalModelFormMixin, ComponentModelForm):
