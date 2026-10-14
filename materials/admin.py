@@ -11,9 +11,16 @@ from .models import (
     MaterialPropertyGroup,
     MaterialPropertyValue,
     Sample,
+    SampleAuthor,
     SampleGroup,
     SampleSeries,
 )
+
+
+class SampleAuthorInline(admin.TabularInline):
+    model = SampleAuthor
+    extra = 1
+    autocomplete_fields = ("author",)
 
 
 @admin.register(AnalyticalMethod)
@@ -171,6 +178,7 @@ class SampleAdmin(admin.ModelAdmin):
     ordering = ("name",)
     autocomplete_fields = ("sources",)
     filter_horizontal = ("sample_groups",)
+    inlines = [SampleAuthorInline]
 
 
 @admin.register(Composition)

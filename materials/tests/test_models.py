@@ -13,7 +13,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from factory.django import mute_signals
 
-from bibliography.models import Source
+from bibliography.models import Author, Source
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import GeoPolygon, LauRegion, Location, NutsRegion, Region
 from materials.models import (
@@ -28,6 +28,7 @@ from materials.models import (
     MaterialPropertyValue,
     MeasurementValueQualifier,
     Sample,
+    SampleAuthor,
     SampleExternalRecord,
     SampleGroup,
     SampleGroupKind,
@@ -1166,6 +1167,46 @@ class SampleTestCase(TestCase):
         with self.assertRaises(ValidationError) as ctx:
             sample.clean()
         self.assertIn("material", ctx.exception.message_dict)
+
+
+class SampleAuthorTestCase(TestCase):
+    """Corresponding-author assignments on samples (bibliography authors)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create(username="sample-author-owner")
+        cls.material = Material.objects.create(
+            name="Attribution material", owner=cls.owner
+        )
+        cls.sample = Sample.objects.create(
+            name="Attributed sample",
+            material=cls.material,
+            owner=cls.owner,
+            standalone=True,
+        )
+
+    def test_ordered_authors_follow_position(self):
+        later = Author.objects.create(first_names="Bea", last_names="Second")
+        earlier = Author.objects.create(first_names="Ada", last_names="First")
+        SampleAuthor.objects.create(sample=self.sample, author=later, position=2)
+        SampleAuthor.objects.create(sample=self.sample, author=earlier, position=1)
+
+        self.assertEqual(
+            [link.author for link in self.sample.ordered_authors()],
+            [earlier, later],
+        )
+        self.assertEqual(self.sample.authors_ordered(), [earlier, later])
+
+    def test_author_can_only_be_assigned_once(self):
+        author = Author.objects.create(first_names="Ada", last_names="First")
+        SampleAuthor.objects.create(sample=self.sample, author=author)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            SampleAuthor.objects.create(sample=self.sample, author=author)
+
+    def test_str_names_sample_and_author(self):
+        author = Author.objects.create(first_names="Ada", last_names="First")
+        link = SampleAuthor.objects.create(sample=self.sample, author=author)
+        self.assertEqual(str(link), f"{self.sample}: {author}")
 
 
 class SampleGeoReferenceTestCase(TestCase):

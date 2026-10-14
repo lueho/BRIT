@@ -11,7 +11,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import dateformat, timezone
 
-from bibliography.models import Source
+from bibliography.models import Author, Source
 from distributions.models import TemporalDistribution, Timestep
 from utils.object_management.models import (
     NamedUserCreatedObject,
@@ -988,6 +988,16 @@ class Sample(NamedUserCreatedObject):
         help_text="If the sample represents a specific time step in a series, select it here.",
     )
     sources = models.ManyToManyField(Source)
+    authors = models.ManyToManyField(
+        Author,
+        blank=True,
+        through="SampleAuthor",
+        related_name="samples",
+        help_text=(
+            "Corresponding authors or data contributors shown on the sample "
+            "detail page."
+        ),
+    )
     sample_groups = models.ManyToManyField(
         SampleGroup,
         related_name="samples",
@@ -1045,6 +1055,14 @@ class Sample(NamedUserCreatedObject):
 
     def get_property_values_queryset(self):
         return self.property_values.all()
+
+    def ordered_authors(self):
+        return self.sample_authors.order_by(
+            "position", "author_id", "id"
+        ).select_related("author")
+
+    def authors_ordered(self):
+        return [link.author for link in self.ordered_authors()]
 
     @property
     def group_ids(self):
@@ -1236,6 +1254,34 @@ class Sample(NamedUserCreatedObject):
                 measurement.duplicate(creator, sample=duplicate)
 
             return duplicate
+
+
+class SampleAuthor(models.Model):
+    """Ordered author/contributor assignment for a sample."""
+
+    sample = models.ForeignKey(
+        Sample,
+        on_delete=models.CASCADE,
+        related_name="sample_authors",
+    )
+    author = models.ForeignKey(
+        Author,
+        on_delete=models.PROTECT,
+        related_name="sample_author_links",
+    )
+    position = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        ordering = ["position", "author_id", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sample", "author"],
+                name="materials_sampleauthor_unique_author",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.sample}: {self.author}"
 
 
 class SampleExternalRecord(models.Model):

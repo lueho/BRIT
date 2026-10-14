@@ -25,6 +25,7 @@ from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 from ..forms import PROCESS_SECTIONS
 from ..models import (
     Process,
+    ProcessAuthor,
     ProcessCategory,
     ProcessInfoResource,
     ProcessMaterial,
@@ -2733,13 +2734,16 @@ class ProcessContributorMotivationViewsTestCase(TestCase):
             "process_materials-0-quantity_unit": "",
         }
 
-    def test_reading_view_credits_creator(self):
+    def test_reading_view_shows_owner_as_editor(self):
         response = self.client.get(self.detail_url())
 
-        self.assertContains(response, "Contributed by")
+        self.assertContains(response, "Editor")
         self.assertContains(response, "workshop-author")
+        self.assertNotContains(response, "Contributed by")
 
-    def test_published_reading_view_credits_creator_for_anonymous_visitors(self):
+    def test_published_reading_view_shows_owner_as_editor_for_anonymous_visitors(
+        self,
+    ):
         Process.objects.filter(pk=self.process.pk).update(
             publication_status="published"
         )
@@ -2747,8 +2751,23 @@ class ProcessContributorMotivationViewsTestCase(TestCase):
 
         response = self.client.get(self.detail_url())
 
-        self.assertContains(response, "Contributed by")
+        self.assertContains(response, "Editor")
         self.assertContains(response, "workshop-author")
+        self.assertNotContains(response, "Contributed by")
+
+    def test_reading_view_labels_contributors_as_corresponding_authors(self):
+        author = Author.objects.create(
+            first_names="Ada",
+            last_names="Example",
+            owner=self.participant,
+            publication_status="published",
+        )
+        ProcessAuthor.objects.create(process=self.process, author=author)
+
+        response = self.client.get(self.detail_url())
+
+        self.assertContains(response, "Corresponding authors")
+        self.assertContains(response, "Example, Ada")
 
     def test_reading_view_shows_last_update(self):
         Process.objects.filter(pk=self.process.pk).update(
