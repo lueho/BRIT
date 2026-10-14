@@ -728,6 +728,27 @@ class StickyFilterOffsetAssetTests(SimpleTestCase):
         self.assertNotIn("top: calc(56px + 1rem);", css)
 
 
+class LetterIndexThemeAssetTests(SimpleTestCase):
+    """The A-Z letter bar must not fall back to stock-Bootstrap blue states.
+
+    Bootstrap's ``.page-link:focus`` reads ``--bs-pagination-focus-color`` and
+    ``--bs-pagination-focus-box-shadow``, separate from the hover/active
+    properties, so those must be recolored to the BRIT primary too.
+    """
+
+    def test_letter_index_overrides_pagination_focus_state(self):
+        css = (Path(settings.BASE_DIR) / "brit/static/css/filtered-list.css").read_text(
+            encoding="utf-8"
+        )
+        block = css.split(".letter-index .pagination {", 1)[1].split("}", 1)[0]
+
+        self.assertIn("--bs-pagination-focus-color: var(--bs-primary);", block)
+        self.assertIn(
+            "--bs-pagination-focus-box-shadow: 0 0 0 .15rem rgba(var(--bs-primary-rgb), .25);",
+            block,
+        )
+
+
 class BreadcrumbRailGlobalStylingAssetTests(SimpleTestCase):
     """Asset-level regression tests for the global .page-breadcrumb-rail styling.
 
