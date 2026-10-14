@@ -108,8 +108,7 @@
     {% endif %}
     {% export_modal_button "collection-export" list_type=list_type button_classes="btn btn-outline-secondary w-100" %}
     {% if list_type == 'private' and user.is_authenticated %}
-        <p class="text-muted small mt-3 mb-1">Manage access for selected items</p>
-        {% include "object_management/bulk_access_toolbar.html" %}
+        {% include "object_management/bulk_access_toolbar.html" with heading="Manage access for selected items" heading_class="mt-3 mb-1" %}
     {% endif %}
 {% endblock options_pane_body %}
 {% block learning_pane_body %}

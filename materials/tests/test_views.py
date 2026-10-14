@@ -5666,6 +5666,20 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertIn('id="bulk-access-form"', content[pane_start:])
         self.assertNotIn('id="bulk-access-form"', content[:pane_start])
 
+    def test_private_sample_list_hides_access_heading_with_toolbar(self):
+        self.client.force_login(self.regular_user)
+        response = self.client.get(reverse("sample-list-owned") + "?scope=private")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertNotIn('name="items"', content)
+        toolbar_start = content.index('id="bulk-access-toolbar"')
+        heading = content.index("Manage access for selected items")
+        form_start = content.index('id="bulk-access-form"')
+        self.assertLess(toolbar_start, heading)
+        self.assertLess(heading, form_start)
+        self.assertIn("getElementById('bulk-access-toolbar')", content)
+
     def test_material_review_list_renders_filter_context_for_staff(self):
         Material.objects.create(
             name="Review Material",

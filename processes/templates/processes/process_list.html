@@ -177,7 +177,6 @@
 
 {% block options_pane_body %}
     {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
-        <p class="text-muted small mb-1">Manage access for selected items</p>
-        {% include "object_management/bulk_access_toolbar.html" %}
+        {% include "object_management/bulk_access_toolbar.html" with heading="Manage access for selected items" %}
     {% endif %}
 {% endblock options_pane_body %}
