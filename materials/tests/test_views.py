@@ -3573,9 +3573,13 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertNotIn("secret-summary-author@example.com", html)
 
         workspace = self.client.get(f"{self.sample.get_absolute_url()}?mode=edit")
-        self.assertContains(workspace, "Visibleauthor")
         self.assertNotContains(workspace, "Secretauthor")
         self.assertNotContains(workspace, "secret-summary-author@example.com")
+        page = workspace.content.decode()
+        start = page.index('id="workspace-section-contributors"')
+        summary = page[start : page.index('id="workspace-editor-contributors"', start)]
+        self.assertIn("Visibleauthor", summary)
+        self.assertNotIn("No corresponding authors added yet", summary)
 
     def test_contributors_reject_author_not_visible_to_editor(self):
         locked = Author.objects.create(last_names="Locked", owner=self.other)
