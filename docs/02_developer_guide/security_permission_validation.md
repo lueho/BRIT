@@ -2,6 +2,10 @@
 
 This is the normative authorization contract for BRIT. Application behavior, role provisioning, user help, tests, and agent workflows must agree with it. A discrepancy is a defect, not an undocumented exception. During the staged migration, incomplete adapters are tracked explicitly; old behavior is not a second specification.
 
+## Migration status and linked guidance
+
+This page defines the target authorization rules, not a guarantee that every runtime path has already migrated. The [implementation map](user_created_objects.md) and [package guide](../../utils/object_management/README.md) explicitly label pre-migration runtime notes. Any staff bypass described there is legacy behavior to remove, not authority granted by this contract. Use the migration acceptance tracker in [#614](https://github.com/lueho/BRIT/pull/614) to distinguish implementation progress from rollout readiness.
+
 ## Architecture
 
 Authorization is capability AND object access AND lifecycle eligibility. Django model permissions express capabilities. Ownership and individual/group editor grants express object access. Publication states constrain actions. Neither ownership nor a model permission alone gives unrestricted write access.
