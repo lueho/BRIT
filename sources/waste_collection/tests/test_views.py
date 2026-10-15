@@ -1467,6 +1467,19 @@ class CollectionListQueryTestCase(TestCase):
 
         self.assertNotContains(response, 'name="letter"')
 
+    def test_private_list_places_bulk_access_form_in_options_pane(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("collection-list-owned"), {"scope": "private"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        pane_start = content.index('id="options-pane"')
+        pane_end = content.index('id="learning-pane"')
+        self.assertIn('id="bulk-access-form"', content[pane_start:pane_end])
+        self.assertNotIn('id="bulk-access-form"', content[:pane_start])
+
     def test_explicit_ordering_is_preserved(self):
         page = self.get_page(
             views.CollectionPublishedListView, ordering=("-valid_from", "-id")

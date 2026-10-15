@@ -25,9 +25,6 @@
 {% endblock title %}
 {% block list_table %}
     {% load custom_tags %}
-    {% if list_type == 'private' and user.is_authenticated %}
-        {% include "object_management/bulk_access_toolbar.html" %}
-    {% endif %}
     {% if chips %}
         <div class="mb-2 d-flex flex-wrap gap-2">
             {% for chip in chips %}
@@ -110,6 +107,9 @@
         </a>
     {% endif %}
     {% export_modal_button "collection-export" list_type=list_type button_classes="btn btn-outline-secondary w-100" %}
+    {% if list_type == 'private' and user.is_authenticated %}
+        {% include "object_management/bulk_access_toolbar.html" with heading="Manage access for selected items" heading_class="mt-3 mb-1" %}
+    {% endif %}
 {% endblock options_pane_body %}
 {% block learning_pane_body %}
     {% include "waste_collection/includes/learning_materials.html" %}
