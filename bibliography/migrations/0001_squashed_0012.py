@@ -9,6 +9,24 @@ import utils.object_management.models
 class Migration(migrations.Migration):
     initial = True
 
+    replaces = [
+        ("bibliography", "0001_initial"),
+        ("bibliography", "0002_author_approved_at_author_approved_by_and_more"),
+        ("bibliography", "0003_alter_author_publication_status_and_more"),
+        ("bibliography", "0004_alter_author_publication_status_and_more"),
+        ("bibliography", "0005_alter_source_abbreviation_blank"),
+        ("bibliography", "0006_alter_source_url"),
+        ("bibliography", "0007_source_article_metadata"),
+        ("bibliography", "0008_source_article_number"),
+        ("bibliography", "0009_rename_source_bibtex_fields"),
+        ("bibliography", "0010_author_contact_details"),
+        (
+            "bibliography",
+            "0011_author_author_type_author_organization_abbreviation_and_more",
+        ),
+        ("bibliography", "0012_source_type_vocabulary"),
+    ]
+
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]

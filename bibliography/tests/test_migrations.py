@@ -60,7 +60,10 @@ class FinalizedBaselineGraphTests(SimpleTestCase):
         self.assertEqual(bibliography_keys, [SQUASHED_KEY])
         migration = loader.disk_migrations[SQUASHED_KEY]
         self.assertTrue(migration.initial)
-        self.assertEqual(getattr(migration, "replaces", []), [])
+        self.assertEqual(
+            migration.replaces,
+            [(APP_LABEL, name) for name in OBSOLETE_MIGRATIONS],
+        )
         self.assertEqual(
             migration.dependencies,
             [migrations.swappable_dependency(settings.AUTH_USER_MODEL)],
@@ -148,11 +151,24 @@ class FinalizedBaselineGraphTests(SimpleTestCase):
             loader = MigrationLoader(connection)
             loader.check_consistent_history(connection)
 
-    def test_missing_baseline_breaks_adopted_dependents(self):
+    def test_original_history_without_baseline_is_adopted(self):
         disk_loader = MigrationLoader(None)
         applied = set(disk_loader.disk_migrations) | {
             (APP_LABEL, name) for name in OBSOLETE_MIGRATIONS
         }
+        applied.discard(SQUASHED_KEY)
+        with mock.patch.object(
+            MigrationRecorder,
+            "applied_migrations",
+            return_value=dict.fromkeys(applied),
+        ):
+            loader = MigrationLoader(connection)
+            loader.check_consistent_history(connection)
+        self.assertIn(SQUASHED_KEY, loader.applied_migrations)
+
+    def test_missing_baseline_and_originals_breaks_dependents(self):
+        disk_loader = MigrationLoader(None)
+        applied = set(disk_loader.disk_migrations)
         applied.discard(SQUASHED_KEY)
         with mock.patch.object(
             MigrationRecorder,
@@ -315,6 +331,38 @@ class FinalizedBaselineRuntimeTests(SimpleTestCase):
         columns = self._columns(schema, "bibliography_source")
         self.assertTrue({"citation_key", "number", "eid"}.issubset(columns))
         self.assertFalse({"abbreviation", "issue", "article_number"} & columns)
+
+    @override_settings(INSTALLED_APPS=MIGRATION_TEST_APPS)
+    def test_migrate_records_baseline_for_original_history(self):
+        schema = self._scratch_schema()
+        executor = self._executor()
+        executor.migrate([SQUASHED_KEY])
+        apps = executor.loader.project_state(nodes=[SQUASHED_KEY]).apps
+        owner = self._create_owner(apps)
+        self._create_current_fixtures(apps, owner)
+
+        recorder = MigrationRecorder(connection)
+        recorder.record_unapplied(*SQUASHED_KEY)
+        for name in OBSOLETE_MIGRATIONS:
+            recorder.record_applied(APP_LABEL, name)
+        before = self._snapshot(schema)
+        self.assertNotIn(SQUASHED_KEY, self._applied())
+
+        executor = self._executor()
+        executor.loader.check_consistent_history(connection)
+        with CaptureQueriesContext(connection) as captured:
+            executor.migrate([SQUASHED_KEY])
+        bibliography_sql = [
+            query["sql"]
+            for query in captured.captured_queries
+            if '"bibliography_' in query["sql"]
+        ]
+        self.assertEqual(bibliography_sql, [])
+        self.assertEqual(before, self._snapshot(schema))
+        applied = self._applied()
+        self.assertIn(SQUASHED_KEY, applied)
+        for name in OBSOLETE_MIGRATIONS:
+            self.assertIn((APP_LABEL, name), applied)
 
     @override_settings(INSTALLED_APPS=MIGRATION_TEST_APPS)
     def test_adopted_history_keeps_data_and_records_stable(self):

@@ -17,11 +17,13 @@ Apps declare `INITIALIZATION_DEPENDENCIES` to express ordering (e.g., materials 
 
 ## Existing Databases: Bibliography Baseline Adoption
 
-The finalized bibliography baseline is an upgrade boundary. Before deploying the version that removes the twelve original bibliography migrations, every existing database that will be retained must already have the matching schema, all twelve original data/schema migrations applied, and the `bibliography.0001_squashed_0012` entry recorded in `django_migrations`.
+The twelve original bibliography migrations are replaced by one schema-only baseline, `bibliography.0001_squashed_0012`, which lists them in `replaces`. Dependent migrations in other apps point at the baseline.
 
-Complete adoption separately while running the transitional migration graph (the originals plus the baseline with `replaces`) by running `python manage.py migrate bibliography` inside the application container. Django records the replacement without recreating existing tables. A separately validated manual metadata adoption is an alternative for an already verified database; do not fake unapplied transformations.
+Existing databases adopt the baseline automatically. When all twelve originals are recorded in `django_migrations`, Django treats the baseline as applied and `python manage.py migrate` (also run by the Heroku release phase and `bootstrap_database`) records the `0001_squashed_0012` row without touching the bibliography tables. Do not fake or delete migration-history rows by hand.
 
-Verify the checkpoint on the target database before deployment:
+A database that has applied only some of the originals cannot use the baseline. Bring it up to `bibliography.0012_source_type_vocabulary` on an earlier revision first.
+
+To verify adoption after deployment:
 
 ```sql
 SELECT app, name, applied
@@ -30,9 +32,11 @@ WHERE app = 'bibliography'
   AND name = '0001_squashed_0012';
 ```
 
-Require exactly one row. If it is absent or duplicated, stop deployment and reconcile the migration history first. This cleaned-up revision cannot perform adoption for an old database by simply running `migrate` or `bootstrap_database`; Django checks the already-applied dependencies before it can run the new initial migration. Keep obsolete history rows if desired; do not clear the migration table. Older backups must cross the same adoption boundary before this revision can use them.
+Expect exactly one row.
 
-Fresh databases do not need manual adoption: the baseline is applied normally during bootstrap.
+Fresh databases apply the baseline normally during bootstrap.
+
+`replaces` must stay until every retained database (production, staging, kept snapshots) has the baseline row. Remove it in a later cleanup change.
 
 ## Simplification & Refactor Lessons
 Key refactor steps included:
