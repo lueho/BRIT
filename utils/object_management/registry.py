@@ -146,9 +146,7 @@ PUBLISHED_ATTACHMENT_SCOPES = {
 # model label -> (marker field, source pointer field). Rows whose marker is
 # true are read-only projections governed by their linked raw source
 # evidence; the class-level policy keeps describing raw records.
-GENERATED_PROJECTIONS = {
-    "waste_collection.collectionpropertyvalue": ("is_derived", "derived_from"),
-}
+GENERATED_PROJECTIONS = {}
 
 
 def _build_policies():
