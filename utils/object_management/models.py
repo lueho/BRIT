@@ -93,14 +93,28 @@ class ReviewAction(models.Model):
     ACTION_APPROVED = "approved"
     ACTION_REJECTED = "rejected"
     ACTION_WITHDRAWN = "withdrawn"
+    ACTION_ARCHIVED = "archived"
     ACTION_COMMENT = "comment"
+    ACTION_CREATED = "created"
+    ACTION_EDITED = "edited"
+    ACTION_DELETED = "deleted"
 
     ACTION_CHOICES = (
         (ACTION_SUBMITTED, "Submitted"),
         (ACTION_APPROVED, "Approved"),
         (ACTION_REJECTED, "Rejected"),
         (ACTION_WITHDRAWN, "Withdrawn"),
+        (ACTION_ARCHIVED, "Archived"),
         (ACTION_COMMENT, "Comment"),
+        (ACTION_CREATED, "Created"),
+        (ACTION_EDITED, "Edited"),
+        (ACTION_DELETED, "Deleted"),
+    )
+    REVIEW_FEEDBACK_ACTIONS = (
+        ACTION_APPROVED,
+        ACTION_REJECTED,
+        ACTION_WITHDRAWN,
+        ACTION_COMMENT,
     )
 
     # Generic relation to the affected object
@@ -117,6 +131,12 @@ class ReviewAction(models.Model):
     action = models.CharField(max_length=20, choices=ACTION_CHOICES)
     comment = models.TextField(blank=True)
 
+    # Content revision the action refers to (null when unbound)
+    content_revision = models.PositiveBigIntegerField(
+        null=True, blank=True, editable=False
+    )
+    changed_fields = models.JSONField(default=list, blank=True, editable=False)
+
     # Timestamp
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -125,6 +145,9 @@ class ReviewAction(models.Model):
         indexes = [
             models.Index(fields=["content_type", "object_id", "action"]),
             models.Index(fields=["created_at"]),
+        ]
+        permissions = [
+            ("administer_objects", "Can administer user-created objects"),
         ]
 
     def __str__(self):
@@ -238,8 +261,8 @@ def annotate_owner_review_feedback(queryset, user):
         content_type=content_type, object_id=models.OuterRef("pk")
     ).order_by("-created_at", "-pk")
     submission = actions.filter(action=ReviewAction.ACTION_SUBMITTED)
-    feedback = actions.exclude(user_id=user.pk).exclude(
-        action=ReviewAction.ACTION_SUBMITTED
+    feedback = actions.exclude(user_id=user.pk).filter(
+        action__in=ReviewAction.REVIEW_FEEDBACK_ACTIONS
     )
     queryset = queryset.alias(
         _review_submission_at=models.Subquery(submission.values("created_at")[:1]),
@@ -366,13 +389,19 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         User, on_delete=models.PROTECT, default=get_default_owner_pk
     )
     publication_status = models.CharField(
-        max_length=10, choices=STATUS_CHOICES, default=STATUS_PRIVATE
+        max_length=10, choices=STATUS_CHOICES, default=STATUS_PRIVATE, editable=False
     )
-    submitted_at = models.DateTimeField(null=True, blank=True)
-    approved_at = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    approved_at = models.DateTimeField(null=True, blank=True, editable=False)
     approved_by = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+        User,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.PROTECT,
+        related_name="+",
     )
+    content_revision = models.PositiveBigIntegerField(default=1, editable=False)
 
     objects = UserCreatedObjectManager()
 
@@ -646,7 +675,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         return (
             ReviewAction.for_object(self)
             .exclude(user_id=self.owner_id)
-            .exclude(action=ReviewAction.ACTION_SUBMITTED)
+            .filter(action__in=ReviewAction.REVIEW_FEEDBACK_ACTIONS)
             .filter(
                 Q(created_at__gt=latest_submission.created_at)
                 | Q(
