@@ -216,6 +216,27 @@ def delete_editor_grants_on_delete(sender, instance, **kwargs):
         pass
 
 
+def _invalidate_editor_grant_caches():
+    from utils.object_management.policy import invalidate_editor_grant_caches
+
+    invalidate_editor_grant_caches()
+    # Repeat on commit so readers that cached pre-commit grants also refresh.
+    transaction.on_commit(invalidate_editor_grant_caches)
+
+
+@receiver(post_save, sender="object_management.ObjectEditorGrant")
+@receiver(post_delete, sender="object_management.ObjectEditorGrant")
+@receiver(post_save, sender="object_management.ObjectGroupEditorGrant")
+@receiver(post_delete, sender="object_management.ObjectGroupEditorGrant")
+def invalidate_editor_grant_caches_on_grant_change(sender, **kwargs):
+    _invalidate_editor_grant_caches()
+
+
+def _on_editor_group_membership_change(sender, action, **kwargs):
+    if action in ("post_add", "post_remove", "post_clear"):
+        _invalidate_editor_grant_caches()
+
+
 @receiver(post_delete)
 def delete_review_notification_mutes_on_delete(sender, instance, **kwargs):
     """Remove notification mutes pointing at a deleted UserCreatedObject."""
@@ -348,6 +369,11 @@ try:
         _on_group_membership_change,
         sender=User.groups.through,
         dispatch_uid="clear_moderator_cache_on_group_change",
+    )
+    m2m_changed.connect(
+        _on_editor_group_membership_change,
+        sender=User.groups.through,
+        dispatch_uid="invalidate_editor_grant_caches_on_group_change",
     )
 except Exception:
     # If connection fails during import, it's not critical

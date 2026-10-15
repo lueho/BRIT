@@ -194,8 +194,13 @@ def _review_actions_for_root(root):
 
 
 def contributor_user_ids(root):
-    """Users who created or meaningfully edited this root's current candidate."""
-    return set(
+    """Users who created or meaningfully edited this root's current candidate.
+
+    Recorded ``created``/``edited`` events are combined with the root's
+    ``created_by``/``lastmodified_by`` metadata, so an edit saved without an
+    audit event still excludes its author from approval.
+    """
+    contributors = set(
         _review_actions_for_root(root)
         .filter(
             action__in=(
