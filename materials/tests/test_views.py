@@ -3654,10 +3654,9 @@ class SampleDetailAttributionTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, "Hertel, Saskia")
         self.assertContains(response, "HAW Hamburg")
 
-    def test_detail_shows_owner_as_editor(self):
+    def test_detail_does_not_display_owner_prominently(self):
         response = self.client.get(self.url)
-        self.assertContains(response, "Editor")
-        self.assertContains(response, self.owner.username)
+        self.assertNotContains(response, "Editor</span>")
         self.assertNotContains(response, "Contributed by")
 
     def test_anonymous_does_not_see_private_author(self):

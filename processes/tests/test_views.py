@@ -2747,14 +2747,13 @@ class ProcessContributorMotivationViewsTestCase(TestCase):
             "process_materials-0-quantity_unit": "",
         }
 
-    def test_reading_view_shows_owner_as_editor(self):
+    def test_reading_view_does_not_display_owner(self):
         response = self.client.get(self.detail_url())
 
-        self.assertContains(response, "Editor")
-        self.assertContains(response, "workshop-author")
+        self.assertNotContains(response, "Editor</span>")
         self.assertNotContains(response, "Contributed by")
 
-    def test_published_reading_view_shows_owner_as_editor_for_anonymous_visitors(
+    def test_published_reading_view_does_not_display_owner_for_anonymous_visitors(
         self,
     ):
         Process.objects.filter(pk=self.process.pk).update(
@@ -2764,8 +2763,8 @@ class ProcessContributorMotivationViewsTestCase(TestCase):
 
         response = self.client.get(self.detail_url())
 
-        self.assertContains(response, "Editor")
-        self.assertContains(response, "workshop-author")
+        self.assertNotContains(response, "Editor</span>")
+        self.assertNotContains(response, "workshop-author")
         self.assertNotContains(response, "Contributed by")
 
     def test_reading_view_labels_contributors_as_corresponding_authors(self):
