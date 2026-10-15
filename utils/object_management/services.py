@@ -307,7 +307,7 @@ def _finalize_mutation(
             raise PermissionDenied("A content edit may not delete the record.")
         _record_event(
             locked_root,
-            actor,
+            disposition["deleted_by"] or actor,
             ReviewAction.ACTION_DELETED,
             object_id=root_pk,
             content_revision=locked_root.content_revision,
@@ -564,7 +564,7 @@ def content_mutation(
                 continue
             tracked[key] = (root, _protected_metadata(root), _content_snapshot(root))
 
-        dispositions = {key: {"deleted": False} for key in tracked}
+        dispositions = {key: {"deleted": False, "deleted_by": None} for key in tracked}
         token = None
         if tracked:
             token = _ACTIVE_MUTATION_ROOTS.set({**active_roots, **dispositions})
@@ -575,10 +575,12 @@ def content_mutation(
                 _ACTIVE_MUTATION_ROOTS.reset(token)
 
         target_exists = model._base_manager.filter(pk=target.pk).exists()
-        if action == "delete" and primary_key in active_roots:
-            primary_root = locked_roots[primary_key]
-            if not type(primary_root)._base_manager.filter(pk=primary_key[1]).exists():
-                active_roots[primary_key]["deleted"] = True
+        # Only a delete aimed at the root itself authorizes its removal; an
+        # owned-child delete is an edit of its parent.
+        deletes_root = action == "delete" and policy.kind != KIND_OWNED
+        if deletes_root and primary_key in active_roots and not target_exists:
+            active_roots[primary_key]["deleted"] = True
+            active_roots[primary_key]["deleted_by"] = actor
         if policy.parent_path is not None and target_exists:
             # Parent changes are reassignments: without ``proposed_parent``
             # the callback may not attach the row to an unauthorized parent.
@@ -593,7 +595,7 @@ def content_mutation(
                 )
 
         for key, (root, protected_before, before) in tracked.items():
-            root_action = action if key == primary_key else "edit"
+            root_action = "delete" if deletes_root and key == primary_key else "edit"
             _finalize_mutation(
                 actor,
                 root,

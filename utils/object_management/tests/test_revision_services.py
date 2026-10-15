@@ -157,6 +157,19 @@ class ContentMutationTests(RevisionServiceBase):
             [ReviewAction.ACTION_DELETED],
         )
 
+    def test_nested_delete_by_other_actor_attributes_deleter(self):
+        self.administrator.user_permissions.add(_perm(Property, "delete_property"))
+        prop_pk = self.prop.pk
+        with content_mutation(self.owner, self.prop, action="edit") as prop:
+            with content_mutation(self.administrator, prop, action="delete") as inner:
+                inner.delete()
+        event = ReviewAction.objects.get(
+            content_type=ContentType.objects.get_for_model(Property),
+            object_id=prop_pk,
+        )
+        self.assertEqual(event.action, ReviewAction.ACTION_DELETED)
+        self.assertEqual(event.user, self.administrator)
+
     def test_edit_callback_cannot_delete_root(self):
         with self.assertRaises(PermissionDenied):
             with content_mutation(self.owner, self.prop, action="edit") as prop:
@@ -301,6 +314,29 @@ class OwnedAndEvidenceTests(RevisionServiceBase):
         self.assertEqual(self.sample.content_revision, 2)
         event = _actions_for(self.sample, "edited").get()
         self.assertTrue(any("deleted" in field for field in event.changed_fields))
+
+    def test_owned_child_delete_callback_cannot_delete_parent(self):
+        composition = Composition.objects.create(
+            sample=self.sample, group=self.group, owner=self.owner
+        )
+        with self.assertRaises(PermissionDenied):
+            with content_mutation(self.owner, composition, action="delete") as row:
+                row.delete()
+                Sample.objects.filter(pk=self.sample.pk).delete()
+        self.assertTrue(Sample.objects.filter(pk=self.sample.pk).exists())
+        self.assertFalse(_actions_for(self.sample, "deleted").exists())
+
+    def test_nested_owned_child_delete_cannot_delete_outer_parent(self):
+        composition = Composition.objects.create(
+            sample=self.sample, group=self.group, owner=self.owner
+        )
+        with self.assertRaises(PermissionDenied):
+            with content_mutation(self.owner, self.sample, action="edit") as sample:
+                with content_mutation(self.owner, composition, action="delete") as row:
+                    row.delete()
+                    sample.delete()
+        self.assertTrue(Sample.objects.filter(pk=self.sample.pk).exists())
+        self.assertFalse(_actions_for(self.sample, "deleted").exists())
 
     def test_independent_evidence_edit_bumps_own_revision_only(self):
         mpv = MaterialPropertyValue.objects.create(
