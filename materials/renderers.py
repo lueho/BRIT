@@ -208,7 +208,9 @@ class SampleMeasurementsXLSXRenderer:
             if sample_sources
             else "",
             "DOI": "; ".join(s.doi for s in sample_sources if s.doi) or "",
-            "Entry done by:": sample.owner.username if sample.owner else "",
+            "Entry done by:": "; ".join(
+                str(link.author) for link in sample.visible_ordered_authors(self.user)
+            ),
         }
 
     def _get_group_color(self, group_name):

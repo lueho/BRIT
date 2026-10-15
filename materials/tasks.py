@@ -30,7 +30,7 @@ def export_sample_measurements_to_excel(self, sample_id, user_id=None):
     try:
         sample = (
             Sample.objects.select_related("material", "series", "owner")
-            .prefetch_related("sources")
+            .prefetch_related("sources", "sample_authors__author")
             .get(pk=sample_id)
         )
     except Sample.DoesNotExist:

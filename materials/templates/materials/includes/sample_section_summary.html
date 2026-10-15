@@ -43,6 +43,18 @@
       <li class="text-muted">No sources added yet.</li>
     {% endfor %}
   </ul>
+{% elif section.key == 'contributors' %}
+  <ul class="list-unstyled mb-0">
+    {% for link in sample_authors %}
+      <li class="mb-2">
+        <span class="fw-semibold">{{ link.author }}</span>
+        {% if link.author.institution %}<span>({{ link.author.institution }})</span>{% endif %}
+        {% if link.author.contact_email %}<a href="mailto:{{ link.author.contact_email }}">{{ link.author.contact_email }}</a>{% endif %}
+      </li>
+    {% empty %}
+      <li class="text-muted">No corresponding authors added yet.</li>
+    {% endfor %}
+  </ul>
 {% elif section.key == 'measurements' %}
   <ul class="list-unstyled mb-0">
     {% for measurement in object.component_measurements.all %}

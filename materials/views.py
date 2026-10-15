@@ -113,6 +113,7 @@ from .forms import (
     SampleModalModelForm,
     SampleModelForm,
     SampleQuickCreateForm,
+    SampleSectionFormSet,
     SampleSeriesAddTemporalDistributionModalModelForm,
     SampleSeriesModalModelForm,
     SampleSeriesModelForm,
@@ -1883,6 +1884,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
             component_measurements
         )
         primary_source = self.object.sources.first()
+        sample_authors = self.object.visible_ordered_authors(self.request.user)
         review_timeline = self._build_review_timeline()
         related = self._build_related_samples(limit=8)
 
@@ -1917,6 +1919,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
             "grouped_measurements": grouped_measurements,
             "charts": self._build_composition_charts(display_compositions),
             "primary_source": primary_source,
+            "sample_authors": sample_authors,
             "sample_policy": sample_policy,
             "review_timeline": review_timeline,
             "related_samples": related,
@@ -2099,6 +2102,7 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
                 self.object,
                 self.section,
                 self.request,
+                formset_class=SampleSectionFormSet,
             )
         return self.inlines
 
@@ -2151,7 +2155,13 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
                     "message": message,
                     "html": render_to_string(
                         "materials/includes/sample_section_summary.html",
-                        {"object": self.object, "section": self.section},
+                        {
+                            "object": self.object,
+                            "section": self.section,
+                            "sample_authors": self.object.visible_ordered_authors(
+                                self.request.user
+                            ),
+                        },
                         request=self.request,
                     ),
                 }
