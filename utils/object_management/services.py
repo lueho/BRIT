@@ -40,6 +40,7 @@ from .registry import (
     generated_source,
     model_policy,
     record_policy,
+    resolve_create_parent,
     resolve_parent,
     resolve_parents,
     root_model,
@@ -299,10 +300,16 @@ def _record_event(
     )
 
 
-def _finalize_mutation(actor, locked_root, root_pk, protected_before, before, action):
+def _finalize_mutation(
+    actor, locked_root, root_pk, protected_before, before, action, disposition
+):
     manager = type(locked_root)._base_manager
     still_exists = manager.filter(pk=root_pk).exists()
-    if action == "delete" and not still_exists:
+    if not still_exists:
+        # A nested ``delete`` mutation may remove an outer-tracked root; only
+        # an authorized deletion is recorded, an edit callback may not delete.
+        if action != "delete" and not disposition["deleted"]:
+            raise PermissionDenied("A content edit may not delete the record.")
         _record_event(
             locked_root,
             actor,
@@ -491,6 +498,8 @@ def content_mutation(
             stored_parents = resolve_parents(persisted, policy.parent_path)
             if not stored_parents:
                 raise ValidationError("The stored parent could not be resolved.")
+        elif policy.parent_path is not None:
+            stored_parents = resolve_parents(persisted, policy.parent_path)
 
         if policy.kind == KIND_OWNED:
             involved = list(stored_parents)
@@ -560,20 +569,44 @@ def content_mutation(
                 continue
             tracked[key] = (root, _protected_metadata(root), _content_snapshot(root))
 
+        dispositions = {key: {"deleted": False} for key in tracked}
         token = None
         if tracked:
-            token = _ACTIVE_MUTATION_ROOTS.set(
-                {**active_roots, **dict.fromkeys(tracked, True)}
-            )
+            token = _ACTIVE_MUTATION_ROOTS.set({**active_roots, **dispositions})
         try:
             yield yield_target
         finally:
             if token is not None:
                 _ACTIVE_MUTATION_ROOTS.reset(token)
+
+        target_exists = model._base_manager.filter(pk=target.pk).exists()
+        if action == "delete" and primary_key in active_roots:
+            primary_root = locked_roots[primary_key]
+            if not type(primary_root)._base_manager.filter(pk=primary_key[1]).exists():
+                active_roots[primary_key]["deleted"] = True
+        if policy.parent_path is not None and target_exists:
+            # Parent changes are reassignments: without ``proposed_parent``
+            # the callback may not attach the row to an unauthorized parent.
+            allowed_keys = {_storage_key(p) for p in (*stored_parents, *proposed)}
+            current = model._base_manager.get(pk=target.pk)
+            current_keys = {
+                _storage_key(p) for p in resolve_parents(current, policy.parent_path)
+            }
+            if not current_keys <= allowed_keys:
+                raise PermissionDenied(
+                    "Changing the parent requires an authorized reassignment."
+                )
+
         for key, (root, protected_before, before) in tracked.items():
             root_action = action if key == primary_key else "edit"
             _finalize_mutation(
-                actor, root, key[1], protected_before, before, root_action
+                actor,
+                root,
+                key[1],
+                protected_before,
+                before,
+                root_action,
+                dispositions[key],
             )
 
 
@@ -791,6 +824,7 @@ def save_evidence_formset_rows(actor, formset, parent) -> None:
     caller is expected to hold an outer ``transaction.atomic`` batch and to
     have validated the formset already.
     """
+    actor = _fresh_actor(actor)
     for form in formset.forms:
         data = getattr(form, "cleaned_data", None)
         if not data:
@@ -808,6 +842,13 @@ def save_evidence_formset_rows(actor, formset, parent) -> None:
             fk = getattr(formset, "fk", None)
             if fk is not None and getattr(formset, "instance", None) is not None:
                 setattr(instance, fk.name, formset.instance)
+            create_parent = (
+                resolve_create_parent(model_policy(type(instance)), instance, data)
+                or parent
+            )
+            decision = decide(actor, "create", type(instance), parent=create_parent)
+            if not decision.allowed:
+                raise PermissionDenied(decision.reason)
             if isinstance(instance, UserCreatedObject):
                 instance.owner = actor
                 instance.publication_status = UserCreatedObject.STATUS_PRIVATE

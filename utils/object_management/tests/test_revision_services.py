@@ -16,6 +16,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
 from django.forms.models import modelform_factory
+from django.forms.models import inlineformset_factory
 from django.test import TestCase, TransactionTestCase
 
 from bibliography.models import Author, Source, SourceAuthor
@@ -56,6 +57,7 @@ from ..services import (
     perform_transition,
     record_comment,
     record_creation,
+    save_evidence_formset_rows,
     validate_reassignment,
 )
 
@@ -140,6 +142,30 @@ class ContentMutationTests(RevisionServiceBase):
         self.prop.refresh_from_db()
         self.assertEqual(self.prop.content_revision, 2)
         self.assertEqual(_actions_for(self.prop, "edited").count(), 1)
+
+    def test_nested_delete_of_outer_root_records_single_deleted_event(self):
+        prop_pk = self.prop.pk
+        with content_mutation(self.owner, self.prop, action="edit") as prop:
+            prop.name = "Outer"
+            prop.save()
+            with content_mutation(self.owner, prop, action="delete") as inner:
+                inner.delete()
+        self.assertFalse(Property.objects.filter(pk=prop_pk).exists())
+        events = ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(Property),
+            object_id=prop_pk,
+        )
+        self.assertEqual(
+            list(events.values_list("action", flat=True)),
+            [ReviewAction.ACTION_DELETED],
+        )
+
+    def test_edit_callback_cannot_delete_root(self):
+        with self.assertRaises(PermissionDenied):
+            with content_mutation(self.owner, self.prop, action="edit") as prop:
+                prop.delete()
+        self.assertTrue(Property.objects.filter(pk=self.prop.pk).exists())
+        self.assertFalse(_actions_for(self.prop).exists())
 
     def test_comment_does_not_bump_and_binds_watermark(self):
         action = record_comment(
@@ -968,6 +994,63 @@ class LockedTargetInvariantTests(RevisionServiceBase):
         self.assertEqual(fresh.content_revision, 2)
 
 
+class EvidenceFormsetCreationTests(RevisionServiceBase):
+    def setUp(self):
+        super().setUp()
+        material = Material.objects.create(
+            name="M", owner=self.owner, publication_status="private"
+        )
+        self.sample = Sample.objects.create(
+            name="S", owner=self.owner, material=material, publication_status="private"
+        )
+        self.owner.user_permissions.add(
+            _perm(Sample, "change_sample"),
+            _perm(MaterialPropertyValue, "add_materialpropertyvalue"),
+        )
+        self.unit = Unit.objects.create(name="g", symbol="g", owner=self.owner)
+        self.mproperty = MaterialProperty.objects.create(name="MP", owner=self.owner)
+
+    def _formset(self):
+        FormSet = inlineformset_factory(
+            Sample,
+            MaterialPropertyValue,
+            fields=("property", "unit", "average"),
+            extra=1,
+            can_delete=True,
+        )
+        prefix = FormSet.get_default_prefix()
+        formset = FormSet(
+            data={
+                f"{prefix}-TOTAL_FORMS": "1",
+                f"{prefix}-INITIAL_FORMS": "0",
+                f"{prefix}-0-property": str(self.mproperty.pk),
+                f"{prefix}-0-unit": str(self.unit.pk),
+                f"{prefix}-0-average": "3",
+            },
+            instance=self.sample,
+        )
+        self.assertTrue(formset.is_valid(), formset.errors)
+        return formset
+
+    def test_new_evidence_row_requires_add_permission(self):
+        self.owner.user_permissions.remove(
+            _perm(MaterialPropertyValue, "add_materialpropertyvalue")
+        )
+        formset = self._formset()
+        with self.assertRaises(PermissionDenied):
+            save_evidence_formset_rows(self._fresh(self.owner), formset, self.sample)
+        self.assertFalse(
+            MaterialPropertyValue.objects.filter(sample=self.sample).exists()
+        )
+
+    def test_new_evidence_row_created_with_add_permission(self):
+        formset = self._formset()
+        save_evidence_formset_rows(self._fresh(self.owner), formset, self.sample)
+        mpv = MaterialPropertyValue.objects.get(sample=self.sample)
+        self.assertEqual(mpv.owner, self.owner)
+        self.assertTrue(_actions_for(mpv, "created").exists())
+
+
 class ReassignmentLockTests(RevisionServiceBase):
     """``proposed_parent`` coordinates locks, re-decision, and dual audit."""
 
@@ -1087,6 +1170,32 @@ class ReassignmentLockTests(RevisionServiceBase):
         mpv.refresh_from_db()
         self.assertEqual(mpv.sample_id, self.sample_a.pk)
         self.assertEqual(mpv.content_revision, 1)
+
+    def test_evidence_reparent_without_proposed_parent_denied(self):
+        mpv = self._mpv(self.sample_a)
+        foreign = Sample.objects.create(
+            name="F4",
+            owner=self.stranger,
+            material=self.material,
+            publication_status="private",
+        )
+        with self.assertRaises(PermissionDenied):
+            with content_mutation(self.owner, mpv, action="edit") as row:
+                row.sample = foreign
+                row.save()
+        mpv.refresh_from_db()
+        self.assertEqual(mpv.sample_id, self.sample_a.pk)
+        self.assertEqual(mpv.content_revision, 1)
+
+    def test_owned_reparent_without_proposed_parent_denied(self):
+        with self.assertRaises(PermissionDenied):
+            with content_mutation(self.owner, self.composition, action="edit") as row:
+                row.sample = self.sample_b
+                row.save()
+        self.composition.refresh_from_db()
+        self.sample_b.refresh_from_db()
+        self.assertEqual(self.composition.sample_id, self.sample_a.pk)
+        self.assertEqual(self.sample_b.content_revision, 1)
 
     def test_new_parent_access_revoked_between_preflight_and_lock_denies(self):
         mpv = self._mpv(self.sample_a)
