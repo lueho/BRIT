@@ -350,6 +350,18 @@ class SampleFilterTestCase(TestCase):
             [self.sample_substrate, self.sample_equivalent],
         )
 
+    def test_q_matches_sample_group_name(self):
+        group = SampleGroup.objects.create(name="CLOSECYCLE")
+        self.sample_substrate.sample_groups.add(group)
+        Sample.objects.create(name="Other sample", material=self.non_substrate_material)
+
+        filtr = SampleFilter(
+            data={"q": "closec"},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertEqual(list(filtr.qs), [self.sample_substrate])
+
     def test_q_combines_with_other_filters(self):
         filtr = SampleFilter(
             data={

@@ -259,12 +259,18 @@ class CompositionFilterSet(rf_filters.FilterSet):
 
 class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
     sortable_fields = {"name": "name", "datetime": "datetime"}
-    search_fields = ("name", "description", "material__name", "location")
+    search_fields = (
+        "name",
+        "description",
+        "material__name",
+        "location",
+        "sample_groups__name",
+    )
 
     q = CharFilter(
         method="filter_q",
         label="Search",
-        help_text="Search sample names, descriptions, substrate materials, or locations.",
+        help_text="Search sample names, descriptions, substrate materials, locations, or sample group names.",
     )
 
     name = ModelChoiceFilter(
