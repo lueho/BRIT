@@ -12,3 +12,4 @@ class ObjectManagementConfig(AppConfig):
         except Exception:
             # Avoid failing hard during app loading; issues will surface in logs when signals run
             pass
+        from . import checks  # noqa: F401
