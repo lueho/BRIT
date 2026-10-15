@@ -136,9 +136,6 @@
           {% endif %}
         </div>
         <ul class="sdv2-hero-meta" aria-label="Process metadata">
-          {% if object.owner %}
-            <li><span class="sdv2-meta-label">Editor</span>{{ object.owner.username|default:object.owner }}</li>
-          {% endif %}
           {% if object.lastmodified_at %}
             <li>
               <span class="sdv2-meta-label">Last updated</span>

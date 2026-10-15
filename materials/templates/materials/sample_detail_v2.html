@@ -233,12 +233,6 @@
               {{ object.analysis_laboratory }}
             </li>
           {% endif %}
-          {% if object.owner %}
-            <li>
-              <span class="sdv2-meta-label">Editor</span>
-              {{ object.owner.username|default:object.owner }}
-            </li>
-          {% endif %}
         </ul>
       </div>
       {% if object.display_image %}
