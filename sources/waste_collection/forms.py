@@ -258,15 +258,17 @@ class CollectionSeasonForm(SimpleForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["distribution"].queryset = TemporalDistribution.objects.filter(
-            name="Months of the year"
+            name="Months of the year", owner=get_default_owner()
         )
         try:
             self.fields["distribution"].initial = TemporalDistribution.objects.get(
-                name="Months of the year"
+                name="Months of the year", owner=get_default_owner()
             )
         except TemporalDistribution.DoesNotExist:
             pass
-        distribution_qs = TemporalDistribution.objects.filter(name="Months of the year")
+        distribution_qs = TemporalDistribution.objects.filter(
+            name="Months of the year", owner=get_default_owner()
+        )
         if distribution_qs.exists():
             distribution = distribution_qs.first()
             self.fields["first_timestep"].queryset = Timestep.objects.filter(
@@ -355,10 +357,17 @@ class CollectionSeasonFormSet(M2MInlineFormSet):
             options.option_3 = form.cleaned_data["option_3"]
             options.save()
 
+        default_distribution = TemporalDistribution.objects.get(
+            name="Months of the year", owner=get_default_owner()
+        )
         CollectionSeason.objects.exclude(
-            distribution=TemporalDistribution.objects.get(name="Months of the year"),
-            first_timestep=Timestep.objects.get(name="January"),
-            last_timestep=Timestep.objects.get(name="December"),
+            distribution=default_distribution,
+            first_timestep=Timestep.objects.get(
+                distribution=default_distribution, name="January"
+            ),
+            last_timestep=Timestep.objects.get(
+                distribution=default_distribution, name="December"
+            ),
         ).filter(collectionfrequency=None).delete()
         return child_objects
 

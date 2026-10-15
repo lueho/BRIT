@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("bibliography", "0012_source_type_vocabulary"),
+        ("bibliography", "0001_squashed_0012"),
         ("materials", "0031_sample_region_sample_site"),
     ]
 

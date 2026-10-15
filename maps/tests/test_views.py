@@ -2676,3 +2676,51 @@ class GeoJSONHeadTests(TestCase):
         self.assertFalse(hasattr(head, "data"))
         get = self.client.get(url, params)
         self.assertEqual(head["X-Data-Version"], get["X-Data-Version"])
+
+
+class MissingNamedDatasetMapViewTestCase(ViewWithPermissionsTestCase):
+    """Named filtered maps render an empty-state page instead of an error
+    when the optional GeoDataset has not been imported or configured."""
+
+    def assertDatasetUnavailable(self, url_name):
+        dataset_count = GeoDataset.objects.count()
+        response = self.client.get(reverse(url_name), follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dataset not configured")
+        self.assertContains(response, "import or configure this dataset")
+        self.assertEqual(GeoDataset.objects.count(), dataset_count)
+
+    def test_waste_collection_map_renders_unavailable_state(self):
+        self.assertDatasetUnavailable("WasteCollection")
+
+    def test_nantes_greenhouses_map_renders_unavailable_state(self):
+        self.assertDatasetUnavailable("NantesGreenhouses")
+
+    def test_hamburg_roadside_trees_map_renders_unavailable_state(self):
+        self.assertDatasetUnavailable("HamburgRoadsideTrees")
+
+    def test_nuts_region_map_renders_unavailable_state(self):
+        self.assertDatasetUnavailable("NutsRegion")
+
+    def test_private_named_map_still_requires_login(self):
+        response = self.client.get(reverse("WasteCollection-owned"))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith(settings.LOGIN_URL))
+
+    def test_missing_explicit_dataset_pk_returns_404(self):
+        response = self.client.get(reverse("geodataset-map", kwargs={"pk": 999999}))
+        self.assertEqual(response.status_code, 404)
+
+    def test_dataset_scoped_catchment_autocomplete_returns_empty(self):
+        Catchment.objects.create(
+            name="Unrelated Catchment", owner=self.owner, publication_status="published"
+        )
+
+        for url_name in (
+            "nantesgreenhouses-catchment-autocomplete",
+            "hamburgroadsidetrees-catchment-autocomplete",
+        ):
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name), data={"q": ""})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(json.loads(response.content)["results"], [])

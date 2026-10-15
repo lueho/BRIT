@@ -86,7 +86,11 @@ from sources.waste_collection.waste_atlas.templatetags.atlas_tags import (
     RENDER_TIME_RESOLVED_KEYS,
 )
 from utils.file_export.generic_tasks import export_user_created_object_to_file
-from utils.object_management.models import ObjectEditorGrant, ReviewAction
+from utils.object_management.models import (
+    ObjectEditorGrant,
+    ReviewAction,
+    get_default_owner,
+)
 from utils.properties.models import Property, Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
@@ -430,8 +434,10 @@ class WasteComponentCRUDViewsTestCase(
 
     @classmethod
     def create_related_objects(cls):
-        MaterialCategory.objects.create(
-            name="Biowaste component", publication_status="published"
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         return {}
 
@@ -1595,8 +1601,10 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     @classmethod
     def create_related_objects(cls):
-        MaterialCategory.objects.create(
-            name="Biowaste component", publication_status="published"
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         catchment = CollectionCatchment.objects.create(
             name="Test catchment", publication_status="published"
@@ -2208,8 +2216,10 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
 
-        cls.material_category = MaterialCategory.objects.create(
-            name="Biowaste component", publication_status="published"
+        cls.material_category, _ = MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed material 1", publication_status="published"
@@ -2638,8 +2648,10 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
 
-        cls.material_category = MaterialCategory.objects.create(
-            name="Biowaste component", publication_status="published"
+        cls.material_category, _ = MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed material 1", publication_status="published"
@@ -3428,7 +3440,9 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
         # Ensure a MaterialCategory (materials.models) for "Biowaste component" exists
         # This might be used by signals or other underlying logic.
         MaterialCategory.objects.get_or_create(
-            name="Biowaste component", publication_status="published"
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
 
         # Create a test user with necessary permissions
@@ -3455,7 +3469,9 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
         # This is distinct from the MaterialCategory above.
         cls.biowaste_component_material_category, _ = (
             MaterialCategory.objects.get_or_create(
-                name="Biowaste component", defaults={"owner": cls.user}
+                owner=get_default_owner(),
+                name="Biowaste component",
+                defaults={"publication_status": "published"},
             )
         )
 
@@ -3725,7 +3741,9 @@ class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
             name="Bio-waste for GroupBy Test"
         )
 
-        MaterialCategory.objects.get_or_create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
 
         cls.waste_component = WasteComponent.objects.create(
             name="Food scraps for GroupBy Test"
@@ -6516,7 +6534,9 @@ class CollectionCSVRendererTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        MaterialCategory.objects.create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed Material 1"
         )
@@ -6672,7 +6692,9 @@ class CollectionXLSXRendererTestCase(TestCase):
         )
         member.user_permissions.add(permission)
 
-        MaterialCategory.objects.create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed Material 1"
         )
@@ -6771,7 +6793,9 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         MaterialCategory.objects.get_or_create(
-            name="Biowaste component", publication_status="published"
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         cls.catchment = CollectionCatchment.objects.create(
             name="Catchment", publication_status="published"
@@ -6788,7 +6812,9 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
         cls.allowed_material = WasteComponent.objects.create(
             name="Allowed", publication_status="published"
         )
-        biowaste_cat = MaterialCategory.objects.get(name="Biowaste component")
+        biowaste_cat = MaterialCategory.objects.get(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material.categories.add(biowaste_cat)
         cls.frequency = CollectionFrequency.objects.create(
             name="Frequency", publication_status="published"
@@ -6879,7 +6905,9 @@ class CollectionInlineWasteFieldsSaveTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         MaterialCategory.objects.get_or_create(
-            name="Biowaste component", publication_status="published"
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         cls.catchment = CollectionCatchment.objects.create(
             name="Catchment", publication_status="published"
@@ -6899,7 +6927,9 @@ class CollectionInlineWasteFieldsSaveTestCase(TestCase):
         cls.forbidden_material = WasteComponent.objects.create(
             name="Forbidden", publication_status="published"
         )
-        biowaste_cat = MaterialCategory.objects.get(name="Biowaste component")
+        biowaste_cat = MaterialCategory.objects.get(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material.categories.add(biowaste_cat)
         cls.forbidden_material.categories.add(biowaste_cat)
         cls.frequency = CollectionFrequency.objects.create(

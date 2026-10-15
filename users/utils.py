@@ -32,6 +32,8 @@ def ensure_initial_data(stdout=None):
         )
         if admin_password:
             superuser.set_password(admin_password)
+        else:
+            superuser.set_unusable_password()
         superuser.save()
 
     # 3. Add superuser to the registered group

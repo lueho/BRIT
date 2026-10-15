@@ -10,7 +10,7 @@ import utils.object_management.models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("bibliography", "0012_source_type_vocabulary"),
+        ("bibliography", "0001_squashed_0012"),
         ("materials", "0027_materialcomponentgroup_is_compositional"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
