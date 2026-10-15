@@ -32,12 +32,13 @@
                    placeholder="Search by title, author or abbreviation..."
                    value=""
                    data-autocomplete-url="{% url widget.autocomplete_url %}"
-                   data-quick-create-url="{% url 'source-quick-create' %}"
+                   {% if widget.can_create_source %}data-quick-create-url="{% url 'source-quick-create' %}"{% endif %}
                    data-author-autocomplete-url="{% url 'author-autocomplete' %}"
-                   data-author-quick-create-url="{% url 'author-quick-create' %}"
+                   {% if widget.can_create_author %}data-author-quick-create-url="{% url 'author-quick-create' %}"{% endif %}
                    data-label-field="{{ widget.label_field }}"
                    data-target-select="{{ widget.attrs.id }}">
         </div>
+        {% if widget.can_create_source %}
         {# Section 2: Create a new source #}
         <div class="source-create-section border rounded p-3 bg-light mb-3"
              id="{{ widget.attrs.id }}_create_section">
@@ -56,12 +57,14 @@
                 <input type="text"
                        id="{{ widget.attrs.id }}_authors"
                        class="form-control form-control-sm source-author-tomselect-add"
-                       placeholder="Search or type name, then press Enter to add"
+                       placeholder="{% if widget.can_create_author %}Search or type name, then press Enter to add{% else %}Search existing authors{% endif %}"
                        data-author-autocomplete-url="{% url 'author-autocomplete' %}"
-                       data-author-quick-create-url="{% url 'author-quick-create' %}">
+                       {% if widget.can_create_author %}data-author-quick-create-url="{% url 'author-quick-create' %}"{% endif %}>
+                {% if widget.can_create_author %}
                 <p class="text-muted small mt-1 mb-0">
                     For organisations or single names, type the full name and press Enter. For persons, use "Last, First" format.
                 </p>
+                {% endif %}
             </div>
             <div class="mb-2">
                 <label class="form-label small mb-1" for="{{ widget.attrs.id }}_year">Year</label>
@@ -78,6 +81,7 @@
             <p class="text-danger small mt-2 mb-0 d-none"
                id="{{ widget.attrs.id }}_feedback"></p>
         </div>
+        {% endif %}
         {# List of selected sources #}
         <div class="source-selected-list">
             <label class="form-label fw-semibold">Selected:</label>

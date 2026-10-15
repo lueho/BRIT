@@ -12,7 +12,7 @@ from django.contrib.auth.mixins import (
     UserPassesTestMixin,
 )
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, Max, Min, Prefetch, Q
+from django.db.models import Count, Max, Min, Prefetch
 from django.forms.models import model_to_dict
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -99,21 +99,22 @@ from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.forms import M2MInlineFormSetMixin
 from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import (
+    apply_scope_filter,
     filter_queryset_for_user,
     get_object_policy,
 )
+from utils.object_management.policy import decide
+from utils.object_management.registry import generated_source
+from utils.object_management.services import (
+    authorize_url_check_job,
+    register_url_check_job,
+)
 from utils.object_management.views import (
-    ApproveItemModalView,
-    ApproveItemView,
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
     PublishedObjectFilterView,
-    RejectItemModalView,
-    RejectItemView,
     ReviewItemDetailView,
     ReviewObjectFilterView,
-    SubmitForReviewModalView,
-    SubmitForReviewView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
@@ -123,8 +124,6 @@ from utils.object_management.views import (
     UserCreatedObjectModalDetailView,
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
-    WithdrawFromReviewModalView,
-    WithdrawFromReviewView,
 )
 from utils.views import BreadcrumbContextMixin
 
@@ -553,19 +552,15 @@ class WasteFlyerModalDeleteView(SourceModalDeleteView):
 
 class WasteFlyerCheckUrlView(SourceCheckUrlView):
     model = WasteFlyer
-    permission_required = "waste_collection.change_wasteflyer"
 
     def get(self, request, *args, **kwargs):
         self.object = get_object_or_404(self.model, pk=kwargs.get("pk"))
-        policy = get_object_policy(request.user, self.object, request=request)
-        if not (
-            policy.get("is_owner")
-            or policy.get("is_staff")
-            or policy.get("is_moderator")
-        ):
-            raise PermissionDenied
+        decision = decide(request.user, "check_url", self.object)
+        if not decision.allowed:
+            raise PermissionDenied(decision.reason)
 
-        task = check_wasteflyer_url.delay(self.object.pk)
+        task = check_wasteflyer_url.delay(self.object.pk, request.user.pk)
+        register_url_check_job(task.task_id, request.user, target=self.object)
         response_data = {"task_id": task.task_id}
         return HttpResponse(json.dumps(response_data), content_type="application/json")
 
@@ -573,6 +568,7 @@ class WasteFlyerCheckUrlView(SourceCheckUrlView):
 class WasteFlyerCheckUrlProgressView(LoginRequiredMixin, View):
     @staticmethod
     def get(request, task_id):
+        authorize_url_check_job(request.user, task_id)
         result = AsyncResult(task_id)
         response_data = {
             "state": result.state,
@@ -592,6 +588,7 @@ class WasteFlyerListCheckUrlsView(PermissionRequiredMixin, View):
         params.pop("csrfmiddlewaretoken", None)
         params.pop("page", None)
         task = check_wasteflyer_urls.delay(params, request.user.pk)
+        register_url_check_job(task.task_id, request.user)
         response_data = {"task_id": task.task_id}
         return HttpResponse(json.dumps(response_data), content_type="application/json")
 
@@ -599,6 +596,7 @@ class WasteFlyerListCheckUrlsView(PermissionRequiredMixin, View):
 class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
     @staticmethod
     def get(request, task_id):
+        authorize_url_check_job(request.user, task_id)
         scheduler_result = AsyncResult(task_id)
 
         # The scheduler task returns the callback task id. Once available, poll the
@@ -809,6 +807,12 @@ class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(_cpv_collection_chain_context(self.object, self.request.user))
+        # A generated projection displays the governance surface (badge,
+        # owner, lifecycle) of its validated source evidence; the numeric
+        # value/unit still comes from the projection row itself.
+        source = generated_source(self.object)
+        context["generated_source"] = source
+        context["governance_object"] = source or self.object
         return context
 
 
@@ -1449,20 +1453,6 @@ class CollectionModalDetailView(UserCreatedObjectModalDetailView):
         return context
 
 
-class CollectionReviewActionCascadeMixin:
-    """
-    Cascade review actions from Collections to related property values.
-
-    When a Collection's review state changes (submit, withdraw, reject, approve),
-    this mixin cascades the action to CollectionPropertyValues and
-    AggregatedCollectionPropertyValues across the entire version chain.
-    """
-
-    def post_action_hook(self, request, previous_status=None):
-        """Delegate to the base hook (model cascade is handled centrally)."""
-        super().post_action_hook(request, previous_status)
-
-
 class CollectionReviewItemDetailView(ReviewItemDetailView):
     """
     Collection-specific review detail view with property value preview.
@@ -1838,7 +1828,10 @@ class CollectionCatchmentAddAggregatedPropertyView(
 
 class SelectNewlyCreatedObjectModelSelectOptionsView(OwnedObjectModelSelectOptionsView):
     def get_selected_object(self):
-        qs = self.model.objects.filter(owner=self.request.user)
+        user = self.request.user
+        if not getattr(user, "is_authenticated", False):
+            return None
+        qs = self.model.objects.filter(owner=user)
         created_at = qs.aggregate(max_created_at=Max("created_at"))["max_created_at"]
         if created_at is None:
             return None
@@ -1847,22 +1840,18 @@ class SelectNewlyCreatedObjectModelSelectOptionsView(OwnedObjectModelSelectOptio
 
 class CollectorOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = Collector
-    permission_required = "waste_collection.view_collector"
 
 
 class CollectionSystemOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = CollectionSystem
-    permission_required = "waste_collection.view_collectionsystem"
 
 
 class CollectionFrequencyOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = CollectionFrequency
-    permission_required = "waste_collection.view_collectionfrequency"
 
 
 class WasteCategoryOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = WasteCategory
-    permission_required = "waste_collection.view_wastecategory"
     template_name = "detail_with_options.html"
 
 
@@ -1977,25 +1966,11 @@ class SoilcomDatasetVersionMixin:
         )
 
     def _dv_queryset(self):
-        scope = self.get_dv_scope()
-        user = getattr(self.request, "user", None)
-        qs = Collection.objects.all()
-
-        if scope == "published":
-            qs = qs.filter(publication_status="published")
-        elif scope == "private":
-            if user and user.is_authenticated and not user.is_staff:
-                qs = qs.filter(owner=user)
-            else:
-                # Staff users on private scope: default to all (matches current staff behavior)
-                qs = qs
-        elif scope == "review":
-            if user and user.is_authenticated and not user.is_staff:
-                qs = qs.filter(Q(owner=user) | Q(publication_status="review"))
-            else:
-                # Staff: restrict dv to items in review to reflect the view's intent
-                qs = qs.filter(publication_status="review")
-        return qs
+        return apply_scope_filter(
+            Collection.objects.all(),
+            self.get_dv_scope(),
+            user=getattr(self.request, "user", None),
+        )
 
     def get_dataset_version(self) -> str:
         qs = self._dv_queryset()
@@ -2100,68 +2075,3 @@ class WasteCollectionPublishedMapIframeView(
         data["scope"] = "published"
         kwargs["data"] = data
         return kwargs
-
-
-# Collection-specific review action views with cascade support
-# These views extend the base review action views to add property value cascading
-
-
-class CollectionSubmitForReviewView(
-    CollectionReviewActionCascadeMixin, SubmitForReviewView
-):
-    """Submit a Collection for review and cascade to related property values."""
-
-    pass
-
-
-class CollectionWithdrawFromReviewView(
-    CollectionReviewActionCascadeMixin, WithdrawFromReviewView
-):
-    """Withdraw a Collection from review and cascade to related property values."""
-
-    pass
-
-
-class CollectionApproveItemView(CollectionReviewActionCascadeMixin, ApproveItemView):
-    """Approve a Collection and cascade to related property values."""
-
-    pass
-
-
-class CollectionRejectItemView(CollectionReviewActionCascadeMixin, RejectItemView):
-    """Reject a Collection and cascade to related property values."""
-
-    pass
-
-
-# Modal versions
-class CollectionSubmitForReviewModalView(
-    CollectionReviewActionCascadeMixin, SubmitForReviewModalView
-):
-    """Modal: Submit a Collection for review with cascade."""
-
-    pass
-
-
-class CollectionWithdrawFromReviewModalView(
-    CollectionReviewActionCascadeMixin, WithdrawFromReviewModalView
-):
-    """Modal: Withdraw a Collection from review with cascade."""
-
-    pass
-
-
-class CollectionApproveItemModalView(
-    CollectionReviewActionCascadeMixin, ApproveItemModalView
-):
-    """Modal: Approve a Collection with cascade."""
-
-    pass
-
-
-class CollectionRejectItemModalView(
-    CollectionReviewActionCascadeMixin, RejectItemModalView
-):
-    """Modal: Reject a Collection with cascade."""
-
-    pass

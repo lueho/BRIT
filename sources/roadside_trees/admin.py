@@ -2,10 +2,11 @@ from django.contrib import admin
 from django.contrib.gis.admin import GISModelAdmin
 
 from sources.roadside_trees.models import HamburgRoadsideTrees
+from utils.object_management.admin import PolicyAdminMixin
 
 
 @admin.register(HamburgRoadsideTrees)
-class HamburgRoadsideTreesAdmin(GISModelAdmin):
+class HamburgRoadsideTreesAdmin(PolicyAdminMixin, GISModelAdmin):
     list_display = (
         "baumid",
         "gattung_deutsch",

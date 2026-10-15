@@ -49,7 +49,7 @@
                     {% empty %}
                         {% if not user.is_authenticated %}
                             {% include "includes/list_empty_state.html" with hint="Log in to create new materials." %}
-                        {% elif create_permission in perms or user.is_staff %}
+                        {% elif create_permission in perms %}
                             {% include "includes/list_empty_state.html" with hint="Create your first material to get started." %}
                         {% else %}
                             {% include "includes/list_empty_state.html" %}

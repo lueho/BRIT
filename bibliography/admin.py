@@ -1,19 +1,20 @@
 from django.contrib import admin
 
+from utils.object_management.admin import PolicyAdminMixin, PolicyOwnedInlineMixin
+
 from .models import Author, Licence, Source, SourceAuthor
 
 
-class SourceAuthorInline(admin.TabularInline):
+class SourceAuthorInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = SourceAuthor
     # formset = SourceAuthorFormSet
     fields = ("author", "position")
-    readonly_fields = ("position",)
     extra = 1
     ordering = ("position",)
 
 
 @admin.register(Author)
-class AuthorAdmin(admin.ModelAdmin):
+class AuthorAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "author_type",
         "last_names",
@@ -38,7 +39,7 @@ class AuthorAdmin(admin.ModelAdmin):
 
 
 @admin.register(Licence)
-class LicenceAdmin(admin.ModelAdmin):
+class LicenceAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "reference_url", "owner", "publication_status")
     search_fields = ("name",)
     list_filter = ("publication_status",)
@@ -46,7 +47,7 @@ class LicenceAdmin(admin.ModelAdmin):
 
 
 @admin.register(Source)
-class SourceAdmin(admin.ModelAdmin):
+class SourceAdmin(PolicyAdminMixin, admin.ModelAdmin):
     inlines = [SourceAuthorInline]
     list_display = (
         "citation_key",

@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
 
+from utils.object_management.admin import PolicyAdminMixin
+
 from .models import (
     InventoryAlgorithm,
     InventoryAlgorithmParameter,
@@ -58,7 +60,7 @@ class InventoryAlgorithmParameterValueAdmin(admin.ModelAdmin):
 
 
 @admin.register(ScenarioInventoryConfiguration)
-class ScenarioInventoryConfigurationAdmin(admin.ModelAdmin):
+class ScenarioInventoryConfigurationAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "scenario",
         "feedstock_link",
@@ -113,7 +115,7 @@ class ScenarioInventoryConfigurationAdmin(admin.ModelAdmin):
 
 
 @admin.register(Scenario)
-class ScenarioAdmin(admin.ModelAdmin):
+class ScenarioAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "name",
         "region_link",

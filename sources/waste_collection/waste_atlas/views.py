@@ -10,6 +10,8 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import FormView, ListView, RedirectView, TemplateView
 
+from utils.object_management.policy import is_active_actor, is_admin
+
 from .forms import WasteAtlasMapConfigurationForm
 from .map_selection import (
     MAP_SELECTION_YEARS,
@@ -69,10 +71,13 @@ def _previous_selection_year(year):
 
 
 class WasteAtlasStaffMixin(LoginRequiredMixin, UserPassesTestMixin):
-    """Restrict configuration tools to authenticated staff users."""
+    """Restrict configuration tools to explicit site administrators.
+
+    The Django staff flag alone is not an application capability here.
+    """
 
     def test_func(self):
-        return self.request.user.is_staff
+        return is_admin(self.request.user)
 
 
 def _configuration_map_pages(config_key):
@@ -249,6 +254,8 @@ class AtlasMapView(TemplateView):
             self.request.user, self.request.GET.get("scope", "published")
         )[0]
         ctx["can_review_collections"] = is_maintainer(self.request.user)
+        ctx["atlas_administrator"] = is_admin(self.request.user)
+        ctx["atlas_active_actor"] = is_active_actor(self.request.user)
         ctx["nuts_prefix"] = self.get_nuts_prefix()
         ctx["nuts_level"] = self.get_nuts_level()
         ctx["map_title"] = page["title"]
@@ -430,6 +437,8 @@ class WasteAtlasOverviewView(TemplateView):
         )
         ctx["directory_selected_category"] = self.request.GET.get("category", "")
         ctx["directory_query"] = self.request.GET.get("q", "")
+        ctx["atlas_administrator"] = is_admin(self.request.user)
+        ctx["atlas_active_actor"] = is_active_actor(self.request.user)
         ctx["atlas_tree_overview_active"] = True
         return ctx
 
@@ -445,6 +454,8 @@ class WasteAtlasChangeMapOverviewView(AtlasShellTreeMixin, TemplateView):
             self.request.user, self.request.GET.get("scope", "published")
         )[0]
         ctx["can_review_collections"] = is_maintainer(self.request.user)
+        ctx["atlas_administrator"] = is_admin(self.request.user)
+        ctx["atlas_active_actor"] = is_active_actor(self.request.user)
         selection_ctx = build_map_selection_context(reverse)
         years = list(selection_ctx["map_selection_years"])
         ctx.update(selection_ctx)

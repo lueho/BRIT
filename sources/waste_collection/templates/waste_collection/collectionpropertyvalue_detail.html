@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="{% static 'css/source_url_display.min.css' %}">
 {% endblock style_sheets %}
 {% block detail_header_badge %}
-    {% include "object_management/review_status_badge.html" with object=object %}
+    {% include "object_management/review_status_badge.html" with object=governance_object|default:object %}
 {% endblock detail_header_badge %}
 {% block detail_header_actions %}
     <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
@@ -64,6 +64,13 @@
             <strong>Collection:</strong>
             <br>
             {{ object.collection }}
+        </p>
+    {% endif %}
+    {% if object.is_derived %}
+        <p class="card-text text-muted small">
+            This value is an automatically generated projection{% if generated_source %}
+            of <a href="{{ generated_source.get_absolute_url }}">its source evidence</a>{% endif %};
+            it is read-only. Change or review the source record instead.
         </p>
     {% endif %}
     <p class="card-text">
@@ -136,22 +143,26 @@
             {% endfor %}
         </ul>
     {% endif %}
-    <p class="card-text">
-        <strong>Owner:</strong>
-        <br>
-        {{ object.owner }}
-    </p>
-    {% if object.publication_status != 'published' %}
-        <p class="card-text text-muted small">
-            {% if object.publication_status == 'private' %}
-                Visible only to you (owner) and moderators until submitted.
-            {% elif object.publication_status == 'review' %}
-                Awaiting moderator review.
-            {% elif object.publication_status == 'declined' %}
-                Changes were declined; update and resubmit after addressing feedback.
-            {% endif %}
+    {% with governance=governance_object|default:object %}
+        <p class="card-text">
+            <strong>Owner:</strong>
+            <br>
+            {{ governance.owner }}
         </p>
-    {% endif %}
+        {% if governance.publication_status != 'published' %}
+            <p class="card-text text-muted small">
+                {% if governance.publication_status == 'private' %}
+                    Private: available to the owner and current authorized collaborators.
+                {% elif governance.publication_status == 'review' %}
+                    In review: awaiting moderator review; authorized collaborators can still make corrections.
+                {% elif governance.publication_status == 'declined' %}
+                    Declined: review history is retained; authorized collaborators can make corrections.
+                {% elif governance.publication_status == 'archived' %}
+                    Archived: retained as public historical data.
+                {% endif %}
+            </p>
+        {% endif %}
+    {% endwith %}
 {% endblock detail_body %}
 {% block detail_card_footer %}
 {% endblock detail_card_footer %}

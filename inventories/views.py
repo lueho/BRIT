@@ -42,6 +42,7 @@ from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
 )
+from utils.object_management.policy import decide
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -972,13 +973,7 @@ def download_scenario_summary(request, scenario_pk):
         scenario = Scenario.objects.get(id=scenario_pk)
     except Scenario.DoesNotExist:
         raise Http404 from None
-    policy = get_object_policy(request.user, scenario, request=request)
-    if not (
-        policy["is_owner"]
-        or policy["is_published"]
-        or policy["is_staff"]
-        or policy["is_moderator"]
-    ):
+    if not decide(request.user, "read", scenario).allowed:
         return HttpResponseForbidden()
     file_name = f"scenario_{scenario_pk}_summary.json"
     with io.StringIO(json.dumps(scenario.summary_dict(), indent=4)) as file:
@@ -1214,13 +1209,7 @@ def download_scenario_result_summary(request, scenario_pk):
         scenario = Scenario.objects.get(id=scenario_pk)
     except Scenario.DoesNotExist:
         raise Http404 from None
-    policy = get_object_policy(request.user, scenario, request=request)
-    if not (
-        policy["is_owner"]
-        or policy["is_published"]
-        or policy["is_staff"]
-        or policy["is_moderator"]
-    ):
+    if not decide(request.user, "read", scenario).allowed:
         return HttpResponseForbidden()
     result = ScenarioResult(scenario)
     with io.StringIO(json.dumps(result.summary_dict(), indent=4)) as file:

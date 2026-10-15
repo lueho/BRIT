@@ -15,6 +15,8 @@ from django.db.models import Count, Max, Min, Sum
 from rest_framework.serializers import ReadOnlyField
 from rest_framework.utils.encoders import JSONEncoder
 
+from utils.object_management.policy import scope_queryset
+
 INITIALIZATION_DEPENDENCIES = ["users", "utils.properties"]
 
 
@@ -268,20 +270,7 @@ def compute_collection_dataset_version(scope="published", user=None):
         base = f"{scope}:0:0:0:0"
         return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
 
-    qs = collection_model.objects.all()
-
-    if scope == "published":
-        qs = qs.filter(publication_status="published")
-    elif scope == "private":
-        if user and user.is_authenticated and not getattr(user, "is_staff", False):
-            qs = qs.filter(owner=user)
-    elif scope == "review":
-        from django.db.models import Q
-
-        if user and user.is_authenticated and not getattr(user, "is_staff", False):
-            qs = qs.filter(Q(owner=user) | Q(publication_status="review"))
-        else:
-            qs = qs.filter(publication_status="review")
+    qs = scope_queryset(user, collection_model.objects.all(), scope)
 
     agg = qs.aggregate(
         cnt=Count("pk"),
@@ -328,6 +317,9 @@ def build_collection_cache_key(
     # Build filter part
     filter_part = _generate_filter_key_part(filters)
     return f"collection_geojson:filter:{filter_part}:dv:{dv}"
+
+
+AUTHZ_GEOJSON_CACHE_PREFIX = "authz-v1:"
 
 
 def set_geojson_cache_payload(cache, cache_key, data, timeout=DEFAULT_TIMEOUT):

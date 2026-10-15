@@ -9,12 +9,32 @@ from utils.object_management.permissions import (
     apply_scope_filter,
     filter_queryset_for_user,
 )
+from utils.object_management.policy import publication_states_queryset
+from utils.object_management.registry import generated_profile
 
 from .export_registry import get_export_spec
 
 BATCH_SIZE = 50
 
 logger = logging.getLogger(__name__)
+
+
+def apply_explicit_state_filter(user, spec, qdict, base_qs):
+    """Literal lifecycle-state filter for generated-projection export models.
+
+    For a profiled model an explicit ``publication_status`` parameter
+    describes the SOURCE lifecycle: matching rows are raw rows in one of the
+    requested states or generated rows whose linked source is. The raw key
+    is removed from ``qdict`` so the legacy filterset can never compare the
+    projection's stale copied status field. Models without a generated
+    profile keep the declared-filter path unchanged.
+    """
+    if generated_profile(spec.model) is None:
+        return base_qs
+    requested_states = qdict.pop("publication_status", [])
+    if not requested_states:
+        return base_qs
+    return publication_states_queryset(user, base_qs, requested_states)
 
 
 @shared_task
@@ -64,6 +84,7 @@ def export_user_created_object_to_file(
     if has_publication_status:
         visible_qs = filter_queryset_for_user(spec.model.objects.all(), user)
         base_qs = apply_scope_filter(visible_qs, list_type, user=user)
+        base_qs = apply_explicit_state_filter(user, spec, qdict, base_qs)
     else:
         if list_type == "private" and user_id is not None:
             base_qs = spec.model.objects.filter(owner_id=user_id)

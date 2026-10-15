@@ -25,3 +25,8 @@ class SourceAuthorInline(InlineFormSetFactory):
         from .forms import SourceAuthorFormSet
 
         return SourceAuthorFormSet
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs

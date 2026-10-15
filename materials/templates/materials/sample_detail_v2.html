@@ -56,7 +56,7 @@
               {{ sample_policy.review_feedback_label }}
             </a>
           {% elif sample_policy.is_in_review and not review_mode %}
-            {% if sample_policy.is_owner or sample_policy.is_staff or sample_policy.is_moderator %}
+            {% if sample_policy.can_view_review_activity %}
               <a class="sdv2-btn sdv2-btn-ghost"
                  href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
                 <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
@@ -461,16 +461,22 @@
                             {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                              <a class="dropdown-item"
-                                 href="{% url 'derived-composition-order-down' sample_pk=object.pk group_pk=group_pk %}?next={{ request|path_without_return_params|urlencode }}">
-                                <i class="fas fa-fw fa-arrow-up me-2" aria-hidden="true"></i>Move earlier
-                              </a>
+                              <form method="post"
+                                    action="{% url 'derived-composition-order-down' sample_pk=object.pk group_pk=group_pk %}?next={{ request|path_without_return_params|urlencode }}">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item">
+                                  <i class="fas fa-fw fa-arrow-up me-2" aria-hidden="true"></i>Move earlier
+                                </button>
+                              </form>
                             </li>
                             <li>
-                              <a class="dropdown-item"
-                                 href="{% url 'derived-composition-order-up' sample_pk=object.pk group_pk=group_pk %}?next={{ request|path_without_return_params|urlencode }}">
-                                <i class="fas fa-fw fa-arrow-down me-2" aria-hidden="true"></i>Move later
-                              </a>
+                              <form method="post"
+                                    action="{% url 'derived-composition-order-up' sample_pk=object.pk group_pk=group_pk %}?next={{ request|path_without_return_params|urlencode }}">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item">
+                                  <i class="fas fa-fw fa-arrow-down me-2" aria-hidden="true"></i>Move later
+                                </button>
+                              </form>
                             </li>
                             {% if composition.settings_pk %}
                               <li><hr class="dropdown-divider"></li>

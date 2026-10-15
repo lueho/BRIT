@@ -1,10 +1,12 @@
 from django.contrib import admin
 
+from utils.object_management.admin import PolicyAdminMixin
+
 from .models import Property, Unit
 
 
 @admin.register(Unit)
-class UnitAdmin(admin.ModelAdmin):
+class UnitAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "name",
         "dimensionless",
@@ -18,7 +20,7 @@ class UnitAdmin(admin.ModelAdmin):
 
 
 @admin.register(Property)
-class PropertyAdmin(admin.ModelAdmin):
+class PropertyAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "owner", "publication_status")
     search_fields = ("name",)
     list_filter = ("publication_status",)

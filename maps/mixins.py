@@ -12,6 +12,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .utils import (
+    AUTHZ_GEOJSON_CACHE_PREFIX,
     GEOJSON_MAX_BUFFERED_POINTS,
     geojson_version_aggregates,
     geojson_version_token,
@@ -182,6 +183,35 @@ class CachedGeoJSONMixin:
             return Polygon.from_bbox((min_lng, min_lat, max_lng, max_lat))
         except (ValueError, TypeError):
             return None
+
+    def _audience_cache_key(self, request, cache_key):
+        """Return the cache key authorized for this request, or ``None``.
+
+        For registry reviewable/owned queryset models, record visibility is
+        per-actor: authenticated requests bypass every cache read/write path
+        so access and revocation are evaluated on each request, while
+        anonymous requests use a dedicated namespace that cannot consume keys
+        warmed by unscoped legacy or authenticated traffic. Unregistered and
+        public-catalogue models keep their existing cache behavior.
+        """
+        try:
+            model = self.get_queryset().model
+        except Exception:
+            return None
+        from utils.object_management.models import UserCreatedObject
+        from utils.object_management.registry import KIND_PUBLIC_CATALOGUE, model_policy
+
+        policy = model_policy(model)
+        if policy is None:
+            if model is not None and issubclass(model, UserCreatedObject):
+                return None
+            return cache_key
+        if policy.kind == KIND_PUBLIC_CATALOGUE:
+            return cache_key
+        user = getattr(request, "user", None)
+        if not getattr(user, "is_authenticated", False):
+            return f"{AUTHZ_GEOJSON_CACHE_PREFIX}{cache_key}"
+        return None
 
     def _apply_bbox_filter(self, queryset, bbox):
         """Apply bounding box filter to queryset if bbox is provided."""
@@ -474,6 +504,7 @@ class CachedGeoJSONMixin:
         use_stream = request.query_params.get("stream", "").lower() == "true"
         bbox = self._parse_bbox(request)
         cache_key = self.get_cache_key(request)
+        scoped_key = self._audience_cache_key(request, cache_key)
         geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
 
         geometry_heavy = False
@@ -485,8 +516,8 @@ class CachedGeoJSONMixin:
             )
             if rejection_response is not None:
                 return rejection_response
-            if not use_stream and not bbox:
-                rendered_key = rendered_geojson_cache_key(cache_key, stats["version"])
+            if not use_stream and not bbox and scoped_key is not None:
+                rendered_key = rendered_geojson_cache_key(scoped_key, stats["version"])
                 payload = (
                     geojson_cache.has_key(rendered_key)
                     if request.method == "HEAD"
@@ -507,16 +538,20 @@ class CachedGeoJSONMixin:
                     )
                     return response
 
-        # Try cache first (unless streaming is explicitly requested)
-        if not use_stream and not bbox and not geometry_heavy:
+        if (
+            not use_stream
+            and not bbox
+            and not geometry_heavy
+            and scoped_key is not None
+        ):
             if request.method == "HEAD":
                 head_response = self._cached_geojson_head(
-                    request, geojson_cache, cache_key
+                    request, geojson_cache, scoped_key
                 )
                 if head_response is not None:
                     return head_response
             else:
-                data = geojson_cache.get(cache_key)
+                data = geojson_cache.get(scoped_key)
                 if data is not None:
                     data_version = self.get_dataset_version(request)
                     response = Response(data)
@@ -586,10 +621,9 @@ class CachedGeoJSONMixin:
         )
         data = serializer.data
 
-        # Cache the result if no bbox filter
-        if not bbox:
+        if not bbox and scoped_key is not None:
             timeout = getattr(self, "cache_timeout", None)
-            set_geojson_cache_payload(geojson_cache, cache_key, data, timeout=timeout)
+            set_geojson_cache_payload(geojson_cache, scoped_key, data, timeout=timeout)
 
         response = Response(data)
         response["X-Cache-Status"] = "MISS"
