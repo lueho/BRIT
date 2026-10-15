@@ -3,6 +3,8 @@
 This page is an implementation map for developers working on
 `UserCreatedObject` flows.
 
+> **Migration status — legacy runtime reference:** This page describes the pre-migration implementation at the start of the authorization review stack. It is not a second policy specification and may lag later migration parts. The [canonical authorization contract](security_permission_validation.md) defines the target rules; in particular, staff status alone must not grant application moderation. Update the corresponding runtime notes as their adapters migrate.
+
 The **authoritative policy tables and state diagrams** live in:
 
 - [`security_permission_validation.md`](security_permission_validation.md)
@@ -54,12 +56,12 @@ private|declined -- submit --> review -- approve --> published -- archive --> ar
 - Four-eyes rule is enforced in permission helpers for approve/reject.
 - API and HTML review actions must delegate to the same helper methods.
 
-## Moderator permissions
+## Legacy moderator checks (pre-migration)
 
 - Per-model moderation rights use `can_moderate_<model>`.
 - Permissions are created/maintained via `post_migrate` signal logic in
   `utils/object_management/signals.py`.
-- Staff users are always treated as moderators for moderation checks.
+- At the pre-migration baseline, moderation checks treat staff users as moderators. This describes legacy runtime behavior to remove; it is not the target contract, where `is_staff` supplies Django-admin eligibility only.
 
 Testing tip:
 
