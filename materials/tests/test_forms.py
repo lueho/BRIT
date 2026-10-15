@@ -21,6 +21,7 @@ from ..forms import (
     ComponentGroupModelForm,
     ComponentMeasurementModelForm,
     ComponentModelForm,
+    MaterialModelForm,
     MaterialPropertyModelForm,
     MaterialPropertyValueModelForm,
     SampleGroupModelForm,
@@ -84,6 +85,13 @@ class AddComponentGroupModalModelFormTestCase(TestCase):
         )
 
 
+class MaterialModelFormTestCase(TestCase):
+    def test_form_includes_abbreviation_field(self):
+        form = MaterialModelForm()
+
+        self.assertIn("abbreviation", form.fields)
+
+
 class ComponentModelFormTestCase(TestCase):
     def test_form_includes_comparable_component_field(self):
         form = ComponentModelForm()
@@ -107,6 +115,16 @@ class ComponentModelFormTestCase(TestCase):
         form = ComponentModelForm()
 
         self.assertEqual(form.fields["comparable_component"].label, "Compared as")
+
+    def test_form_includes_abbreviation_field(self):
+        form = ComponentModelForm()
+
+        self.assertIn("abbreviation", form.fields)
+
+    def test_form_includes_categories_field(self):
+        form = ComponentModelForm()
+
+        self.assertIn("categories", form.fields)
 
 
 class MaterialPropertyModelFormTestCase(TestCase):

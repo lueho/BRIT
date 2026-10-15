@@ -4,10 +4,12 @@ from decimal import Decimal
 from io import BytesIO, StringIO
 from zoneinfo import ZoneInfo
 
+from django.contrib.auth.models import User
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from openpyxl import load_workbook
 
+from bibliography.models import Author
 from maps.models import Location, Region
 from utils.properties.models import Unit
 
@@ -19,6 +21,7 @@ from ..models import (
     MaterialProperty,
     MaterialPropertyValue,
     Sample,
+    SampleAuthor,
 )
 from ..renderers import (
     SampleCSVRenderer,
@@ -216,6 +219,70 @@ class SampleMeasurementsXLSXRendererTestCase(TestCase):
                     self.assertEqual(metadata["Analysis date"], "2024-09-01")
                     self.assertEqual(metadata["Analysis laboratorium"], "Renderer lab")
                 self.assertEqual(sample.datetime, original)
+
+    def test_entry_done_by_lists_corresponding_authors_not_owner(self):
+        owner = User.objects.create(username="import-account")
+        material = Material.objects.create(name="Contributor Material")
+        sample = Sample.objects.create(
+            name="Contributor Sample", material=material, owner=owner
+        )
+        first = Author.objects.create(
+            first_names="Saskia", last_names="Hertel", publication_status="published"
+        )
+        second = Author.objects.create(
+            first_names="Steffen", last_names="Walk", publication_status="published"
+        )
+        SampleAuthor.objects.create(sample=sample, author=second, position=2)
+        SampleAuthor.objects.create(sample=sample, author=first, position=1)
+
+        metadata = SampleMeasurementsXLSXRenderer(
+            sample=sample,
+            measurements=sample.component_measurements.all(),
+        )._build_metadata_values()
+
+        self.assertEqual(metadata["Entry done by:"], "Hertel, Saskia; Walk, Steffen")
+
+    def test_entry_done_by_omits_authors_hidden_from_export_user(self):
+        owner = User.objects.create(username="private-author-owner")
+        requester = User.objects.create(username="export-requester")
+        material = Material.objects.create(name="Private Contributor Material")
+        sample = Sample.objects.create(
+            name="Private Contributor Sample",
+            material=material,
+            owner=owner,
+            publication_status="published",
+        )
+        public = Author.objects.create(
+            first_names="Saskia", last_names="Hertel", publication_status="published"
+        )
+        private = Author.objects.create(last_names="Secretauthor", owner=owner)
+        SampleAuthor.objects.create(sample=sample, author=private, position=1)
+        SampleAuthor.objects.create(sample=sample, author=public, position=2)
+
+        def entry_done_by(user):
+            return SampleMeasurementsXLSXRenderer(
+                sample=sample,
+                measurements=sample.component_measurements.all(),
+                user=user,
+            )._build_metadata_values()["Entry done by:"]
+
+        self.assertEqual(entry_done_by(None), "Hertel, Saskia")
+        self.assertEqual(entry_done_by(requester), "Hertel, Saskia")
+        self.assertEqual(entry_done_by(owner), "Secretauthor; Hertel, Saskia")
+
+    def test_entry_done_by_is_blank_without_contributors(self):
+        owner = User.objects.create(username="lonely-owner")
+        material = Material.objects.create(name="Unattributed Material")
+        sample = Sample.objects.create(
+            name="Unattributed Sample", material=material, owner=owner
+        )
+
+        metadata = SampleMeasurementsXLSXRenderer(
+            sample=sample,
+            measurements=sample.component_measurements.all(),
+        )._build_metadata_values()
+
+        self.assertEqual(metadata["Entry done by:"], "")
 
     def test_render_exports_raw_component_measurements(self):
         material = Material.objects.create(name="Renderer Material")

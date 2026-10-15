@@ -12,9 +12,6 @@
 {% endblock list_card_header %}
 
 {% block list_table %}
-    {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
-        {% include "object_management/bulk_access_toolbar.html" %}
-    {% endif %}
     <div class="collection-list-min-height">
         <div class="table-responsive">
             <table class="table modern-table">

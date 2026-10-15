@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 
 from django.conf import settings
@@ -76,6 +77,7 @@ class AnonymousRateLimitMiddleware:
         "/closecycle/api/showcase/geojson/",
         "/closecycle/api/showcase/version/",
     )
+    EXEMPT_PATH_PATTERN = re.compile(r"/maps/geodatasets/\d+/features\.geojson")
     WINDOW_SECONDS = 60
 
     def __init__(self, get_response):
@@ -87,6 +89,7 @@ class AnonymousRateLimitMiddleware:
             not limit
             or request.path in self.EXEMPT_PATHS
             or request.path.startswith(self.EXEMPT_PATH_PREFIXES)
+            or self.EXEMPT_PATH_PATTERN.fullmatch(request.path)
             or self._is_authenticated(request)
         ):
             return self.get_response(request)

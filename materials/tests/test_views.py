@@ -5,6 +5,7 @@ from unittest.mock import patch
 from urllib.parse import quote
 from uuid import uuid4
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
@@ -17,7 +18,7 @@ from django.utils import timezone
 from django.utils.html import escape
 from factory.django import mute_signals
 
-from bibliography.models import Source
+from bibliography.models import Author, Source
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import Location, Region
 from utils.object_management.models import (
@@ -42,6 +43,7 @@ from ..models import (
     MaterialPropertyValue,
     MeasurementValueQualifier,
     Sample,
+    SampleAuthor,
     SampleExternalRecord,
     SampleGroup,
     SampleSeries,
@@ -53,7 +55,7 @@ from ..views import DETAIL_RELATED_LIMIT, SampleSubstrateMaterialQuickCreateView
 User = get_user_model()
 
 
-class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
+class MaterialExplorerViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "change_material"
 
     def test_get_http_200_ok_for_anonymous(self):
@@ -787,7 +789,7 @@ class MaterialCategoryCRUDViewsTestCase(
 
     model = MaterialCategory
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialcategory-create"
     view_modal_create_name = "materialcategory-create-modal"
     view_published_list_name = "materialcategory-list"
@@ -814,7 +816,7 @@ class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
 
     model = Material
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "material-create"
     view_modal_create_name = "material-create-modal"
     view_published_list_name = "material-list"
@@ -851,7 +853,7 @@ class MaterialComponentCRUDViewsTestCase(
 
     model = MaterialComponent
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialcomponent-create"
     view_modal_create_name = "materialcomponent-create-modal"
     view_published_list_name = "materialcomponent-list"
@@ -888,7 +890,7 @@ class MaterialComponentGroupCRUDViewsTestCase(
 
     model = MaterialComponentGroup
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialcomponentgroup-create"
     view_modal_create_name = "materialcomponentgroup-create-modal"
     view_published_list_name = "materialcomponentgroup-list"
@@ -925,7 +927,7 @@ class MaterialPropertyCRUDViewsTestCase(
 
     model = MaterialProperty
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialproperty-create"
     view_modal_create_name = "materialproperty-create-modal"
     view_published_list_name = "materialproperty-list"
@@ -1989,7 +1991,7 @@ class AnalyticalMethodCRUDViewsTestCase(
 
     model = AnalyticalMethod
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "analyticalmethod-create"
     view_published_list_name = "analyticalmethod-list"
     view_private_list_name = "analyticalmethod-list-owned"
@@ -2120,7 +2122,7 @@ class SampleSeriesCRUDViewsTestCase(
 
     model = SampleSeries
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "sampleseries-create"
     view_modal_create_name = "sampleseries-create-modal"
     view_published_list_name = "sampleseries-list"
@@ -3007,7 +3009,7 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
     model = Sample
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "sample-create"
     view_modal_create_name = "sample-create-modal"
     view_published_list_name = "sample-list"
@@ -3237,8 +3239,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="published"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3256,8 +3258,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="published"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3275,8 +3277,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="private"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3294,8 +3296,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="private"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3398,6 +3400,7 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertContains(response, 'data-workspace-section="sampling"')
         self.assertContains(response, 'data-workspace-section="analysis"')
         self.assertContains(response, 'data-workspace-section="sources"')
+        self.assertContains(response, 'data-workspace-section="contributors"')
         self.assertNotContains(response, "TOTAL_FORMS")
 
     def test_edit_workspace_not_offered_to_non_owner_of_private_sample(self):
@@ -3521,6 +3524,78 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertFalse(response.json()["saved"])
         self.assertIn("series", response.json()["html"])
 
+    def test_contributors_section_adds_ordered_authors(self):
+        author = Author.objects.create(
+            first_names="Ada",
+            last_names="Example",
+            owner=self.owner,
+            publication_status="published",
+        )
+        response = self.client.post(
+            self.section_url("contributors"),
+            {
+                "sample_authors-TOTAL_FORMS": "1",
+                "sample_authors-INITIAL_FORMS": "0",
+                "sample_authors-0-author": str(author.pk),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        link = self.sample.sample_authors.get()
+        self.assertEqual(link.author, author)
+        self.assertEqual(link.position, 1)
+
+    def test_contributors_summary_hides_authors_not_visible_to_editor(self):
+        secret = Author.objects.create(
+            last_names="Secretauthor",
+            contact_email="secret-summary-author@example.com",
+            owner=self.other,
+        )
+        SampleAuthor.objects.create(sample=self.sample, author=secret, position=1)
+        author = Author.objects.create(
+            last_names="Visibleauthor", owner=self.owner, publication_status="published"
+        )
+        response = self.client.post(
+            self.section_url("contributors"),
+            {
+                "sample_authors-TOTAL_FORMS": "1",
+                "sample_authors-INITIAL_FORMS": "0",
+                "sample_authors-0-author": str(author.pk),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        html = response.json()["html"]
+        self.assertIn("Visibleauthor", html)
+        self.assertNotIn("Secretauthor", html)
+        self.assertNotIn("secret-summary-author@example.com", html)
+
+        workspace = self.client.get(f"{self.sample.get_absolute_url()}?mode=edit")
+        self.assertNotContains(workspace, "Secretauthor")
+        self.assertNotContains(workspace, "secret-summary-author@example.com")
+        page = workspace.content.decode()
+        start = page.index('id="workspace-section-contributors"')
+        summary = page[start : page.index('id="workspace-editor-contributors"', start)]
+        self.assertIn("Visibleauthor", summary)
+        self.assertNotIn("No corresponding authors added yet", summary)
+
+    def test_contributors_reject_author_not_visible_to_editor(self):
+        locked = Author.objects.create(last_names="Locked", owner=self.other)
+        response = self.client.post(
+            self.section_url("contributors"),
+            {
+                "sample_authors-TOTAL_FORMS": "1",
+                "sample_authors-INITIAL_FORMS": "0",
+                "sample_authors-0-author": str(locked.pk),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(response.json()["saved"])
+        self.assertFalse(self.sample.sample_authors.exists())
+
     def test_unknown_section_returns_404(self):
         response = self.client.get(self.section_url("bogus"))
         self.assertEqual(response.status_code, 404)
@@ -3541,6 +3616,61 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertFalse(data["saved"])
         self.sample.refresh_from_db()
         self.assertEqual(self.sample.name, "Pilot sample")
+
+
+class SampleDetailAttributionTestCase(ViewWithPermissionsTestCase):
+    """Sample detail attribution: bibliography authors, not the owner."""
+
+    member_permissions = ["add_sample", "change_sample"]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.material = Material.objects.create(
+            owner=cls.owner,
+            name="Attribution material",
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Attributed sample",
+            material=cls.material,
+            standalone=True,
+            publication_status="published",
+        )
+        cls.author = Author.objects.create(
+            first_names="Saskia",
+            last_names="Hertel",
+            institution="HAW Hamburg",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        SampleAuthor.objects.create(sample=cls.sample, author=cls.author)
+        cls.url = reverse("sample-detail", kwargs={"pk": cls.sample.pk})
+
+    def test_detail_labels_contributors_as_corresponding_authors(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, "Corresponding authors")
+        self.assertContains(response, "Hertel, Saskia")
+        self.assertContains(response, "HAW Hamburg")
+
+    def test_detail_shows_owner_as_editor(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, "Editor")
+        self.assertContains(response, self.owner.username)
+        self.assertNotContains(response, "Contributed by")
+
+    def test_anonymous_does_not_see_private_author(self):
+        secret = Author.objects.create(
+            last_names="Secretauthor",
+            contact_email="secret-sample-author@example.com",
+            owner=self.outsider,
+        )
+        SampleAuthor.objects.create(sample=self.sample, author=secret)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secretauthor")
+        self.assertNotContains(response, "secret-sample-author@example.com")
 
 
 class SampleMeasurementWorkspaceTestCase(TestCase):
@@ -4495,7 +4625,7 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
     model = Composition
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "composition-create"
     view_modal_create_name = "composition-create-modal"
     view_detail_name = "composition-detail"
@@ -5654,6 +5784,30 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "Reset filters")
         self.assertNotContains(response, "Create your first material")
         self.assertNotContains(response, "Log in to create")
+
+    def test_private_material_list_places_bulk_access_form_in_options_pane(self):
+        self.client.force_login(self.regular_user)
+        response = self.client.get(reverse("material-list-owned") + "?scope=private")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        pane_start = content.index('id="options-pane"')
+        self.assertIn('id="bulk-access-form"', content[pane_start:])
+        self.assertNotIn('id="bulk-access-form"', content[:pane_start])
+
+    def test_private_sample_list_hides_access_heading_with_toolbar(self):
+        self.client.force_login(self.regular_user)
+        response = self.client.get(reverse("sample-list-owned") + "?scope=private")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertNotIn('name="items"', content)
+        toolbar_start = content.index('id="bulk-access-toolbar"')
+        heading = content.index("Manage access for selected items")
+        form_start = content.index('id="bulk-access-form"')
+        self.assertLess(toolbar_start, heading)
+        self.assertLess(heading, form_start)
+        self.assertIn("getElementById('bulk-access-toolbar')", content)
 
     def test_material_review_list_renders_filter_context_for_staff(self):
         Material.objects.create(
@@ -7944,9 +8098,11 @@ class MaterialsReviewDetailAccessTests(TestCase):
         response = self.client.get(self._review_detail_url(self.review_sample))
         self.assertEqual(response.status_code, 403)
 
-    def test_anonymous_cannot_access_review_detail(self):
-        response = self.client.get(self._review_detail_url(self.review_sample))
-        self.assertEqual(response.status_code, 403)
+    def test_anonymous_is_redirected_to_login_for_review_detail(self):
+        url = self._review_detail_url(self.review_sample)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"{settings.LOGIN_URL}?next={url}")
 
 
 class SampleDetailTemplateReviewUITests(TestCase):
@@ -9682,7 +9838,7 @@ class SampleGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
     model = SampleGroup
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "samplegroup-create"
     view_modal_create_name = "samplegroup-create-modal"
     view_published_list_name = "samplegroup-list"

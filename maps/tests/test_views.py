@@ -465,7 +465,7 @@ class LocationCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
     model = Location
     add_scope_query_param_to_list_urls = True
 
-    view_dashboard_name = "maps-dashboard"
+    view_explorer_name = "maps-explorer"
     view_create_name = "location-create"
     view_published_list_name = "location-list"
     view_private_list_name = "location-list-owned"
@@ -493,7 +493,7 @@ class RegionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     model = Region
     add_scope_query_param_to_list_urls = True
 
-    view_dashboard_name = "maps-dashboard"
+    view_explorer_name = "maps-explorer"
     view_create_name = "region-create"
     view_published_list_name = "region-list"
     view_private_list_name = "region-list-owned"
@@ -578,7 +578,7 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     model = Catchment
     model_add_permission = "add_catchment"
 
-    view_dashboard_name = "maps-dashboard"
+    view_explorer_name = "maps-explorer"
     view_create_name = "catchment-create"
     view_published_list_name = "catchment-list"
     view_private_list_name = "catchment-list-owned"
@@ -1462,7 +1462,7 @@ class AttributeCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 
     model = Attribute
 
-    view_dashboard_name = "maps-dashboard"
+    view_explorer_name = "maps-explorer"
     view_create_name = "attribute-create"
     view_modal_create_name = "attribute-create-modal"
     view_published_list_name = "attribute-list"
@@ -1499,7 +1499,7 @@ class RegionAttributeValueCRUDViewsTestCase(
 
     model = RegionAttributeValue
 
-    view_dashboard_name = "maps-dashboard"
+    view_explorer_name = "maps-explorer"
     view_create_name = "regionattributevalue-create"
     view_modal_create_name = "regionattributevalue-create-modal"
     view_detail_name = "regionattributevalue-detail"

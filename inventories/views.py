@@ -171,13 +171,13 @@ class InventoryAlgorithmAutocompleteView(AutocompleteModelView):
 class PublishedScenarioFilterView(PublishedObjectFilterView):
     model = Scenario
     filterset_class = ScenarioFilterSet
-    dashboard_url = reverse_lazy("inventories-explorer")
+    explorer_url = reverse_lazy("inventories-explorer")
 
 
 class PrivateScenarioFilterView(PrivateObjectFilterView):
     model = Scenario
     filterset_class = ScenarioFilterSet
-    dashboard_url = reverse_lazy("inventories-explorer")
+    explorer_url = reverse_lazy("inventories-explorer")
 
 
 class ScenarioCreateView(UserCreatedObjectCreateView):

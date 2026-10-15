@@ -152,7 +152,7 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 
     model = Collector
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collector-create"
     view_modal_create_name = "collector-create-modal"
     view_published_list_name = "collector-list"
@@ -360,7 +360,7 @@ class CollectionSystemCRUDViewsTestCase(
 
     model = CollectionSystem
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collectionsystem-create"
     view_modal_create_name = "collectionsystem-create-modal"
     view_published_list_name = "collectionsystem-list"
@@ -389,7 +389,7 @@ class WasteCategoryCRUDViewsTestCase(
 
     model = WasteCategory
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "wastecategory-create"
     view_modal_create_name = "wastecategory-create-modal"
     view_published_list_name = "wastecategory-list"
@@ -418,7 +418,7 @@ class WasteComponentCRUDViewsTestCase(
 
     model = WasteComponent
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "wastecomponent-create"
     view_modal_create_name = "wastecomponent-create-modal"
     view_published_list_name = "wastecomponent-list"
@@ -459,7 +459,7 @@ class FeeSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     model = FeeSystem
     add_scope_query_param_to_list_urls = True
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "feesystem-create"
     view_published_list_name = "feesystem-list"
     view_private_list_name = "feesystem-list-owned"
@@ -484,7 +484,7 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     model = WasteFlyer
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_published_list_name = "wasteflyer-list"
     view_private_list_name = "wasteflyer-list-owned"
     view_detail_name = "wasteflyer-detail"
@@ -576,7 +576,7 @@ class CollectionFrequencyCRUDViewsTestCase(
 
     model = CollectionFrequency
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collectionfrequency-create"
     view_published_list_name = "collectionfrequency-list"
     view_private_list_name = "collectionfrequency-list-owned"
@@ -791,7 +791,7 @@ class CollectionPropertyValueCRUDViewsTestCase(
 
     model = CollectionPropertyValue
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collectionpropertyvalue-create"
     view_detail_name = "collectionpropertyvalue-detail"
     view_update_name = "collectionpropertyvalue-update"
@@ -1023,7 +1023,7 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
 
     model = AggregatedCollectionPropertyValue
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "aggregatedcollectionpropertyvalue-create"
     view_detail_name = "aggregatedcollectionpropertyvalue-detail"
     view_update_name = "aggregatedcollectionpropertyvalue-update"
@@ -1195,7 +1195,7 @@ class CollectionCatchmentCRUDViewsTestCase(
     model = CollectionCatchment
     model_add_permission = "add_collectioncatchment"
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_published_list_name = "collectioncatchment-list"
     view_private_list_name = "collectioncatchment-list-owned"
     view_create_name = "collectioncatchment-create"
@@ -1382,6 +1382,110 @@ class CollectionListQueryTestCase(TestCase):
 
         self.assertEqual(actual, [obj.pk for obj in self.published[:20]])
 
+    def test_letter_filter_narrows_list_to_matching_initials(self):
+        # bulk_create keeps the explicit name; save() would auto-generate it.
+        zebra = Collection.objects.bulk_create(
+            [
+                Collection(
+                    name="Zebra collection",
+                    owner=self.owner,
+                    publication_status="published",
+                    valid_from=date(2024, 2, 1),
+                    catchment=self.catchment,
+                    collector=self.collector,
+                    waste_category=self.category,
+                    collection_system=self.system,
+                )
+            ]
+        )[0]
+
+        page = self.get_page(views.CollectionPublishedListView, data={"letter": "Z"})
+        self.assertEqual(page.paginator.count, 1)
+        self.assertEqual([obj.pk for obj in page.object_list], [zebra.pk])
+
+        page = self.get_page(views.CollectionPublishedListView, data={"letter": "R"})
+        self.assertEqual(page.paginator.count, 25)
+
+    def test_letter_index_is_exposed_and_marks_active_letter(self):
+        request = RequestFactory().get(
+            "/collections/", {"scope": "published", "letter": "R"}
+        )
+        request.user = AnonymousUser()
+        response = views.CollectionPublishedListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        index = {
+            entry["letter"]: entry for entry in response.context_data["letter_index"]
+        }
+        self.assertTrue(index["R"]["enabled"])
+        self.assertTrue(index["R"]["active"])
+        self.assertFalse(index["B"]["enabled"])
+
+    def test_review_route_applies_letter_filter_and_index(self):
+        moderator = User.objects.create_user(username="letter-moderator")
+        moderator.user_permissions.add(
+            Permission.objects.get_or_create(
+                codename="can_moderate_collection",
+                content_type=ContentType.objects.get_for_model(Collection),
+                defaults={"name": "Can moderate collections"},
+            )[0]
+        )
+        river, zebra = Collection.objects.bulk_create(
+            [
+                Collection(
+                    name=name,
+                    owner=self.other_owner,
+                    publication_status="review",
+                    valid_from=date(2024, 1, 1),
+                    catchment=self.catchment,
+                    collector=self.collector,
+                    waste_category=self.category,
+                    collection_system=self.system,
+                )
+                for name in ("River collection", "Zebra collection")
+            ]
+        )
+        self.client.force_login(moderator)
+
+        response = self.client.get(
+            reverse("collection-list-review"), {"scope": "review", "letter": "R"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result_pks = {obj.pk for obj in response.context["object_list"]}
+        self.assertIn(river.pk, result_pks)
+        self.assertNotIn(zebra.pk, result_pks)
+        index = {entry["letter"]: entry for entry in response.context["letter_index"]}
+        self.assertTrue(index["R"]["active"])
+        self.assertTrue(index["Z"]["enabled"])
+
+    def test_filter_form_carries_active_letter(self):
+        response = self.client.get(
+            reverse("collection-list"), {"scope": "published", "letter": "R"}
+        )
+
+        self.assertContains(
+            response, '<input type="hidden" name="letter" value="R">', html=True
+        )
+
+    def test_filter_form_has_no_letter_input_without_active_letter(self):
+        response = self.client.get(reverse("collection-list"), {"scope": "published"})
+
+        self.assertNotContains(response, 'name="letter"')
+
+    def test_private_list_places_bulk_access_form_in_options_pane(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("collection-list-owned"), {"scope": "private"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        pane_start = content.index('id="options-pane"')
+        pane_end = content.index('id="learning-pane"')
+        self.assertIn('id="bulk-access-form"', content[pane_start:pane_end])
+        self.assertNotIn('id="bulk-access-form"', content[:pane_start])
+
     def test_explicit_ordering_is_preserved(self):
         page = self.get_page(
             views.CollectionPublishedListView, ordering=("-valid_from", "-id")
@@ -1404,11 +1508,11 @@ class CollectionListQueryTestCase(TestCase):
                 self.assertEqual(obj.collection_system.name, "List system")
 
     @override_settings(GOOGLE_ANALYTICS_KEY="")
-    def test_anonymous_list_renders_with_nine_queries(self):
+    def test_anonymous_list_renders_with_ten_queries(self):
         request = RequestFactory().get("/collections/", {"scope": "published"})
         request.user = AnonymousUser()
 
-        with self.assertNumQueries(9):
+        with self.assertNumQueries(10):
             response = views.CollectionPublishedListView.as_view()(request)
             response.render()
 
@@ -1432,7 +1536,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     model = Collection
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collection-create"
     view_published_list_name = "collection-list"
     view_private_list_name = "collection-list-owned"

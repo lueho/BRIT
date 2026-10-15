@@ -14,7 +14,8 @@ from django.views import View
 from django.views.generic import DetailView, TemplateView
 from django.views.generic.edit import FormMixin
 from django_filters.views import FilterView
-from rest_framework.exceptions import NotFound, ParseError
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from rest_framework.exceptions import AuthenticationFailed, NotFound, ParseError
 from rest_framework.views import APIView, Response
 
 from maps.mixins import (
@@ -97,6 +98,7 @@ from .models import (
     RegionProperty,
 )
 from .signals import clear_geojson_cache_pattern
+from .throttling import GeoJSONAnonThrottle
 from .validation import RegionCompositionError, validate_region_composition
 
 # Query parameters that are navigation/control hints rather than dataset
@@ -381,10 +383,23 @@ class MapMixin:
         return context
 
 
-class MapsDashboardView(BreadcrumbContextMixin, TemplateView):
-    template_name = "maps_dashboard.html"
+class MapsExplorerView(BreadcrumbContextMixin, TemplateView):
+    template_name = "maps_explorer.html"
     breadcrumb_module_label = "Maps"
     breadcrumb_page_title = "Maps"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        published = {"publication_status": "published"}
+        context["dataset_count"] = GeoDataset.objects.filter(**published).count()
+        context["attribute_count"] = Attribute.objects.filter(**published).count()
+        context["region_count"] = Region.objects.filter(**published).count()
+        context["catchment_count"] = Catchment.objects.filter(**published).count()
+        context["location_count"] = Location.objects.filter(**published).count()
+        context["nuts_count"] = (
+            NutsRegion.objects.in_vintage().filter(**published).count()
+        )
+        return context
 
 
 # ----------- GeoDataSet CRUD ------------------------------------------------------------------------------------------
@@ -394,7 +409,7 @@ class MapsDashboardView(BreadcrumbContextMixin, TemplateView):
 class GeoDataSetRepresentationMixin:
     model = GeoDataset
     filterset_class = GeoDataSetFilterSet
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
     def get_default_filters(self):
         defaults = super().get_default_filters()
@@ -745,7 +760,7 @@ class GeoDataSetRuntimeMapView(
         self.get_runtime_adapter().configure_view(self)
         self.object = dataset
         self.map_title = dataset.name
-        self.dashboard_url = dataset.get_absolute_url()
+        self.explorer_url = dataset.get_absolute_url()
 
     def get(self, request, *args, **kwargs):
         adapter = self.get_runtime_adapter()
@@ -783,7 +798,7 @@ class GeoDataSetRuntimeMapView(
         context_update = {
             "object": dataset,
             "dataset": dataset,
-            "dashboard_url": dataset.get_absolute_url(),
+            "explorer_url": dataset.get_absolute_url(),
             "public_map_url": dataset.get_map_url(),
             "private_map_url": dataset.get_map_url(),
             "review_map_url": dataset.get_map_url(),
@@ -859,13 +874,13 @@ class GeoDataSetRuntimeTableView(
                 }
                 for obj in context["object_list"]
             ],
-            "dashboard_url": dataset.get_absolute_url(),
+            "explorer_url": dataset.get_absolute_url(),
             "map_url": self.add_current_query_params(dataset.get_map_url()),
             "public_map_url": dataset.get_map_url(),
             "private_map_url": dataset.get_map_url(),
             "review_map_url": dataset.get_map_url(),
             "breadcrumb_module_label": "Maps",
-            "breadcrumb_module_url": reverse("maps-dashboard"),
+            "breadcrumb_module_url": reverse("maps-explorer"),
             "breadcrumb_section_label": "GeoDatasets",
             "breadcrumb_section_url": reverse("geodataset-list"),
             "breadcrumb_object_label": dataset.name,
@@ -946,7 +961,7 @@ class GeoDataSetRuntimeFeatureDetailView(
                     for policy in column_policies
                 ],
                 "breadcrumb_module_label": "Maps",
-                "breadcrumb_module_url": reverse("maps-dashboard"),
+                "breadcrumb_module_url": reverse("maps-explorer"),
                 "breadcrumb_section_label": "GeoDatasets",
                 "breadcrumb_section_url": reverse("geodataset-list"),
                 "breadcrumb_object_label": dataset.name,
@@ -961,8 +976,22 @@ class GeoDataSetRuntimeFeatureDetailView(
 class GeoDataSetRuntimeFeatureGeoJSONView(
     GeoDataSetRuntimePermissionMixin, UserPassesTestMixin, APIView
 ):
-    authentication_classes = []
+    authentication_classes = [SessionAuthentication]
     permission_classes = []
+    throttle_classes = [GeoJSONAnonThrottle]
+
+    def dispatch(self, request, *args, **kwargs):
+        # The visibility check in UserPassesTestMixin runs before DRF
+        # authentication, so resolve a valid token user first. Invalid tokens
+        # stay anonymous rather than turning public datasets into 401s.
+        if not request.user.is_authenticated and "HTTP_AUTHORIZATION" in request.META:
+            try:
+                token_auth = TokenAuthentication().authenticate(request)
+            except AuthenticationFailed:
+                token_auth = None
+            if token_auth is not None:
+                request.user = token_auth[0]
+        return super().dispatch(request, *args, **kwargs)
 
     def get(self, request, *args, **kwargs):
         adapter = self.get_runtime_adapter()
@@ -1064,13 +1093,13 @@ class GeoDataSetAutocompleteView(UserCreatedObjectAutocompleteView):
 class LocationPublishedListView(PublishedObjectFilterView):
     model = Location
     filterset_class = LocationListFilter
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class LocationPrivateListView(PrivateObjectFilterView):
     model = Location
     filterset_class = LocationListFilter
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class LocationAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -1102,13 +1131,13 @@ class LocationModalDeleteView(UserCreatedObjectModalDeleteView):
 class RegionPublishedFilterView(PublishedObjectFilterView):
     model = Region
     filterset_class = RegionFilterSet
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class RegionPrivateFilterView(PrivateObjectFilterView):
     model = Region
     filterset_class = RegionFilterSet
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class RegionMapView(LoginRequiredMixin, MapMixin, FilterView):
@@ -1196,13 +1225,13 @@ class RegionModalDeleteView(UserCreatedObjectModalDeleteView):
 class CatchmentPublishedFilterView(PublishedObjectFilterView):
     model = Catchment
     filterset_class = CatchmentFilterSet
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class CatchmentPrivateFilterView(PrivateObjectFilterView):
     model = Catchment
     filterset_class = CatchmentFilterSet
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class CatchmentDetailView(MapMixin, UserCreatedObjectDetailView):
@@ -1726,13 +1755,13 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
 class AttributePublishedListView(PublishedObjectFilterView):
     model = Attribute
     filterset_class = AttributeListFilter
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class AttributePrivateListView(PrivateObjectFilterView):
     model = Attribute
     filterset_class = AttributeListFilter
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class AttributeAutocompleteView(UserCreatedObjectAutocompleteView):

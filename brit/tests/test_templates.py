@@ -145,7 +145,8 @@ class CookieConsentTemplateHardeningTests(TestCase):
         html = render_to_string("partials/_cookie_bar.html", {"request": request})
 
         self.assertIn("cookiebar.module.js", html)
-        self.assertIn("showCookieBar({", html)
+        self.assertIn("startCookieBar(showCookieBar, {", html)
+        self.assertIn("js/cookie_bar.min.js", html)
         self.assertNotIn("legacyShowCookieBar", html)
         self.assertNotIn("cookiebar.js", html)
 
@@ -188,8 +189,8 @@ class BreadcrumbModuleLandingTests(TestCase):
             html=True,
         )
 
-    def test_utils_dashboard_uses_utilities_label(self):
-        response = self.client.get(reverse("utils-dashboard"))
+    def test_utils_explorer_uses_utilities_label(self):
+        response = self.client.get(reverse("utils-explorer"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "BRIT | Utilities")
@@ -727,6 +728,27 @@ class StickyFilterOffsetAssetTests(SimpleTestCase):
         self.assertNotIn("top: calc(56px + 1rem);", css)
 
 
+class LetterIndexThemeAssetTests(SimpleTestCase):
+    """The A-Z letter bar must not fall back to stock-Bootstrap blue states.
+
+    Bootstrap's ``.page-link:focus`` reads ``--bs-pagination-focus-color`` and
+    ``--bs-pagination-focus-box-shadow``, separate from the hover/active
+    properties, so those must be recolored to the BRIT primary too.
+    """
+
+    def test_letter_index_overrides_pagination_focus_state(self):
+        css = (Path(settings.BASE_DIR) / "brit/static/css/filtered-list.css").read_text(
+            encoding="utf-8"
+        )
+        block = css.split(".letter-index .pagination {", 1)[1].split("}", 1)[0]
+
+        self.assertIn("--bs-pagination-focus-color: var(--bs-primary);", block)
+        self.assertIn(
+            "--bs-pagination-focus-box-shadow: 0 0 0 .15rem rgba(var(--bs-primary-rgb), .25);",
+            block,
+        )
+
+
 class BreadcrumbRailGlobalStylingAssetTests(SimpleTestCase):
     """Asset-level regression tests for the global .page-breadcrumb-rail styling.
 
@@ -908,3 +930,128 @@ class NarrativeSpacingAssetTests(SimpleTestCase):
         match = re.search(r"\.sdv2-about-body\s*>\s*p:last-child\s*\{([^}]*)\}", css)
         self.assertIsNotNone(match)
         self.assertIn("margin-bottom: 0;", match.group(1))
+
+
+class ExplorerUrlNameTests(TestCase):
+    """Explorer pages use canonical ``*-explorer`` URL names (issue #89)."""
+
+    def test_explorer_url_names_resolve(self):
+        self.assertEqual(reverse("maps-explorer"), "/maps/explorer/")
+        self.assertEqual(reverse("utils-explorer"), "/utils/explorer/")
+        self.assertEqual(reverse("properties-explorer"), "/utils/properties/explorer/")
+        self.assertEqual(reverse("processes:explorer"), "/processes/explorer/")
+
+    def test_legacy_dashboard_url_names_are_removed(self):
+        from django.urls import NoReverseMatch
+
+        for name in (
+            "maps-dashboard",
+            "utils-dashboard",
+            "properties-dashboard",
+            "processes:dashboard",
+            "processes:processes-explorer",
+        ):
+            with self.subTest(url_name=name):
+                with self.assertRaises(NoReverseMatch):
+                    reverse(name)
+
+
+class MapsExplorerTests(TestCase):
+    """The Maps explorer uses the shared explorer-card pattern and links to all
+    entity lists (issue #89)."""
+
+    def test_explorer_links_to_all_entity_lists(self):
+        response = self.client.get(reverse("maps-explorer"))
+
+        self.assertEqual(response.status_code, 200)
+        for url_name in (
+            "maps_list",
+            "attribute-list",
+            "region-list",
+            "catchment-list",
+            "location-list",
+        ):
+            with self.subTest(url_name=url_name):
+                self.assertContains(response, reverse(url_name))
+
+    def test_explorer_uses_shared_card_pattern(self):
+        response = self.client.get(reverse("maps-explorer"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "explorer-card")
+
+    def test_nuts_count_covers_only_the_current_vintage(self):
+        from maps.models import NutsRegion, NutsVintage
+
+        other_vintage = NutsVintage.objects.create(year=2024)
+        for vintage in (NutsVintage.default(), other_vintage):
+            NutsRegion.objects.create(
+                name="Deutschland",
+                nuts_id="DE",
+                levl_code=0,
+                cntr_code="DE",
+                version=vintage,
+                publication_status=NutsRegion.STATUS_PUBLISHED,
+            )
+
+        response = self.client.get(reverse("maps-explorer"))
+
+        self.assertEqual(response.context["nuts_count"], 1)
+
+
+class SidebarNavigationTests(TestCase):
+    """Sidebar module entries point at primary lists and mark the active
+    section from the resolved route, not the raw path (issue #89)."""
+
+    @staticmethod
+    def _active_link(url):
+        return f'<a class="nav-link active" href="{url}"'
+
+    def test_bibliography_sidebar_links_to_source_list(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertContains(
+            response,
+            f'<a class="nav-link" href="{reverse("source-list")}">',
+            html=False,
+        )
+
+    def test_maps_page_marks_maps_nav_active(self):
+        response = self.client.get(reverse("maps_list"), follow=True)
+
+        self.assertContains(
+            response, self._active_link(reverse("maps_list")), html=False
+        )
+
+    def test_materials_page_marks_only_materials_nav_active(self):
+        response = self.client.get(reverse("sample-list"), follow=True)
+
+        self.assertContains(
+            response, self._active_link(reverse("sample-list")), html=False
+        )
+        self.assertNotContains(
+            response, self._active_link(reverse("maps_list")), html=False
+        )
+
+    def test_collection_list_marks_sources_nav_active(self):
+        """Waste Collection stays under Sources, so its pages highlight Sources."""
+        response = self.client.get(reverse("collection-list"), follow=True)
+
+        self.assertContains(
+            response, self._active_link(reverse("sources-explorer")), html=False
+        )
+
+    def test_waste_atlas_marks_waste_atlas_nav_active(self):
+        response = self.client.get(reverse("waste-atlas-overview"), follow=True)
+
+        self.assertContains(
+            response, self._active_link(reverse("waste-atlas-overview")), html=False
+        )
+        self.assertNotContains(
+            response, self._active_link(reverse("sources-explorer")), html=False
+        )
+
+    def test_about_page_marks_about_nav_active(self):
+        response = self.client.get(reverse("about"))
+
+        self.assertContains(response, self._active_link(reverse("about")), html=False)

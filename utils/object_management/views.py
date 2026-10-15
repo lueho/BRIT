@@ -112,12 +112,12 @@ class ReviewItemReference(NamedTuple):
 DEFAULT_BREADCRUMB_MODULES = {
     "bibliography": {"label": "Bibliography", "url_name": "bibliography-explorer"},
     "inventories": {"label": "Inventories", "url_name": "inventories-explorer"},
-    "maps": {"label": "Maps", "url_name": "maps-dashboard"},
+    "maps": {"label": "Maps", "url_name": "maps-explorer"},
     "materials": {"label": "Materials", "url_name": "materials-explorer"},
-    "processes": {"label": "Processes", "url_name": "processes:process-list"},
-    "properties": {"label": "Properties", "url_name": "properties-dashboard"},
+    "processes": {"label": "Processes", "url_name": "processes:explorer"},
+    "properties": {"label": "Properties", "url_name": "properties-explorer"},
     "sources": {"label": "Sources", "url_name": "sources-explorer"},
-    "utils": {"label": "Utilities", "url_name": "utils-dashboard"},
+    "utils": {"label": "Utilities", "url_name": "utils-explorer"},
     "greenhouses": {
         "label": "Greenhouses",
         "url_name": None,
@@ -1725,7 +1725,7 @@ class UserCreatedObjectListMixin:
     paginate_by = 10
     header = None
     list_type = None
-    dashboard_url = None
+    explorer_url = None
     breadcrumb_parent_module_label = None
     breadcrumb_parent_module_url = None
     breadcrumb_module_label = None
@@ -1817,8 +1817,8 @@ class UserCreatedObjectListMixin:
         else:
             return None
 
-    def get_dashboard_url(self):
-        return self.dashboard_url
+    def get_explorer_url(self):
+        return self.explorer_url
 
     def get_create_url(self):
         return self.model.create_url
@@ -1872,7 +1872,7 @@ class UserCreatedObjectListMixin:
                 "create_permission": self.get_create_permission(),
                 "list_type": self.get_list_type(),
                 "private_list_owner": self.get_private_list_owner(),
-                "dashboard_url": self.get_dashboard_url(),
+                "explorer_url": self.get_explorer_url(),
                 "sortable_fields": self.get_sortable_fields(),
                 "current_sort": self.get_current_sort() or "",
             }
@@ -1889,7 +1889,7 @@ class UserCreatedObjectListMixin:
                 module_label=self.breadcrumb_module_label or default_module_label,
                 module_url=(
                     self.breadcrumb_module_url
-                    or self.get_dashboard_url()
+                    or self.get_explorer_url()
                     or _get_default_breadcrumb_module_url(breadcrumb_model)
                 ),
                 section_label=breadcrumb_section_label,
@@ -2510,6 +2510,9 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
 
     template_name = "object_management/review_detail_wrapper.html"
     detail_view_class = None
+    permission_denied_message = (
+        "You do not have permission to access the review details page."
+    )
     _model_view_registry = {}
 
     @classmethod
@@ -2580,9 +2583,7 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             return super().dispatch(request, *args, **kwargs)
 
         if not user_is_moderator_for_model(request.user, obj.__class__):
-            raise PermissionDenied(
-                "You do not have permission to access the review details page."
-            )
+            return self.handle_no_permission()
         return super().dispatch(request, *args, **kwargs)
 
     def _resolve_base_template(self):

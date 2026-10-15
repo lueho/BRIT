@@ -3,9 +3,10 @@ import json
 from celery.result import AsyncResult
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import ProtectedError, Q, RestrictedError
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
@@ -34,7 +35,7 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateWithInlinesView,
 )
 from utils.permissions import HasModelPermission
-from utils.views import BreadcrumbContextMixin
+from utils.views import BreadcrumbContextMixin, LetterIndexMixin
 
 from .filters import AuthorFilterSet, LicenceListFilter, SourceFilter
 from .forms import (
@@ -61,7 +62,7 @@ from .tasks import check_source_url, check_source_urls
 
 
 class BibliographyExplorerView(BreadcrumbContextMixin, TemplateView):
-    template_name = "bibliography_dashboard.html"
+    template_name = "bibliography_explorer.html"
     breadcrumb_module_label = "Bibliography"
     breadcrumb_page_title = "Bibliography"
 
@@ -87,21 +88,21 @@ class BibliographyExplorerView(BreadcrumbContextMixin, TemplateView):
 class AuthorPublishedListView(PublishedObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
 class AuthorPrivateListView(PrivateObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
 class AuthorReviewListView(ReviewObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
@@ -189,19 +190,19 @@ class AuthorAutocompleteView(UserCreatedObjectAutocompleteView):
 class LicencePublishedListView(PublishedObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class LicencePrivateListView(PrivateObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class LicenceReviewListView(ReviewObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class LicenceCreateView(UserCreatedObjectCreateView):
@@ -245,31 +246,35 @@ class LicenceAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SourcePublishedFilterView(PublishedObjectFilterView):
+class SourceLetterIndexMixin(LetterIndexMixin):
+    letter_field = "citation_key"
+
+
+class SourcePublishedFilterView(SourceLetterIndexMixin, PublishedObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
         "citation_key"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
-class SourcePrivateFilterView(PrivateObjectFilterView):
+class SourcePrivateFilterView(SourceLetterIndexMixin, PrivateObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
         "citation_key"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
-class SourceReviewFilterView(ReviewObjectFilterView):
+class SourceReviewFilterView(SourceLetterIndexMixin, ReviewObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
         "citation_key"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class SourceCreateView(UserCreatedObjectCreateWithInlinesView):
@@ -468,6 +473,7 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
     """
 
     permission_required = "bibliography.add_source"
+    author_cleanup_salt = "bibliography.source-quick-create.author-cleanup"
 
     @staticmethod
     def _normalize_name_part(value):
@@ -475,13 +481,17 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         return " ".join(str(value or "").split())
 
     def _resolve_authors(self, request, payload):
-        """Resolve payload authors to Author objects preserving payload order."""
+        """Resolve payload authors to Author objects preserving payload order.
+
+        Returns ``(authors, created_author_ids, error_response)``.
+        """
         raw_authors = payload.get("authors", [])
         if not isinstance(raw_authors, list):
-            return [], None
+            return [], [], None
 
         resolved_authors = []
         resolved_ids = set()
+        created_author_ids = []
 
         for raw_author in raw_authors:
             if not isinstance(raw_author, dict):
@@ -510,14 +520,18 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
                     if author is None:
                         if not request.user.has_perm("bibliography.add_author"):
-                            return [], JsonResponse(
-                                {
-                                    "error": (
-                                        "You need permission to create authors "
-                                        "for inline source creation."
-                                    )
-                                },
-                                status=403,
+                            return (
+                                [],
+                                [],
+                                JsonResponse(
+                                    {
+                                        "error": (
+                                            "You need permission to create authors "
+                                            "for inline source creation."
+                                        )
+                                    },
+                                    status=403,
+                                ),
                             )
 
                         author = Author.objects.create(
@@ -525,6 +539,7 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                             author_type="organization",
                             organization_name=organization_name,
                         )
+                        created_author_ids.append(author.pk)
                 else:
                     first_names = self._normalize_name_part(
                         raw_author.get("first_names")
@@ -540,14 +555,18 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
                     if author is None:
                         if not request.user.has_perm("bibliography.add_author"):
-                            return [], JsonResponse(
-                                {
-                                    "error": (
-                                        "You need permission to create authors "
-                                        "for inline source creation."
-                                    )
-                                },
-                                status=403,
+                            return (
+                                [],
+                                [],
+                                JsonResponse(
+                                    {
+                                        "error": (
+                                            "You need permission to create authors "
+                                            "for inline source creation."
+                                        )
+                                    },
+                                    status=403,
+                                ),
                             )
 
                         author = Author.objects.create(
@@ -555,12 +574,13 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                             first_names=first_names,
                             last_names=last_names,
                         )
+                        created_author_ids.append(author.pk)
 
             if author and author.pk not in resolved_ids:
                 resolved_authors.append(author)
                 resolved_ids.add(author.pk)
 
-        return resolved_authors, None
+        return resolved_authors, created_author_ids, None
 
     def post(self, request, *args, **kwargs):
         """Create a Source from a JSON payload and return option data as JSON."""
@@ -587,11 +607,14 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     status=400,
                 )
 
-        authors, author_error = self._resolve_authors(request, payload)
-        if author_error is not None:
-            return author_error
-
         with transaction.atomic():
+            authors, created_author_ids, author_error = self._resolve_authors(
+                request, payload
+            )
+            if author_error is not None:
+                transaction.set_rollback(True)
+                return author_error
+
             source = Source.objects.create(
                 owner=request.user,
                 title=title,
@@ -612,6 +635,14 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 "title": source.title,
                 "text": formatted_label,
                 "label": formatted_label,
+                "author_cleanup_token": signing.dumps(
+                    {
+                        "source": source.pk,
+                        "user": request.user.pk,
+                        "authors": created_author_ids,
+                    },
+                    salt=self.author_cleanup_salt,
+                ),
             },
             status=201,
         )
@@ -623,6 +654,11 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         been published (i.e. still in draft/private state) may be deleted via
         this endpoint.  This prevents orphaned records when the user removes a
         just-created source from the widget before saving the parent form.
+
+        ``author_cleanup_token`` is the signed token returned when the source
+        was quick-created.  The authors that call inserted for this source are
+        deleted as well while they are still private and no longer referenced
+        by any source or process.
         """
         try:
             payload = json.loads(request.body.decode("utf-8") or "{}")
@@ -644,8 +680,48 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 status=403,
             )
 
-        source.delete()
+        created_author_ids = self._created_author_ids_from_token(
+            payload.get("author_cleanup_token"), source, request.user
+        )
+
+        with transaction.atomic():
+            linked_author_ids = list(
+                source.sourceauthors.filter(
+                    author_id__in=created_author_ids
+                ).values_list("author_id", flat=True)
+            )
+            source.delete()
+            orphaned_authors = Author.objects.filter(
+                pk__in=linked_author_ids,
+                owner=request.user,
+                publication_status=Author.STATUS_PRIVATE,
+                sourceauthors__isnull=True,
+                process_author_links__isnull=True,
+            )
+            for author in orphaned_authors:
+                try:
+                    with transaction.atomic():
+                        author.delete()
+                except (ProtectedError, RestrictedError):
+                    continue
         return JsonResponse({"deleted": True}, status=200)
+
+    def _created_author_ids_from_token(self, token, source, user):
+        """Return the author IDs a valid cleanup token issued for ``source`` lists."""
+        if not isinstance(token, str) or not token:
+            return []
+        try:
+            data = signing.loads(token, salt=self.author_cleanup_salt)
+        except signing.BadSignature:
+            return []
+        if not isinstance(data, dict):
+            return []
+        if data.get("source") != source.pk or data.get("user") != user.pk:
+            return []
+        author_ids = data.get("authors")
+        if not isinstance(author_ids, list):
+            return []
+        return [author_id for author_id in author_ids if isinstance(author_id, int)]
 
 
 class SourceCreateAPIView(APIView):

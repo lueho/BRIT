@@ -158,6 +158,20 @@
             <span class="text-muted">Unlinked material</span>
           {% endif %}
         </div>
+        {% if sample_authors %}
+          <div class="small text-muted my-3">
+            <div class="sdv2-meta-label mb-1">Corresponding authors</div>
+            {% for sample_author in sample_authors %}
+              {% with author=sample_author.author %}
+                <div class="mb-1">
+                  <span class="fw-semibold">{{ author }}</span>
+                  {% if author.institution %}<span>({{ author.institution }})</span>{% endif %}
+                  {% if author.contact_email %}<a class="text-break" href="mailto:{{ author.contact_email }}">{{ author.contact_email }}</a>{% endif %}
+                </div>
+              {% endwith %}
+            {% endfor %}
+          </div>
+        {% endif %}
         <ul class="sdv2-hero-meta" aria-label="Sample metadata">
           {% if object.series %}
             <li>
@@ -217,6 +231,12 @@
             <li>
               <span class="sdv2-meta-label">Lab</span>
               {{ object.analysis_laboratory }}
+            </li>
+          {% endif %}
+          {% if object.owner %}
+            <li>
+              <span class="sdv2-meta-label">Editor</span>
+              {{ object.owner.username|default:object.owner }}
             </li>
           {% endif %}
         </ul>
