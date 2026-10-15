@@ -37,17 +37,17 @@ Base model for globally accessible objects that don't require ownership tracking
 
 BRIT uses a centralized permission system for `UserCreatedObject` models with automatic permission creation and management.
 
-### Automatic Permission Creation (legacy runtime)
+### Permission Rows and Role Provisioning
 
 **How it works:**
 
-1. **Signal-based creation**: A `post_migrate` signal handler in `utils/object_management/signals.py` automatically creates `can_moderate_<model>` permissions for all `UserCreatedObject` subclasses.
+1. **Signal-based creation**: A `post_migrate` signal handler in `utils/object_management/signals.py` creates `can_moderate_<model>` permission rows for every reviewable model in the explicit policy registry (`utils/object_management/registry.py`).
 
 2. **Runs everywhere**: The signal runs in all environments (development, production, and **tests**) to ensure consistent behavior.
 
 3. **Idempotent**: Uses `get_or_create()` to safely handle multiple executions without errors.
 
-4. **Group assignment**: Permissions are automatically assigned to the moderators group (configurable via `settings.REVIEW_MODERATORS_GROUP_NAME`, defaults to `"moderators"`).
+4. **No group assignment**: The signal never creates groups or assigns permissions. Managed roles (`registered`, `editors`, `librarians`, the moderators group named by `settings.REVIEW_MODERATORS_GROUP_NAME`, and `administrators`) are reconciled from the manifest in `users/roles.py` by `python manage.py sync_roles` (dry-run report), `sync_roles --apply` (add missing grants) or `sync_roles --check` (fail on drift).
 
 **Example:**
 
@@ -55,7 +55,7 @@ For a model `Collection(UserCreatedObject)`:
 - Permission codename: `can_moderate_collection`
 - Permission name: `"Can moderate collections"`
 - Content type: Links to the `Collection` model
-- Assigned to: The `moderators` group
+- Granted to: The moderators group after `sync_roles --apply`
 
 ### Permission Naming Convention
 
@@ -72,7 +72,7 @@ All moderation permissions follow this pattern:
 REVIEW_MODERATORS_GROUP_NAME = "moderators"  # Default group for moderators
 ```
 
-**No manual setup required** - permissions are created automatically during migrations.
+**Setup:** migrations create the permission rows; run `python manage.py sync_roles --apply` after migrating to grant them to the managed roles.
 
 ### Usage in Code
 
@@ -259,12 +259,12 @@ class MyViewSet(UserCreatedObjectViewSet):
    ↓
 3. ensure_moderation_permissions() executes
    ↓
-4. Iterates all UserCreatedObject subclasses
+4. Iterates registered reviewable models
    ↓
 5. Creates can_moderate_<model> permissions
-   ↓
-6. Assigns to moderators group
 ```
+
+Group grants are applied separately by `python manage.py sync_roles --apply`.
 
 ### Files
 
