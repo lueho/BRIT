@@ -7249,3 +7249,53 @@ class CollectionDetailV2LayoutTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "sdv2-hero")
         self.assertNotContains(response, "detail-layout-card")
+
+
+class CollectionPropertyValueDetailV2LayoutTestCase(TestCase):
+    """The CPV detail page uses the shared ``detail_v2`` (sdv2) layout."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="v2-cpv-owner")
+        cls.collection = Collection.objects.create(
+            owner=cls.owner,
+            valid_from=date(2020, 1, 1),
+            valid_until=date(2022, 12, 31),
+            publication_status="published",
+        )
+        cls.prop = Property.objects.create(
+            name="Specific waste collected (v2)", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="V2 Indicator Unit", publication_status="published"
+        )
+        cls.cpv = CollectionPropertyValue.objects.create(
+            collection=cls.collection,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2015,
+            average=12.3456789,
+            publication_status="published",
+        )
+        cls.url = reverse("collectionpropertyvalue-detail", kwargs={"pk": cls.cpv.pk})
+
+    def test_detail_uses_v2_layout(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="sdv2"')
+        self.assertContains(response, "sdv2-hero")
+        self.assertNotContains(response, "detail-layout-card")
+        self.assertNotContains(response, 'id="options-pane"')
+
+    def test_value_is_rounded_for_display(self):
+        response = self.client.get(self.url)
+
+        self.assertContains(response, "12.3")
+        self.assertNotContains(response, "12.345")
+
+    def test_out_of_period_year_uses_subtle_indicator(self):
+        response = self.client.get(self.url)
+
+        self.assertContains(response, "outside the collection validity period")
+        self.assertNotContains(response, "fa-triangle-exclamation")

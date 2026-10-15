@@ -149,12 +149,6 @@
       {{ object.get_participation_policy_display|capfirst }}
     </li>
   {% endif %}
-  {% if object.owner %}
-    <li>
-      <span class="sdv2-meta-label">Editor</span>
-      {{ object.owner.username|default:object.owner }}
-    </li>
-  {% endif %}
 {% endblock hero_meta_items %}
 {% block hero_media %}
   {% if not review_mode %}
@@ -417,38 +411,7 @@
         </div>
       </div>
       <ul class="mb-0">
-        {% for source in all_sources %}
-          <li>
-            {% if source.type == "waste_flyer" %}
-              <i class="fas fa-file-alt text-muted"></i>
-              <span class="badge bg-secondary text-white me-2">Waste Flyer</span>
-              <a href="{{ source.url }}"
-                 target="_blank"
-                 rel="noopener noreferrer"
-                 class="source-url-line js-compact-url">
-                <span class="source-url-label">{{ source.url }}</span>
-                <i class="fas fa-external-link-alt ms-1 small"></i>
-              </a>
-              {% if "web.archive.org" in source.url %}<span class="badge text-bg-light border ms-2">Archived</span>{% endif %}
-            {% else %}
-              <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
-              {% if source.title %}- {{ source.title }}{% endif %}
-              {% if source.year %}({{ source.year }}){% endif %}
-              {% if source.url %}
-                <br>
-                <span class="text-muted small source-url-meta">
-                  <a href="{{ source.url }}"
-                     target="_blank"
-                     rel="noopener noreferrer"
-                     class="source-url-line js-compact-url">
-                    <i class="fas fa-external-link-alt"></i>
-                    <span class="source-url-label">{{ source.url }}</span>
-                  </a>
-                </span>
-              {% endif %}
-            {% endif %}
-          </li>
-        {% endfor %}
+        {% include "waste_collection/includes/source_list_items.html" with sources=all_sources %}
       </ul>
     </section>
   {% endif %}
