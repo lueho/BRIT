@@ -173,10 +173,16 @@ def object_access_routes(user, obj):
         if parent is not None:
             obj = parent
 
+    public_routes = []
+    if getattr(obj, "publication_status", None) == "published":
+        public_routes.append("published (public read)")
+    if getattr(obj, "publication_status", None) == "archived":
+        public_routes.append("archived (public historical read)")
+
     routes = []
     actor = _actor(user)
     if not actor.active:
-        return routes
+        return public_routes
     if actor.admin:
         routes.append("administrator")
     if is_owner(user, obj):
@@ -198,10 +204,7 @@ def object_access_routes(user, obj):
             pass
     if is_moderator(user, type(obj)):
         routes.append("moderator")
-    if getattr(obj, "publication_status", None) == "published":
-        routes.append("published (public read)")
-    if getattr(obj, "publication_status", None) == "archived":
-        routes.append("archived (public historical read)")
+    routes.extend(public_routes)
     if not routes:
         routes.append("read access")
     if generated:
@@ -209,23 +212,52 @@ def object_access_routes(user, obj):
     return routes
 
 
+EDITOR_GRANTS_VERSION_KEY = "object_management:editor_grants_version"
+_UNVERSIONED = object()
+
+
+def _editor_grants_version():
+    from django.core.cache import cache
+
+    try:
+        return cache.get(EDITOR_GRANTS_VERSION_KEY)
+    except Exception:
+        return _UNVERSIONED
+
+
+def invalidate_editor_grant_caches():
+    """Invalidate every per-user editor-grant cache after a grant or
+    group-membership change, including on user instances already held."""
+    import uuid
+
+    from django.core.cache import cache
+
+    try:
+        cache.set(EDITOR_GRANTS_VERSION_KEY, uuid.uuid4().hex, None)
+    except Exception:
+        pass
+
+
 def _editor_grant_ids(model, user):
     from django.contrib.contenttypes.models import ContentType
 
+    from .models import editor_grant_object_ids
+
     content_type = ContentType.objects.get_for_model(model)
-    cache = getattr(user, "_editor_grant_cache", None)
-    if not isinstance(cache, dict):
-        cache = {}
+    version = _editor_grants_version()
+    if version is _UNVERSIONED:
+        return set(editor_grant_object_ids(model, user))
+    cache = getattr(user, "_policy_editor_grant_cache", None)
+    if not isinstance(cache, dict) or cache.get("version") != version:
+        cache = {"version": version, "ids": {}}
         try:
-            user._editor_grant_cache = cache
+            user._policy_editor_grant_cache = cache
         except Exception:
             pass
-    ids = cache.get(content_type.pk)
+    ids = cache["ids"].get(content_type.pk)
     if ids is None:
-        from .models import editor_grant_object_ids
-
         ids = set(editor_grant_object_ids(model, user))
-        cache[content_type.pk] = ids
+        cache["ids"][content_type.pk] = ids
     return ids
 
 
@@ -903,7 +935,8 @@ def reviewable_queryset(user, queryset):
     """Return rows of ``queryset`` the user may review (moderate).
 
     Restricted to records in ``review`` status for users holding the model's
-    moderation permission or administrator status.
+    moderation permission or administrator status, excluding the user's own
+    records, which four-eyes review never lets them resolve.
     """
     model = queryset.model
     policy = model_policy(model)
@@ -917,6 +950,9 @@ def reviewable_queryset(user, queryset):
     ):
         return queryset.none()
     queryset = queryset.filter(publication_status=_STATUS_REVIEW)
+    if actor.pk is not None:
+        # Four-eyes: own submissions can be neither approved nor rejected.
+        queryset = queryset.exclude(owner_id=actor.pk)
     profile = generated_profile(model)
     if profile is not None:
         # Review queues hold raw evidence only; projections have no
