@@ -3,6 +3,8 @@
 This page is an implementation map for developers working on
 `UserCreatedObject` flows.
 
+> **Migration status — legacy runtime reference:** This page describes the pre-migration implementation at the start of the authorization review stack. It is not a second policy specification and may lag later migration parts. The [canonical authorization contract](security_permission_validation.md) defines the target rules; in particular, staff status alone must not grant application moderation. Update the corresponding runtime notes as their adapters migrate.
+
 The **authoritative policy tables and state diagrams** live in:
 
 - [`security_permission_validation.md`](security_permission_validation.md)
@@ -116,6 +118,34 @@ UI/API request
   decline/withdraw.
 
 ## Known pending boundaries
+
+## Legacy moderator checks (pre-migration)
+
+- Per-model moderation rights use `can_moderate_<model>`.
+- Permissions are created/maintained via `post_migrate` signal logic in
+  `utils/object_management/signals.py`.
+- At the pre-migration baseline, moderation checks treat staff users as moderators. This describes legacy runtime behavior to remove; it is not the target contract, where `is_staff` supplies Django-admin eligibility only.
+
+Testing tip:
+
+```python
+# Fetch auto-created permission (do not create duplicates)
+permission = Permission.objects.get(
+    codename="can_moderate_mymodel",
+    content_type=content_type,
+)
+```
+
+## Template usage
+
+```django
+{% load moderation_tags %}
+{% object_policy object as policy %}
+
+{% if policy.can_submit_review %}
+  <a href="{{ object.submit_for_review_url }}">Submit for review</a>
+{% endif %}
+```
 
 - Revision-safe review is implemented in the shared boundary
   (`utils/object_management/services.py`): `content_mutation` locks the
