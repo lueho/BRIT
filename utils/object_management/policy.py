@@ -217,12 +217,19 @@ _UNVERSIONED = object()
 
 
 def _editor_grants_version():
+    import uuid
+
     from django.core.cache import cache
 
     try:
-        return cache.get(EDITOR_GRANTS_VERSION_KEY)
+        version = cache.get(EDITOR_GRANTS_VERSION_KEY)
+        if version is None:
+            cache.add(EDITOR_GRANTS_VERSION_KEY, uuid.uuid4().hex, None)
+            version = cache.get(EDITOR_GRANTS_VERSION_KEY)
     except Exception:
         return _UNVERSIONED
+    # An unreadable version store must not freeze cached grants.
+    return _UNVERSIONED if version is None else version
 
 
 def invalidate_editor_grant_caches():
@@ -243,13 +250,18 @@ def _editor_grant_ids(model, user):
 
     from .models import editor_grant_object_ids
 
+    from ..transaction_scope import current_scope
+
     content_type = ContentType.objects.get_for_model(model)
     version = _editor_grants_version()
     if version is _UNVERSIONED:
         return set(editor_grant_object_ids(model, user))
+    # The transaction scope keeps grants read inside an atomic block from
+    # outliving its rollback.
+    stamp = (version, current_scope())
     cache = getattr(user, "_policy_editor_grant_cache", None)
-    if not isinstance(cache, dict) or cache.get("version") != version:
-        cache = {"version": version, "ids": {}}
+    if not isinstance(cache, dict) or cache.get("stamp") != stamp:
+        cache = {"stamp": stamp, "ids": {}}
         try:
             user._policy_editor_grant_cache = cache
         except Exception:

@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser, Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.test import TestCase
 
 from utils.properties.models import Property
@@ -887,3 +888,30 @@ class PolicyReviewFindingRegressionTests(TestCase):
                 self.assertFalse(decision.allowed)
                 self.assertEqual(decision.reason, "four_eyes_required")
         self.assertTrue(decide(self.moderator, "approve", self.review_property).allowed)
+
+    def test_rolled_back_grant_does_not_survive_in_cached_user_instance(self):
+        editor = User.objects.get(pk=self.editor.pk)
+        with self.assertRaises(RuntimeError):
+            with transaction.atomic():
+                self.private_property.add_editor(self.editor)
+                self.assertTrue(decide(editor, "read", self.private_property).allowed)
+                raise RuntimeError("rollback")
+        self.assertFalse(decide(editor, "read", self.private_property).allowed)
+
+    def test_editor_grants_are_not_cached_while_version_store_is_unavailable(self):
+        class UnavailableCache:
+            def get(self, *args, **kwargs):
+                return None
+
+            def add(self, *args, **kwargs):
+                return False
+
+            def set(self, *args, **kwargs):
+                return None
+
+        self.private_property.add_editor(self.editor)
+        editor = User.objects.get(pk=self.editor.pk)
+        with patch("django.core.cache.cache", UnavailableCache()):
+            self.assertTrue(decide(editor, "read", self.private_property).allowed)
+            self.private_property.remove_editor(self.editor)
+            self.assertFalse(decide(editor, "read", self.private_property).allowed)
