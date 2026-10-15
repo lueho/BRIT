@@ -2,7 +2,7 @@ from django.conf import settings
 
 from utils.object_management.models import get_default_owner
 
-from .models import MaterialComponent, MaterialComponentGroup
+from .models import MaterialCategory, MaterialComponent, MaterialComponentGroup
 
 INITIALIZATION_DEPENDENCIES = ["object_management"]
 
@@ -41,6 +41,19 @@ def ensure_initial_data(stdout=None):
     other_component, _ = MaterialComponent.objects.get_or_create(
         name=other_component_name, defaults={"owner": owner}
     )
+
+    if not MaterialCategory.objects.filter(name="Product", owner=owner).exists():
+        MaterialCategory.objects.create(
+            name="Product",
+            description=(
+                "A product is the output of a production process and is "
+                "intentionally created from one or more materials to fulfil "
+                "a specific function. It is a good with an intended positive "
+                "market value."
+            ),
+            publication_status="published",
+            owner=owner,
+        )
 
     if stdout:
         stdout.write(f'Ensured component group "{group.name}" exists')

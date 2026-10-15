@@ -7,9 +7,10 @@ def ensure_initial_data(stdout=None):
     """
     Ensures all required initial data for the utils.properties app exists.
     Idempotent: safe to run multiple times.
-    Creates the "No unit" unit for the default owner.
+    Creates the "No unit" unit and the "number of collection points" property
+    for the default owner.
     """
-    from .models import Unit
+    from .models import Property, Unit
 
     owner = get_default_owner()
     no_unit, created = Unit.objects.get_or_create(
@@ -18,6 +19,15 @@ def ensure_initial_data(stdout=None):
     if not created and not no_unit.dimensionless:
         no_unit.dimensionless = True
         no_unit.save(update_fields=["dimensionless"])
+    if not Property.objects.filter(
+        owner=owner, name="number of collection points"
+    ).exists():
+        point_property = Property.objects.create(
+            owner=owner,
+            name="number of collection points",
+            publication_status="published",
+        )
+        point_property.allowed_units.add(no_unit)
     if stdout:
         print(
             f"Ensured unit 'No unit' for owner '{owner.username}' exists.", file=stdout

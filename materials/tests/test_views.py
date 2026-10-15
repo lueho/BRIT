@@ -6976,12 +6976,15 @@ class EmptyStateViewsTestCase(TestCase):
             publication_status="published",
         )
         default_group = MaterialComponentGroup.objects.default()
+        unit_percent, _ = Unit.objects.get_or_create(
+            owner=self.staff_user, name="%", defaults={"symbol": "percent"}
+        )
         ComponentMeasurement.objects.create(
             owner=self.staff_user,
             sample=sample,
             group=default_group,
             component=MaterialComponent.objects.default(),
-            unit=Unit.objects.filter(name="%").first(),
+            unit=unit_percent,
             average=Decimal("100.0"),
         )
 

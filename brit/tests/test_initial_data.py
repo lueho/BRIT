@@ -30,7 +30,8 @@ from sources.waste_collection.models import (
 )
 from users.utils import ensure_initial_data as ensure_users_data
 from utils.object_management.models import get_default_owner
-from utils.properties.models import Unit
+from utils.properties.models import Property, Unit
+from utils.properties.utils import ensure_initial_data as ensure_properties_data
 
 
 class InitializerDependencyOrderingTests(SimpleTestCase):
@@ -294,6 +295,118 @@ class FullInitialDataSeedingTests(TestCase):
             )
         admin.refresh_from_db()
         self.assertTrue(admin.check_password("adm-secret"))
+
+    @override_settings(DEFAULT_OBJECT_OWNER_USERNAME="defaults-owner")
+    def test_full_initialization_seeds_point_property_and_product_category(self):
+        environment = {
+            "ADMIN_USERNAME": "defaults-admin",
+            "ADMIN_PASSWORD": "adm-secret",
+        }
+        self._run_all_initializers(environment)
+
+        owner = User.objects.get(username="defaults-owner")
+        no_unit = Unit.objects.get(owner=owner, name="No unit")
+        point_property = Property.objects.get(
+            owner=owner, name="number of collection points"
+        )
+        self.assertEqual(point_property.publication_status, "published")
+        self.assertEqual(list(point_property.allowed_units.all()), [no_unit])
+        product = MaterialCategory.objects.get(owner=owner, name="Product")
+        self.assertEqual(product.publication_status, "published")
+        self.assertEqual(
+            product.description,
+            "A product is the output of a production process and is "
+            "intentionally created from one or more materials to fulfil "
+            "a specific function. It is a good with an intended positive "
+            "market value.",
+        )
+
+    @override_settings(DEFAULT_OBJECT_OWNER_USERNAME="defaults-owner")
+    def test_initializers_do_not_reuse_or_overwrite_existing_rows(self):
+        environment = {
+            "ADMIN_USERNAME": "defaults-admin",
+            "ADMIN_PASSWORD": "adm-secret",
+        }
+        foreign = User.objects.create(username="foreign-owner")
+        foreign_product = MaterialCategory.objects.create(
+            owner=foreign,
+            name="Product",
+            description="foreign product description",
+        )
+        foreign_property = Property.objects.create(
+            owner=foreign, name="number of collection points"
+        )
+
+        self._run_all_initializers(environment)
+
+        owner = User.objects.get(username="defaults-owner")
+        foreign_product.refresh_from_db()
+        foreign_property.refresh_from_db()
+        self.assertEqual(foreign_product.description, "foreign product description")
+        self.assertEqual(
+            MaterialCategory.objects.filter(owner=owner, name="Product").count(), 1
+        )
+        self.assertEqual(
+            Property.objects.filter(
+                owner=owner, name="number of collection points"
+            ).count(),
+            1,
+        )
+
+        product = MaterialCategory.objects.get(owner=owner, name="Product")
+        point_property = Property.objects.get(
+            owner=owner, name="number of collection points"
+        )
+        custom_unit = Unit.objects.create(owner=owner, name="custom unit")
+        point_property.allowed_units.set([custom_unit])
+        product.description = "custom product description"
+        product.publication_status = "private"
+        product.save()
+        ids = (product.pk, point_property.pk, custom_unit.pk)
+
+        self._run_all_initializers(environment)
+
+        product.refresh_from_db()
+        point_property.refresh_from_db()
+        self.assertEqual(product.description, "custom product description")
+        self.assertEqual(product.publication_status, "private")
+        self.assertEqual(list(point_property.allowed_units.all()), [custom_unit])
+        self.assertEqual(ids, (product.pk, point_property.pk, custom_unit.pk))
+
+    @override_settings(DEFAULT_OBJECT_OWNER_USERNAME="defaults-owner")
+    def test_initializers_tolerate_duplicate_matching_rows(self):
+        environment = {
+            "ADMIN_USERNAME": "defaults-admin",
+            "ADMIN_PASSWORD": "adm-secret",
+        }
+        self._run_all_initializers(environment)
+
+        owner = User.objects.get(username="defaults-owner")
+        MaterialCategory.objects.create(
+            owner=owner, name="Product", description="duplicate product"
+        )
+        Property.objects.create(owner=owner, name="number of collection points")
+
+        self._run_all_initializers(environment)
+
+        self.assertEqual(
+            MaterialCategory.objects.filter(owner=owner, name="Product").count(), 2
+        )
+        self.assertEqual(
+            Property.objects.filter(
+                owner=owner, name="number of collection points"
+            ).count(),
+            2,
+        )
+
+    @override_settings(DEFAULT_OBJECT_OWNER_USERNAME="defaults-owner")
+    def test_properties_initializer_keeps_no_unit_return_contract(self):
+        User.objects.create(username="defaults-owner")
+
+        result = ensure_properties_data()
+
+        self.assertIn("no_unit", result)
+        self.assertEqual(result["no_unit"].name, "No unit")
 
     def test_first_waste_component_after_initialization_gets_category(self):
         call_command("ensure_initial_data", stdout=io.StringIO())
