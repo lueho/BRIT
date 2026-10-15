@@ -248,9 +248,8 @@ def invalidate_editor_grant_caches():
 def _editor_grant_ids(model, user):
     from django.contrib.contenttypes.models import ContentType
 
-    from .models import editor_grant_object_ids
-
     from ..transaction_scope import current_scope
+    from .models import editor_grant_object_ids
 
     content_type = ContentType.objects.get_for_model(model)
     version = _editor_grants_version()
