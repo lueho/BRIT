@@ -130,8 +130,13 @@ UI/API request
   refactor is not yet verified green across the whole suite.
 - Specialized collection create actions declare their model targets in
   `action_create_models` and authorize those targets through the shared
-  core; importer persistence and existing-record reuse remain separately
-  tracked pending boundaries.
+  core; the programmatic `property-value/create` and
+  `aggregated-property-value/create` endpoints persist through
+  `sources/waste_collection/services.py`, which locks the actor and parent
+  rows, preflights source/flyer/property/unit references, and routes
+  relation edits through `content_mutation`. Workbook-importer persistence
+  and the HTML/formset write paths remain separately tracked pending
+  boundaries.
 - Generated collection property values are read-only projections of their
   linked raw source (`is_derived`/`derived_from` record profile
   `generated`); schema, source-governed authorization, generator provenance

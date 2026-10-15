@@ -1731,7 +1731,7 @@ class CollectionMutationApiTestCase(APITestCase):
             (
                 index
                 for index, sql in enumerate(sqls)
-                if f'FROM "{user_table}"' in sql and "FOR UPDATE" in sql
+                if f'FROM "{user_table}"' in sql and "FOR NO KEY UPDATE" in sql
             ),
             None,
         )

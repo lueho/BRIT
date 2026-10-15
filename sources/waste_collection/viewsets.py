@@ -2,7 +2,6 @@ import logging
 import time
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import connection, transaction
@@ -38,7 +37,6 @@ from sources.waste_collection.models import (
     CollectionPropertyValue,
     CollectionSeason,
     Collector,
-    WasteFlyer,
 )
 from sources.waste_collection.serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
@@ -57,6 +55,13 @@ from sources.waste_collection.serializers import (
     CollectionResearchSerializer,
     CollectorGeometrySerializer,
     WasteCollectionGeometrySerializer,
+)
+from sources.waste_collection.services import (
+    create_or_reuse_aggregated_collection_property_value,
+    create_or_reuse_collection_property_value,
+    flyer_title,
+    resolve_evidence_definitions,
+    resolve_flyer,
 )
 from utils.object_management.permissions import apply_scope_filter
 from utils.object_management.policy import (
@@ -473,13 +478,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     @staticmethod
     def _flyer_title(url):
         """Return a short title derived from the URL hostname (max 255 chars)."""
-        from urllib.parse import urlparse
-
-        try:
-            hostname = urlparse(url).hostname or url
-        except Exception:
-            hostname = url
-        return hostname[:255]
+        return flyer_title(url)
 
     @staticmethod
     def _require_readable_reference(actor, obj, label):
@@ -500,60 +499,13 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 cls._require_readable_reference(actor, value, label)
 
     @staticmethod
-    def _check_flyer_urls(actor, flyer_urls):
-        """Pre-gate flyer URLs for importer-driven attaches.
-
-        Returns the URLs that will create a new flyer row. An existing flyer
-        must be readable by the actor; creating a new row requires the
-        actor's own ``add`` capability.
-        """
-        new_urls = []
-        for url in flyer_urls or []:
-            if len(url) > 2083:
-                continue
-            existing = WasteFlyer.objects.filter(url=url).order_by("id").first()
-            if existing is not None:
-                if not decide(actor, "read", existing).allowed:
-                    raise PermissionDenied("The referenced flyer is not accessible.")
-                continue
-            if not decide(actor, "create", WasteFlyer).allowed:
-                raise PermissionDenied(
-                    "You do not have permission to add waste flyers."
-                )
-            new_urls.append(url)
-        return new_urls
-
-    @staticmethod
-    def _record_new_flyers(actor, flyer_urls):
-        for url in flyer_urls:
-            flyer = WasteFlyer.objects.filter(url=url).order_by("id").first()
-            if flyer is not None:
-                record_creation(actor, flyer)
-
-    @staticmethod
     def _resolve_flyer(actor, url):
         """Return a flyer for ``url`` the actor may reference.
 
         An existing row must be readable by the actor; a new row requires
         the actor's own ``add`` capability and is audited as a creation.
         """
-        flyer, created = WasteFlyer.objects.get_or_create_by_url(
-            url=url,
-            defaults={
-                "owner": actor,
-                "title": CollectionViewSet._flyer_title(url),
-                "publication_status": "private",
-            },
-        )
-        if created:
-            decision = decide(actor, "create", WasteFlyer)
-            if not decision.allowed:
-                raise PermissionDenied(
-                    "You do not have permission to add waste flyers."
-                )
-            record_creation(actor, flyer)
-        elif not decide(actor, "read", flyer).allowed:
-            raise PermissionDenied("The referenced flyer is not accessible.")
+        flyer, _created = resolve_flyer(actor, url)
         return flyer
 
     @classmethod
@@ -591,19 +543,6 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 collection.flyers.set(flyers)
             else:
                 collection.flyers.add(*flyers)
-
-    @classmethod
-    def _attach_sources_and_flyers_to_property_value(
-        cls, obj, sources, flyer_urls, *, actor
-    ):
-        cls._require_readable_references(actor, [("source", sources)])
-        if sources:
-            obj.sources.add(*sources)
-
-        for url in flyer_urls:
-            if len(url) > 2083:
-                continue
-            obj.sources.add(cls._resolve_flyer(actor, url))
 
     def _submit_for_review_if_requested(self, request, collection, submit_for_review):
         """Submit ``collection`` for review through the transition service."""
@@ -1033,111 +972,44 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         data = serializer.validated_data
 
         target_collection = data["collection"]
-        self._require_readable_reference(actor, target_collection, "collection")
-        anchor_collection = target_collection.version_anchor or target_collection
-        self._require_create_capability(
-            actor,
-            "create_collection_property_value",
-            parent=anchor_collection,
-        )
-        new_flyer_urls = self._check_flyer_urls(actor, data.get("flyer_urls", []))
-
-        with transaction.atomic():
-            importer = CollectionImporter(
-                owner=actor,
-                publication_status="private",
+        try:
+            prop, unit = resolve_evidence_definitions(
+                actor,
+                property_id=data["property_id"],
+                unit_name=data["unit_name"],
             )
-            importer._load_lookups()
-            prop = importer._properties.get(data["property_id"])
-            unit = importer._units.get(data["unit_name"])
-            if prop is None:
-                return Response(
-                    {"detail": f"Property id={data['property_id']} not found."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if unit is None:
-                return Response(
-                    {"detail": f"Unit '{data['unit_name']}' not found."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            existing_cpv = (
-                CollectionPropertyValue.objects.filter(
-                    collection=anchor_collection,
-                    property=prop,
-                    unit=unit,
-                    year=data["year"],
-                )
-                .order_by("pk")
-                .first()
-            )
-
-            cpv_stats = {
-                "cpv_created": 0,
-                "cpv_unchanged": 0,
-                "cpv_skipped": 0,
-                "flyers_created": 0,
-                "warnings": [],
-            }
-            importer._import_property_value(
-                anchor_collection,
-                {
-                    "property_id": data["property_id"],
-                    "unit_name": data["unit_name"],
-                    "year": data["year"],
-                    "average": data["average"],
-                    "standard_deviation": data.get("standard_deviation"),
-                    "flyer_urls": data.get("flyer_urls", []),
-                },
-                cpv_stats,
-                record={},
-            )
-
-            cpv = (
-                existing_cpv
-                or CollectionPropertyValue.objects.filter(
-                    collection=anchor_collection,
-                    property=prop,
-                    unit=unit,
-                    year=data["year"],
-                    owner=actor,
-                )
-                .order_by("-pk")
-                .first()
-            )
-            if cpv is None:
-                return Response(
-                    {"detail": "CollectionPropertyValue could not be created."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            if existing_cpv is None:
-                record_creation(actor, cpv)
-                self._record_new_flyers(actor, new_flyer_urls)
-            self._attach_sources_and_flyers_to_property_value(
-                cpv,
+            result = create_or_reuse_collection_property_value(
+                actor,
+                collection=target_collection,
+                measurement_property=prop,
+                unit=unit,
+                year=data["year"],
+                average=data["average"],
+                standard_deviation=data.get("standard_deviation"),
                 sources=data.get("sources", []),
-                flyer_urls=[],
-                actor=actor,
+                flyer_urls=data.get("flyer_urls", []),
+                submit_for_review=data.get("submit_for_review", True),
             )
-            submitted = self._submit_object_for_review_if_requested(
-                request,
-                cpv,
-                submit_for_review=(
-                    data.get("submit_for_review", True) and existing_cpv is None
-                ),
-            )
+        except DjangoValidationError as exc:
+            raise ValidationError(
+                getattr(exc, "message_dict", None) or exc.messages
+            ) from exc
 
+        cpv = result.value
         response_payload = self._serialize_user_created_object_response(
             cpv,
-            submitted,
+            result.submitted,
             detail_url_name="collectionpropertyvalue-detail",
         )
-        response_payload.update(cpv_stats)
         response_payload.update(
             {
+                "cpv_created": int(result.created),
+                "cpv_unchanged": int(not result.created),
+                "cpv_skipped": 0,
+                "flyers_created": result.flyers_created,
+                "warnings": [],
                 "collection_id": target_collection.pk,
-                "anchor_collection_id": anchor_collection.pk,
+                "anchor_collection_id": cpv.collection_id,
                 "is_derived": cpv.is_derived,
             }
         )
@@ -1165,93 +1037,40 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 {"detail": "At least one collection is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        self._require_create_capability(
-            actor,
-            "create_aggregated_collection_property_value",
-            parent=collections,
-        )
-
-        importer = CollectionImporter(
-            owner=actor,
-            publication_status=(
-                "review" if data.get("submit_for_review", True) else "private"
-            ),
-        )
-        importer._load_lookups()
-        prop = importer._properties.get(data["property_id"])
-        unit = importer._units.get(data["unit_name"])
-        if prop is None:
-            return Response(
-                {"detail": f"Property id={data['property_id']} not found."},
-                status=status.HTTP_400_BAD_REQUEST,
+        try:
+            prop, unit = resolve_evidence_definitions(
+                actor,
+                property_id=data["property_id"],
+                unit_name=data["unit_name"],
             )
-        if unit is None:
-            return Response(
-                {"detail": f"Unit '{data['unit_name']}' not found."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        self._check_flyer_urls(actor, data.get("flyer_urls", []))
-        requested_collection_ids = sorted(collection.pk for collection in collections)
-
-        with transaction.atomic():
-            # The dedup key spans the collections M2M, so no unique constraint
-            # can enforce it; serialize find-or-create per owner instead.
-            get_user_model().objects.select_for_update().filter(pk=actor.pk).exists()
-            existing_acpv = None
-            for candidate in AggregatedCollectionPropertyValue.objects.filter(
-                owner=actor,
-                property=prop,
+            result = create_or_reuse_aggregated_collection_property_value(
+                actor,
+                collections=collections,
+                measurement_property=prop,
                 unit=unit,
                 year=data["year"],
-            ).prefetch_related("collections"):
-                candidate_ids = sorted(
-                    collection.pk for collection in candidate.collections.all()
-                )
-                if candidate_ids == requested_collection_ids:
-                    existing_acpv = candidate
-                    break
-
-            if existing_acpv is None:
-                acpv = AggregatedCollectionPropertyValue.objects.create(
-                    name=f"Aggregated {prop.name} {data['year']}",
-                    owner=actor,
-                    publication_status="private",
-                    property=prop,
-                    unit=unit,
-                    year=data["year"],
-                    average=data["average"],
-                    standard_deviation=data.get("standard_deviation"),
-                )
-                acpv.collections.set(collections)
-                created = True
-                record_creation(actor, acpv)
-            else:
-                acpv = existing_acpv
-                created = False
-
-            self._attach_sources_and_flyers_to_property_value(
-                acpv,
+                average=data["average"],
+                standard_deviation=data.get("standard_deviation"),
                 sources=data.get("sources", []),
                 flyer_urls=data.get("flyer_urls", []),
-                actor=actor,
-            )
-            submitted = self._submit_object_for_review_if_requested(
-                request,
-                acpv,
                 submit_for_review=data.get("submit_for_review", True),
             )
+        except DjangoValidationError as exc:
+            raise ValidationError(
+                getattr(exc, "message_dict", None) or exc.messages
+            ) from exc
 
+        acpv = result.value
         response_payload = self._serialize_user_created_object_response(
             acpv,
-            submitted,
+            result.submitted,
             detail_url_name="aggregatedcollectionpropertyvalue-detail",
         )
         response_payload.update(
             {
-                "created": created,
-                "skipped": not created,
-                "collection_ids": requested_collection_ids,
+                "created": result.created,
+                "skipped": not result.created,
+                "collection_ids": sorted(acpv.collections.values_list("pk", flat=True)),
             }
         )
         return Response(response_payload, status=status.HTTP_201_CREATED)
