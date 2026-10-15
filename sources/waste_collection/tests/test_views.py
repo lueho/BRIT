@@ -7164,3 +7164,88 @@ class CollectionDetailBackLinkTestCase(TestCase):
 
                     self.assertNotContains(response, "Back to results")
                     self.assertNotContains(response, "?next=javascript")
+
+
+class CollectionDetailV2LayoutTestCase(TestCase):
+    """The collection detail page uses the shared ``detail_v2`` (sdv2) layout."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="v2-collection-owner")
+        cls.catchment = CollectionCatchment.objects.create(
+            name="V2 Catchment", publication_status="published"
+        )
+        cls.collector = Collector.objects.create(
+            name="V2 Collector", publication_status="published"
+        )
+        cls.system = CollectionSystem.objects.create(
+            name="V2 Collection System", publication_status="published"
+        )
+        cls.category = WasteCategory.objects.create(
+            name="V2 Biowaste", publication_status="published"
+        )
+        cls.collection = Collection.objects.create(
+            owner=cls.owner,
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.system,
+            waste_category=cls.category,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+        cls.url = reverse("collection-detail", kwargs={"pk": cls.collection.pk})
+
+    def test_detail_uses_v2_layout(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="sdv2"')
+        self.assertContains(response, "sdv2-hero")
+        self.assertContains(
+            response,
+            f'<h1 class="sdv2-hero-title">{self.collection.name}</h1>',
+            html=True,
+        )
+        self.assertContains(response, "sdv2-hero-meta")
+        # The legacy card/options-pane shell is gone.
+        self.assertNotContains(response, "detail-layout-card")
+        self.assertNotContains(response, 'id="options-pane"')
+
+    def test_detail_shows_action_rail_for_authenticated_user(self):
+        staff = User.objects.create_user(username="v2-staff", is_staff=True)
+        self.client.force_login(staff)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="sdv2-rail"')
+        self.assertContains(response, "sdv2-status-pill")
+        self.assertContains(response, "sdv2-actions-menu")
+        self.assertContains(
+            response,
+            reverse("collection-update", kwargs={"pk": self.collection.pk}),
+        )
+
+    def test_detail_renders_map_outside_review_mode(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "map-container")
+        self.assertContains(response, 'id="mapConfig"')
+
+    def test_review_detail_uses_v2_layout(self):
+        staff = User.objects.create_user(username="v2-reviewer", is_staff=True)
+        self.client.force_login(staff)
+        content_type = ContentType.objects.get_for_model(Collection)
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={
+                    "content_type_id": content_type.pk,
+                    "object_id": self.collection.pk,
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sdv2-hero")
+        self.assertNotContains(response, "detail-layout-card")
