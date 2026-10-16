@@ -13,10 +13,9 @@
          target="_blank"
          rel="noopener noreferrer"
          class="source-url-line js-compact-url">
-        <span class="source-url-label">{{ source.url }}</span>
+        <span class="source-url-label">{{ source.url|truncatechars:90 }}</span>
         <i class="fas fa-external-link-alt ms-1 small"></i>
       </a>
-      {% if "web.archive.org" in source.url %}<span class="badge text-bg-light border ms-2">Archived</span>{% endif %}
     {% else %}
       <a href="{{ source.get_absolute_url }}">{{ source.title|default:source.abbreviation }}</a>
       {% if source.title %}<span class="text-muted">({{ source.abbreviation }})</span>{% endif %}
