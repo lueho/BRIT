@@ -54,6 +54,7 @@ class InitializerDependencyOrderingTests(SimpleTestCase):
             "distributions",
             "maps",
             "waste_collection",
+            "waste_atlas",
             "brit",
         ):
             self.assertIn(label, ordered)
