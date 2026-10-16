@@ -10,7 +10,8 @@ from bibliography.models import Source
 from sources.waste_collection.models import Collection, WasteCategory
 from utils.properties.models import Property
 
-from ..models import ReviewAction, UserCreatedObject
+from ..models import ReviewAction, UserCreatedObject, annotate_owner_review_feedback
+from ..review_context import _serialize_review_feedback
 
 
 class ReviewWorkflowModelTests(TestCase):
@@ -236,6 +237,66 @@ class ReviewWorkflowModelTests(TestCase):
 
         self.assertTrue(self.collection.has_review_feedback)
         self.assertEqual(self.collection.latest_review_feedback_action.pk, rejection.pk)
+
+    def test_audit_actions_after_submission_are_not_review_feedback(self):
+        content_type = ContentType.objects.get_for_model(Collection)
+        ReviewAction.objects.create(
+            content_type=content_type,
+            object_id=self.collection.pk,
+            action=ReviewAction.ACTION_SUBMITTED,
+            user=self.owner,
+        )
+        for action in (
+            ReviewAction.ACTION_CREATED,
+            ReviewAction.ACTION_EDITED,
+            ReviewAction.ACTION_DELETED,
+            ReviewAction.ACTION_ARCHIVED,
+        ):
+            ReviewAction.objects.create(
+                content_type=content_type,
+                object_id=self.collection.pk,
+                action=action,
+                user=self.moderator,
+            )
+
+        collection = Collection.objects.get(pk=self.collection.pk)
+        self.assertIsNone(collection.latest_review_feedback_action)
+        self.assertFalse(collection.has_review_feedback)
+
+        annotated = annotate_owner_review_feedback(
+            Collection.objects.filter(pk=self.collection.pk), self.owner
+        ).get()
+        self.assertFalse(annotated.has_review_feedback)
+
+        feedback = _serialize_review_feedback(collection, history_limit=10)
+        self.assertFalse(feedback["has_feedback"])
+        self.assertEqual(feedback["feedback_actions_since_submission"], [])
+
+        comment = ReviewAction.objects.create(
+            content_type=content_type,
+            object_id=self.collection.pk,
+            action=ReviewAction.ACTION_COMMENT,
+            comment="moderator note",
+            user=self.moderator,
+        )
+        ReviewAction.objects.create(
+            content_type=content_type,
+            object_id=self.collection.pk,
+            action=ReviewAction.ACTION_EDITED,
+            user=self.moderator,
+        )
+
+        collection = Collection.objects.get(pk=self.collection.pk)
+        self.assertEqual(collection.latest_review_feedback_action.pk, comment.pk)
+        annotated = annotate_owner_review_feedback(
+            Collection.objects.filter(pk=self.collection.pk), self.owner
+        ).get()
+        self.assertTrue(annotated.has_review_feedback)
+        feedback = _serialize_review_feedback(collection, history_limit=10)
+        self.assertEqual(
+            [item["action"] for item in feedback["feedback_actions_since_submission"]],
+            [ReviewAction.ACTION_COMMENT],
+        )
 
 
 class BreadcrumbLabelModelTests(TestCase):
