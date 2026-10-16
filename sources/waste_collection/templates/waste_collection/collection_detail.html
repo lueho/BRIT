@@ -1,9 +1,9 @@
-{% extends "detail_with_options.html" %}
+{% extends "detail_v2.html" %}
 {% load i18n %}
-{% load moderation_tags %}
 {% load static %}
-{% load file_export_tags %}
 {% load leaflet_tags %}
+{% load file_export_tags %}
+{% load moderation_tags %}
 {% block style_sheets %}
   {{ block.super }}
   <link rel="stylesheet" href="{% static 'css/source_url_display.min.css' %}">
@@ -14,599 +14,451 @@
     <link rel="stylesheet" href="{% static 'css/collection_detail.min.css' %}">
   {% endif %}
 {% endblock style_sheets %}
-{# Confirm texts available to all blocks #}
-{% trans "Are you sure you want to submit this for review?" as submit_confirm %}
-{% trans "Are you sure you want to withdraw this from review?" as withdraw_confirm %}
-{% trans "Are you sure you want to approve this?" as approve_confirm %}
-{% trans "Are you sure you want to reject this?" as reject_confirm %}
-{% block detail_header_badge %}
-  {% include "object_management/review_status_badge.html" with object=object %}
-{% endblock detail_header_badge %}
-{% block detail_header_actions %}
-  <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
-    {% block detail_header_primary_actions %}
-      <div class="btn-group me-2" role="group">
-        {% safe_back_url as back_url %}
-        {% if back_url %}
-          <a class="btn btn-sm btn-outline-secondary"
-             href="{{ back_url }}"
-             rel="nofollow"
-             title="Back to results">
-            <i class="fas fa-arrow-left"></i>
-            <span class="d-none d-md-inline">Back to results</span>
-          </a>
-        {% endif %}
-        {% if not request.GET.review %}
-          {% if object.list_url %}
-            <a class="btn btn-sm btn-outline-secondary"
-               href="{{ object.list_url }}"
-               title="List">
-              <i class="fas fa-list-ul"></i>
-              <span class="d-none d-md-inline">List</span>
-            </a>
-          {% else %}
-            <a class="btn btn-sm btn-outline-secondary"
-               href="{% url 'collection-list' %}"
-               title="List">
-              <i class="fas fa-list-ul"></i>
-              <span class="d-none d-md-inline">List</span>
-            </a>
-          {% endif %}
-        {% endif %}
-        {# Map button logic - handle review mode properly #}
-        {% if review_mode %}
-          {# In review mode, always link to the map view with review scope #}
-          <a class="btn btn-sm btn-outline-secondary"
-             href="{% url 'WasteCollection-review' %}?id={{ object.id }}&load_features=true&scope=review"
-             title="Map">
-            <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
-          </a>
-        {% else %}
-          {# Not in review mode - use original logic #}
-          {% if request.GET.next %}
-            <a class="btn btn-sm btn-outline-secondary"
-               href="{{ request.GET.next }}"
-               title="Map">
-              <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
-            </a>
-          {% else %}
-            {% with scope=object.publication_status %}
-              <a class="btn btn-sm btn-outline-secondary"
-                 href="{% url 'WasteCollection' %}?id={{ object.id }}&load_features=true{% if scope %}&scope={{ scope }}{% endif %}"
-                 title="Map">
-                <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
-              </a>
-            {% endwith %}
-          {% endif %}
-        {% endif %}
-        <a class="btn btn-sm btn-outline-secondary"
-           href="{% url 'wastecollection-explorer' %}"
-           title="Open Explorer (dashboard)">
-          <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
-        </a>
-      </div>
-    {% endblock detail_header_primary_actions %}
-    {% block detail_header_review_actions %}
-      {% object_policy object review_mode=review_mode as policy %}
-      <div class="btn-group me-2" role="group">
-        {% if policy.can_view_review_feedback %}
-          <a class="btn btn-sm btn-outline-danger"
-             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}"
-             title="Review feedback">
-            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
-          </a>
-        {% elif policy.is_in_review %}
-          {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
-            <a class="btn btn-sm btn-outline-secondary"
-               href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
-               title="Review view">
-              <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
-            </a>
-          {% endif %}
-        {% elif policy.is_declined and policy.is_staff %}
-          <a class="btn btn-sm btn-outline-secondary"
-             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
-             title="Review view">
-            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
-          </a>
-        {% elif policy.is_declined and policy.is_moderator %}
-          <a class="btn btn-sm btn-outline-secondary"
-             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
-             title="Review view">
-            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
-          </a>
-        {% endif %}
-      </div>
-    {% endblock detail_header_review_actions %}
-  </div>
-  {# Reject handled via global modal scaffold (modal-link in options pane) #}
-{% endblock detail_header_actions %}
-{% block detail_top_image %}
-  {% if not review_mode %}
-    <div class="card-img-top map-container">{% leaflet_map "main" %}</div>
-  {% endif %}
-{% endblock detail_top_image %}
-{% block detail_body %}
-  <p class="card-text">
-    <strong>Catchment:</strong>
-    <br>
-    <a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment.name }}</a>
-  </p>
-  <p class="card-text">
-    <strong>Collector:</strong>
-    <br>
-    <a href="{{ object.collector.get_absolute_url }}">{{ object.collector.name }}</a>
-  </p>
-  <p class="card-text">
-    <strong>Collection System:</strong>
-    <br>
-    <a href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system.name }}</a>
-  </p>
-  {% if object.bin_configuration %}
-    <p class="card-text">
-      <strong>Bin configuration:</strong>
-      <br>
-      {{ object.bin_configuration.name }}
-    </p>
-  {% endif %}
-  <p class="card-text">
-    <strong>Waste Category:</strong>
-    <br>
-    {% if object.effective_waste_category %}
-      <a href="{{ object.effective_waste_category.get_absolute_url }}">{{ object.effective_waste_category }}</a>
-    {% else %}
-      <span class="text-muted">Not specified</span>
-    {% endif %}
-  </p>
-  <p class="card-text">
-    <strong>Year:</strong>
-    <br>
-    {{ object.valid_from|date:"Y" }}
-  </p>
-  {% if object.established %}
-    <p class="card-text">
-      <strong>Year established:</strong>
-      <br>
-      {{ object.established }}
-    </p>
-  {% endif %}
-  {% if object.participation_policy %}
-    <p class="card-text">
-      <strong>Participation Policy:</strong>
-      <br>
-      {% if object.participation_policy == 'MANDATORY' %}
-        Mandatory
-      {% elif object.participation_policy == 'VOLUNTARY' %}
-        Voluntary
-      {% elif object.participation_policy == 'MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION' %}
-        Mandatory with exception for home composters
-      {% elif object.participation_policy == 'not_specified' %}
-        Not specified
-      {% else %}
-        {{ object.participation_policy }}
-      {% endif %}
-    </p>
-  {% endif %}
-  {% if object.min_bin_size %}
-    <p class="card-text">
-      <strong>Smallest available bin size (L):</strong>
-      <br>
-      {{ object.min_bin_size }} L
-    </p>
-  {% endif %}
-  {% if object.required_bin_capacity %}
-    <p class="card-text">
-      <strong>Minimum required specific bin capacity (L/reference unit):</strong>
-      <br>
-      {{ object.required_bin_capacity }} L
-      {% if object.required_bin_capacity_reference %}
-        {% if object.required_bin_capacity_reference == 'not_specified' %}
-          <span class="text-muted">(reference not specified)</span>
-        {% else %}
-          <span class="text-muted">{{ object.get_required_bin_capacity_reference_display }}</span>
-        {% endif %}
-      {% endif %}
-    </p>
-  {% endif %}
-  {% if allowed_materials %}
-    <p class="card-text">
-      <strong>Allowed Materials:</strong>
-    </p>
-    <ul>
-      {% for material in allowed_materials %}
-        <li>
-          <a href="{{ material.get_absolute_url }}">{{ material }}</a>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p class="card-text text-muted">No allowed materials specified.</p>
-  {% endif %}
-  {% if forbidden_materials %}
-    <p class="card-text">
-      <strong>Forbidden Materials:</strong>
-    </p>
-    <ul>
-      {% for material in forbidden_materials %}
-        <li>
-          <a href="{{ material.get_absolute_url }}">{{ material }}</a>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p class="card-text text-muted">No forbidden materials specified.</p>
-  {% endif %}
-  {% if object.frequency and frequency_display %}
-    {% if frequency_display.is_year_round %}
-      <p class="card-text">
-        <strong>Collection frequency (normalized schedule):</strong>
-        <br>
-        {{ frequency_display.summary }}
-      </p>
-      {% if frequency_display.options %}
-        <p class="card-text text-muted small mt-0">Alternatively: {{ frequency_display.options|join:", " }}</p>
-      {% endif %}
-    {% elif frequency_display.rows %}
-      <p class="card-text mb-1">
-        <strong>Collection frequency (normalized schedule):</strong>
-      </p>
-      <ul class="mb-2">
-        {% for frequency_row in frequency_display.rows %}
-          <li>
-            <strong>{{ frequency_row.segment }}:</strong> {{ frequency_row.standard }}
-            {% if frequency_row.options %}
-              <br>
-              <span class="text-muted small">Alternatively: {{ frequency_row.options|join:", " }}</span>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-  {% endif %}
-  {% if object.fee_system %}
-    <p class="card-text">
-      <strong>Fee System:</strong>
-      <br>
-      {{ object.fee_system.name }}
-    </p>
-  {% endif %}
-  {% if collection_property_values %}
-    {% regroup collection_property_values by property as property_list %}
-    {% for prop in property_list %}
-      <p class="card-text">
-        <strong>{{ prop.grouper.name|title }}:</strong>
-      </p>
-      <ul>
-        {% for val in prop.list|dictsortreversed:"year" %}
-          <li>
-            {% object_policy val as val_policy %}
-            {% include "object_management/review_status_icon.html" with object=val policy=val_policy %}
-            <a href="{{ val.get_absolute_url }}">
-              {% if val.standard_deviation %}
-                {{ val.display_average }} ± {{ val.display_standard_deviation }} {{ val.unit.name }} (
-                {{ val.year }})
-                {% if val.is_derived %}<span class="text-muted fst-italic">(derived)</span>{% endif %}
-              {% else %}
-                {{ val.display_average }} {{ val.unit.name }} ({{ val.year }})
-                {% if val.is_derived %}<span class="text-muted fst-italic">(derived)</span>{% endif %}
-              {% endif %}
-            </a>
-            {% if val_policy.can_submit_review or val_policy.can_withdraw_review %}
-              <div class="mt-1 d-flex flex-wrap gap-2">
-                {% if val_policy.can_submit_review %}
-                  <a class="btn btn-xs btn-outline-primary modal-link"
-                     href="{% url 'object_management:submit_for_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request|path_without_return_params|urlencode }}">
-                    <i class="fas fa-paper-plane"></i>
-                    Submit for review
-                  </a>
-                {% endif %}
-                {% if val_policy.can_withdraw_review %}
-                  <a class="btn btn-xs btn-outline-warning modal-link"
-                     href="{% url 'object_management:withdraw_from_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request|path_without_return_params|urlencode }}">
-                    <i class="fas fa-rotate-left"></i>
-                    Withdraw
-                  </a>
-                {% endif %}
-                {% if val_policy.can_approve or val_policy.can_reject %}
-                  <a class="btn btn-xs btn-outline-secondary"
-                     href="{% url 'object_management:review_item_detail' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ object.get_absolute_url|urlencode }}">
-                    <i class="fas fa-clipboard-check"></i>
-                    Review view
-                  </a>
-                {% endif %}
-              </div>
-            {% elif val_policy.can_approve or val_policy.can_reject %}
-              <div class="mt-1 d-flex flex-wrap gap-2">
-                <a class="btn btn-xs btn-outline-secondary"
-                   href="{% url 'object_management:review_item_detail' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ object.get_absolute_url|urlencode }}">
-                  <i class="fas fa-clipboard-check"></i>
-                  Review view
-                </a>
-              </div>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    {% endfor %}
-  {% else %}
-    <p class="card-text text-muted">No collection properties available.</p>
-  {% endif %}
-  {% if aggregated_collection_property_values %}
-    {% regroup aggregated_collection_property_values by property as property_list %}
-    {% for prop in property_list %}
-      <p class="card-text">
-        <strong>{{ prop.grouper.name|title }}:</strong>
-      </p>
-      <ul>
-        {% for val in prop.list|dictsortreversed:"year" %}
-          <li>
-            {% object_policy val as agg_policy %}
-            {% include "object_management/review_status_icon.html" with object=val policy=agg_policy %}
-            <a href="{{ val.get_absolute_url }}">
-              {% if val.standard_deviation %}
-                {{ val.display_average }} ± {{ val.display_standard_deviation }} {{ val.unit.name }} (
-                {{ val.year }}) (aggregated)
-              {% else %}
-                {{ val.display_average }} {{ val.unit.name }} ({{ val.year }}) (aggregated)
-              {% endif %}
-            </a>
-            {% if agg_policy.can_submit_review or agg_policy.can_withdraw_review %}
-              <div class="mt-1 d-flex flex-wrap gap-2">
-                {% if agg_policy.can_submit_review %}
-                  <a class="btn btn-xs btn-outline-primary modal-link"
-                     href="{% url 'object_management:submit_for_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request|path_without_return_params|urlencode }}">
-                    <i class="fas fa-paper-plane"></i>
-                    Submit for review
-                  </a>
-                {% endif %}
-                {% if agg_policy.can_withdraw_review %}
-                  <a class="btn btn-xs btn-outline-warning modal-link"
-                     href="{% url 'object_management:withdraw_from_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request|path_without_return_params|urlencode }}">
-                    <i class="fas fa-rotate-left"></i>
-                    Withdraw
-                  </a>
-                {% endif %}
-                {% if agg_policy.can_approve or agg_policy.can_reject %}
-                  <a class="btn btn-xs btn-outline-secondary"
-                     href="{% url 'object_management:review_item_detail' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ object.get_absolute_url|urlencode }}">
-                    <i class="fas fa-clipboard-check"></i>
-                    Review view
-                  </a>
-                {% endif %}
-              </div>
-            {% elif agg_policy.can_approve or agg_policy.can_reject %}
-              <div class="mt-1 d-flex flex-wrap gap-2">
-                <a class="btn btn-xs btn-outline-secondary"
-                   href="{% url 'object_management:review_item_detail' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ object.get_absolute_url|urlencode }}">
-                  <i class="fas fa-clipboard-check"></i>
-                  Review view
-                </a>
-              </div>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    {% endfor %}
-  {% else %}
-    <p class="card-text text-muted">No aggregated collection properties available.</p>
-  {% endif %}
-  {% if samples %}
-    <p class="card-text">
-      <strong>Samples</strong>
-    </p>
-    <ul>
-      {% for sample in samples %}
-        <li>
-          <a href="{{ sample.get_absolute_url }}">{{ sample.name }}</a>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p class="card-text text-muted">No samples linked to this collection.</p>
-  {% endif %}
-  {% if all_sources %}
-    <p class="card-text">
-      <strong>Sources:</strong>
-    </p>
-    <ul>
-      {% for source in all_sources %}
-        <li>
-          {% if source.type == "waste_flyer" %}
-            <i class="fas fa-file-alt text-muted"></i>
-            <span class="badge bg-secondary text-white me-2">Waste Flyer</span>
-            <a href="{{ source.url }}"
-               target="_blank"
-               rel="noopener noreferrer"
-               class="source-url-line js-compact-url">
-              <span class="source-url-label">{{ source.url }}</span>
-              <i class="fas fa-external-link-alt ms-1 small"></i>
-            </a>
-            {% if "web.archive.org" in source.url %}<span class="badge text-bg-light border ms-2">Archived</span>{% endif %}
-          {% else %}
-            <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
-            {% if source.title %}- {{ source.title }}{% endif %}
-            {% if source.year %}({{ source.year }}){% endif %}
-            {% if source.url %}
-              <br>
-              <span class="text-muted small source-url-meta">
-                <a href="{{ source.url }}"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   class="source-url-line js-compact-url">
-                  <i class="fas fa-external-link-alt"></i>
-                  <span class="source-url-label">{{ source.url }}</span>
-                </a>
-              </span>
-            {% endif %}
-          {% endif %}
-        </li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-  {% if object.description %}
-    <p class="card-text">
-      <strong>Comments:</strong>
-      <br>
-      {{ object.description|collection_description_to_html }}
-    </p>
-  {% endif %}
-  <p class="card-text">
-    <strong>Valid from:</strong>
-    <br>
-    {{ object.valid_from|date:"d.m.Y" }}
-  </p>
-  <p class="card-text">
-    <strong>Valid until:</strong>
-    <br>
-    {{ object.valid_until|date:"d.m.Y" }}
-  </p>
-  <p class="card-text">
-    <strong>Last update:</strong>
-    <br>
-    {{ object.lastmodified_at|date:"d.m.Y" }}
-  </p>
-  {% if object.owner %}
-    <p class="card-text">
-      <strong>{% trans "Owner" %}:</strong>
-      <br>
-      {{ object.owner.username|default:object.owner }}
-    </p>
-  {% endif %}
-  {% if review_mode %}
-    <p class="card-text">
-      <strong>Created at:</strong>
-      <br>
-      {{ object.created_at|date:"d.m.Y H:i" }}
-    </p>
-    {% if review_submitted_action %}
-      <p class="card-text">
-        <strong>Submitted at:</strong>
-        <br>
-        {{ review_submitted_action.created_at|date:"d.m.Y H:i" }}
-        <span class="text-muted">by {{ review_submitted_action.user }}</span>
-      </p>
-    {% endif %}
-  {% endif %}
-  {% if visible_predecessors %}
-    <strong>Predecessors:</strong>
-    <br>
-    <ul>
-      {% for predecessor_collection in visible_predecessors %}
-        <li>
-          <a href="{{ predecessor_collection.get_absolute_url }}">{{ predecessor_collection }}</a>
-        </li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-  {% if visible_successors %}
-    <strong>Successors:</strong>
-    <br>
-    <ul>
-      {% for successor_collection in visible_successors %}
-        <li>
-          <a href="{{ successor_collection.get_absolute_url }}">{{ successor_collection }}</a>
-        </li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-{% endblock detail_body %}
-{# Options for the integrated right column (new base) #}
-{% block options_pane %}
-  {% object_policy object review_mode=review_mode as policy %}
-  {# CRUD #}
-  {% if policy.can_edit %}
-    {% if policy.is_owner and policy.is_declined %}
-      <a class="btn btn-primary w-100 mb-2"
-         href="{{ object.update_url }}?next={% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
-        <i class="fas fa-pen-to-square"></i> Edit
-      </a>
-    {% else %}
-      <a class="btn btn-primary w-100 mb-2"
-         href="{{ object.update_url }}?next={{ request|path_without_return_params|urlencode }}">
-        <i class="fas fa-pen-to-square"></i> Edit
-      </a>
-    {% endif %}
-  {% endif %}
-  {% if policy.can_manage_samples %}
-    <a class="btn btn-outline-secondary w-100 mb-2"
-       href="{% url 'collection-wastesamples' object.id %}">
-      <i class="fas fa-pen-to-square"></i> Manage samples
+{% block rail_aria_label %}Collection toolbar{% endblock rail_aria_label %}
+{% block rail_nav %}
+  {% include "waste_collection/includes/collection_context_nav.html" %}
+{% endblock rail_nav %}
+{% block anon_nav %}
+  {% include "waste_collection/includes/collection_context_nav.html" %}
+{% endblock anon_nav %}
+{% block detail_header_review_actions %}
+  {% if object.publication_status == 'private' and policy.can_submit_review %}
+    <a class="sdv2-btn modal-link"
+       href="{% url 'object_management:submit_for_review_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+      <i class="fas fa-paper-plane" aria-hidden="true"></i> {% trans "Submit for Review" %}
     </a>
+  {% elif policy.can_view_review_feedback and not review_mode %}
+    <a class="sdv2-btn sdv2-btn-ghost"
+       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+      <i class="fas fa-clipboard-check" aria-hidden="true"></i> {{ policy.review_feedback_label }}
+    </a>
+  {% elif policy.is_in_review and not review_mode %}
+    {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+      <a class="sdv2-btn sdv2-btn-ghost"
+         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+        <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
+      </a>
+    {% endif %}
+  {% elif policy.is_declined and not review_mode %}
+    {% if policy.is_staff or policy.is_moderator %}
+      <a class="sdv2-btn sdv2-btn-ghost"
+         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+        <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
+      </a>
+    {% endif %}
+  {% endif %}
+{% endblock detail_header_review_actions %}
+{% block rail_dropdown_extra %}
+  {% if policy.can_manage_samples %}
+    <li>
+      <a class="dropdown-item"
+         href="{% url 'collection-wastesamples' object.id %}">
+        <i class="fas fa-fw fa-pen-to-square me-2" aria-hidden="true"></i>Manage samples
+      </a>
+    </li>
   {% endif %}
   {% if policy.can_add_property %}
-    <a class="btn btn-outline-secondary w-100 mb-2"
-       href="{% url 'collection-add-property' object.id %}">
-      <i class="fas fa-circle-plus"></i> Add property
-    </a>
+    <li>
+      <a class="dropdown-item"
+         href="{% url 'collection-add-property' object.id %}">
+        <i class="fas fa-fw fa-circle-plus me-2" aria-hidden="true"></i>Add property
+      </a>
+    </li>
   {% endif %}
   {% if policy.can_duplicate %}
-    <a class="btn btn-outline-secondary w-100 mb-2"
-       href="{% url 'collection-copy' object.id %}">
-      <i class="fas fa-copy"></i> Duplicate
-    </a>
+    <li>
+      <a class="dropdown-item"
+         href="{% url 'collection-copy' object.id %}">
+        <i class="fas fa-fw fa-copy me-2" aria-hidden="true"></i>Duplicate
+      </a>
+    </li>
   {% endif %}
   {% if policy.can_new_version %}
-    <a class="btn btn-outline-secondary w-100 mb-2"
-       href="{% url 'collection-new-version' object.id %}">
-      <i class="fas fa-code-branch"></i> New version
-    </a>
+    <li>
+      <a class="dropdown-item"
+         href="{% url 'collection-new-version' object.id %}">
+        <i class="fas fa-fw fa-code-branch me-2" aria-hidden="true"></i>New version
+      </a>
+    </li>
   {% endif %}
   {% if policy.can_archive %}
-    <a class="btn btn-outline-secondary modal-link w-100 mb-2"
-       href="{% url 'collection-archive-modal' object.id %}">
-      <i class="fas fa-archive"></i> Archive
-    </a>
-  {% endif %}
-  {% include "object_management/manage_access_button.html" with object=object policy=policy %}
-  {# Delete #}
-  {% if policy.can_delete %}
-    {% safe_back_url as back_url %}
-    <a class="btn btn-outline-danger modal-link w-100 mb-2"
-       href="{{ object.modal_delete_url }}{% if back_url %}?next={{ back_url|urlencode }}{% endif %}">
-      <i class="fas fa-trash"></i> Delete
-    </a>
-  {% endif %}
-  {# Review navigation is exposed in the header action group to avoid duplication #}
-  {# Review workflow #}
-  {% if policy.can_submit_review %}
-    <a class="btn btn-outline-primary w-100 mb-2 modal-link"
-       href="{% url 'object_management:submit_for_review_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
-      <i class="fas fa-paper-plane"></i> {% trans "Submit for Review" %}
-    </a>
-  {% endif %}
-  {% if object.is_in_review %}
-    {% if policy.can_withdraw_review %}
-      <a class="btn btn-outline-warning w-100 mb-2 modal-link"
-         href="{% url 'object_management:withdraw_from_review_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={% if review_mode %}{{ object.get_absolute_url }}{% else %}{{ request|path_without_return_params|urlencode }}{% endif %}">
-        <i class="fas fa-rotate-left"></i> {% trans "Withdraw from Review" %}
+    <li>
+      <a class="dropdown-item modal-link"
+         href="{% url 'collection-archive-modal' object.id %}">
+        <i class="fas fa-fw fa-archive me-2" aria-hidden="true"></i>Archive
       </a>
-    {% endif %}
-    {% if policy.can_approve %}
-      <a class="btn btn-outline-success w-100 mb-2 modal-link"
-         href="{% url 'object_management:approve_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
-        <i class="fas fa-check"></i> {% trans "Approve" %}
-      </a>
-    {% endif %}
-    {% if policy.can_reject %}
-      <a class="btn btn-outline-danger w-100 mb-2 modal-link"
-         href="{% url 'object_management:reject_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
-        <i class="fas fa-xmark"></i> {% trans "Reject" %}
-      </a>
-    {% endif %}
+    </li>
   {% endif %}
-  {# Export #}
   {% if policy.can_export %}
-    {% export_modal_button "collection-export" list_type=policy.export_list_type id=object.id button_classes="btn btn-outline-secondary w-100 mb-2" %}
+    <li>
+      {% export_modal_button "collection-export" list_type=policy.export_list_type id=object.id button_classes="dropdown-item" text="Export" icon_class="fas fa-fw fa-file-export me-2" %}
+    </li>
   {% endif %}
-{% endblock options_pane %}
-{# Learning tab content (new base) #}
-{% block learning_content %}
-  {% include "waste_collection/includes/learning_materials.html" %}
-{% endblock learning_content %}
-{# Legacy block preserved but disabled #}
-{% block second_row %}
-{% endblock second_row %}
-{% block detail_with_options_scripts %}
+  <li>
+    <a class="dropdown-item" href="{% url 'wastecollection-explorer' %}">
+      <i class="fas fa-fw fa-table-cells-large me-2" aria-hidden="true"></i>Open explorer
+    </a>
+  </li>
+{% endblock rail_dropdown_extra %}
+{% block rail_primary %}
+  {% if policy.can_edit and object.update_url %}
+    {% if policy.is_owner and policy.is_declined %}
+      <a class="sdv2-btn sdv2-btn-primary"
+         href="{{ object.update_url }}?next={% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+        <i class="fas fa-pen-to-square" aria-hidden="true"></i> Edit
+      </a>
+    {% else %}
+      <a class="sdv2-btn sdv2-btn-primary"
+         href="{{ object.update_url }}?next={{ request|path_without_return_params|urlencode }}">
+        <i class="fas fa-pen-to-square" aria-hidden="true"></i> Edit
+      </a>
+    {% endif %}
+  {% endif %}
+{% endblock rail_primary %}
+{% block hero_class %}{% if review_mode %}sdv2-hero-no-media{% else %}sdv2-hero-with-media{% endif %}{% endblock hero_class %}
+{% block hero_lede %}{% endblock hero_lede %}
+{% block hero_meta_items %}
+  {% if object.catchment %}
+    <li>
+      <span class="sdv2-meta-label">Catchment</span>
+      <a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment.name }}</a>
+    </li>
+  {% endif %}
+  {% if object.collector %}
+    <li>
+      <span class="sdv2-meta-label">Collector</span>
+      <a href="{{ object.collector.get_absolute_url }}">{{ object.collector.name }}</a>
+    </li>
+  {% endif %}
+  {% if object.collection_system %}
+    <li>
+      <span class="sdv2-meta-label">Collection system</span>
+      <a href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system.name }}</a>
+    </li>
+  {% endif %}
+  {% if object.effective_waste_category %}
+    <li>
+      <span class="sdv2-meta-label">Waste category</span>
+      <a href="{{ object.effective_waste_category.get_absolute_url }}">{{ object.effective_waste_category }}</a>
+    </li>
+  {% endif %}
+  <li>
+    <span class="sdv2-meta-label">Year</span>
+    {{ object.valid_from|date:"Y" }}
+  </li>
+  {% if object.participation_policy %}
+    <li>
+      <span class="sdv2-meta-label">Participation</span>
+      {{ object.get_participation_policy_display|capfirst }}
+    </li>
+  {% endif %}
+{% endblock hero_meta_items %}
+{% block hero_media %}
+  {% if not review_mode %}
+    <figure class="sdv2-hero-media sdv2-hero-map">
+      <div class="map-container">{% leaflet_map "main" %}</div>
+    </figure>
+  {% endif %}
+{% endblock hero_media %}
+{% block hero_footer %}
+  {% if object.sources.all %}
+    <div class="sdv2-hero-provenance">
+      <span class="sdv2-prov-label">Sources</span>
+      <span class="sdv2-prov-sources">
+        {% for source in object.sources.all %}
+          <a href="{{ source.get_absolute_url }}"
+             class="sdv2-source-chip"
+             title="{{ source.title|default:source.abbreviation }}">{{ source.abbreviation|default:source.title }}</a>
+        {% endfor %}
+      </span>
+    </div>
+  {% endif %}
+{% endblock hero_footer %}
+{% block anchor_nav %}
+  <nav class="sdv2-anchor-nav" aria-label="Jump to section">
+    {% if object.description %}<a class="sdv2-anchor-chip" href="#comments">Comments</a>{% endif %}
+    <a class="sdv2-anchor-chip" href="#details">Details</a>
+    {% if object.frequency and frequency_display %}
+      <a class="sdv2-anchor-chip" href="#frequency">Frequency</a>
+    {% endif %}
+    <a class="sdv2-anchor-chip" href="#materials">Materials</a>
+    <a class="sdv2-anchor-chip" href="#properties">Properties</a>
+    <a class="sdv2-anchor-chip" href="#aggregated-properties">Aggregated</a>
+    <a class="sdv2-anchor-chip" href="#samples">Samples</a>
+    {% if all_sources %}<a class="sdv2-anchor-chip" href="#sources">Sources</a>{% endif %}
+  </nav>
+{% endblock anchor_nav %}
+{% block layout_class %}sdv2-layout{% endblock layout_class %}
+{% block detail_sections %}
+  {% if object.description %}
+    <section class="sdv2-about sdv2-section-panel sdv2-anchor-target"
+             id="comments"
+             aria-label="Comments">
+      <h2 class="sdv2-section-title">Comments</h2>
+      <div class="sdv2-about-body">{{ object.description|collection_description_to_html }}</div>
+    </section>
+  {% endif %}
+  <section class="sdv2-section-panel sdv2-anchor-target"
+           id="details"
+           aria-label="Collection details">
+    <div class="sdv2-section-header">
+      <div class="sdv2-section-heading">
+        <h2 class="sdv2-section-title">Details</h2>
+      </div>
+    </div>
+    <dl class="sdv2-context-details">
+      <div>
+        <dt>{% trans "Valid from" %}</dt>
+        <dd>{{ object.valid_from|date:"d.m.Y" }}</dd>
+      </div>
+      <div>
+        <dt>{% trans "Valid until" %}</dt>
+        <dd>{{ object.valid_until|date:"d.m.Y"|default:"—" }}</dd>
+      </div>
+      {% if object.established %}
+        <div>
+          <dt>{% trans "Year established" %}</dt>
+          <dd>{{ object.established }}</dd>
+        </div>
+      {% endif %}
+      {% if object.participation_policy %}
+        <div>
+          <dt>{% trans "Participation policy" %}</dt>
+          <dd>
+            {% if object.participation_policy == 'not_specified' %}
+              <span class="text-muted">Not specified</span>
+            {% else %}
+              {{ object.get_participation_policy_display|capfirst }}
+            {% endif %}
+          </dd>
+        </div>
+      {% endif %}
+      {% if object.bin_configuration %}
+        <div>
+          <dt>{% trans "Bin configuration" %}</dt>
+          <dd>{{ object.bin_configuration.name }}</dd>
+        </div>
+      {% endif %}
+      {% if object.min_bin_size %}
+        <div>
+          <dt>{% trans "Smallest available bin size (L)" %}</dt>
+          <dd>{{ object.min_bin_size }} L</dd>
+        </div>
+      {% endif %}
+      {% if object.required_bin_capacity %}
+        <div>
+          <dt>{% trans "Minimum required specific bin capacity (L/reference unit)" %}</dt>
+          <dd>
+            {{ object.required_bin_capacity }} L
+            {% if object.required_bin_capacity_reference %}
+              {% if object.required_bin_capacity_reference == 'not_specified' %}
+                <span class="text-muted">(reference not specified)</span>
+              {% else %}
+                <span class="text-muted">{{ object.get_required_bin_capacity_reference_display }}</span>
+              {% endif %}
+            {% endif %}
+          </dd>
+        </div>
+      {% endif %}
+      {% if object.fee_system %}
+        <div>
+          <dt>{% trans "Fee system" %}</dt>
+          <dd>{{ object.fee_system.name }}</dd>
+        </div>
+      {% endif %}
+      <div>
+        <dt>{% trans "Last update" %}</dt>
+        <dd>{{ object.lastmodified_at|date:"d.m.Y" }}</dd>
+      </div>
+      {% if object.owner %}
+        <div>
+          <dt>{% trans "Editor" %}</dt>
+          <dd>{{ object.owner.username|default:object.owner }}</dd>
+        </div>
+      {% endif %}
+      {% if review_mode %}
+        <div>
+          <dt>{% trans "Created at" %}</dt>
+          <dd>{{ object.created_at|date:"d.m.Y H:i" }}</dd>
+        </div>
+        {% if review_submitted_action %}
+          <div>
+            <dt>{% trans "Submitted at" %}</dt>
+            <dd>
+              {{ review_submitted_action.created_at|date:"d.m.Y H:i" }}
+              <span class="text-muted">by {{ review_submitted_action.user }}</span>
+            </dd>
+          </div>
+        {% endif %}
+      {% endif %}
+    </dl>
+  </section>
+  {% if object.frequency and frequency_display %}
+    {% if frequency_display.is_year_round or frequency_display.rows %}
+      <section class="sdv2-section-panel sdv2-anchor-target"
+               id="frequency"
+               aria-label="Collection frequency">
+        <div class="sdv2-section-header">
+          <div class="sdv2-section-heading">
+            <h2 class="sdv2-section-title">Collection frequency</h2>
+          </div>
+        </div>
+        {% if frequency_display.is_year_round %}
+          <p>
+            <strong>Collection frequency (normalized schedule):</strong>
+            <br>
+            {{ frequency_display.summary }}
+          </p>
+          {% if frequency_display.options %}
+            <p class="text-muted small mt-0">Alternatively: {{ frequency_display.options|join:", " }}</p>
+          {% endif %}
+        {% elif frequency_display.rows %}
+          <p class="mb-1">
+            <strong>Collection frequency (normalized schedule):</strong>
+          </p>
+          <ul class="mb-0">
+            {% for frequency_row in frequency_display.rows %}
+              <li>
+                <strong>{{ frequency_row.segment }}:</strong> {{ frequency_row.standard }}
+                {% if frequency_row.options %}
+                  <br>
+                  <span class="text-muted small">Alternatively: {{ frequency_row.options|join:", " }}</span>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </section>
+    {% endif %}
+  {% endif %}
+  <section class="sdv2-section-panel sdv2-anchor-target"
+           id="materials"
+           aria-label="Materials">
+    <div class="sdv2-section-header">
+      <div class="sdv2-section-heading">
+        <h2 class="sdv2-section-title">Materials</h2>
+      </div>
+    </div>
+    <div class="cdv2-material-group">
+      <h3 class="cdv2-prop-title">{% trans "Allowed Materials" %}</h3>
+      {% if allowed_materials %}
+        <ul class="sdv2-related-list">
+          {% for material in allowed_materials %}
+            <li>
+              <a class="sdv2-related-link" href="{{ material.get_absolute_url }}">
+                <span class="sdv2-related-name">{{ material }}</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="sdv2-related-empty">No allowed materials specified.</p>
+      {% endif %}
+    </div>
+    <div class="cdv2-material-group">
+      <h3 class="cdv2-prop-title">{% trans "Forbidden Materials" %}</h3>
+      {% if forbidden_materials %}
+        <ul class="sdv2-related-list">
+          {% for material in forbidden_materials %}
+            <li>
+              <a class="sdv2-related-link" href="{{ material.get_absolute_url }}">
+                <span class="sdv2-related-name">{{ material }}</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="sdv2-related-empty">No forbidden materials specified.</p>
+      {% endif %}
+    </div>
+  </section>
+  <section class="sdv2-section-panel sdv2-anchor-target"
+           id="properties"
+           aria-label="Collection properties">
+    <div class="sdv2-section-header">
+      <div class="sdv2-section-heading">
+        <h2 class="sdv2-section-title">Properties</h2>
+        <span class="sdv2-section-hint">Measured values reported for this collection, e.g. connection rate or specific amounts.</span>
+      </div>
+      {% if policy.can_add_property %}
+        <div class="sdv2-section-actions">
+          <a class="sdv2-btn sdv2-btn-sm" href="{% url 'collection-add-property' object.id %}">
+            <i class="fas fa-circle-plus" aria-hidden="true"></i> Add property
+          </a>
+        </div>
+      {% endif %}
+    </div>
+    {% include "waste_collection/includes/collection_property_values.html" with values=collection_property_values empty_message="No collection properties available." %}
+  </section>
+  <section class="sdv2-section-panel sdv2-anchor-target"
+           id="aggregated-properties"
+           aria-label="Aggregated collection properties">
+    <div class="sdv2-section-header">
+      <div class="sdv2-section-heading">
+        <h2 class="sdv2-section-title">Aggregated properties</h2>
+        <span class="sdv2-section-hint">Values derived from related collections in the version chain.</span>
+      </div>
+    </div>
+    {% include "waste_collection/includes/collection_property_values.html" with values=aggregated_collection_property_values empty_message="No aggregated collection properties available." value_suffix="(aggregated)" %}
+  </section>
+  <div id="samples" class="sdv2-anchor-target">
+    {% include "includes/sdv2_related_section.html" with section_title="Samples" section_label="Samples taken from this collection" items=samples item_url_name="sample-detail" empty_title="No samples" empty_body="No samples linked to this collection." %}
+  </div>
+  {% if all_sources %}
+    <section class="sdv2-section-panel sdv2-anchor-target"
+             id="sources"
+             aria-label="Sources">
+      <div class="sdv2-section-header">
+        <div class="sdv2-section-heading">
+          <h2 class="sdv2-section-title">Sources</h2>
+        </div>
+      </div>
+      <ul class="mb-0">
+        {% include "waste_collection/includes/source_list_items.html" with sources=all_sources %}
+      </ul>
+    </section>
+  {% endif %}
+{% endblock detail_sections %}
+{% block detail_aside %}
+  <aside class="sdv2-related" aria-label="Related information">
+    {% if visible_predecessors or visible_successors %}
+      <section class="sdv2-related-section sdv2-surface"
+               aria-label="Version history">
+        <h3 class="sdv2-related-title">Version history</h3>
+        {% if visible_predecessors %}
+          <strong class="sdv2-meta-label d-block mb-1">Predecessors:</strong>
+          <ul class="sdv2-related-list mb-3">
+            {% for predecessor_collection in visible_predecessors %}
+              <li>
+                <a class="sdv2-related-link" href="{{ predecessor_collection.get_absolute_url }}">
+                  <span class="sdv2-related-name">{{ predecessor_collection }}</span>
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% if visible_successors %}
+          <strong class="sdv2-meta-label d-block mb-1">Successors:</strong>
+          <ul class="sdv2-related-list">
+            {% for successor_collection in visible_successors %}
+              <li>
+                <a class="sdv2-related-link" href="{{ successor_collection.get_absolute_url }}">
+                  <span class="sdv2-related-name">{{ successor_collection }}</span>
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </section>
+    {% endif %}
+    <section class="sdv2-related-section sdv2-surface" aria-label="Learning">
+      <h3 class="sdv2-related-title">{% trans "Learning" %}</h3>
+      {% include "waste_collection/includes/learning_materials.html" %}
+    </section>
+  </aside>
+{% endblock detail_aside %}
+{% block javascript %}
+  {{ block.super }}
   <script src="{% static 'js/file_export.min.js' %}" type="text/javascript"></script>
   <script src="{% static 'js/source_url_display.min.js' %}"
           type="text/javascript"></script>
@@ -620,4 +472,4 @@
   });
     </script>
   {% endif %}
-{% endblock detail_with_options_scripts %}
+{% endblock javascript %}

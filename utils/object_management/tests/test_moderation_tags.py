@@ -17,6 +17,7 @@ from utils.object_management.templatetags.moderation_tags import (
     has_pending_review_items_for_user,
     markdown_to_html,
     safe_back_url,
+    safe_next_url,
 )
 
 
@@ -211,6 +212,30 @@ class SafeBackUrlTagTests(SimpleTestCase):
 
     def test_without_request_returns_empty(self):
         self.assertEqual(safe_back_url({}), "")
+
+
+class SafeNextUrlTagTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def next_url(self, value):
+        request = self.factory.get("/waste_collection/collections/1/", {"next": value})
+        return safe_next_url({"request": request})
+
+    def test_same_host_path_is_returned(self):
+        self.assertEqual(
+            self.next_url("/waste_collection/collections/map/?catchment=1"),
+            "/waste_collection/collections/map/?catchment=1",
+        )
+
+    def test_javascript_url_is_rejected(self):
+        self.assertEqual(self.next_url("javascript:alert(1)"), "")
+
+    def test_external_url_is_rejected(self):
+        self.assertEqual(self.next_url("https://evil.example/"), "")
+
+    def test_without_request_returns_empty(self):
+        self.assertEqual(safe_next_url({}), "")
 
 
 class ContextNavNoFollowTests(SimpleTestCase):

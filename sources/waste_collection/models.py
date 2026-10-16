@@ -1031,6 +1031,12 @@ class CollectionPropertyValue(PropertyValue):
         help_text="True when this value was computed from another property (e.g. total ↔ specific via population).",
     )
 
+    def get_breadcrumb_object_label(self):
+        label = f"{self.property}: {self.display_average}"
+        if self.standard_deviation:
+            label += f" ± {self.display_standard_deviation}"
+        return label
+
     @property
     def year_outside_collection_period(self):
         """True when ``year`` falls outside the collection's valid period.
