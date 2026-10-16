@@ -427,6 +427,22 @@ class FullInitialDataSeedingTests(TestCase):
             Unit.objects.filter(owner=owner, name="Unspecified").count(), 1
         )
 
+    @override_settings(
+        DEFAULT_OBJECT_OWNER_USERNAME="defaults-owner",
+        DEFAULT_NO_UNIT_NAME="Unspecified",
+    )
+    def test_properties_initializer_repairs_legacy_configured_default_unit(self):
+        owner = User.objects.create(username="defaults-owner")
+        legacy_unit = Unit.objects.create(
+            owner=owner, name="Unspecified", dimensionless=False
+        )
+
+        ensure_properties_data()
+
+        legacy_unit.refresh_from_db()
+        self.assertEqual(get_default_unit_pk(), legacy_unit.pk)
+        self.assertTrue(legacy_unit.dimensionless)
+
     def test_first_waste_component_after_initialization_gets_category(self):
         call_command("ensure_initial_data", stdout=io.StringIO())
 

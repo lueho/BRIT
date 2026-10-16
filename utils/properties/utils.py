@@ -25,15 +25,13 @@ def ensure_initial_data(stdout=None):
     (``DEFAULT_NO_UNIT_NAME``) and the "number of collection points" property
     for the default owner.
     """
-    from .models import Property, Unit
+    from .models import Property
 
     owner = get_default_owner()
     no_unit = _ensure_dimensionless_unit(owner, "No unit")
     default_unit_name = getattr(settings, "DEFAULT_NO_UNIT_NAME", "No unit")
     if default_unit_name != no_unit.name:
-        Unit.objects.get_or_create(
-            owner=owner, name=default_unit_name, defaults={"dimensionless": True}
-        )
+        _ensure_dimensionless_unit(owner, default_unit_name)
     if not Property.objects.filter(
         owner=owner, name="number of collection points"
     ).exists():
