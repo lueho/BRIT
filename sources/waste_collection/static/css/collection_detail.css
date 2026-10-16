@@ -1,6 +1,11 @@
 /* Collection detail (detail_v2 / "sdv2" layout) — page-specific styles. */
 
 /* The catchment map sits in the hero media slot. */
+.sdv2-hero-map {
+  /* Anchor the absolutely-positioned .map-error alert inside the map. */
+  position: relative;
+}
+
 .sdv2-hero-map .map-container {
   height: 16rem;
   width: 100%;
