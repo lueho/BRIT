@@ -7,6 +7,7 @@
 {% load moderation_tags %}
 <nav class="sdv2-context-nav" aria-label="Collection navigation">
   {% safe_back_url as back_url %}
+  {% safe_next_url as next_url %}
   {% if back_url %}
     <a class="sdv2-btn sdv2-btn-ghost" href="{{ back_url }}" rel="nofollow">
       <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to results
@@ -30,9 +31,9 @@
            href="{% url 'WasteCollection-review' %}?id={{ object.id }}&load_features=true&scope=review"
            title="View on map"
            aria-label="View on map"><i class="fas fa-map"></i></a>
-      {% elif request.GET.next %}
+      {% elif next_url %}
         <a class="btn btn-outline-secondary"
-           href="{{ request.GET.next }}"
+           href="{{ next_url }}"
            title="View on map"
            aria-label="View on map"><i class="fas fa-map"></i></a>
       {% else %}

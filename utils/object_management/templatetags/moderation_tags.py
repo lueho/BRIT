@@ -70,6 +70,28 @@ def safe_back_url(context):
     return back
 
 
+@register.simple_tag(takes_context=True)
+def safe_next_url(context):
+    """Return the request's ``next`` param if it is a same-host URL, else ``""``."""
+    request = context.get("request")
+    if request is None:
+        return ""
+
+    next_url = request.GET.get("next")
+    if not next_url:
+        return ""
+
+    try:
+        is_safe = url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        )
+    except ValueError:
+        return ""
+    return next_url if is_safe else ""
+
+
 @register.filter
 def markdown_to_html(value):
     """Render a deliberately limited markdown subset.

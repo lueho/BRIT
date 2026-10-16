@@ -7234,6 +7234,23 @@ class CollectionDetailV2LayoutTestCase(TestCase):
         self.assertContains(response, 'aria-label="View on map"')
         self.assertContains(response, reverse("wastecollection-explorer"))
 
+    def test_map_link_ignores_unsafe_next_url(self):
+        response = self.client.get(self.url, {"next": "javascript:alert(1)"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "javascript:alert")
+        self.assertContains(
+            response,
+            f"{reverse('WasteCollection')}?id={self.collection.pk}&load_features=true",
+        )
+
+    def test_map_link_keeps_safe_next_url(self):
+        map_url = f"{reverse('WasteCollection')}?catchment=1"
+        response = self.client.get(self.url, {"next": map_url})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{map_url}"')
+
     def test_detail_renders_map_outside_review_mode(self):
         response = self.client.get(self.url)
 
