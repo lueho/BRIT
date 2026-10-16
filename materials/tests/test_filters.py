@@ -1,11 +1,13 @@
 from datetime import datetime
 from decimal import Decimal
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import AnonymousUser, User
 from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
 from maps.models import Location, Region
+from utils.file_export.generic_tasks import export_user_created_object_to_file
 from utils.properties.models import Unit
 
 from ..filters import (
@@ -403,6 +405,35 @@ class SampleFilterTestCase(TestCase):
         )
 
         self.assertIn(sample, filtr.qs)
+
+    @patch("utils.file_export.storages.get_file_export_storage")
+    @patch("utils.file_export.storages.write_file_for_download", return_value="url")
+    def test_export_task_matches_own_private_sample_group_name(
+        self, mock_write, mock_storage
+    ):
+        mock_storage.return_value.size.return_value = 0
+        alice = User.objects.create(username="export_group_owner_alice")
+        group = SampleGroup.objects.create(name="Trial Q", owner=alice)
+        sample = Sample.objects.create(
+            name="Alice exported sample",
+            material=self.substrate_material,
+            owner=alice,
+            publication_status="private",
+        )
+        sample.sample_groups.add(group)
+        task_self = MagicMock()
+        task_self.request.id = "sample-group-export"
+
+        export_user_created_object_to_file.run.__func__(
+            task_self,
+            "materials.Sample",
+            "csv",
+            {"q": ["Trial Q"]},
+            {"user_id": alice.pk, "list_type": "private"},
+        )
+
+        exported = mock_write.call_args.args[1]
+        self.assertEqual([row["id"] for row in exported], [sample.pk])
 
     def test_q_combines_with_other_filters(self):
         filtr = SampleFilter(
