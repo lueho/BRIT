@@ -1,13 +1,14 @@
 {% comment %}
   Shared source list items for detail_v2 pages. Renders one <li> per
-  record in `sources`. Waste-flyer records render as external document
-  links; bibliographic sources link to their detail page.
+  record in `sources`. Flyer records are external links of any kind
+  (web pages, statutes, documents) and render as compact external
+  links; bibliographic sources link to their detail page, labeled by
+  title since auto-imported citation keys can be cryptic.
 {% endcomment %}
 {% for source in sources %}
   <li>
     {% if source.type == "waste_flyer" %}
-      <i class="fas fa-file-alt text-muted"></i>
-      <span class="badge bg-secondary text-white me-2">Document</span>
+      <i class="fas fa-link text-muted"></i>
       <a href="{{ source.url }}"
          target="_blank"
          rel="noopener noreferrer"
@@ -17,8 +18,8 @@
       </a>
       {% if "web.archive.org" in source.url %}<span class="badge text-bg-light border ms-2">Archived</span>{% endif %}
     {% else %}
-      <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
-      {% if source.title %}- {{ source.title }}{% endif %}
+      <a href="{{ source.get_absolute_url }}">{{ source.title|default:source.abbreviation }}</a>
+      {% if source.title %}<span class="text-muted">({{ source.abbreviation }})</span>{% endif %}
       {% if source.year %}({{ source.year }}){% endif %}
       {% if source.url %}
         <br>
