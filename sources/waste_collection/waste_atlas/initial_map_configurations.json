@@ -1,0 +1,2475 @@
+{
+  "access_control": {
+    "categories": [
+      {
+        "color": "#1b9e77",
+        "label": "BP: yes",
+        "value": "Bring point: yes"
+      },
+      {
+        "color": "#a6dba0",
+        "label": "BP: no",
+        "value": "Bring point: no"
+      },
+      {
+        "color": "#2166ac",
+        "label": "DtD: yes",
+        "value": "Door-to-door: yes"
+      },
+      {
+        "color": "#92c5de",
+        "label": "DtD: no",
+        "value": "Door-to-door: no"
+      },
+      {
+        "color": "#542788",
+        "label": "DtD: yes | BP: yes",
+        "value": "Bring point: yes | Door-to-door: yes"
+      },
+      {
+        "color": "#ef8a62",
+        "label": "DtD: no | BP: no",
+        "value": "Bring point: no | Door-to-door: no"
+      },
+      {
+        "color": "#b2182b",
+        "label": "DtD: no | BP: yes",
+        "value": "Bring point: yes | Door-to-door: no"
+      },
+      {
+        "color": "#998ec3",
+        "label": "DtD: yes | BP: no",
+        "value": "Bring point: no | Door-to-door: yes"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "No separate biowaste collection"
+      }
+    ],
+    "dataField": "access_control",
+    "dataUrl": "/waste_collection/waste-atlas/api/access-control/",
+    "exportLegendColumns": 3,
+    "exportLegendItemFlow": "column",
+    "legendCategoryOrder": [
+      "Bring point: yes",
+      "Bring point: no",
+      "Door-to-door: yes",
+      "Door-to-door: no",
+      "Bring point: yes | Door-to-door: yes",
+      "Bring point: no | Door-to-door: yes",
+      "Bring point: yes | Door-to-door: no",
+      "Bring point: no | Door-to-door: no",
+      "No separate biowaste collection"
+    ],
+    "legendColumnBreakBefore": [
+      "Bring point: yes | Door-to-door: yes",
+      "No separate biowaste collection"
+    ],
+    "legendNote": "DtD = Door to door \u00b7 BP = Bring point",
+    "legendTitle": "Collection mode + Access/use control",
+    "legendWidth": 400,
+    "noDataLabel": "No data",
+    "title": "Access control for biowaste collection"
+  },
+  "bin_configuration": {
+    "categories": [
+      {
+        "color": "#4dbf8b",
+        "label": "Separate bins",
+        "value": "Separate bins"
+      },
+      {
+        "color": "#66a3ff",
+        "label": "Optical bag sorting",
+        "value": "Optical bag sorting"
+      },
+      {
+        "color": "#f2a541",
+        "exportLabel": "4-compartment bin",
+        "label": "Four compartments bin",
+        "value": "Four compartments bin"
+      },
+      {
+        "color": "#9c89d9",
+        "exportLabel": "2-compartment bin",
+        "label": "Two compartments bin",
+        "value": "Two compartments bin"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "No separate collection"
+      }
+    ],
+    "dataField": "bin_configuration",
+    "dataUrl": "/waste_collection/waste-atlas/api/bin-configuration/",
+    "legendTitle": "Bin configuration",
+    "noDataLabel": "No data",
+    "title": "Bin configuration of waste fractions"
+  },
+  "biowaste_collection_amount": {
+    "categories": [
+      {
+        "color": "#1a9850",
+        "label": "151\u2013236 (very high)",
+        "value": "very_high"
+      },
+      {
+        "color": "#66bd63",
+        "label": "101\u2013150 (high)",
+        "value": "high"
+      },
+      {
+        "color": "#a6d96a",
+        "label": "51\u2013100 (medium)",
+        "value": "medium"
+      },
+      {
+        "color": "#d9f0d3",
+        "label": "0\u201350 (low)",
+        "value": "low"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "no_bio"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/biowaste-collection-amount/",
+    "legendTitle": "Collected amount (kg/cap/a)",
+    "noDataLabel": "No data",
+    "numericField": "amount",
+    "outlineGeoJsonUrl": "/waste_collection/waste-atlas/api/biowaste-collection-amount/acpv-outline-geojson/",
+    "overlayPatternField": "_has_acpv_overlay",
+    "overlayPatternLegendLabel": "Hatched = aggregated value",
+    "quartileColors": [
+      "#d9f0d3",
+      "#a6d96a",
+      "#66bd63",
+      "#1a9850"
+    ],
+    "quartileSpecialCases": [
+      {
+        "classValue": "no_bio",
+        "color": "#fff696",
+        "field": "no_collection",
+        "label": "No separate biowaste collection"
+      }
+    ],
+    "title": "Specifically collected amount of biowaste",
+    "transformName": "biowasteCollectionAmount"
+  },
+  "biowaste_collection_count": {
+    "categories": [
+      {
+        "color": "#08519c",
+        "label": "104 per year (2\u00d7 per week)",
+        "value": "twice_weekly"
+      },
+      {
+        "color": "#1E90FF",
+        "label": "52 per year (weekly)",
+        "value": "weekly"
+      },
+      {
+        "color": "#66CDAA",
+        "label": "26 per year (every 2 weeks)",
+        "value": "biweekly"
+      },
+      {
+        "color": "#4b2a60",
+        "label": "Less than 26 per year",
+        "value": "less_frequent"
+      },
+      {
+        "color": "#F4A460",
+        "label": "Seasonally varying",
+        "value": "seasonal"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate door-to-door biowaste collection",
+        "value": "no_door_to_door"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/biowaste-collection-count/",
+    "legendTitle": "Collection count",
+    "noDataLabel": "No data",
+    "numericField": "collection_count",
+    "quartileColors": [
+      "#4b2a60",
+      "#66CDAA",
+      "#1E90FF",
+      "#08519c"
+    ],
+    "quartilePreserveClasses": [
+      "seasonal",
+      "no_door_to_door"
+    ],
+    "title": "Annual biowaste collection count",
+    "transformName": "biowasteCollectionCount"
+  },
+  "biowaste_collection_point_count": {
+    "categories": [
+      {
+        "color": "#005a32",
+        "label": "\u2265 59",
+        "value": "very_high"
+      },
+      {
+        "color": "#31a354",
+        "label": "10 \u2013 58",
+        "value": "high"
+      },
+      {
+        "color": "#74c476",
+        "label": "2 \u2013 9",
+        "value": "medium"
+      },
+      {
+        "color": "#e0e0e0",
+        "label": "Collection points, but no data",
+        "value": "very_low"
+      },
+      {
+        "color": "#e0e0e0",
+        "label": "Full door-to-door / no data",
+        "value": "full_dtd"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/biowaste-collection-point-count/",
+    "legendTitle": "Biowaste collection points",
+    "noDataLabel": "No data",
+    "numericField": "collection_point_count",
+    "quartileColors": [
+      "#edf8e9",
+      "#74c476",
+      "#31a354",
+      "#005a32"
+    ],
+    "quartilePreserveClasses": [
+      "full_dtd"
+    ],
+    "title": "Number of biowaste collection points",
+    "transformName": "biowasteCollectionPointCount"
+  },
+  "biowaste_collection_system": {
+    "categories": [
+      {
+        "color": "#d0fcd5",
+        "label": "PAP total",
+        "value": "Door to door"
+      },
+      {
+        "color": "#a8e6cf",
+        "label": "PAP parcial",
+        "value": "Mixed door-to-door and bring point"
+      },
+      {
+        "color": "#3dc7dc",
+        "label": "Bring point",
+        "value": "Bring point"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate collection",
+        "value": "No separate collection"
+      }
+    ],
+    "dataField": "collection_system",
+    "dataUrl": "/waste_collection/waste-atlas/api/biowaste-collection-system/",
+    "legendTitle": "Collection system",
+    "title": "Biowaste collection system"
+  },
+  "biowaste_fee_system": {
+    "categories": [
+      {
+        "color": "#228B22",
+        "label": "Flat rate",
+        "value": "Flat fee"
+      },
+      {
+        "color": "#00ced1",
+        "label": "Flexible",
+        "value": "Flexible"
+      },
+      {
+        "color": "#FFD700",
+        "label": "Flexible+",
+        "value": "Flexible+"
+      },
+      {
+        "color": "#4b2a60",
+        "label": "Pay as you throw",
+        "value": "Pay as you throw (PAYT)"
+      },
+      {
+        "color": "#e41a1c",
+        "label": "No fee",
+        "value": "No fee"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate door-to-door biowaste collection",
+        "value": "no_door_to_door"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/biowaste-fee-system/",
+    "legendTitle": "Fee system",
+    "noDataLabel": "No data",
+    "title": "Fee system for biowaste collection",
+    "transformName": "biowasteFeeSystem"
+  },
+  "biowaste_frequency": {
+    "categories": [
+      {
+        "color": "#2e8b57",
+        "label": "Seasonally varying",
+        "value": "Fixed-Seasonal"
+      },
+      {
+        "color": "#4169e1",
+        "label": "Flexible",
+        "value": "Fixed-Flexible"
+      },
+      {
+        "color": "#8c9eff",
+        "label": "Fixed",
+        "value": "Fixed"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate door-to-door biowaste collection",
+        "value": "no_bio_collection"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/biowaste-frequency-type/",
+    "legendTitle": "Collection frequency setting",
+    "noDataLabel": "No data",
+    "title": "Collection frequency setting for biowaste collection",
+    "transformName": "biowasteFrequency"
+  },
+  "biowaste_impurity": {
+    "categories": [
+      {
+        "color": "#1a9850",
+        "label": "0\u20135 (very low)",
+        "value": "very_low"
+      },
+      {
+        "color": "#66bd63",
+        "label": "5\u201310 (low)",
+        "value": "low"
+      },
+      {
+        "color": "#fee08b",
+        "label": "10\u201320 (medium)",
+        "value": "medium"
+      },
+      {
+        "color": "#f46d43",
+        "label": "20\u201340 (high)",
+        "value": "high"
+      },
+      {
+        "color": "#d73027",
+        "label": "> 40 (very high)",
+        "value": "very_high"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "no_collection"
+      }
+    ],
+    "collectionYear": 2024,
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/biowaste-impurity/",
+    "legendTitle": "Impurity rate (%)",
+    "noDataLabel": "No data",
+    "numericField": "impurity_rate",
+    "quartileColors": [
+      "#1a9850",
+      "#66bd63",
+      "#f46d43",
+      "#d73027"
+    ],
+    "quartileSpecialCases": [
+      {
+        "classValue": "no_collection",
+        "color": "#fff696",
+        "field": "no_collection",
+        "label": "No separate biowaste collection"
+      }
+    ],
+    "title": "Biowaste impurity rate",
+    "transformName": "biowasteImpurity"
+  },
+  "biowaste_min_bin_size": {
+    "categories": [
+      {
+        "color": "#ffffe5",
+        "label": "< 40",
+        "value": "under_40"
+      },
+      {
+        "color": "#f7fcb9",
+        "label": "40",
+        "value": "exactly_40"
+      },
+      {
+        "color": "#d9f0a3",
+        "label": "41 \u2013 59",
+        "value": "between_40_and_60"
+      },
+      {
+        "color": "#addd8e",
+        "label": "60",
+        "value": "exactly_60"
+      },
+      {
+        "color": "#78c679",
+        "label": "61 \u2013 79",
+        "value": "between_60_and_80"
+      },
+      {
+        "color": "#41ab5d",
+        "label": "80",
+        "value": "exactly_80"
+      },
+      {
+        "color": "#238443",
+        "label": "81 \u2013 119",
+        "value": "between_80_and_120"
+      },
+      {
+        "color": "#006837",
+        "label": "120",
+        "value": "exactly_120"
+      },
+      {
+        "color": "#004529",
+        "label": "> 120",
+        "value": "over_120"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate door-to-door biowaste collection",
+        "value": "no_door_to_door"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/biowaste-min-bin-size/",
+    "enableQuartiles": false,
+    "legendCategoryOrder": [
+      "under_40",
+      "exactly_40",
+      "between_40_and_60",
+      "exactly_60",
+      "between_60_and_80",
+      "exactly_80",
+      "between_80_and_120",
+      "exactly_120",
+      "over_120",
+      "no_door_to_door"
+    ],
+    "legendTitle": "Min. bin size (L)",
+    "noDataLabel": "No data",
+    "numericField": "min_bin_size",
+    "quartileColors": [
+      "#d9f0d3",
+      "#a6d96a",
+      "#1a9850",
+      "#006837"
+    ],
+    "quartilePreserveClasses": [
+      "no_door_to_door"
+    ],
+    "showOnlyPresentCategories": true,
+    "title": "Smallest available bin size for biowaste (L)",
+    "transformName": "biowasteMinBinSize"
+  },
+  "biowaste_required_bin_capacity": {
+    "categories": [
+      {
+        "color": "#d9f0d3",
+        "label": "\u2264 5",
+        "value": "very_low"
+      },
+      {
+        "color": "#a6d96a",
+        "label": "6 \u2013 10",
+        "value": "low"
+      },
+      {
+        "color": "#66bd63",
+        "label": "11 \u2013 20",
+        "value": "medium"
+      },
+      {
+        "color": "#1a9850",
+        "label": "21 \u2013 60",
+        "value": "high"
+      },
+      {
+        "color": "#006837",
+        "label": "> 60",
+        "value": "very_high"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate door-to-door biowaste collection",
+        "value": "no_door_to_door"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/biowaste-required-bin-capacity/",
+    "legendTitle": "Minimum bin capacity (L/unit)",
+    "noDataLabel": "No data",
+    "numericField": "required_bin_capacity",
+    "quartileColors": [
+      "#d9f0d3",
+      "#a6d96a",
+      "#1a9850",
+      "#006837"
+    ],
+    "quartilePreserveClasses": [
+      "no_door_to_door"
+    ],
+    "title": "Required bin capacity for biowaste (L/reference unit)",
+    "transformName": "biowasteRequiredBinCapacity"
+  },
+  "bw_rw_kg": {
+    "categories": [
+      {
+        "color": "#fee5d9",
+        "label": "Quartile 1",
+        "value": "q1"
+      },
+      {
+        "color": "#fcae91",
+        "label": "Quartile 2",
+        "value": "q2"
+      },
+      {
+        "color": "#fb6a4a",
+        "label": "Quartile 3",
+        "value": "q3"
+      },
+      {
+        "color": "#cb181d",
+        "label": "Quartile 4",
+        "value": "q4"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/residual-waste-composition/",
+    "enableQuartiles": true,
+    "legendTitle": "Amount (kg/cap/a)",
+    "noDataLabel": "No data",
+    "numericField": "bw_rw_kg",
+    "quartileColors": [
+      "#fee5d9",
+      "#fcae91",
+      "#fb6a4a",
+      "#cb181d"
+    ],
+    "title": "Total biowaste in residual waste",
+    "tooltipFields": [
+      {
+        "field": "analysis_year",
+        "label": "Analysis year"
+      },
+      {
+        "field": "amount_basis_year",
+        "label": "Amount basis year"
+      }
+    ]
+  },
+  "bw_rw_percentage": {
+    "categories": [
+      {
+        "color": "#fee5d9",
+        "label": "Quartile 1",
+        "value": "q1"
+      },
+      {
+        "color": "#fcae91",
+        "label": "Quartile 2",
+        "value": "q2"
+      },
+      {
+        "color": "#fb6a4a",
+        "label": "Quartile 3",
+        "value": "q3"
+      },
+      {
+        "color": "#cb181d",
+        "label": "Quartile 4",
+        "value": "q4"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/residual-waste-composition/",
+    "enableQuartiles": true,
+    "legendTitle": "Share of residual waste (%)",
+    "noDataLabel": "No data",
+    "numericField": "bw_rw_percentage",
+    "quartileColors": [
+      "#fee5d9",
+      "#fcae91",
+      "#fb6a4a",
+      "#cb181d"
+    ],
+    "title": "Total biowaste in residual waste",
+    "tooltipFields": [
+      {
+        "field": "analysis_year",
+        "label": "Analysis year"
+      }
+    ]
+  },
+  "collection_count_ratio": {
+    "categories": [
+      {
+        "color": "#1b9e77",
+        "exportLabel": "2:1 bio > residual",
+        "label": "2 : 1 (biowaste collected twice as often)",
+        "value": "bio_2x"
+      },
+      {
+        "color": "#7570b3",
+        "exportLabel": "1:1 equal",
+        "label": "1 : 1 (collected equally often)",
+        "value": "same"
+      },
+      {
+        "color": "#d95f02",
+        "exportLabel": "1:2 bio < residual",
+        "label": "1 : 2 (residual collected twice as often)",
+        "value": "bio_half"
+      },
+      {
+        "color": "#F4A460",
+        "exportLabel": "Seasonal",
+        "label": "Seasonally varying ratio",
+        "value": "seasonal"
+      },
+      {
+        "color": "#fff696",
+        "exportLabel": "No separate door-to-door biowaste collection",
+        "label": "No separate door-to-door biowaste collection",
+        "value": "no_bio"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/collection-count-ratio/",
+    "legendTitle": "Bio : residual count",
+    "noDataLabel": "No data",
+    "title": "Annual collection-count ratio: biowaste vs residual waste",
+    "transformName": "collectionCountRatio"
+  },
+  "collection_orga_level": {
+    "catchmentDataUrl": "/waste_collection/waste-atlas/api/catchment/collection-geojson/",
+    "categories": [
+      {
+        "color": "#93d163",
+        "label": "Districts and district-free cities",
+        "value": "nuts"
+      },
+      {
+        "color": "#72a0dd",
+        "label": "Municipal level",
+        "value": "lau"
+      },
+      {
+        "color": "#d491f3",
+        "label": "Other administrative level",
+        "value": "individual"
+      }
+    ],
+    "dataField": "orga_level",
+    "dataUrl": "/waste_collection/waste-atlas/api/collection-orga-level/",
+    "legendTitle": "Administrative level",
+    "noDataLabel": "No data",
+    "title": "Administrative level of collections"
+  },
+  "collection_orga_level_eu": {
+    "catchmentDataUrl": "/waste_collection/waste-atlas/api/catchment/collection-geojson/",
+    "categories": [
+      {
+        "color": "#93d163",
+        "label": "NUTS 3 / county level",
+        "value": "nuts"
+      },
+      {
+        "color": "#72a0dd",
+        "label": "LAU / municipal level",
+        "value": "lau"
+      },
+      {
+        "color": "#d491f3",
+        "label": "Other administrative level",
+        "value": "individual"
+      }
+    ],
+    "dataField": "orga_level",
+    "dataUrl": "/waste_collection/waste-atlas/api/collection-orga-level/",
+    "legendTitle": "Administrative level",
+    "noDataLabel": "No data",
+    "title": "Administrative level of collections"
+  },
+  "collection_point_count": {
+    "categories": [
+      {
+        "color": "#d95f0e",
+        "label": "> 10",
+        "value": "high"
+      },
+      {
+        "color": "#fe9929",
+        "label": "6 \u2013 10",
+        "value": "medium"
+      },
+      {
+        "color": "#fed98e",
+        "label": "2 \u2013 5",
+        "value": "low"
+      },
+      {
+        "color": "#ffffd4",
+        "label": "Collection point",
+        "value": "very_low"
+      },
+      {
+        "color": "#e0e0e0",
+        "label": "Full Door to door/No data",
+        "value": "full_dtd"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/collection-point-count/",
+    "legendTitle": "Collection points",
+    "noDataLabel": "No data",
+    "numericField": "collection_point_count",
+    "quartileColors": [
+      "#ffffd4",
+      "#fed98e",
+      "#fe9929",
+      "#d95f0e"
+    ],
+    "quartilePreserveClasses": [
+      "full_dtd"
+    ],
+    "title": "Number of collection points",
+    "transformName": "collectionPointCount"
+  },
+  "collection_point_count_ratio": {
+    "categories": [
+      {
+        "color": "#1b9e77",
+        "exportLabel": "Bio > residual",
+        "label": "More biowaste than residual points",
+        "value": "bio_more"
+      },
+      {
+        "color": "#7570b3",
+        "exportLabel": "Equal",
+        "label": "Equal number of points",
+        "value": "same"
+      },
+      {
+        "color": "#d95f02",
+        "exportLabel": "Bio < residual",
+        "label": "Fewer biowaste than residual points",
+        "value": "bio_less"
+      },
+      {
+        "color": "#fff696",
+        "exportLabel": "No bio data",
+        "label": "No biowaste collection-point data",
+        "value": "no_bio"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/collection-point-count-ratio/",
+    "legendTitle": "Bio / residual points",
+    "noDataLabel": "No data",
+    "title": "Collection points: biowaste vs residual waste",
+    "transformName": "collectionPointCountRatio"
+  },
+  "collection_support": {
+    "categories": [
+      {
+        "color": "#4caf50",
+        "label": "Paper allowed, compostable plastic bags allowed",
+        "value": "paper_a_plastic_a"
+      },
+      {
+        "color": "#fdd835",
+        "label": "Paper forbidden, compostable plastic bags allowed",
+        "value": "paper_f_plastic_a"
+      },
+      {
+        "color": "#2196f3",
+        "label": "Paper allowed, compostable plastic bags forbidden",
+        "value": "paper_a_plastic_f"
+      },
+      {
+        "color": "#90caf9",
+        "label": "Paper allowed, compostable plastic bags unknown",
+        "value": "paper_a_plastic_n"
+      },
+      {
+        "color": "#7e57c2",
+        "label": "Paper forbidden, compostable plastic bags forbidden",
+        "value": "paper_f_plastic_f"
+      },
+      {
+        "color": "#ff7043",
+        "label": "Paper unknown, compostable plastic bags forbidden",
+        "value": "paper_n_plastic_f"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "no_collection"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/collection-support/",
+    "legendTitle": "Collection aids",
+    "noDataLabel": "No data",
+    "title": "Accepted materials for biowaste collection aids",
+    "transformName": "collectionSupport"
+  },
+  "collection_system": {
+    "categories": [
+      {
+        "color": "#d0fcd5",
+        "label": "Door to door collection",
+        "value": "Door to door"
+      },
+      {
+        "color": "#a8e6cf",
+        "label": "Mixed door-to-door and bring point",
+        "value": "Mixed door-to-door and bring point"
+      },
+      {
+        "color": "#3dc79b",
+        "label": "Recycling centre",
+        "value": "Recycling centre"
+      },
+      {
+        "color": "#3dc7dc",
+        "label": "Bring point",
+        "value": "Bring point"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "No separate collection"
+      }
+    ],
+    "conflictOverlayLabel": "Conflicting catchments (>1 collection system)",
+    "conflictTheme": "collection_system",
+    "conflictUrl": "/waste_collection/waste-atlas/api/collection-conflicts/",
+    "dataField": "collection_system",
+    "dataUrl": "/waste_collection/waste-atlas/api/collection-system/",
+    "legendTitle": "Collection system",
+    "noDataLabel": "No data",
+    "title": "Primary collection system for biowaste"
+  },
+  "combined_collection_count": {
+    "categories": [
+      {
+        "color": "#64427b",
+        "exportLabel": "More / more",
+        "label": "Biowaste more often, residual waste more often",
+        "value": "bio_more_res_more"
+      },
+      {
+        "color": "#9c67a5",
+        "exportLabel": "More / 2 weeks",
+        "label": "Biowaste more often, residual waste every two weeks",
+        "value": "bio_more_res_bi"
+      },
+      {
+        "color": "#c5a5cf",
+        "exportLabel": "More / less",
+        "label": "Biowaste more often, residual waste less frequent",
+        "value": "bio_more_res_less"
+      },
+      {
+        "color": "#2862a8",
+        "exportLabel": "2 weeks / more",
+        "label": "Biowaste every two weeks, residual waste more often",
+        "value": "bio_bi_res_more"
+      },
+      {
+        "color": "#4292c6",
+        "exportLabel": "2 weeks / 2 weeks",
+        "label": "Biowaste every two weeks, residual waste every two weeks",
+        "value": "bio_bi_res_bi"
+      },
+      {
+        "color": "#73b2d8",
+        "exportLabel": "2 weeks / less",
+        "label": "Biowaste every two weeks, residual waste less frequent",
+        "value": "bio_bi_res_less"
+      },
+      {
+        "color": "#e33e88",
+        "exportLabel": "Less / more",
+        "label": "Biowaste less frequent, residual waste more often",
+        "value": "bio_less_res_more"
+      },
+      {
+        "color": "#ff7986",
+        "exportLabel": "Less / 2 weeks",
+        "label": "Biowaste less frequent, residual waste every two weeks",
+        "value": "bio_less_res_bi"
+      },
+      {
+        "color": "#f7b1b8",
+        "exportLabel": "Less / less",
+        "label": "Biowaste less frequent, residual waste less frequent",
+        "value": "bio_less_res_less"
+      },
+      {
+        "color": "#fff696",
+        "exportLabel": "No separate door-to-door biowaste collection",
+        "label": "No separate door-to-door biowaste collection",
+        "value": "no_bio"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/combined-collection-count/",
+    "exportLegendTitle": "Collection count: bio / residual",
+    "legendTitle": "Collection count",
+    "noDataLabel": "No data",
+    "title": "Annual collection count: biowaste vs residual waste",
+    "transformName": "combinedCollectionCount"
+  },
+  "combined_collection_system": {
+    "categories": [
+      {
+        "color": "#238b45",
+        "exportLabel": "PAP total / PAP total",
+        "label": "PAP total / PAP total",
+        "value": "Door to door / Door to door"
+      },
+      {
+        "color": "#74c476",
+        "exportLabel": "PAP total / BP",
+        "label": "PAP total / Bring point",
+        "value": "Door to door / Bring point"
+      },
+      {
+        "color": "#bae4b3",
+        "exportLabel": "PAP total / none",
+        "label": "PAP total / no residual",
+        "value": "Door to door / No separate collection"
+      },
+      {
+        "color": "#2b8cbe",
+        "exportLabel": "PAP parcial / PAP total",
+        "label": "PAP parcial / PAP total",
+        "value": "Mixed door-to-door and bring point / Door to door"
+      },
+      {
+        "color": "#7bccc4",
+        "exportLabel": "PAP parcial / BP",
+        "label": "PAP parcial / Bring point",
+        "value": "Mixed door-to-door and bring point / Bring point"
+      },
+      {
+        "color": "#bae4bc",
+        "exportLabel": "PAP parcial / none",
+        "label": "PAP parcial / no residual",
+        "value": "Mixed door-to-door and bring point / No separate collection"
+      },
+      {
+        "color": "#756bb1",
+        "exportLabel": "BP / PAP total",
+        "label": "Bring point / PAP total",
+        "value": "Bring point / Door to door"
+      },
+      {
+        "color": "#9e9ac8",
+        "exportLabel": "BP / BP",
+        "label": "Bring point / Bring point",
+        "value": "Bring point / Bring point"
+      },
+      {
+        "color": "#cbc9e2",
+        "exportLabel": "BP / none",
+        "label": "Bring point / no residual",
+        "value": "Bring point / No separate collection"
+      },
+      {
+        "color": "#fd8d3c",
+        "exportLabel": "None / PAP total",
+        "label": "No biowaste / PAP total",
+        "value": "No separate collection / Door to door"
+      },
+      {
+        "color": "#fdae6b",
+        "exportLabel": "None / BP",
+        "label": "No biowaste / Bring point",
+        "value": "No separate collection / Bring point"
+      },
+      {
+        "color": "#fff696",
+        "exportLabel": "None / none",
+        "label": "No separate collection",
+        "value": "No separate collection / No separate collection"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/combined-collection-system/",
+    "legendTitle": "Collection system: bio / residual",
+    "noDataLabel": "No data",
+    "title": "Collection system combination: biowaste vs residual waste",
+    "transformName": "combinedCollectionSystem"
+  },
+  "combined_fee_system": {
+    "categories": [
+      {
+        "color": "#00ced1",
+        "exportLabel": "BWB & RWB: Flexible",
+        "label": "BWB & RWB: Flexible",
+        "value": "flex_flex"
+      },
+      {
+        "color": "#80e6e8",
+        "exportLabel": "BWB: No fee | RWB: Flexible",
+        "label": "BWB: No fee | RWB: Flexible",
+        "value": "no_fee_flex"
+      },
+      {
+        "color": "#4b2a60",
+        "exportLabel": "BWB & RWB: PAYT",
+        "label": "BWB & RWB: PAYT",
+        "value": "payt_payt"
+      },
+      {
+        "color": "#7b5a8c",
+        "exportLabel": "BWB: Flexible | RWB: PAYT",
+        "label": "BWB: Flexible | RWB: PAYT",
+        "value": "flex_payt"
+      },
+      {
+        "color": "#b6a1c5",
+        "exportLabel": "BWB: No fee | RWB: PAYT",
+        "label": "BWB: No fee | RWB: PAYT",
+        "value": "no_fee_payt"
+      },
+      {
+        "color": "#ffd700",
+        "exportLabel": "BWB: Flexible | RWB: Flexible+",
+        "label": "BWB: Flexible | RWB: Flexible+",
+        "value": "flex_flex_plus"
+      },
+      {
+        "color": "#fff696",
+        "exportLabel": "No separate door-to-door biowaste collection",
+        "label": "No separate door-to-door biowaste collection",
+        "value": "no_bio"
+      },
+      {
+        "color": "#4daf4a",
+        "exportLabel": "Other combinations",
+        "label": "Other combinations",
+        "value": "other_combined"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/combined-fee-system/",
+    "exportLegendBottomColumns": 2,
+    "legendTitle": "Fee: bio / residual",
+    "noDataLabel": "No data",
+    "title": "Fee system: biowaste vs residual waste",
+    "transformName": "combinedFeeSystem"
+  },
+  "combined_frequency": {
+    "categories": [
+      {
+        "color": "#2e8b57",
+        "exportLabel": "Seasonal / flexible",
+        "label": "Biowaste seasonal, residual flexible",
+        "value": "bio_seasonal_res_flexible"
+      },
+      {
+        "color": "#4169e1",
+        "exportLabel": "Flexible / flexible",
+        "label": "Biowaste flexible, residual flexible",
+        "value": "bio_flexible_res_flexible"
+      },
+      {
+        "color": "#9ecae1",
+        "exportLabel": "Fixed / flexible",
+        "label": "Biowaste fixed, residual flexible",
+        "value": "bio_fixed_res_flexible"
+      },
+      {
+        "color": "#66cdaa",
+        "exportLabel": "Seasonal / fixed",
+        "label": "Biowaste seasonal, residual fixed",
+        "value": "bio_seasonal_res_fixed"
+      },
+      {
+        "color": "#e08840",
+        "exportLabel": "Flexible / fixed",
+        "label": "Biowaste flexible, residual fixed",
+        "value": "bio_flexible_res_fixed"
+      },
+      {
+        "color": "#6a51a3",
+        "exportLabel": "Fixed / fixed",
+        "label": "Biowaste fixed, residual fixed",
+        "value": "bio_fixed_res_fixed"
+      },
+      {
+        "color": "#fff696",
+        "exportLabel": "No separate door-to-door biowaste collection",
+        "label": "No separate door-to-door biowaste collection",
+        "value": "no_bio_collection"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/combined-frequency-type/",
+    "exportLegendTitle": "Schedule: bio / residual",
+    "legendTitle": "Collection frequency setting",
+    "noDataLabel": "No data",
+    "title": "Collection frequency setting: biowaste vs residual waste",
+    "transformName": "combinedFrequency"
+  },
+  "connection_rate": {
+    "categories": [
+      {
+        "color": "#003f5c",
+        "label": "100% \u2013 full connection",
+        "value": "full_connection"
+      },
+      {
+        "color": "#00608e",
+        "label": "75% \u2013 <100%",
+        "value": "75-99"
+      },
+      {
+        "color": "#0090cb",
+        "label": "50% \u2013 <75%",
+        "value": "50-74"
+      },
+      {
+        "color": "#7fcce9",
+        "label": "25% \u2013 <50%",
+        "value": "25-49"
+      },
+      {
+        "color": "#d1e7e6",
+        "label": "0% \u2013 <25%",
+        "value": "0-24"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate door-to-door biowaste collection",
+        "value": "no_d2d"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/connection-rate/",
+    "enableQuartiles": true,
+    "legendTitle": "Connection rate",
+    "noDataLabel": "No data",
+    "numericField": "connection_rate",
+    "quartileColors": [
+      "#d1e7e6",
+      "#7fcce9",
+      "#0090cb",
+      "#00608e"
+    ],
+    "quartileDefaultEnabled": false,
+    "quartileDisplayMultiplier": 100,
+    "quartilePreserveClasses": [
+      "no_d2d"
+    ],
+    "title": "Connection rate for door-to-door biowaste collection",
+    "tooltipFields": [
+      {
+        "field": "reporting_year",
+        "label": "Reporting year"
+      }
+    ],
+    "transformName": "connectionRate"
+  },
+  "denmark_collection_support": {
+    "categories": [
+      {
+        "color": "#4caf50",
+        "label": "Paper allowed, plastic bags allowed",
+        "value": "paper_a_plastic_a"
+      },
+      {
+        "color": "#fdd835",
+        "label": "Paper forbidden, plastic bags allowed",
+        "value": "paper_f_plastic_a"
+      },
+      {
+        "color": "#2196f3",
+        "label": "Paper allowed, plastic bags forbidden",
+        "value": "paper_a_plastic_f"
+      },
+      {
+        "color": "#90caf9",
+        "label": "Paper allowed, plastic bags unknown",
+        "value": "paper_a_plastic_n"
+      },
+      {
+        "color": "#7e57c2",
+        "label": "Paper forbidden, plastic bags forbidden",
+        "value": "paper_f_plastic_f"
+      },
+      {
+        "color": "#ff7043",
+        "label": "Paper unknown, plastic bags forbidden",
+        "value": "paper_n_plastic_f"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "no_collection"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/regular-plastic-collection-support/",
+    "legendTitle": "Collection aids",
+    "noDataLabel": "No data",
+    "title": "Accepted materials for biowaste collection aids",
+    "transformName": "denmarkCollectionSupport"
+  },
+  "denmark_food_waste_category": {
+    "categories": [
+      {
+        "color": "#2c7da0",
+        "label": "All food waste",
+        "value": "All four materials"
+      },
+      {
+        "color": "#61a35c",
+        "label": "No raw animal products",
+        "value": "No raw meat"
+      },
+      {
+        "color": "#41b6c4",
+        "label": "No animal products",
+        "value": "No meat"
+      },
+      {
+        "color": "#9ac93e",
+        "label": "Only raw plant-based products",
+        "value": "Only raw plant-based"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "No separate collection"
+      }
+    ],
+    "dataField": "food_waste_category",
+    "dataUrl": "/waste_collection/waste-atlas/api/food-waste-category/",
+    "legendTitle": "Accepted food waste",
+    "noDataLabel": "No data",
+    "title": "Accepted food waste in biowaste"
+  },
+  "denmark_paper_bags": {
+    "categories": [
+      {
+        "color": "#2196f3",
+        "label": "Allowed",
+        "value": "allowed"
+      },
+      {
+        "color": "#f57c00",
+        "label": "Forbidden",
+        "value": "forbidden"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "No separate collection"
+      }
+    ],
+    "dataField": "status",
+    "dataUrl": "/waste_collection/waste-atlas/api/paper-bags/",
+    "legendTitle": "Paper bags",
+    "noDataLabel": "No data",
+    "title": "Use of paper bags for biowaste collection"
+  },
+  "denmark_plastic_bags": {
+    "categories": [
+      {
+        "color": "#fdd835",
+        "label": "Allowed",
+        "value": "allowed"
+      },
+      {
+        "color": "#78909c",
+        "label": "Forbidden",
+        "value": "forbidden"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "No separate collection"
+      }
+    ],
+    "dataField": "status",
+    "dataUrl": "/waste_collection/waste-atlas/api/regular-plastic-bags/",
+    "legendTitle": "Plastic bags",
+    "noDataLabel": "No data",
+    "title": "Use of plastic bags for biowaste collection"
+  },
+  "food_waste_category": {
+    "categories": [
+      {
+        "color": "#2c7da0",
+        "label": "All food waste",
+        "value": "All four materials"
+      },
+      {
+        "color": "#61a35c",
+        "label": "No raw animal products",
+        "value": "No raw meat"
+      },
+      {
+        "color": "#41b6c4",
+        "label": "No animal products",
+        "value": "No meat"
+      },
+      {
+        "color": "#9ac93e",
+        "label": "Only raw plant-based products",
+        "value": "Only raw plant-based"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "No separate collection"
+      }
+    ],
+    "dataField": "food_waste_category",
+    "dataUrl": "/waste_collection/waste-atlas/api/food-waste-category/",
+    "legendTitle": "Accepted food waste",
+    "noDataLabel": "No data",
+    "title": "Accepted food waste in biowaste"
+  },
+  "fwtot_rw_kg": {
+    "categories": [
+      {
+        "color": "#fee5d9",
+        "label": "Quartile 1",
+        "value": "q1"
+      },
+      {
+        "color": "#fcae91",
+        "label": "Quartile 2",
+        "value": "q2"
+      },
+      {
+        "color": "#fb6a4a",
+        "label": "Quartile 3",
+        "value": "q3"
+      },
+      {
+        "color": "#cb181d",
+        "label": "Quartile 4",
+        "value": "q4"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/residual-waste-composition/",
+    "enableQuartiles": true,
+    "legendTitle": "Amount (kg/cap/a)",
+    "noDataLabel": "No data",
+    "numericField": "fwtot_rw_kg",
+    "quartileColors": [
+      "#fee5d9",
+      "#fcae91",
+      "#fb6a4a",
+      "#cb181d"
+    ],
+    "title": "Total food waste in residual waste",
+    "tooltipFields": [
+      {
+        "field": "analysis_year",
+        "label": "Analysis year"
+      },
+      {
+        "field": "amount_basis_year",
+        "label": "Amount basis year"
+      }
+    ]
+  },
+  "green_waste_collection_amount": {
+    "categories": [
+      {
+        "color": "#1b9e77",
+        "label": "151 and more (very high)",
+        "value": "very_high"
+      },
+      {
+        "color": "#66a61e",
+        "label": "101\u2013150 (high)",
+        "value": "high"
+      },
+      {
+        "color": "#a6d854",
+        "label": "51\u2013100 (medium)",
+        "value": "medium"
+      },
+      {
+        "color": "#d9f0d3",
+        "label": "0\u201350 (low)",
+        "value": "low"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate green waste collection",
+        "value": "no_green"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/green-waste-collection-amount/",
+    "legendTitle": "Collected amount (kg/cap/a)",
+    "noDataLabel": "No data",
+    "numericField": "amount",
+    "quartileColors": [
+      "#d9f0d3",
+      "#a6d854",
+      "#66a61e",
+      "#1b9e77"
+    ],
+    "quartileSpecialCases": [
+      {
+        "classValue": "no_green",
+        "color": "#fff696",
+        "field": "no_collection",
+        "label": "No separate green waste collection"
+      }
+    ],
+    "title": "Specifically collected amount of green waste",
+    "transformName": "greenWasteCollectionAmount"
+  },
+  "green_waste_collection_system_count": {
+    "categories": [
+      {
+        "color": "#1b9e77",
+        "label": "3 or more collection systems",
+        "value": "3plus"
+      },
+      {
+        "color": "#66a61e",
+        "label": "2 collection systems",
+        "value": "2"
+      },
+      {
+        "color": "#a6d854",
+        "label": "1 collection system",
+        "value": "1"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/green-waste-collection-system-count/",
+    "legendTitle": "Number of collection systems",
+    "noDataLabel": "No data",
+    "title": "Number of green waste collection systems per catchment",
+    "transformName": "greenWasteCollectionSystemCount"
+  },
+  "min_bin_size_ratio": {
+    "categories": [
+      {
+        "color": "#1b9e77",
+        "exportLabel": "Bio bin larger",
+        "label": "Biowaste bin larger than residual waste bin",
+        "value": "bio_larger"
+      },
+      {
+        "color": "#7570b3",
+        "exportLabel": "Equal bin size",
+        "label": "Biowaste and residual waste bins equal size",
+        "value": "same"
+      },
+      {
+        "color": "#d95f02",
+        "exportLabel": "Bio bin smaller",
+        "label": "Biowaste bin smaller than residual waste bin",
+        "value": "bio_smaller"
+      },
+      {
+        "color": "#fff696",
+        "exportLabel": "No separate door-to-door biowaste collection",
+        "label": "No separate door-to-door biowaste collection",
+        "value": "no_bio"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/min-bin-size-ratio/",
+    "legendTitle": "Biowaste / Residual waste",
+    "noDataLabel": "No data",
+    "title": "Ratio of minimum bin sizes (Biowaste / Residual waste)",
+    "transformName": "minBinSizeRatio"
+  },
+  "orga_level": {
+    "catchmentDataUrl": "/waste_collection/waste-atlas/api/catchment/collector-geojson/",
+    "categories": [
+      {
+        "color": "#93d163",
+        "label": "Districts and district-free cities",
+        "value": "nuts"
+      },
+      {
+        "color": "#72a0dd",
+        "label": "Municipal level",
+        "value": "lau"
+      },
+      {
+        "color": "#d491f3",
+        "label": "Other administrative level",
+        "value": "individual"
+      }
+    ],
+    "dataField": "orga_level",
+    "dataUrl": "/waste_collection/waste-atlas/api/collector-orga-level/",
+    "legendTitle": "Administrative level",
+    "noDataLabel": "No data",
+    "title": "Administrative level of collectors"
+  },
+  "orga_level_eu": {
+    "catchmentDataUrl": "/waste_collection/waste-atlas/api/catchment/collector-geojson/",
+    "categories": [
+      {
+        "color": "#93d163",
+        "label": "NUTS 3 / county level",
+        "value": "nuts"
+      },
+      {
+        "color": "#72a0dd",
+        "label": "LAU / municipal level",
+        "value": "lau"
+      },
+      {
+        "color": "#d491f3",
+        "label": "Other administrative level",
+        "value": "individual"
+      }
+    ],
+    "dataField": "orga_level",
+    "dataUrl": "/waste_collection/waste-atlas/api/collector-orga-level/",
+    "legendTitle": "Administrative level",
+    "noDataLabel": "No data",
+    "title": "Administrative level of collectors"
+  },
+  "organic_collection_amount": {
+    "categories": [
+      {
+        "color": "#1a9850",
+        "label": "> 300",
+        "value": "very_high"
+      },
+      {
+        "color": "#66bd63",
+        "label": "201 \u2013 300",
+        "value": "high"
+      },
+      {
+        "color": "#a6d96a",
+        "label": "101 \u2013 200",
+        "value": "medium"
+      },
+      {
+        "color": "#d9f0d3",
+        "label": "51 \u2013 100",
+        "value": "low"
+      },
+      {
+        "color": "#f7fcf0",
+        "label": "0 \u2013 50",
+        "value": "very_low"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate collection",
+        "value": "no_collection"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/organic-collection-amount/",
+    "legendTitle": "Organic-fraction amount (kg/cap/a)",
+    "noDataLabel": "No data",
+    "numericField": "amount",
+    "quartileColors": [
+      "#d9f0d3",
+      "#a6d96a",
+      "#66bd63",
+      "#1a9850"
+    ],
+    "quartileSpecialCases": [
+      {
+        "classValue": "no_collection",
+        "color": "#fff696",
+        "field": "no_collection",
+        "label": "No separate collection"
+      }
+    ],
+    "title": "Aggregated collected amount of organic fractions (kg/cap/a)",
+    "transformName": "organicCollectionAmount"
+  },
+  "organic_waste_ratio": {
+    "categories": [
+      {
+        "color": "#0868ac",
+        "label": "> 66 (much more organic than residual)",
+        "value": "very_high"
+      },
+      {
+        "color": "#43a2ca",
+        "label": "51\u201366 (more organic than residual)",
+        "value": "high"
+      },
+      {
+        "color": "#7bccc4",
+        "label": "34\u201350 (more residual than organic)",
+        "value": "medium"
+      },
+      {
+        "color": "#bae4bc",
+        "label": "0\u201333 (low organic share)",
+        "value": "low"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate collection",
+        "value": "no_collection"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/organic-waste-ratio/",
+    "legendTitle": "Organic stream separation rate (%)",
+    "noDataLabel": "No data",
+    "numericField": "ratio",
+    "quartileColors": [
+      "#bae4bc",
+      "#7bccc4",
+      "#43a2ca",
+      "#0868ac"
+    ],
+    "quartileDisplayMultiplier": 100,
+    "quartileSpecialCases": [
+      {
+        "classValue": "no_collection",
+        "color": "#fff696",
+        "field": "no_collection",
+        "label": "No separate collection"
+      }
+    ],
+    "title": "Organic stream separation rate (%)",
+    "transformName": "organicWasteRatio"
+  },
+  "paper_bags": {
+    "categories": [
+      {
+        "color": "#2196f3",
+        "label": "Allowed",
+        "value": "allowed"
+      },
+      {
+        "color": "#f57c00",
+        "label": "Forbidden",
+        "value": "forbidden"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "No separate collection"
+      }
+    ],
+    "dataField": "status",
+    "dataUrl": "/waste_collection/waste-atlas/api/paper-bags/",
+    "legendTitle": "Paper bags",
+    "noDataLabel": "No data",
+    "title": "Use of paper bags for biowaste collection"
+  },
+  "participation_policy": {
+    "categories": [
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "no_bio_collection"
+      },
+      {
+        "color": "#00608e",
+        "label": "Mandatory",
+        "value": "MANDATORY"
+      },
+      {
+        "color": "#0090cb",
+        "label": "Mandatory, except home composters",
+        "value": "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION"
+      },
+      {
+        "color": "#7fcce9",
+        "label": "Voluntary",
+        "value": "VOLUNTARY"
+      }
+    ],
+    "dataField": "participation_policy",
+    "dataUrl": "/waste_collection/waste-atlas/api/participation-policy/",
+    "legendTitle": "Participation Policy",
+    "noDataLabel": "No data",
+    "title": "Participation Policy"
+  },
+  "plastic_bags": {
+    "categories": [
+      {
+        "color": "#fdd835",
+        "label": "Allowed",
+        "value": "allowed"
+      },
+      {
+        "color": "#78909c",
+        "label": "Forbidden",
+        "value": "forbidden"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "No separate collection"
+      }
+    ],
+    "dataField": "status",
+    "dataUrl": "/waste_collection/waste-atlas/api/plastic-bags/",
+    "legendTitle": "Plastic bags",
+    "noDataLabel": "No data",
+    "title": "Use of compostable plastic bags for biowaste collection"
+  },
+  "population_density": {
+    "categories": [
+      {
+        "color": "#ffea46",
+        "label": "Urban (> 1 500 / km\u00b2)",
+        "value": "urban"
+      },
+      {
+        "color": "#7d7c78",
+        "label": "Suburban (300 \u2013 1 500 / km\u00b2)",
+        "value": "suburban"
+      },
+      {
+        "color": "#00204d",
+        "label": "Rural (< 300 / km\u00b2)",
+        "value": "rural"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/population/",
+    "legendTitle": "Population density",
+    "noDataLabel": "No data",
+    "numericField": "population_density",
+    "quartileColors": [
+      "#00204d",
+      "#7d7c78",
+      "#ffea46",
+      "#fff59d"
+    ],
+    "title": "Population density",
+    "transformName": "populationDensity"
+  },
+  "residual_collection_amount": {
+    "categories": [
+      {
+        "color": "#d95f0e",
+        "label": "226\u2013311 (high)",
+        "value": "high"
+      },
+      {
+        "color": "#fe9929",
+        "label": "151\u2013225 (medium)",
+        "value": "medium"
+      },
+      {
+        "color": "#fed98e",
+        "label": "76\u2013150 (low)",
+        "value": "low"
+      },
+      {
+        "color": "#ffffd4",
+        "label": "0 \u2013 75 (Very low)",
+        "value": "very_low"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/residual-collection-amount/",
+    "legendTitle": "Collected amount (kg/cap/a)",
+    "noDataLabel": "No data",
+    "numericField": "amount",
+    "outlineGeoJsonUrl": "/waste_collection/waste-atlas/api/residual-collection-amount/acpv-outline-geojson/",
+    "overlayPatternField": "_has_acpv_overlay",
+    "overlayPatternLegendLabel": "Hatched = aggregated value",
+    "quartileColors": [
+      "#ffffd4",
+      "#fed98e",
+      "#fe9929",
+      "#d95f0e"
+    ],
+    "title": "Specifically collected amount of residual waste",
+    "transformName": "residualCollectionAmount"
+  },
+  "residual_collection_count": {
+    "categories": [
+      {
+        "color": "#08306B",
+        "label": "104 per year (2\u00d7 per week)",
+        "value": "twice_weekly"
+      },
+      {
+        "color": "#4292C6",
+        "label": "52 per year (weekly)",
+        "value": "weekly"
+      },
+      {
+        "color": "#9ECAE1",
+        "label": "26 per year (every 2 weeks)",
+        "value": "biweekly"
+      },
+      {
+        "color": "#FDBF6F",
+        "label": "< 26 per year (every 3\u20134 weeks)",
+        "value": "less_frequent"
+      },
+      {
+        "color": "#e4595b",
+        "label": "Seasonally varying",
+        "value": "seasonal"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/residual-collection-count/",
+    "legendTitle": "Collection count",
+    "noDataLabel": "No data",
+    "numericField": "collection_count",
+    "quartileColors": [
+      "#FDBF6F",
+      "#9ECAE1",
+      "#4292C6",
+      "#08306B"
+    ],
+    "quartilePreserveClasses": [
+      "seasonal"
+    ],
+    "title": "Annual residual waste collection count",
+    "transformName": "residualCollectionCount"
+  },
+  "residual_collection_point_count": {
+    "categories": [
+      {
+        "color": "#67000d",
+        "label": "\u2265 121",
+        "value": "very_high"
+      },
+      {
+        "color": "#cb181d",
+        "label": "59 \u2013 120",
+        "value": "high"
+      },
+      {
+        "color": "#fc9272",
+        "label": "8 \u2013 58",
+        "value": "medium"
+      },
+      {
+        "color": "#fee0d2",
+        "label": "1 \u2013 7",
+        "value": "low"
+      },
+      {
+        "color": "#e0e0e0",
+        "label": "Full door-to-door / no data",
+        "value": "full_dtd"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/residual-collection-point-count/",
+    "legendTitle": "Residual collection points",
+    "noDataLabel": "No data",
+    "numericField": "collection_point_count",
+    "quartileColors": [
+      "#fee0d2",
+      "#fc9272",
+      "#cb181d",
+      "#67000d"
+    ],
+    "quartilePreserveClasses": [
+      "full_dtd"
+    ],
+    "title": "Number of residual waste collection points",
+    "transformName": "residualCollectionPointCount"
+  },
+  "residual_collection_system": {
+    "categories": [
+      {
+        "color": "#d0fcd5",
+        "label": "PAP total",
+        "value": "Door to door"
+      },
+      {
+        "color": "#a8e6cf",
+        "label": "PAP parcial",
+        "value": "Mixed door-to-door and bring point"
+      },
+      {
+        "color": "#3dc7dc",
+        "label": "Bring point",
+        "value": "Bring point"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate collection",
+        "value": "No separate collection"
+      }
+    ],
+    "dataField": "collection_system",
+    "dataUrl": "/waste_collection/waste-atlas/api/residual-collection-system/",
+    "legendTitle": "Collection system",
+    "title": "Residual waste collection system"
+  },
+  "residual_fee_system": {
+    "categories": [
+      {
+        "color": "#4daf4a",
+        "label": "Flat rate",
+        "value": "Flat fee"
+      },
+      {
+        "color": "#00ced1",
+        "label": "Flexible",
+        "value": "Flexible"
+      },
+      {
+        "color": "#ffd700",
+        "label": "Flexible+",
+        "value": "Flexible+"
+      },
+      {
+        "color": "#4b2a60",
+        "label": "Pay as you throw",
+        "value": "Pay as you throw (PAYT)"
+      }
+    ],
+    "dataField": "fee_system",
+    "dataUrl": "/waste_collection/waste-atlas/api/residual-fee-system/",
+    "legendTitle": "Fee system",
+    "noDataLabel": "No data",
+    "title": "Fee system for residual waste collection"
+  },
+  "residual_frequency": {
+    "categories": [
+      {
+        "color": "#2e8b57",
+        "label": "Seasonally varying",
+        "value": "Fixed-Seasonal"
+      },
+      {
+        "color": "#4169e1",
+        "label": "Flexible",
+        "value": "Fixed-Flexible"
+      },
+      {
+        "color": "#b0b0ff",
+        "label": "Fixed",
+        "value": "Fixed"
+      }
+    ],
+    "dataField": "frequency_type",
+    "dataUrl": "/waste_collection/waste-atlas/api/residual-frequency-type/",
+    "legendTitle": "Collection frequency setting",
+    "noDataLabel": "No data",
+    "title": "Collection frequency setting for residual waste collection"
+  },
+  "residual_min_bin_size": {
+    "categories": [
+      {
+        "color": "#fff5f0",
+        "label": "< 40",
+        "value": "under_40"
+      },
+      {
+        "color": "#fee0d2",
+        "label": "40",
+        "value": "exactly_40"
+      },
+      {
+        "color": "#fcbba1",
+        "label": "41 \u2013 59",
+        "value": "between_40_and_60"
+      },
+      {
+        "color": "#fc9272",
+        "label": "60",
+        "value": "exactly_60"
+      },
+      {
+        "color": "#fb6a4a",
+        "label": "61 \u2013 79",
+        "value": "between_60_and_80"
+      },
+      {
+        "color": "#ef3b2c",
+        "label": "80",
+        "value": "exactly_80"
+      },
+      {
+        "color": "#cb181d",
+        "label": "81 \u2013 119",
+        "value": "between_80_and_120"
+      },
+      {
+        "color": "#a50f15",
+        "label": "120",
+        "value": "exactly_120"
+      },
+      {
+        "color": "#67000d",
+        "label": "> 120",
+        "value": "over_120"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/residual-min-bin-size/",
+    "enableQuartiles": false,
+    "legendCategoryOrder": [
+      "under_40",
+      "exactly_40",
+      "between_40_and_60",
+      "exactly_60",
+      "between_60_and_80",
+      "exactly_80",
+      "between_80_and_120",
+      "exactly_120",
+      "over_120"
+    ],
+    "legendTitle": "Min. bin size (L)",
+    "noDataLabel": "No data",
+    "numericField": "min_bin_size",
+    "quartileColors": [
+      "#fde0dd",
+      "#fc9272",
+      "#de2d26",
+      "#67000d"
+    ],
+    "showOnlyPresentCategories": true,
+    "title": "Smallest available bin size for residual waste (L)",
+    "transformName": "residualMinBinSize"
+  },
+  "residual_required_bin_capacity": {
+    "categories": [
+      {
+        "color": "#fde0dd",
+        "label": "\u2264 10",
+        "value": "very_low"
+      },
+      {
+        "color": "#fc9272",
+        "label": "11 \u2013 20",
+        "value": "low"
+      },
+      {
+        "color": "#de2d26",
+        "label": "21 \u2013 40",
+        "value": "medium"
+      },
+      {
+        "color": "#a50f15",
+        "label": "41 \u2013 80",
+        "value": "high"
+      },
+      {
+        "color": "#67000d",
+        "label": "> 80",
+        "value": "very_high"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/residual-required-bin-capacity/",
+    "legendTitle": "Minimum bin capacity (L/unit)",
+    "noDataLabel": "No data",
+    "numericField": "required_bin_capacity",
+    "quartileColors": [
+      "#fde0dd",
+      "#fc9272",
+      "#a50f15",
+      "#67000d"
+    ],
+    "title": "Required bin capacity for residual waste (L/reference unit)",
+    "transformName": "residualRequiredBinCapacity"
+  },
+  "rp_biowaste_collection_count": {
+    "categories": [
+      {
+        "color": "#fdd0a2",
+        "label": "< 13",
+        "value": "under_13"
+      },
+      {
+        "color": "#f7fbff",
+        "label": "13",
+        "value": "13"
+      },
+      {
+        "color": "#c6dbef",
+        "label": "14 - 25",
+        "value": "14_25"
+      },
+      {
+        "color": "#9ecae1",
+        "label": "26",
+        "value": "26"
+      },
+      {
+        "color": "#6baed6",
+        "label": "27 - 39",
+        "value": "27_39"
+      },
+      {
+        "color": "#3182bd",
+        "label": "40 - 51",
+        "value": "40_51"
+      },
+      {
+        "color": "#08519c",
+        "label": "52",
+        "value": "52"
+      },
+      {
+        "color": "#08306b",
+        "label": "> 52",
+        "value": "over_52"
+      },
+      {
+        "colorRef": "no_collection",
+        "label": "No separate door-to-door biowaste collection",
+        "value": "no_door_to_door"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/biowaste-collection-count/",
+    "enableQuartiles": false,
+    "legendTitle": "Annual biowaste collection count",
+    "noDataLabel": "No data",
+    "numericField": "collection_count",
+    "showOnlyPresentCategories": true,
+    "title": "Annual biowaste collection count",
+    "transformName": "rpBiowasteCollectionCount"
+  },
+  "rp_collection_count_ratio": {
+    "categories": [
+      {
+        "color": "#1b9e77",
+        "label": "2:1",
+        "value": "two_to_one"
+      },
+      {
+        "color": "#7570b3",
+        "label": "< 2:1 > 1:1",
+        "value": "between_two_and_one"
+      },
+      {
+        "color": "#d95f02",
+        "label": "1:1",
+        "value": "one_to_one"
+      },
+      {
+        "color": "#a6761d",
+        "label": "< 1:1",
+        "value": "below_one_to_one"
+      },
+      {
+        "colorRef": "no_collection",
+        "label": "No separate door-to-door biowaste collection",
+        "value": "no_bio"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/collection-count-ratio/",
+    "legendTitle": "Annual collection count ratio - Biowaste : Residual waste",
+    "noDataLabel": "No data",
+    "showOnlyPresentCategories": true,
+    "title": "Annual collection-count ratio: biowaste vs residual waste",
+    "transformName": "rpCollectionCountRatio"
+  },
+  "rp_combined_frequency": {
+    "categories": [
+      {
+        "color": "#2e8b57",
+        "label": "SEASONAL / FLEXIBLE",
+        "value": "bio_seasonal_res_flexible"
+      },
+      {
+        "color": "#4169e1",
+        "label": "FLEXIBLE / FLEXIBLE",
+        "value": "bio_flexible_res_flexible"
+      },
+      {
+        "color": "#9ecae1",
+        "label": "FIXED / FLEXIBLE",
+        "value": "bio_fixed_res_flexible"
+      },
+      {
+        "color": "#66cdaa",
+        "label": "SEASONAL / FIXED",
+        "value": "bio_seasonal_res_fixed"
+      },
+      {
+        "color": "#e08840",
+        "label": "FLEXIBLE / FIXED",
+        "value": "bio_flexible_res_fixed"
+      },
+      {
+        "color": "#6a51a3",
+        "label": "FIXED / FIXED",
+        "value": "bio_fixed_res_fixed"
+      },
+      {
+        "colorRef": "no_collection",
+        "label": "NO SEPARATE DOOR-TO-DOOR BIOWASTE COLLECTION",
+        "value": "no_bio_collection"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/combined-frequency-type/",
+    "exportLegendColumns": 2,
+    "exportLegendItemFlow": "row",
+    "exportLegendTitle": "Schedule: bio / residual",
+    "legendColumns": 2,
+    "legendTitle": "Collection frequency structure: Biowaste / Residual waste",
+    "noDataLabel": "No data",
+    "showOnlyPresentCategories": true,
+    "title": "Collection frequency setting: biowaste vs residual waste",
+    "transformName": "combinedFrequency"
+  },
+  "rp_residual_collection_count": {
+    "categories": [
+      {
+        "color": "#fdd0a2",
+        "label": "< 13",
+        "value": "under_13"
+      },
+      {
+        "color": "#f7fbff",
+        "label": "13",
+        "value": "13"
+      },
+      {
+        "color": "#c6dbef",
+        "label": "14 - 25",
+        "value": "14_25"
+      },
+      {
+        "color": "#9ecae1",
+        "label": "26",
+        "value": "26"
+      },
+      {
+        "color": "#6baed6",
+        "label": "27 - 39",
+        "value": "27_39"
+      },
+      {
+        "color": "#3182bd",
+        "label": "40 - 51",
+        "value": "40_51"
+      },
+      {
+        "color": "#08519c",
+        "label": "52",
+        "value": "52"
+      },
+      {
+        "color": "#08306b",
+        "label": "> 52",
+        "value": "over_52"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/residual-collection-count/",
+    "enableQuartiles": false,
+    "legendTitle": "Annual residual waste collection count",
+    "noDataLabel": "No data",
+    "numericField": "collection_count",
+    "showOnlyPresentCategories": true,
+    "title": "Annual residual waste collection count",
+    "transformName": "rpResidualCollectionCount"
+  },
+  "system_access_control": {
+    "categories": [
+      {
+        "color": "#238b45",
+        "exportLabel": "BP + access",
+        "label": "BP + control",
+        "value": "Bring point + access control"
+      },
+      {
+        "color": "#a1d99b",
+        "exportLabel": "BP + no access",
+        "label": "BP + no control",
+        "value": "Bring point + no access control"
+      },
+      {
+        "color": "#2b8cbe",
+        "label": "DtD + control",
+        "value": "Door to door + control"
+      },
+      {
+        "color": "#a6bddb",
+        "label": "DtD + no control",
+        "value": "Door to door + no control"
+      },
+      {
+        "color": "#fdae61",
+        "label": "Other combination",
+        "value": "Other combination"
+      }
+    ],
+    "dataField": "access_control",
+    "dataUrl": "/waste_collection/waste-atlas/api/catalonia-system-access-control/",
+    "legendNote": "DtD = Door to door \u00b7 BP = Bring point",
+    "legendTitle": "Collection mode + Access/use control",
+    "noDataLabel": "No data",
+    "title": "Collection system and access/use control"
+  },
+  "target_waste_category": {
+    "categories": [
+      {
+        "color": "#94cf7c",
+        "label": "Biowaste",
+        "value": "Biowaste"
+      },
+      {
+        "color": "#debf6a",
+        "label": "Food waste",
+        "value": "Food waste"
+      },
+      {
+        "color": "#d7d7d7",
+        "label": "No separate collection",
+        "value": "No separate collection"
+      }
+    ],
+    "dataField": "target_waste_category",
+    "dataUrl": "/waste_collection/waste-atlas/api/target-waste-category/",
+    "legendTitle": "Target waste category",
+    "noDataLabel": "No data",
+    "title": "Target waste category"
+  },
+  "waste_ratio": {
+    "categories": [
+      {
+        "color": "#0868ac",
+        "label": "> 66 (Biowaste-stream dominant)",
+        "value": "very_high"
+      },
+      {
+        "color": "#43a2ca",
+        "label": "51\u201366",
+        "value": "high"
+      },
+      {
+        "color": "#7bccc4",
+        "label": "34\u201350",
+        "value": "low"
+      },
+      {
+        "color": "#bae4bc",
+        "label": "\u2264 33 (Residual-waste-stream dominant)",
+        "value": "very_low"
+      },
+      {
+        "color": "#fff696",
+        "label": "No separate biowaste collection",
+        "value": "no_bio"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/waste-ratio/",
+    "exportLegendTitle": "Separation rate \u2013\nBiowaste stream (%)",
+    "legendTitle": "Separation rate \u2013 Biowaste stream (%)",
+    "noDataLabel": "No data",
+    "numericField": "ratio",
+    "overlayPatternField": "uses_aggregated_amount",
+    "overlayPatternLegendLabel": "Hatched = includes aggregated value",
+    "quartileColors": [
+      "#bae4bc",
+      "#7bccc4",
+      "#43a2ca",
+      "#0868ac"
+    ],
+    "quartileDisplayMultiplier": 100,
+    "quartilePreserveClasses": [
+      "no_bio"
+    ],
+    "title": "Separation rate \u2013 Biowaste stream (%)",
+    "transformName": "wasteRatio"
+  },
+  "weekly_bp_access_days": {
+    "categories": [
+      {
+        "color": "#1a9850",
+        "label": "7 days (daily access)",
+        "value": "7"
+      },
+      {
+        "color": "#66bd63",
+        "label": "5\u20136 days",
+        "value": "5_6"
+      },
+      {
+        "color": "#a6d96a",
+        "label": "3\u20134 days",
+        "value": "3_4"
+      },
+      {
+        "color": "#d9f0d3",
+        "label": "1\u20132 days",
+        "value": "1_2"
+      },
+      {
+        "color": "#fff696",
+        "label": "No bring-point collection",
+        "value": "no_bp"
+      }
+    ],
+    "dataField": "_classified",
+    "dataUrl": "/waste_collection/waste-atlas/api/weekly-bp-access-days/",
+    "legendTitle": "Weekly access days",
+    "noDataLabel": "No data",
+    "numericField": "weekly_access_days",
+    "quartileColors": [
+      "#d9f0d3",
+      "#a6d96a",
+      "#66bd63",
+      "#1a9850"
+    ],
+    "quartilePreserveClasses": [
+      "no_bp"
+    ],
+    "title": "Weekly bring-point access days",
+    "transformName": "weeklyBpAccessDays"
+  }
+}
