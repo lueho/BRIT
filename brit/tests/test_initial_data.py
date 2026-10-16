@@ -30,7 +30,7 @@ from sources.waste_collection.models import (
 )
 from users.utils import ensure_initial_data as ensure_users_data
 from utils.object_management.models import get_default_owner
-from utils.properties.models import Property, Unit
+from utils.properties.models import Property, Unit, get_default_unit_pk
 from utils.properties.utils import ensure_initial_data as ensure_properties_data
 
 
@@ -407,6 +407,25 @@ class FullInitialDataSeedingTests(TestCase):
 
         self.assertIn("no_unit", result)
         self.assertEqual(result["no_unit"].name, "No unit")
+
+    @override_settings(
+        DEFAULT_OBJECT_OWNER_USERNAME="defaults-owner",
+        DEFAULT_NO_UNIT_NAME="Unspecified",
+    )
+    def test_properties_initializer_seeds_configured_default_unit(self):
+        owner = User.objects.create(username="defaults-owner")
+
+        ensure_properties_data()
+        ensure_properties_data()
+
+        default_unit = Unit.objects.get(pk=get_default_unit_pk())
+        self.assertEqual(default_unit.owner, owner)
+        self.assertEqual(default_unit.name, "Unspecified")
+        self.assertTrue(default_unit.dimensionless)
+        self.assertTrue(Unit.objects.filter(owner=owner, name="No unit").exists())
+        self.assertEqual(
+            Unit.objects.filter(owner=owner, name="Unspecified").count(), 1
+        )
 
     def test_first_waste_component_after_initialization_gets_category(self):
         call_command("ensure_initial_data", stdout=io.StringIO())
