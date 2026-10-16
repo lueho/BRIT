@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AnonymousUser, User
 from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
@@ -350,8 +350,10 @@ class SampleFilterTestCase(TestCase):
             [self.sample_substrate, self.sample_equivalent],
         )
 
-    def test_q_matches_sample_group_name(self):
-        group = SampleGroup.objects.create(name="CLOSECYCLE")
+    def test_q_matches_published_sample_group_name(self):
+        group = SampleGroup.objects.create(
+            name="CLOSECYCLE", publication_status="published"
+        )
         self.sample_substrate.sample_groups.add(group)
         Sample.objects.create(name="Other sample", material=self.non_substrate_material)
 
@@ -361,6 +363,46 @@ class SampleFilterTestCase(TestCase):
         )
 
         self.assertEqual(list(filtr.qs), [self.sample_substrate])
+
+    def test_q_does_not_match_private_sample_group_name_for_anonymous(self):
+        group = SampleGroup.objects.create(name="Hidden group")
+        sample = Sample.objects.create(
+            name="Published grouped sample",
+            material=self.substrate_material,
+            publication_status="published",
+        )
+        sample.sample_groups.add(group)
+        request = RequestFactory().get("/")
+        request.user = AnonymousUser()
+
+        filtr = SampleFilter(
+            data={"q": "Hidden"},
+            queryset=Sample.objects.all(),
+            request=request,
+        )
+
+        self.assertNotIn(sample, filtr.qs)
+
+    def test_q_matches_own_private_sample_group_name(self):
+        alice = User.objects.create(username="group_owner_alice")
+        group = SampleGroup.objects.create(name="Alice private group", owner=alice)
+        sample = Sample.objects.create(
+            name="Alice grouped sample",
+            material=self.substrate_material,
+            owner=alice,
+            publication_status="private",
+        )
+        sample.sample_groups.add(group)
+        request = RequestFactory().get("/")
+        request.user = alice
+
+        filtr = SampleFilter(
+            data={"q": "Alice private", "scope": "private"},
+            queryset=Sample.objects.filter(owner=alice),
+            request=request,
+        )
+
+        self.assertIn(sample, filtr.qs)
 
     def test_q_combines_with_other_filters(self):
         filtr = SampleFilter(

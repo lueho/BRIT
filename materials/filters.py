@@ -259,13 +259,7 @@ class CompositionFilterSet(rf_filters.FilterSet):
 
 class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
     sortable_fields = {"name": "name", "datetime": "datetime"}
-    search_fields = (
-        "name",
-        "description",
-        "material__name",
-        "location",
-        "sample_groups__name",
-    )
+    search_fields = ("name", "description", "material__name", "location")
 
     q = CharFilter(
         method="filter_q",
@@ -402,6 +396,19 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             )
         ),
     )
+
+    def filter_q(self, queryset, name, value):
+        filtered = super().filter_q(queryset, name, value)
+        value = (value or "").strip()
+        if not value:
+            return filtered
+        user = getattr(getattr(self, "request", None), "user", None)
+        matching_groups = filter_queryset_for_user(
+            SampleGroup.objects.filter(name__icontains=value), user
+        )
+        return queryset.filter(
+            Q(pk__in=filtered.values("pk")) | Q(sample_groups__in=matching_groups)
+        ).distinct()
 
     def filter_parameter(self, queryset, name, value):
         canonical_property = value.canonical_property
