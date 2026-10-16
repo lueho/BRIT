@@ -7225,6 +7225,15 @@ class CollectionDetailV2LayoutTestCase(TestCase):
             reverse("collection-update", kwargs={"pk": self.collection.pk}),
         )
 
+    def test_anonymous_detail_keeps_collection_navigation(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'class="sdv2-rail"')
+        self.assertContains(response, 'aria-label="Collection navigation"')
+        self.assertContains(response, 'aria-label="View on map"')
+        self.assertContains(response, reverse("wastecollection-explorer"))
+
     def test_detail_renders_map_outside_review_mode(self):
         response = self.client.get(self.url)
 
@@ -7287,6 +7296,14 @@ class CollectionPropertyValueDetailV2LayoutTestCase(TestCase):
         self.assertContains(response, "sdv2-hero")
         self.assertNotContains(response, "detail-layout-card")
         self.assertNotContains(response, 'id="options-pane"')
+
+    def test_anonymous_detail_keeps_collection_property_navigation(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'class="sdv2-rail"')
+        self.assertContains(response, 'aria-label="Collection property navigation"')
+        self.assertContains(response, reverse("wastecollection-explorer"))
 
     def test_value_is_rounded_for_display(self):
         response = self.client.get(self.url)

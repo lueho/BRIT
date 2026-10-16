@@ -18,6 +18,9 @@
 {% block rail_nav %}
   {% include "waste_collection/includes/collection_context_nav.html" %}
 {% endblock rail_nav %}
+{% block anon_nav %}
+  {% include "waste_collection/includes/collection_context_nav.html" %}
+{% endblock anon_nav %}
 {% block detail_header_review_actions %}
   {% if object.publication_status == 'private' and policy.can_submit_review %}
     <a class="sdv2-btn modal-link"
