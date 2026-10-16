@@ -7,7 +7,7 @@ build:
 release:
   image: web
   command:
-    - python manage.py migrate --noinput
+    - python manage.py migrate --noinput && python manage.py ensure_initial_data --app waste_atlas
     - python manage.py collectstatic --noinput
 run:
   # Container deploys don't get WEB_CONCURRENCY, so gunicorn defaulted to a

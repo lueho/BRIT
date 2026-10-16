@@ -9,6 +9,7 @@ from contextlib import closing
 from http.client import HTTPConnection
 from pathlib import Path
 
+import yaml
 from django.conf import settings
 from django.test import SimpleTestCase
 from gunicorn.config import Config
@@ -54,6 +55,26 @@ class ProductionSecretKeyTests(SimpleTestCase):
             "django.core.exceptions.ImproperlyConfigured: "
             "SECRET_KEY must be set in production.",
             completed.stderr,
+        )
+
+
+class ProductionReleasePhaseTests(SimpleTestCase):
+    def setUp(self):
+        deployment = yaml.safe_load(
+            (Path(settings.BASE_DIR) / "heroku.yml").read_text()
+        )
+        # Heroku's release phase runs only the first command entry, so every
+        # release step must be chained there.
+        self.release = deployment["release"]["command"][0]
+        self.steps = [step.strip() for step in self.release.split("&&")]
+
+    def test_migrations_run_first(self):
+        self.assertEqual(self.steps[0], "python manage.py migrate --noinput")
+
+    def test_waste_atlas_defaults_follow_migrations(self):
+        self.assertIn(
+            "python manage.py ensure_initial_data --app waste_atlas",
+            self.steps[1:],
         )
 
 
