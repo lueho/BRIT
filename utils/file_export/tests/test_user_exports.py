@@ -18,7 +18,7 @@ TaskExportSpec = namedtuple(
 
 
 class DummyFilterSet:
-    def __init__(self, data, queryset):
+    def __init__(self, data, queryset, request=None):
         self.qs = queryset
 
 
