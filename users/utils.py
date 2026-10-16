@@ -3,17 +3,20 @@ import os
 from django.contrib.auth.models import Group, User
 from django.utils import timezone
 
+from .roles import MANAGED_ROLES
+
 
 def ensure_initial_data(stdout=None):
     """
     Ensures all required initial data for the users app exists.
     Idempotent: safe to run multiple times.
-    Creates the 'registered' and 'analysis_api' groups and the admin user
-    (from ADMIN_USERNAME).
+    Creates the empty named groups and the admin user (from ADMIN_USERNAME).
+    Permissions are assigned separately by the sync_roles command.
     """
-    # 1. Create group for registered users and the extended analysis API group
     registered, _ = Group.objects.get_or_create(name="registered")
     Group.objects.get_or_create(name="analysis_api")
+    for name in MANAGED_ROLES:
+        Group.objects.get_or_create(name=name)
 
     # 2. Create superuser (admin)
     admin_username = os.environ["ADMIN_USERNAME"]

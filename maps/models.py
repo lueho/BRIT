@@ -419,6 +419,10 @@ def set_country(sender, instance, created, **kwargs):
             instance.save(update_fields=["country"])
 
 
+class GeoreferencedRegion(GeoPolygon, Region):
+    pass
+
+
 class NutsVintage(models.Model):
     """A NUTS classification vintage, e.g. NUTS 2021.
 
@@ -561,6 +565,10 @@ class NutsRegion(Region):
         ]
 
 
+class GeoreferencedNutsRegion(GeoPolygon, NutsRegion):
+    pass
+
+
 class LauRegion(Region):
     cntr_code = models.CharField(max_length=2, blank=True, null=True)
     lau_id = models.CharField(max_length=13, blank=True, null=True)
@@ -659,6 +667,10 @@ class Catchment(NamedUserCreatedObject, TreeNode):
             .order_by(F("effective_from").desc(nulls_last=True), "-pk")
             .first()
         )
+
+
+class GeoreferencedCatchment(GeoPolygon, Catchment):
+    pass
 
 
 class CatchmentRevisionQuerySet(UserCreatedObjectQuerySet):
