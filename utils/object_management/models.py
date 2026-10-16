@@ -110,6 +110,12 @@ class ReviewAction(models.Model):
         (ACTION_EDITED, "Edited"),
         (ACTION_DELETED, "Deleted"),
     )
+    REVIEW_FEEDBACK_ACTIONS = (
+        ACTION_APPROVED,
+        ACTION_REJECTED,
+        ACTION_WITHDRAWN,
+        ACTION_COMMENT,
+    )
 
     # Generic relation to the affected object
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
@@ -255,8 +261,8 @@ def annotate_owner_review_feedback(queryset, user):
         content_type=content_type, object_id=models.OuterRef("pk")
     ).order_by("-created_at", "-pk")
     submission = actions.filter(action=ReviewAction.ACTION_SUBMITTED)
-    feedback = actions.exclude(user_id=user.pk).exclude(
-        action=ReviewAction.ACTION_SUBMITTED
+    feedback = actions.exclude(user_id=user.pk).filter(
+        action__in=ReviewAction.REVIEW_FEEDBACK_ACTIONS
     )
     queryset = queryset.alias(
         _review_submission_at=models.Subquery(submission.values("created_at")[:1]),
@@ -669,7 +675,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         return (
             ReviewAction.for_object(self)
             .exclude(user_id=self.owner_id)
-            .exclude(action=ReviewAction.ACTION_SUBMITTED)
+            .filter(action__in=ReviewAction.REVIEW_FEEDBACK_ACTIONS)
             .filter(
                 Q(created_at__gt=latest_submission.created_at)
                 | Q(
