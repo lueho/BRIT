@@ -512,6 +512,8 @@ class SampleSeriesTestCase(TestCase):
             empty_series = SampleSeries.objects.create(material=self.material1)
 
         empty_series.publication_status = SampleSeries.STATUS_PUBLISHED
+        empty_series.approved_at = timezone.now()
+        empty_series.approved_by = self.user
 
         with self.assertRaises(ValidationError) as context:
             empty_series.clean()
@@ -530,6 +532,8 @@ class SampleSeriesTestCase(TestCase):
             timestep=Timestep.objects.default(),
         )
         series_with_sample.publication_status = SampleSeries.STATUS_PUBLISHED
+        series_with_sample.approved_at = timezone.now()
+        series_with_sample.approved_by = self.user
 
         # Should not raise any exception
         try:
@@ -548,7 +552,7 @@ class SampleSeriesTestCase(TestCase):
         empty_series.publication_status = SampleSeries.STATUS_REVIEW
 
         with self.assertRaises(ValidationError) as context:
-            empty_series.approve()
+            empty_series.approve(user=self.user)
 
         self.assertIn(
             "Cannot approve a sample series that contains no samples",
@@ -569,7 +573,7 @@ class SampleSeriesTestCase(TestCase):
 
         # Should not raise any exception and should approve the series
         try:
-            series_with_sample.approve()
+            series_with_sample.approve(user=self.user)
         except ValidationError:
             self.fail(
                 "approve() raised ValidationError unexpectedly for series with samples"
@@ -578,6 +582,8 @@ class SampleSeriesTestCase(TestCase):
         self.assertEqual(
             series_with_sample.publication_status, SampleSeries.STATUS_PUBLISHED
         )
+        self.assertIsNotNone(series_with_sample.approved_at)
+        self.assertEqual(series_with_sample.approved_by, self.user)
 
     def test_duplicate_with_new_material_applies_it_to_copied_samples(self):
         creator = User.objects.create(username="dup_material_creator")

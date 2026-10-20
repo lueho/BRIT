@@ -935,11 +935,16 @@ class CollectionReviewCascadeTransitionTestCase(TestCase):
             publication_status="published"
         )
 
+        approver = User.objects.create_user(username="cascade-approver")
         with self.assertLogs("sources.waste_collection.models", "WARNING") as logs:
-            Collection._apply_review_action_transition([stale, other], "approve")
+            Collection._apply_review_action_transition(
+                [stale, other], "approve", actor=approver
+            )
 
         other.refresh_from_db()
         self.assertEqual(other.publication_status, "published")
+        self.assertIsNotNone(other.approved_at)
+        self.assertEqual(other.approved_by_id, approver.pk)
         self.assertEqual(len(logs.records), 1)
         self.assertIn(str(stale.pk), logs.output[0])
 

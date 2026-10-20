@@ -372,8 +372,11 @@ class AnalyticalMethod(NamedUserCreatedObject):
             action = getattr(source, config["handler"], None)
             if not callable(action):
                 continue
+            if action_name == "approve" and actor is None:
+                # approve() requires the approving user for the audit trail.
+                continue
             try:
-                if action_name == "approve" and actor is not None:
+                if action_name == "approve":
                     action(user=actor)
                 else:
                     action()

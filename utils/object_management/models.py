@@ -408,6 +408,29 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         if fields is None or "publication_status" in fields:
             self._loaded_publication_status = self.publication_status
 
+    def clean(self):
+        super().clean()
+        loaded_status = getattr(self, "_loaded_publication_status", None)
+        if (
+            self.publication_status == self.STATUS_PUBLISHED
+            and loaded_status != self.STATUS_PUBLISHED
+        ):
+            missing = [
+                name
+                for name, value in (
+                    ("approved_at", self.approved_at),
+                    ("approved_by", self.approved_by_id),
+                )
+                if value is None
+            ]
+            if missing:
+                raise ValidationError(
+                    "Cannot set publication_status to 'published' without "
+                    f"approval metadata ({', '.join(missing)} missing). "
+                    "Use the review workflow's approve() method to publish "
+                    "objects."
+                )
+
     def _lock_and_validate_transition(self, expected_statuses, error_message):
         current_status = (
             self.__class__._default_manager.select_for_update()
@@ -463,17 +486,21 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         Approve this object, transitioning from review to published.
         Sets approved_at and approved_by.
         """
+        if user is None:
+            raise ValidationError(
+                "approve() requires the approving user so that approved_by is "
+                "always recorded."
+            )
         with transaction.atomic():
             self._lock_and_validate_transition(
                 (self.STATUS_REVIEW,), "Only objects in review can be approved."
             )
             self.publication_status = self.STATUS_PUBLISHED
             self.approved_at = timezone.now()
-            update_fields = ["publication_status", "approved_at"]
-            if user is not None:
-                self.approved_by = user
-                update_fields.append("approved_by")
-            self.save(update_fields=update_fields)
+            self.approved_by = user
+            self.save(
+                update_fields=["publication_status", "approved_at", "approved_by"]
+            )
 
     def reject(self):
         with transaction.atomic():

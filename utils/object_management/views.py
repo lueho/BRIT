@@ -1048,17 +1048,6 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
                 action_kwargs["user"] = request.user
             action_callable(**action_kwargs)
 
-            # Fallback: if approve() did not set approved_by for any reason, set it here
-            if (
-                self.action_attr_name == "approve"
-                and getattr(self.object, "approved_by_id", None) is None
-            ):
-                try:
-                    self.object.approved_by = request.user
-                    self.object.save(update_fields=["approved_by"])
-                except (AttributeError, ValueError, DatabaseError):
-                    pass
-
             # Log review action
             create_review_action_safely(
                 self.object,

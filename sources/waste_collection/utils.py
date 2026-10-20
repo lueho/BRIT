@@ -1,4 +1,5 @@
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
 
 from distributions.models import Period, TemporalDistribution, Timestep
 from materials.models import MaterialCategory
@@ -20,7 +21,11 @@ def ensure_initial_data(stdout=None):
     MaterialCategory.objects.get_or_create(
         owner=owner,
         name="Biowaste component",
-        defaults={"publication_status": "published"},
+        defaults={
+            "publication_status": "published",
+            "approved_at": timezone.now(),
+            "approved_by": owner,
+        },
     )
 
     try:

@@ -83,6 +83,59 @@ class ReviewWorkflowModelTests(TestCase):
         self.assertIsNotNone(self.collection.approved_at)
         self.assertEqual(self.collection.approved_by, self.moderator)
 
+    def test_approve_requires_the_approving_user(self):
+        """approve() must always record who published the object."""
+        self.collection.submit_for_review()
+
+        with self.assertRaisesMessage(
+            ValidationError, "approve() requires the approving user"
+        ):
+            self.collection.approve()
+
+        self.collection.refresh_from_db()
+        self.assertEqual(
+            self.collection.publication_status, UserCreatedObject.STATUS_REVIEW
+        )
+        self.assertIsNone(self.collection.approved_at)
+        self.assertIsNone(self.collection.approved_by)
+
+    def test_clean_rejects_transition_to_published_without_approval(self):
+        self.collection.publication_status = UserCreatedObject.STATUS_PUBLISHED
+
+        with self.assertRaises(ValidationError) as context:
+            self.collection.clean()
+
+        self.assertIn("approved_at", str(context.exception))
+        self.assertIn("approved_by", str(context.exception))
+
+    def test_clean_rejects_transition_to_published_with_partial_approval(self):
+        self.collection.publication_status = UserCreatedObject.STATUS_PUBLISHED
+        self.collection.approved_at = timezone.now()
+
+        with self.assertRaises(ValidationError) as context:
+            self.collection.clean()
+
+        self.assertIn("approved_by", str(context.exception))
+
+    def test_clean_allows_publishing_transition_with_approval_metadata(self):
+        self.collection.publication_status = UserCreatedObject.STATUS_PUBLISHED
+        self.collection.approved_at = timezone.now()
+        self.collection.approved_by = self.moderator
+
+        self.collection.clean()
+
+    def test_clean_allows_updates_to_already_published_objects(self):
+        """Rows already stored as published (e.g. pre-workflow data) stay editable."""
+        Collection.objects.filter(pk=self.collection.pk).update(
+            publication_status=UserCreatedObject.STATUS_PUBLISHED
+        )
+        published = Collection.objects.get(pk=self.collection.pk)
+        self.assertIsNone(published.approved_at)
+        self.assertIsNone(published.approved_by)
+
+        published.name = "Renamed collection"
+        published.clean()
+
     def test_reject(self):
         """Test rejecting an object."""
         # Set up initial state

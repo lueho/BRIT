@@ -4,6 +4,7 @@ from datetime import date
 from importlib import import_module
 
 from django.contrib.admin.sites import AdminSite
+from django.contrib.auth.models import User
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -175,7 +176,8 @@ class CatchmentRevisionValidityTests(TestCase):
         successor.predecessors.add(predecessor)
         successor.submit_for_review()
 
-        successor.approve()
+        approver = User.objects.create(username="catchment_approver")
+        successor.approve(user=approver)
 
         predecessor.refresh_from_db()
         successor.refresh_from_db()
@@ -206,8 +208,9 @@ class CatchmentRevisionValidityTests(TestCase):
         )
         successor.submit_for_review()
 
+        approver = User.objects.create(username="catchment_approver")
         with self.assertRaisesMessage(ValidationError, "overlaps a published period"):
-            successor.approve()
+            successor.approve(user=approver)
 
 
 class CatchmentRevisionCompositionTests(TestCase):
