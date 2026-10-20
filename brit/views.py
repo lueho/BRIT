@@ -8,12 +8,28 @@ from django.views import View
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
+from brit.featured import BRIT_EU_MAP_LINKS, FEATURED_DESTINATIONS
 from utils.views import BreadcrumbContextMixin
 
 
 @method_decorator(xframe_options_exempt, name="dispatch")
 class HomeView(TemplateView):
     template_name = "home.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["featured_destinations"] = FEATURED_DESTINATIONS
+        return context
+
+
+class BritEUResultsView(BreadcrumbContextMixin, TemplateView):
+    template_name = "brit_eu_results.html"
+    breadcrumb_page_title = "BRIT-EU results"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["brit_eu_map_links"] = BRIT_EU_MAP_LINKS
+        return context
 
 
 class AboutView(BreadcrumbContextMixin, TemplateView):

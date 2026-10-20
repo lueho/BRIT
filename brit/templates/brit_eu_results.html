@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load static %}
+{% block style_sheets %}
+  {{ block.super }}
+  <link href="{% static 'css/sample_detail_v2.min.css' %}" rel="stylesheet">
+  <link href="{% static 'css/discovery.min.css' %}" rel="stylesheet">
+{% endblock style_sheets %}
+{% block content %}
+  <div class="sdv2 discovery-page" data-has-action-rail="0">
+    <div class="sdv2-canvas">
+      <header class="sdv2-hero sdv2-surface">
+        <div class="sdv2-hero-identity">
+          <div class="sdv2-hero-kicker">Project results</div>
+          <h1 class="sdv2-hero-title">BRIT-EU results</h1>
+          <div class="sdv2-hero-material">
+            Explore the maps and analysis resources developed through BRIT-EU to compare municipal
+            biowaste collection systems.
+          </div>
+        </div>
+        <img class="discovery-hero-logo"
+             src="{% static 'img/brit_eu_logo.png' %}"
+             width="1335"
+             height="387"
+             alt="BRIT-EU logo">
+      </header>
+      <p class="discovery-note">
+        BRIT-EU maps are part of the Waste Atlas, which also includes maps beyond this project.
+        <a href="{% url 'waste-atlas-overview' %}">Open Waste Atlas</a>
+      </p>
+      <section id="brit-eu-maps" aria-labelledby="brit-eu-maps-heading">
+        <h2 id="brit-eu-maps-heading" class="discovery-section-heading">BRIT-EU maps in the Waste Atlas</h2>
+        <p class="discovery-section-hint">
+          Explore collection systems in the five project case-study regions. These links open the
+          existing Atlas maps; use the Atlas controls to explore available themes and years.
+        </p>
+        <div class="discovery-map-grid">
+          {% for link in brit_eu_map_links %}
+            <a class="discovery-map-card sdv2-surface"
+               href="{% url link.url_name %}"
+               aria-label="Open map: {{ link.label }}">
+              <span class="discovery-map-region">{{ link.label }}</span>
+              <span class="discovery-map-theme">Primary collection system for kitchen waste</span>
+              <span class="discovery-map-action">Open map</span>
+            </a>
+          {% endfor %}
+        </div>
+        <p class="discovery-footnote">
+          Atlas maps use current BRIT records. The historical analysis package uses archived project
+          inputs.
+        </p>
+      </section>
+      <section id="data-analysis" aria-labelledby="data-analysis-heading">
+        <h2 id="data-analysis-heading" class="discovery-section-heading">Data and analysis</h2>
+        <div class="discovery-panels">
+          <div class="discovery-panel sdv2-surface">
+            <h3>Explore collection data</h3>
+            <p>Browse published waste collection records and their sources in the collection database.</p>
+            <a class="sdv2-btn sdv2-btn-primary" href="{% url 'collection-list' %}">Browse collection data</a>
+          </div>
+          <div class="discovery-panel sdv2-surface">
+            <h3>Analyze in R</h3>
+            <p>
+              The R analysis page provides the archived BRIT-EU analysis package, including
+              historical input data, and a client for current BRIT data. Live-data access requires
+              staff rights or membership in the analysis_api group.
+            </p>
+            <a class="sdv2-btn sdv2-btn-primary" href="{% url 'r-analysis' %}">R analysis and downloads</a>
+          </div>
+        </div>
+      </section>
+      <p class="discovery-footnote">
+        BRIT-EU brought together Hamburg University of Technology and the European Compost Network
+        from December 2024 to May 2026.
+        <a href="{% url 'about' %}#project-history">Project history and funding</a>
+      </p>
+    </div>
+  </div>
+{% endblock content %}

@@ -14,6 +14,7 @@ from sources.registry import (
 from .sitemaps import DynamicViewSitemap, HomepageSitemap
 from .views import (
     AboutView,
+    BritEUResultsView,
     CacheTestView,
     HomeView,
     LearningView,
@@ -43,6 +44,11 @@ urlpatterns = [
     path("about/", AboutView.as_view(), name="about"),
     path("learning/", LearningView.as_view(), name="learning"),
     path("r-analysis/", RAnalysisView.as_view(), name="r-analysis"),
+    path(
+        "projects/brit-eu/",
+        BritEUResultsView.as_view(),
+        name="brit-eu-results",
+    ),
     path(
         "r-analysis/BRIT_Datenanalyse.R",
         download_r_analysis_client,
