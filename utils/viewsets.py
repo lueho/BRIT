@@ -1,5 +1,9 @@
 from rest_framework.viewsets import ModelViewSet
 
+from .object_management.models import UserCreatedObject
+from .object_management.policy import visible_queryset
+from .object_management.registry import model_policy
+from .object_management.viewsets import perform_policy_update
 from .permissions import (
     HasModelPermission,
 )
@@ -92,3 +96,66 @@ class AutoPermModelViewSet(ModelViewSet):
         # This triggers the lazy initialization of permission_required if needed
         _ = self.permission_required
         return super().get_permissions()
+
+    def get_queryset(self):
+        """Scope listed objects to what the requesting user may read.
+
+        Registered models delegate to the shared visibility policy; this is
+        what keeps private bibliography records out of anonymous/staff-free
+        list responses even where ``custom_permission_required`` declares
+        ``list``/``retrieve`` permission-free.
+        """
+        queryset = super().get_queryset()
+        if queryset is None:
+            return queryset
+        if model_policy(queryset.model) is None:
+            if issubclass(queryset.model, UserCreatedObject):
+                return queryset.none()
+            return queryset
+        scope = self.request.query_params.get("scope")
+        if scope is None:
+            return visible_queryset(self.request.user, queryset)
+        from .object_management.policy import scope_queryset
+
+        return scope_queryset(self.request.user, queryset, scope)
+
+    def get_object(self):
+        """Fetch detail objects from the read-scoped queryset.
+
+        Invisible objects resolve to 404 instead of leaking existence; the
+        object-level permission check still gates the requested action.
+        """
+        from django.shortcuts import get_object_or_404
+
+        queryset = self.get_queryset()
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        lookup_value = self.kwargs.get(lookup_url_kwarg)
+        obj = get_object_or_404(queryset, **{self.lookup_field: lookup_value})
+        self.check_object_permissions(self.request, obj)
+        return obj
+
+    def perform_create(self, serializer):
+        """Server owns owner/lifecycle initialization; payload cannot forge them."""
+        from .object_management.viewsets import (
+            finalize_policy_create,
+            perform_policy_create,
+        )
+
+        policy, parent = perform_policy_create(self, serializer)
+        finalize_policy_create(self, serializer, policy, parent)
+
+    def perform_update(self, serializer):
+        perform_policy_update(self, serializer)
+
+    def perform_destroy(self, instance):
+        from .object_management.services import content_mutation
+
+        if isinstance(instance, UserCreatedObject) or (
+            model_policy(type(instance)) is not None
+        ):
+            with content_mutation(
+                self.request.user, instance, action="delete"
+            ) as locked:
+                locked.delete()
+            return
+        instance.delete()

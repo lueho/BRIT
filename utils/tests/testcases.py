@@ -36,6 +36,9 @@ class ViewWithPermissionsTestCase(UserLoginTestCase):
         cls.outsider = User.objects.create(username="outsider")
         cls.member = User.objects.create(username="member")
         cls.staff = User.objects.create(username="staff", is_staff=True)
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         if cls.member_permissions:
             if isinstance(cls.member_permissions, str):
                 cls.member_permissions = [cls.member_permissions]
@@ -184,9 +187,8 @@ class AbstractTestCases:
             cls.staff_user = User.objects.create(username="staff", is_staff=True)
 
             if cls.model:
-                add_perm_codename = (
-                    cls.model_add_permission or f"add_{cls.model._meta.model_name}"
-                )
+                model_name = cls.model._meta.model_name
+                add_perm_codename = cls.model_add_permission or f"add_{model_name}"
                 add_perm = Permission.objects.get(codename=add_perm_codename)
 
                 cls.user_with_add_perm = User.objects.create(
@@ -194,9 +196,14 @@ class AbstractTestCases:
                 )
                 cls.user_with_add_perm.user_permissions.add(add_perm)
 
-                change_perm_codename = f"change_{cls.model._meta.model_name}"
-                change_perm = Permission.objects.get(codename=change_perm_codename)
-                cls.owner_user.user_permissions.add(change_perm)
+                change_perm = Permission.objects.get(codename=f"change_{model_name}")
+                delete_perm = Permission.objects.get(codename=f"delete_{model_name}")
+                cls.owner_user.user_permissions.add(change_perm, delete_perm)
+
+                admin_perm = Permission.objects.get(codename="administer_objects")
+                cls.staff_user.user_permissions.add(
+                    admin_perm, add_perm, change_perm, delete_perm
+                )
 
             if cls.allow_create_for_any_authenticated_user:
                 cls.owner_user.user_permissions.add(add_perm)
@@ -945,22 +952,24 @@ class AbstractTestCases:
         def test_update_view_get_published_as_staff_user(self):
             if not self.update_view:
                 self.skipTest("Update view is not enabled for this test case.")
-            # staff can edit any object
             self.client.force_login(self.staff_user)
             url = self.get_update_url(self.published_object.pk)
             response = self.client.get(url)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(
+                response, self.permission_denied_message, status_code=403
+            )
 
         def test_update_view_post_published_as_staff_user(self):
             if not self.update_view:
                 self.skipTest("Update view is not enabled for this test case.")
-            # staff can edit any object
             self.client.force_login(self.staff_user)
             url = self.get_update_url(self.published_object.pk)
             data = self.compile_update_post_data()
             response = self.client.post(url, data)
-            self.assertRedirects(
-                response, self.get_update_success_url(pk=self.published_object.pk)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(
+                response, self.permission_denied_message, status_code=403
             )
 
         def test_update_view_get_unpublished_as_anonymous(self):
@@ -1106,23 +1115,19 @@ class AbstractTestCases:
         def test_modal_update_view_get_published_as_staff_user(self):
             if not self.modal_update_view:
                 self.skipTest("ModalUpdate view is not enabled for this test case.")
-            # staff can edit any object
             self.client.force_login(self.staff_user)
             url = self.get_modal_update_url(self.published_object.pk)
             response = self.client.get(url)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 403)
 
         def test_modal_update_view_post_published_as_staff_user(self):
             if not self.modal_update_view:
                 self.skipTest("ModalUpdate view is not enabled for this test case.")
-            # staff can edit any object
             self.client.force_login(self.staff_user)
             url = self.get_modal_update_url(self.published_object.pk)
             data = self.compile_update_post_data()
             response = self.client.post(url, data)
-            self.assertRedirects(
-                response, self.get_update_success_url(pk=self.published_object.pk)
-            )
+            self.assertEqual(response.status_code, 403)
 
         def test_modal_update_view_get_unpublished_as_anonymous(self):
             if not self.modal_update_view:
@@ -1263,23 +1268,23 @@ class AbstractTestCases:
         def test_delete_view_get_published_as_staff_user(self):
             if not self.delete_view:
                 self.skipTest("Delete view is not enabled for this test case.")
-            # Staff users can delete any object
             self.client.force_login(self.staff_user)
             response = self.client.get(self.get_delete_url(self.published_object.pk))
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(
+                response, self.permission_denied_message, status_code=403
+            )
 
         def test_delete_view_post_published_as_staff_user(self):
             if not self.delete_view:
                 self.skipTest("Delete view is not enabled for this test case.")
-            # Staff users can delete any object
             self.client.force_login(self.staff_user)
             response = self.client.post(
                 self.get_delete_url(self.published_object.pk), follow=True
             )
-            with self.assertRaises(self.model.DoesNotExist):
-                self.model.objects.get(pk=self.published_object.pk)
-            self.assertRedirects(
-                response, self.get_delete_success_url(publication_status="published")
+            self.assertEqual(response.status_code, 403)
+            self.assertTrue(
+                self.model.objects.filter(pk=self.published_object.pk).exists()
             )
 
         def test_delete_view_get_unpublished_as_anonymous(self):

@@ -12,7 +12,7 @@ from django.urls import reverse
 from django.utils.text import capfirst
 
 from .models import ReviewAction
-from .permissions import user_is_moderator_for_model
+from .policy import decide
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +66,12 @@ def _notification_protocol():
 
 
 def _can_open_review_link(user, obj):
-    """Mirror ``ReviewItemDetailView`` access: current owner or moderator."""
-    return user.pk == obj.owner_id or user_is_moderator_for_model(user, obj.__class__)
+    """Mirror ``ReviewItemDetailView`` access via ``view_review_activity``.
+
+    Evaluated at delivery time, so revoked grants or ownership transfers are
+    honored even when the action predates the change.
+    """
+    return decide(user, "view_review_activity", obj).allowed
 
 
 _CURRENT_OWNER = object()

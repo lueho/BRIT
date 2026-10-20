@@ -47,6 +47,7 @@ def build_review_context(
             "owner_id": getattr(obj, "owner_id", None),
             "submitted_at": _serialize_value(getattr(obj, "submitted_at", None)),
             "approved_at": _serialize_value(getattr(obj, "approved_at", None)),
+            "content_revision": getattr(obj, "content_revision", None),
         },
         "fields": _serialize_model_fields(obj),
         "related_display": _serialize_related_display(obj),
@@ -112,6 +113,8 @@ def _serialize_review_action(action: ReviewAction | None) -> dict[str, Any] | No
         "user_id": action.user_id,
         "username": action.user.username,
         "created_at": _serialize_value(action.created_at),
+        "content_revision": action.content_revision,
+        "changed_fields": action.changed_fields,
     }
 
 

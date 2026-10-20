@@ -312,47 +312,26 @@ class UserCreatedObjectQuerySet(models.QuerySet):
         return self.filter(owner=user)
 
     def editable_by_user(self, user):
-        """Objects the user owns or has been granted edit access to."""
-        if not user or not user.is_authenticated:
-            return self.none()
-        return self.filter(
-            Q(owner=user) | Q(pk__in=self._editor_grant_object_ids(user))
-        )
+        """Objects the user may edit under the shared policy."""
+        from .policy import editable_queryset
+
+        return editable_queryset(user, self.all())
 
     def _editor_grant_object_ids(self, user):
         return editor_grant_object_ids(self.model, user)
 
     def reviewable_by_user(self, user):
-        if self._is_moderator(user):
-            return self.filter(publication_status=UserCreatedObject.STATUS_REVIEW)
-        else:
-            return self.none()
+        from .policy import reviewable_queryset
+
+        return reviewable_queryset(user, self.all())
 
     def in_review(self):
         return self.filter(publication_status=UserCreatedObject.STATUS_REVIEW)
 
     def accessible_by_user(self, user):
-        if self._is_moderator(user):
-            return self.all()
-        else:
-            filters = (
-                Q(owner=user)
-                | Q(publication_status=UserCreatedObject.STATUS_PUBLISHED)
-                | Q(publication_status=UserCreatedObject.STATUS_REVIEW, owner=user)
-            )
-            if user and user.is_authenticated:
-                filters |= Q(pk__in=self._editor_grant_object_ids(user))
-            return self.filter(filters)
+        from .policy import visible_queryset
 
-    def _is_moderator(self, user):
-        """
-        Determines if the user has moderation permissions for the model.
-        Assumes that a permission named 'can_moderate_<modelname>' exists.
-        """
-        model_name = self.model._meta.model_name
-        perm_codename = f"can_moderate_{model_name}"
-        app_label = self.model._meta.app_label
-        return user.is_staff or user.has_perm(f"{app_label}.{perm_codename}")
+        return visible_queryset(user, self.all())
 
 
 class UserCreatedObjectManager(models.Manager):

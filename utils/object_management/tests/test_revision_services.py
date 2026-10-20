@@ -8,13 +8,14 @@ deterministic concurrency boundary.
 
 import threading
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
-from django.forms.models import inlineformset_factory
+from django.forms.models import inlineformset_factory, modelform_factory
 from django.test import TestCase, TransactionTestCase
 
 from bibliography.models import Author, Source, SourceAuthor
@@ -957,6 +958,33 @@ class LockedTargetInvariantTests(RevisionServiceBase):
         self.prop.refresh_from_db()
         self.assertEqual(self.prop.name, "Rev Test Property")
         self.assertEqual(self.prop.content_revision, 1)
+
+    def test_narrow_form_preserves_concurrent_field_change(self):
+        from django.http import HttpResponse
+
+        from utils.object_management.views import _perform_bound_update
+
+        narrow_form_class = modelform_factory(Property, fields=["name"])
+        stale = Property.objects.get(pk=self.prop.pk)
+        form = narrow_form_class({"name": "Posted"}, instance=stale)
+        self.assertTrue(form.is_valid())
+        Property.objects.filter(pk=self.prop.pk).update(description="concurrent edit")
+
+        def fake_super(bound_form):
+            view.object = bound_form.save()
+            return HttpResponse()
+
+        view = SimpleNamespace(
+            object=stale,
+            request=SimpleNamespace(user=self.owner),
+            _call_super_form_valid=fake_super,
+        )
+        response = _perform_bound_update(view, form)
+        self.assertIsNotNone(response)
+        fresh = Property.objects.get(pk=self.prop.pk)
+        self.assertEqual(fresh.description, "concurrent edit")
+        self.assertEqual(fresh.name, "Posted")
+        self.assertEqual(fresh.content_revision, 2)
 
 
 class EvidenceFormsetCreationTests(RevisionServiceBase):

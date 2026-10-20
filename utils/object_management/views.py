@@ -25,8 +25,9 @@ from django.core.exceptions import (
     PermissionDenied,
     ValidationError,
 )
-from django.db import DatabaseError
-from django.db.models import CharField, Q, QuerySet, Value
+from django.db import DatabaseError, transaction
+from django.db.models import CharField, Model, Q, QuerySet, Value
+from django.forms.models import BaseModelForm, construct_instance
 from django.http import (
     Http404,
     HttpRequest,
@@ -54,11 +55,6 @@ from utils.modal import (
     BSModalUpdateView,
 )
 from utils.object_management.filters import ReviewDashboardFilterSet
-from utils.object_management.helpers import (
-    create_review_action,
-    create_review_action_safely,
-    invoke_cascade_handler,
-)
 from utils.object_management.models import (
     ReviewAction,
     UserCreatedObject,
@@ -72,10 +68,34 @@ from utils.object_management.permissions import (
     get_object_policy,
     user_is_moderator_for_model,
 )
+from utils.object_management.policy import (
+    decide,
+    is_active_actor,
+    is_admin,
+    reviewable_queryset,
+    visible_queryset,
+)
+from utils.object_management.registry import (
+    KIND_OWNED,
+    KIND_REVIEWABLE,
+    model_policy,
+    resolve_create_parent,
+    review_target,
+)
 from utils.object_management.review_filtering import ReviewItemFilter
 from utils.object_management.review_hooks import (
     get_breadcrumb_module,
     get_review_search_fields,
+)
+from utils.object_management.services import (
+    _fresh_actor,
+    authorize_create,
+    content_mutation,
+    perform_transition,
+    record_comment,
+    record_creation,
+    validate_created_parent,
+    validate_references,
 )
 from utils.views import get_safe_next_url
 
@@ -427,8 +447,8 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
 
         # Optimize: Pre-fetch all user permissions in a single query
         # This avoids N+1 queries when checking permissions for each model
-        if self.request.user.is_staff:
-            # Staff users can moderate all models
+        if is_admin(self.request.user):
+            # Administrators can moderate all registered models
             user_can_moderate_all = True
             user_permission_codenames = set()
         else:
@@ -454,14 +474,20 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             return codename in user_permission_codenames
 
         def has_visible_review_items(model):
-            queryset = self._in_review_queryset_for_model(model)
+            queryset = reviewable_queryset(
+                self.request.user, self._in_review_queryset_for_model(model)
+            )
             return queryset.exclude(owner=self.request.user).exists()
 
         for model in apps.get_models():
-            # Check if model inherits from UserCreatedObject and is not abstract
+            # Check if model is a registered reviewable root (owned children
+            # and unregistered subclasses are never moderation targets)
+            policy = model_policy(model)
             if (
                 issubclass(model, UserCreatedObject)
                 and not model._meta.abstract
+                and policy is not None
+                and policy.kind != KIND_OWNED
                 and self._is_primary_model_module(model)
                 and hasattr(model, "objects")
                 and model not in available_models
@@ -505,6 +531,8 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                 if (
                     issubclass(model, UserCreatedObject)
                     and not model._meta.abstract
+                    and model_policy(model) is not None
+                    and model_policy(model).kind != KIND_OWNED
                     and self._is_primary_model_module(model)
                     and hasattr(model, "objects")
                 )
@@ -682,7 +710,10 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             ):
                 continue
             try:
-                queryset = self._in_review_queryset_for_model(model_class)
+                queryset = reviewable_queryset(
+                    self.request.user,
+                    self._in_review_queryset_for_model(model_class),
+                )
             except (
                 AttributeError,
                 FieldDoesNotExist,
@@ -759,7 +790,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         if not user or not getattr(user, "is_authenticated", False):
             return False
 
-        if user.is_staff:
+        if is_admin(user):
             user_can_moderate_all = True
             user_permission_codenames = set()
         else:
@@ -791,7 +822,9 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
 
             try:
                 has_items = (
-                    self._in_review_queryset_for_model(model_class)
+                    reviewable_queryset(
+                        user, self._in_review_queryset_for_model(model_class)
+                    )
                     .exclude(owner=user)
                     .exists()
                 )
@@ -1019,6 +1052,18 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
             return f"{object_name} has been {action_message}."
         return f"{object_name} has been updated."
 
+    _TRANSITION_FOR_METHOD = {
+        "submit_for_review": "submit",
+        "register_for_review": "submit",
+        "withdraw_from_review": "withdraw",
+        "approve": "approve",
+        "reject": "reject",
+        "archive": "archive",
+    }
+
+    def _get_expected_revision(self, request):
+        return request.POST.get("expected_revision") or None
+
     def handle_review_action_post(self, request, *args, **kwargs):
         """Shared POST flow for all review actions."""
         # Resolve object for both modal and non-modal views
@@ -1038,34 +1083,17 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
             previous_status = getattr(self.object, "publication_status", None)
             if not self.action_attr_name:
                 raise ImproperlyConfigured("action_attr_name must be set on the view")
-            action_callable = getattr(self.object, self.action_attr_name, None)
-            if not callable(action_callable):
+            policy_action = self._TRANSITION_FOR_METHOD.get(self.action_attr_name)
+            if policy_action is None:
                 raise ImproperlyConfigured(
                     f"Object has no callable '{self.action_attr_name}' method"
                 )
-            action_kwargs = dict(self.get_action_kwargs(request, self.object) or {})
-            if self.action_attr_name == "approve" and "user" not in action_kwargs:
-                action_kwargs["user"] = request.user
-            action_callable(**action_kwargs)
-
-            # Fallback: if approve() did not set approved_by for any reason, set it here
-            if (
-                self.action_attr_name == "approve"
-                and getattr(self.object, "approved_by_id", None) is None
-            ):
-                try:
-                    self.object.approved_by = request.user
-                    self.object.save(update_fields=["approved_by"])
-                except (AttributeError, ValueError, DatabaseError):
-                    pass
-
-            # Log review action
-            create_review_action_safely(
-                self.object,
+            self.object = perform_transition(
                 request.user,
-                self.review_action,
-                comment,
-                exceptions=DatabaseError,
+                self.object,
+                policy_action,
+                expected_revision=self._get_expected_revision(request),
+                comment=comment,
             )
 
             # Success message
@@ -1096,18 +1124,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
             request: The HTTP request
             previous_status: The object's publication_status before the action
         """
-        obj = getattr(self, "object", None)
-        action_name = getattr(self, "action_attr_name", None)
-        if not obj or not action_name:
-            return
-
-        invoke_cascade_handler(
-            obj,
-            action_name,
-            actor=getattr(request, "user", None),
-            previous_status=previous_status,
-            exceptions=(AttributeError, TypeError, ValidationError, DatabaseError),
-        )
+        return
 
     # Default POST handler for all review action views (modal and non‑modal)
     def post(self, request, *args, **kwargs):  # type: ignore[override]
@@ -1216,23 +1233,20 @@ class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
         context = super().get_context_data(**kwargs)
         # Pass through 'next' if provided in the opener link; templates will append it to the form action
         context["next_url"] = self.request.GET.get("next")
-        # If the object supports cascade review actions, expose the affected
-        # author count so the modal can show a notice.
-        obj = context.get("object")
-        if obj is not None and hasattr(obj, "affected_author_count"):
-            action = getattr(self, "action_attr_name", None)
-            if action:
-                try:
-                    context["cascade_author_count"] = obj.affected_author_count(action)
-                except (
-                    AttributeError,
-                    TypeError,
-                    FieldDoesNotExist,
-                    FieldError,
-                    DatabaseError,
-                ):
-                    context["cascade_author_count"] = 0
+        expected = self._parse_revision_param(self.request.GET.get("expected_revision"))
+        context["expected_revision"] = expected
+        context["expected_revision_bound"] = expected is not None
         return context
+
+    @staticmethod
+    def _parse_revision_param(raw):
+        if raw in (None, ""):
+            return None
+        try:
+            value = int(str(raw).strip())
+        except (TypeError, ValueError):
+            return None
+        return value if value >= 0 else None
 
     def post(self, request, *args, **kwargs):  # type: ignore[override]
         """Preflight handling for django-bootstrap-modal-forms.
@@ -1415,14 +1429,7 @@ class TransferOwnershipView(BaseObjectAccessActionView):
             f"to {new_owner.username}.",
         )
         success_url = self.get_success_url()
-        policy = get_object_policy(request.user, obj, request=request)
-        if not (
-            policy["is_published"]
-            or policy["is_owner"]
-            or policy["is_editor"]
-            or policy["is_staff"]
-            or policy["is_moderator"]
-        ):
+        if not decide(request.user, "read", obj).allowed:
             # The former owner may no longer read the object; avoid a 403 by
             # falling back to the model's private list, or the start page as
             # a last resort.
@@ -1701,9 +1708,10 @@ class BulkManageAccessView(LoginRequiredMixin, View):
 
 
 class UserOwnsObjectMixin(UserPassesTestMixin):
-    """
-    All models that have access restrictions specific to a user contain a field named 'owner'. This mixin prevents
-    access to objects owned by other users.
+    """Content-action adapter requiring edit access on the resolved object.
+
+    Owned children delegate to their reviewable root through the core
+    decision, so editors and lifecycle rules apply uniformly.
     """
 
     def test_func(self):
@@ -1717,8 +1725,7 @@ class UserOwnsObjectMixin(UserPassesTestMixin):
             raise Http404 from err
         except Exception:
             return False
-        policy = get_object_policy(self.request.user, obj, request=self.request)
-        return policy["is_owner"]
+        return decide(self.request.user, "edit", obj).allowed
 
 
 class UserCreatedObjectListMixin:
@@ -1785,8 +1792,18 @@ class UserCreatedObjectListMixin:
         if owner_field is not None:
             queryset = queryset.select_related("owner")
 
-        if self.list_type in {"published", "private", "review", "declined", "archived"}:
+        if self.list_type in {
+            "published",
+            "private",
+            "owned",
+            "shared",
+            "review",
+            "declined",
+            "archived",
+        }:
             queryset = apply_scope_filter(queryset, self.list_type, user=user)
+        elif self.list_type is not None:
+            queryset = queryset.none()
         else:
             queryset = filter_queryset_for_user(queryset, user)
 
@@ -2054,7 +2071,16 @@ class AddReviewCommentView(BaseReviewActionView):
             messages.error(request, "Comment cannot be empty.")
             return HttpResponseRedirect(self.get_success_url())
 
-        create_review_action(obj, request.user, ReviewAction.ACTION_COMMENT, message)
+        try:
+            record_comment(
+                request.user,
+                obj,
+                message,
+                expected_revision=request.POST.get("expected_revision") or None,
+            )
+        except ValidationError as e:
+            messages.error(request, self._format_action_error(e))
+            return HttpResponseRedirect(self.get_failure_url())
 
         messages.success(request, "Comment added.")
         return HttpResponseRedirect(self.get_success_url())
@@ -2165,11 +2191,12 @@ class ReviewObjectListView(ReviewObjectListMixin, ListView):
 
 class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
     """
-    A Mixin to control access to objects based on 'publication_status' and 'owner'.
+    A Mixin to control read access via the shared authorization policy.
 
-    - Published objects ('publication_status' == 'published') are accessible to all users.
-    - Unpublished objects are accessible to their owners, staff, or moderators
-      (users with the per‑model permission `can_moderate_<model>`).
+    Delegates to ``policy.decide(user, "read", obj)``: published objects are
+    publicly readable and archived objects are public frozen historical data;
+    private/review/declined objects require the applicable object-level
+    access.
     """
 
     publication_status_field = "publication_status"
@@ -2189,42 +2216,23 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
         except Exception:
             return False
 
-        if not hasattr(obj, self.publication_status_field) or not hasattr(
-            obj, self.owner_field
-        ):
+        if (
+            not hasattr(obj, self.publication_status_field)
+            or not hasattr(obj, self.owner_field)
+        ) and model_policy(type(obj)) is None:
             raise ImproperlyConfigured(
                 f"The model {obj.__class__.__name__} must have '{self.publication_status_field}' and '{self.owner_field}' fields."
             )
 
-        # Directly honor model publication_status for public read access
-        try:
-            status = getattr(obj, self.publication_status_field, None)
-            if status is not None:
-                published_value = _resolve_status_value(obj.__class__, "published")
-                if status == published_value:
-                    return True
-        except Exception:
-            pass
-
-        # Policy-based evaluation (covers private/review/declined/archived and role checks)
-        policy = get_object_policy(self.request.user, obj, request=self.request)
-        if policy["is_published"]:
-            return True
-        # Archived, private, review, and declined objects require authentication
-        return (
-            policy["is_owner"]
-            or policy["is_editor"]
-            or policy["is_staff"]
-            or policy["is_moderator"]
-        )
+        return decide(self.request.user, "read", obj).allowed
 
 
 class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
     """
-    A Mixin to control write access to objects based on 'publication_status' and 'owner'.
+    A Mixin to control write access via the shared authorization policy.
 
-    - Published objects ('publication_status' == 'published') are accessible to all users.
-    - Unpublished objects are only accessible to their owners.
+    ``object_policy_action`` selects the policy action: ``edit``, ``delete``,
+    or ``duplicate`` (mapped onto ``new_version``).
     """
 
     publication_status_field = "publication_status"
@@ -2233,10 +2241,15 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
     permission_denied_message = "You do not have permission to access this object."
     object_policy_action = "edit"
 
+    _POLICY_ACTION_MAP = {
+        "edit": "edit",
+        "delete": "delete",
+        "duplicate": "new_version",
+    }
+
     def test_func(self):
         user = self.request.user
 
-        # Authentication is required for all write operations
         if not user.is_authenticated:
             return False
 
@@ -2250,50 +2263,219 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
         except Exception:
             return False
 
-        if not hasattr(obj, self.publication_status_field) or not hasattr(
-            obj, self.owner_field
-        ):
+        if (
+            not hasattr(obj, self.publication_status_field)
+            or not hasattr(obj, self.owner_field)
+        ) and model_policy(type(obj)) is None:
             raise ImproperlyConfigured(
                 f"The model {obj.__class__.__name__} must have '{self.publication_status_field}' and '{self.owner_field}' fields."
             )
 
-        policy = get_object_policy(user, obj, request=self.request)
-        if self.object_policy_action == "delete":
-            if policy["can_delete"]:
-                return True
-            # Fallback for models without delete URLs in the policy
-            return not policy["is_archived"] and (
-                policy["is_staff"]
-                or (policy["is_owner"] and not policy["is_published"])
+        action = self._POLICY_ACTION_MAP.get(self.object_policy_action)
+        if action is None:
+            raise ImproperlyConfigured(
+                f"Unknown object_policy_action '{self.object_policy_action}'."
             )
+        return decide(user, action, obj).allowed
 
-        if self.object_policy_action == "duplicate" and policy["can_new_version"]:
-            return True
 
-        if policy["can_edit"]:
-            return True
+class PolicyPermissionRequiredMixin(PermissionRequiredMixin):
+    """Bridge named model actions to the shared authorization policy.
 
-        # Fallback for models without update URLs in the policy
-        return not policy["is_archived"] and (
-            policy["is_staff"]
-            or (
-                policy["is_owner"]
-                and not policy["is_published"]
-                and policy["has_change_permission"]
+    Resolves the target model from ``policy_model``, the view's ``model``, or
+    the form's ``_meta.model`` and delegates to ``policy.decide``. Views serving
+    models outside the policy registry keep their ``permission_required``
+    enforcement.
+    """
+
+    policy_model = None
+    policy_action = "create"
+
+    def get_policy_model(self):
+        if self.policy_model is not None:
+            return self.policy_model
+        model = getattr(self, "model", None)
+        if model is not None:
+            return model
+        form_class = getattr(self, "form_class", None)
+        form_meta = getattr(form_class, "_meta", None)
+        return getattr(form_meta, "model", None)
+
+    def get_policy_parent(self):
+        """Return the persisted parent for owned-child creates, if any."""
+        return None
+
+    def _resolve_create_parent(self, form):
+        model = self.get_policy_model()
+        if model is None:
+            return None, None
+        policy = model_policy(model)
+        if policy is None or policy.parent_path is None:
+            return policy, None
+        parent = self.get_policy_parent()
+        if parent is None:
+            parent = resolve_create_parent(
+                policy,
+                instance=getattr(form, "instance", None),
+                validated_data=getattr(form, "cleaned_data", None),
             )
-        )
+        return policy, parent
 
+    def _enforce_policy_create(self, form, parent=None):
+        """Authoritative create authorization inside the write boundary.
 
-class CreateUserObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
+        Delegates to ``services.authorize_create`` with the resolved parent
+        context so the actor and every declared parent row are re-read at the
+        boundary — a capability or context revoked after any advisory check
+        can never slip a write through. Unregistered ``UserCreatedObject``
+        models deny; unregistered non-UCO models keep their plain behavior.
+        Returns the fresh actor for owner attribution and audit writes.
+        """
+        model = self.get_policy_model()
+        if model is None:
+            return None
+        policy = model_policy(model)
+        if policy is None:
+            if issubclass(model, UserCreatedObject):
+                raise PermissionDenied("Unregistered model cannot be created.")
+            return None
+        if parent is None and policy.parent_path is not None:
+            policy, parent = self._resolve_create_parent(form)
+        return authorize_create(self.request.user, model, parent=parent)
+
     def has_permission(self):
-        # Staff users can always create objects
-        if self.request.user.is_staff:
-            return True
-        # For non-staff users, use the default permission check
-        return super().has_permission()
+        model = self.get_policy_model()
+        if model is None:
+            return super().has_permission()
+        policy = model_policy(model)
+        if policy is None:
+            if issubclass(model, UserCreatedObject):
+                return False
+            return super().has_permission()
+        parent = self.get_policy_parent()
+        if policy.kind == KIND_OWNED and parent is None:
+            return is_active_actor(self.request.user)
+        return decide(
+            self.request.user,
+            self.policy_action,
+            model,
+            parent=parent,
+        ).allowed
+
+
+def _perform_bound_update(view, form):
+    """Persist a bound update inside the shared mutation boundary.
+
+    Independent-evidence rows re-targeted at a different parent are moved
+    under the ``proposed_parent`` protocol: all affected roots stay locked
+    through the write. The validated form is re-bound to the locked fresh
+    instance via ``construct_instance``, so only the form's declared fields
+    are written and protected or out-of-section state can never be reverted
+    by a stale pre-loaded instance.
+    """
+    obj = getattr(view, "object", None)
+    policy = model_policy(type(obj)) if isinstance(obj, Model) else None
+    if policy is None and not isinstance(obj, UserCreatedObject):
+        return None
+    proposed_parent = None
+    if (
+        policy is not None
+        and policy.kind == KIND_REVIEWABLE
+        and policy.parent_path is not None
+    ):
+        parent_field = policy.parent_path.split("__")[0]
+        if parent_field in getattr(form, "changed_data", []):
+            new_parent = resolve_create_parent(
+                policy, validated_data=getattr(form, "cleaned_data", None)
+            )
+            if new_parent is None:
+                raise ValidationError("invalid_parent")
+            old_pk = getattr(obj, f"{parent_field}_id", None)
+            if old_pk is None or getattr(new_parent, "pk", None) != old_pk:
+                proposed_parent = new_parent
+    with content_mutation(
+        view.request.user, obj, action="edit", proposed_parent=proposed_parent
+    ) as fresh:
+        # Revalidate against the freshly read actor on the same request
+        # object so form clean hooks that check the requester never run on
+        # a stale permission cache.
+        view.request.user = _fresh_actor(view.request.user)
+        if isinstance(form, BaseModelForm):
+            form.instance = fresh
+            # Re-run validation against the locked instance so clean_* hooks
+            # that write non-declared attributes (e.g. datetime_precision)
+            # apply to the row that is actually saved.
+            form.full_clean()
+            if form.errors:
+                return view.form_invalid(form)
+            construct_instance(form, fresh)
+            validate_references(view.request.user, getattr(form, "cleaned_data", None))
+        view.object = fresh
+        return view._call_super_form_valid(form)
+
+
+def _perform_bound_create(view, form):
+    """Persist a bound create inside the shared mutation boundary.
+
+    Reviewable roots get a ``created`` audit event after full persistence;
+    owned children are written inside a ``content_mutation`` on their
+    resolved parent so the parent's snapshot captures the new row.
+    """
+    instance = form.instance
+    model = view.get_policy_model() or (
+        type(instance) if isinstance(instance, Model) else None
+    )
+    policy = model_policy(model) if model is not None else None
+    if policy is None and not isinstance(instance, UserCreatedObject):
+        return None
+    if isinstance(instance, UserCreatedObject):
+        instance.owner = view.request.user
+        instance.publication_status = UserCreatedObject.STATUS_PRIVATE
+    policy, parent = view._resolve_create_parent(form)
+    if policy is not None and policy.kind == KIND_OWNED and parent is not None:
+        with content_mutation(
+            view.request.user, parent, action="edit"
+        ) as locked_parent:
+            actor = view._enforce_policy_create(form, parent=locked_parent)
+            view.request.user = actor
+            validate_references(actor, getattr(form, "cleaned_data", None))
+            if isinstance(instance, UserCreatedObject):
+                instance.owner = actor
+                instance.publication_status = UserCreatedObject.STATUS_PRIVATE
+            response = view._call_super_form_valid(form)
+            validate_created_parent(instance, parent=locked_parent)
+            return response
+    with transaction.atomic():
+        actor = view._enforce_policy_create(form, parent=parent)
+        if actor is not None:
+            view.request.user = actor
+        validate_references(
+            actor or view.request.user, getattr(form, "cleaned_data", None)
+        )
+        response = view._call_super_form_valid(form)
+        validate_created_parent(instance, parent=parent)
+        if isinstance(instance, UserCreatedObject):
+            record_creation(actor or view.request.user, instance)
+    return response
+
+
+class CreateUserObjectMixin(PolicyPermissionRequiredMixin, NextOrSuccessUrlMixin):
+    def get_policy_model(self):
+        model = getattr(self, "model", None)
+        if model is not None:
+            return model
+        queryset = getattr(self, "queryset", None)
+        if queryset is not None:
+            return queryset.model
+        return super().get_policy_model()
+
+    def _call_super_form_valid(self, form):
+        return super().form_valid(form)
 
     def form_valid(self, form):
-        form.instance.owner = self.request.user
+        response = _perform_bound_create(self, form)
+        if response is not None:
+            return response
         return super().form_valid(form)
 
 
@@ -2359,16 +2541,11 @@ class UserCreatedObjectCreateView(
         return template_names
 
 
-class UserCreatedObjectModalCreateView(PermissionRequiredMixin, BSModalCreateView):
+class UserCreatedObjectModalCreateView(
+    PolicyPermissionRequiredMixin, BSModalCreateView
+):
     template_name = "modal_form.html"
     object = None
-
-    def has_permission(self):
-        # Staff users can always create objects
-        if self.request.user.is_staff:
-            return True
-        # For non-staff users, use the default permission check
-        return super().has_permission()
 
     def get_form_kwargs(self):
         """Pass request to form - required by bootstrap_modal_forms and our custom mixins."""
@@ -2408,8 +2585,13 @@ class UserCreatedObjectModalCreateView(PermissionRequiredMixin, BSModalCreateVie
             return f"{model_name} created successfully."
         return "Object created successfully."
 
+    def _call_super_form_valid(self, form):
+        return super().form_valid(form)
+
     def form_valid(self, form):
-        form.instance.owner = self.request.user
+        response = _perform_bound_create(self, form)
+        if response is not None:
+            return response
         return super().form_valid(form)
 
 
@@ -2449,16 +2631,20 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
         # moderation metadata (reviewer names, actions, comments) that must not
         # leak to arbitrary readers of a published object.
         policy = get_object_policy(request.user, obj, request=request)
-        show_panel = request.GET.get("review") is not None and (
-            policy["is_owner"] or policy["is_editor"] or policy["is_moderator"]
+        show_panel = (
+            request.GET.get("review") is not None and policy["can_view_review_activity"]
         )
 
         logs = []
         if show_panel:
-            try:
-                logs = list(ReviewAction.for_object(obj).select_related("user"))
-            except (DatabaseError, FieldError, AttributeError):
-                logs = []
+            log_target = review_target(obj)
+            if log_target is not None:
+                try:
+                    logs = list(
+                        ReviewAction.for_object(log_target).select_related("user")
+                    )
+                except (DatabaseError, FieldError, AttributeError):
+                    logs = []
 
         context.update(
             {
@@ -2530,28 +2716,20 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         ReviewItemDetailView._model_view_registry[model_class] = cls
 
     def test_func(self):
-        """Allow access for staff, moderators, and owners.
+        """Allow access to anyone with review-activity rights on the object.
 
-        This overrides the default read-access mixin so that non-staff moderators who
-        hold the dynamic per-model permission (can_moderate_<model>) may access the
-        review detail view. Owners are permitted to access the review view for any
-        of their objects to see review history and activity.
+        Delegates to the shared ``view_review_activity`` decision: owners,
+        editors, administrators, and moderators with read access.
         """
         user = getattr(self, "request", None) and self.request.user
         if not user or not getattr(user, "is_authenticated", False):
             return False
 
-        obj = self.get_object()
-        policy = get_object_policy(user, obj, request=self.request)
-
-        if policy["is_owner"]:
-            return True
-
-        return user_is_moderator_for_model(user, obj.__class__)
+        return decide(user, "view_review_activity", self.get_object()).allowed
 
     def dispatch(self, request, *args, **kwargs):
         """
-        Authorize review details for moderators/staff and for owners.
+        Authorize review details via the shared ``view_review_activity`` decision.
 
         Delegation order:
         1. Resolve object from content type/object id.
@@ -2559,9 +2737,6 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         3. If a specialized class is registered, call that class via `as_view()` and
            return its response.
         4. Otherwise execute base authorization and rendering.
-
-        Owners can access the review page for any of their objects to see review
-        history and activity, regardless of publication status.
         """
         obj = self.get_object()
         model_class = obj.__class__
@@ -2573,15 +2748,23 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             specialized_view = specialized_view_class.as_view()
             return specialized_view(request, *args, **kwargs)
 
-        # Standard authorization checks
-        policy = get_object_policy(request.user, obj, request=request)
-
-        if policy["is_owner"]:
-            return super().dispatch(request, *args, **kwargs)
-
-        if not user_is_moderator_for_model(request.user, obj.__class__):
+        if not decide(request.user, "view_review_activity", obj).allowed:
             raise PermissionDenied(
                 "You do not have permission to access the review details page."
+            )
+        target = review_target(obj)
+        if target is not None and target.pk != obj.pk:
+            # A generated projection has no independent approval surface;
+            # review activity lives on its source evidence.
+            source_ct = ContentType.objects.get_for_model(type(target))
+            return HttpResponseRedirect(
+                reverse(
+                    "object_management:review_item_detail",
+                    kwargs={
+                        "content_type_id": source_ct.pk,
+                        "object_id": target.pk,
+                    },
+                )
             )
         return super().dispatch(request, *args, **kwargs)
 
@@ -2759,6 +2942,15 @@ class UserCreatedObjectUpdateView(
 
         return kwargs
 
+    def _call_super_form_valid(self, form):
+        return super().form_valid(form)
+
+    def form_valid(self, form):
+        response = _perform_bound_update(self, form)
+        if response is not None:
+            return response
+        return super().form_valid(form)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         model = self.object.__class__
@@ -2866,6 +3058,15 @@ class UserCreatedObjectUpdateWithInlinesView(
 
         return kwargs
 
+    def _call_super_form_valid(self, form):
+        return super().form_valid(form)
+
+    def form_valid(self, form):
+        response = _perform_bound_update(self, form)
+        if response is not None:
+            return response
+        return super().form_valid(form)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         model = self.object.__class__
@@ -2922,6 +3123,15 @@ class UserCreatedObjectModalUpdateView(
 
         return kwargs
 
+    def _call_super_form_valid(self, form):
+        return super().form_valid(form)
+
+    def form_valid(self, form):
+        response = _perform_bound_update(self, form)
+        if response is not None:
+            return response
+        return super().form_valid(form)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(
@@ -2970,7 +3180,7 @@ class UserCreatedObjectModalArchiveView(
 
     def form_valid(self, form):
         success_url = self.get_success_url()
-        self.object.archive()
+        perform_transition(self.request.user, self.object, "archive")
         return HttpResponseRedirect(success_url)
 
 
@@ -2980,6 +3190,18 @@ class UserCreatedObjectModalDeleteView(
     object_policy_action = "delete"
     template_name = "modal_delete.html"
     success_message = "Successfully deleted."
+
+    def form_valid(self, form):
+        if isinstance(self.object, UserCreatedObject) or (
+            isinstance(self.object, Model)
+            and model_policy(type(self.object)) is not None
+        ):
+            with content_mutation(
+                self.request.user, self.object, action="delete"
+            ) as locked:
+                self.object = locked
+                return super().form_valid(form)
+        return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -3043,10 +3265,23 @@ class UserCreatedObjectModalDeleteView(
         return self.model.public_list_url()
 
 
-class OwnedObjectModelSelectOptionsView(
-    PermissionRequiredMixin, ModelSelectOptionsView
-):
-    pass
+class OwnedObjectModelSelectOptionsView(ModelSelectOptionsView):
+    """Post-create option refresh scoped by the shared read policy.
+
+    Options are the records the request user may currently read
+    (published/owned/granted); no separate model view permission is required
+    on top of the create affordance that triggered the refresh.
+    """
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if queryset is None:
+            return queryset
+        if model_policy(queryset.model) is None:
+            if issubclass(queryset.model, UserCreatedObject):
+                return queryset.none()
+            return queryset
+        return visible_queryset(self.request.user, queryset)
 
 
 class UserCreatedObjectAutocompleteView(AutocompleteModelView):

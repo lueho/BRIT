@@ -34,10 +34,8 @@ from maps.serializers import (
     RegionGeoFeatureModelSerializer,
 )
 from utils.forms import TomSelectFormsetHelper
-from utils.object_management.permissions import (
-    filter_queryset_for_user,
-    get_object_policy,
-)
+from utils.object_management.permissions import filter_queryset_for_user
+from utils.object_management.policy import decide, is_admin
 from utils.object_management.views import (
     CreateUserObjectMixin,
     OwnedObjectModelSelectOptionsView,
@@ -620,18 +618,7 @@ class GeoDataSetRuntimePermissionMixin:
         return params
 
     def test_func(self):
-        policy = get_object_policy(
-            self.request.user,
-            self.get_dataset(),
-            request=self.request,
-        )
-        return (
-            policy["is_published"]
-            or policy["is_archived"]
-            or policy["is_owner"]
-            or policy["is_staff"]
-            or (policy["is_in_review"] and policy["is_moderator"])
-        )
+        return decide(self.request.user, "read", self.get_dataset()).allowed
 
     def get_queryset(self):
         adapter = self.get_runtime_adapter()
@@ -757,18 +744,7 @@ class GeoDataSetRuntimeMapView(
         return self.render_to_response(context)
 
     def test_func(self):
-        policy = get_object_policy(
-            self.request.user,
-            self.get_dataset(),
-            request=self.request,
-        )
-        return (
-            policy["is_published"]
-            or policy["is_archived"]
-            or policy["is_owner"]
-            or policy["is_staff"]
-            or (policy["is_in_review"] and policy["is_moderator"])
-        )
+        return decide(self.request.user, "read", self.get_dataset()).allowed
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -1816,7 +1792,7 @@ class RegionChildCatchmentOptions(OwnedObjectModelSelectOptionsView):
 
 class ClearGeojsonCacheView(UserPassesTestMixin, View):
     def test_func(self):
-        return self.request.user.is_staff
+        return is_admin(self.request.user)
 
     def get(self, request, *args, **kwargs):
         pattern = request.GET.get("pattern", "*")

@@ -1,17 +1,185 @@
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
+from django.db.models import Model
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from .helpers import create_review_action_safely, invoke_cascade_handler
-from .models import ReviewAction
+from .models import UserCreatedObject
 from .permissions import (
     GlobalObjectPermission,
     UserCreatedObjectPermission,
+    _forbidden_write_fields,
     apply_scope_filter,
     filter_queryset_for_user,
 )
+from .policy import decide
+from .registry import (
+    KIND_OWNED,
+    KIND_REVIEWABLE,
+    model_policy,
+    resolve_create_parent,
+    resolve_parent,
+    resolve_parents,
+)
+from .services import (
+    StaleRevisionError,
+    _fresh_actor,
+    authorize_create,
+    content_mutation,
+    perform_transition,
+    record_creation,
+    validate_created_parent,
+    validate_references,
+)
+
+
+def _serializer_model(view, serializer):
+    model = getattr(getattr(serializer, "Meta", None), "model", None)
+    if model is None:
+        queryset = getattr(view, "queryset", None)
+        model = getattr(queryset, "model", None)
+    return model
+
+
+def _create_parent(view, serializer, policy):
+    get_policy_parent = getattr(view, "get_policy_parent", None)
+    parent = get_policy_parent() if callable(get_policy_parent) else None
+    if parent is None:
+        parent = resolve_create_parent(
+            policy, validated_data=getattr(serializer, "validated_data", None)
+        )
+    return parent
+
+
+def perform_policy_create(view, serializer):
+    """Advisory create-context resolution for bound creates.
+
+    Resolves the registered policy and declared ``parent_path`` parent context
+    and performs a preliminary ``create`` decision for early denial. The
+    authoritative check runs inside the write boundary via
+    ``services.authorize_create`` with a freshly reloaded actor and parent
+    rows; this advisory step never substitutes for it.
+
+    Returns ``(policy, parent)`` so callers can scope the write boundary.
+    """
+    model = _serializer_model(view, serializer)
+    policy = model_policy(model)
+    if policy is None:
+        return policy, None
+    parent = None
+    if policy.parent_path is not None:
+        parent = _create_parent(view, serializer, policy)
+        if parent is None:
+            raise PermissionDenied("Creation requires a valid parent context.")
+    decision = decide(view.request.user, "create", model, parent=parent)
+    if not decision.allowed:
+        raise PermissionDenied(decision.reason)
+    return policy, parent
+
+
+def finalize_policy_create(view, serializer, policy, parent):
+    """Persist a governed create inside the shared write boundary.
+
+    Owned children are written inside a ``content_mutation`` on the resolved
+    parent so the parent's audit captures the new row; only real
+    ``UserCreatedObject`` rows get owner/lifecycle injection and creation
+    audit events. Unregistered non-UCO models keep plain serializer
+    persistence with reference validation.
+    """
+    model = _serializer_model(view, serializer)
+    is_uco = isinstance(model, type) and issubclass(model, UserCreatedObject)
+    if is_uco and policy is None:
+        raise PermissionDenied("Unregistered model cannot be created.")
+    validated = getattr(serializer, "validated_data", None)
+    if policy is not None and isinstance(validated, dict):
+        for forbidden in _forbidden_write_fields(model):
+            validated.pop(forbidden, None)
+    if policy is not None and policy.kind == KIND_OWNED and parent is not None:
+        with content_mutation(
+            view.request.user, parent, action="edit"
+        ) as locked_parent:
+            actor = authorize_create(view.request.user, model, parent=locked_parent)
+            validate_references(actor, validated)
+            if is_uco:
+                obj = serializer.save(
+                    owner=actor,
+                    publication_status=UserCreatedObject.STATUS_PRIVATE,
+                )
+            else:
+                obj = serializer.save()
+            validate_created_parent(obj, parent=locked_parent)
+            return obj
+    with transaction.atomic():
+        if policy is not None:
+            actor = authorize_create(view.request.user, model, parent=parent)
+        else:
+            actor = _fresh_actor(view.request.user)
+        validate_references(actor, validated)
+        if is_uco:
+            obj = serializer.save(
+                owner=actor,
+                publication_status=UserCreatedObject.STATUS_PRIVATE,
+            )
+            validate_created_parent(obj, parent=parent)
+            record_creation(actor, obj)
+            return obj
+        created = serializer.save()
+        validate_created_parent(created, parent=parent)
+        return created
+
+
+def perform_policy_update(view, serializer):
+    """Shared governed-update boundary for bound serializers.
+
+    Resolves a changed declared evidence parent through
+    ``resolve_create_parent``/``resolve_parents``, hands the reparent to
+    ``content_mutation`` via ``proposed_parent``, rebinds
+    ``serializer.instance`` to the yielded fresh row, validates reference read
+    access inside the locked write boundary, and saves once. Non-governed
+    instances keep ordinary serializer behavior.
+    """
+    instance = getattr(serializer, "instance", None)
+    policy = model_policy(type(instance)) if isinstance(instance, Model) else None
+    if policy is None and not isinstance(instance, UserCreatedObject):
+        serializer.save()
+        return
+    proposed_parent = None
+    if (
+        policy is not None
+        and policy.kind == KIND_REVIEWABLE
+        and policy.parent_path is not None
+    ):
+        parent_field = policy.parent_path.split("__")[0]
+        validated = getattr(serializer, "validated_data", None) or {}
+        if parent_field in validated:
+            new_parent = resolve_create_parent(policy, validated_data=validated)
+            if new_parent is None:
+                raise ValidationError("invalid_parent")
+            if isinstance(new_parent, (list, tuple)):
+                new_keys = sorted(getattr(p, "pk", None) for p in new_parent)
+                old_keys = sorted(
+                    p.pk for p in resolve_parents(instance, policy.parent_path)
+                )
+                if new_keys != old_keys:
+                    proposed_parent = new_parent
+            else:
+                old_parent = resolve_parent(instance, policy.parent_path)
+                if getattr(new_parent, "pk", None) != getattr(old_parent, "pk", None):
+                    proposed_parent = new_parent
+    with content_mutation(
+        view.request.user,
+        instance,
+        action="edit",
+        proposed_parent=proposed_parent,
+    ) as fresh:
+        serializer.instance = fresh
+        validate_references(
+            _fresh_actor(view.request.user),
+            getattr(serializer, "validated_data", None),
+        )
+        serializer.save()
 
 
 class GlobalObjectViewSet(ModelViewSet):
@@ -19,7 +187,7 @@ class GlobalObjectViewSet(ModelViewSet):
     Base viewset for Global Objects.
     Implements read and write permissions.
     Read: Any user (authenticated or not)
-    Write: Only staff users
+    Write: users with the explicit administer_objects capability
     """
 
     permission_classes = [GlobalObjectPermission]
@@ -38,34 +206,27 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Return a queryset filtered according to user permissions and scope parameter.
 
-        Supports query parameter:
-        - scope: Different filtering options for objects
-          'published' - Only published objects (default)
-          'private' - Only user's own objects across statuses
-          'review' - Review objects visible to the user role
+        Delegates to ``policy.scope_queryset``: a missing scope returns the
+        read-visible set; an unknown scope returns no rows.
         """
         user = self.request.user
         queryset = self.queryset
-        scope = self.request.query_params.get("scope", "published")
+        scope = self.request.query_params.get("scope")
 
-        if scope in {"published", "private", "review"}:
-            return apply_scope_filter(queryset, scope, user=user)
-
-        return filter_queryset_for_user(queryset, user)
+        if scope is None:
+            return filter_queryset_for_user(queryset, user)
+        return apply_scope_filter(queryset, scope, user=user)
 
     def get_object(self):
-        """
-        Retrieve a single object by primary key without applying scope-based list filters,
-        then enforce object-level permissions.
+        """Retrieve a single object from the read-scoped queryset, then enforce
+        object-level permissions.
 
-        Rationale: list-scoped filtering (e.g., scope=private) should not cause 404 on
-        detail views when the user has permission to view the object. The object-level
-        permission check performed by check_object_permissions will gate access
-        appropriately (published: anyone; private/review/archived: owner/moderator/staff).
+        Objects the user may not read resolve to 404 instead of leaking existence; the
+        object-level permission check still gates the requested action.
         """
         from django.shortcuts import get_object_or_404
 
-        base_qs = self.queryset
+        base_qs = filter_queryset_for_user(self.queryset, self.request.user)
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
         lookup_value = self.kwargs.get(lookup_url_kwarg)
         obj = get_object_or_404(base_qs, **{self.lookup_field: lookup_value})
@@ -74,15 +235,16 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         return obj
 
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
+        """Server owns owner/lifecycle initialization; payload cannot forge them."""
+        policy, parent = perform_policy_create(self, serializer)
+        finalize_policy_create(self, serializer, policy, parent)
 
-    def _is_moderator(self, user, model):
-        """
-        Determines if the user has moderation permissions for the model.
-        """
-        perm_codename = f"can_moderate_{model._meta.model_name}"
-        app_label = model._meta.app_label
-        return user.has_perm(f"{app_label}.{perm_codename}") or user.is_staff
+    def perform_update(self, serializer):
+        perform_policy_update(self, serializer)
+
+    def perform_destroy(self, instance):
+        with content_mutation(self.request.user, instance, action="delete") as locked:
+            locked.delete()
 
     def _get_comment(self, request) -> str:
         try:
@@ -94,23 +256,34 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
             return (payload.get("comment") or payload.get("message") or "").strip()
         return ""
 
-    def _post_review_action(
-        self,
-        request,
-        obj,
-        action_name,
-        review_action,
-        previous_status=None,
-    ):
-        comment = self._get_comment(request)
-        if review_action:
-            create_review_action_safely(obj, request.user, review_action, comment)
+    def _get_expected_revision(self, request):
+        try:
+            payload = request.data
+        except Exception:
+            payload = {}
+        if isinstance(payload, dict):
+            return payload.get("expected_revision")
+        return None
 
-        invoke_cascade_handler(
-            obj,
-            action_name,
-            actor=getattr(request, "user", None),
-            previous_status=previous_status,
+    def _transition_response(self, request, obj, policy_action, message):
+        try:
+            perform_transition(
+                request.user,
+                obj,
+                policy_action,
+                expected_revision=self._get_expected_revision(request),
+                comment=self._get_comment(request),
+            )
+        except StaleRevisionError as e:
+            return Response(
+                {"error": str(e.messages[0] if e.messages else e)},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"status": f"{self.queryset.model.__name__} {message}"},
+            status=status.HTTP_200_OK,
         )
 
     @action(
@@ -134,24 +307,9 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        try:
-            previous_status = getattr(obj, "publication_status", None)
-            obj.register_for_review()
-            self._post_review_action(
-                request,
-                obj,
-                action_name="submit_for_review",
-                review_action=ReviewAction.ACTION_SUBMITTED,
-                previous_status=previous_status,
-            )
-            return Response(
-                {
-                    "status": f"{self.queryset.model.__name__} has been submitted for review."
-                },
-                status=status.HTTP_200_OK,
-            )
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return self._transition_response(
+            request, obj, "submit", "has been submitted for review."
+        )
 
     @action(
         detail=True, methods=["post"], permission_classes=[UserCreatedObjectPermission]
@@ -174,24 +332,9 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        try:
-            previous_status = getattr(obj, "publication_status", None)
-            obj.withdraw_from_review()
-            self._post_review_action(
-                request,
-                obj,
-                action_name="withdraw_from_review",
-                review_action=ReviewAction.ACTION_WITHDRAWN,
-                previous_status=previous_status,
-            )
-            return Response(
-                {
-                    "status": f"{self.queryset.model.__name__} has been withdrawn from review."
-                },
-                status=status.HTTP_200_OK,
-            )
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return self._transition_response(
+            request, obj, "withdraw", "has been withdrawn from review."
+        )
 
     @action(
         detail=True, methods=["post"], permission_classes=[UserCreatedObjectPermission]
@@ -213,27 +356,9 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        try:
-            previous_status = getattr(obj, "publication_status", None)
-            obj.approve(
-                user=request.user
-            )  # Utilize the model's approve method for consistency
-            self._post_review_action(
-                request,
-                obj,
-                action_name="approve",
-                review_action=ReviewAction.ACTION_APPROVED,
-                previous_status=previous_status,
-            )
-            # TODO: Implement notification to the owner
-            return Response(
-                {
-                    "status": f"{self.queryset.model.__name__} has been approved and is now published."
-                },
-                status=status.HTTP_200_OK,
-            )
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return self._transition_response(
+            request, obj, "approve", "has been approved and is now published."
+        )
 
     @action(
         detail=True, methods=["post"], permission_classes=[UserCreatedObjectPermission]
@@ -255,25 +380,7 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        try:
-            previous_status = getattr(obj, "publication_status", None)
-            obj.reject()
-            self._post_review_action(
-                request,
-                obj,
-                action_name="reject",
-                review_action=ReviewAction.ACTION_REJECTED,
-                previous_status=previous_status,
-            )
-            # TODO: Implement notification to the owner
-            return Response(
-                {
-                    "status": f"{self.queryset.model.__name__} has been rejected and is now private."
-                },
-                status=status.HTTP_200_OK,
-            )
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return self._transition_response(request, obj, "reject", "has been declined.")
 
     @action(
         detail=True, methods=["post"], permission_classes=[UserCreatedObjectPermission]
@@ -296,14 +403,4 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        try:
-            obj.archive()
-            # TODO: Implement notification to the owner
-            return Response(
-                {
-                    "status": f"{self.queryset.model.__name__} has been archived and is now private."
-                },
-                status=status.HTTP_200_OK,
-            )
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return self._transition_response(request, obj, "archive", "has been archived.")

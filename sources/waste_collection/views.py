@@ -1838,7 +1838,10 @@ class CollectionCatchmentAddAggregatedPropertyView(
 
 class SelectNewlyCreatedObjectModelSelectOptionsView(OwnedObjectModelSelectOptionsView):
     def get_selected_object(self):
-        qs = self.model.objects.filter(owner=self.request.user)
+        user = self.request.user
+        if not getattr(user, "is_authenticated", False):
+            return None
+        qs = self.model.objects.filter(owner=user)
         created_at = qs.aggregate(max_created_at=Max("created_at"))["max_created_at"]
         if created_at is None:
             return None
