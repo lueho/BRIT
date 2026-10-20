@@ -1,13 +1,17 @@
 from collections import OrderedDict
 from datetime import date
+from io import StringIO
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
+from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.db.models.signals import post_save
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from factory.django import mute_signals
+from rest_framework.exceptions import PermissionDenied
 
 from ..models import Author, Licence, Source, SourceAuthor
 from ..serializers import (
@@ -139,6 +143,15 @@ class SourceCreateSerializerPersistenceTestCase(TestCase):
                     content_type=ContentType.objects.get_for_model(model),
                 )
             )
+    @classmethod
+    def setUpTestData(cls):
+        cls._role_output = StringIO()
+        call_command("sync_roles", "--apply", stdout=cls._role_output)
+
+    def setUp(self):
+        # New users join the registered role automatically; that role carries
+        # the add_source/add_author capabilities this contract relies on.
+        self.user = User.objects.create_user(username="creator")
         self.existing_author = Author.objects.create(
             owner=self.user,
             first_names="Ada",
@@ -177,6 +190,7 @@ class SourceCreateSerializerPersistenceTestCase(TestCase):
         self.assertEqual(Author.objects.get(pk=rows[1][1]).owner, self.user)
 
     def test_save_denied_without_add_source(self):
+        self.user.groups.clear()
         self.user.user_permissions.clear()
         serializer = self._serializer({"title": "T", "type": "misc"})
         self.assertTrue(serializer.is_valid(), serializer.errors)

@@ -49,6 +49,17 @@ Represents a bibliographic reference with fields for:
 A through model for the many-to-many relationship between Source and Author:
 - Maintains the position/order of authors for a reference
 
+## Authorization and inline creation
+
+The module follows the [canonical authorization contract](../docs/02_developer_guide/security_permission_validation.md), including its contributor capabilities and explicit application-administration rules. `is_staff` alone grants no application authority.
+
+- Source quick-create, the compound source API, and BibTeX import use `create_source_with_authors`; author quick-create uses `resolve_author_for_source`. HTML/modal forms use the shared object-management adapters. Actual creation is authorized and audited inside atomic transactions against fresh actor state.
+- Existing readable Authors can be reused without `add_author`; new independent Authors require their own create decision. Unknown and unreadable author IDs return the same validation error.
+- SourceAuthor rows belong to their Source. Their changes participate in the Source revision; Authors retain independent ownership and review lifecycles.
+- Compound creation failures leave no new sources, authors, association rows, or audit events. Source creation does not publish linked Authors.
+- The source widget offers source and author creation separately according to the corresponding shared decisions, while retaining existing-author search when author creation is unavailable.
+- Quick-delete uses the canonical delete decision, preserves independent Authors, and refuses cited or lifecycle-ineligible Sources.
+
 ## Views
 The module provides a complete set of views for managing bibliographic data:
 - Dashboard view

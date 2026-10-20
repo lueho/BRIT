@@ -11,7 +11,12 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 
 from utils.object_management.policy import decide, visible_queryset
-from utils.object_management.services import record_creation
+from utils.object_management.services import (
+    _fresh_actor,
+    authorize_create,
+    record_creation,
+    validate_references,
+)
 
 from .models import (
     AUTHOR_TYPES,
@@ -24,9 +29,9 @@ from .models import (
     author_name_has_letter,
 )
 
-SOURCE_ADD_DENIED_MESSAGE = "You don't have permission to create sources."
 AUTHOR_ADD_DENIED_MESSAGE = "You need permission to create authors for source creation."
 UNKNOWN_AUTHOR_MESSAGE = "The referenced author does not exist or is not accessible."
+AUTHENTICATION_REQUIRED_MESSAGE = "An active account is required."
 
 _SOURCE_WRITABLE_FIELDS = frozenset(
     {
@@ -68,6 +73,16 @@ def _normalize(value):
     return " ".join(str(value or "").split())
 
 
+def _active_actor(actor):
+    """Fresh actor with an active authenticated account, or denied."""
+    actor = _fresh_actor(actor)
+    if not getattr(actor, "is_active", False) or not getattr(
+        actor, "is_authenticated", False
+    ):
+        raise PermissionDenied(AUTHENTICATION_REQUIRED_MESSAGE)
+    return actor
+
+
 def _visible_authors(actor):
     """Authors the actor may reference — invisible private rows are excluded."""
     return visible_queryset(actor, Author.objects.all())
@@ -81,19 +96,33 @@ def _author_field_map(author_data):
     }
 
 
+def _create_author(actor, fields):
+    """Authorize, persist, and audit a new Author inside one atomic block."""
+    with transaction.atomic():
+        actor = authorize_create(actor, Author)
+        author = Author(owner=actor, **fields)
+        author.full_clean()
+        author.save()
+        record_creation(actor, author)
+    return author
+
+
 def resolve_author_for_source(actor, author_data, *, allow_create):
     """Resolve one author payload entry to an accessible ``Author``.
 
     ``author_data`` is a mapping with either an ``id`` referencing an existing
     author or name fields describing a new/reusable author. Lookups run on the
     read-visible queryset so private records owned by others can neither be
-    referenced nor discovered by name. New authors require ``allow_create``
-    (the caller's ``add_author`` capability). Raises ``ValidationError`` for
-    invalid/inaccessible references and ``PermissionDenied`` when creation of a
-    genuinely new author is not permitted.
+    referenced nor discovered by name. ``allow_create`` only narrows access:
+    a genuinely new author still goes through the authoritative
+    ``authorize_create`` check and its ``created`` audit is recorded by this
+    resolver itself, inside the caller's transaction.
 
+    Raises ``ValidationError`` for invalid/inaccessible references and
+    ``PermissionDenied`` when creation of a new author is not permitted.
     Returns ``(author, created)``.
     """
+    actor = _active_actor(actor)
     if not isinstance(author_data, dict):
         raise ValidationError("Invalid author entry.")
 
@@ -132,13 +161,13 @@ def resolve_author_for_source(actor, author_data, *, allow_create):
         if author is None:
             if not allow_create:
                 raise PermissionDenied(AUTHOR_ADD_DENIED_MESSAGE)
-            author = Author(
-                owner=actor,
-                author_type="organization",
-                **{k: v for k, v in fields.items() if k != "author_type"},
+            author = _create_author(
+                actor,
+                {
+                    "author_type": "organization",
+                    **{k: v for k, v in fields.items() if k != "author_type"},
+                },
             )
-            author.full_clean()
-            author.save()
             return author, True
         return author, False
 
@@ -161,19 +190,19 @@ def resolve_author_for_source(actor, author_data, *, allow_create):
     if author is None:
         if not allow_create:
             raise PermissionDenied(AUTHOR_ADD_DENIED_MESSAGE)
-        author = Author(
-            owner=actor,
-            author_type="person",
-            first_names=first_names,
-            last_names=last_names,
-            **{
-                k: v
-                for k, v in fields.items()
-                if k not in ("author_type", "first_names", "last_names")
+        author = _create_author(
+            actor,
+            {
+                "author_type": "person",
+                "first_names": first_names,
+                "last_names": last_names,
+                **{
+                    k: v
+                    for k, v in fields.items()
+                    if k not in ("author_type", "first_names", "last_names")
+                },
             },
         )
-        author.full_clean()
-        author.save()
         return author, True
     return author, False
 
@@ -181,10 +210,10 @@ def resolve_author_for_source(actor, author_data, *, allow_create):
 def create_source_with_authors(actor, source_data: dict, authors_data: list) -> Source:
     """Create a private ``Source`` with ordered author relations for ``actor``.
 
-    - ``actor`` must hold the ``add_source`` capability.
+    - ``actor`` must hold the ``create`` capability on ``Source``.
     - Referenced authors must be visible to ``actor``; invisible or missing
       references fail with a uniform validation error.
-    - Genuinely new authors require the ``add_author`` capability.
+    - Genuinely new authors require the ``create`` capability on ``Author``.
     - ``SourceAuthor`` rows are owned children of the source and need no
       separate permission.
     - Duplicate author references are deduplicated, first position wins.
@@ -192,15 +221,10 @@ def create_source_with_authors(actor, source_data: dict, authors_data: list) -> 
       always created private with ``owner=actor``.
     - The whole write is atomic: any invalid entry rolls back all rows.
     """
-    if not decide(actor, "create", Source).allowed:
-        raise PermissionDenied(SOURCE_ADD_DENIED_MESSAGE)
-
-    if authors_data is None:
-        authors_data = []
-    elif not isinstance(authors_data, (list, tuple)):
+    if not isinstance(authors_data, (list, tuple)) and authors_data is not None:
         raise ValidationError("authors_data must be a list of author entries.")
-
-    can_create_author = decide(actor, "create", Author).allowed
+    if source_data is not None and not isinstance(source_data, dict):
+        raise ValidationError("source_data must be a mapping of source fields.")
 
     cleaned = {
         key: value
@@ -211,28 +235,33 @@ def create_source_with_authors(actor, source_data: dict, authors_data: list) -> 
         raise ValidationError("A non-empty title is required to create a source.")
     cleaned["title"] = _normalize(cleaned.get("title"))
 
-    licence = cleaned.get("licence")
-    if licence not in (None, ""):
-        licence_pk = getattr(licence, "pk", licence)
-        try:
-            licence_pk = int(licence_pk)
-        except (TypeError, ValueError):
-            raise ValidationError(
-                "The referenced licence does not exist or is not accessible."
-            ) from None
-        licence = (
-            visible_queryset(actor, Licence.objects.all()).filter(pk=licence_pk).first()
-        )
-        if licence is None:
-            raise ValidationError(
-                "The referenced licence does not exist or is not accessible."
-            )
-        cleaned["licence"] = licence
-
-    source = Source(owner=actor, **cleaned)
-    source.full_clean()
-
     with transaction.atomic():
+        actor = authorize_create(actor, Source)
+
+        licence = cleaned.get("licence")
+        if licence == "":
+            licence = None
+            cleaned["licence"] = None
+        if licence is not None:
+            licence_pk = getattr(licence, "pk", licence)
+            try:
+                licence_pk = int(licence_pk)
+            except (TypeError, ValueError):
+                raise ValidationError(
+                    "The referenced licence does not exist or is not accessible."
+                ) from None
+            licence = (
+                visible_queryset(actor, Licence.objects.all())
+                .filter(pk=licence_pk)
+                .first()
+            )
+            if licence is None:
+                raise ValidationError(
+                    "The referenced licence does not exist or is not accessible."
+                )
+            cleaned["licence"] = licence
+
+        can_create_author = decide(actor, "create", Author).allowed
         authors = []
         seen_ids = set()
         for author_data in authors_data or []:
@@ -241,15 +270,22 @@ def create_source_with_authors(actor, source_data: dict, authors_data: list) -> 
             )
             if author.pk not in seen_ids:
                 seen_ids.add(author.pk)
-                authors.append((author, created))
+                authors.append(author)
 
+        source = Source(owner=actor, **cleaned)
+        source.full_clean()
+        # Re-read the actor immediately before reference validation and
+        # persistence: a capability revoked while authors were resolved must
+        # deny every later reference, not just the final create decision.
+        actor = authorize_create(actor, Source)
+        source.owner = actor
+        validate_references(
+            actor, {"licence": source.licence, "authors": list(authors)}
+        )
         source.save()
-        for position, (author, _created) in enumerate(authors, start=1):
+        for position, author in enumerate(authors, start=1):
             SourceAuthor.objects.create(source=source, author=author, position=position)
         record_creation(actor, source)
-        for author, created in authors:
-            if created:
-                record_creation(actor, author)
     return source
 
 

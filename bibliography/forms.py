@@ -10,12 +10,14 @@ from utils.forms import (
     SimpleForm,
     SimpleModelForm,
 )
+from utils.object_management.policy import visible_queryset
 
 from .bibtex import (
     BibtexArticleParseError,
     parse_bibtex_article_entries,
 )
 from .models import Author, Licence, Source, SourceAuthor, author_name_has_letter
+from .services import AUTHOR_ADD_DENIED_MESSAGE, create_source_with_authors
 
 
 class AuthorModelForm(SimpleModelForm):
@@ -111,10 +113,10 @@ class SourceBibtexArticleImportForm(SimpleForm):
         return bibtex_entry
 
     def create_source(self, *, owner):
-        sources = self.create_sources(owner=owner)
-        if len(sources) != 1:
+        parsed_entries = getattr(self, "parsed_entries", None)
+        if parsed_entries is not None and len(parsed_entries) != 1:
             raise ValueError("The BibTeX import form contains multiple entries.")
-        return sources[0]
+        return self.create_sources(owner=owner)[0]
 
     def create_sources(self, *, owner):
         parsed_entries = getattr(self, "parsed_entries", None)
@@ -134,8 +136,6 @@ class SourceBibtexArticleImportForm(SimpleForm):
         return sources
 
     def _create_source_from_parsed_entry(self, *, owner, parsed_entry):
-        from .services import create_source_with_authors
-
         authors_data = [
             parsed_author
             for parsed_author in parsed_entry["authors"]
@@ -160,9 +160,11 @@ class SourceBibtexArticleImportForm(SimpleForm):
         try:
             source = create_source_with_authors(owner, source_data, authors_data)
         except PermissionDenied as exc:
-            raise ValidationError(
-                "You need permission to create missing authors from BibTeX imports."
-            ) from exc
+            if str(exc) == AUTHOR_ADD_DENIED_MESSAGE:
+                raise ValidationError(
+                    "You need permission to create missing authors from BibTeX imports."
+                ) from exc
+            raise ValidationError(str(exc)) from exc
         source.update_abbreviation()
         return source
 
@@ -186,8 +188,6 @@ class SourceAuthorForm(SimpleModelForm):
 
     def __init__(self, *args, request=None, **kwargs):
         super().__init__(*args, **kwargs)
-        from utils.object_management.policy import visible_queryset
-
         user = getattr(request, "user", None)
         self.fields["author"].queryset = visible_queryset(user, Author.objects.all())
 

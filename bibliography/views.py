@@ -28,6 +28,9 @@ from utils.object_management.permissions import (
     UserCreatedObjectPermission,
     get_object_policy,
 )
+from utils.object_management.permissions import get_object_policy
+from utils.object_management.policy import decide, visible_queryset
+from utils.object_management.services import _fresh_actor, content_mutation
 from utils.object_management.templatetags.moderation_tags import safe_back_url
 from utils.object_management.views import (
     PolicyPermissionRequiredMixin,
@@ -393,7 +396,7 @@ def _parse_json_object(request):
 
 
 class AuthorQuickCreateView(LoginRequiredMixin, View):
-    """Create a minimal Author object for inline source creation workflows."""
+    """Create or reuse an Author for inline source creation workflows."""
 
     def post(self, request, *args, **kwargs):
         """Create or return an Author from a JSON payload."""

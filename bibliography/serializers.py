@@ -1,6 +1,8 @@
 from collections import OrderedDict
 
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import (
     CharField,
     ChoiceField,
@@ -22,6 +24,7 @@ from .models import (
     find_or_create_author,
     normalize_author_name_part,
 )
+from .services import create_source_with_authors
 from .utils import DOI_FORMAT_MESSAGE, DOI_PATTERN, normalize_doi
 
 
@@ -213,7 +216,6 @@ class SourceCreateSerializer(ModelSerializer):
         return authors
 
     def create(self, validated_data):
-        from .services import create_source_with_authors
 
         authors_data = validated_data.pop("authors", [])
         actor = getattr(self.context.get("request"), "user", None)
@@ -221,6 +223,8 @@ class SourceCreateSerializer(ModelSerializer):
             return create_source_with_authors(actor, dict(validated_data), authors_data)
         except DjangoValidationError as exc:
             raise ValidationError(exc.messages) from exc
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
 
 
 class SourceModelSerializer(ModelSerializer):
