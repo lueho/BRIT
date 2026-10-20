@@ -9,8 +9,8 @@ landscape using mapping and visualization approaches, as well as interactive sce
 A public instance of this tool is hosted by Hamburg University of Technology and can be accessed at
 https://brit.bioresource-tools.net.
 
-This instance contains the data and case studies from the projects FLEXIBI and SOILCOM as well as other data produced 
-by the BIEM research group.
+This instance contains the data and case studies from the projects FLEXIBI, SOILCOM, CLOSECYCLE and BRIT-EU as well
+as other data produced by the BIEM research group.
 
 ## Local setup
 
@@ -49,6 +49,39 @@ repository. See
 [Repository Boundaries](docs/02_developer_guide/repository_boundaries.md) before
 adding helper infrastructure or data-management tooling.
 
+## The BRIT-EU project
+
+[![BRIT-EU logo with BMFTR funding acknowledgement](brit/static/img/brit_eu_funding_logo.png)](https://www.compostnetwork.info/brit-eu/)
+
+From December 2024 to May 2026, Hamburg University of Technology (TUHH) and the European Compost Network (ECN)
+developed BRIT further in the BRIT-EU project.
+The project expanded the household waste collection data model and introduced a contributor submission and review
+workflow and the digital Waste Atlas.
+Structured data, source references and exports supported comparisons of biowaste collection systems and case
+studies in Catalonia, North Rhine-Westphalia, Rhineland-Palatinate, Sweden and South Tyrol.
+
+BRIT-EU was funded through the DATIpilot programme of the German
+Federal Ministry of Research, Technology and Space (BMFTR), under grant numbers 03DPS1185A (TUHH) and
+03DPS1185B (ECN).
+
+Development and data curation have continued beyond the funded project period.
+
+BRIT-EU website: https://www.compostnetwork.info/brit-eu/
+
+## The CLOSECYCLE project
+
+[![CLOSECYCLE logo with Interreg North Sea and European Union co-funding acknowledgement](brit/static/img/interreg_with_closecycle_logo.png)](https://www.interregnorthsea.eu/closecycle)
+
+CLOSECYCLE (2024 to 2027) is an Interreg North Sea project, co-funded by the European Union, working towards
+Territorial Biorefinery Networks (TBNs) that turn local residual bioresources into useful products.
+BRIT forms part of its digital tool package.
+The ongoing work includes a revised Materials model for samples, analytical measurements, units, reference bases
+and sources; a Processes module linking input and output materials with operating conditions; and mapped showcases
+of territorial biorefinery networks.
+Partner data and process descriptions are being curated and reviewed.
+
+CLOSECYCLE website: https://www.interregnorthsea.eu/closecycle
+
 ## The SOILCOM project
 
 ![SOILCOM Logo](brit/static/img/interreg_with_soilcom_logo_300.png)
@@ -85,7 +118,8 @@ FLEXIBI website: http://www.flexibi-biorefineries.eu
 
 ## The BIEM research group
 BIEM is a research group that is dedicated to bioresource management.
-It is based at the Institute of Wastewater Management and Water Protection of the Hamburg University of Technology. 
+It is based at the Institute of Water Resources and Water Supply of Hamburg University of Technology,
+at Eißendorfer Str. 40, 21073 Hamburg, Germany.
 To find out more about the group and its most recent research, visit https://www.tuhh.de/alt/aww/research/biem.
 
 The BIEM group operates a platform to disseminate the tools, lectures and info
