@@ -951,6 +951,16 @@ class PropertiesTableAssetTests(SimpleTestCase):
         self.assertIsNotNone(comment)
         self.assertIn("overflow-wrap: anywhere;", comment.group(1))
 
+    def test_scenario_parameters_source_cell_keeps_nowrap(self):
+        import re
+
+        css = (
+            Path(settings.BASE_DIR) / "inventories/static/css/scenario_detail.css"
+        ).read_text(encoding="utf-8")
+        match = re.search(r"\.sri-parameters td:last-child\s*\{([^}]*)\}", css)
+        self.assertIsNotNone(match)
+        self.assertIn("white-space: nowrap;", match.group(1))
+
 
 class ExplorerUrlNameTests(TestCase):
     """Explorer pages use canonical ``*-explorer`` URL names (issue #89)."""
