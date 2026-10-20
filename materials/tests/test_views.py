@@ -4124,6 +4124,41 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         self.assertEqual(measurement.display_value, "<0.8")
         self.assertEqual(measurement.display_detection_limit, "0.8")
 
+    def test_measurements_post_limit_type_change_drops_raw_limit_text(self):
+        measurement = ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=self.group,
+            component=self.component,
+            unit=self.unit,
+            average=Decimal("0.1"),
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            limit_type=MeasurementLimitType.LOD,
+            detection_limit=Decimal("6.57"),
+            raw_detection_limit="LD=6,57",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(measurement.pk),
+                        average="0.1",
+                        value_qualifier="less_than",
+                        limit_type="rl",
+                        detection_limit="6.57",
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertTrue(response.json()["saved"], response.json())
+        measurement.refresh_from_db()
+        self.assertEqual(measurement.limit_type, "rl")
+        self.assertEqual(measurement.raw_detection_limit, "")
+        self.assertEqual(measurement.display_detection_limit, "6.57")
+
     def test_properties_post_saves_limit_type(self):
         response = self.client.post(
             self.section_url("properties"),

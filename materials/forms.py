@@ -193,7 +193,7 @@ class MeasurementLimitFieldsFormMixin:
         changed = set(self.changed_data)
         if changed & {"average", "value_qualifier"}:
             self.instance.raw_value = ""
-        if "detection_limit" in changed:
+        if changed & {"detection_limit", "limit_type"}:
             self.instance.raw_detection_limit = ""
         super()._post_clean()
 

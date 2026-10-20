@@ -155,11 +155,18 @@ class SchemaOnlyBaselineGraphTests(SimpleTestCase):
         for app, baseline in BASELINES.items():
             with self.subTest(app=app):
                 key = (app, baseline)
-                self.assertEqual(loader.graph.leaf_nodes(app), [key])
                 plan = [
                     node for node in loader.graph.forwards_plan(key) if node[0] == app
                 ]
                 self.assertEqual(plan, [key])
+                (leaf,) = loader.graph.leaf_nodes(app)
+                full_plan = [
+                    node for node in loader.graph.forwards_plan(leaf) if node[0] == app
+                ]
+                self.assertEqual(full_plan[0], key)
+                self.assertFalse(
+                    {(app, name) for name in ORIGINALS[app]} & set(full_plan)
+                )
 
     def test_baseline_operations_are_schema_only(self):
         loader = MigrationLoader(None)
