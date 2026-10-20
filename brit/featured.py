@@ -49,8 +49,8 @@ FEATURED_DESTINATIONS = (
         ),
         "url_name": "Showcase",
         "cta_label": "Explore showcases",
-        "image_path": "img/featured/closecycle_showcase_regions_map.webp",
-        "image_alt": "Map of the CLOSECYCLE showcases and pilot regions across north-western Europe",
+        "image_path": "img/featured/closecycle_showcases_themes_map.webp",
+        "image_alt": "Map of the CLOSECYCLE showcases, pilot regions and themes across the North Sea region",
         "image_width": 1280,
         "image_height": 720,
         "logos": (
