@@ -1902,6 +1902,10 @@ class CollectionPropertyValueReviewDashboardTest(TestCase):
         cls.staff_user.user_permissions.add(
             Permission.objects.get(codename="administer_objects")
         )
+        cls.staff_user.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
+        cls.owner_user = User.objects.create_user(username="owner", password="test123")
 
         cls.unit = Unit.objects.create(name="kg")
         cls.property = Property.objects.create(name="Test Property")
@@ -2236,6 +2240,9 @@ class ReviewDashboardViewTests(TestCase):
             username="regular",
         )
         cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
+        cls.staff_user.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.staff_user.user_permissions.add(
             Permission.objects.get(codename="administer_objects")
         )

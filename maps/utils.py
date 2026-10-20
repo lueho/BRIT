@@ -219,25 +219,36 @@ def get_location_cache_key(location_id=None, filters=None):
 
 
 def get_region_cache_key(region_id=None, filters=None):
-    """Generate a cache key for Region GeoJSON data."""
+    """Generate a cache key for Region GeoJSON data.
+
+    An id-only key is kept only when no further filters accompany the id;
+    otherwise the remaining filters contribute a deterministic suffix so a
+    scoped request can never hit an unscoped payload.
+    """
+    filters_copy = filters.copy() if filters else {}
+    filters_copy.pop("id", None)
     if region_id:
         key = f"region_geojson:id:{region_id}"
+        if filters_copy:
+            key = f"{key}:filter:{_generate_filter_key_part(filters_copy)}"
     else:
-        # Remove 'id' from filters if present, as it's handled above
-        filters_copy = filters.copy() if filters else {}
-        filters_copy.pop("id", None)
         filter_part = _generate_filter_key_part(filters_copy)
         key = f"region_geojson:filter:{filter_part}"
     return key
 
 
 def get_catchment_cache_key(catchment_id=None, filters=None):
-    """Generate a cache key for Catchment GeoJSON data."""
+    """Generate a cache key for Catchment GeoJSON data.
+
+    Mirrors :func:`get_region_cache_key`: remaining filters extend the id key.
+    """
+    filters_copy = filters.copy() if filters else {}
+    filters_copy.pop("id", None)
     if catchment_id:
         key = f"catchment_geojson:id:{catchment_id}"
+        if filters_copy:
+            key = f"{key}:filter:{_generate_filter_key_part(filters_copy)}"
     else:
-        filters_copy = filters.copy() if filters else {}
-        filters_copy.pop("id", None)
         filter_part = _generate_filter_key_part(filters_copy)
         key = f"catchment_geojson:filter:{filter_part}"
     return key

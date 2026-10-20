@@ -15,8 +15,7 @@ from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
-from django.forms.models import modelform_factory
-from django.forms.models import inlineformset_factory
+from django.forms.models import inlineformset_factory, modelform_factory
 from django.test import TestCase, TransactionTestCase
 
 from bibliography.models import Author, Source, SourceAuthor

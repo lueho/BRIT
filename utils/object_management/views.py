@@ -26,7 +26,7 @@ from django.core.exceptions import (
     ValidationError,
 )
 from django.db import DatabaseError, transaction
-from django.db.models import CharField, Q, QuerySet, Value
+from django.db.models import CharField, Model, Q, QuerySet, Value
 from django.forms.models import BaseModelForm, construct_instance
 from django.http import (
     Http404,
@@ -91,10 +91,14 @@ from utils.object_management.review_hooks import (
     get_review_search_fields,
 )
 from utils.object_management.services import (
+    _fresh_actor,
+    authorize_create,
     content_mutation,
     perform_transition,
     record_comment,
     record_creation,
+    validate_created_parent,
+    validate_references,
 )
 from utils.views import get_safe_next_url
 
@@ -2322,8 +2326,9 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
     A Mixin to control read access via the shared authorization policy.
 
     Delegates to ``policy.decide(user, "read", obj)``: published objects are
-    publicly readable; private/review/declined/archived objects require the
-    applicable object-level access.
+    publicly readable and archived objects are public frozen historical data;
+    private/review/declined objects require the applicable object-level
+    access.
     """
 
     publication_status_field = "publication_status"
@@ -2343,9 +2348,10 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
         except Exception:
             return False
 
-        if not hasattr(obj, self.publication_status_field) or not hasattr(
-            obj, self.owner_field
-        ):
+        if (
+            not hasattr(obj, self.publication_status_field)
+            or not hasattr(obj, self.owner_field)
+        ) and model_policy(type(obj)) is None:
             raise ImproperlyConfigured(
                 f"The model {obj.__class__.__name__} must have '{self.publication_status_field}' and '{self.owner_field}' fields."
             )
@@ -2389,9 +2395,10 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
         except Exception:
             return False
 
-        if not hasattr(obj, self.publication_status_field) or not hasattr(
-            obj, self.owner_field
-        ):
+        if (
+            not hasattr(obj, self.publication_status_field)
+            or not hasattr(obj, self.owner_field)
+        ) and model_policy(type(obj)) is None:
             raise ImproperlyConfigured(
                 f"The model {obj.__class__.__name__} must have '{self.publication_status_field}' and '{self.owner_field}' fields."
             )
@@ -2446,25 +2453,27 @@ class PolicyPermissionRequiredMixin(PermissionRequiredMixin):
             )
         return policy, parent
 
-    def _enforce_policy_create(self, form):
-        """Final authorization boundary for bound HTML creates.
+    def _enforce_policy_create(self, form, parent=None):
+        """Authoritative create authorization inside the write boundary.
 
-        For owned children and independent evidence models the declared
-        ``parent_path`` is resolved against the validated form and the create
-        decision is re-evaluated with that context; missing or unauthorized
-        context denies before any row is written.
+        Delegates to ``services.authorize_create`` with the resolved parent
+        context so the actor and every declared parent row are re-read at the
+        boundary — a capability or context revoked after any advisory check
+        can never slip a write through. Unregistered ``UserCreatedObject``
+        models deny; unregistered non-UCO models keep their plain behavior.
+        Returns the fresh actor for owner attribution and audit writes.
         """
         model = self.get_policy_model()
         if model is None:
-            return
-        policy, parent = self._resolve_create_parent(form)
-        if policy is None or policy.parent_path is None:
-            return
-        if parent is None:
-            raise PermissionDenied("Creation requires a valid parent context.")
-        decision = decide(self.request.user, "create", model, parent=parent)
-        if not decision.allowed:
-            raise PermissionDenied(decision.reason)
+            return None
+        policy = model_policy(model)
+        if policy is None:
+            if issubclass(model, UserCreatedObject):
+                raise PermissionDenied("Unregistered model cannot be created.")
+            return None
+        if parent is None and policy.parent_path is not None:
+            policy, parent = self._resolve_create_parent(form)
+        return authorize_create(self.request.user, model, parent=parent)
 
     def has_permission(self):
         model = self.get_policy_model()
@@ -2497,9 +2506,9 @@ def _perform_bound_update(view, form):
     by a stale pre-loaded instance.
     """
     obj = getattr(view, "object", None)
-    if not isinstance(obj, UserCreatedObject):
+    policy = model_policy(type(obj)) if isinstance(obj, Model) else None
+    if policy is None and not isinstance(obj, UserCreatedObject):
         return None
-    policy = model_policy(type(obj))
     proposed_parent = None
     if (
         policy is not None
@@ -2519,6 +2528,10 @@ def _perform_bound_update(view, form):
     with content_mutation(
         view.request.user, obj, action="edit", proposed_parent=proposed_parent
     ) as fresh:
+        # Revalidate against the freshly read actor on the same request
+        # object so form clean hooks that check the requester never run on
+        # a stale permission cache.
+        view.request.user = _fresh_actor(view.request.user)
         if isinstance(form, BaseModelForm):
             form.instance = fresh
             # Re-run validation against the locked instance so clean_* hooks
@@ -2528,6 +2541,7 @@ def _perform_bound_update(view, form):
             if form.errors:
                 return view.form_invalid(form)
             construct_instance(form, fresh)
+            validate_references(view.request.user, getattr(form, "cleaned_data", None))
         view.object = fresh
         return view._call_super_form_valid(form)
 
@@ -2539,19 +2553,41 @@ def _perform_bound_create(view, form):
     owned children are written inside a ``content_mutation`` on their
     resolved parent so the parent's snapshot captures the new row.
     """
-    view._enforce_policy_create(form)
     instance = form.instance
-    if not isinstance(instance, UserCreatedObject):
+    model = view.get_policy_model() or (
+        type(instance) if isinstance(instance, Model) else None
+    )
+    policy = model_policy(model) if model is not None else None
+    if policy is None and not isinstance(instance, UserCreatedObject):
         return None
-    instance.owner = view.request.user
-    instance.publication_status = UserCreatedObject.STATUS_PRIVATE
+    if isinstance(instance, UserCreatedObject):
+        instance.owner = view.request.user
+        instance.publication_status = UserCreatedObject.STATUS_PRIVATE
     policy, parent = view._resolve_create_parent(form)
     if policy is not None and policy.kind == KIND_OWNED and parent is not None:
-        with content_mutation(view.request.user, parent, action="edit"):
-            return view._call_super_form_valid(form)
+        with content_mutation(
+            view.request.user, parent, action="edit"
+        ) as locked_parent:
+            actor = view._enforce_policy_create(form, parent=locked_parent)
+            view.request.user = actor
+            validate_references(actor, getattr(form, "cleaned_data", None))
+            if isinstance(instance, UserCreatedObject):
+                instance.owner = actor
+                instance.publication_status = UserCreatedObject.STATUS_PRIVATE
+            response = view._call_super_form_valid(form)
+            validate_created_parent(instance, parent=locked_parent)
+            return response
     with transaction.atomic():
+        actor = view._enforce_policy_create(form, parent=parent)
+        if actor is not None:
+            view.request.user = actor
+        validate_references(
+            actor or view.request.user, getattr(form, "cleaned_data", None)
+        )
         response = view._call_super_form_valid(form)
-        record_creation(view.request.user, instance)
+        validate_created_parent(instance, parent=parent)
+        if isinstance(instance, UserCreatedObject):
+            record_creation(actor or view.request.user, instance)
     return response
 
 
@@ -3291,8 +3327,14 @@ class UserCreatedObjectModalDeleteView(
     success_message = "Successfully deleted."
 
     def form_valid(self, form):
-        if isinstance(self.object, UserCreatedObject):
-            with content_mutation(self.request.user, self.object, action="delete"):
+        if isinstance(self.object, UserCreatedObject) or (
+            isinstance(self.object, Model)
+            and model_policy(type(self.object)) is not None
+        ):
+            with content_mutation(
+                self.request.user, self.object, action="delete"
+            ) as locked:
+                self.object = locked
                 return super().form_valid(form)
         return super().form_valid(form)
 

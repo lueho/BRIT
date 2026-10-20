@@ -135,6 +135,8 @@ def _serialize_review_action(action: ReviewAction | None) -> dict[str, Any] | No
         "user_id": action.user_id,
         "username": action.user.username,
         "created_at": _serialize_value(action.created_at),
+        "content_revision": action.content_revision,
+        "changed_fields": action.changed_fields,
     }
 
 
