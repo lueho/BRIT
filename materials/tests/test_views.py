@@ -4045,6 +4045,33 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         self.assertEqual(value.owner, self.owner)
         self.assertEqual(value.average, Decimal("312.5"))
 
+    def test_properties_editor_offers_comment_field(self):
+        response = self.client.get(
+            self.section_url("properties"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("property_values-__prefix__-comment", response.json()["html"])
+
+    def test_properties_post_saves_comment(self):
+        response = self.client.post(
+            self.section_url("properties"),
+            self.property_formset(
+                [
+                    {
+                        "property": str(self.property.pk),
+                        "average": "312.5",
+                        "unit": str(self.unit.pk),
+                        "comment": "calculated; C approximated as OM/1.8",
+                    }
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        value = self.sample.property_values.get()
+        self.assertEqual(value.comment, "calculated; C approximated as OM/1.8")
+
 
 # ----------- Sample utilities -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -6592,6 +6619,7 @@ class EmptyStateViewsTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<td class="sdv2-num sdv2-edit-cell">')
         self.assertContains(
             response,
             reverse(
@@ -6861,6 +6889,39 @@ class EmptyStateViewsTestCase(TestCase):
             publication_status="published",
         )
         return sample, group
+
+    def test_v2_properties_table_shows_property_value_comment(self):
+        sample, _group = self._create_sample_with_composition_and_property()
+        prop = sample.property_values.get()
+        prop.comment = "Calculated from dry-matter measurements"
+        prop.save()
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        properties_section = content[content.index('id="properties"') :]
+        properties_section = properties_section[: properties_section.index("</table>")]
+        self.assertIn('<th scope="col">Comments</th>', properties_section)
+        self.assertIn(
+            '<td class="sdv2-comment-cell">Calculated from dry-matter measurements</td>',
+            properties_section,
+        )
+
+    def test_v2_properties_table_shows_dash_for_empty_property_comment(self):
+        sample, _group = self._create_sample_with_composition_and_property()
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+
+        content = response.content.decode()
+        row = content[content.index('id="property-') :]
+        row = row[: row.index("</tr>")]
+        self.assertEqual(row.count("<td"), 6)
+        self.assertIn("<td>—</td>", row)
 
     def test_v2_anchor_nav_links_sections_for_all_users(self):
         sample, group = self._create_sample_with_composition_and_property()

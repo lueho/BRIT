@@ -932,6 +932,36 @@ class NarrativeSpacingAssetTests(SimpleTestCase):
         self.assertIn("margin-bottom: 0;", match.group(1))
 
 
+class PropertiesTableAssetTests(SimpleTestCase):
+    def test_only_edit_cell_disables_wrapping(self):
+        import re
+
+        css = (
+            Path(settings.BASE_DIR) / "brit/static/css/sample_detail_v2.css"
+        ).read_text(encoding="utf-8")
+        self.assertNotRegex(css, r"\.sdv2-properties-table td:last-child\s*\{")
+        edit = re.search(
+            r"\.sdv2-properties-table td\.sdv2-edit-cell\s*\{([^}]*)\}", css
+        )
+        self.assertIsNotNone(edit)
+        self.assertIn("white-space: nowrap;", edit.group(1))
+        comment = re.search(
+            r"\.sdv2-properties-table td\.sdv2-comment-cell\s*\{([^}]*)\}", css
+        )
+        self.assertIsNotNone(comment)
+        self.assertIn("overflow-wrap: anywhere;", comment.group(1))
+
+    def test_scenario_parameters_source_cell_keeps_nowrap(self):
+        import re
+
+        css = (
+            Path(settings.BASE_DIR) / "inventories/static/css/scenario_detail.css"
+        ).read_text(encoding="utf-8")
+        match = re.search(r"\.sri-parameters td:last-child\s*\{([^}]*)\}", css)
+        self.assertIsNotNone(match)
+        self.assertIn("white-space: nowrap;", match.group(1))
+
+
 class ExplorerUrlNameTests(TestCase):
     """Explorer pages use canonical ``*-explorer`` URL names (issue #89)."""
 
