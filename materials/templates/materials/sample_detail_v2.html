@@ -747,6 +747,7 @@
                   <th scope="col">Basis</th>
                   <th scope="col">Method</th>
                   <th scope="col">Sources</th>
+                  <th scope="col">Comments</th>
                   {% if edit_mode_enabled %}<th scope="col" class="sdv2-num">Edit</th>{% endif %}
                 </tr>
               </thead>
@@ -793,6 +794,7 @@
                         <span class="text-muted">—</span>
                       {% endfor %}
                     </td>
+                    <td>{{ prop.comment|default:"—" }}</td>
                     {% if edit_mode_enabled %}
                       <td class="sdv2-num">
                         {% object_policy prop as pp %}
