@@ -2,7 +2,7 @@
 
 {% block meta %}
   <meta name="description"
-        content="Download the BRIT-EU R client and analysis code, with instructions for live BRIT data and historical case studies.">
+        content="Download the BRIT-EU R client and analysis package, with instructions for live BRIT data and historical case studies.">
 {% endblock meta %}
 
 {% block content %}
@@ -11,7 +11,7 @@
       <h1 class="h2">Analyze BRIT data in R</h1>
       <p class="lead mb-0">
         Download a ready-to-run R file for current waste collection data, or the BRIT-EU
-        code archive for the project's historical case studies.
+        analysis package for the project's historical case studies.
       </p>
     </div>
   </div>
@@ -50,18 +50,20 @@
         <div class="card-body d-flex flex-column">
           <p>
             The archive contains the original case-study R scripts, the fixed package
-            dependency list, a data manifest and detailed instructions. You can inspect
-            and adapt the analyses locally.
+            dependency list, the archived historical input data and detailed
+            instructions. The analyses can be reproduced locally, and the statistical
+            methods can be inspected and adapted.
           </p>
           <p class="mb-3">
-            This public archive contains <strong>code only</strong>. The historical input data
-            are not included while their release and licensing are being resolved.
-            The historical results cannot yet be reproduced from this download alone.
+            Package version 1.0.1. A smaller code-only archive without the input data
+            is also available for inspecting the scripts.
           </p>
           <a class="btn btn-outline-primary mt-auto align-self-start"
-             href="https://flexibi-dst.s3.amazonaws.com/media/rscripts/brit_eu.zip">
-            <i class="fas fa-download me-2" aria-hidden="true"></i>Download BRIT-EU R code (ZIP)
+             href="https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-1.0.1.zip">
+            <i class="fas fa-download me-2" aria-hidden="true"></i>Download BRIT-EU analysis package (ZIP)
           </a>
+          <a class="d-inline-block mt-2 small"
+             href="https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-Code-1.0.1.zip">Code only, without input data</a>
         </div>
       </section>
     </div>
@@ -97,16 +99,19 @@
         </div>
         <div class="card-body">
           <p>
-            Extract the ZIP and read <code>brit_eu/README.md</code>. Once the separately
-            released input files are available, place them as documented in the manifest.
-            In the <code>brit_eu</code> folder, run:
+            Extract the ZIP and read <code>README.md</code>. The archive already
+            contains the archived input data; no further downloads are needed.
+            In the extracted folder, run:
           </p>
           <pre class="bg-body-tertiary border rounded p-3"><code>Rscript --vanilla setup.R
 Rscript run.R</code></pre>
           <p class="mb-0">
-            The locked package versions support R 4.3.3. These fixed inputs are distinct
-            from the changing BRIT API. Downloading live collections does not recreate
-            the project's historical fact sheets.
+            The locked package versions support R 4.3.3. Individual case-study scripts
+            in <code>scripts/</code> can also be sourced directly, for example via
+            <strong>Source</strong> in RStudio; they locate the package folder
+            themselves. These fixed inputs are distinct from the changing BRIT API.
+            Downloading live collections does not recreate the project's historical
+            fact sheets.
           </p>
         </div>
       </section>
