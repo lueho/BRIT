@@ -6619,6 +6619,7 @@ class EmptyStateViewsTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<td class="sdv2-num sdv2-edit-cell">')
         self.assertContains(
             response,
             reverse(
@@ -6904,7 +6905,10 @@ class EmptyStateViewsTestCase(TestCase):
         properties_section = content[content.index('id="properties"') :]
         properties_section = properties_section[: properties_section.index("</table>")]
         self.assertIn('<th scope="col">Comments</th>', properties_section)
-        self.assertIn("Calculated from dry-matter measurements", properties_section)
+        self.assertIn(
+            '<td class="sdv2-comment-cell">Calculated from dry-matter measurements</td>',
+            properties_section,
+        )
 
     def test_v2_properties_table_shows_dash_for_empty_property_comment(self):
         sample, _group = self._create_sample_with_composition_and_property()

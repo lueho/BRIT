@@ -1221,8 +1221,12 @@ tr.sdv2-has-swatch:hover .sdv2-swatch {
   border-bottom: none;
 }
 
-.sdv2-properties-table td:last-child {
+.sdv2-properties-table td.sdv2-edit-cell {
   white-space: nowrap;
+}
+
+.sdv2-properties-table td.sdv2-comment-cell {
+  overflow-wrap: anywhere;
 }
 
 .sdv2-properties > .sdv2-btn {
