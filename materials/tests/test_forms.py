@@ -244,6 +244,10 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
             form.cleaned_data["basis_component"], self.property.default_basis_component
         )
 
+    def test_form_includes_comment_field(self):
+        form = MaterialPropertyValueModelForm()
+        self.assertIn("comment", form.fields)
+
 
 class ComponentMeasurementModelFormTestCase(TestCase):
     def test_standard_deviation_is_optional(self):

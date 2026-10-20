@@ -4045,6 +4045,33 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         self.assertEqual(value.owner, self.owner)
         self.assertEqual(value.average, Decimal("312.5"))
 
+    def test_properties_editor_offers_comment_field(self):
+        response = self.client.get(
+            self.section_url("properties"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("property_values-__prefix__-comment", response.json()["html"])
+
+    def test_properties_post_saves_comment(self):
+        response = self.client.post(
+            self.section_url("properties"),
+            self.property_formset(
+                [
+                    {
+                        "property": str(self.property.pk),
+                        "average": "312.5",
+                        "unit": str(self.unit.pk),
+                        "comment": "calculated; C approximated as OM/1.8",
+                    }
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        value = self.sample.property_values.get()
+        self.assertEqual(value.comment, "calculated; C approximated as OM/1.8")
+
 
 # ----------- Sample utilities -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------

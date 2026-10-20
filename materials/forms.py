@@ -365,6 +365,7 @@ class MaterialPropertyValueModelForm(
             "sources",
             "average",
             "standard_deviation",
+            "comment",
         )
 
     def clean(self):
