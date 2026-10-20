@@ -12,10 +12,11 @@ from utils.object_management.permissions import visible_related_object
 QUALIFIER_HEADERS = [
     "Value qualifier",
     "Raw value",
-    "Detection limit",
-    "Raw detection limit",
+    "Limit type",
+    "Limit value",
+    "Raw limit value",
 ]
-QUALIFIER_COLUMN_WIDTHS = [24, 28, 18, 28]
+QUALIFIER_COLUMN_WIDTHS = [24, 28, 12, 18, 28]
 
 # Excel column headers matching the import format (order matches input files)
 MEASUREMENT_HEADERS = [
@@ -350,6 +351,7 @@ class SampleMeasurementsXLSXRenderer:
         return (
             measurement.value_qualifier,
             measurement.raw_value,
+            measurement.effective_limit_type,
             float(measurement.detection_limit)
             if measurement.detection_limit is not None
             else "",
