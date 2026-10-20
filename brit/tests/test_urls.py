@@ -49,11 +49,11 @@ class RAnalysisPageTests(TestCase):
         self.assertContains(response, "/r-analysis/BRIT_Datenanalyse.R")
         self.assertContains(
             response,
-            "https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-1.0.4.zip",
+            "https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-1.0.5.zip",
         )
         self.assertContains(
             response,
-            "https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-Code-1.0.4.zip",
+            "https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-Code-1.0.5.zip",
         )
         self.assertContains(response, "analysis_api")
         self.assertContains(response, "historical input data")
