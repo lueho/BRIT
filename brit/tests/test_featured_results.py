@@ -66,6 +66,24 @@ class FeaturedRegistryTests(TestCase):
                 self.assertIn(key, feature)
             self.assertTrue(reverse(feature["url_name"]))
 
+    def test_collection_map_previews_match_featured_destinations(self):
+        by_slug = {feature["slug"]: feature for feature in FEATURED_DESTINATIONS}
+        expected = {
+            "waste-atlas": (
+                "img/featured/germany_organic_collection_amount_map.webp",
+                "Map of German districts coloured by the collected amount of organic waste per capita",
+            ),
+            "brit-eu": (
+                "img/featured/europe_data_coverage_map.webp",
+                "Map of Europe highlighting the regions with biowaste collection data",
+            ),
+        }
+
+        for slug, (image_path, image_alt) in expected.items():
+            with self.subTest(slug=slug):
+                self.assertEqual(by_slug[slug]["image_path"], image_path)
+                self.assertEqual(by_slug[slug]["image_alt"], image_alt)
+
     def test_featured_images_are_distinct_from_module_covers(self):
         home_url = reverse("home")
         anonymous_response = self.client.get(home_url)
