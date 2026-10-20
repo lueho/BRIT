@@ -17,8 +17,11 @@ from rest_framework.views import APIView
 
 from utils.forms import TomSelectFormsetHelper
 from utils.object_management.permissions import get_object_policy
+from utils.object_management.policy import decide, visible_queryset
+from utils.object_management.services import _fresh_actor, content_mutation
 from utils.object_management.templatetags.moderation_tags import safe_back_url
 from utils.object_management.views import (
+    PolicyPermissionRequiredMixin,
     PrivateObjectFilterView,
     PublishedObjectFilterView,
     ReviewObjectFilterView,
@@ -48,15 +51,17 @@ from .forms import (
 )
 from .inlines import SourceAuthorInline
 from .models import (
-    LETTERLESS_ORGANIZATION_NAME_MESSAGE,
-    LETTERLESS_SURNAME_MESSAGE,
     SOURCE_TYPES,
     Author,
     Licence,
     Source,
-    author_name_has_letter,
 )
 from .serializers import HyperlinkedSourceSerializer, SourceCreateSerializer
+from .services import (
+    create_source_with_authors,
+    resolve_author_for_source,
+    source_is_referenced,
+)
 from .tasks import check_source_url, check_source_urls
 
 
@@ -286,8 +291,9 @@ class SourceModalCreateView(UserCreatedObjectModalCreateView):
     permission_required = "bibliography.add_source"
 
 
-class SourceBibtexArticleImportView(PermissionRequiredMixin, FormView):
+class SourceBibtexArticleImportView(PolicyPermissionRequiredMixin, FormView):
     form_class = SourceBibtexArticleImportForm
+    policy_model = Source
     permission_required = "bibliography.add_source"
     template_name = "bibliography/source_bibtex_article_import_form.html"
 
@@ -362,104 +368,57 @@ class SourceModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AuthorQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    """Create a minimal Author object for inline source creation workflows."""
+def _parse_json_object(request):
+    """Parse the request body as a JSON object; ``None`` marks invalid input."""
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return payload
 
-    permission_required = "bibliography.add_author"
+
+class AuthorQuickCreateView(LoginRequiredMixin, View):
+    """Create or reuse an Author for inline source creation workflows."""
 
     def post(self, request, *args, **kwargs):
         """Create or return an Author from a JSON payload."""
+        payload = _parse_json_object(request)
+        if payload is None:
+            return JsonResponse({"error": "Invalid JSON object."}, status=400)
+
+        allow_create = decide(request.user, "create", Author).allowed
         try:
-            payload = json.loads(request.body.decode("utf-8") or "{}")
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            payload = {}
-
-        author_type = payload.get("author_type", "person")
-
-        if author_type == "organization":
-            organization_name = " ".join(
-                str(payload.get("organization_name", "")).split()
+            author, created = resolve_author_for_source(
+                request.user, payload, allow_create=allow_create
             )
-            organization_abbreviation = " ".join(
-                str(payload.get("organization_abbreviation", "")).split()
-            )
-            if not organization_name:
-                return JsonResponse(
-                    {"error": "Organizations need a name."},
-                    status=400,
-                )
-            if not author_name_has_letter(organization_name):
-                return JsonResponse(
-                    {"error": LETTERLESS_ORGANIZATION_NAME_MESSAGE},
-                    status=400,
-                )
-
-            author = Author.objects.filter(
-                author_type="organization",
-                organization_name__iexact=organization_name,
-            ).first()
-
-            created = False
-            if author is None:
-                author = Author.objects.create(
-                    owner=request.user,
-                    author_type="organization",
-                    organization_name=organization_name,
-                    organization_abbreviation=organization_abbreviation,
-                )
-                created = True
-
-            label = author.organization_name
+        except PermissionDenied as exc:
+            return JsonResponse({"error": str(exc)}, status=403)
+        except ValidationError as exc:
             return JsonResponse(
-                {
-                    "id": author.pk,
-                    "author_type": "organization",
-                    "organization_name": author.organization_name,
-                    "label": label,
-                    "text": label,
-                },
-                status=201 if created else 200,
-            )
-
-        first_names = " ".join(str(payload.get("first_names", "")).split())
-        last_names = " ".join(str(payload.get("last_names", "")).split())
-
-        if not last_names:
-            return JsonResponse(
-                {"error": "A non-empty last name is required to create an author."},
+                {"error": exc.messages[0] if exc.messages else str(exc)},
                 status=400,
             )
-        if not author_name_has_letter(last_names):
-            return JsonResponse({"error": LETTERLESS_SURNAME_MESSAGE}, status=400)
-
-        author = Author.objects.filter(
-            first_names__iexact=first_names,
-            last_names__iexact=last_names,
-        ).first()
-
-        created = False
-        if author is None:
-            author = Author.objects.create(
-                owner=request.user,
-                first_names=first_names,
-                last_names=last_names,
-            )
-            created = True
-
-        label = f"{author.last_names}, {author.first_names}".strip(", ")
-        return JsonResponse(
-            {
+        if author.author_type == "organization":
+            label = author.organization_name
+            data = {
+                "id": author.pk,
+                "author_type": "organization",
+                "organization_name": author.organization_name,
+            }
+        else:
+            label = f"{author.last_names}, {author.first_names}".strip(", ")
+            data = {
                 "id": author.pk,
                 "first_names": author.first_names,
                 "last_names": author.last_names,
-                "label": label,
-                "text": label,
-            },
-            status=201 if created else 200,
-        )
+            }
+        data.update({"label": label, "text": label})
+        return JsonResponse(data, status=201 if created else 200)
 
 
-class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
+class SourceQuickCreateView(LoginRequiredMixin, View):
     """Create a minimal Source object for inline source selectors.
 
     This endpoint is used by SourceListWidget to create a new bibliography source
@@ -467,114 +426,11 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
     navigating away to the bibliography module.
     """
 
-    permission_required = "bibliography.add_source"
-
-    @staticmethod
-    def _normalize_name_part(value):
-        """Normalize whitespace for name parts in request payloads."""
-        return " ".join(str(value or "").split())
-
-    def _resolve_authors(self, request, payload):
-        """Resolve payload authors to Author objects preserving payload order."""
-        raw_authors = payload.get("authors", [])
-        if not isinstance(raw_authors, list):
-            return [], None
-
-        resolved_authors = []
-        resolved_ids = set()
-
-        for raw_author in raw_authors:
-            if not isinstance(raw_author, dict):
-                continue
-
-            author = None
-            raw_author_id = raw_author.get("id")
-            if raw_author_id not in (None, ""):
-                try:
-                    author = Author.objects.get(pk=int(raw_author_id))
-                except (Author.DoesNotExist, TypeError, ValueError):
-                    author = None
-            else:
-                author_type = raw_author.get("author_type", "person")
-                if author_type == "organization":
-                    organization_name = self._normalize_name_part(
-                        raw_author.get("organization_name")
-                    )
-                    if not author_name_has_letter(organization_name):
-                        continue
-
-                    author = Author.objects.filter(
-                        author_type="organization",
-                        organization_name__iexact=organization_name,
-                    ).first()
-
-                    if author is None:
-                        if not request.user.has_perm("bibliography.add_author"):
-                            return [], JsonResponse(
-                                {
-                                    "error": (
-                                        "You need permission to create authors "
-                                        "for inline source creation."
-                                    )
-                                },
-                                status=403,
-                            )
-
-                        author = Author.objects.create(
-                            owner=request.user,
-                            author_type="organization",
-                            organization_name=organization_name,
-                        )
-                else:
-                    first_names = self._normalize_name_part(
-                        raw_author.get("first_names")
-                    )
-                    last_names = self._normalize_name_part(raw_author.get("last_names"))
-                    if not author_name_has_letter(last_names):
-                        continue
-
-                    author = Author.objects.filter(
-                        first_names__iexact=first_names,
-                        last_names__iexact=last_names,
-                    ).first()
-
-                    if author is None:
-                        if not request.user.has_perm("bibliography.add_author"):
-                            return [], JsonResponse(
-                                {
-                                    "error": (
-                                        "You need permission to create authors "
-                                        "for inline source creation."
-                                    )
-                                },
-                                status=403,
-                            )
-
-                        author = Author.objects.create(
-                            owner=request.user,
-                            first_names=first_names,
-                            last_names=last_names,
-                        )
-
-            if author and author.pk not in resolved_ids:
-                resolved_authors.append(author)
-                resolved_ids.add(author.pk)
-
-        return resolved_authors, None
-
     def post(self, request, *args, **kwargs):
         """Create a Source from a JSON payload and return option data as JSON."""
-        try:
-            payload = json.loads(request.body.decode("utf-8") or "{}")
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            payload = {}
-
-        title = str(payload.get("title", "")).strip()
-        if not title:
-            return JsonResponse(
-                {"error": "A non-empty title is required to create a source."},
-                status=400,
-            )
+        payload = _parse_json_object(request)
+        if payload is None:
+            return JsonResponse({"error": "Invalid JSON object."}, status=400)
 
         raw_year = payload.get("year")
         year = None
@@ -587,20 +443,29 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     status=400,
                 )
 
-        authors, author_error = self._resolve_authors(request, payload)
-        if author_error is not None:
-            return author_error
-
-        with transaction.atomic():
-            source = Source.objects.create(
-                owner=request.user,
-                title=title,
-                type="misc",
-                year=year,
+        authors_data = payload.get("authors", [])
+        if not isinstance(authors_data, list):
+            return JsonResponse(
+                {"error": "The 'authors' field must be a list."},
+                status=400,
             )
-            for position, author in enumerate(authors, start=1):
-                source.sourceauthors.create(author=author, position=position)
 
+        source_data = {
+            "title": payload.get("title", ""),
+            "type": "misc",
+            "year": year,
+        }
+        try:
+            source = create_source_with_authors(request.user, source_data, authors_data)
+        except PermissionDenied as exc:
+            return JsonResponse({"error": str(exc)}, status=403)
+        except ValidationError as exc:
+            return JsonResponse(
+                {"error": exc.messages[0] if exc.messages else str(exc)},
+                status=400,
+            )
+
+        authors = source.authors_ordered
         author_part = "; ".join(author.abbreviated_full_name for author in authors)
         formatted_label = (
             f"{author_part}. {source.title}" if author_part else source.title
@@ -617,34 +482,57 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         )
 
     def delete(self, request, *args, **kwargs):
-        """Delete a quick-created Source owned by the requesting user.
+        """Delete a quick-created Source when the delete policy allows it.
 
-        Only sources that were created by the requesting user and have not yet
-        been published (i.e. still in draft/private state) may be deleted via
-        this endpoint.  This prevents orphaned records when the user removes a
-        just-created source from the widget before saving the parent form.
+        The initial lookup is read-scoped so invisible foreign sources resolve
+        to 404. The row is then locked for update and the delete decision is
+        evaluated before any reference inspection, so unauthorized actors
+        cannot probe citation state; cited sources report 400 inside the lock.
+        Authors are independent reviewable records and are never
+        cascade-deleted.
         """
-        try:
-            payload = json.loads(request.body.decode("utf-8") or "{}")
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            payload = {}
+        payload = _parse_json_object(request)
+        if payload is None:
+            return JsonResponse({"error": "Invalid JSON object."}, status=400)
 
         source_id = payload.get("id")
         if not source_id:
             return JsonResponse({"error": "Source id is required."}, status=400)
 
         try:
-            source = Source.objects.get(pk=int(source_id), owner=request.user)
-        except (Source.DoesNotExist, TypeError, ValueError):
+            pk = int(source_id)
+        except (TypeError, ValueError):
             return JsonResponse({"error": "Source not found."}, status=404)
 
-        if source.publication_status == "published":
-            return JsonResponse(
-                {"error": "Published sources cannot be deleted via this endpoint."},
-                status=403,
-            )
+        source = (
+            visible_queryset(request.user, Source.objects.all()).filter(pk=pk).first()
+        )
+        if source is None:
+            return JsonResponse({"error": "Source not found."}, status=404)
 
-        source.delete()
+        try:
+            # Lock the row and re-read the actor before any reference
+            # inspection: denied actors never learn whether the source is
+            # cited, and the full row lock blocks new citing FKs until the
+            # boundary commits.
+            with transaction.atomic():
+                locked = Source._base_manager.select_for_update().get(pk=source.pk)
+                actor = _fresh_actor(request.user)
+                if not decide(actor, "delete", locked).allowed:
+                    raise PermissionDenied(
+                        "You don't have permission to delete this source."
+                    )
+                if source_is_referenced(locked):
+                    return JsonResponse(
+                        {"error": "This source is referenced by other objects."},
+                        status=400,
+                    )
+                with content_mutation(actor, locked, action="delete") as inner:
+                    inner.delete()
+        except Source.DoesNotExist:
+            return JsonResponse({"error": "Source not found."}, status=404)
+        except PermissionDenied as exc:
+            return JsonResponse({"error": str(exc)}, status=403)
         return JsonResponse({"deleted": True}, status=200)
 
 
