@@ -66,6 +66,61 @@ class FeaturedRegistryTests(TestCase):
                 self.assertIn(key, feature)
             self.assertTrue(reverse(feature["url_name"]))
 
+    def test_collection_map_previews_match_featured_destinations(self):
+        by_slug = {feature["slug"]: feature for feature in FEATURED_DESTINATIONS}
+        expected = {
+            "waste-atlas": (
+                "img/featured/germany_organic_collection_amount_map.webp",
+                "Map of German districts coloured by the collected amount of organic waste per capita",
+            ),
+            "brit-eu": (
+                "img/featured/europe_data_coverage_map.webp",
+                "Map of Europe highlighting the regions with biowaste collection data",
+            ),
+        }
+
+        for slug, (image_path, image_alt) in expected.items():
+            with self.subTest(slug=slug):
+                self.assertEqual(by_slug[slug]["image_path"], image_path)
+                self.assertEqual(by_slug[slug]["image_alt"], image_alt)
+
+    def test_featured_images_are_distinct_from_module_covers(self):
+        home_url = reverse("home")
+        anonymous_response = self.client.get(home_url)
+        self.assertEqual(anonymous_response.status_code, 200)
+
+        for feature in FEATURED_DESTINATIONS:
+            with self.subTest(slug=feature["slug"]):
+                self.assertTrue(feature["image_path"].startswith("img/featured/"))
+                self.assertContains(
+                    anonymous_response, Path(feature["image_path"]).name
+                )
+
+        user = User.objects.create_user(username="featured-image-viewer")
+        permission = Permission.objects.get(
+            content_type__app_label="processes",
+            codename="access_app_feature",
+        )
+        user.user_permissions.add(permission)
+        self.client.force_login(user)
+        response = self.client.get(home_url)
+        self.assertEqual(response.status_code, 200)
+
+        html = response.content.decode()
+        featured_section = html[
+            html.index('id="featured-results"') : html.index('id="modules"')
+        ]
+        modules_section = html[html.index('id="modules"') :]
+
+        for feature in FEATURED_DESTINATIONS:
+            with self.subTest(slug=feature["slug"]):
+                self.assertNotIn(Path(feature["image_path"]).name, modules_section)
+
+        for module_cover in ("maps_cover_card.png", "processes_cover_card.png"):
+            with self.subTest(module_cover=module_cover):
+                self.assertIn(module_cover, modules_section)
+                self.assertNotIn(module_cover, featured_section)
+
     def test_registry_images_resolve_with_native_dimensions(self):
         from PIL import Image
 
