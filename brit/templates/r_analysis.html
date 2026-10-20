@@ -55,15 +55,15 @@
             methods can be inspected and adapted.
           </p>
           <p class="mb-3">
-            Package version 1.0.2. A smaller code-only archive without the input data
+            Package version 1.0.3. A smaller code-only archive without the input data
             is also available for inspecting the scripts.
           </p>
           <a class="btn btn-outline-primary mt-auto align-self-start"
-             href="https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-1.0.2.zip">
+             href="https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-1.0.3.zip">
             <i class="fas fa-download me-2" aria-hidden="true"></i>Download BRIT-EU analysis package (ZIP)
           </a>
           <a class="d-inline-block mt-2 small"
-             href="https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-Code-1.0.2.zip">Code only, without input data</a>
+             href="https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-Code-1.0.3.zip">Code only, without input data</a>
         </div>
       </section>
     </div>
@@ -116,9 +116,13 @@
           <p class="mb-0">
             From a terminal the same steps are <code>Rscript --vanilla setup.R</code>
             followed by <code>Rscript run.R</code> (<code>--case=nrw</code> runs a
-            single case). The locked package versions support R 4.3.3. These fixed
-            inputs are distinct from the changing BRIT API. Downloading live
-            collections does not recreate the project's historical fact sheets.
+            single case). The locked package versions require exactly R 4.3.3 — on
+            Windows install that previous release
+            from <a href="https://cran.r-project.org/bin/windows/base/old/4.3.3/">CRAN</a>,
+            because other versions have no binaries for the pinned packages and would
+            compile them from source (Rtools required). These fixed inputs are distinct
+            from the changing BRIT API. Downloading live collections does not recreate
+            the project's historical fact sheets.
           </p>
         </div>
       </section>
