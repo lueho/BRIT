@@ -25,6 +25,29 @@ def author_name_has_letter(value):
     return any(char.isalpha() for char in str(value or ""))
 
 
+def normalize_author_name_part(value):
+    """Collapse whitespace in an author name part from a payload."""
+    return " ".join(str(value or "").split())
+
+
+class AuthorCreationDenied(Exception):
+    """Raised when author creation is needed but the owner lacks permission."""
+
+
+def find_or_create_author(owner, *, filters, create_kwargs):
+    """Find an author by ``filters`` or create it (needs add_author permission).
+
+    Returns ``(author, created)``. Raises :class:`AuthorCreationDenied` when
+    the author is missing and ``owner`` may not create authors.
+    """
+    author = Author.objects.filter(**filters).first()
+    if author is not None:
+        return author, False
+    if not owner.has_perm("bibliography.add_author"):
+        raise AuthorCreationDenied("permission")
+    return Author.objects.create(owner=owner, **create_kwargs), True
+
+
 class Author(UserCreatedObject):
     author_type = models.CharField(
         max_length=20, choices=AUTHOR_TYPES, default="person"
