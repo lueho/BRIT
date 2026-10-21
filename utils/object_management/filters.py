@@ -6,6 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.forms import CheckboxSelectMultiple
 from django_filters import (
     CharFilter,
+    ChoiceFilter,
     DateFilter,
     ModelChoiceFilter,
     ModelMultipleChoiceFilter,
@@ -30,6 +31,7 @@ class ReviewDashboardFilterFormHelper(FormHelper):
                 "owner",
                 "submitted_after",
                 "submitted_before",
+                "scope",
                 "ordering",
             ),
         )
@@ -96,6 +98,17 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
         method="filter_submitted_before",
     )
 
+    scope = ChoiceFilter(
+        choices=(
+            ("review", "Pending review"),
+            ("declined", "Declined"),
+        ),
+        label="Review state",
+        empty_label=None,
+        method="filter_scope",
+        help_text="Pending moderation queue or declined follow-up history",
+    )
+
     ordering = OrderingFilter(
         label="Sort by",
         choices=(
@@ -137,6 +150,10 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
             self.filters["model_type"].queryset = ContentType.objects.filter(
                 id__in=model_ids
             ).order_by("model")
+
+    def filter_scope(self, queryset, name, value):
+        """Form-only filter; the dashboard resolves the scope itself."""
+        return queryset
 
     def filter_search(self, queryset, name, value):
         """Filter by object name (case-insensitive contains).

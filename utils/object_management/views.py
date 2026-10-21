@@ -414,14 +414,11 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         )
 
     def get_available_models(self) -> list[type[UserCreatedObject]]:
-        """Discover all concrete UserCreatedObject subclasses that have items in review.
+        """Discover registered roots with visible items in the selected queue.
 
-        Returns models that either:
-        1. Have items currently in review, OR
-        2. Are in the priority list and user has moderation permissions
-
-        Optimized to avoid N+1 queries by pre-fetching all user permissions.
-        Results are cached per-request to avoid repeated expensive queries.
+        Pending review is the default; declined follow-up is explicit.
+        Priority settings affect ordering, never eligibility or visibility.
+        Results are cached only for this request.
         """
         # Return cached result if available
         if self._available_models_cache is not None:
@@ -430,7 +427,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         from django.apps import apps
         from django.contrib.auth.models import Permission
 
-        # Get priority models from settings (models always shown in filters if user has permissions)
+        # Priority settings order eligible models without adding empty queues.
         # Format: ['app_label.ModelName', ...]
         priority_model_paths = getattr(settings, "REVIEW_DASHBOARD_PRIORITY_MODELS", [])
         priority_models = []
@@ -476,9 +473,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             return codename in user_permission_codenames
 
         def has_visible_review_items(model):
-            queryset = reviewable_queryset(
-                self.request.user, self._in_review_queryset_for_model(model)
-            )
+            queryset = self._review_queryset_for_model(model)
             return queryset.exclude(owner=self.request.user).exists()
 
         for model in apps.get_models():
@@ -522,6 +517,24 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         # Cache for subsequent calls within the same request
         self._available_models_cache = available_models
         return available_models
+
+    def _review_queryset_for_model(
+        self, model: type[UserCreatedObject]
+    ) -> QuerySet[UserCreatedObject]:
+        """Scope-aware moderation queryset for ``model``.
+
+        ``?scope=review`` (default) uses the model's in-review manager;
+        ``scope=declined`` uses the full table and lets the policy apply the
+        declined-state filter. Unknown scopes fail closed inside
+        ``reviewable_queryset`` — they never widen the base.
+        """
+        scope = self.request.GET.get("scope", "review")
+        base = (
+            self._in_review_queryset_for_model(model)
+            if scope == "review"
+            else model.objects.all()
+        )
+        return reviewable_queryset(self.request.user, base, scope=scope)
 
     def _get_fallback_queryset(self) -> QuerySet:
         from django.apps import apps
@@ -712,10 +725,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             ):
                 continue
             try:
-                queryset = reviewable_queryset(
-                    self.request.user,
-                    self._in_review_queryset_for_model(model_class),
-                )
+                queryset = self._review_queryset_for_model(model_class)
             except (
                 AttributeError,
                 FieldDoesNotExist,
@@ -892,6 +902,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                 "title": "Content Review Dashboard",
                 "list_type": "review",
                 "header": "Content Review Dashboard",
+                "review_scope": self.request.GET.get("scope", "review"),
                 "review_items": page_obj.object_list,
                 "object_list": page_obj.object_list,  # For template compatibility
                 "page_obj": page_obj,
@@ -944,7 +955,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
     def get_success_url(self):
         """Resolve redirect target using the shared redirect resolver."""
         obj = self.get_object()
-        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        next_url = get_safe_next_url(self.request)
 
         resolver = self.get_redirect_resolver(obj)
         default_url = obj.get_absolute_url()
@@ -954,7 +965,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
 
     def get_failure_url(self):
         obj = self.get_object()
-        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        next_url = get_safe_next_url(self.request)
         default_url = obj.get_absolute_url()
 
         if next_url and self._is_review_detail_url(next_url, obj):
@@ -1177,7 +1188,7 @@ class WithdrawFromReviewView(BaseReviewActionView):
 
     def get_success_url(self):
         obj = getattr(self, "object", None)
-        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        next_url = get_safe_next_url(self.request)
 
         if obj and next_url:
             try:
@@ -1234,7 +1245,7 @@ class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Pass through 'next' if provided in the opener link; templates will append it to the form action
-        context["next_url"] = self.request.GET.get("next")
+        context["next_url"] = get_safe_next_url(self.request)
         expected = self._parse_revision_param(self.request.GET.get("expected_revision"))
         context["expected_revision"] = expected
         context["expected_revision_bound"] = expected is not None

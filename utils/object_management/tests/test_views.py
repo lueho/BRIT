@@ -27,7 +27,7 @@ from factory.django import mute_signals
 
 from bibliography.models import Author, Source
 from distributions.models import TemporalDistribution
-from maps.models import Catchment, Region
+from maps.models import Catchment, MapConfiguration, Region
 from maps.views import GeoDataSetPrivateGalleryView, GeoDataSetPublishedGalleryView
 from sources.waste_collection.models import (
     Collection,
@@ -60,6 +60,7 @@ from utils.object_management.views import (
     WithdrawFromReviewView,
 )
 from utils.properties.models import Property, Unit
+from utils.tests.testcases import ensure_test_default_owner
 
 from ..views import (
     FilterDefaultsMixin,
@@ -1398,6 +1399,7 @@ class SharedListScopeCountTestCase(TestCase):
 class BreadcrumbContractViewTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.owner = User.objects.create_user(username="breadcrumb-owner")
         cls.creator = User.objects.create_user(username="breadcrumb-creator")
         cls.creator.user_permissions.add(
@@ -1497,6 +1499,10 @@ class ReadAccessArchivedDetailTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(username="owner")
+        MapConfiguration.objects.get_or_create(
+            name="Default Map Configuration",
+            defaults={"owner": cls.owner, "publication_status": "published"},
+        )
         # Create a Collection in archived state
         with mute_signals(post_save, pre_save):
             cls.archived = Collection.objects.create(
@@ -1729,6 +1735,7 @@ class CollectionPropertyValueReviewDashboardTest(TestCase):
         )
         cls.owner_user = User.objects.create_user(username="owner", password="test123")
 
+        ensure_test_default_owner()
         cls.unit = Unit.objects.create(name="kg")
         cls.property = Property.objects.create(name="Test Property")
 
