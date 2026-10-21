@@ -9860,8 +9860,10 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
                 self.assertNotContains(response, "Detection limit: 6.57")
                 self.assertContains(
                     response,
-                    '<abbr class="sdv2-limit" title="Reporting limit (RL): 0.8 %">'
-                    "RL</abbr>",
+                    '<details class="sdv2-limit">'
+                    '<summary title="Reporting limit (RL): 0.8 %">RL</summary>'
+                    '<span class="sdv2-limit-detail">Reporting limit (RL): 0.8 %</span>'
+                    "</details>",
                     html=True,
                 )
                 self.assertNotContains(
@@ -9880,12 +9882,15 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
         self.assertIn("&lt;0.1", html)
         self.assertIn("&gt;1450", html)
         self.assertIn("Below detection limit", html)
-        self.assertIn("Limit of detection (LOD): 6.57", html)
-        self.assertIn("Reporting limit (RL): 0.8", html)
+        self.assertIn(
+            '<span class="visually-hidden">Limit of detection (LOD)</span>: 6.57',
+            html,
+        )
         self.assertInHTML(
-            '<abbr class="text-muted small" '
-            'title="Reporting limit (RL): 0.8 percent">'
-            "RL</abbr>",
+            '<span class="text-muted small">'
+            '<span aria-hidden="true">RL</span>'
+            '<span class="visually-hidden">Reporting limit (RL)</span>'
+            ": 0.8 percent</span>",
             html,
         )
         self.assertIn(escape(self.hostile_raw), html)
@@ -9896,7 +9901,10 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
             {"object": self.sample, "section": {"key": "properties"}},
         )
         self.assertIn("&lt;0.25", html)
-        self.assertIn("Limit (type not specified): 6.57", html)
+        self.assertIn(
+            '<span class="visually-hidden">Limit (type not specified)</span>: 6.57',
+            html,
+        )
 
 
 class SampleCompositionSafetyViewTestCase(TestCase):

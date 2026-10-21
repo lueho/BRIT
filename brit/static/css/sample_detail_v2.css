@@ -1135,11 +1135,49 @@ tr.sdv2-has-swatch:hover .sdv2-swatch {
 }
 
 .sdv2-limit {
+  position: relative;
+  display: inline-block;
   color: var(--sdv2-text-muted);
   font-size: 11px;
   margin-left: 0.25rem;
-  cursor: help;
+}
+
+.sdv2-limit > summary {
+  display: inline;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+  list-style: none;
+  cursor: pointer;
   text-decoration: underline dotted;
+}
+
+.sdv2-limit > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sdv2-limit > summary::before {
+  content: none;
+}
+
+.sdv2-limit > summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+
+.sdv2-limit-detail {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  margin-top: 2px;
+  padding: 0.25rem 0.5rem;
+  background: var(--sdv2-surface);
+  border: 1px solid var(--sdv2-border);
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .sdv2-alias-chip {
