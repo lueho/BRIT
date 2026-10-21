@@ -820,6 +820,7 @@ class MeasurementQualifierSerializerTestCase(TestCase):
         "display_value",
         "value_qualifier",
         "raw_value",
+        "limit_type",
         "detection_limit",
         "raw_detection_limit",
     )
@@ -856,6 +857,7 @@ class MeasurementQualifierSerializerTestCase(TestCase):
             average=Decimal("0.1"),
             raw_value="0.1",
             value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            limit_type="loq",
             detection_limit=Decimal("6.57"),
             raw_detection_limit="6,57",
         )
@@ -867,6 +869,7 @@ class MeasurementQualifierSerializerTestCase(TestCase):
             average=Decimal("0.1"),
             raw_value="0.1",
             value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            limit_type="loq",
             detection_limit=Decimal("6.57"),
             raw_detection_limit="6,57",
         )
@@ -878,6 +881,7 @@ class MeasurementQualifierSerializerTestCase(TestCase):
         self.assertEqual(Decimal(str(data["average"])), Decimal("0.1"))
         self.assertEqual(data["value_qualifier"], "less_than")
         self.assertEqual(data["raw_value"], "0.1")
+        self.assertEqual(data["limit_type"], "loq")
         self.assertEqual(Decimal(str(data["detection_limit"])), Decimal("6.57"))
         self.assertEqual(data["raw_detection_limit"], "6,57")
 

@@ -43,6 +43,18 @@ class MeasurementValueQualifier(models.TextChoices):
     ESTIMATED = "estimated", "Estimated"
 
 
+class MeasurementLimitType(models.TextChoices):
+    """Analytical limit a stated limit value refers to (LOD/MDL < LOQ < RL)."""
+
+    LOD = "lod", "Limit of detection (LOD)"
+    MDL = "mdl", "Method detection limit (MDL)"
+    LOQ = "loq", "Limit of quantification (LOQ)"
+    RL = "rl", "Reporting limit (RL)"
+
+
+DETECTION_LIMIT_TYPES = frozenset({MeasurementLimitType.LOD, MeasurementLimitType.MDL})
+
+
 def get_sample_substrate_category_name():
     """Return the configured substrate category name used for sample filtering."""
     return getattr(settings, "SAMPLE_SUBSTRATE_CATEGORY_NAME", "Bioresource")
@@ -670,13 +682,27 @@ class MeasurementMetadataMixin(models.Model):
         choices=MeasurementValueQualifier.choices,
         default=MeasurementValueQualifier.EXACT,
     )
+    limit_type = models.CharField(
+        max_length=8,
+        choices=MeasurementLimitType.choices,
+        blank=True,
+        help_text=(
+            "Analytical limit the limit value refers to: limit of detection (LOD) "
+            "or method detection limit (MDL) < limit of quantification (LOQ) < "
+            "reporting limit (RL)."
+        ),
+    )
     detection_limit = models.DecimalField(
+        "limit value",
         max_digits=30,
         decimal_places=15,
         null=True,
         blank=True,
+        help_text="Analytical limit in the measurement unit; see limit type.",
     )
-    raw_detection_limit = models.CharField(max_length=255, blank=True)
+    raw_detection_limit = models.CharField(
+        "raw limit value", max_length=255, blank=True
+    )
     analysis_date = models.DateTimeField(null=True, blank=True)
     analysis_laboratory = models.CharField(max_length=255, blank=True)
     comment = models.TextField(
@@ -691,6 +717,7 @@ class MeasurementMetadataMixin(models.Model):
         return {
             "raw_value": self.raw_value,
             "value_qualifier": self.value_qualifier,
+            "limit_type": self.limit_type,
             "detection_limit": self.detection_limit,
             "raw_detection_limit": self.raw_detection_limit,
             "analysis_date": self.analysis_date,
@@ -735,6 +762,39 @@ class MeasurementMetadataMixin(models.Model):
         return (
             self.raw_detection_limit or ""
         ).strip() or self._format_measurement_number(self.detection_limit)
+
+    @builtin_property
+    def effective_limit_type(self):
+        if self.limit_type:
+            return self.limit_type
+        if self.value_qualifier == MeasurementValueQualifier.BELOW_DETECTION_LIMIT:
+            return MeasurementLimitType.LOD
+        return ""
+
+    @builtin_property
+    def limit_label(self):
+        limit_type = self.effective_limit_type
+        if limit_type in MeasurementLimitType.values:
+            return MeasurementLimitType(limit_type).label
+        if limit_type or self.display_detection_limit:
+            return "Limit (type not specified)"
+        return ""
+
+    def clean(self):
+        super().clean()
+        if (
+            self.value_qualifier == MeasurementValueQualifier.BELOW_DETECTION_LIMIT
+            and self.limit_type
+            and self.limit_type not in DETECTION_LIMIT_TYPES
+        ):
+            raise ValidationError(
+                {
+                    "limit_type": (
+                        "'Below detection limit' refers to an LOD or MDL. Use "
+                        "'Less than' for values below the LOQ or reporting limit."
+                    )
+                }
+            )
 
 
 class MaterialPropertyValue(

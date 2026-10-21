@@ -223,7 +223,7 @@ class BreadcrumbStaticPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            '<h5 class="mb-0">Bioresource Information Tool</h5>',
+            '<h1 class="sdv2-hero-title">Bioresource Information Tool</h1>',
             html=True,
         )
         self.assertNotContains(

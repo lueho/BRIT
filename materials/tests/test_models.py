@@ -26,6 +26,7 @@ from materials.models import (
     MaterialComponentGroup,
     MaterialProperty,
     MaterialPropertyValue,
+    MeasurementLimitType,
     MeasurementValueQualifier,
     Sample,
     SampleAuthor,
@@ -1811,6 +1812,62 @@ class MeasurementQualifierDisplayTestCase(SimpleTestCase):
         ):
             with self.subTest(model=type(instance).__name__):
                 self.assertEqual(instance.display_value, "mystery: 2")
+
+    def test_limit_label_names_the_stated_limit_type(self):
+        cases = (
+            ({"limit_type": MeasurementLimitType.LOD}, "Limit of detection (LOD)"),
+            (
+                {"limit_type": MeasurementLimitType.MDL},
+                "Method detection limit (MDL)",
+            ),
+            (
+                {"limit_type": MeasurementLimitType.LOQ},
+                "Limit of quantification (LOQ)",
+            ),
+            ({"limit_type": MeasurementLimitType.RL}, "Reporting limit (RL)"),
+        )
+        for kwargs, expected in cases:
+            for instance in self._instances(average=Decimal("1"), **kwargs):
+                with self.subTest(model=type(instance).__name__, **kwargs):
+                    self.assertEqual(instance.limit_label, expected)
+
+    def test_below_detection_limit_implies_limit_of_detection(self):
+        for instance in self._instances(
+            average=Decimal("0"),
+            value_qualifier=MeasurementValueQualifier.BELOW_DETECTION_LIMIT,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(
+                    instance.effective_limit_type, MeasurementLimitType.LOD
+                )
+                self.assertEqual(instance.limit_label, "Limit of detection (LOD)")
+
+    def test_limit_without_type_is_not_called_a_detection_limit(self):
+        for instance in self._instances(
+            average=Decimal("0.1"),
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            detection_limit=Decimal("0.1"),
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.effective_limit_type, "")
+                self.assertEqual(instance.limit_label, "Limit (type not specified)")
+
+    def test_limit_label_is_empty_without_limit_information(self):
+        for instance in self._instances(average=Decimal("1")):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.limit_label, "")
+
+    def test_metadata_kwargs_copy_limit_type(self):
+        for instance in self._instances(
+            average=Decimal("0.8"),
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            limit_type=MeasurementLimitType.RL,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(
+                    instance.measurement_metadata_kwargs()["limit_type"],
+                    MeasurementLimitType.RL,
+                )
 
     def test_display_detection_limit(self):
         cases = (

@@ -12,8 +12,13 @@
     <div class="col-md-6">{% include "utils/includes/workspace_field.html" with field=workspace_row.average only %}</div>
     <div class="col-md-6">{% include "utils/includes/workspace_field.html" with field=workspace_row.standard_deviation only %}</div>
   </div>
-  <details class="mb-3" {% if workspace_row.basis_component.errors or workspace_row.analytical_method.errors or workspace_row.sources.errors or workspace_row.comment.errors %}open{% endif %}>
+  <details class="mb-3" {% if workspace_row.basis_component.errors or workspace_row.analytical_method.errors or workspace_row.sources.errors or workspace_row.comment.errors or workspace_row.value_qualifier.errors or workspace_row.limit_type.errors or workspace_row.detection_limit.errors %}open{% endif %}>
     <summary class="mb-3">Optional measurement details</summary>
+    <div class="row">
+      <div class="col-md-4">{% include "utils/includes/workspace_field.html" with field=workspace_row.value_qualifier only %}</div>
+      <div class="col-md-4">{% include "utils/includes/workspace_field.html" with field=workspace_row.limit_type only %}</div>
+      <div class="col-md-4">{% include "utils/includes/workspace_field.html" with field=workspace_row.detection_limit only %}</div>
+    </div>
     <div class="row">
       <div class="col-md-6">{% include "utils/includes/workspace_field.html" with field=workspace_row.basis_component only %}</div>
       <div class="col-md-6">{% include "utils/includes/workspace_field.html" with field=workspace_row.analytical_method only %}</div>

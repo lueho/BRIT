@@ -27,14 +27,6 @@ BASELINES = {
     "materials": "0001_squashed_0032",
 }
 
-# Apps may add post-baseline migrations on top of the squashed baseline; the
-# newest one becomes the app's leaf node while the baseline plan itself must
-# stay unchanged.
-LEAVES = {
-    "properties": "0001_squashed_0010",
-    "materials": "0033_backfill_approval_metadata",
-}
-
 ORIGINALS = {
     "properties": [
         "0001_initial",
@@ -163,11 +155,18 @@ class SchemaOnlyBaselineGraphTests(SimpleTestCase):
         for app, baseline in BASELINES.items():
             with self.subTest(app=app):
                 key = (app, baseline)
-                self.assertEqual(loader.graph.leaf_nodes(app), [(app, LEAVES[app])])
                 plan = [
                     node for node in loader.graph.forwards_plan(key) if node[0] == app
                 ]
                 self.assertEqual(plan, [key])
+                (leaf,) = loader.graph.leaf_nodes(app)
+                full_plan = [
+                    node for node in loader.graph.forwards_plan(leaf) if node[0] == app
+                ]
+                self.assertEqual(full_plan[0], key)
+                self.assertFalse(
+                    {(app, name) for name in ORIGINALS[app]} & set(full_plan)
+                )
 
     def test_baseline_operations_are_schema_only(self):
         loader = MigrationLoader(None)

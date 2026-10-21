@@ -389,18 +389,19 @@ class SampleMeasurementsXLSXRendererTestCase(TestCase):
         metadata_headers = [
             "Value qualifier",
             "Raw value",
-            "Detection limit",
-            "Raw detection limit",
+            "Limit type",
+            "Limit value",
+            "Raw limit value",
         ]
 
         sheet = workbook["Measurements"]
         headers = [cell.value for cell in sheet[15]]
-        self.assertEqual(headers[-4:], metadata_headers)
+        self.assertEqual(headers[-5:], metadata_headers)
         value_col = headers.index("Value") + 1
         qualifier_col = headers.index("Value qualifier") + 1
         raw_col = headers.index("Raw value") + 1
-        limit_col = headers.index("Detection limit") + 1
-        raw_limit_col = headers.index("Raw detection limit") + 1
+        limit_col = headers.index("Limit value") + 1
+        raw_limit_col = headers.index("Raw limit value") + 1
         rows = {
             sheet.cell(row=row, column=1).value: row
             for row in range(16, sheet.max_row + 1)
@@ -443,6 +444,9 @@ class SampleMeasurementsXLSXRendererTestCase(TestCase):
         self.assertEqual(
             sheet.cell(row=row, column=qualifier_col).value, "below_detection_limit"
         )
+        self.assertEqual(
+            sheet.cell(row=row, column=headers.index("Limit type") + 1).value, "lod"
+        )
         self.assertFalse(sheet.cell(row=row, column=limit_col).value)
         self.assertFalse(sheet.cell(row=row, column=raw_limit_col).value)
 
@@ -453,12 +457,12 @@ class SampleMeasurementsXLSXRendererTestCase(TestCase):
 
         sheet = workbook["Sample Properties"]
         headers = [cell.value for cell in sheet[15]]
-        self.assertEqual(headers[-4:], metadata_headers)
+        self.assertEqual(headers[-5:], metadata_headers)
         value_col = headers.index("Value") + 1
         qualifier_col = headers.index("Value qualifier") + 1
         raw_col = headers.index("Raw value") + 1
-        limit_col = headers.index("Detection limit") + 1
-        raw_limit_col = headers.index("Raw detection limit") + 1
+        limit_col = headers.index("Limit value") + 1
+        raw_limit_col = headers.index("Raw limit value") + 1
         rows = {
             sheet.cell(row=row, column=1).value: row
             for row in range(16, sheet.max_row + 1)
