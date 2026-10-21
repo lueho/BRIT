@@ -41,6 +41,16 @@ class RobotsTxtTests(SimpleTestCase):
                 self.assertIn(f"Disallow: {path}", content)
 
 
+class DebugSessionEndpointTests(SimpleTestCase):
+    """Session debug stubs were dev scaffolding and must not be routed."""
+
+    def test_session_debug_endpoints_are_not_routed(self):
+        for path in ("/set_session/", "/get_session/"):
+            with self.subTest(path=path):
+                with self.assertRaises(Resolver404):
+                    resolve(path)
+
+
 class RAnalysisPageTests(TestCase):
     def test_public_page_links_downloads_and_explains_access(self):
         response = self.client.get("/r-analysis/")
