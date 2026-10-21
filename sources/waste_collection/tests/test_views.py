@@ -4837,6 +4837,11 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertIsNotNone(match, "no atlas-config JSON found in response")
         return json.loads(match.group(1))
 
+    def _overview_pane(self, html, region_id):
+        start = html.index(f'id="atlas-{region_id}"')
+        end = html.find('<div class="tab-pane', start)
+        return html[start:] if end == -1 else html[start:end]
+
     def test_scope_controls_and_map_config_follow_permissions(self):
         url = reverse("waste-atlas-germany-collection-system-map")
         response = self.client.get(url, {"scope": "mine"})
@@ -5184,6 +5189,71 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertEqual(response.context["directory_selected_category"], "biowaste")
         self.assertEqual(response.context["directory_query"], "amount")
+
+    def test_overview_uses_map_set_picker_and_topic_cards(self):
+        response = self.client.get(reverse("waste-atlas-overview"))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        groups = response.context["directory_region_groups"]
+
+        germany = next(group for group in groups if group["id"] == "germany")
+        germany_pane = self._overview_pane(html, "germany")
+        expected_values = [region["value"] for region in germany["regions"]]
+        chips = re.findall(
+            r'<button\s+type="button"\s+class="atlas-mapset-chip"\s+'
+            r'data-map-set="([^"]+)"\s+aria-pressed="([^"]+)">',
+            germany_pane,
+        )
+        self.assertEqual([value for value, _pressed in chips], expected_values)
+        self.assertEqual(
+            [pressed for _value, pressed in chips].count("true"),
+            1,
+        )
+        self.assertEqual(chips[0][1], "true")
+        self.assertIn('data-map-set="DE-NW"', germany_pane)
+        self.assertIn('aria-label="Map sets in Germany"', germany_pane)
+
+        for group in groups:
+            with self.subTest(group=group["id"]):
+                pane = self._overview_pane(html, group["id"])
+                sections = re.findall(
+                    r'<section\s+class="atlas-directory-region atlas-mapset'
+                    r'( is-active)?"\s+data-region-value="([^"]+)"',
+                    pane,
+                )
+                self.assertEqual(
+                    [(value, bool(active)) for active, value in sections],
+                    [
+                        (region["value"], index == 0)
+                        for index, region in enumerate(group["regions"])
+                    ],
+                )
+                for region in group["regions"]:
+                    self.assertIn(
+                        f'<span class="atlas-mapset-meta">'
+                        f"{region['map_count']} maps</span>",
+                        pane,
+                    )
+                    for section in region["sections"]:
+                        self.assertIn(
+                            f'class="fas fa-fw {section["icon"]}"',
+                            pane,
+                        )
+
+        catalonia = self._overview_pane(html, "catalonia")
+        self.assertNotIn('class="atlas-mapset-picker"', catalonia)
+        europe = self._overview_pane(html, "europe")
+        self.assertIn("Europe-wide maps", europe)
+        self.assertIn('class="atlas-link-group atlas-topic-card"', europe)
+
+    def test_overview_sidebar_tree_keeps_region_groups_collapsed(self):
+        response = self.client.get(reverse("waste-atlas-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotRegex(
+            response.content.decode(),
+            r'<details class="atlas-tree-region"[^>]*\bopen\b',
+        )
 
     # ---- change-map tests -------------------------------------------------
 

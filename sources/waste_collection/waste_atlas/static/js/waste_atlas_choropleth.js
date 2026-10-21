@@ -3878,11 +3878,45 @@ var WasteAtlasChoropleth = (function () {
     var searchInput = document.getElementById('atlas-directory-search');
     if (!tabList && !categorySelect && !searchInput) return null;
 
+    var directory = document.querySelector('.atlas-directory');
+    if (directory) directory.classList.add('atlas-directory--enhanced');
+
     var params = new URLSearchParams(window.location.search);
 
     function activeRegion() {
       var activeTab = tabList && tabList.querySelector('.nav-link.active');
       return activeTab ? activeTab.getAttribute('data-region') : '';
+    }
+
+    function activeMapSet(pane) {
+      if (!pane) return null;
+      return pane.querySelector('.atlas-mapset.is-active')
+        || pane.querySelector('.atlas-mapset');
+    }
+
+    function activateMapSet(pane, value) {
+      var active = null;
+      pane.querySelectorAll('.atlas-mapset').forEach(function (mapSet) {
+        var selected = mapSet.getAttribute('data-region-value') === value;
+        mapSet.classList.toggle('is-active', selected);
+        if (selected) active = mapSet;
+      });
+      if (!active) return null;
+      pane.querySelectorAll('.atlas-mapset-chip').forEach(function (chip) {
+        chip.setAttribute(
+          'aria-pressed',
+          chip.getAttribute('data-map-set') === value ? 'true' : 'false'
+        );
+      });
+      return active;
+    }
+
+    function activePane() {
+      var region = activeRegion();
+      var pane = region ? document.getElementById('atlas-' + region) : null;
+      return pane || document.querySelector(
+        '#atlas-region-tab-content .atlas-region-pane.active'
+      );
     }
 
     function updateUrl() {
@@ -3891,9 +3925,15 @@ var WasteAtlasChoropleth = (function () {
       var region = activeRegion();
       var category = categorySelect ? categorySelect.value : '';
       var query = searchInput ? searchInput.value.trim() : '';
+      var pane = activePane();
+      var picker = pane && pane.querySelector('.atlas-mapset-picker');
+      var mapSet = activeMapSet(pane);
       if (region) next.set('region', region);
       if (category) next.set('category', category);
       if (query) next.set('q', query);
+      if (picker && mapSet) {
+        next.set('set', mapSet.getAttribute('data-region-value'));
+      }
       var qs = next.toString();
       window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
     }
@@ -3903,6 +3943,10 @@ var WasteAtlasChoropleth = (function () {
       var query = searchInput ? searchInput.value.trim().toLowerCase() : '';
       var panes = document.querySelectorAll('#atlas-region-tab-content .atlas-region-pane');
       panes.forEach(function (pane) {
+        var activeSet = activeMapSet(pane);
+        var activeSetValue = activeSet
+          ? activeSet.getAttribute('data-region-value')
+          : '';
         var visibleInPane = 0;
         pane.querySelectorAll('.atlas-map-link').forEach(function (link) {
           var linkCategory = link.getAttribute('data-category') || '';
@@ -3910,7 +3954,10 @@ var WasteAtlasChoropleth = (function () {
           var matches = (!category || linkCategory === '' || linkCategory === category)
             && (!query || haystack.toLowerCase().indexOf(query) !== -1);
           link.hidden = !matches;
-          if (matches) visibleInPane += 1;
+          var linkMapSet = link.getAttribute('data-map-set') || '';
+          if (matches && (!linkMapSet || linkMapSet === activeSetValue)) {
+            visibleInPane += 1;
+          }
         });
         pane.querySelectorAll('.atlas-link-group').forEach(function (group) {
           var anyVisible = Array.prototype.some.call(
@@ -3926,6 +3973,28 @@ var WasteAtlasChoropleth = (function () {
           );
           region.hidden = !anyVisible;
         });
+        pane.querySelectorAll('.atlas-mapset-chip').forEach(function (chip) {
+          var mapSetValue = chip.getAttribute('data-map-set');
+          var mapSet = null;
+          pane.querySelectorAll('.atlas-mapset').forEach(function (candidate) {
+            if (candidate.getAttribute('data-region-value') === mapSetValue) {
+              mapSet = candidate;
+            }
+          });
+          var visibleCount = 0;
+          if (mapSet) {
+            mapSet.querySelectorAll('.atlas-map-link').forEach(function (link) {
+              if (!link.hidden) visibleCount += 1;
+            });
+          }
+          var count = chip.querySelector('.atlas-mapset-count');
+          if (count) count.textContent = String(visibleCount);
+          if (visibleCount === 0) {
+            chip.setAttribute('data-empty', '');
+          } else {
+            chip.removeAttribute('data-empty');
+          }
+        });
         var emptyEl = pane.querySelector('.atlas-directory-empty');
         if (emptyEl) emptyEl.hidden = visibleInPane !== 0;
       });
@@ -3933,6 +4002,23 @@ var WasteAtlasChoropleth = (function () {
 
     if (categorySelect && params.has('category')) categorySelect.value = params.get('category');
     if (searchInput && params.has('q')) searchInput.value = params.get('q');
+
+    var activeRegionId = activeRegion();
+    var panes = document.querySelectorAll('#atlas-region-tab-content .atlas-region-pane');
+    panes.forEach(function (pane) {
+      var mapSet = activeMapSet(pane);
+      if (!mapSet) return;
+      var value = mapSet.getAttribute('data-region-value');
+      if (pane.id === 'atlas-' + activeRegionId && params.has('set')) {
+        var requestedSet = params.get('set');
+        pane.querySelectorAll('.atlas-mapset').forEach(function (candidate) {
+          if (candidate.getAttribute('data-region-value') === requestedSet) {
+            value = requestedSet;
+          }
+        });
+      }
+      activateMapSet(pane, value);
+    });
 
     if (tabList) {
       tabList.addEventListener('shown.bs.tab', function () {
@@ -3952,6 +4038,15 @@ var WasteAtlasChoropleth = (function () {
         updateUrl();
       }, 150));
     }
+    panes.forEach(function (pane) {
+      pane.querySelectorAll('.atlas-mapset-chip').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+          if (!activateMapSet(pane, chip.getAttribute('data-map-set'))) return;
+          applyFilters();
+          updateUrl();
+        });
+      });
+    });
 
     applyFilters();
     return { applyFilters: applyFilters };
