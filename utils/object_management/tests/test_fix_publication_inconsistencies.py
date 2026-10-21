@@ -61,3 +61,30 @@ class FixPublicationInconsistenciesTests(TestCase):
         self.assertIsNone(category.approved_at)
         self.assertIsNone(category.approved_by)
         self.assertIn("missing approval metadata", output)
+
+    def test_keeps_approval_metadata_of_archived_rows(self):
+        """archive() retains approval metadata; the cleanup must not erase it."""
+        category = self._published_without_approval("Archived")
+        self._run_command()
+        category.refresh_from_db()
+        category.archive()
+        approved_at = category.approved_at
+
+        self._run_command()
+
+        category.refresh_from_db()
+        self.assertEqual(category.publication_status, "archived")
+        self.assertEqual(category.approved_at, approved_at)
+        self.assertEqual(category.approved_by_id, self.owner.pk)
+
+    def test_clears_approval_metadata_of_private_rows(self):
+        category = WasteCategory.objects.create(name="Private", owner=self.owner)
+        WasteCategory.objects.filter(pk=category.pk).update(
+            approved_at=timezone.now(), approved_by=self.owner
+        )
+
+        self._run_command()
+
+        category.refresh_from_db()
+        self.assertIsNone(category.approved_at)
+        self.assertIsNone(category.approved_by)

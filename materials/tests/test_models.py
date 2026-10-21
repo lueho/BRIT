@@ -344,6 +344,16 @@ class SampleSubstrateCategoryTestCase(TestCase):
             1,
         )
 
+    def test_created_category_records_approval_metadata(self):
+        category, created = get_or_create_sample_substrate_category()
+
+        self.assertTrue(created)
+        category.refresh_from_db()
+        self.assertEqual(category.publication_status, "published")
+        self.assertIsNotNone(category.approved_at)
+        self.assertIsNotNone(category.approved_by_id)
+        self.assertEqual(category.approved_by_id, category.owner_id)
+
     def test_keeps_existing_category_when_homonym_is_added(self):
         published = MaterialCategory.objects.create(
             name="Substrate test category", publication_status="published"

@@ -136,6 +136,65 @@ class ReviewWorkflowModelTests(TestCase):
         published.name = "Renamed collection"
         published.clean()
 
+    def test_direct_create_as_published_stamps_approval_metadata(self):
+        """ORM saves bypass clean(), so save() must still record approval."""
+        category = WasteCategory.objects.create(
+            name="Directly published",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+
+        category.refresh_from_db()
+        self.assertIsNotNone(category.approved_at)
+        self.assertEqual(category.approved_by, self.owner)
+
+    def test_direct_save_publishing_with_update_fields_stamps_approval(self):
+        self.collection.publication_status = UserCreatedObject.STATUS_PUBLISHED
+        self.collection.save(update_fields=("publication_status",))
+
+        self.collection.refresh_from_db()
+        self.assertEqual(
+            self.collection.publication_status, UserCreatedObject.STATUS_PUBLISHED
+        )
+        self.assertIsNotNone(self.collection.approved_at)
+        self.assertEqual(self.collection.approved_by, self.owner)
+
+    def test_direct_publish_keeps_existing_approval_metadata(self):
+        approved_at = timezone.now() - datetime.timedelta(days=1)
+        category = WasteCategory.objects.create(
+            name="Explicitly approved",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+            approved_at=approved_at,
+            approved_by=self.moderator,
+        )
+
+        category.refresh_from_db()
+        self.assertEqual(category.approved_at, approved_at)
+        self.assertEqual(category.approved_by, self.moderator)
+
+    def test_save_of_non_published_object_leaves_approval_empty(self):
+        self.collection.name = "Renamed private collection"
+        self.collection.save()
+
+        self.collection.refresh_from_db()
+        self.assertIsNone(self.collection.approved_at)
+        self.assertIsNone(self.collection.approved_by)
+
+    def test_save_of_already_published_object_does_not_stamp(self):
+        """Pre-workflow rows are backfilled by migration, not by unrelated edits."""
+        Collection.objects.filter(pk=self.collection.pk).update(
+            publication_status=UserCreatedObject.STATUS_PUBLISHED
+        )
+        published = Collection.objects.get(pk=self.collection.pk)
+
+        published.name = "Renamed collection"
+        published.save()
+
+        published.refresh_from_db()
+        self.assertIsNone(published.approved_at)
+        self.assertIsNone(published.approved_by)
+
     def test_reject(self):
         """Test rejecting an object."""
         # Set up initial state

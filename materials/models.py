@@ -90,10 +90,14 @@ def get_or_create_sample_substrate_category():
         category = _find_sample_substrate_category(name)
         if category is not None:
             return category, False
+        owner = get_default_owner()
         category = MaterialCategory.objects.create(
             name=name,
             description="Category for substrate materials used in sample filtering.",
+            owner=owner,
             publication_status=UserCreatedObject.STATUS_PUBLISHED,
+            approved_at=timezone.now(),
+            approved_by=owner,
         )
     return category, True
 

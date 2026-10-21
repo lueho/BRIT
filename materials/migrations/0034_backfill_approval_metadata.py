@@ -34,7 +34,7 @@ def backfill_approval_metadata(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("materials", "0032_sampleauthor_sample_authors_and_more"),
+        ("materials", "0033_measurement_limit_type"),
     ]
 
     operations = [

@@ -10,7 +10,7 @@ from django.utils import timezone
 from materials.models import MaterialCategory
 
 backfill_module = importlib.import_module(
-    "materials.migrations.0033_backfill_approval_metadata"
+    "materials.migrations.0034_backfill_approval_metadata"
 )
 
 

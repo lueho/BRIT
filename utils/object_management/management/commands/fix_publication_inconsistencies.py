@@ -119,17 +119,23 @@ class Command(BaseCommand):
                 )
             )
 
-        # 3. Report any objects with approval metadata but not published
+        # 3. Report any objects with approval metadata that were never
+        # published. Archived objects keep their approval audit trail.
         invalid_approval = model_class.objects.filter(
-            ~Q(publication_status=UserCreatedObject.STATUS_PUBLISHED),
-            approved_at__isnull=False,
+            Q(approved_at__isnull=False) | Q(approved_by__isnull=False),
+        ).exclude(
+            publication_status__in=(
+                UserCreatedObject.STATUS_PUBLISHED,
+                UserCreatedObject.STATUS_ARCHIVED,
+            )
         )
 
         if invalid_approval.exists():
             count = invalid_approval.count()
             self.stdout.write(
                 self.style.WARNING(
-                    f"Found {count} {model_name} with approval metadata but not published. "
+                    f"Found {count} {model_name} with approval metadata but not "
+                    "published or archived. "
                     "This is an inconsistent state."
                 )
             )
