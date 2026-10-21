@@ -1,4 +1,4 @@
-from sources.waste_collection.waste_atlas.pages import ABFALLATLAS_URL
+from utils.external_urls import ABFALLATLAS_URL
 
 ECN_BRIT_EU_URL = "https://www.compostnetwork.info/brit-eu/"
 ECN_FACTSHEETS_URL = "https://www.compostnetwork.info/downloads/factsheets/"
