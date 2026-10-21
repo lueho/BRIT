@@ -35,7 +35,7 @@ from django.http import (
     HttpResponseNotAllowed,
     HttpResponseRedirect,
 )
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string, select_template
 from django.urls import NoReverseMatch, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -61,6 +61,7 @@ from utils.object_management.helpers import (
 )
 from utils.object_management.models import (
     ReviewAction,
+    ReviewNotificationMute,
     UserCreatedObject,
     populate_owner_review_feedback,
 )
@@ -2047,6 +2048,76 @@ class AddReviewCommentView(BaseReviewActionView):
 
         messages.success(request, "Comment added.")
         return HttpResponseRedirect(self.get_success_url())
+
+
+class ReviewNotificationMuteView(BaseReviewActionView):
+    """Toggle per-object review notification e-mails for the current user."""
+
+    permission_method = "has_comment_permission"
+    permission_denied_message = (
+        "You don't have permission to change notifications for this item."
+    )
+    template_name = "object_management/review_notification_mute.html"
+
+    def get_object(self, request=None, *args, **kwargs):
+        content_type = get_object_or_404(
+            ContentType, pk=self.kwargs.get("content_type_id")
+        )
+        model_class = content_type.model_class()
+        if model_class is None or not issubclass(model_class, UserCreatedObject):
+            raise Http404("Review notifications are not available for this item.")
+        return super().get_object(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        obj = self.get_object(request, *args, **kwargs)
+        self.ensure_permission(request, obj)
+        return render(
+            request,
+            self.template_name,
+            {
+                "object": obj,
+                "muted": self._is_muted(request.user, obj),
+                "review_url": reverse(
+                    "object_management:review_item_detail",
+                    kwargs={
+                        "content_type_id": self.kwargs["content_type_id"],
+                        "object_id": obj.pk,
+                    },
+                ),
+            },
+        )
+
+    def post(self, request, *args, **kwargs):
+        obj = self.get_object(request, *args, **kwargs)
+        self.ensure_permission(request, obj)
+        mute, created = ReviewNotificationMute.objects.get_or_create(
+            user=request.user,
+            content_type_id=self.kwargs["content_type_id"],
+            object_id=obj.pk,
+        )
+        if created:
+            messages.success(request, "E-mail notifications for this item disabled.")
+        else:
+            mute.delete()
+            messages.success(request, "E-mail notifications for this item enabled.")
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_success_url(self):
+        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={self.request.get_host()},
+            require_https=self.request.is_secure(),
+        ):
+            return next_url
+        return self.get_object().get_absolute_url()
+
+    def _is_muted(self, user, obj):
+        return ReviewNotificationMute.objects.filter(
+            user=user,
+            content_type_id=self.kwargs["content_type_id"],
+            object_id=obj.pk,
+        ).exists()
 
 
 class ReviewObjectListMixin(

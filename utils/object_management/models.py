@@ -144,6 +144,36 @@ class ReviewAction(models.Model):
         )
 
 
+class ReviewNotificationMute(models.Model):
+    """Suppresses review notification e-mails for one user on one object.
+
+    Uses a GenericForeignKey like ``ReviewAction`` so a mute can target any
+    model participating in the review workflow.
+    """
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="review_notification_mutes"
+    )
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "content_type", "object_id"],
+                name="unique_review_notification_mute",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+        ]
+
+    def __str__(self):
+        return f"Muted review notifications for {self.user} on {self.content_object}"
+
+
 class ObjectEditorGrant(models.Model):
     """Grants a user edit access to a single ``UserCreatedObject`` instance.
 

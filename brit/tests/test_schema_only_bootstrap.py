@@ -122,6 +122,7 @@ class SchemaOnlyBaselineGraphTests(SimpleTestCase):
         loader = MigrationLoader(None)
         loader.graph.validate_consistency()
         loader.graph.ensure_not_cyclic()
+        self.assertFalse(loader.detect_conflicts())
 
     def test_baselines_are_initial_and_replace_exact_originals(self):
         loader = MigrationLoader(None)
