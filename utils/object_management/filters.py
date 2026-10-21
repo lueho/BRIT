@@ -6,6 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.forms import CheckboxSelectMultiple
 from django_filters import (
     CharFilter,
+    ChoiceFilter,
     DateFilter,
     ModelChoiceFilter,
     ModelMultipleChoiceFilter,
@@ -30,6 +31,7 @@ class ReviewDashboardFilterFormHelper(FormHelper):
                 "owner",
                 "submitted_after",
                 "submitted_before",
+                "scope",
                 "ordering",
             ),
         )
@@ -96,6 +98,17 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
         method="form_only_filter",
     )
 
+    scope = ChoiceFilter(
+        choices=(
+            ("review", "Pending review"),
+            ("declined", "Declined"),
+        ),
+        label="Review state",
+        empty_label=None,
+        method="filter_scope",
+        help_text="Pending moderation queue or declined follow-up history",
+    )
+
     ordering = OrderingFilter(
         label="Sort by",
         choices=(
@@ -138,8 +151,12 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
                 id__in=model_ids
             ).order_by("model")
 
-    def form_only_filter(self, queryset, name, value):
-        """No-op so this FilterSet can validate input and render its form.
+    def filter_scope(self, queryset, name, value):
+        """Form-only filter; the dashboard resolves the scope itself."""
+        return queryset
+
+    def filter_search(self, queryset, name, value):
+        """Filter by object name (case-insensitive contains).
 
         The view applies the real filtering and sorting to each model queryset
         via ``ReviewItemCollector``; the ``queryset`` seen here is only the

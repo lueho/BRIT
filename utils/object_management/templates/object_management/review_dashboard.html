@@ -5,7 +5,14 @@
 {% load crispy_forms_tags %}
 
 {% block list_card_header %}
-    <strong><i class="fas fa-clipboard-check"></i> {{ title }}</strong>
+    <strong data-review-scope="{{ review_scope }}"><i class="fas fa-clipboard-check"></i> {{ title }}</strong>
+    {% if review_scope == 'declined' %}
+        <span class="badge bg-secondary">Declined follow-up</span>
+    {% elif review_scope == 'review' %}
+        <span class="badge bg-secondary">Pending review</span>
+    {% else %}
+        <span class="badge bg-warning text-dark">Unknown review state</span>
+    {% endif %}
 {% endblock list_card_header %}
 
 {% block list_table %}
@@ -40,10 +47,38 @@
         </div>
     {% else %}
         <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i> There are no items currently in review.
+            {% if review_scope == 'declined' %}
+                <i class="fas fa-info-circle"></i> There are no declined items.
+            {% elif review_scope == 'review' %}
+                <i class="fas fa-info-circle"></i> There are no items currently in review.
+            {% else %}
+                <i class="fas fa-info-circle"></i> Unknown review state — nothing to show.
+            {% endif %}
         </div>
     {% endif %}
 {% endblock list_table %}
+
+{% block scope_toggle %}{% endblock scope_toggle %}
+
+{% block active_filters %}
+    {% active_filter_chips as active_filter_chips %}
+    {% if active_filter_chips %}
+        <div class="active-filters mb-3">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span class="text-muted small">Active filters:</span>
+                {% for chip in active_filter_chips %}
+                    <a href="{{ chip.remove_url }}" class="badge bg-secondary text-decoration-none"
+                       aria-label="Remove filter {{ chip.label }}">
+                        {{ chip.label }}: {{ chip.value }} <i class="fas fa-times"></i>
+                    </a>
+                {% endfor %}
+                <a href="{% url 'object_management:review_dashboard' %}" class="badge bg-danger text-decoration-none">
+                    Clear all <i class="fas fa-times-circle"></i>
+                </a>
+            </div>
+        </div>
+    {% endif %}
+{% endblock active_filters %}
 
 {% block filters_pane_body %}
     <form method="get">
