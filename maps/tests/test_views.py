@@ -37,7 +37,6 @@ from utils.tests.testcases import (
 from utils.tests.testrunner import serial_test
 
 from ..models import (
-    Attribute,
     Catchment,
     GeoDataset,
     GeoDatasetRuntimeConfiguration,
@@ -1448,40 +1447,6 @@ class NutsAndLauCatchmentPedigreeAPITestCase(ViewSetWithPermissionsTestCase):
             {"id": self.level_3_catchment_1.id, "direction": "children"},
         )
         self.assertIn("id_level_4", response.data)
-
-
-# ----------- Attribute CRUD -------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class AttributeCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
-    modal_detail_view = True
-    modal_update_view = True
-    modal_create_view = True
-    add_scope_query_param_to_list_urls = True
-
-    model = Attribute
-
-    view_explorer_name = "maps-explorer"
-    view_create_name = "attribute-create"
-    view_modal_create_name = "attribute-create-modal"
-    view_published_list_name = "attribute-list"
-    view_private_list_name = "attribute-list-owned"
-    view_detail_name = "attribute-detail"
-    view_modal_detail_name = "attribute-detail-modal"
-    view_update_name = "attribute-update"
-    view_modal_update_name = "attribute-update-modal"
-    view_delete_name = "attribute-delete-modal"
-
-    create_object_data = {
-        "name": "Test Attribute",
-        "unit": "Test Unit",
-    }
-    update_object_data = {
-        "name": "Updated Test Attribute",
-        "unit": "Updated Test Unit",
-        "description": "Updated description",
-    }
 
 
 # ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------

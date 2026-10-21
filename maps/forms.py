@@ -41,7 +41,6 @@ from utils.properties.forms import NumericMeasurementFieldsFormMixin
 
 from .models import (
     BACKEND_TYPE_CHOICES,
-    Attribute,
     Catchment,
     GeoDataset,
     GeoDatasetColumnPolicy,
@@ -277,16 +276,6 @@ class RegionModelForm(SimpleModelForm):
         if commit:
             instance.save()
         return instance
-
-
-class AttributeModelForm(SimpleModelForm):
-    class Meta:
-        model = Attribute
-        fields = ("name", "unit", "description")
-
-
-class AttributeModalModelForm(ModalModelFormMixin, AttributeModelForm):
-    pass
 
 
 class RegionAttributeValueModelForm(NumericMeasurementFieldsFormMixin, SimpleModelForm):

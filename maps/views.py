@@ -60,7 +60,6 @@ from utils.object_management.views import (
 from utils.views import BreadcrumbContextMixin
 
 from .filters import (
-    AttributeListFilter,
     CatchmentFilterSet,
     GeoDataSetFilterSet,
     LocationListFilter,
@@ -68,8 +67,6 @@ from .filters import (
     RegionFilterSet,
 )
 from .forms import (
-    AttributeModalModelForm,
-    AttributeModelForm,
     CatchmentCreateDrawCustomForm,
     CatchmentCreateMergeLauForm,
     CatchmentModelForm,
@@ -83,7 +80,6 @@ from .forms import (
     build_local_relation_filter_form,
 )
 from .models import (
-    Attribute,
     Catchment,
     GeoDataset,
     GeoPolygon,
@@ -392,7 +388,6 @@ class MapsExplorerView(BreadcrumbContextMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         published = {"publication_status": "published"}
         context["dataset_count"] = GeoDataset.objects.filter(**published).count()
-        context["attribute_count"] = Attribute.objects.filter(**published).count()
         context["region_count"] = Region.objects.filter(**published).count()
         context["catchment_count"] = Catchment.objects.filter(**published).count()
         context["location_count"] = Location.objects.filter(**published).count()
@@ -1746,61 +1741,6 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
                 data[f"id_level_{lvl}"] = serializer.data
 
         return Response(data)
-
-
-# ----------- Attribute CRUD -------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class AttributePublishedListView(PublishedObjectFilterView):
-    model = Attribute
-    filterset_class = AttributeListFilter
-    explorer_url = reverse_lazy("maps-explorer")
-
-
-class AttributePrivateListView(PrivateObjectFilterView):
-    model = Attribute
-    filterset_class = AttributeListFilter
-    explorer_url = reverse_lazy("maps-explorer")
-
-
-class AttributeAutocompleteView(UserCreatedObjectAutocompleteView):
-    model = Attribute
-
-
-class AttributeCreateView(UserCreatedObjectCreateView):
-    form_class = AttributeModelForm
-    success_url = reverse_lazy("attribute-list")
-    permission_required = "maps.add_attribute"
-
-
-class AttributeModalCreateView(UserCreatedObjectModalCreateView):
-    form_class = AttributeModalModelForm
-    success_url = reverse_lazy("attribute-list")
-    permission_required = "maps.add_attribute"
-
-
-class AttributeDetailView(UserCreatedObjectDetailView):
-    template_name = "attribute_detail.html"
-    model = Attribute
-
-
-class AttributeModalDetailView(UserCreatedObjectModalDetailView):
-    model = Attribute
-
-
-class AttributeUpdateView(UserCreatedObjectUpdateView):
-    model = Attribute
-    form_class = AttributeModelForm
-
-
-class AttributeModalUpdateView(UserCreatedObjectModalUpdateView):
-    model = Attribute
-    form_class = AttributeModalModelForm
-
-
-class AttributeModalDeleteView(UserCreatedObjectModalDeleteView):
-    model = Attribute
 
 
 # ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------

@@ -121,30 +121,4 @@
         </div>
     </div>
 
-    <h6 class="text-muted text-uppercase explorer-section-heading fw-bold mb-3">
-        <i class="fas fa-tags me-1"></i> Attributes
-    </h6>
-    <div class="row g-3 mb-4">
-        <div class="col-12 col-sm-6 col-lg-3">
-            <div class="card shadow-sm h-100 explorer-card"
-                 onclick="window.location='{% url 'attribute-list' %}'">
-                <div class="card-body d-flex flex-column">
-                    <div class="d-flex align-items-center mb-2">
-                        <span class="explorer-icon bg-warning bg-opacity-10 text-warning"><i class="fas fa-list-ol"></i></span>
-                        <h6 class="mb-0 ms-2">Attributes</h6>
-                    </div>
-                    <p class="card-text text-muted small flex-grow-1">
-                        Named region attributes such as population or population
-                        density that can hold values per region and year.
-                    </p>
-                    <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
-                        <span class="badge bg-light text-dark border">{{ attribute_count }} published</span>
-                        <a href="{% url 'attribute-list' %}"
-                           class="btn btn-sm btn-outline-primary card-link">Browse</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
 {% endblock content %}

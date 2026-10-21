@@ -996,7 +996,6 @@ class MapsExplorerTests(TestCase):
         self.assertEqual(response.status_code, 200)
         for url_name in (
             "maps_list",
-            "attribute-list",
             "region-list",
             "catchment-list",
             "location-list",
