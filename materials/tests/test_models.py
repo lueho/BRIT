@@ -1862,6 +1862,24 @@ class MeasurementQualifierDisplayTestCase(SimpleTestCase):
                 self.assertEqual(instance.effective_limit_type, "")
                 self.assertEqual(instance.limit_label, "Limit (type not specified)")
 
+    def test_limit_abbreviation_is_compact_limit_marker(self):
+        cases = (
+            ({"limit_type": MeasurementLimitType.LOD}, "LOD"),
+            ({"limit_type": MeasurementLimitType.MDL}, "MDL"),
+            ({"limit_type": MeasurementLimitType.LOQ}, "LOQ"),
+            ({"limit_type": MeasurementLimitType.RL}, "RL"),
+            (
+                {"value_qualifier": MeasurementValueQualifier.BELOW_DETECTION_LIMIT},
+                "LOD",
+            ),
+            ({"detection_limit": Decimal("0.1")}, "Limit"),
+            ({}, ""),
+        )
+        for kwargs, expected in cases:
+            for instance in self._instances(average=Decimal("1"), **kwargs):
+                with self.subTest(model=type(instance).__name__, **kwargs):
+                    self.assertEqual(instance.limit_abbreviation, expected)
+
     def test_limit_label_is_empty_without_limit_information(self):
         for instance in self._instances(average=Decimal("1")):
             with self.subTest(model=type(instance).__name__):

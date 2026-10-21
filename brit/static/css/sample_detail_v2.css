@@ -1134,6 +1134,14 @@ tr.sdv2-has-swatch:hover .sdv2-swatch {
   margin-left: 0.25rem;
 }
 
+.sdv2-limit {
+  color: var(--sdv2-text-muted);
+  font-size: 11px;
+  margin-left: 0.25rem;
+  cursor: help;
+  text-decoration: underline dotted;
+}
+
 .sdv2-alias-chip {
   display: inline-flex;
   align-items: center;

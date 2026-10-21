@@ -9858,6 +9858,15 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
                 self.assertContains(response, "Reporting limit (RL): 0.8 %")
                 self.assertContains(response, "Limit (type not specified): 6.57 %")
                 self.assertNotContains(response, "Detection limit: 6.57")
+                self.assertContains(
+                    response,
+                    '<abbr class="sdv2-limit" title="Reporting limit (RL): 0.8 %">'
+                    "RL</abbr>",
+                    html=True,
+                )
+                self.assertNotContains(
+                    response, '<span class="sdv2-sd">Reporting limit (RL)'
+                )
                 self.assertContains(response, "<strong>0</strong>")
                 self.assertContains(response, "<strong>&lt;0.25</strong>")
                 self.assertNotContains(response, '<img src=x onerror="alert(31337)">')
@@ -9873,6 +9882,12 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
         self.assertIn("Below detection limit", html)
         self.assertIn("Limit of detection (LOD): 6.57", html)
         self.assertIn("Reporting limit (RL): 0.8", html)
+        self.assertInHTML(
+            '<abbr class="text-muted small" '
+            'title="Reporting limit (RL): 0.8 percent">'
+            "RL</abbr>",
+            html,
+        )
         self.assertIn(escape(self.hostile_raw), html)
         self.assertNotIn('<img src=x onerror="alert(31337)">', html)
 
