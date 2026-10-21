@@ -10,7 +10,14 @@ from django.utils import timezone
 
 from inventories.models import InventoryAlgorithm, Scenario, ScenarioStatus
 from layer_manager.models import Layer, LayerAggregatedValue
-from maps.models import Catchment, GeoDataset, GeoPolygon, Region
+from maps.models import (
+    Catchment,
+    GeoDataset,
+    GeoPolygon,
+    MapConfiguration,
+    MapLayerConfiguration,
+    Region,
+)
 from materials.models import Material, Sample, SampleSeries
 from processes.models import Process
 from utils.tests.testcases import AbstractTestCases
@@ -834,3 +841,35 @@ class ShowcaseGeoJSONVersionTestCase(TestCase):
         from ..viewsets import ShowcaseViewSet
 
         self.assertIn("code-labels-v1", ShowcaseViewSet()._version_timestamp({}))
+
+
+class ShowcasePublishedMapViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(
+            name="Showcase map region", country="FR", publication_status="published"
+        )
+        cls.region.geom = MultiPolygon(Polygon.from_bbox((0, 0, 10, 10)))
+        cls.region.save()
+        Showcase.objects.create(
+            name="Showcase map view fixture",
+            region=cls.region,
+            publication_status="published",
+        )
+        GeoDataset.objects.create(
+            name="Showcase map view test", model_name="Showcase", region=cls.region
+        )
+        config, _ = MapConfiguration.objects.get_or_create(
+            name="Default Map Configuration"
+        )
+        for kind in ("region", "catchment", "features"):
+            layer = MapLayerConfiguration.objects.create(
+                name=f"Showcase map view {kind}", layer_type=kind
+            )
+            config.layers.add(layer)
+
+    def test_theme_navigation_uses_visible_chip_class(self):
+        response = self.client.get(reverse("Showcase"), {"scope": "published"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "csm-theme-chip")

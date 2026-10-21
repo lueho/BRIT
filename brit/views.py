@@ -8,7 +8,13 @@ from django.views import View
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
-from brit.featured import BRIT_EU_MAP_LINKS, FEATURED_DESTINATIONS
+from brit.featured import (
+    BRIT_EU_ECN_FACTSHEETS,
+    BRIT_EU_MAP_LINKS,
+    ECN_BRIT_EU_URL,
+    ECN_FACTSHEETS_URL,
+    FEATURED_DESTINATIONS,
+)
 from utils.views import BreadcrumbContextMixin
 
 
@@ -29,6 +35,12 @@ class BritEUResultsView(BreadcrumbContextMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["brit_eu_map_links"] = BRIT_EU_MAP_LINKS
+        context["brit_eu_ecn_factsheets"] = BRIT_EU_ECN_FACTSHEETS
+        context["ecn_brit_eu_url"] = ECN_BRIT_EU_URL
+        context["ecn_factsheets_url"] = ECN_FACTSHEETS_URL
+        context["brit_eu_feature"] = next(
+            feature for feature in FEATURED_DESTINATIONS if feature["slug"] == "brit-eu"
+        )
         return context
 
 

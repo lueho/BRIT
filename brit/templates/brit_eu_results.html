@@ -8,20 +8,33 @@
 {% block content %}
   <div class="sdv2 discovery-page" data-has-action-rail="0">
     <div class="sdv2-canvas">
-      <header class="sdv2-hero sdv2-surface">
+      <header class="sdv2-hero sdv2-hero-with-media sdv2-surface discovery-hero">
         <div class="sdv2-hero-identity">
+          <img class="discovery-hero-logo"
+               src="{% static brit_eu_feature.logos.0.image_path %}"
+               width="{{ brit_eu_feature.logos.0.width }}"
+               height="{{ brit_eu_feature.logos.0.height }}"
+               alt="{{ brit_eu_feature.logos.0.alt }}">
           <div class="sdv2-hero-kicker">Project results</div>
           <h1 class="sdv2-hero-title">BRIT-EU results</h1>
           <div class="sdv2-hero-material">
             Explore the maps and analysis resources developed through BRIT-EU to compare municipal
             biowaste collection systems.
           </div>
+          <div class="discovery-hero-actions">
+            <a class="sdv2-btn sdv2-btn-primary"
+               href="{{ ecn_brit_eu_url }}"
+               target="_blank"
+               rel="noopener noreferrer">All results at ECN <i class="fas fa-external-link-alt" aria-hidden="true"></i><span class="visually-hidden">(opens in a new tab)</span></a>
+            <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'waste-atlas-overview' %}">Open Waste Atlas</a>
+          </div>
         </div>
-        <img class="discovery-hero-logo"
-             src="{% static 'img/brit_eu_logo.png' %}"
-             width="1335"
-             height="387"
-             alt="BRIT-EU logo">
+        <figure class="sdv2-hero-media">
+          <img src="{% static brit_eu_feature.image_path %}"
+               width="{{ brit_eu_feature.image_width }}"
+               height="{{ brit_eu_feature.image_height }}"
+               alt="{{ brit_eu_feature.image_alt }}">
+        </figure>
       </header>
       <p class="discovery-note">
         BRIT-EU maps are part of the Waste Atlas, which also includes maps beyond this project.
@@ -35,13 +48,22 @@
         </p>
         <div class="discovery-map-grid">
           {% for link in brit_eu_map_links %}
-            <a class="discovery-map-card sdv2-surface"
-               href="{% url link.url_name %}"
-               aria-label="Open map: {{ link.label }}">
-              <span class="discovery-map-region">{{ link.label }}</span>
+            <article class="discovery-map-card sdv2-surface">
+              <h3 class="discovery-map-region">
+                <i class="fas fa-map-marker-alt" aria-hidden="true"></i> {{ link.label }}
+              </h3>
               <span class="discovery-map-theme">Primary collection system for kitchen waste</span>
-              <span class="discovery-map-action">Open map</span>
-            </a>
+              <div class="discovery-map-links">
+                <a class="discovery-map-action"
+                   href="{% url link.url_name %}"
+                   aria-label="Open map: {{ link.label }}">Open map <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+                <a class="discovery-map-profile"
+                   href="{{ link.ecn_profile_url }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   aria-label="ECN case study profile: {{ link.label }} (opens in a new tab)">Case study profile <i class="fas fa-external-link-alt" aria-hidden="true"></i></a>
+              </div>
+            </article>
           {% endfor %}
         </div>
         <p class="discovery-footnote">
@@ -49,16 +71,60 @@
           inputs.
         </p>
       </section>
+      <section id="ecn-results" aria-labelledby="ecn-results-heading">
+        <h2 id="ecn-results-heading" class="discovery-section-heading">BRIT-EU results at the European Compost Network</h2>
+        <p class="discovery-section-hint">
+          The European Compost Network (ECN) publishes the complete BRIT-EU results: influencing-factor factsheets, case study profiles and the project methodology.
+        </p>
+        <div class="discovery-panels">
+          <div class="discovery-panel sdv2-surface">
+            <h3><i class="fas fa-file-alt" aria-hidden="true"></i> Factsheets</h3>
+            <ul class="discovery-link-list">
+              {% for factsheet in brit_eu_ecn_factsheets %}
+                <li>
+                  <a href="{{ factsheet.url }}"
+                     target="_blank"
+                     rel="noopener noreferrer">{{ factsheet.label }} <i class="fas fa-external-link-alt" aria-hidden="true"></i><span class="visually-hidden">(opens in a new tab)</span></a>
+                </li>
+              {% endfor %}
+            </ul>
+            <a class="sdv2-btn"
+               href="{{ ecn_factsheets_url }}"
+               target="_blank"
+               rel="noopener noreferrer">All factsheets at ECN <i class="fas fa-external-link-alt" aria-hidden="true"></i><span class="visually-hidden">(opens in a new tab)</span></a>
+          </div>
+          <div class="discovery-panel sdv2-surface">
+            <h3><i class="fas fa-map" aria-hidden="true"></i> Case study profiles</h3>
+            <ul class="discovery-link-list">
+              {% for link in brit_eu_map_links %}
+                <li>
+                  <a href="{{ link.ecn_profile_url }}"
+                     target="_blank"
+                     rel="noopener noreferrer">{{ link.label }} <i class="fas fa-external-link-alt" aria-hidden="true"></i><span class="visually-hidden">(opens in a new tab)</span></a>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+          <div class="discovery-panel sdv2-surface">
+            <h3><i class="fas fa-project-diagram" aria-hidden="true"></i> Methodology and KPIs</h3>
+            <p>The ECN project page describes the research framework, key performance indicators and influencing factors used in BRIT-EU.</p>
+            <a class="sdv2-btn sdv2-btn-primary"
+               href="{{ ecn_brit_eu_url }}"
+               target="_blank"
+               rel="noopener noreferrer">BRIT-EU project page <i class="fas fa-external-link-alt" aria-hidden="true"></i><span class="visually-hidden">(opens in a new tab)</span></a>
+          </div>
+        </div>
+      </section>
       <section id="data-analysis" aria-labelledby="data-analysis-heading">
         <h2 id="data-analysis-heading" class="discovery-section-heading">Data and analysis</h2>
         <div class="discovery-panels">
           <div class="discovery-panel sdv2-surface">
-            <h3>Explore collection data</h3>
+            <h3><i class="fas fa-database" aria-hidden="true"></i> Explore collection data</h3>
             <p>Browse published waste collection records and their sources in the collection database.</p>
             <a class="sdv2-btn sdv2-btn-primary" href="{% url 'collection-list' %}">Browse collection data</a>
           </div>
           <div class="discovery-panel sdv2-surface">
-            <h3>Analyze in R</h3>
+            <h3><i class="fas fa-chart-line" aria-hidden="true"></i> Analyze in R</h3>
             <p>
               The R analysis page provides the archived BRIT-EU analysis package, including
               historical input data, and a client for current BRIT data. Live-data access requires

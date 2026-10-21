@@ -8,11 +8,19 @@
          alt="{{ feature.image_alt }}">
   </a>
   <div class="discovery-feature-body">
-    <div class="discovery-feature-category">{{ feature.category }}</div>
+    <div class="discovery-feature-category">
+      <i class="fas fa-fw {{ feature.icon }}" aria-hidden="true"></i>{{ feature.category }}
+    </div>
     <h3 class="discovery-feature-title">
       <a href="{% url feature.url_name %}">{{ feature.title }}</a>
     </h3>
-    <p>{{ feature.description }}</p>
+    <p class="discovery-feature-text">{{ feature.description }}</p>
+    {% if feature.external_link %}
+      <a class="discovery-feature-external"
+         href="{{ feature.external_link.url }}"
+         target="_blank"
+         rel="noopener noreferrer">{{ feature.external_link.label }} <i class="fas fa-external-link-alt" aria-hidden="true"></i><span class="visually-hidden">(opens in a new tab)</span></a>
+    {% endif %}
     {% if feature.logos %}
       <div class="discovery-branding">
         {% for logo in feature.logos %}
@@ -24,7 +32,9 @@
         {% endfor %}
       </div>
     {% endif %}
-    <a class="sdv2-btn sdv2-btn-primary discovery-feature-cta"
-       href="{% url feature.url_name %}">{{ feature.cta_label }}</a>
+    <div class="discovery-feature-actions">
+      <a class="sdv2-btn sdv2-btn-primary discovery-feature-cta"
+         href="{% url feature.url_name %}">{{ feature.cta_label }} <i class="fas fa-arrow-right ms-1" aria-hidden="true"></i></a>
+    </div>
   </div>
 </article>

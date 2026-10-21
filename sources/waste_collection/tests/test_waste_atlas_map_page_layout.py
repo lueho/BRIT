@@ -186,6 +186,14 @@ class MapPageChromeTests(TestCase):
         self.assertIn('id="atlas-tree-toggle"', content)
         self.assertIn('aria-controls="atlas-tree"', content)
 
+    def test_map_page_keeps_the_current_tree_region_open(self):
+        content = self._content()
+
+        self.assertRegex(
+            content,
+            r'<details class="atlas-tree-region"[^>]*\bopen\b',
+        )
+
     def test_edit_configuration_lives_in_the_options_pane_for_staff(self):
         self.client.force_login(self.staff)
         content = self._content()

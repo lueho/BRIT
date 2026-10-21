@@ -7,9 +7,15 @@ from django.contrib.staticfiles import finders
 from django.test import TestCase
 from django.urls import reverse
 
-from brit.featured import BRIT_EU_MAP_LINKS, FEATURED_DESTINATIONS
+from brit.featured import (
+    BRIT_EU_ECN_FACTSHEETS,
+    BRIT_EU_MAP_LINKS,
+    ECN_BRIT_EU_URL,
+    ECN_FACTSHEETS_URL,
+    FEATURED_DESTINATIONS,
+)
 from brit.sitemap_items import BASE_SITEMAP_ITEMS
-from sources.waste_collection.waste_atlas.pages import MAP_PAGES
+from sources.waste_collection.waste_atlas.pages import ABFALLATLAS_URL, MAP_PAGES
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -43,6 +49,17 @@ class FeatureParser(HTMLParser):
             self._current = None
 
 
+class ExternalLinkParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.links = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "a" and attrs.get("href", "").startswith("https://"):
+            self.links.append(attrs)
+
+
 class FeaturedRegistryTests(TestCase):
     def test_three_ordered_destinations_with_resolvable_routes(self):
         self.assertEqual(
@@ -65,6 +82,39 @@ class FeaturedRegistryTests(TestCase):
             ):
                 self.assertIn(key, feature)
             self.assertTrue(reverse(feature["url_name"]))
+
+    def test_feature_and_ecn_reference_metadata(self):
+        by_slug = {feature["slug"]: feature for feature in FEATURED_DESTINATIONS}
+        self.assertEqual(
+            {
+                slug: (feature["icon"], feature["external_link"])
+                for slug, feature in by_slug.items()
+            },
+            {
+                "waste-atlas": (
+                    "fa-map-marked-alt",
+                    {"label": "abfall-atlas.de", "url": ABFALLATLAS_URL},
+                ),
+                "brit-eu": (
+                    "fa-chart-bar",
+                    {"label": "All results at ECN", "url": ECN_BRIT_EU_URL},
+                ),
+                "closecycle": ("fa-recycle", None),
+            },
+        )
+        self.assertEqual(ABFALLATLAS_URL, "https://www.abfall-atlas.de/")
+        self.assertEqual(ECN_BRIT_EU_URL, "https://www.compostnetwork.info/brit-eu/")
+        self.assertEqual(
+            ECN_FACTSHEETS_URL,
+            "https://www.compostnetwork.info/downloads/factsheets/",
+        )
+        self.assertEqual(len(BRIT_EU_ECN_FACTSHEETS), 6)
+        for link in BRIT_EU_MAP_LINKS:
+            self.assertTrue(
+                link["ecn_profile_url"].startswith("https://www.compostnetwork.info/")
+            )
+        for link in BRIT_EU_ECN_FACTSHEETS:
+            self.assertTrue(link["url"].startswith("https://www.compostnetwork.info/"))
 
     def test_collection_map_previews_match_featured_destinations(self):
         by_slug = {feature["slug"]: feature for feature in FEATURED_DESTINATIONS}
@@ -207,6 +257,30 @@ class HomeFeaturedTests(TestCase):
             hrefs = [a.get("href") for a in feature["anchors"]]
             self.assertIn(expected[feature["slug"]], hrefs)
 
+    def test_feature_external_links_are_safe_and_optional(self):
+        features = {
+            feature["slug"]: feature for feature in self._features(self._home())
+        }
+        expected = {
+            "waste-atlas": ABFALLATLAS_URL,
+            "brit-eu": ECN_BRIT_EU_URL,
+        }
+        for slug, href in expected.items():
+            with self.subTest(slug=slug):
+                link = next(
+                    anchor
+                    for anchor in features[slug]["anchors"]
+                    if anchor.get("href") == href
+                )
+                self.assertEqual(link.get("target"), "_blank")
+                self.assertTrue({"noopener", "noreferrer"} <= set(link["rel"].split()))
+        self.assertFalse(
+            any(
+                anchor.get("href", "").startswith("https://")
+                for anchor in features["closecycle"]["anchors"]
+            )
+        )
+
     def test_module_links_retained_and_processes_gated(self):
         response = self._home()
         for name in (
@@ -274,16 +348,37 @@ class BritEuResultsPageTests(TestCase):
         response = self.client.get(reverse("brit-eu-results"))
         html = response.content.decode()
 
-        section = html[
-            html.index('id="brit-eu-maps"') : html.index('id="data-analysis"')
-        ]
+        section = html[html.index('id="brit-eu-maps"') : html.index('id="ecn-results"')]
         for link in BRIT_EU_MAP_LINKS:
             self.assertIn(link["label"], section)
             self.assertIn(reverse(link["url_name"]), section)
+            self.assertIn(link["ecn_profile_url"], section)
         self.assertEqual(
             section.count("Primary collection system for kitchen waste"), 5
         )
         self.assertIn("Open map", section)
+
+    def test_ecn_results_are_ordered_and_external_links_are_safe(self):
+        response = self.client.get(reverse("brit-eu-results"))
+        html = response.content.decode()
+
+        self.assertIn('id="ecn-results"', html)
+        self.assertLess(html.index('id="brit-eu-maps"'), html.index('id="ecn-results"'))
+        self.assertLess(
+            html.index('id="ecn-results"'), html.index('id="data-analysis"')
+        )
+        for href in (ECN_BRIT_EU_URL, ECN_FACTSHEETS_URL):
+            self.assertIn(href, html)
+        for factsheet in BRIT_EU_ECN_FACTSHEETS:
+            self.assertIn(factsheet["url"], html)
+
+        parser = ExternalLinkParser()
+        parser.feed(html)
+        self.assertTrue(parser.links)
+        for link in parser.links:
+            with self.subTest(href=link["href"]):
+                self.assertEqual(link.get("target"), "_blank")
+                self.assertEqual(link.get("rel"), "noopener noreferrer")
 
     def test_map_destinations_resolve_anonymously(self):
         for link in BRIT_EU_MAP_LINKS:
@@ -347,9 +442,11 @@ class BritEuResultsPageTests(TestCase):
         self.assertIn("max-width: 6rem", secondary.group(1))
         self.assertIn("max-height: 2rem", secondary.group(1))
 
-        cta = re.search(r"\.discovery-page a\.discovery-feature-cta\s*\{([^}]*)\}", css)
-        self.assertIsNotNone(cta, "CTA selector must outrank shared sdv2 anchor rule")
-        self.assertIn("margin-top: auto", cta.group(1))
+        actions = re.search(
+            r"\.discovery-page \.discovery-feature-actions\s*\{([^}]*)\}", css
+        )
+        self.assertIsNotNone(actions)
+        self.assertIn("margin-top: auto", actions.group(1))
 
         self.assertIsNotNone(
             finders.find("css/discovery.min.css"),
@@ -362,3 +459,18 @@ class BritEuResultsPageTests(TestCase):
         self.assertNotIn("BRIT-EU-R", source)
         self.assertNotIn(".zip", source)
         self.assertNotIn("amazonaws", source)
+
+
+class WasteAtlasOverviewExternalLinkTests(TestCase):
+    def test_non_staff_overview_shows_abfall_atlas_link_but_hides_staff_actions(self):
+        response = self.client.get(reverse("waste-atlas-overview"))
+        html = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertRegex(
+            html,
+            r'href="https://www\.abfall-atlas\.de/"\s+target="_blank"\s+rel="noopener noreferrer"',
+        )
+        self.assertContains(response, "abfall-atlas.de")
+        self.assertNotContains(response, reverse("waste-atlas-change-map-overview"))
+        self.assertNotContains(response, reverse("waste-atlas-data-conflicts-overview"))
