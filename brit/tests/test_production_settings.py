@@ -15,9 +15,13 @@ import yaml
 from django.conf import settings
 from django.test import SimpleTestCase
 from gunicorn.config import Config
-from gunicorn.workers.gthread import ThreadWorker
+from gunicorn.workers.gthread import TConn, ThreadWorker
 
-from brit.gunicorn import SocketTimeoutThreadWorker
+from brit.gunicorn import (
+    SocketTimeoutConn,
+    SocketTimeoutThreadWorker,
+    _TimeoutClosingParser,
+)
 
 
 class ProductionSecretKeyTests(SimpleTestCase):
@@ -212,7 +216,7 @@ Probe().run()
         self.assertIn("Autorestarting worker after current request.", output)
         self.assertGreaterEqual(output.count("Booting worker with pid:"), 2)
 
-    def test_stalled_response_clients_do_not_block_new_requests(self):
+    def _start_socket_timeout_probe(self):
         with closing(socket.socket()) as listener:
             listener.bind(("127.0.0.1", 0))
             port = listener.getsockname()[1]
@@ -288,21 +292,42 @@ Probe().run()
             env=environment,
             text=True,
         )
+        return server, port, output
+
+    def _wait_for_probe(self, port):
+        deadline = time.monotonic() + 15
+        while True:
+            with closing(HTTPConnection("127.0.0.1", port, timeout=1)) as client:
+                try:
+                    client.request("GET", "/ok")
+                    response = client.getresponse()
+                    if response.status == 200 and response.read() == b"OK":
+                        break
+                except OSError:
+                    pass
+            if time.monotonic() > deadline:
+                self.fail("Gunicorn probe did not start")
+            time.sleep(0.05)
+
+    def _stop_socket_timeout_probe(self, server, output, clients):
+        for client in clients:
+            client.close()
+        server.terminate()
+        try:
+            server.wait(timeout=40)
+        except subprocess.TimeoutExpired:
+            server.kill()
+            server.wait()
+        output.seek(0)
+        server_log = output.read()
+        output.close()
+        return server_log
+
+    def test_stalled_response_clients_do_not_block_new_requests(self):
+        server, port, output = self._start_socket_timeout_probe()
         stalled = []
         try:
-            deadline = time.monotonic() + 15
-            while True:
-                with closing(HTTPConnection("127.0.0.1", port, timeout=1)) as client:
-                    try:
-                        client.request("GET", "/ok")
-                        response = client.getresponse()
-                        if response.status == 200 and response.read() == b"OK":
-                            break
-                    except OSError:
-                        pass
-                if time.monotonic() > deadline:
-                    self.fail("Gunicorn probe did not start")
-                time.sleep(0.05)
+            self._wait_for_probe(port)
             for _ in range(self.arguments.threads):
                 client = socket.create_connection(("127.0.0.1", port), timeout=5)
                 client.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1024)
@@ -331,20 +356,36 @@ Probe().run()
                 self.assertEqual(response.status, 200)
                 self.assertEqual(response.read(), b"OK")
         finally:
-            for client in stalled:
-                client.close()
-            server.terminate()
-            try:
-                server.wait(timeout=40)
-            except subprocess.TimeoutExpired:
-                server.kill()
-                server.wait()
-            output.seek(0)
-            server_log = output.read()
-            output.close()
+            server_log = self._stop_socket_timeout_probe(server, output, stalled)
         self.assertEqual(
             server_log.count("LARGE-REQUEST-START"), self.arguments.threads, server_log
         )
+        self.assertEqual(server_log.count("Booting worker with pid:"), 1, server_log)
+        self.assertNotIn("WORKER TIMEOUT", server_log)
+
+    def test_partial_header_clients_do_not_block_new_requests(self):
+        server, port, output = self._start_socket_timeout_probe()
+        stalled = []
+        try:
+            self._wait_for_probe(port)
+            # Enough bytes to pass gthread's readiness wait, never a full
+            # header block: each connection parks a thread in the parser.
+            for _ in range(self.arguments.threads):
+                client = socket.create_connection(("127.0.0.1", port), timeout=5)
+                client.sendall(b"GET /ok HTTP/1.1\r\nHost: ")
+                stalled.append(client)
+            with closing(HTTPConnection("127.0.0.1", port, timeout=3)) as client:
+                client.request("GET", "/ok", headers={"Connection": "close"})
+                response = client.getresponse()
+                self.assertEqual(response.status, 200)
+                self.assertEqual(response.read(), b"OK")
+            for client in stalled:
+                try:
+                    self.assertEqual(client.recv(1024), b"")
+                except ConnectionResetError:
+                    pass
+        finally:
+            server_log = self._stop_socket_timeout_probe(server, output, stalled)
         self.assertEqual(server_log.count("Booting worker with pid:"), 1, server_log)
         self.assertNotIn("WORKER TIMEOUT", server_log)
 
@@ -358,20 +399,15 @@ class SocketTimeoutThreadWorkerTests(SimpleTestCase):
         self.assertTrue(issubclass(SocketTimeoutThreadWorker, ThreadWorker))
         self.assertEqual(SocketTimeoutThreadWorker.socket_timeout, 10)
 
-    def test_socket_timeout_is_set_before_delegating_to_parent(self):
-        connection = mock.Mock()
-        request = mock.Mock()
-        calls = mock.Mock()
-        calls.attach_mock(connection.sock.settimeout, "settimeout")
-        with mock.patch.object(ThreadWorker, "handle_request") as parent:
-            calls.attach_mock(parent, "parent_handle_request")
-            self.worker.handle_request(request, connection)
-        calls.assert_has_calls(
-            [
-                mock.call.settimeout(10),
-                mock.call.parent_handle_request(request, connection),
-            ]
-        )
+    def test_handle_upgrades_connection_before_delegating_to_parent(self):
+        connection = TConn(mock.Mock(), mock.Mock(), None, None)
+        self.worker.socket_timeout = 0.5
+        with mock.patch.object(ThreadWorker, "handle", return_value=False) as parent:
+            result = self.worker.handle(connection)
+        self.assertFalse(result)
+        parent.assert_called_once_with(connection)
+        self.assertIsInstance(connection, SocketTimeoutConn)
+        self.assertEqual(connection.socket_timeout, 0.5)
 
     def test_parent_result_is_returned_and_connection_stays_open(self):
         connection = mock.Mock()
@@ -393,6 +429,73 @@ class SocketTimeoutThreadWorkerTests(SimpleTestCase):
                 self.worker.handle_request(request, connection)
         self.assertIs(raised.exception, error)
         connection.close.assert_called_once_with()
+
+
+class SocketTimeoutConnTests(SimpleTestCase):
+    def setUp(self):
+        self.sock = mock.Mock()
+        self.connection = SocketTimeoutConn(mock.Mock(), self.sock, None, None)
+        self.connection.socket_timeout = 10
+
+    def test_init_applies_timeout_after_parent_and_wraps_parser(self):
+        parser = mock.Mock()
+        calls = mock.Mock()
+        calls.attach_mock(self.sock.settimeout, "settimeout")
+
+        def parent_init(connection):
+            calls.parent_init()
+            connection.parser = parser
+
+        with mock.patch.object(TConn, "init", autospec=True, side_effect=parent_init):
+            self.connection.init()
+            self.connection.init()
+        self.assertEqual(
+            calls.mock_calls,
+            [
+                mock.call.parent_init(),
+                mock.call.settimeout(10),
+                mock.call.parent_init(),
+                mock.call.settimeout(10),
+            ],
+        )
+        self.assertIsInstance(self.connection.parser, _TimeoutClosingParser)
+        self.assertIs(self.connection.parser.unreader, parser.unreader)
+        self.assertIs(self.connection.parser._parser, parser)
+
+    def test_http2_parser_is_not_wrapped(self):
+        parser = mock.Mock()
+
+        def parent_init(connection):
+            connection.is_http2 = True
+            connection.parser = parser
+
+        with mock.patch.object(TConn, "init", autospec=True, side_effect=parent_init):
+            self.connection.init()
+        self.assertIs(self.connection.parser, parser)
+        self.sock.settimeout.assert_called_once_with(10)
+
+    def test_parser_returns_requests_and_keeps_connection_open(self):
+        request = mock.Mock()
+        parser = _TimeoutClosingParser(iter([request]), self.connection)
+        self.assertIs(next(parser), request)
+        self.sock.close.assert_not_called()
+
+    def test_header_timeout_closes_connection_and_reraises(self):
+        error = TimeoutError("timed out")
+        source = mock.Mock()
+        source.__next__ = mock.Mock(side_effect=error)
+        parser = _TimeoutClosingParser(source, self.connection)
+        with self.assertRaises(TimeoutError) as raised:
+            next(parser)
+        self.assertIs(raised.exception, error)
+        self.sock.close.assert_called_once_with()
+
+    def test_close_skips_already_closed_socket(self):
+        self.sock.fileno.return_value = -1
+        self.connection.close(graceful=True)
+        self.sock.setblocking.assert_called_once_with(False)
+        self.sock.shutdown.assert_not_called()
+        self.sock.close.assert_not_called()
 
 
 class ProductionStoragesTests(SimpleTestCase):
