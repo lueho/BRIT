@@ -15,6 +15,7 @@ from factory.django import mute_signals
 
 from sources.waste_collection.models import Collection
 from users.models import UserProfile
+from utils.file_export.models import UserExport
 from utils.object_management.models import (
     ReviewAction,
     ReviewNotificationMute,
@@ -640,6 +641,54 @@ class ReviewNotificationOptOutTests(ReviewNotificationTestBase):
         self.assertIn(self._mute_url(), output)
         self.assertGreaterEqual(len(logs.output), 2)
         self.assertFalse(ReviewNotificationMute.objects.filter(user=outsider).exists())
+
+    def test_mute_view_rejects_non_review_object_owned_by_user(self):
+        export = UserExport.objects.create(
+            owner=self.commenter,
+            model_label="waste_collection.Collection",
+            file_format="xlsx",
+            file_name="secret-export.xlsx",
+        )
+        export_ct = ContentType.objects.get_for_model(UserExport)
+        url = reverse(
+            "object_management:review_notification_mute",
+            kwargs={"content_type_id": export_ct.id, "object_id": export.id},
+        )
+        self.client.force_login(self.commenter)
+        with self.assertLogs("django.request", level="WARNING"):
+            get_response = self.client.get(url)
+            post_response = self.client.post(url)
+        self.assertEqual(get_response.status_code, 403)
+        self.assertNotContains(get_response, "secret-export", status_code=403)
+        self.assertEqual(post_response.status_code, 403)
+        self.assertFalse(ReviewNotificationMute.objects.exists())
+
+    def test_mute_view_rejects_non_review_object_for_staff(self):
+        staff = User.objects.create_user(
+            username="staffer", email="staffer@example.com", is_staff=True
+        )
+        url = reverse(
+            "object_management:review_notification_mute",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(User).id,
+                "object_id": self.owner.id,
+            },
+        )
+        self.client.force_login(staff)
+        with self.assertLogs("django.request", level="WARNING"):
+            response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+        self.assertNotContains(response, self.owner.username, status_code=403)
+
+    def test_mutes_are_deleted_with_object(self):
+        self._mute(self.commenter)
+        object_id = self.collection.id
+        self.collection.delete()
+        self.assertFalse(
+            ReviewNotificationMute.objects.filter(
+                content_type_id=self.content_type_id, object_id=object_id
+            ).exists()
+        )
 
     def test_mute_view_post_requires_csrf_token(self):
         middleware = list(settings.MIDDLEWARE)

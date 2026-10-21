@@ -2059,6 +2059,15 @@ class ReviewNotificationMuteView(BaseReviewActionView):
     )
     template_name = "object_management/review_notification_mute.html"
 
+    def get_object(self, request=None, *args, **kwargs):
+        content_type = get_object_or_404(
+            ContentType, pk=self.kwargs.get("content_type_id")
+        )
+        model_class = content_type.model_class()
+        if model_class is None or not issubclass(model_class, UserCreatedObject):
+            raise Http404("Review notifications are not available for this item.")
+        return super().get_object(request, *args, **kwargs)
+
     def get(self, request, *args, **kwargs):
         obj = self.get_object(request, *args, **kwargs)
         self.ensure_permission(request, obj)
