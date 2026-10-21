@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
@@ -17,6 +17,12 @@ class BulkManageAccessViewTests(TestCase):
         cls.other = User.objects.create_user(username="other", password="pw")
         cls.staff = User.objects.create_user(
             username="staff", password="pw", is_staff=True
+        )
+        cls.admin = User.objects.create_user(
+            username="sharing-admin", password="pw", is_staff=True
+        )
+        cls.admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
         )
         cls.collection_a = Collection.objects.create(
             name="Collection A",
@@ -104,8 +110,8 @@ class BulkManageAccessViewTests(TestCase):
             self.foreign_collection.editors.filter(pk=self.editor.pk).exists()
         )
 
-    def test_staff_can_bulk_manage_foreign_objects(self):
-        self.client.force_login(self.staff)
+    def test_admin_can_bulk_manage_foreign_objects(self):
+        self.client.force_login(self.admin)
         response = self.client.post(
             self.url,
             {

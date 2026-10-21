@@ -580,8 +580,9 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
     def transfer_ownership(self, new_owner, initiator=None):
         """Transfer ownership of this object to ``new_owner``.
 
-        Any editor grant held by the new owner is removed since owners
-        implicitly have edit access.
+        Existing editor grants are preserved on transfer: a former owner's
+        direct or group route keeps working after the handover. Ownership
+        supplies object access, not model capabilities or a lifecycle bypass.
         """
         if not isinstance(new_owner, User):
             raise ValidationError("New owner must be a user.")
@@ -592,7 +593,6 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         with transaction.atomic():
             self.owner = new_owner
             self.save(update_fields=["owner"])
-            self.remove_editor(new_owner)
 
     @property
     def is_private(self):

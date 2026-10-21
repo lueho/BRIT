@@ -18,6 +18,10 @@ class GroupAccessManagementTests(TestCase):
         cls.member = User.objects.create_user(username="access-member")
         cls.other = User.objects.create_user(username="access-other")
         cls.staff = User.objects.create_user(username="access-staff", is_staff=True)
+        cls.admin = User.objects.create_user(username="access-admin", is_staff=True)
+        cls.admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.group = Group.objects.create(name="Workshop editors")
         cls.group.permissions.add(
             Permission.objects.get(
@@ -71,14 +75,14 @@ class GroupAccessManagementTests(TestCase):
         self.assertTrue(get_object_policy(self.member, self.process)["can_edit"])
         self.assertFalse(get_object_policy(self.member, self.unshared)["can_edit"])
 
-    def test_staff_can_grant_group_access(self):
-        self.client.force_login(self.staff)
+    def test_admin_can_grant_group_access(self):
+        self.client.force_login(self.admin)
         response = self.client.post(
             self.url("add_editor_group"), {"group": self.group.name}
         )
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
-            ObjectGroupEditorGrant.for_object(self.process).get().granted_by, self.staff
+            ObjectGroupEditorGrant.for_object(self.process).get().granted_by, self.admin
         )
 
     def test_group_grants_do_not_change_membership_or_model_permissions(self):
@@ -200,9 +204,9 @@ class GroupAccessManagementTests(TestCase):
         self.assertFalse(get_object_policy(self.member, self.process)["can_edit"])
         self.assertTrue(self.group.user_set.filter(pk=self.member.pk).exists())
 
-    def test_staff_can_revoke_group_access(self):
+    def test_admin_can_revoke_group_access(self):
         self.grant()
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
         self.assertEqual(
             self.client.post(
                 self.url("remove_editor_group"), {"group": self.group.name}
@@ -294,11 +298,16 @@ class GroupAccessManagementTests(TestCase):
         csrf_client.force_login(self.owner)
         for action in ("add_editor_group", "remove_editor_group"):
             self.assertEqual(self.client.get(self.url(action)).status_code, 405)
-            self.assertEqual(
-                csrf_client.post(
-                    self.url(action), {"group": self.group.name}
-                ).status_code,
-                403,
+            with self.assertLogs("django.security.csrf", level="WARNING") as logs:
+                self.assertEqual(
+                    csrf_client.post(
+                        self.url(action), {"group": self.group.name}
+                    ).status_code,
+                    403,
+                )
+            self.assertTrue(
+                any("Forbidden" in line for line in logs.output),
+                logs.output,
             )
         self.assertFalse(ObjectGroupEditorGrant.for_object(self.process).exists())
 

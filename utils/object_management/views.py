@@ -72,6 +72,7 @@ from utils.object_management.policy import (
     decide,
     is_active_actor,
     is_admin,
+    object_access_routes,
     reviewable_queryset,
     visible_queryset,
 )
@@ -91,6 +92,7 @@ from utils.object_management.services import (
     _fresh_actor,
     authorize_create,
     content_mutation,
+    perform_access_change,
     perform_transition,
     record_comment,
     record_creation,
@@ -1324,6 +1326,31 @@ class RejectItemModalView(BaseReviewActionModalView):
     review_action = ReviewAction.ACTION_REJECTED
 
 
+def _edit_access_explanation(decision):
+    """Human-readable explanation for a denied ``edit`` decision.
+
+    Used by the your-access modal and the post-grant warning so a recipient
+    sees why a visible record is not editable — never internals the actor
+    should not learn.
+    """
+    reason = getattr(decision, "reason", "")
+    return {
+        "missing_model_permission": (
+            "You can view this record but do not have permission to edit "
+            "records of this type."
+        ),
+        "immutable_state": (
+            "This record is in a lifecycle state that does not allow editing."
+        ),
+        "no_object_access": (
+            "You can view this record but do not have edit access to it."
+        ),
+        "authentication_required": (
+            "An active account is required to edit this record."
+        ),
+    }.get(reason, "You don't have permission to edit this record.")
+
+
 class BaseObjectAccessActionView(LoginRequiredMixin, UserPassesTestMixin, View):
     """Base view for ownership transfer and shared edit access actions.
 
@@ -1395,6 +1422,24 @@ class BaseObjectAccessActionView(LoginRequiredMixin, UserPassesTestMixin, View):
             group = Group.objects.filter(name=name.strip()).first()
         return group
 
+    def _apply_access_change(self, action, recipient):
+        """Route one sharing mutation through the canonical service.
+
+        The service returns the freshly locked/persisted object; ``self.object``
+        is rebound so subsequent redirect/permission logic never reuses stale
+        state. A target that disappeared mid-request maps to 404; authorization
+        failures propagate as ``PermissionDenied`` (403), while model-level
+        ``ValidationError`` stays a user-facing form error.
+        """
+        try:
+            fresh = perform_access_change(
+                self.request.user, self.get_object(), action, recipient
+            )
+        except ObjectDoesNotExist as exc:
+            raise Http404("The object no longer exists.") from exc
+        self.object = fresh
+        return fresh
+
     def _resolve_group_id(self, group_id):
         from django.contrib.auth.models import Group
 
@@ -1419,7 +1464,7 @@ class TransferOwnershipView(BaseObjectAccessActionView):
             messages.error(request, "The specified user does not exist.")
             return HttpResponseRedirect(self.get_success_url())
         try:
-            obj.transfer_ownership(new_owner, initiator=request.user)
+            obj = self._apply_access_change("transfer_ownership", new_owner)
         except ValidationError as e:
             messages.error(request, " ".join(e.messages))
             return HttpResponseRedirect(self.get_success_url())
@@ -1466,7 +1511,7 @@ class AddEditorView(BaseObjectAccessActionView):
             messages.error(request, "The specified user does not exist.")
             return HttpResponseRedirect(self.get_success_url())
         try:
-            obj.add_editor(user, granted_by=request.user)
+            obj = self._apply_access_change("add_editor", user)
         except ValidationError as e:
             messages.error(request, " ".join(e.messages))
             return HttpResponseRedirect(self.get_success_url())
@@ -1474,6 +1519,12 @@ class AddEditorView(BaseObjectAccessActionView):
             request,
             f"Added a direct edit grant for {user.username} on this {obj._meta.verbose_name}.",
         )
+        recipient_decision = decide(_fresh_actor(user), "edit", obj)
+        if not recipient_decision.allowed:
+            messages.warning(
+                request,
+                f"{user.username}: {_edit_access_explanation(recipient_decision)}",
+            )
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -1491,7 +1542,11 @@ class RemoveEditorView(BaseObjectAccessActionView):
         if user is None:
             messages.error(request, "The specified user does not exist.")
             return HttpResponseRedirect(self.get_success_url())
-        obj.remove_editor(user)
+        try:
+            obj = self._apply_access_change("remove_editor", user)
+        except ValidationError as e:
+            messages.error(request, " ".join(e.messages))
+            return HttpResponseRedirect(self.get_success_url())
         messages.success(
             request,
             f"Removed the direct edit grant for {user.username} on this {obj._meta.verbose_name}.",
@@ -1511,10 +1566,21 @@ class AddEditorGroupView(BaseObjectAccessActionView):
         if group is None:
             messages.error(request, "The specified group does not exist.")
             return HttpResponseRedirect(self.get_success_url())
-        obj.add_editor_group(group, granted_by=request.user)
+        try:
+            obj = self._apply_access_change("add_editor_group", group)
+        except ValidationError as e:
+            messages.error(request, " ".join(e.messages))
+            return HttpResponseRedirect(self.get_success_url())
         messages.success(
             request,
             f"Added an edit grant for group {group.name} on this {obj._meta.verbose_name}.",
+        )
+        messages.warning(
+            request,
+            "This grant is scoped to this record only. Whether each group "
+            "member can actually edit depends on that member's own "
+            "permissions and the record's state; group membership alone does "
+            "not guarantee edit access.",
         )
         return HttpResponseRedirect(self.get_success_url())
 
@@ -1534,7 +1600,11 @@ class RemoveEditorGroupView(BaseObjectAccessActionView):
         if group is None:
             messages.error(request, "The specified group does not exist.")
             return HttpResponseRedirect(self.get_success_url())
-        obj.remove_editor_group(group)
+        try:
+            obj = self._apply_access_change("remove_editor_group", group)
+        except ValidationError as e:
+            messages.error(request, " ".join(e.messages))
+            return HttpResponseRedirect(self.get_success_url())
         messages.success(
             request,
             f"Removed the edit grant for group {group.name} on this {obj._meta.verbose_name}.",
@@ -1588,6 +1658,41 @@ class ManageAccessModalView(BaseObjectAccessActionView):
         return HttpResponseNotAllowed(["GET", "POST"])
 
 
+class YourAccessModalView(BaseObjectAccessActionView):
+    """Read-only modal explaining the actor's own access to a record.
+
+    Never lists other users, grants, or management controls — only the
+    requesting actor's own routes and their effective edit decision.
+    """
+
+    http_method_names = ["get", "head", "options"]
+    permission_method = None
+    permission_denied_message = "You don't have permission to view this item."
+    template_name = "object_management/your_access_modal.html"
+
+    def test_func(self):
+        try:
+            obj = self.get_object()
+        except Http404:
+            raise
+        except Exception:
+            return False
+        return decide(self.request.user, "read", obj).allowed
+
+    def get(self, request, *args, **kwargs):
+        obj = self.get_object()
+        edit_decision = decide(request.user, "edit", obj)
+        root = review_target(obj) or obj
+        context = {
+            "object": obj,
+            "governance_object": root,
+            "access_routes": object_access_routes(request.user, obj),
+            "edit_decision": edit_decision,
+            "edit_explanation": _edit_access_explanation(edit_decision),
+        }
+        return HttpResponse(render_to_string(self.template_name, context, request))
+
+
 class BulkManageAccessView(LoginRequiredMixin, View):
     """Apply an access-management action to multiple UserCreatedObjects.
 
@@ -1633,14 +1738,9 @@ class BulkManageAccessView(LoginRequiredMixin, View):
                 if not checker(request, obj):
                     skipped += 1
                     continue
-                if action == "add_editor":
-                    obj.add_editor(target_user, granted_by=request.user)
-                elif action == "remove_editor":
-                    obj.remove_editor(target_user)
-                else:
-                    obj.transfer_ownership(target_user, initiator=request.user)
+                perform_access_change(request.user, obj, action, target_user)
                 applied += 1
-            except (ValidationError, PermissionDenied):
+            except (ObjectDoesNotExist, ValidationError, PermissionDenied):
                 skipped += 1
 
         label = {
@@ -1650,6 +1750,14 @@ class BulkManageAccessView(LoginRequiredMixin, View):
         }[action]
         if applied:
             messages.success(request, f"{label} for {applied} item(s).")
+            if action == "add_editor":
+                messages.warning(
+                    request,
+                    "A grant is scoped to the record only. Actual editing still "
+                    "requires the recipient's own permissions and an editable "
+                    "record state; no group or role permissions were assigned "
+                    "and frozen content stays unchanged.",
+                )
         if skipped:
             messages.warning(request, f"Skipped {skipped} item(s).")
         if not applied and not skipped:
@@ -2170,9 +2278,19 @@ class PublishedObjectListView(PublishedObjectListMixin, ListView):
 
 
 class PrivateObjectListView(PrivateObjectListMixin, ListView):
+    """Workspace list for plain (non-FilterSet) private views.
+
+    The queryset starts from the already-authorized workspace visibility and
+    refines it by the requested ``scope`` (``private`` = all workspace records,
+    ``owned``, ``shared``); unknown or blank values fail closed.
     """
-    A view to display a list of objects owned by the currently logged-in user.
-    """
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        scope = self.request.GET.get("scope", "private")
+        if scope == "private":
+            return queryset
+        return apply_scope_filter(queryset, scope, user=self.request.user)
 
     def get_template_names(self):
         template_names = super().get_template_names()

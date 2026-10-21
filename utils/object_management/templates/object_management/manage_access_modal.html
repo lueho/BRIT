@@ -24,7 +24,7 @@
         <i class="fas fa-exchange-alt"></i> Transfer
       </button>
     </div>
-    <div class="form-text">The new owner gains full control of this item.</div>
+    <div class="form-text">The new owner gains ownership of this item. Editing still requires the model change permission and an editable state; published and archived content stays frozen. Existing editor grants are kept.</div>
   </form>
   <h6>Direct user grants</h6>
   {% if editors %}
@@ -66,6 +66,11 @@
     </div>
   </form>
   <h6>Group grants</h6>
+  <p class="text-muted small mb-2">
+    A group grant is scoped to this record only. Whether each member can edit
+    depends on that member's own permissions and the record's state;
+    membership alone does not guarantee edit access.
+  </p>
   {% if editor_groups %}
     <ul class="list-group mb-3">
       {% for group in editor_groups %}
