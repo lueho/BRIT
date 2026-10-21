@@ -952,6 +952,12 @@ class GeoDataset(NamedUserCreatedObject):
     Holds meta information about datasets from the core module or scenario extensions.
     """
 
+    @classmethod
+    def with_map_relations(cls):
+        return cls.objects.select_related(
+            "region", "map_configuration", "runtime_configuration"
+        ).prefetch_related("sources", "column_policies")
+
     preview = models.ImageField(upload_to="maps_geodataset/", default="generic_map.png")
     publish = models.BooleanField(default=False)
     region = models.ForeignKey(

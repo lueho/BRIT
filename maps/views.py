@@ -575,13 +575,7 @@ class GeoDataSetRuntimePermissionMixin:
             return self._dataset
         dataset_pk = self.kwargs.get("pk")
         try:
-            self._dataset = (
-                GeoDataset.objects.select_related(
-                    "region", "map_configuration", "runtime_configuration"
-                )
-                .prefetch_related("sources", "column_policies")
-                .get(pk=dataset_pk)
-            )
+            self._dataset = GeoDataset.with_map_relations().get(pk=dataset_pk)
         except GeoDataset.DoesNotExist as err:
             raise Http404(f"No GeoDataset with pk {dataset_pk} found.") from err
         return self._dataset
@@ -694,9 +688,7 @@ class FilteredMapMixin(MapMixin):
 
     def get_dataset(self):
         dataset_pk = self.kwargs.get("pk")
-        queryset = GeoDataset.objects.select_related(
-            "region", "map_configuration", "runtime_configuration"
-        ).prefetch_related("sources", "column_policies")
+        queryset = GeoDataset.with_map_relations()
         if dataset_pk is not None:
             try:
                 return queryset.get(pk=dataset_pk)
@@ -764,20 +756,6 @@ class GeoDataSetRuntimeMapView(
         self.object_list = adapter.get_records(query_params=request.GET)
         context = self.get_context_data(object_list=self.object_list)
         return self.render_to_response(context)
-
-    def test_func(self):
-        policy = get_object_policy(
-            self.request.user,
-            self.get_dataset(),
-            request=self.request,
-        )
-        return (
-            policy["is_published"]
-            or policy["is_archived"]
-            or policy["is_owner"]
-            or policy["is_staff"]
-            or (policy["is_in_review"] and policy["is_moderator"])
-        )
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -1631,29 +1609,58 @@ class NutsRegionPublishedMapView(GeoDataSetPublishedFilteredMapView):
     map_title = "NUTS Regions"
 
 
-class NutsRegionPedigreeAPI(APIView):
-    """
-    This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
-    region and not the geometry.
-    """
+class BasePedigreeAPI(APIView):
+    """Shared validation and traversal helpers for the pedigree option APIs."""
 
     authentication_classes = []
     permission_classes = []
 
     @staticmethod
-    def get(request):
+    def validate_params(request, object_label):
         if "id" not in request.query_params:
             raise ParseError(
-                'Query parameter "id" missing. Must provide valid id of NUTS region.'
+                f'Query parameter "id" missing. Must provide valid {object_label}.'
             )
-
         if "direction" not in request.query_params or request.query_params[
             "direction"
         ] not in ("children", "parents"):
             raise ParseError(
                 'Missing or wrong query parameter "direction". Options: "parents", "children"'
             )
+        return request.query_params["direction"]
 
+    @staticmethod
+    def traverse_children(instance, serializer_cls, prefetch=None):
+        data = {}
+        for lvl in range(instance.levl_code + 1, 4):
+            qs = NutsRegion.objects.filter(
+                levl_code=lvl,
+                nuts_id__startswith=instance.nuts_id,
+                version=instance.version_id,
+            )
+            if prefetch:
+                qs = qs.prefetch_related(prefetch)
+            data[f"id_level_{lvl}"] = serializer_cls(qs, many=True).data
+        return data
+
+    @staticmethod
+    def traverse_parents(instance, serializer_cls):
+        data = {}
+        for lvl in range(instance.levl_code - 1, -1, -1):
+            instance = instance.parent
+            data[f"id_level_{lvl}"] = serializer_cls(instance).data
+        return data
+
+
+class NutsRegionPedigreeAPI(BasePedigreeAPI):
+    """
+    This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
+    region and not the geometry.
+    """
+
+    @staticmethod
+    def get(request):
+        direction = BasePedigreeAPI.validate_params(request, "id of NUTS region")
         try:
             instance = NutsRegion.objects.get(id=request.query_params["id"])
         except NutsRegion.DoesNotExist as err:
@@ -1661,50 +1668,26 @@ class NutsRegionPedigreeAPI(APIView):
                 "A NUTS region with the provided id does not exist."
             ) from err
 
-        data = {}
-
-        if request.query_params["direction"] == "children":
-            for lvl in range(instance.levl_code + 1, 4):
-                qs = NutsRegion.objects.filter(
-                    levl_code=lvl,
-                    nuts_id__startswith=instance.nuts_id,
-                    version=instance.version_id,
-                )
-                serializer = NutsRegionOptionSerializer(qs, many=True)
-                data[f"id_level_{lvl}"] = serializer.data
-
-        if request.query_params["direction"] == "parents":
-            for lvl in range(instance.levl_code - 1, -1, -1):
-                instance = instance.parent
-                serializer = NutsRegionOptionSerializer(instance)
-                data[f"id_level_{lvl}"] = serializer.data
-
+        if direction == "children":
+            data = BasePedigreeAPI.traverse_children(
+                instance, NutsRegionOptionSerializer
+            )
+        else:
+            data = BasePedigreeAPI.traverse_parents(
+                instance, NutsRegionOptionSerializer
+            )
         return Response(data)
 
 
-class NutsAndLauCatchmentPedigreeAPI(APIView):
+class NutsAndLauCatchmentPedigreeAPI(BasePedigreeAPI):
     """
     This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
     region and not the geometry.
     """
 
-    authentication_classes = []
-    permission_classes = []
-
     @staticmethod
     def get(request):
-        if "id" not in request.query_params:
-            raise ParseError(
-                'Query parameter "id" missing. Must provide valid catchment id.'
-            )
-
-        if "direction" not in request.query_params or request.query_params[
-            "direction"
-        ] not in ("children", "parents"):
-            raise ParseError(
-                'Missing or wrong query parameter "direction". Options: "parents", "children"'
-            )
-
+        direction = BasePedigreeAPI.validate_params(request, "catchment id")
         try:
             catchment = Catchment.objects.get(id=request.query_params["id"])
             instance = catchment.region.nutsregion
@@ -1713,33 +1696,24 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
                 "A NUTS region with the provided id does not exist."
             ) from err
 
-        data = {}
-
-        if request.query_params["direction"] == "children":
-            for lvl in range(instance.levl_code + 1, 4):
-                # Prefetch needed: serializer accesses region_ptr.catchment_set in get_id
-                qs = NutsRegion.objects.filter(
-                    levl_code=lvl,
-                    nuts_id__startswith=instance.nuts_id,
-                    version=instance.version_id,
-                ).prefetch_related("region_ptr__catchment_set")
-                serializer = NutsRegionCatchmentOptionSerializer(qs, many=True)
-                data[f"id_level_{lvl}"] = serializer.data
+        if direction == "children":
+            # Prefetch needed: serializer accesses region_ptr.catchment_set in get_id
+            data = BasePedigreeAPI.traverse_children(
+                instance,
+                NutsRegionCatchmentOptionSerializer,
+                prefetch="region_ptr__catchment_set",
+            )
             data["id_level_4"] = []
             if instance.levl_code == 3:
                 # Prefetch needed: serializer accesses region_ptr.catchment_set
                 qs = LauRegion.objects.filter(nuts_parent=instance).prefetch_related(
                     "region_ptr__catchment_set"
                 )
-                serializer = LauRegionOptionSerializer(qs, many=True)
-                data["id_level_4"] = serializer.data
-
-        if request.query_params["direction"] == "parents":
-            for lvl in range(instance.levl_code - 1, -1, -1):
-                instance = instance.parent
-                serializer = NutsRegionCatchmentOptionSerializer(instance)
-                data[f"id_level_{lvl}"] = serializer.data
-
+                data["id_level_4"] = LauRegionOptionSerializer(qs, many=True).data
+        else:
+            data = BasePedigreeAPI.traverse_parents(
+                instance, NutsRegionCatchmentOptionSerializer
+            )
         return Response(data)
 
 
