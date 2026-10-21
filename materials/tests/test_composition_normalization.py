@@ -600,3 +600,225 @@ class SampleCompositionNormalizationTestCase(TestCase):
 
         self.assertEqual(composition["shares"], [])
         self.assertEqual(composition["warning_codes"], ["invalid_units"])
+
+    def _other_group(self, name):
+        return MaterialComponentGroup.objects.create(
+            name=name,
+            publication_status="published",
+            owner=self.owner,
+        )
+
+    def _compositions_by_group_name(self, sample):
+        return {
+            composition["group_name"]: composition
+            for composition in get_sample_normalized_compositions(sample)
+        }
+
+    def test_residual_gap_is_decomposed_into_other_group_components(self):
+        sample, biochemical = self._sample_with_group("Cross Decomposition")
+        proximate = self._other_group("Proximate Analysis")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        organic_matter = MaterialComponent.objects.create(
+            name="Organic matter", owner=self.owner
+        )
+        ash = MaterialComponent.objects.create(
+            name="Total Ash",
+            owner=self.owner,
+            basis_component=dm,
+            complement_component=organic_matter,
+        )
+        self._measure(sample, biochemical, "Cellulose", "70.2", basis=dm)
+        self._measure(sample, biochemical, "Hemicellulose", "21.8", basis=dm)
+        self._measure(sample, biochemical, "Lignin", "5.7", basis=dm)
+        self._measure(sample, proximate, ash, "2.3", basis=dm)
+
+        compositions = self._compositions_by_group_name(sample)
+
+        biochemical_composition = compositions["Cross Decomposition Group"]
+        self.assertEqual(
+            [
+                (share["component_name"], share["percent"], share["inferred"])
+                for share in biochemical_composition["shares"]
+            ],
+            [
+                ("Cellulose", 70.2, False),
+                ("Hemicellulose", 21.8, False),
+                ("Lignin", 5.7, False),
+                ("Total Ash", 2.3, True),
+            ],
+        )
+        self.assertNotIn(
+            WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER,
+            biochemical_composition["warning_codes"],
+        )
+        self.assertIn(
+            "remaining_fraction_decomposed",
+            biochemical_composition["warning_codes"],
+        )
+
+        proximate_composition = compositions["Proximate Analysis"]
+        self.assertEqual(
+            [
+                (share["component_name"], share["percent"], share["inferred"])
+                for share in proximate_composition["shares"]
+            ],
+            [
+                ("Total Ash", 2.3, False),
+                ("Organic matter", 97.7, True),
+            ],
+        )
+
+    def test_residual_complement_applies_without_other_groups(self):
+        sample, group = self._sample_with_group("Ash Only")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        organic_matter = MaterialComponent.objects.create(
+            name="Organic matter", owner=self.owner
+        )
+        ash = MaterialComponent.objects.create(
+            name="Total Ash",
+            owner=self.owner,
+            basis_component=dm,
+            complement_component=organic_matter,
+        )
+        self._measure(sample, group, ash, "2.3", basis=dm)
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [
+                (share["component_name"], share["percent"], share["inferred"])
+                for share in composition["shares"]
+            ],
+            [("Total Ash", 2.3, False), ("Organic matter", 97.7, True)],
+        )
+
+    def test_residual_complement_requires_matching_basis(self):
+        sample, group = self._sample_with_group("Complement Basis")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        fm = MaterialComponent.objects.create(name="Fresh matter", owner=self.owner)
+        organic_matter = MaterialComponent.objects.create(
+            name="Organic matter", owner=self.owner
+        )
+        ash = MaterialComponent.objects.create(
+            name="Total Ash",
+            owner=self.owner,
+            basis_component=dm,
+            complement_component=organic_matter,
+        )
+        self._measure(sample, group, ash, "2.3", basis=fm)
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [
+                (share["component_name"], share["percent"])
+                for share in composition["shares"]
+            ],
+            [("Total Ash", 2.3), ("Other", 97.7)],
+        )
+
+    def test_residual_complement_needs_single_measured_component(self):
+        sample, group = self._sample_with_group("Two Components")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        organic_matter = MaterialComponent.objects.create(
+            name="Organic matter", owner=self.owner
+        )
+        ash = MaterialComponent.objects.create(
+            name="Total Ash",
+            owner=self.owner,
+            basis_component=dm,
+            complement_component=organic_matter,
+        )
+        self._measure(sample, group, ash, "2.3", basis=dm)
+        self._measure(sample, group, "Volatile solids", "80", basis=dm)
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(
+            [
+                (share["component_name"], share["percent"])
+                for share in composition["shares"]
+            ],
+            [("Volatile solids", 80.0), ("Total Ash", 2.3), ("Other", 17.7)],
+        )
+
+    def test_multi_component_cover_becomes_aggregate_share(self):
+        sample, group = self._sample_with_group("Covered Gap")
+        other_group = self._other_group("Covering Group")
+        self._measure(sample, group, "Cellulose", "50")
+        self._measure(sample, other_group, "Total Ash", "30")
+        self._measure(sample, other_group, "Extractives", "20")
+
+        composition = self._compositions_by_group_name(sample)["Covered Gap Group"]
+
+        self.assertEqual(
+            [
+                (share["component_name"], share["percent"], share["inferred"])
+                for share in composition["shares"]
+            ],
+            [("Cellulose", 50.0, False), ("Other measured components", 50.0, True)],
+        )
+        self.assertIn("remaining_fraction_decomposed", composition["warning_codes"])
+
+    def test_residual_decomposition_requires_matching_basis(self):
+        sample, biochemical = self._sample_with_group("Basis Guard")
+        proximate = self._other_group("Foreign Basis")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        fm = MaterialComponent.objects.create(name="Fresh matter", owner=self.owner)
+        self._measure(sample, biochemical, "Cellulose", "97.7", basis=dm)
+        self._measure(sample, proximate, "Total Ash", "2.3", basis=fm)
+
+        compositions = self._compositions_by_group_name(sample)
+
+        self.assertEqual(
+            [
+                (share["component_name"], share["percent"])
+                for share in compositions["Basis Guard Group"]["shares"]
+            ],
+            [("Cellulose", 97.7), ("Other", 2.3)],
+        )
+        self.assertEqual(
+            [
+                (share["component_name"], share["percent"])
+                for share in compositions["Foreign Basis"]["shares"]
+            ],
+            [("Total Ash", 2.3), ("Other", 97.7)],
+        )
+
+    def test_residual_gap_remains_other_without_covering_components(self):
+        sample, biochemical = self._sample_with_group("No Cover")
+        proximate = self._other_group("Partial Only")
+        self._measure(sample, biochemical, "Cellulose", "97.7")
+        self._measure(sample, proximate, "Total Ash", "5.0")
+
+        compositions = self._compositions_by_group_name(sample)
+
+        self.assertEqual(
+            [
+                (share["component_name"], share["percent"])
+                for share in compositions["No Cover Group"]["shares"]
+            ],
+            [("Cellulose", 97.7), ("Other", 2.3)],
+        )
+
+    def test_residual_decomposition_ignores_aggregate_components(self):
+        sample, biochemical = self._sample_with_group("Aggregate Candidate")
+        proximate = self._other_group("Aggregate Group")
+        total = MaterialComponent.objects.create(
+            name="Total Biochemical",
+            publication_status="published",
+            owner=self.owner,
+            is_aggregate=True,
+        )
+        self._measure(sample, biochemical, "Cellulose", "97.7")
+        self._measure(sample, proximate, total, "2.3")
+
+        compositions = self._compositions_by_group_name(sample)
+
+        self.assertEqual(
+            [
+                (share["component_name"], share["percent"])
+                for share in compositions["Aggregate Candidate Group"]["shares"]
+            ],
+            [("Cellulose", 97.7), ("Other", 2.3)],
+        )

@@ -9,6 +9,7 @@ WARNING_MULTIPLE_BASIS_COMPONENTS = "multiple_basis_components"
 WARNING_AGGREGATE_COMPONENTS_EXCLUDED = "aggregate_components_excluded"
 WARNING_INVALID_UNITS = "invalid_units"
 WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER = "remaining_fraction_assigned_to_other"
+WARNING_REMAINING_FRACTION_DECOMPOSED = "remaining_fraction_decomposed"
 WARNING_SHARES_SCALED_TO_100 = "shares_scaled_to_100"
 WARNING_LEGACY_OTHER_IGNORED = "legacy_other_measurements_ignored"
 
@@ -42,6 +43,7 @@ def get_sorted_component_measurements(
                 "group",
                 "component",
                 "component__comparable_component",
+                "component__complement_component",
                 "basis_component",
                 "analytical_method",
                 "unit",
@@ -111,6 +113,7 @@ def get_sample_normalized_compositions(
             group=group,
             measurements=group_measurements,
             composition_setting=composition_setting,
+            all_measurements=component_measurements,
         )
         if raw_composition is not None:
             compositions.append(raw_composition)
@@ -141,7 +144,7 @@ def _unavailable_group_composition(sample, group, composition_setting, code, mes
 
 
 def _build_raw_derived_group_composition(
-    *, sample, group, measurements, composition_setting
+    *, sample, group, measurements, composition_setting, all_measurements=()
 ):
     measurements = list(measurements)
     if not measurements:
@@ -319,6 +322,7 @@ def _build_raw_derived_group_composition(
                 "average": float(component_percent / Decimal("100")),
                 "standard_deviation": None,
                 "as_percentage": f"{round(component_percent, 1)}{display_unit}",
+                "inferred": False,
             }
         )
 
@@ -347,20 +351,88 @@ def _build_raw_derived_group_composition(
         warning_codes.append(WARNING_SHARES_SCALED_TO_100)
     elif total_percent < Decimal("100"):
         other_gap = Decimal("100") - total_percent
-        shares.append(
-            {
-                "component": other_component.pk,
-                "component_name": other_component.name,
-                "average": float(other_gap / Decimal("100")),
-                "standard_deviation": None,
-                "as_percentage": f"{round(other_gap, 1)}{display_unit}",
-            }
+        residual_measurements = _decompose_residual_gap(
+            other_gap,
+            all_measurements,
+            exclude_group_id=group.pk,
+            exclude_component_ids={c.pk for c in grouped_components},
+            observed_basis=observed_basis,
+            other_component=other_component,
         )
-        warning_codes.append(WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER)
+        complement = _residual_complement(positive_measurements, observed_basis)
+        if residual_measurements is not None and len(residual_measurements) == 1:
+            measurement = residual_measurements[0]
+            component_percent = to_weight_percent(
+                Decimal(str(measurement.average)), measurement.unit
+            )
+            shares.append(
+                {
+                    "component": measurement.component.pk,
+                    "component_name": measurement.component.name,
+                    "average": float(component_percent / Decimal("100")),
+                    "standard_deviation": None,
+                    "as_percentage": f"{round(component_percent, 1)}{display_unit}",
+                    "inferred": True,
+                }
+            )
+            warnings.append(
+                "The residual fraction was identified as: "
+                f"{measurement.component.name} ({measurement.group.name})."
+            )
+            warning_codes.append(WARNING_REMAINING_FRACTION_DECOMPOSED)
+        elif complement is not None:
+            shares.append(
+                {
+                    "component": complement.pk,
+                    "component_name": complement.name,
+                    "average": float(other_gap / Decimal("100")),
+                    "standard_deviation": None,
+                    "as_percentage": f"{round(other_gap, 1)}{display_unit}",
+                    "inferred": True,
+                }
+            )
+            warnings.append(
+                "The residual fraction is the complement of "
+                f"{positive_measurements[0].component.name}."
+            )
+            warning_codes.append(WARNING_REMAINING_FRACTION_DECOMPOSED)
+        elif residual_measurements is not None:
+            shares.append(
+                {
+                    "component": other_component.pk,
+                    "component_name": "Other measured components",
+                    "average": float(other_gap / Decimal("100")),
+                    "standard_deviation": None,
+                    "as_percentage": f"{round(other_gap, 1)}{display_unit}",
+                    "inferred": True,
+                }
+            )
+            warnings.append(
+                "The residual fraction corresponds to measured components: "
+                + ", ".join(
+                    f"{m.component.name} ({m.group.name})"
+                    for m in residual_measurements
+                )
+                + "."
+            )
+            warning_codes.append(WARNING_REMAINING_FRACTION_DECOMPOSED)
+        else:
+            shares.append(
+                {
+                    "component": other_component.pk,
+                    "component_name": other_component.name,
+                    "average": float(other_gap / Decimal("100")),
+                    "standard_deviation": None,
+                    "as_percentage": f"{round(other_gap, 1)}{display_unit}",
+                    "inferred": False,
+                }
+            )
+            warning_codes.append(WARNING_REMAINING_FRACTION_ASSIGNED_TO_OTHER)
 
     shares.sort(
         key=lambda share: (
             share["component"] == other_component.pk,
+            share["inferred"],
             0 if share["component"] == other_component.pk else -share["average"],
             share["component_name"].lower(),
         )
@@ -388,6 +460,100 @@ def _build_raw_derived_group_composition(
         if composition_setting is not None
         else None,
     }
+
+
+_RESIDUAL_DECOMPOSITION_TOLERANCE = Decimal("0.05")
+_RESIDUAL_DECOMPOSITION_MAX_STATES = 20000
+
+
+def _residual_complement(positive_measurements, observed_basis):
+    """The complement of a lone measured component, if defined on this basis.
+
+    When a group measures a single component that declares a complement
+    (e.g. Total Ash -> Organic Matter), the residual is that complement by
+    definition - provided the component's own basis matches the observed one.
+    """
+    if len(positive_measurements) != 1:
+        return None
+    component = positive_measurements[0].component
+    if (
+        component.complement_component_id
+        and component.basis_component_id == observed_basis
+    ):
+        return component.complement_component
+    return None
+
+
+def _decompose_residual_gap(
+    gap,
+    all_measurements,
+    *,
+    exclude_group_id,
+    exclude_component_ids,
+    observed_basis,
+    other_component,
+):
+    """Return the other-group measurements that account for a residual gap.
+
+    A residual gap is everything in the material not covered by this group's
+    measured components. Components measured in other groups on the same
+    basis are part of it; when a subset of them sums to the gap, the residual
+    can be shown as those actual components instead of a generic "Other".
+    """
+    candidates = []
+    for measurement in all_measurements:
+        if measurement.group_id == exclude_group_id:
+            continue
+        if (
+            measurement.component_id in exclude_component_ids
+            or measurement.component_id == other_component.pk
+            or measurement.component.is_aggregate
+            or measurement.basis_component_id != observed_basis
+            or measurement.value_qualifier != MeasurementValueQualifier.EXACT
+        ):
+            continue
+        try:
+            percent = to_weight_percent(
+                Decimal(str(measurement.average)), measurement.unit
+            )
+        except UnitConversionError:
+            continue
+        if (
+            not percent.is_finite()
+            or percent <= 0
+            or percent > gap + _RESIDUAL_DECOMPOSITION_TOLERANCE
+        ):
+            continue
+        candidates.append((measurement, percent))
+    if not candidates:
+        return None
+    candidates.sort(
+        key=lambda item: (-item[1], item[0].component.name.lower(), item[0].pk)
+    )
+
+    reachable = {Decimal("0"): []}
+    for measurement, percent in candidates:
+        for total, subset in list(reachable.items()):
+            new_total = total + percent
+            if new_total > gap + _RESIDUAL_DECOMPOSITION_TOLERANCE:
+                continue
+            if measurement.component_id in {m.component_id for m in subset}:
+                continue
+            current = reachable.get(new_total)
+            if current is None or len(subset) + 1 < len(current):
+                reachable[new_total] = subset + [measurement]
+        if len(reachable) > _RESIDUAL_DECOMPOSITION_MAX_STATES:
+            break
+
+    covering = [
+        total
+        for total in reachable
+        if abs(total - gap) <= _RESIDUAL_DECOMPOSITION_TOLERANCE
+    ]
+    if not covering:
+        return None
+    best = min(covering, key=lambda total: (len(reachable[total]), abs(total - gap)))
+    return reachable[best]
 
 
 def _normalize_component_name(component):
