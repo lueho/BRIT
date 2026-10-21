@@ -25,7 +25,7 @@ from utils.object_management.permissions import (
     get_object_policy,
 )
 from utils.properties.models import Property
-from utils.serializers import FieldLabelModelSerializer
+from utils.serializers import FieldLabelModelSerializer, SimplifiedGeometryMixin
 
 # Geometry simplification tolerance in degrees (approx 100m at equator)
 # Lower values = more detail, higher values = more simplification
@@ -83,12 +83,16 @@ GeoreferencedWasteCollection = models.Collection
 GeoreferencedCollector = models.Collector
 
 
-class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
+class WasteCollectionGeometrySerializer(
+    SimplifiedGeometryMixin, GeoFeatureModelSerializer
+):
     """GeoJSON serializer for waste collections with simplified geometry.
 
     Uses simplified geometry to reduce payload size and improve performance.
     The geometry is simplified using ST_SimplifyPreserveTopology to maintain
-    valid topology while reducing point count.
+    valid topology while reducing point count. The ``simplified_geom``
+    annotation is added by the viewset queryset; the serializer falls back
+    to the original geometry when the annotation is not present.
     """
 
     id = serializers.IntegerField(source="pk", read_only=True)
@@ -102,16 +106,6 @@ class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
         geo_field = "geom"
         id_field = False
         fields = ["id", "catchment", "waste_category", "collection_system"]
-
-    def get_geom(self, instance):
-        """Return simplified geometry if available, otherwise original.
-
-        The simplified_geom annotation is added by the viewset queryset.
-        Falls back to original geometry if annotation is not present.
-        """
-        if hasattr(instance, "simplified_geom") and instance.simplified_geom:
-            return instance.simplified_geom
-        return getattr(instance, "geom", None)
 
     @staticmethod
     def get_waste_category(instance):
