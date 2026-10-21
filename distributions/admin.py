@@ -1,10 +1,12 @@
 from django.contrib import admin
 
+from utils.object_management.admin import PolicyAdminMixin
+
 from .models import Period, TemporalDistribution, Timestep
 
 
 @admin.register(TemporalDistribution)
-class TemporalDistributionAdmin(admin.ModelAdmin):
+class TemporalDistributionAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "owner", "publication_status")
     search_fields = ("name",)
     list_filter = ("publication_status",)
@@ -12,7 +14,7 @@ class TemporalDistributionAdmin(admin.ModelAdmin):
 
 
 @admin.register(Timestep)
-class TimestepAdmin(admin.ModelAdmin):
+class TimestepAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "distribution", "order", "owner", "publication_status")
     search_fields = ("name",)
     list_filter = ("publication_status", "distribution")
@@ -21,7 +23,7 @@ class TimestepAdmin(admin.ModelAdmin):
 
 
 @admin.register(Period)
-class PeriodAdmin(admin.ModelAdmin):
+class PeriodAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "distribution",

@@ -1,5 +1,7 @@
 from django.contrib import admin
 
+from utils.object_management.admin import PolicyAdminMixin
+
 from .models import (
     AggregatedCollectionPropertyValue,
     BinConfiguration,
@@ -17,7 +19,7 @@ from .models import (
 
 
 @admin.register(Collector)
-class CollectorAdmin(admin.ModelAdmin):
+class CollectorAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "website", "catchment", "owner", "publication_status")
     search_fields = ("name", "description")
     list_filter = ("publication_status",)
@@ -25,7 +27,7 @@ class CollectorAdmin(admin.ModelAdmin):
 
 
 @admin.register(CollectionSystem)
-class CollectionSystemAdmin(admin.ModelAdmin):
+class CollectionSystemAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "owner", "publication_status")
     search_fields = ("name",)
     list_filter = ("publication_status",)
@@ -33,7 +35,7 @@ class CollectionSystemAdmin(admin.ModelAdmin):
 
 
 @admin.register(BinConfiguration)
-class BinConfigurationAdmin(admin.ModelAdmin):
+class BinConfigurationAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "owner", "publication_status")
     search_fields = ("name",)
     list_filter = ("publication_status",)
@@ -41,7 +43,7 @@ class BinConfigurationAdmin(admin.ModelAdmin):
 
 
 @admin.register(WasteCategory)
-class WasteCategoryAdmin(admin.ModelAdmin):
+class WasteCategoryAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "owner", "publication_status")
     search_fields = ("name",)
     list_filter = ("publication_status",)
@@ -49,7 +51,7 @@ class WasteCategoryAdmin(admin.ModelAdmin):
 
 
 @admin.register(WasteComponent)
-class WasteComponentAdmin(admin.ModelAdmin):
+class WasteComponentAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "owner", "publication_status")
     search_fields = ("name",)
     list_filter = ("publication_status",)
@@ -57,7 +59,7 @@ class WasteComponentAdmin(admin.ModelAdmin):
 
 
 @admin.register(WasteFlyer)
-class WasteFlyerAdmin(admin.ModelAdmin):
+class WasteFlyerAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("__str__", "url", "url_valid", "owner", "publication_status")
     search_fields = ("url", "title")
     list_filter = ("publication_status", "url_valid")
@@ -65,7 +67,7 @@ class WasteFlyerAdmin(admin.ModelAdmin):
 
 
 @admin.register(CollectionSeason)
-class CollectionSeasonAdmin(admin.ModelAdmin):
+class CollectionSeasonAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "distribution",
@@ -79,7 +81,7 @@ class CollectionSeasonAdmin(admin.ModelAdmin):
 
 
 @admin.register(CollectionFrequency)
-class CollectionFrequencyAdmin(admin.ModelAdmin):
+class CollectionFrequencyAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "type", "owner", "publication_status")
     search_fields = ("name",)
     list_filter = ("publication_status", "type")
@@ -87,7 +89,7 @@ class CollectionFrequencyAdmin(admin.ModelAdmin):
 
 
 @admin.register(FeeSystem)
-class FeeSystemAdmin(admin.ModelAdmin):
+class FeeSystemAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "owner", "publication_status")
     search_fields = ("name",)
     list_filter = ("publication_status",)
@@ -95,7 +97,7 @@ class FeeSystemAdmin(admin.ModelAdmin):
 
 
 @admin.register(Collection)
-class CollectionAdmin(admin.ModelAdmin):
+class CollectionAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "name",
         "collector",
@@ -119,7 +121,7 @@ class CollectionAdmin(admin.ModelAdmin):
 
 
 @admin.register(CollectionPropertyValue)
-class CollectionPropertyValueAdmin(admin.ModelAdmin):
+class CollectionPropertyValueAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "collection",
@@ -136,7 +138,7 @@ class CollectionPropertyValueAdmin(admin.ModelAdmin):
 
 
 @admin.register(AggregatedCollectionPropertyValue)
-class AggregatedCollectionPropertyValueAdmin(admin.ModelAdmin):
+class AggregatedCollectionPropertyValueAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "property",
