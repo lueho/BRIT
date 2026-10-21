@@ -784,6 +784,13 @@ class MeasurementMetadataMixin(models.Model):
             return "Limit (type not specified)"
         return ""
 
+    @builtin_property
+    def limit_abbreviation(self):
+        limit_type = self.effective_limit_type
+        if limit_type in MeasurementLimitType.values:
+            return limit_type.upper()
+        return "Limit" if self.limit_label else ""
+
     def clean(self):
         super().clean()
         if (

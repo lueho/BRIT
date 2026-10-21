@@ -600,7 +600,7 @@
                                   {% endif %}
                                   <span class="sdv2-unit">{{ measurement.unit }}</span>
                                   {% if measurement.limit_label %}
-                                    <span class="sdv2-sd">{{ measurement.limit_label }}{% if measurement.display_detection_limit %}: {{ measurement.display_detection_limit }} {{ measurement.unit }}{% endif %}</span>
+                                    {% include "materials/includes/limit_marker.html" with item=measurement %}
                                   {% endif %}
                                 </td>
                                 <td class="sdv2-num">{{ measurement.sample_size|default:"—" }}</td>
@@ -690,7 +690,7 @@
                   </p>
                   <ul>
                     <li>Only compositional groups with one consistent basis and one observation per component are normalized. Other groups retain their raw measurement tables.</li>
-                    <li>Less-than and below-detection-limit observations, i.e. values below a stated limit of detection (LOD), method detection limit (MDL), limit of quantification (LOQ) or reporting limit (RL), contribute zero to aggregation as an explicit approximation; their stored values are not changed. Other qualified values require a separate aggregation policy.</li>
+                    <li>Less-than and below-detection-limit observations, i.e. values below a stated limit of detection (LOD), method detection limit (MDL), limit of quantification (LOQ) or reporting limit (RL), contribute zero to aggregation as an explicit approximation; their stored values are not changed. The limit type is marked next to the value; select the marker to show the full limit type and stated limit. Other qualified values require a separate aggregation policy.</li>
                     <li>All measurements are first converted to weight percent (e.g. g/kg → %, mg/kg → %); component measurements only accept weight-fraction units.</li>
                     <li>If the raw shares sum to more than 100%, all shares are scaled down proportionally.</li>
                     <li>If they sum to less than 100%, the gap is shown as <em>Other</em>.</li>
@@ -771,7 +771,7 @@
                       {% endif %}
                       <span class="sdv2-unit">{{ prop.unit }}</span>
                       {% if prop.limit_label %}
-                        <span class="sdv2-sd">{{ prop.limit_label }}{% if prop.display_detection_limit %}: {{ prop.display_detection_limit }} {{ prop.unit }}{% endif %}</span>
+                        {% include "materials/includes/limit_marker.html" with item=prop %}
                       {% endif %}
                     </td>
                     <td>{{ prop.basis_component.name|default:"—" }}</td>
