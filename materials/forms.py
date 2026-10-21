@@ -50,6 +50,7 @@ from .models import (
     MaterialComponentGroup,
     MaterialProperty,
     MaterialPropertyValue,
+    MeasurementValueQualifier,
     Sample,
     SampleAuthor,
     SampleGroup,
@@ -165,7 +166,40 @@ class MaterialPropertyModalModelForm(ModalModelFormMixin, MaterialPropertyModelF
     pass
 
 
+class MeasurementLimitFieldsFormMixin:
+    """Edit value qualifier and analytical limit; drop raw text it supersedes."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "value_qualifier" in self.fields:
+            self.fields["value_qualifier"].required = False
+        if "detection_limit" in self.fields:
+            self.fields["detection_limit"].label = "Limit value"
+            self.fields[
+                "detection_limit"
+            ].help_text = "Stated analytical limit in the measurement unit."
+        if "limit_type" in self.fields:
+            self.fields["limit_type"].help_text = (
+                "LOD/MDL < LOQ < RL. Values below the LOQ or reporting limit are "
+                "entered as 'Less than'."
+            )
+
+    def clean_value_qualifier(self):
+        return (
+            self.cleaned_data.get("value_qualifier") or MeasurementValueQualifier.EXACT
+        )
+
+    def _post_clean(self):
+        changed = set(self.changed_data)
+        if changed & {"average", "value_qualifier"}:
+            self.instance.raw_value = ""
+        if changed & {"detection_limit", "limit_type"}:
+            self.instance.raw_detection_limit = ""
+        super()._post_clean()
+
+
 class ComponentMeasurementModelForm(
+    MeasurementLimitFieldsFormMixin,
     NumericMeasurementFieldsFormMixin,
     UserCreatedObjectFormMixin,
     SourcesFieldMixin,
@@ -227,6 +261,9 @@ class ComponentMeasurementModelForm(
             "average",
             "standard_deviation",
             "sample_size",
+            "value_qualifier",
+            "limit_type",
+            "detection_limit",
             "comment",
         )
 
@@ -300,6 +337,7 @@ class ComponentMeasurementSectionForm(
 
 
 class MaterialPropertyValueModelForm(
+    MeasurementLimitFieldsFormMixin,
     NumericMeasurementFieldsFormMixin,
     UserCreatedObjectFormMixin,
     SourcesFieldMixin,
@@ -365,6 +403,9 @@ class MaterialPropertyValueModelForm(
             "sources",
             "average",
             "standard_deviation",
+            "value_qualifier",
+            "limit_type",
+            "detection_limit",
             "comment",
         )
 

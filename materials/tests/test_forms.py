@@ -7,6 +7,7 @@ from django.db.models.signals import post_save
 from django.http import QueryDict
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
+from django.utils.datastructures import MultiValueDict
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.forms import TomSelectModelChoiceField
 from factory.django import mute_signals
@@ -248,8 +249,33 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
         form = MaterialPropertyValueModelForm()
         self.assertIn("comment", form.fields)
 
+    def test_form_includes_limit_fields(self):
+        form = MaterialPropertyValueModelForm()
+        for field in ("value_qualifier", "limit_type", "detection_limit"):
+            self.assertIn(field, form.fields)
+
 
 class ComponentMeasurementModelFormTestCase(TestCase):
+    def test_form_includes_limit_fields(self):
+        form = ComponentMeasurementModelForm()
+        for field in ("value_qualifier", "limit_type", "detection_limit"):
+            self.assertIn(field, form.fields)
+        self.assertEqual(form.fields["detection_limit"].label, "Limit value")
+
+    def test_below_detection_limit_rejects_quantification_and_reporting_limits(self):
+        for limit_type in ("loq", "rl"):
+            with self.subTest(limit_type=limit_type):
+                form = ComponentMeasurementModelForm(
+                    data=MultiValueDict(
+                        {
+                            "value_qualifier": ["below_detection_limit"],
+                            "limit_type": [limit_type],
+                        }
+                    )
+                )
+                form.is_valid()
+                self.assertTrue(form.has_error("limit_type"))
+
     def test_standard_deviation_is_optional(self):
         form = ComponentMeasurementModelForm()
 

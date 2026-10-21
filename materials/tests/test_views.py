@@ -41,6 +41,7 @@ from ..models import (
     MaterialProperty,
     MaterialPropertyGroup,
     MaterialPropertyValue,
+    MeasurementLimitType,
     MeasurementValueQualifier,
     Sample,
     SampleAuthor,
@@ -4051,6 +4052,135 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn("property_values-__prefix__-comment", response.json()["html"])
+
+    def test_measurements_editor_offers_limit_fields(self):
+        response = self.client.get(
+            self.section_url("measurements"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 200)
+        html = response.json()["html"]
+        for field in ("value_qualifier", "limit_type", "detection_limit"):
+            self.assertIn(f"component_measurements-__prefix__-{field}", html)
+
+    def test_measurements_post_saves_reporting_limit(self):
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        average="0.8",
+                        value_qualifier="less_than",
+                        limit_type="rl",
+                        detection_limit="0.8",
+                    )
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        measurement = self.sample.component_measurements.exclude(
+            pk=self.measurement.pk
+        ).get()
+        self.assertEqual(measurement.value_qualifier, "less_than")
+        self.assertEqual(measurement.limit_type, "rl")
+        self.assertEqual(measurement.detection_limit, Decimal("0.8"))
+        self.assertEqual(measurement.display_value, "<0.8")
+
+    def test_measurements_post_drops_stale_raw_limit_text(self):
+        measurement = ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=self.group,
+            component=self.component,
+            unit=self.unit,
+            average=Decimal("0.1"),
+            raw_value="(0,1)<LD=6,57",
+            value_qualifier=MeasurementValueQualifier.BELOW_DETECTION_LIMIT,
+            detection_limit=Decimal("6.57"),
+            raw_detection_limit="6,57",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(measurement.pk),
+                        average="0.8",
+                        value_qualifier="less_than",
+                        limit_type="rl",
+                        detection_limit="0.8",
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"], response.json())
+        measurement.refresh_from_db()
+        self.assertEqual(measurement.raw_value, "")
+        self.assertEqual(measurement.raw_detection_limit, "")
+        self.assertEqual(measurement.display_value, "<0.8")
+        self.assertEqual(measurement.display_detection_limit, "0.8")
+
+    def test_measurements_post_limit_type_change_drops_raw_limit_text(self):
+        measurement = ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=self.group,
+            component=self.component,
+            unit=self.unit,
+            average=Decimal("0.1"),
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            limit_type=MeasurementLimitType.LOD,
+            detection_limit=Decimal("6.57"),
+            raw_detection_limit="LD=6,57",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(measurement.pk),
+                        average="0.1",
+                        value_qualifier="less_than",
+                        limit_type="rl",
+                        detection_limit="6.57",
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertTrue(response.json()["saved"], response.json())
+        measurement.refresh_from_db()
+        self.assertEqual(measurement.limit_type, "rl")
+        self.assertEqual(measurement.raw_detection_limit, "")
+        self.assertEqual(measurement.display_detection_limit, "6.57")
+
+    def test_properties_post_saves_limit_type(self):
+        response = self.client.post(
+            self.section_url("properties"),
+            self.property_formset(
+                [
+                    {
+                        "property": str(self.property.pk),
+                        "average": "0.5",
+                        "unit": str(self.unit.pk),
+                        "value_qualifier": "less_than",
+                        "limit_type": "loq",
+                        "detection_limit": "0.5",
+                    }
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        value = self.sample.property_values.get()
+        self.assertEqual(value.limit_type, "loq")
+        self.assertEqual(value.detection_limit, Decimal("0.5"))
 
     def test_properties_post_saves_comment(self):
         response = self.client.post(
@@ -9667,6 +9797,16 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
                     "detection_limit": Decimal("6.57"),
                 },
             ),
+            (
+                "Below reporting limit",
+                {
+                    "average": Decimal("0.8"),
+                    "raw_value": "<0.8",
+                    "value_qualifier": MeasurementValueQualifier.LESS_THAN,
+                    "limit_type": MeasurementLimitType.RL,
+                    "detection_limit": Decimal("0.8"),
+                },
+            ),
             ("Exact zero", {"average": Decimal("0")}),
             (
                 "Hostile raw",
@@ -9714,7 +9854,10 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
                 self.assertContains(response, "<strong>&lt;0.1</strong>")
                 self.assertContains(response, "<strong>&gt;1450</strong>")
                 self.assertContains(response, "Below detection limit")
-                self.assertContains(response, "Detection limit: 6.57 %")
+                self.assertContains(response, "Limit of detection (LOD): 6.57 %")
+                self.assertContains(response, "Reporting limit (RL): 0.8 %")
+                self.assertContains(response, "Limit (type not specified): 6.57 %")
+                self.assertNotContains(response, "Detection limit: 6.57")
                 self.assertContains(response, "<strong>0</strong>")
                 self.assertContains(response, "<strong>&lt;0.25</strong>")
                 self.assertNotContains(response, '<img src=x onerror="alert(31337)">')
@@ -9728,7 +9871,8 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
         self.assertIn("&lt;0.1", html)
         self.assertIn("&gt;1450", html)
         self.assertIn("Below detection limit", html)
-        self.assertIn("Detection limit: 6.57", html)
+        self.assertIn("Limit of detection (LOD): 6.57", html)
+        self.assertIn("Reporting limit (RL): 0.8", html)
         self.assertIn(escape(self.hostile_raw), html)
         self.assertNotIn('<img src=x onerror="alert(31337)">', html)
 
@@ -9737,7 +9881,7 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
             {"object": self.sample, "section": {"key": "properties"}},
         )
         self.assertIn("&lt;0.25", html)
-        self.assertIn("Detection limit: 6.57", html)
+        self.assertIn("Limit (type not specified): 6.57", html)
 
 
 class SampleCompositionSafetyViewTestCase(TestCase):

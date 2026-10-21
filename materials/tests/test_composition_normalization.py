@@ -500,6 +500,57 @@ class SampleCompositionNormalizationTestCase(TestCase):
         self.assertEqual(below_dl.average, Decimal("0.2"))
         self.assertEqual(trace.average, Decimal("0"))
 
+    def test_censored_warning_names_reporting_limit(self):
+        sample, group = self._sample_with_group("Reporting Limit")
+        self._measure(sample, group, "Carbon", "40")
+        for name, raw in (("Sodium", "<0.8"), ("Magnesium", "<1.1")):
+            self._measure(
+                sample,
+                group,
+                name,
+                raw[1:],
+                raw_value=raw,
+                value_qualifier="less_than",
+                limit_type="rl",
+            )
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertIn(
+            "2 observation(s) below the reporting limit (RL) were approximated as "
+            "zero for aggregation; their stored values are unchanged.",
+            composition["warnings"],
+        )
+        self.assertFalse(
+            any("detection" in warning for warning in composition["warnings"])
+        )
+
+    def test_censored_warning_counts_each_limit_type(self):
+        sample, group = self._sample_with_group("Mixed Limits")
+        self._measure(sample, group, "Carbon", "40")
+        self._measure(
+            sample, group, "Sulfur", "0", value_qualifier="below_detection_limit"
+        )
+        self._measure(
+            sample,
+            group,
+            "Zinc",
+            "0.2",
+            value_qualifier="less_than",
+            limit_type="loq",
+        )
+        self._measure(sample, group, "Lead", "0.1", value_qualifier="less_than")
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertIn(
+            "1 observation(s) below the limit of detection (LOD), 1 below the "
+            "limit of quantification (LOQ) and 1 below an unspecified limit were "
+            "approximated as zero for aggregation; their stored values are "
+            "unchanged.",
+            composition["warnings"],
+        )
+
     def test_censored_only_group_is_unavailable_without_fabricated_other(self):
         sample, group = self._sample_with_group("Censored Only")
         self._measure(
