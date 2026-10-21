@@ -3,7 +3,7 @@ import csv
 import json
 import re
 import time
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from datetime import date, timedelta
 from io import BytesIO
 from unittest.mock import MagicMock, patch
@@ -22,6 +22,7 @@ from django.forms.formsets import BaseFormSet
 from django.http import JsonResponse
 from django.http.request import MultiValueDict, QueryDict
 from django.test import RequestFactory, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from factory.django import mute_signals
@@ -4449,11 +4450,35 @@ class CollectionDetailQueryCountTestCase(TestCase):
             response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
 
-    def test_review_detail_view_query_count_is_bounded(self):
+    def test_review_detail_view_prefetches_source_relations(self):
+        """Source/flyer relations load via one prefetch each, not per row (#169).
+
+        The shared review context adds environment-dependent bookkeeping
+        queries (editor grants, per-model review badges), so this asserts the
+        N+1 regression signature directly instead of an exact total.
+        """
         self.client.force_login(self.staff)
-        with self.assertNumQueries(90):
+        with CaptureQueriesContext(connection) as ctx:
             response = self.client.get(self.review_url)
         self.assertEqual(response.status_code, 200)
+        self.assertLessEqual(len(ctx.captured_queries), 100)
+        source_tables = {
+            "waste_collection_collection_sources",
+            "waste_collection_collection_flyers",
+            "waste_collection_collectionpropertyvalue_sources",
+            "waste_collection_aggregatedcollectionpropertyvalue_sources",
+        }
+        per_table = defaultdict(int)
+        for query in ctx.captured_queries:
+            for table in source_tables:
+                if f'"{table}"' in query["sql"]:
+                    per_table[table] += 1
+        for table in source_tables:
+            self.assertLessEqual(
+                per_table[table],
+                1,
+                f"{table} queried {per_table[table]} times; expected one prefetch",
+            )
 
 
 class CollectionReviewDetailPropertiesTestCase(TestCase):
