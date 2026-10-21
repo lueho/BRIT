@@ -55,6 +55,21 @@ class MeasurementLimitType(models.TextChoices):
 DETECTION_LIMIT_TYPES = frozenset({MeasurementLimitType.LOD, MeasurementLimitType.MDL})
 
 
+def resolve_canonical(obj, comparable_field_name):
+    """Resolve the canonical object by following a comparable_* FK chain.
+
+    Traverses ``comparable_<field>`` links with cycle detection and returns
+    the last reachable object.
+    """
+    current = obj
+    visited_ids = set()
+    comparable_id_field = f"{comparable_field_name}_id"
+    while getattr(current, comparable_id_field) and current.pk not in visited_ids:
+        visited_ids.add(current.pk)
+        current = getattr(current, comparable_field_name)
+    return current
+
+
 def get_sample_substrate_category_name():
     """Return the configured substrate category name used for sample filtering."""
     return getattr(settings, "SAMPLE_SUBSTRATE_CATEGORY_NAME", "Bioresource")
@@ -268,12 +283,7 @@ class MaterialComponent(TypedMaterialMixin, BaseMaterial):
 
     @property
     def canonical_component(self):
-        component = self
-        visited_ids = set()
-        while component.comparable_component_id and component.pk not in visited_ids:
-            visited_ids.add(component.pk)
-            component = component.comparable_component
-        return component
+        return resolve_canonical(self, "comparable_component")
 
 
 class MaterialComponentGroupManager(UserCreatedObjectManager):
@@ -655,14 +665,7 @@ class MaterialProperty(PropertyBase):
 
     @property
     def canonical_property(self):
-        property_obj = self
-        visited_ids = set()
-        while (
-            property_obj.comparable_property_id and property_obj.pk not in visited_ids
-        ):
-            visited_ids.add(property_obj.pk)
-            property_obj = property_obj.comparable_property
-        return property_obj
+        return resolve_canonical(self, "comparable_property")
 
     def __str__(self):
         units = self.allowed_units.all()
