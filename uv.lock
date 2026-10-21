@@ -103,6 +103,7 @@ dependencies = [
     { name = "ambient-toolbox" },
     { name = "boto3" },
     { name = "celery" },
+    { name = "collectfasta" },
     { name = "crispy-bootstrap5" },
     { name = "dj-database-url" },
     { name = "django" },
@@ -152,6 +153,7 @@ requires-dist = [
     { name = "ambient-toolbox", specifier = ">=12.10.2" },
     { name = "boto3", specifier = ">=1.43.6" },
     { name = "celery", specifier = ">=5.6.3" },
+    { name = "collectfasta", specifier = "==3.3.5" },
     { name = "crispy-bootstrap5", specifier = ">=2026.3" },
     { name = "dj-database-url", specifier = ">=3.1.2" },
     { name = "django", specifier = ">=6.0.5,<6.1" },
@@ -497,6 +499,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/cb/a2/57f4ac79838cfae6912f997b4d1a64a858fb0c86d7fcaae6f7b58d267fca/click-repl-0.3.0.tar.gz", hash = "sha256:17849c23dba3d667247dc4defe1757fff98694e90fe37474f3feebb69ced26a9", size = 10449, upload-time = "2023-06-15T12:43:51.141Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/52/40/9d857001228658f0d59e97ebd4c346fe73e138c6de1bce61dc568a57c7f8/click_repl-0.3.0-py3-none-any.whl", hash = "sha256:fb7e06deb8da8de86180a33a9da97ac316751c094c6899382da7feeeeb51b812", size = 10289, upload-time = "2023-06-15T12:43:48.626Z" },
+]
+
+[[package]]
+name = "collectfasta"
+version = "3.3.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "django-storages" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8c/ac/dc0647f563cada60619f27150d31dd2fff9dde75abe5e40265ff4883357b/collectfasta-3.3.5.tar.gz", hash = "sha256:8f01b9d87619be01b4a42908ffc106e01416cff8088a711183fb593f4e2f291e", size = 25518, upload-time = "2026-09-27T15:34:28.782Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5c/4f/4f3485188506bd1040e3b6092fb84103f2b0c3d17af0ab59f14270603019/collectfasta-3.3.5-py2.py3-none-any.whl", hash = "sha256:6144b4c86ccf6a5355267c9dd4b648226d0d01a7b1aa06d96a7e96abb6d65fa4", size = 32418, upload-time = "2026-09-27T15:34:27.428Z" },
 ]
 
 [[package]]

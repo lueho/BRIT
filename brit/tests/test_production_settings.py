@@ -74,8 +74,12 @@ class ProductionReleasePhaseTests(SimpleTestCase):
         )
         # Heroku's release phase runs only the first command entry, so every
         # release step must be chained there.
-        self.release = deployment["release"]["command"][0]
+        self.commands = deployment["release"]["command"]
+        self.release = self.commands[0]
         self.steps = [step.strip() for step in self.release.split("&&")]
+
+    def test_release_runs_a_single_command_entry(self):
+        self.assertEqual(len(self.commands), 1)
 
     def test_migrations_run_first(self):
         self.assertEqual(self.steps[0], "python manage.py migrate --noinput")
@@ -85,6 +89,28 @@ class ProductionReleasePhaseTests(SimpleTestCase):
             "python manage.py ensure_initial_data --app waste_atlas",
             self.steps[1:],
         )
+
+    def test_guarded_collectstatic_follows_seeding(self):
+        self.assertIn(
+            "python manage.py collectstatic_safe --noinput --manifest-output /tmp/brit-staticfiles.json",
+            self.steps,
+        )
+        self.assertGreater(
+            self.steps.index(
+                "python manage.py collectstatic_safe --noinput "
+                "--manifest-output /tmp/brit-staticfiles.json"
+            ),
+            self.steps.index("python manage.py ensure_initial_data --app waste_atlas"),
+        )
+
+    def test_verify_staticfiles_runs_last_with_same_receipt(self):
+        verify = (
+            "python manage.py verify_staticfiles --manifest /tmp/brit-staticfiles.json"
+        )
+        self.assertEqual(self.steps[-1], verify)
+        collect = next(step for step in self.steps if "collectstatic_safe" in step)
+        receipt = collect.split("--manifest-output", 1)[1].strip()
+        self.assertEqual(verify.split("--manifest", 1)[1].strip(), receipt)
 
 
 class ProductionWebMemoryTests(SimpleTestCase):
