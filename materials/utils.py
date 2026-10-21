@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.utils import timezone
 
 from utils.object_management.models import get_default_owner
 
@@ -52,6 +53,8 @@ def ensure_initial_data(stdout=None):
                 "market value."
             ),
             publication_status="published",
+            approved_at=timezone.now(),
+            approved_by=owner,
             owner=owner,
         )
 

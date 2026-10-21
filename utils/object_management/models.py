@@ -408,6 +408,58 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         if fields is None or "publication_status" in fields:
             self._loaded_publication_status = self.publication_status
 
+    def _missing_approval_fields(self):
+        return [
+            name
+            for name, value in (
+                ("approved_at", self.approved_at),
+                ("approved_by", self.approved_by_id),
+            )
+            if value is None
+        ]
+
+    def _is_publishing_transition(self):
+        loaded_status = getattr(self, "_loaded_publication_status", None)
+        return (
+            self.publication_status == self.STATUS_PUBLISHED
+            and loaded_status != self.STATUS_PUBLISHED
+        )
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = list(update_fields)
+            kwargs["update_fields"] = update_fields
+        if (
+            update_fields is None or "publication_status" in update_fields
+        ) and self._is_publishing_transition():
+            # Direct ORM publishes bypass clean() and approve(); record the
+            # owner as approver, matching the pre-workflow backfill.
+            missing = self._missing_approval_fields()
+            if "approved_at" in missing:
+                self.approved_at = timezone.now()
+            if "approved_by" in missing:
+                self.approved_by_id = self.owner_id
+            if update_fields is not None:
+                update_fields.extend(
+                    name
+                    for name in ("approved_at", "approved_by")
+                    if name not in update_fields
+                )
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        if self._is_publishing_transition():
+            missing = self._missing_approval_fields()
+            if missing:
+                raise ValidationError(
+                    "Cannot set publication_status to 'published' without "
+                    f"approval metadata ({', '.join(missing)} missing). "
+                    "Use the review workflow's approve() method to publish "
+                    "objects."
+                )
+
     def _lock_and_validate_transition(self, expected_statuses, error_message):
         current_status = (
             self.__class__._default_manager.select_for_update()
@@ -463,17 +515,21 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         Approve this object, transitioning from review to published.
         Sets approved_at and approved_by.
         """
+        if user is None:
+            raise ValidationError(
+                "approve() requires the approving user so that approved_by is "
+                "always recorded."
+            )
         with transaction.atomic():
             self._lock_and_validate_transition(
                 (self.STATUS_REVIEW,), "Only objects in review can be approved."
             )
             self.publication_status = self.STATUS_PUBLISHED
             self.approved_at = timezone.now()
-            update_fields = ["publication_status", "approved_at"]
-            if user is not None:
-                self.approved_by = user
-                update_fields.append("approved_by")
-            self.save(update_fields=update_fields)
+            self.approved_by = user
+            self.save(
+                update_fields=["publication_status", "approved_at", "approved_by"]
+            )
 
     def reject(self):
         with transaction.atomic():

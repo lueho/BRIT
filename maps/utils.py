@@ -12,6 +12,7 @@ from django.core.cache import caches
 from django.core.cache.backends.base import DEFAULT_TIMEOUT
 from django.db import connections
 from django.db.models import Count, Max, Min, Sum
+from django.utils import timezone
 from rest_framework.serializers import ReadOnlyField
 from rest_framework.utils.encoders import JSONEncoder
 
@@ -24,7 +25,11 @@ def ensure_initial_data(stdout=None):
     Idempotent and safe to run multiple times. Logs to stdout if provided.
     Returns a dict summarizing created objects.
     """
+    from utils.object_management.models import get_default_owner
+
     from .models import MapConfiguration, MapLayerConfiguration, MapLayerStyle
+
+    owner = get_default_owner()
 
     def log(msg):
         if stdout:
@@ -42,6 +47,8 @@ def ensure_initial_data(stdout=None):
             "opacity": 1.0,
             "weight": 3,
             "publication_status": "published",
+            "approved_at": timezone.now(),
+            "approved_by": owner,
         },
     )
     created["default_region_layer_style"] = region_style_created
@@ -59,6 +66,8 @@ def ensure_initial_data(stdout=None):
                 "opacity": 1.0,
                 "weight": 3,
                 "publication_status": "published",
+                "approved_at": timezone.now(),
+                "approved_by": owner,
             },
         )
     )
@@ -77,6 +86,8 @@ def ensure_initial_data(stdout=None):
             "weight": 3,
             "radius": 3,
             "publication_status": "published",
+            "approved_at": timezone.now(),
+            "approved_by": owner,
         },
     )
     created["default_features_layer_style"] = feature_style_created
@@ -93,6 +104,8 @@ def ensure_initial_data(stdout=None):
                 "load_layer": True,
                 "api_basename": "api-region",
                 "publication_status": "published",
+                "approved_at": timezone.now(),
+                "approved_by": owner,
             },
         )
     )
@@ -110,6 +123,8 @@ def ensure_initial_data(stdout=None):
                 "load_layer": True,
                 "api_basename": "api-catchment",
                 "publication_status": "published",
+                "approved_at": timezone.now(),
+                "approved_by": owner,
             },
         )
     )
@@ -126,6 +141,8 @@ def ensure_initial_data(stdout=None):
                 "layer_type": "features",
                 "load_layer": True,
                 "publication_status": "published",
+                "approved_at": timezone.now(),
+                "approved_by": owner,
             },
         )
     )
@@ -138,6 +155,8 @@ def ensure_initial_data(stdout=None):
         name="Default Map Configuration",
         defaults={
             "publication_status": "published",
+            "approved_at": timezone.now(),
+            "approved_by": owner,
         },
     )
     if map_config_created:

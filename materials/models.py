@@ -90,10 +90,14 @@ def get_or_create_sample_substrate_category():
         category = _find_sample_substrate_category(name)
         if category is not None:
             return category, False
+        owner = get_default_owner()
         category = MaterialCategory.objects.create(
             name=name,
             description="Category for substrate materials used in sample filtering.",
+            owner=owner,
             publication_status=UserCreatedObject.STATUS_PUBLISHED,
+            approved_at=timezone.now(),
+            approved_by=owner,
         )
     return category, True
 
@@ -384,8 +388,11 @@ class AnalyticalMethod(NamedUserCreatedObject):
             action = getattr(source, config["handler"], None)
             if not callable(action):
                 continue
+            if action_name == "approve" and actor is None:
+                # approve() requires the approving user for the audit trail.
+                continue
             try:
-                if action_name == "approve" and actor is not None:
+                if action_name == "approve":
                     action(user=actor)
                 else:
                     action()

@@ -344,6 +344,16 @@ class SampleSubstrateCategoryTestCase(TestCase):
             1,
         )
 
+    def test_created_category_records_approval_metadata(self):
+        category, created = get_or_create_sample_substrate_category()
+
+        self.assertTrue(created)
+        category.refresh_from_db()
+        self.assertEqual(category.publication_status, "published")
+        self.assertIsNotNone(category.approved_at)
+        self.assertIsNotNone(category.approved_by_id)
+        self.assertEqual(category.approved_by_id, category.owner_id)
+
     def test_keeps_existing_category_when_homonym_is_added(self):
         published = MaterialCategory.objects.create(
             name="Substrate test category", publication_status="published"
@@ -513,6 +523,8 @@ class SampleSeriesTestCase(TestCase):
             empty_series = SampleSeries.objects.create(material=self.material1)
 
         empty_series.publication_status = SampleSeries.STATUS_PUBLISHED
+        empty_series.approved_at = timezone.now()
+        empty_series.approved_by = self.user
 
         with self.assertRaises(ValidationError) as context:
             empty_series.clean()
@@ -531,6 +543,8 @@ class SampleSeriesTestCase(TestCase):
             timestep=Timestep.objects.default(),
         )
         series_with_sample.publication_status = SampleSeries.STATUS_PUBLISHED
+        series_with_sample.approved_at = timezone.now()
+        series_with_sample.approved_by = self.user
 
         # Should not raise any exception
         try:
@@ -549,7 +563,7 @@ class SampleSeriesTestCase(TestCase):
         empty_series.publication_status = SampleSeries.STATUS_REVIEW
 
         with self.assertRaises(ValidationError) as context:
-            empty_series.approve()
+            empty_series.approve(user=self.user)
 
         self.assertIn(
             "Cannot approve a sample series that contains no samples",
@@ -570,7 +584,7 @@ class SampleSeriesTestCase(TestCase):
 
         # Should not raise any exception and should approve the series
         try:
-            series_with_sample.approve()
+            series_with_sample.approve(user=self.user)
         except ValidationError:
             self.fail(
                 "approve() raised ValidationError unexpectedly for series with samples"
@@ -579,6 +593,8 @@ class SampleSeriesTestCase(TestCase):
         self.assertEqual(
             series_with_sample.publication_status, SampleSeries.STATUS_PUBLISHED
         )
+        self.assertIsNotNone(series_with_sample.approved_at)
+        self.assertEqual(series_with_sample.approved_by, self.user)
 
     def test_duplicate_with_new_material_applies_it_to_copied_samples(self):
         creator = User.objects.create(username="dup_material_creator")
