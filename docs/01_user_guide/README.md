@@ -4,6 +4,7 @@ Welcome to the BRIT User Guide. This section contains all user-facing documentat
 
 ## Recommended Reading Order
 - [How-Tos](howtos.md)
+- [Sharing and collaboration](sharing_and_collaboration.md)
 
 ## Other Resources
 

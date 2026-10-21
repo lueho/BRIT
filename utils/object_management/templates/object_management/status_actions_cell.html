@@ -7,6 +7,9 @@
 <div class="action-container d-flex align-items-center justify-content-end">
   {% if list_type == 'private' %}
     <div class="status-badge-container">{% include "object_management/review_status_badge.html" with object=object %}</div>
+    {% if policy.is_editor and not policy.is_owner %}
+      {% include "object_management/workspace_access_badge.html" %}
+    {% endif %}
   {% endif %}
   {% if list_type == 'private' and policy.has_review_feedback %}
     <a class="badge rounded-pill {% if policy.is_declined %}text-bg-danger{% else %}text-bg-info{% endif %} text-decoration-none me-2"
@@ -35,16 +38,11 @@
            href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
           <i class="fas fa-clipboard-check"></i> {{ policy.review_feedback_label }}
         </a>
-      {% endif %}
-
-      {# Review view for moderators in review scope (avoid showing for owners) #}
-      {% if list_type == 'review' %}
-        {% if policy.is_moderator and not policy.is_owner %}
-          <a class="dropdown-item"
-             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-            <i class="fas fa-clipboard-check"></i> Review view
-          </a>
-        {% endif %}
+      {% elif policy.can_view_review_activity %}
+        <a class="dropdown-item"
+           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+          <i class="fas fa-clipboard-check"></i> Review activity
+        </a>
       {% endif %}
 
       {# Edit via policy #}
@@ -55,11 +53,16 @@
         </a>
       {% endif %}
 
-      {# Manage access: transfer ownership and shared edit access (owner or staff) #}
+      {# Owners/administrators manage grants; recipients inspect their own routes. #}
       {% if policy.can_manage_editors %}
         <a class="dropdown-item modal-link"
            href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
           <i class="fas fa-user-group"></i> Manage access
+        </a>
+      {% elif policy.can_read and user.is_authenticated and user.is_active %}
+        <a class="dropdown-item modal-link"
+           href="{% url 'object_management:your_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
+          <i class="fas fa-circle-info"></i> Your access
         </a>
       {% endif %}
 

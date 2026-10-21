@@ -30,7 +30,7 @@
 
 {% block list_card_header %}
     {% if list_type == 'private' %}
-        <strong>My processes</strong>
+        <strong>Workspace processes</strong>
     {% elif list_type == 'review' %}
         <strong>Processes in review</strong>
     {% else %}
@@ -64,7 +64,7 @@
                aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
                {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
                href="{% process_scope_switch_url 'private' %}">
-                Mine
+                Workspace
             </a>
             {% if user|can_moderate:object_list.model and review_representation_url %}
                 <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"

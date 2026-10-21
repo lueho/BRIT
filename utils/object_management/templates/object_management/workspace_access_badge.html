@@ -1,0 +1,8 @@
+{% load moderation_tags %}
+{% workspace_access object as access %}
+{% if access %}
+  <span class="badge rounded-pill text-bg-secondary text-decoration-none me-2"
+        title="Shared by {{ access.owner.username }}{% if access.routes %}; access via: {{ access.routes|join:', ' }}{% endif %}">
+    <i class="fas fa-user-group"></i> Shared by {{ access.owner.username }}
+  </span>
+{% endif %}
