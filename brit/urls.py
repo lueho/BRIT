@@ -21,9 +21,7 @@ from .views import (
     PrivacyPolicyView,
     RAnalysisView,
     download_r_analysis_client,
-    get_session,
     health_check,
-    set_session,
 )
 
 admin.autodiscover()
@@ -87,8 +85,6 @@ urlpatterns = [
         TemplateView.as_view(template_name="robots.txt", content_type="text/plain"),
     ),
     path("cache-test/", CacheTestView.as_view(), name="cache_test"),
-    path("set_session/", set_session, name="set_session"),
-    path("get_session/", get_session, name="get_session"),
 ]
 
 if settings.DEBUG:

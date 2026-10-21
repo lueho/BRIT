@@ -95,16 +95,6 @@ class CacheTestView(View):
             return HttpResponse(f"Cached value: {cached_value}")
 
 
-def set_session(request):
-    request.session["test_key"] = "test_value"
-    return HttpResponse("Session value set")
-
-
-def get_session(request):
-    value = request.session.get("test_key", "Not found")
-    return HttpResponse(f"Session value: {value}")
-
-
 def health_check(request):
     """Returns a 200 OK response."""
     return HttpResponse(status=200)
