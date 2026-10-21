@@ -4365,6 +4365,96 @@ class CollectionFrequencyDisplayTestCase(TestCase):
         self.assertIn("Every 4 weeks", body)
         self.assertNotIn("4 collections during this period", body)
 
+    def test_frequency_display_context_issues_bounded_queries(self):
+        # One options query plus one month-span COUNT per season row; the
+        # schedule rows must not be built twice per page render.
+        with self.assertNumQueries(3):
+            views._frequency_display_context(self.frequency)
+
+
+class CollectionDetailQueryCountTestCase(TestCase):
+    """Bounded-query regression guards for collection detail views (#169)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create(username="query-guard-mod", is_staff=True)
+        distribution = TemporalDistribution.objects.get(name="Months of the year")
+        season, _ = CollectionSeason.objects.get_or_create(
+            distribution=distribution,
+            first_timestep=Timestep.objects.get(name="January"),
+            last_timestep=Timestep.objects.get(name="June"),
+        )
+        cls.frequency = CollectionFrequency.objects.create(
+            name="QC frequency", publication_status="published"
+        )
+        CollectionCountOptions.objects.create(
+            frequency=cls.frequency, season=season, standard=26, option_1=52
+        )
+        cls.catchment = CollectionCatchment.objects.create(
+            name="QC catchment", publication_status="published"
+        )
+        cls.collection = Collection.objects.create(
+            name="QC collection",
+            catchment=cls.catchment,
+            frequency=cls.frequency,
+            publication_status="published",
+        )
+        cls.source = Source.objects.create(
+            owner=cls.staff,
+            type="article",
+            title="QC source",
+            abbreviation="QCS",
+            publication_status="published",
+        )
+        cls.collection.sources.add(cls.source)
+        cls.flyer = WasteFlyer.objects.create(
+            abbreviation="QCF", url="https://www.qc-flyer.example"
+        )
+        cls.collection.flyers.add(cls.flyer)
+        cls.prop = Property.objects.create(
+            name="QC property", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(name="QC unit", publication_status="published")
+        for year in (2019, 2020, 2021):
+            cpv = CollectionPropertyValue.objects.create(
+                collection=cls.collection,
+                property=cls.prop,
+                unit=cls.unit,
+                year=year,
+                average=10,
+                publication_status="published",
+            )
+            cpv.sources.add(cls.source)
+        cls.agg = AggregatedCollectionPropertyValue.objects.create(
+            property=cls.prop,
+            unit=cls.unit,
+            year=2022,
+            average=20,
+            publication_status="published",
+        )
+        cls.agg.collections.add(cls.collection)
+        cls.agg.sources.add(cls.source)
+        cls.url = reverse("collection-detail", kwargs={"pk": cls.collection.pk})
+        cls.review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(Collection).pk,
+                "object_id": cls.collection.pk,
+            },
+        )
+
+    @override_settings(GOOGLE_ANALYTICS_KEY="")
+    def test_anonymous_detail_view_query_count_is_bounded(self):
+        with self.assertNumQueries(22):
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_review_detail_view_query_count_is_bounded(self):
+        self.client.force_login(self.staff)
+        with self.assertNumQueries(90):
+            response = self.client.get(self.review_url)
+        self.assertEqual(response.status_code, 200)
+
 
 class CollectionReviewDetailPropertiesTestCase(TestCase):
     @classmethod
