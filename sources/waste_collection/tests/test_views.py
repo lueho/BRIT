@@ -6263,9 +6263,10 @@ class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
 class ReviewSubmissionConsistencyTests(TestCase):
     """Regression tests ensuring review-submission timestamps remain consistent."""
 
-    def setUp(self):
-        self.owner = User.objects.create_user(username="owner")
-        self.moderator = User.objects.create_user(username="moderator", is_staff=True)
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner")
+        cls.moderator = User.objects.create_user(username="moderator", is_staff=True)
 
         content_type = ContentType.objects.get_for_model(Collection)
         permission, _ = Permission.objects.get_or_create(
@@ -6273,20 +6274,20 @@ class ReviewSubmissionConsistencyTests(TestCase):
             content_type=content_type,
             defaults={"name": "Can moderate collections"},
         )
-        self.moderator.user_permissions.add(permission)
+        cls.moderator.user_permissions.add(permission)
 
-        self.collection = Collection.objects.create(
+        cls.collection = Collection.objects.create(
             name="Test Collection",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status=Collection.STATUS_PRIVATE,
         )
-        self.source = Source.objects.create(
-            owner=self.owner,
+        cls.source = Source.objects.create(
+            owner=cls.owner,
             title="Review submission source",
             abbreviation="ReviewSubmissionSource",
             url="https://example.com/review-submission-source",
         )
-        self.collection.sources.add(self.source)
+        cls.collection.sources.add(cls.source)
 
     def test_initial_submission_consistency(self):
         self.client.force_login(self.owner)

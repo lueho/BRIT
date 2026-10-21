@@ -1481,16 +1481,19 @@ class ScenarioCustomParameterValueTests(TestCase):
 
 
 class ScenarioDetailViewRunTestCase(TestCase):
-    def setUp(self):
-        self.owner = User.objects.create(username="scenario-run-owner")
-        self.owner.user_permissions.add(
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create(username="scenario-run-owner")
+        cls.owner.user_permissions.add(
             Permission.objects.get(codename="change_scenario")
         )
-        self.scenario = Scenario.objects.create(
+        cls.scenario = Scenario.objects.create(
             name="Run Scenario",
-            owner=self.owner,
+            owner=cls.owner,
             region=Region.objects.create(name="Run Region"),
         )
+
+    def setUp(self):
         self.client.force_login(self.owner)
 
     @patch("inventories.views.start_inventory_run")

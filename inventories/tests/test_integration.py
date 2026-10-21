@@ -45,18 +45,17 @@ class InventoryExecutionIntegrationTests(TestCase):
     def setUpTestData(cls):
         cls.default_owner = User.objects.create(username="standard_user")
 
-    def setUp(self):
         average_distribution = TemporalDistribution.objects.filter(
             name="Average"
         ).first()
         if average_distribution is None:
             average_distribution = TemporalDistribution.objects.create(
-                owner=self.default_owner,
+                owner=cls.default_owner,
                 name="Average",
                 publication_status="published",
             )
-        elif average_distribution.owner_id != self.default_owner.id:
-            average_distribution.owner = self.default_owner
+        elif average_distribution.owner_id != cls.default_owner.id:
+            average_distribution.owner = cls.default_owner
             average_distribution.save(update_fields=["owner"])
 
         average_timestep = Timestep.objects.filter(
@@ -65,12 +64,12 @@ class InventoryExecutionIntegrationTests(TestCase):
         ).first()
         if average_timestep is None:
             Timestep.objects.create(
-                owner=self.default_owner,
+                owner=cls.default_owner,
                 distribution=average_distribution,
                 name="Average",
             )
-        elif average_timestep.owner_id != self.default_owner.id:
-            average_timestep.owner = self.default_owner
+        elif average_timestep.owner_id != cls.default_owner.id:
+            average_timestep.owner = cls.default_owner
             average_timestep.save(update_fields=["owner"])
 
         months_distribution = TemporalDistribution.objects.filter(
@@ -78,12 +77,12 @@ class InventoryExecutionIntegrationTests(TestCase):
         ).first()
         if months_distribution is None:
             months_distribution = TemporalDistribution.objects.create(
-                owner=self.default_owner,
+                owner=cls.default_owner,
                 name="Months of the year",
                 publication_status="published",
             )
-        elif months_distribution.owner_id != self.default_owner.id:
-            months_distribution.owner = self.default_owner
+        elif months_distribution.owner_id != cls.default_owner.id:
+            months_distribution.owner = cls.default_owner
             months_distribution.save(update_fields=["owner"])
 
         for month in ("January", "February"):
@@ -93,27 +92,27 @@ class InventoryExecutionIntegrationTests(TestCase):
             ).first()
             if timestep is None:
                 Timestep.objects.create(
-                    owner=self.default_owner,
+                    owner=cls.default_owner,
                     distribution=months_distribution,
                     name=month,
                 )
-            elif timestep.owner_id != self.default_owner.id:
-                timestep.owner = self.default_owner
+            elif timestep.owner_id != cls.default_owner.id:
+                timestep.owner = cls.default_owner
                 timestep.save(update_fields=["owner"])
 
         if not MaterialComponentGroup.objects.filter(name="Total Material").exists():
             MaterialComponentGroup.objects.create(
-                owner=self.default_owner,
+                owner=cls.default_owner,
                 name="Total Material",
                 publication_status="published",
             )
 
         if not Unit.objects.filter(
-            owner=self.default_owner,
+            owner=cls.default_owner,
             name="No unit",
         ).exists():
             Unit.objects.create(
-                owner=self.default_owner,
+                owner=cls.default_owner,
                 name="No unit",
                 symbol="-",
                 publication_status="published",
@@ -123,14 +122,15 @@ class InventoryExecutionIntegrationTests(TestCase):
             component = MaterialComponent.objects.filter(name=component_name).first()
             if component is None:
                 MaterialComponent.objects.create(
-                    owner=self.default_owner,
+                    owner=cls.default_owner,
                     name=component_name,
                     publication_status="published",
                 )
-            elif component.owner_id != self.default_owner.id:
-                component.owner = self.default_owner
+            elif component.owner_id != cls.default_owner.id:
+                component.owner = cls.default_owner
                 component.save(update_fields=["owner"])
 
+    @classmethod
     @classmethod
     def tearDownClass(cls):
         for model_name in list(apps.all_models["layer_manager"]):

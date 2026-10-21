@@ -20,43 +20,44 @@ from ..serializers import MapConfigurationSerializer, NutsRegionSummarySerialize
 
 
 class MapConfigurationSerializerTestCase(TestCase):
-    def setUp(self):
-        self.style = MapLayerStyle.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.style = MapLayerStyle.objects.create(
             color="#0000FF",
             weight=2,
             opacity=0.5,
             fill_color="#0000FF",
             fill_opacity=0.3,
         )
-        self.layer1 = MapLayerConfiguration.objects.create(
+        cls.layer1 = MapLayerConfiguration.objects.create(
             layer_type="catchment",
             api_basename="api-catchment",
             load_layer=True,
             feature_id="123",
-            style=self.style,
+            style=cls.style,
         )
-        self.layer2 = MapLayerConfiguration.objects.create(
+        cls.layer2 = MapLayerConfiguration.objects.create(
             layer_type="region",
             api_basename="api-region",
             load_layer=False,
             feature_id="321",
-            style=self.style,
+            style=cls.style,
         )
-        self.layer3 = MapLayerConfiguration.objects.create(
+        cls.layer3 = MapLayerConfiguration.objects.create(
             layer_type="features",
             api_basename="",  # To test NoReverseMatch
             load_layer=True,
             feature_id="",
-            style=self.style,
+            style=cls.style,
         )
 
         # Create a MapConfiguration instance
-        self.map_config = MapConfiguration.objects.create(
+        cls.map_config = MapConfiguration.objects.create(
             adjust_bounds_to_layer=True,
             apply_filter_to_features=False,
             load_features_layer_summary=True,
         )
-        self.map_config.layers.set([self.layer2, self.layer1, self.layer3])
+        cls.map_config.layers.set([cls.layer2, cls.layer1, cls.layer3])
 
     def mock_reverse_side_effect(name, *args, **kwargs):
         if "-detail" in name:
@@ -418,10 +419,8 @@ class NutsRegionSummarySerializerTestCase(TestCase):
         )
         CategoricalAttribute.objects.get_or_create(name="Urban rural remoteness")
         RegionProperty.objects.create(name="Population")
-
-    def setUp(self):
-        self.region = NutsRegion.objects.get(nuts_id="TE57")
-        self.urban_rural_remoteness = CategoricalAttribute.objects.get(
+        cls.region = NutsRegion.objects.get(nuts_id="TE57")
+        cls.urban_rural_remoteness = CategoricalAttribute.objects.get(
             name="Urban rural remoteness"
         )
 

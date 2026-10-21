@@ -5328,16 +5328,14 @@ class ComponentOrderDownViewTestCase(ViewWithPermissionsTestCase):
         cls.sample = Sample.objects.get(
             series=cls.series, timestep=Timestep.objects.default()
         )
-
-    def setUp(self):
-        self.composition = Composition.objects.create(
-            owner=self.member,
-            sample=self.sample,
-            group=self.component_group,
-            fractions_of=self.default_component,
+        cls.composition = Composition.objects.create(
+            owner=cls.member,
+            sample=cls.sample,
+            group=cls.component_group,
+            fractions_of=cls.default_component,
         )
-        self.component = MaterialComponent.objects.create(
-            owner=self.member, name="Test Component"
+        cls.component = MaterialComponent.objects.create(
+            owner=cls.member, name="Test Component"
         )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -5870,11 +5868,12 @@ class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
 class EmptyStateViewsTestCase(TestCase):
     """Test empty state messaging and CTAs across Materials views."""
 
-    def setUp(self):
-        self.regular_user = User.objects.create_user(
+    @classmethod
+    def setUpTestData(cls):
+        cls.regular_user = User.objects.create_user(
             username="regular",
         )
-        self.staff_user = User.objects.create_user(username="staff", is_staff=True)
+        cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
 
         content_types = {
             "material": ContentType.objects.get_for_model(Material),
@@ -5894,7 +5893,7 @@ class EmptyStateViewsTestCase(TestCase):
                 codename=f"add_{model_name}",
                 content_type=ct,
             )
-            self.staff_user.user_permissions.add(perm)
+            cls.staff_user.user_permissions.add(perm)
 
     def _create_unused_category(self):
         """Create a category guaranteed not to be assigned in this test."""

@@ -87,16 +87,17 @@ class SitemapItemsTestCase(SimpleTestCase):
 class CookieConsentTemplateHardeningTests(TestCase):
     """Regression tests for cookie-consent template compatibility and behavior."""
 
-    def setUp(self):
-        self.factory = RequestFactory()
-        self.cookie_group = CookieGroup.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.factory = RequestFactory()
+        cls.cookie_group = CookieGroup.objects.create(
             varname="analytics",
             name="Analytics",
             description="Analytics cookies",
             is_required=False,
         )
         Cookie.objects.create(
-            cookiegroup=self.cookie_group,
+            cookiegroup=cls.cookie_group,
             name="_ga",
             description="Google Analytics",
             domain="example.org",
