@@ -174,7 +174,7 @@ def _frequency_display_context(frequency):
     if not frequency:
         return None
     frequency_rows = CollectionFrequencyScheduleService.rows_from_frequency(frequency)
-    rows = CollectionFrequencyScheduleService.display_rows(frequency)
+    rows = CollectionFrequencyScheduleService.display_rows_from_rows(frequency_rows)
     is_year_round = len(rows) == 1 and rows[0]["segment"] == "All year"
     return {
         "canonical_label": frequency.name,
