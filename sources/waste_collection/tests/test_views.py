@@ -5337,6 +5337,10 @@ class WasteAtlasMapViewsTestCase(TestCase):
     def test_overview_shows_maintainer_links_only_for_staff(self):
         response = self.client.get(reverse("waste-atlas-overview"))
         self.assertEqual(response.status_code, 200)
+        self.assertRegex(
+            response.content.decode(),
+            r'href="https://abfallatlas\.de/"\s+target="_blank"\s+rel="noopener noreferrer"',
+        )
         self.assertNotContains(response, 'id="atlas-tools-menu"')
         self.assertNotContains(response, reverse("waste-atlas-change-map-overview"))
         self.assertNotContains(response, reverse("waste-atlas-data-conflicts-overview"))

@@ -13,8 +13,15 @@
                Choose a region, then the information you need — collection systems and bins, schedules and collection counts, fees, or collected amounts.
             </p>
          </div>
-         {% if request.user.is_staff %}
-            <div class="atlas-context-actions">
+         <div class="atlas-context-actions">
+            <a class="btn btn-outline-primary btn-sm atlas-hero-btn"
+               href="{{ abfallatlas_url }}"
+               target="_blank"
+               rel="noopener noreferrer"
+               title="Visit abfallatlas.de">
+               <i class="fas fa-globe" aria-hidden="true"></i> abfallatlas.de <i class="fas fa-external-link-alt" aria-hidden="true"></i><span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+            {% if request.user.is_staff %}
                <a class="btn btn-outline-primary btn-sm atlas-hero-btn"
                   href="{% url 'waste-atlas-change-map-overview' %}">
                   <i class="fas fa-exchange-alt"></i> Change maps
@@ -23,8 +30,8 @@
                   href="{% url 'waste-atlas-data-conflicts-overview' %}">
                   <i class="fas fa-exclamation-triangle"></i> Data conflicts
                </a>
-            </div>
-         {% endif %}
+            {% endif %}
+         </div>
       </header>
       <section class="atlas-panel atlas-directory" aria-labelledby="atlas-directory-title">
          <div class="atlas-directory-header">
