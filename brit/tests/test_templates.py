@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import urlparse
 
 from cookie_consent.models import Cookie, CookieGroup
 from django.conf import settings
@@ -7,8 +8,6 @@ from django.test import RequestFactory, SimpleTestCase, TestCase, override_setti
 from django.urls import Resolver404, resolve, reverse
 
 from brit.sitemap_registry import get_sitemap_items
-
-SITEMAP_ITEMS = get_sitemap_items()
 
 
 class ListEmptyStateTemplateTests(SimpleTestCase):
@@ -74,24 +73,26 @@ class DeleteConfirmationTemplateTests(SimpleTestCase):
 
 class SitemapItemsTestCase(SimpleTestCase):
     def test_sources_explorer_is_canonical_sitemap_entry(self):
-        self.assertIn("/sources/explorer/", SITEMAP_ITEMS)
-        self.assertNotIn("/sources/list/", SITEMAP_ITEMS)
+        self.assertIn("/sources/explorer/", get_sitemap_items())
+        self.assertNotIn("/sources/list/", get_sitemap_items())
 
     def test_source_plugin_sitemap_entries_are_composed_dynamically(self):
-        self.assertIn("/maps/nantes/greenhouses/export/", SITEMAP_ITEMS)
-        self.assertIn("/waste_collection/collections/", SITEMAP_ITEMS)
+        self.assertIn("/maps/nantes/greenhouses/map/", get_sitemap_items())
+        self.assertIn("/waste_collection/collections/", get_sitemap_items())
 
     def test_stale_nantes_roadside_tree_sitemap_entries_are_absent(self):
-        self.assertNotIn("/maps/nantes/roadside_trees/export/", SITEMAP_ITEMS)
-        self.assertNotIn("/case_studies/nantes/roadside_trees/export/", SITEMAP_ITEMS)
+        self.assertNotIn("/maps/nantes/roadside_trees/export/", get_sitemap_items())
+        self.assertNotIn(
+            "/case_studies/nantes/roadside_trees/export/", get_sitemap_items()
+        )
 
 
-class SitemapIntegrityTests(SimpleTestCase):
-    """Every sitemap entry must stay a live route (issue #144)."""
+class SitemapIntegrityTests(TestCase):
+    """Every sitemap entry must stay a live, publicly indexable page (#144)."""
 
     def test_all_sitemap_entries_resolve(self):
         unresolved = []
-        for item in SITEMAP_ITEMS:
+        for item in get_sitemap_items():
             try:
                 resolve(item)
             except Resolver404:
@@ -103,7 +104,29 @@ class SitemapIntegrityTests(SimpleTestCase):
         )
 
     def test_sitemap_entries_are_unique(self):
-        self.assertEqual(len(SITEMAP_ITEMS), len(set(SITEMAP_ITEMS)))
+        items = get_sitemap_items()
+        self.assertEqual(len(items), len(set(items)))
+
+    def test_all_sitemap_entries_serve_public_pages(self):
+        failures = {}
+        for item in get_sitemap_items():
+            response = self.client.get(item, follow=True)
+            if response.status_code != 200:
+                failures[item] = f"status {response.status_code}"
+                continue
+            if response.redirect_chain:
+                final_url = response.redirect_chain[-1][0]
+                if urlparse(final_url).path != urlparse(item).path:
+                    failures[item] = f"redirects to {final_url}"
+                    continue
+            if "text/html" not in response.headers.get("Content-Type", ""):
+                failures[item] = "non-HTML response"
+        self.assertEqual(
+            failures,
+            {},
+            "Sitemap entries not serving a public page to anonymous "
+            f"requests: {failures}",
+        )
 
 
 class CookieConsentTemplateHardeningTests(TestCase):

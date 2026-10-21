@@ -23,21 +23,11 @@ plugin = SourceDomainPlugin(
     ),
     sitemap_items=(
         "/maps/nantes/cultures/",
-        "/maps/nantes/cultures/create/",
-        "/maps/nantes/greenhouses/map/",
-        "/maps/nantes/greenhouses/export/",
-        "/maps/nantes/greenhouses/catchment_autocomplete/",
         "/maps/nantes/greenhouses/",
-        "/maps/nantes/greenhouses/create/",
-        "/maps/nantes/growthcycles/create_inline/",
+        "/maps/nantes/greenhouses/map/",
         "/case_studies/nantes/cultures/",
-        "/case_studies/nantes/cultures/create/",
-        "/case_studies/nantes/greenhouses/map/",
-        "/case_studies/nantes/greenhouses/export/",
-        "/case_studies/nantes/greenhouses/catchment_autocomplete/",
         "/case_studies/nantes/greenhouses/",
-        "/case_studies/nantes/greenhouses/create/",
-        "/case_studies/nantes/growthcycles/create_inline/",
+        "/case_studies/nantes/greenhouses/map/",
     ),
     dataset_runtime_compatibilities=(
         SourceDomainDatasetRuntimeCompatibility(

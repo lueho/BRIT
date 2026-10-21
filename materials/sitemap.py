@@ -1,9 +1,7 @@
 SITEMAP_ITEMS = (
-    "/materials/",
-    "/materials/sample_series/",
-    "/materials/sample_series/featured/",
     "/materials/samples/",
-    "/materials/samples/featured/",
+    "/materials/samples/gallery/",
+    "/materials/sample_series/",
     "/materials/categories/",
     "/materials/components/",
     "/materials/componentgroups/",
