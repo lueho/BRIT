@@ -22,41 +22,30 @@ from brit.gunicorn import (
     SocketTimeoutThreadWorker,
     _TimeoutClosingParser,
 )
+from brit.tests.probes import run_settings_probe
 
 
 class ProductionSecretKeyTests(SimpleTestCase):
     def test_configured_secret_key_imports_production_settings(self):
-        environment = os.environ.copy()
-        environment["DJANGO_SETTINGS_MODULE"] = "brit.settings.heroku"
-        environment["SECRET_KEY"] = "configured-secret-key"
-        completed = subprocess.run(
-            [
-                sys.executable,
-                "-c",
-                (
-                    "import brit.settings.heroku as production_settings; "
-                    "assert production_settings.SECRET_KEY == "
-                    "'configured-secret-key'"
-                ),
-            ],
-            capture_output=True,
-            check=False,
-            env=environment,
-            text=True,
+        completed = run_settings_probe(
+            "import brit.settings.heroku as production_settings; "
+            "assert production_settings.SECRET_KEY == "
+            "'configured-secret-key'",
+            env={
+                "DJANGO_SETTINGS_MODULE": "brit.settings.heroku",
+                "SECRET_KEY": "configured-secret-key",
+            },
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
     def test_missing_secret_key_fails_settings_import(self):
-        environment = os.environ.copy()
-        environment["DJANGO_SETTINGS_MODULE"] = "brit.settings.heroku"
-        environment.pop("SECRET_KEY", None)
-        completed = subprocess.run(
-            [sys.executable, "-c", "import brit.settings.heroku"],
-            capture_output=True,
-            check=False,
-            env=environment,
-            text=True,
+        completed = run_settings_probe(
+            "import brit.settings.heroku",
+            env={
+                "DJANGO_SETTINGS_MODULE": "brit.settings.heroku",
+                "SECRET_KEY": None,
+            },
         )
 
         self.assertNotEqual(completed.returncode, 0)
@@ -526,15 +515,8 @@ class SocketTimeoutConnTests(SimpleTestCase):
 
 class ProductionStoragesTests(SimpleTestCase):
     def test_staticfiles_overrides_base_storages_without_mutating(self):
-        environment = os.environ.copy()
-        environment["DJANGO_SETTINGS_MODULE"] = "brit.settings.heroku"
-        environment["SECRET_KEY"] = "test-secret-key"
-        environment["AWS_STORAGE_BUCKET_NAME"] = "brit-test-assets"
-        completed = subprocess.run(
-            [
-                sys.executable,
-                "-c",
-                """
+        completed = run_settings_probe(
+            """
 import brit.settings.settings as base
 import brit.settings.heroku as h
 
@@ -548,11 +530,11 @@ assert h.STORAGES["staticfiles"]["BACKEND"] == "brit.storages.StaticStorage"
 assert h.STORAGES["staticfiles"]["OPTIONS"]["bucket_name"] == "brit-test-assets"
 assert h.STORAGES["staticfiles"]["OPTIONS"]["location"] == "static"
 """,
-            ],
-            capture_output=True,
-            check=False,
-            env=environment,
-            text=True,
+            env={
+                "DJANGO_SETTINGS_MODULE": "brit.settings.heroku",
+                "SECRET_KEY": "test-secret-key",
+                "AWS_STORAGE_BUCKET_NAME": "brit-test-assets",
+            },
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)

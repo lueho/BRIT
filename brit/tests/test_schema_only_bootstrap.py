@@ -20,7 +20,6 @@ from django.test.utils import CaptureQueriesContext
 
 import utils.object_management.models as object_management_models
 import utils.object_management.signals as object_management_signals
-from utils.tests.testrunner import serial_test
 
 BASELINES = {
     "properties": "0001_squashed_0010",
@@ -225,13 +224,16 @@ class SchemaOnlyBaselineGraphTests(SimpleTestCase):
                 self.assertFalse(changes.get(app), changes.get(app))
 
 
-@serial_test
-class ControlledDatabaseBootstrapTests(SimpleTestCase):
-    """Bootstrap behavior against unique disposable physical databases.
+class ControlledDatabaseBootstrapBase(SimpleTestCase):
+    """Shared plumbing for bootstrap tests on disposable databases.
 
     Each test creates a dedicated database so migrations run on a real
     PostGIS layout instead of a scratch schema inside the shared test
     database. Only the uniquely named database is dropped afterwards.
+    Subclasses hold one test each so the parallel test runner distributes
+    the expensive full-migration runs across workers; the disposable
+    databases are uniquely named and the swapped default connection is
+    restored on cleanup, so no serial execution is required.
     """
 
     databases = {"default"}
@@ -310,6 +312,8 @@ class ControlledDatabaseBootstrapTests(SimpleTestCase):
     def _applied(self, fresh):
         return set(MigrationRecorder(fresh).applied_migrations())
 
+
+class FreshBootstrapSchemaTests(ControlledDatabaseBootstrapBase):
     @override_settings(
         DEFAULT_OBJECT_OWNER_USERNAME="schema-owner",
         DEFAULT_OWNER_USERNAME="legacy-owner",
@@ -403,6 +407,8 @@ class ControlledDatabaseBootstrapTests(SimpleTestCase):
                 ),
             )
 
+
+class PartialLegacyHistoryBootstrapTests(ControlledDatabaseBootstrapBase):
     @override_settings(
         DEFAULT_OBJECT_OWNER_USERNAME="schema-owner",
         DEFAULT_OWNER_USERNAME="legacy-owner",
@@ -496,6 +502,8 @@ class ControlledDatabaseBootstrapTests(SimpleTestCase):
             self.assertEqual(migrated.name, "Legacy Material")
             self.assertEqual(migrated.description, "custom legacy description")
 
+
+class AdoptedHistoryBootstrapTests(ControlledDatabaseBootstrapBase):
     @override_settings(
         DEFAULT_OBJECT_OWNER_USERNAME="schema-owner",
         DEFAULT_OWNER_USERNAME="legacy-owner",
