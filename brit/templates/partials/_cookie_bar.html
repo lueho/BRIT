@@ -36,10 +36,11 @@
             </div>
         </div>
     </template>
+    <script src="{% static 'js/cookie_bar.min.js' %}" nonce="{{ csp_nonce }}"></script>
     <script type="module" nonce="{{ csp_nonce }}">
       import { showCookieBar } from "{{ cookiebar_src }}";
 
-      showCookieBar({
+      startCookieBar(showCookieBar, {
           statusUrl: "{{ status_url|escapejs }}",
           templateSelector: "#cookie-consent__cookie-bar",
           cookieGroupsSelector: "#cookie-consent__cookie-groups",

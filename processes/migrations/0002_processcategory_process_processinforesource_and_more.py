@@ -11,7 +11,7 @@ import utils.object_management.models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("bibliography", "0003_alter_author_publication_status_and_more"),
+        ("bibliography", "0001_squashed_0012"),
         ("materials", "0003_alter_analyticalmethod_publication_status_and_more"),
         ("processes", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

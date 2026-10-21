@@ -57,7 +57,7 @@
             {% endblock detail_header_review_actions %}
             {% block rail_extra_actions %}{% endblock rail_extra_actions %}
             {% block rail_more_actions %}
-              {% if policy.can_edit or policy.can_manage_editors or policy.can_delete or policy.can_duplicate or policy.can_manage_samples %}
+              {% if policy.can_edit or policy.can_manage_editors or policy.can_delete or policy.can_duplicate or policy.can_manage_samples or policy.can_add_property or policy.can_new_version or policy.can_archive or policy.can_export %}
                 <div class="dropdown sdv2-actions-menu">
                   <button class="sdv2-btn sdv2-actions-trigger"
                           type="button"
@@ -137,6 +137,7 @@
           {% endblock hero_meta_wrapper %}
         </div>
         {% block hero_media %}{% endblock hero_media %}
+        {% block hero_footer %}{% endblock hero_footer %}
       </header>
       {% if object.publication_status == 'review' or object.publication_status == 'declined' %}
         <div class="sdv2-review-banner sdv2-review-banner-{{ object.publication_status }}"
@@ -158,6 +159,7 @@
           </div>
         </div>
       {% endif %}
+      {% block anchor_nav %}{% endblock anchor_nav %}
       <div class="{% block layout_class %}sdv2-layout sdv2-layout-full{% endblock layout_class %}">
         <main class="sdv2-main">
           {% block detail_sections %}{% endblock detail_sections %}
@@ -167,3 +169,7 @@
     </div>
   </div>
 {% endblock content %}
+{% block javascript %}
+  {{ block.super }}
+  <script src="{% static 'js/detail_v2.min.js' %}" defer></script>
+{% endblock javascript %}

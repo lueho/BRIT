@@ -48,10 +48,17 @@ class RAnalysisPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "/r-analysis/BRIT_Datenanalyse.R")
         self.assertContains(
-            response, "https://flexibi-dst.s3.amazonaws.com/media/rscripts/brit_eu.zip"
+            response,
+            "https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-1.0.4.zip",
+        )
+        self.assertContains(
+            response,
+            "https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-Code-1.0.4.zip",
         )
         self.assertContains(response, "analysis_api")
         self.assertContains(response, "historical input data")
+        self.assertContains(response, "BRIT.Rproj")
+        self.assertContains(response, "validated runtime is R 4.3.3")
 
     def test_standalone_r_client_is_available_as_static_file(self):
         self.assertIsNotNone(finders.find("rscripts/BRIT_Datenanalyse.R"))

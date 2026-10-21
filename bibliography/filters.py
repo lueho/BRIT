@@ -8,27 +8,34 @@ from utils.filters import (
     UserCreatedObjectScopedFilterSet,
 )
 from utils.object_management.permissions import (
-    apply_scope_filter,
     filter_queryset_for_user,
 )
 
 from .models import Author, Licence, Source
 
 
-class AuthorFilterSet(UserCreatedObjectScopedFilterSet):
+class AuthorFilterSet(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
+    search_placeholder = "Search by name or organization ..."
+    search_fields = (
+        "last_names",
+        "first_names",
+        "organization_name",
+        "organization_abbreviation",
+    )
+
     last_names = CharFilter(lookup_expr="icontains")
     first_names = CharFilter(lookup_expr="icontains")
     organization_name = CharFilter(lookup_expr="icontains")
 
     class Meta:
         model = Author
-        fields = ("scope", "last_names", "first_names", "organization_name")
+        fields = ("scope", "q", "last_names", "first_names", "organization_name")
 
 
 class LicenceListFilter(UserCreatedObjectScopedFilterSet):
     name = ModelChoiceFilter(
         queryset=Licence.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Licence Name",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -40,26 +47,9 @@ class LicenceListFilter(UserCreatedObjectScopedFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        queryset = Licence.objects.all()
-        if request and hasattr(request, "user"):
-            queryset = filter_queryset_for_user(queryset, request.user)
-
-        scope_value = None
-        try:
-            if hasattr(self, "data") and self.data:
-                scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
-        except Exception:
-            scope_value = None
-
-        if scope_value:
-            queryset = apply_scope_filter(
-                queryset, scope_value, user=getattr(request, "user", None)
-            )
-
-        self.filters["name"].queryset = queryset
+        self.filters["name"].queryset = self.scoped_choice_queryset(
+            Licence.objects.all(), selected_field="name"
+        )
 
     class Meta:
         model = Licence
@@ -146,7 +136,7 @@ class SourceFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.filters["title"].queryset = self.scoped_choice_queryset(
-            Source.objects.all()
+            Source.objects.all(), selected_field="title"
         )
         # Authors and licences have their own publication status, so a private
         # source may cite a published author. Restrict by visibility only.

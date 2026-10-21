@@ -1,7 +1,9 @@
 import contextlib
 import logging
 
+from django.apps import apps
 from django.contrib.gis.geos import GEOSGeometry, Point
+from django.db import models
 from django.db.models import QuerySet
 from django.test import TestCase
 from django.urls import reverse
@@ -10,7 +12,6 @@ from maps.models import GeoPolygon
 from utils.properties.models import PropertyBase, Unit
 
 from ..models import (
-    Attribute,
     Catchment,
     CategoricalAttribute,
     GeoDataset,
@@ -371,11 +372,22 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         self.assertEqual(value.measurement_unit_label, unit.name)
 
 
-class AttributePropertyBaseContractTestCase(TestCase):
-    def test_attribute_uses_shared_property_base_contract(self):
-        attribute = Attribute.objects.create(name="Population density", unit="1/km²")
+class LegacyAttributeRemovalTestCase(TestCase):
+    def test_legacy_attribute_model_is_removed(self):
+        with self.assertRaises(LookupError):
+            apps.get_model("maps", "Attribute")
 
-        self.assertIsInstance(attribute, PropertyBase)
+    def test_no_property_base_subclass_uses_unit_charfield(self):
+        offenders = [
+            subclass.__name__
+            for subclass in PropertyBase.__subclasses__()
+            if any(
+                field.name == "unit" and isinstance(field, models.CharField)
+                for field in subclass._meta.get_fields()
+            )
+        ]
+
+        self.assertEqual(offenders, [])
 
 
 class RegionPropertyBaseContractTestCase(TestCase):

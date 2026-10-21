@@ -1,7 +1,7 @@
 from sources.registry import get_source_domain_sitemap_items
 
 BASE_SITEMAP_ITEMS = [
-    "/utils/dashboard/",
+    "/utils/explorer/",
     "/utils/properties/",
     "/utils/properties/create/",
     "/utils/properties/units/",
@@ -10,11 +10,9 @@ BASE_SITEMAP_ITEMS = [
     "/about/",
     "/learning/",
     "/r-analysis/",
+    "/projects/brit-eu/",
     "/maps/list/",
-    "/maps/dashboard/",
-    "/maps/attributes/",
-    "/maps/attributes/create/",
-    "/maps/attributes/create/modal/",
+    "/maps/explorer/",
     "/maps/attribute_values/",
     "/maps/attribute_values/create/",
     "/maps/attribute_values/create/modal/",

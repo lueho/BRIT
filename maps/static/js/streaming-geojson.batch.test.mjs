@@ -170,3 +170,37 @@ test("a throwing onFeatureBatch rejects the parse instead of re-emitting the bat
     assert.deepEqual(batches, [1000]);
     assert.equal(completed, false);
 });
+
+function delayedCompletion(order) {
+  return async () => {
+    order.push("complete:start");
+    await new Promise((r) => setTimeout(r, 5));
+    order.push("complete:end");
+  };
+}
+
+test("a streamed parse resolves only after an async onComplete has finished", async () => {
+  const payload = JSON.stringify({ type: "FeatureCollection", features: makeFeatures(150) });
+  const order = [];
+  const loader = new StreamingGeoJSONLoader({ onComplete: delayedCompletion(order) });
+  await loader._parseStreamingResponse(fakeResponse(payload, 4096), 150);
+  order.push("resolved");
+  assert.deepEqual(order, ["complete:start", "complete:end", "resolved"]);
+});
+
+test("a small JSON load resolves only after an async onComplete has finished", async () => {
+  const order = [];
+  sandbox.fetch = async () => ({
+    ok: true,
+    headers: { get: (name) => ({ "X-Total-Count": "3", "X-Cache-Status": "HIT" })[name] ?? null },
+    json: async () => ({ type: "FeatureCollection", features: makeFeatures(3) }),
+  });
+  try {
+    const loader = new StreamingGeoJSONLoader({ onComplete: delayedCompletion(order) });
+    await loader.fetch("/features/");
+    order.push("resolved");
+  } finally {
+    delete sandbox.fetch;
+  }
+  assert.deepEqual(order, ["complete:start", "complete:end", "resolved"]);
+});

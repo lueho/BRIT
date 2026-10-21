@@ -119,3 +119,59 @@ class ProductionRedisSettingsTests(SimpleTestCase):
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
+
+
+class LocalSettingsTests(SimpleTestCase):
+    def run_local_assertions(self, environment, assertions):
+        return subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                f"import brit.settings.local as s; {assertions}",
+            ],
+            capture_output=True,
+            check=False,
+            env=environment,
+            text=True,
+        )
+
+    def test_local_uses_filesystem_media_storage(self):
+        environment = os.environ.copy()
+        completed = self.run_local_assertions(
+            environment,
+            (
+                "assert s.STORAGES['default']['BACKEND'] == "
+                "'django.core.files.storage.FileSystemStorage'; "
+                "assert s.MEDIA_URL == '/media/'; "
+                "assert s.MEDIA_ROOT"
+            ),
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_local_uses_console_email_backend_without_smtp_host(self):
+        environment = os.environ.copy()
+        environment.pop("EMAIL_HOST", None)
+        completed = self.run_local_assertions(
+            environment,
+            (
+                "assert s.EMAIL_BACKEND == "
+                "'django.core.mail.backends.console.EmailBackend'"
+            ),
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_local_preserves_explicit_smtp_configuration(self):
+        environment = os.environ.copy()
+        environment["EMAIL_HOST"] = "smtp.example.org"
+        completed = self.run_local_assertions(
+            environment,
+            (
+                "assert s.EMAIL_BACKEND == "
+                "'django.core.mail.backends.smtp.EmailBackend'; "
+                "assert s.EMAIL_HOST == 'smtp.example.org'"
+            ),
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)

@@ -5,7 +5,7 @@ just enough structure to display demo content.  The models in this module now
 move beyond that baseline by introducing reusable entities that can capture
 real-world process data:
 
-* processes retain their hierarchical organisation and descriptive metadata
+* processes are organised by categories and descriptive metadata
 * structured operating parameters are stored in :class:`ProcessOperatingParameter`
   records so editors can capture ranges for temperature, pressure, residence
   time, yield and custom metrics – each with explicit units
@@ -57,7 +57,12 @@ def validate_internal_or_external_url(value: str) -> None:
     parsed = urlparse(candidate)
     if parsed.scheme in {"http", "https"} and parsed.netloc:
         return
-    if not parsed.scheme and candidate.startswith("/") and " " not in candidate:
+    if (
+        not parsed.scheme
+        and candidate.startswith("/")
+        and not candidate.startswith("//")
+        and " " not in candidate
+    ):
         return
     raise ValidationError(
         _("Provide either an absolute http(s) URL or a root-relative path."),
@@ -106,14 +111,6 @@ class Process(NamedUserCreatedObject):
 
     url_format = "processes:{name_lower}-{action}{suffix}"
 
-    parent = models.ForeignKey(
-        "self",
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True,
-        related_name="variants",
-        help_text="Optional parent process that groups this technology.",
-    )
     categories = models.ManyToManyField(
         ProcessCategory,
         blank=True,

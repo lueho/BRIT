@@ -76,17 +76,17 @@ The legacy `object` / `header` / `title` / `breadcrumb_page_title` fallback chai
 |---|---|---|---|
 | `bibliography` | Bibliography | `bibliography-explorer` | — |
 | `inventories` | Inventories | `inventories-explorer` | — |
-| `maps` | Maps | `maps-dashboard` | — |
+| `maps` | Maps | `maps-explorer` | — |
 | `materials` | Materials | `materials-explorer` | — |
-| `processes` | Processes | `processes:dashboard` | — |
-| `properties` | Properties | `properties-dashboard` | — |
+| `processes` | Processes | `processes:explorer` | — |
+| `properties` | Properties | `properties-explorer` | — |
 | `sources` | Sources | `sources-explorer` | — |
-| `utils` | Utilities | `utils-dashboard` | — |
+| `utils` | Utilities | `utils-explorer` | — |
 | `waste_collection` | Waste Collection | `wastecollection-explorer` | `Sources` → `sources-explorer` |
 | `greenhouses` | Greenhouses | *(none — plain text)* | `Sources` → `sources-explorer` |
 | `roadside_trees` | Roadside Trees | *(none — plain text)* | `Sources` → `sources-explorer` |
 
-To nest a new plugin under an existing module, add an entry with `parent_label` / `parent_url_name` pointing at the parent module; no per-view template changes are needed. Setting `url_name` to `None` causes the module crumb to render as plain text (no link), which is the current pattern for plugins without a dashboard page.
+To nest a new plugin under an existing module, add an entry with `parent_label` / `parent_url_name` pointing at the parent module; no per-view template changes are needed. Setting `url_name` to `None` causes the module crumb to render as plain text (no link), which is the current pattern for plugins without an explorer page.
 
 ### How pages adopt the contract
 
@@ -129,7 +129,7 @@ New breadcrumb-affecting changes must add or extend a focused regression test in
 ### Current known limitations
 
 - **Fallback leakage on non-contract pages** — pages that do not use `BreadcrumbContextMixin` or the shared CRUD base classes may still fall back to `title` or route-name humanization. Adopt the contract to remove the weak label.
-- **Greenhouses and Roadside Trees have no plugin dashboard** — their nested module crumb renders as plain text (no link). The parent crumb (`Sources`) still links back to the Sources explorer.
+- **Greenhouses and Roadside Trees have no plugin explorer** — their nested module crumb renders as plain text (no link). The parent crumb (`Sources`) still links back to the Sources explorer.
 
 ## Integration
 The BRIT Core Module integrates all other modules of the application:

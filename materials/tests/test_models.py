@@ -13,7 +13,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from factory.django import mute_signals
 
-from bibliography.models import Source
+from bibliography.models import Author, Source
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import GeoPolygon, LauRegion, Location, NutsRegion, Region
 from materials.models import (
@@ -26,8 +26,10 @@ from materials.models import (
     MaterialComponentGroup,
     MaterialProperty,
     MaterialPropertyValue,
+    MeasurementLimitType,
     MeasurementValueQualifier,
     Sample,
+    SampleAuthor,
     SampleExternalRecord,
     SampleGroup,
     SampleGroupKind,
@@ -342,6 +344,16 @@ class SampleSubstrateCategoryTestCase(TestCase):
             1,
         )
 
+    def test_created_category_records_approval_metadata(self):
+        category, created = get_or_create_sample_substrate_category()
+
+        self.assertTrue(created)
+        category.refresh_from_db()
+        self.assertEqual(category.publication_status, "published")
+        self.assertIsNotNone(category.approved_at)
+        self.assertIsNotNone(category.approved_by_id)
+        self.assertEqual(category.approved_by_id, category.owner_id)
+
     def test_keeps_existing_category_when_homonym_is_added(self):
         published = MaterialCategory.objects.create(
             name="Substrate test category", publication_status="published"
@@ -511,6 +523,8 @@ class SampleSeriesTestCase(TestCase):
             empty_series = SampleSeries.objects.create(material=self.material1)
 
         empty_series.publication_status = SampleSeries.STATUS_PUBLISHED
+        empty_series.approved_at = timezone.now()
+        empty_series.approved_by = self.user
 
         with self.assertRaises(ValidationError) as context:
             empty_series.clean()
@@ -529,6 +543,8 @@ class SampleSeriesTestCase(TestCase):
             timestep=Timestep.objects.default(),
         )
         series_with_sample.publication_status = SampleSeries.STATUS_PUBLISHED
+        series_with_sample.approved_at = timezone.now()
+        series_with_sample.approved_by = self.user
 
         # Should not raise any exception
         try:
@@ -547,7 +563,7 @@ class SampleSeriesTestCase(TestCase):
         empty_series.publication_status = SampleSeries.STATUS_REVIEW
 
         with self.assertRaises(ValidationError) as context:
-            empty_series.approve()
+            empty_series.approve(user=self.user)
 
         self.assertIn(
             "Cannot approve a sample series that contains no samples",
@@ -568,7 +584,7 @@ class SampleSeriesTestCase(TestCase):
 
         # Should not raise any exception and should approve the series
         try:
-            series_with_sample.approve()
+            series_with_sample.approve(user=self.user)
         except ValidationError:
             self.fail(
                 "approve() raised ValidationError unexpectedly for series with samples"
@@ -577,6 +593,8 @@ class SampleSeriesTestCase(TestCase):
         self.assertEqual(
             series_with_sample.publication_status, SampleSeries.STATUS_PUBLISHED
         )
+        self.assertIsNotNone(series_with_sample.approved_at)
+        self.assertEqual(series_with_sample.approved_by, self.user)
 
     def test_duplicate_with_new_material_applies_it_to_copied_samples(self):
         creator = User.objects.create(username="dup_material_creator")
@@ -1168,6 +1186,122 @@ class SampleTestCase(TestCase):
         self.assertIn("material", ctx.exception.message_dict)
 
 
+class SampleAuthorTestCase(TestCase):
+    """Corresponding-author assignments on samples (bibliography authors)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create(username="sample-author-owner")
+        cls.material = Material.objects.create(
+            name="Attribution material", owner=cls.owner
+        )
+        cls.sample = Sample.objects.create(
+            name="Attributed sample",
+            material=cls.material,
+            owner=cls.owner,
+            standalone=True,
+        )
+
+    def test_ordered_authors_follow_position(self):
+        later = Author.objects.create(first_names="Bea", last_names="Second")
+        earlier = Author.objects.create(first_names="Ada", last_names="First")
+        SampleAuthor.objects.create(sample=self.sample, author=later, position=2)
+        SampleAuthor.objects.create(sample=self.sample, author=earlier, position=1)
+
+        self.assertEqual(
+            [link.author for link in self.sample.ordered_authors()],
+            [earlier, later],
+        )
+        self.assertEqual(self.sample.authors_ordered(), [earlier, later])
+
+    def test_author_can_only_be_assigned_once(self):
+        author = Author.objects.create(first_names="Ada", last_names="First")
+        SampleAuthor.objects.create(sample=self.sample, author=author)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            SampleAuthor.objects.create(sample=self.sample, author=author)
+
+    def test_str_names_sample_and_author(self):
+        author = Author.objects.create(first_names="Ada", last_names="First")
+        link = SampleAuthor.objects.create(sample=self.sample, author=author)
+        self.assertEqual(str(link), f"{self.sample}: {author}")
+
+    def _attribute(self, sample):
+        first = Author.objects.create(
+            first_names="Ada", last_names="First", publication_status="published"
+        )
+        second = Author.objects.create(
+            first_names="Bea", last_names="Second", publication_status="published"
+        )
+        SampleAuthor.objects.create(sample=sample, author=second, position=2)
+        SampleAuthor.objects.create(sample=sample, author=first, position=1)
+        return [first, second]
+
+    def test_duplicate_copies_ordered_authors(self):
+        authors = self._attribute(self.sample)
+        creator = User.objects.create(username="sample-author-duplicator")
+
+        duplicate = self.sample.duplicate(creator)
+
+        self.assertEqual(duplicate.authors_ordered(), authors)
+        self.assertEqual(
+            [link.position for link in duplicate.ordered_authors()], [1, 2]
+        )
+        self.assertEqual(self.sample.authors_ordered(), authors)
+
+    def test_duplicate_skips_authors_hidden_from_creator(self):
+        public = Author.objects.create(
+            last_names="Public", publication_status="published"
+        )
+        private = Author.objects.create(last_names="Private", owner=self.owner)
+        SampleAuthor.objects.create(sample=self.sample, author=private, position=1)
+        SampleAuthor.objects.create(sample=self.sample, author=public, position=2)
+        outsider = User.objects.create(username="sample-author-outsider-copier")
+
+        duplicate = self.sample.duplicate(outsider)
+
+        self.assertEqual(duplicate.authors_ordered(), [public])
+        self.assertEqual([link.position for link in duplicate.ordered_authors()], [1])
+        self.assertEqual(
+            self.sample.duplicate(self.owner).authors_ordered(), [private, public]
+        )
+
+    def test_series_duplicate_copies_sample_authors(self):
+        series = SampleSeries.objects.create(
+            name="Attributed series", material=self.material, owner=self.owner
+        )
+        sample = Sample.objects.create(
+            name="Series sample",
+            material=self.material,
+            series=series,
+            owner=self.owner,
+        )
+        authors = self._attribute(sample)
+        creator = User.objects.create(username="series-author-duplicator")
+
+        duplicate = series.duplicate(creator)
+
+        self.assertEqual(
+            duplicate.samples.get(name=f"{sample.name} (copy)").authors_ordered(),
+            authors,
+        )
+
+    def test_visible_ordered_authors_hide_private_authors(self):
+        published = Author.objects.create(
+            last_names="Published", publication_status="published"
+        )
+        private = Author.objects.create(last_names="Private", owner=self.owner)
+        SampleAuthor.objects.create(sample=self.sample, author=private, position=1)
+        SampleAuthor.objects.create(sample=self.sample, author=published, position=2)
+        outsider = User.objects.create(username="sample-author-outsider")
+
+        def visible(user):
+            return [link.author for link in self.sample.visible_ordered_authors(user)]
+
+        self.assertEqual(visible(None), [published])
+        self.assertEqual(visible(outsider), [published])
+        self.assertEqual(visible(self.owner), [private, published])
+
+
 class SampleGeoReferenceTestCase(TestCase):
     """
     Samples carry a canonical region link (maps.Region) and optionally an
@@ -1688,6 +1822,80 @@ class MeasurementQualifierDisplayTestCase(SimpleTestCase):
         ):
             with self.subTest(model=type(instance).__name__):
                 self.assertEqual(instance.display_value, "mystery: 2")
+
+    def test_limit_label_names_the_stated_limit_type(self):
+        cases = (
+            ({"limit_type": MeasurementLimitType.LOD}, "Limit of detection (LOD)"),
+            (
+                {"limit_type": MeasurementLimitType.MDL},
+                "Method detection limit (MDL)",
+            ),
+            (
+                {"limit_type": MeasurementLimitType.LOQ},
+                "Limit of quantification (LOQ)",
+            ),
+            ({"limit_type": MeasurementLimitType.RL}, "Reporting limit (RL)"),
+        )
+        for kwargs, expected in cases:
+            for instance in self._instances(average=Decimal("1"), **kwargs):
+                with self.subTest(model=type(instance).__name__, **kwargs):
+                    self.assertEqual(instance.limit_label, expected)
+
+    def test_below_detection_limit_implies_limit_of_detection(self):
+        for instance in self._instances(
+            average=Decimal("0"),
+            value_qualifier=MeasurementValueQualifier.BELOW_DETECTION_LIMIT,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(
+                    instance.effective_limit_type, MeasurementLimitType.LOD
+                )
+                self.assertEqual(instance.limit_label, "Limit of detection (LOD)")
+
+    def test_limit_without_type_is_not_called_a_detection_limit(self):
+        for instance in self._instances(
+            average=Decimal("0.1"),
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            detection_limit=Decimal("0.1"),
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.effective_limit_type, "")
+                self.assertEqual(instance.limit_label, "Limit (type not specified)")
+
+    def test_limit_abbreviation_is_compact_limit_marker(self):
+        cases = (
+            ({"limit_type": MeasurementLimitType.LOD}, "LOD"),
+            ({"limit_type": MeasurementLimitType.MDL}, "MDL"),
+            ({"limit_type": MeasurementLimitType.LOQ}, "LOQ"),
+            ({"limit_type": MeasurementLimitType.RL}, "RL"),
+            (
+                {"value_qualifier": MeasurementValueQualifier.BELOW_DETECTION_LIMIT},
+                "LOD",
+            ),
+            ({"detection_limit": Decimal("0.1")}, "Limit"),
+            ({}, ""),
+        )
+        for kwargs, expected in cases:
+            for instance in self._instances(average=Decimal("1"), **kwargs):
+                with self.subTest(model=type(instance).__name__, **kwargs):
+                    self.assertEqual(instance.limit_abbreviation, expected)
+
+    def test_limit_label_is_empty_without_limit_information(self):
+        for instance in self._instances(average=Decimal("1")):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(instance.limit_label, "")
+
+    def test_metadata_kwargs_copy_limit_type(self):
+        for instance in self._instances(
+            average=Decimal("0.8"),
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            limit_type=MeasurementLimitType.RL,
+        ):
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(
+                    instance.measurement_metadata_kwargs()["limit_type"],
+                    MeasurementLimitType.RL,
+                )
 
     def test_display_detection_limit(self):
         cases = (

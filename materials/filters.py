@@ -50,7 +50,7 @@ class MaterialListFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilte
 
     name = ModelChoiceFilter(
         queryset=Material.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Material Name",
         empty_label="All",
         widget=TomSelectModelWidget(
@@ -70,7 +70,7 @@ class MaterialListFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilte
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.filters["name"].queryset = self.scoped_choice_queryset(
-            Material.objects.all()
+            Material.objects.all(), selected_field="name"
         )
 
     class Meta:
@@ -100,7 +100,7 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
     sortable_fields = {"name": "name"}
     name = ModelChoiceFilter(
         queryset=MaterialComponent.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Component Name",
         empty_label="All",
         widget=TomSelectModelWidget(
@@ -161,7 +161,7 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.filters["name"].queryset = self.scoped_choice_queryset(
-            MaterialComponent.objects.all()
+            MaterialComponent.objects.all(), selected_field="name"
         )
 
     def filter_component_group(self, queryset, name, value):
@@ -264,12 +264,12 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
     q = CharFilter(
         method="filter_q",
         label="Search",
-        help_text="Search sample names, descriptions, substrate materials, or locations.",
+        help_text="Search sample names, descriptions, substrate materials, locations, or sample group names.",
     )
 
     name = ModelChoiceFilter(
         queryset=Sample.objects.none(),
-        field_name="name",
+        method="filter_selected_object",
         label="Sample Name",
         help_text="Select a specific sample by name.",
         empty_label="All",
@@ -397,6 +397,19 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
         ),
     )
 
+    def filter_q(self, queryset, name, value):
+        filtered = super().filter_q(queryset, name, value)
+        value = (value or "").strip()
+        if not value:
+            return filtered
+        user = getattr(getattr(self, "request", None), "user", None)
+        matching_groups = filter_queryset_for_user(
+            SampleGroup.objects.filter(name__icontains=value), user
+        )
+        return queryset.filter(
+            Q(pk__in=filtered.values("pk")) | Q(sample_groups__in=matching_groups)
+        ).distinct()
+
     def filter_parameter(self, queryset, name, value):
         canonical_property = value.canonical_property
         comparable_ids = MaterialProperty.objects.filter(
@@ -433,26 +446,26 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
         super().__init__(*args, **kwargs)
         substrate_category, _ = get_or_create_sample_substrate_category()
         self.filters["name"].queryset = self.scoped_choice_queryset(
-            Sample.objects.all()
+            Sample.objects.all(), selected_field="name"
         )
         self.filters["substrate_material"].queryset = Material.objects.filter(
             sampled_substrate_material_q(substrate_category)
         ).distinct()
-        self.filters["parameter"].queryset = self.scoped_choice_queryset(
+        # Properties, components, groups and geography are shared reference
+        # data: a private or in-review sample may point to a published object
+        # of another owner, so the list scope must not narrow these choices.
+        self.filters["parameter"].queryset = self.visible_choice_queryset(
             MaterialProperty.objects.all()
         )
-        self.filters["raw_parameter"].queryset = self.scoped_choice_queryset(
+        self.filters["raw_parameter"].queryset = self.visible_choice_queryset(
             MaterialComponent.objects.all()
         )
-        self.filters["component_group"].queryset = self.scoped_choice_queryset(
+        self.filters["component_group"].queryset = self.visible_choice_queryset(
             MaterialComponentGroup.objects.all()
         )
-        self.filters["sample_group"].queryset = self.scoped_choice_queryset(
+        self.filters["sample_group"].queryset = self.visible_choice_queryset(
             SampleGroup.objects.all()
         )
-        # Geography is shared reference data: a private sample may point to a
-        # published region or site of another owner, so the list scope must not
-        # narrow these choices.
         self.filters["region"].queryset = self.visible_choice_queryset(
             Region.objects.all()
         )

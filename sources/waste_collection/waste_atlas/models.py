@@ -1,6 +1,11 @@
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
+
+from utils.transaction_scope import delete_scoped, scoped_cache_key
 
 from .legend import AUTO, COLUMN_FLOW, EXPORT_LEGEND_ITEM_FLOW_CHOICES
 
@@ -70,6 +75,7 @@ class WasteAtlasRenderingSettings(models.Model):
     """
 
     SINGLETON_PK = 1
+    CACHE_KEY = "waste_atlas:rendering_settings"
 
     no_data_color = _color_field(
         "Fill for regions without data.",
@@ -271,14 +277,27 @@ class WasteAtlasRenderingSettings(models.Model):
     def save(self, *args, **kwargs):
         self.pk = self.SINGLETON_PK
         super().save(*args, **kwargs)
+        delete_scoped(cache, self.CACHE_KEY)
 
     def delete(self, *args, **kwargs):
         raise ValidationError("The Waste Atlas rendering settings cannot be deleted.")
 
     @classmethod
     def load(cls):
-        """Return the settings row, creating it with the defaults if missing."""
-        settings, _created = cls.objects.get_or_create(pk=cls.SINGLETON_PK)
+        """Return the settings row, creating it with the defaults if missing.
+
+        The singleton is read on every map render, so the row is cached in the
+        default cache; ``save()`` (and ``post_delete`` for queryset deletes,
+        which bypass the ``delete()`` guard) invalidate it. Keys are scoped to
+        the current transaction (see ``utils.transaction_scope.scoped_cache_key``), so values
+        written inside a rolled-back block cannot leak. Caching the pickled
+        instance gives every caller an independent copy.
+        """
+        cache_key = scoped_cache_key(cls.CACHE_KEY)
+        settings = cache.get(cache_key)
+        if settings is None:
+            settings, _created = cls.objects.get_or_create(pk=cls.SINGLETON_PK)
+            cache.set(cache_key, settings)
         return settings
 
     def clean(self):
@@ -364,3 +383,9 @@ class WasteAtlasRenderingSettings(models.Model):
             "itemFlow": self.export_legend_item_flow,
             "maxWidthFraction": self.export_legend_width_fraction,
         }
+
+
+@receiver(post_delete, sender=WasteAtlasRenderingSettings)
+def invalidate_rendering_settings_cache(sender, **kwargs):
+    """Queryset deletes bypass the ``delete()`` guard; drop the cache either way."""
+    delete_scoped(cache, WasteAtlasRenderingSettings.CACHE_KEY)

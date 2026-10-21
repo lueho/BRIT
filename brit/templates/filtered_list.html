@@ -34,40 +34,42 @@
               {# View toggle (List / Featured / Map) – peer representations of the same dataset. #}
               {% include "partials/representation_switcher.html" %}
               {# Scope toggle – visible for authenticated users and only for UserCreatedObject models #}
-              {% if user.is_authenticated and object_list.model|is_user_created %}
-                <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
-                  <a class="btn btn-outline-secondary {% if list_type == 'published' %}active disabled{% endif %}"
-                     role="button"
-                     title="Show published items"
-                     aria-pressed="{% if list_type == 'published' %}true{% else %}false{% endif %}"
-                     {% if list_type == 'published' %}aria-disabled="true" tabindex="-1"{% endif %}
-                     href="{{ public_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
-                    Published
-                  </a>
-                  <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
-                     role="button"
-                     title="Show only my items"
-                     aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
-                     {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
-                     href="{{ private_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
-                    Mine
-                  </a>
-                  {% if user|can_moderate:object_list.model and review_representation_url %}
-                    <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
+              {% block scope_toggle %}
+                {% if user.is_authenticated and object_list.model|is_user_created %}
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
+                    <a class="btn btn-outline-secondary {% if list_type == 'published' %}active disabled{% endif %}"
                        role="button"
-                       title="Show items pending review"
-                       aria-pressed="{% if list_type == 'review' %}true{% else %}false{% endif %}"
-                       {% if list_type == 'review' %}aria-disabled="true" tabindex="-1"{% endif %}
-                       href="{{ review_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review">
-                      Review
+                       title="Show published items"
+                       aria-pressed="{% if list_type == 'published' %}true{% else %}false{% endif %}"
+                       {% if list_type == 'published' %}aria-disabled="true" tabindex="-1"{% endif %}
+                       href="{{ public_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
+                      Published
                     </a>
-                  {% endif %}
-                </div>
-              {% endif %}
-              {% if dashboard_url %}
+                    <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
+                       role="button"
+                       title="Show only my items"
+                       aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
+                       {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
+                       href="{{ private_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
+                      Mine
+                    </a>
+                    {% if user|can_moderate:object_list.model and review_representation_url %}
+                      <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
+                         role="button"
+                         title="Show items pending review"
+                         aria-pressed="{% if list_type == 'review' %}true{% else %}false{% endif %}"
+                         {% if list_type == 'review' %}aria-disabled="true" tabindex="-1"{% endif %}
+                         href="{{ review_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review">
+                        Review
+                      </a>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              {% endblock scope_toggle %}
+              {% if explorer_url %}
                 <a class="btn btn-sm btn-outline-secondary"
-                   href="{{ dashboard_url }}"
-                   title="Open Explorer (dashboard)">
+                   href="{{ explorer_url }}"
+                   title="Open Explorer">
                   <i class="fas fa-table-cells-large"></i> Explorer
                 </a>
               {% endif %}
@@ -100,10 +102,10 @@
                 </div>
               {% endif %}
             {% endblock active_filters %}
+            {% block list_letter_index %}
+              {% include "partials/letter_index.html" %}
+            {% endblock list_letter_index %}
             {% block list_table %}
-              {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
-                {% include "object_management/bulk_access_toolbar.html" %}
-              {% endif %}
               <div class="table-responsive">
                 <table class="table modern-table">
                   {% block list_table_head %}
@@ -247,6 +249,7 @@
                   {% block filter_body %}
                     <form method="get">
                       {% crispy filter.form %}
+                      {% include "partials/letter_index_input.html" %}
                       <div class="d-flex justify-content-end gap-2 mt-2">
                         <button id="btn-filter"
                                 class="btn btn-sm btn-primary submit-filter"
@@ -280,6 +283,9 @@
                     {% endblock list_card_export_actions %}
                     {% block list_card_options_dropdown_additional_links %}
                     {% endblock list_card_options_dropdown_additional_links %}
+                    {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
+                      {% include "object_management/bulk_access_toolbar.html" with heading="Manage access for selected items" heading_class="mt-3 mb-1" %}
+                    {% endif %}
                     {% if not user.is_authenticated %}
                       <p class="text-muted small mt-3 mb-0">Log in to enable export and additional options.</p>
                     {% endif %}

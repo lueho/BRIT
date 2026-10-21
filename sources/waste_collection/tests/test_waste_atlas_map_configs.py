@@ -11,7 +11,7 @@ from importlib import import_module
 from django.apps import apps
 from django.template import Context
 from django.test import TestCase
-from django.urls import Resolver404, resolve
+from django.urls import Resolver404, resolve, reverse
 
 from sources.waste_collection.waste_atlas.map_configs import (
     MAP_CONFIGS,
@@ -24,6 +24,7 @@ from sources.waste_collection.waste_atlas.map_selection import (
     THEME_LABELS,
     WASTE_ATLAS_MAP_SELECTIONS,
     build_map_selection_context,
+    build_overview_directory_context,
 )
 from sources.waste_collection.waste_atlas.models import (
     WasteAtlasMapConfiguration,
@@ -681,6 +682,68 @@ class WasteAtlasMapConfigStructureTests(TestCase):
         )
 
 
+class MapSelectionContextCachingTests(TestCase):
+    """The selection/directory contexts resolve ~1000 URLs per call over a
+    static registry, so the resolved structure is cached per reverse
+    function."""
+
+    def test_repeated_calls_resolve_urls_only_once(self):
+        calls = []
+
+        def counting_reverse(route_name, args=None):
+            calls.append(route_name)
+            return f"/{route_name}/"
+
+        build_map_selection_context(counting_reverse)
+        resolved = len(calls)
+        self.assertGreater(resolved, 0)
+        build_map_selection_context(counting_reverse)
+        self.assertEqual(len(calls), resolved)
+
+    def test_directory_context_reuses_resolved_urls(self):
+        calls = []
+
+        def counting_reverse(route_name, args=None):
+            calls.append(route_name)
+            return f"/{route_name}/"
+
+        build_overview_directory_context(counting_reverse)
+        resolved = len(calls)
+        self.assertGreater(resolved, 0)
+        build_overview_directory_context(counting_reverse)
+        self.assertEqual(len(calls), resolved)
+
+    def test_selection_flags_still_vary_per_call(self):
+        selected = build_map_selection_context(
+            reverse, selected_map_set="DE", selected_theme="orga_level"
+        )
+        other = build_map_selection_context(
+            reverse, selected_map_set="SE", selected_theme="orga_level"
+        )
+
+        de_entry = next(
+            entry
+            for entry in selected["map_selection_map_sets"]
+            if entry["value"] == "DE"
+        )
+        se_entry = next(
+            entry for entry in other["map_selection_map_sets"] if entry["value"] == "SE"
+        )
+        self.assertTrue(de_entry["selected"])
+        self.assertTrue(se_entry["selected"])
+        self.assertEqual(selected["selected_map_set"], "DE")
+        self.assertEqual(other["selected_map_set"], "SE")
+
+    def test_cached_results_are_isolated_between_calls(self):
+        """Mutating a returned context must not poison the shared cache."""
+        first = build_map_selection_context(reverse)
+        first["map_selection_themes_by_map_set"]["DE"][0]["url"] = "MUTATED"
+        second = build_map_selection_context(reverse)
+        self.assertNotEqual(
+            second["map_selection_themes_by_map_set"]["DE"][0]["url"], "MUTATED"
+        )
+
+
 class WasteAtlasMapSelectionTests(TestCase):
     @staticmethod
     def _context(**kwargs):
@@ -713,3 +776,46 @@ class WasteAtlasMapSelectionTests(TestCase):
             for waste_category, labels in by_waste_category.items():
                 with self.subTest(map_set=map_set, waste_category=waste_category):
                     self.assertEqual(sorted(labels), sorted(set(labels)))
+
+
+class MapConfigurationLookupCachingTests(TestCase):
+    """MAP_CONFIGS lookups are per-request hot paths, so they are cached, but
+    the cache must stay in sync with runtime edits through the ORM."""
+
+    def test_repeated_lookup_does_not_query_again(self):
+        MAP_CONFIGS["collection_system"]
+        with self.assertNumQueries(0):
+            for _ in range(3):
+                config = MAP_CONFIGS["collection_system"]
+        self.assertIsInstance(config, dict)
+
+    def test_lookup_returns_an_independent_copy(self):
+        """Mutating a returned config must not corrupt the cached value."""
+        first = MAP_CONFIGS["collection_system"]
+        first["__probe__"] = "mutated"
+        first.setdefault("legend", {})["title"] = "mutated title"
+        second = MAP_CONFIGS["collection_system"]
+        self.assertNotIn("__probe__", second)
+        self.assertNotEqual(second.get("legend", {}).get("title"), "mutated title")
+
+    def test_lookup_reflects_saved_configuration(self):
+        MAP_CONFIGS["collection_system"]
+        stored = WasteAtlasMapConfiguration.objects.get(key="collection_system")
+        stored.configuration["marker"] = "updated"
+        stored.save()
+        self.assertEqual(MAP_CONFIGS["collection_system"]["marker"], "updated")
+
+    def test_lookup_raises_keyerror_after_delete(self):
+        MAP_CONFIGS["collection_system"]
+        WasteAtlasMapConfiguration.objects.get(key="collection_system").delete()
+        with self.assertRaises(KeyError):
+            MAP_CONFIGS["collection_system"]
+
+    def test_renamed_configuration_drops_the_old_key(self):
+        MAP_CONFIGS["collection_system"]
+        stored = WasteAtlasMapConfiguration.objects.get(key="collection_system")
+        stored.key = "collection_system_renamed"
+        stored.save()
+        with self.assertRaises(KeyError):
+            MAP_CONFIGS["collection_system"]
+        self.assertIsInstance(MAP_CONFIGS["collection_system_renamed"], dict)

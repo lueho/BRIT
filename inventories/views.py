@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import re
@@ -5,8 +6,8 @@ import re
 from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.db import transaction
-from django.db.models import Q
+from django.db import connection, transaction
+from django.db.models import Prefetch, Q
 from django.http import (
     Http404,
     HttpResponse,
@@ -15,16 +16,25 @@ from django.http import (
     JsonResponse,
 )
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
-from django.views.generic import CreateView, DetailView, TemplateView, View
+from django.urls import reverse, reverse_lazy
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
+from django.views.generic import (
+    CreateView,
+    DetailView,
+    RedirectView,
+    TemplateView,
+    View,
+)
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
 from django_tomselect.autocompletes import AutocompleteModelView
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from layer_manager.models import Layer
-from maps.models import GeoDataset
+from layer_manager.models import Layer, LayerAggregatedValue
+from maps.models import Catchment, GeoDataset, Region
 from maps.serializers import BaseResultMapSerializer
 from maps.views import GeoDataSetAutocompleteView, MapMixin
 from materials.models import Material, SampleSeries
@@ -42,7 +52,7 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateView,
     get_tomselect_filter_value,
 )
-from utils.views import BreadcrumbContextMixin
+from utils.views import BreadcrumbContextMixin, build_breadcrumb_context
 
 from .evaluations import ScenarioResult
 from .exceptions import InvalidParameterValue
@@ -161,13 +171,13 @@ class InventoryAlgorithmAutocompleteView(AutocompleteModelView):
 class PublishedScenarioFilterView(PublishedObjectFilterView):
     model = Scenario
     filterset_class = ScenarioFilterSet
-    dashboard_url = reverse_lazy("inventories-explorer")
+    explorer_url = reverse_lazy("inventories-explorer")
 
 
 class PrivateScenarioFilterView(PrivateObjectFilterView):
     model = Scenario
     filterset_class = ScenarioFilterSet
-    dashboard_url = reverse_lazy("inventories-explorer")
+    explorer_url = reverse_lazy("inventories-explorer")
 
 
 class ScenarioCreateView(UserCreatedObjectCreateView):
@@ -175,7 +185,59 @@ class ScenarioCreateView(UserCreatedObjectCreateView):
     permission_required = "inventories.add_scenario"
 
 
-class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
+def scenario_presentation_context(scenario, user):
+    """Region, catchment and showcase of ``scenario`` that ``user`` may read."""
+
+    def visible(model, pk):
+        if pk is None:
+            return None
+        return filter_queryset_for_user(model.objects.filter(pk=pk), user).first()
+
+    showcase_model = Scenario._meta.get_field("showcase").related_model
+    return {
+        "visible_region": visible(Region, scenario.region_id),
+        "visible_catchment": visible(Catchment, scenario.catchment_id),
+        "visible_showcase": visible(showcase_model, scenario.showcase_id),
+    }
+
+
+def inventories_for_template(config):
+    """Flatten ``Scenario.configuration_for_template()`` into one entry per inventory."""
+    return [
+        {
+            "feedstock": feedstock,
+            "algorithm": algorithm,
+            "parameters": [
+                (parameter, value)
+                for parameter, value in parameters.items()
+                if parameter is not None
+            ],
+        }
+        for feedstock, algorithms in config.items()
+        for algorithm, parameters in algorithms.items()
+    ]
+
+
+class ScenarioMapMixin(MapMixin):
+    """Draws only the scenario's region and catchment that the user may read."""
+
+    def _visible_feature_id(self, model, pk):
+        if pk is None:
+            return None
+        return (
+            filter_queryset_for_user(model.objects.filter(pk=pk), self.request.user)
+            .values_list("pk", flat=True)
+            .first()
+        )
+
+    def get_region_feature_id(self):
+        return self._visible_feature_id(Region, self.object.region_id)
+
+    def get_catchment_feature_id(self):
+        return self._visible_feature_id(Catchment, self.object.catchment_id)
+
+
+class ScenarioDetailView(ScenarioMapMixin, UserCreatedObjectDetailView):
     """Summary of the Scenario with complete configuration. Page for final review, which also contains the
     'run' button."""
 
@@ -189,7 +251,9 @@ class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
         self.config = self.object.configuration_for_template()
         context = self.get_context_data(object=self.object)
         context["config"] = self.config
+        context["inventories"] = inventories_for_template(self.config)
         context["allow_edit"] = self.allow_edit
+        context.update(scenario_presentation_context(self.object, request.user))
         return self.render_to_response(context)
 
     def post(self, request, *args, **kwargs):
@@ -431,9 +495,9 @@ class ScenarioAddInventoryAlgorithmView(
             request.POST.get("geodataset"),
             queryset=filter_queryset_for_user(GeoDataset.objects.all(), request.user),
         )
-        if geodataset.region_id != scenario.region_id:
+        if not scenario.compatible_geodatasets().filter(pk=geodataset.pk).exists():
             return HttpResponseBadRequest(
-                "The geodataset does not belong to the scenario region."
+                "The geodataset does not cover the scenario region."
             )
         if function_name not in InventoryAlgorithms.generic_functions(geodataset):
             return HttpResponseBadRequest(
@@ -704,13 +768,14 @@ class ScenarioRemoveInventoryAlgorithmView(
 
 
 class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
-    """GeoDataset autocomplete scoped to a scenario's region.
+    """GeoDataset autocomplete scoped to datasets covering a scenario's region.
 
     The widget passes the scenario id via either ``filter_by`` or
     ``exclude_by`` and an optional feedstock id via ``filter_by``. With a
     feedstock, datasets already configured for that feedstock's material in
-    the scenario are excluded. Without one, every dataset in the region is
-    offered — generic algorithms work on any dataset.
+    the scenario are excluded. Without one, every dataset of the scenario
+    region or of a region enclosing it is offered — generic algorithms work
+    on any dataset.
     """
 
     def apply_filters(self, queryset):
@@ -727,7 +792,7 @@ class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
         except Scenario.DoesNotExist:
             return GeoDataset.objects.none()
 
-        queryset = queryset.filter(region=scenario.region)
+        queryset = scenario.compatible_geodatasets(queryset)
 
         if feedstock_id:
             try:
@@ -922,37 +987,77 @@ def download_scenario_summary(request, scenario_pk):
         return response
 
 
-class ResultMapAPI(APIView):
-    """REST API to get GeoJSON features from scenario result layers.
+def get_visible_result_layer(user, layer_name):
+    """Return the live result layer of a scenario the user may read, else 404."""
+    visible_scenarios = filter_queryset_for_user(Scenario.objects.all(), user)
+    return get_object_or_404(
+        Layer.objects.select_related("scenario"),
+        table_name=layer_name,
+        scenario__in=visible_scenarios,
+    )
 
-    Returns GeoJSON feature collection for Leaflet map rendering.
-    The layer_name parameter identifies the dynamically generated result table.
+
+def result_layer_version(layer):
+    """Fingerprint of the layer's feature rows and aggregates.
+
+    Recomputations replace the rows of the result table, so hashing their
+    content changes the token whenever any result value or geometry changes.
     """
+    table = connection.ops.quote_name(layer.get_feature_collection()._meta.db_table)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"SELECT md5(coalesce(string_agg(t::text, '|' ORDER BY t.id), '')) "  # noqa: S608
+            f"FROM {table} t"
+        )
+        features_digest = cursor.fetchone()[0]
+    aggregates = list(
+        layer.layeraggregatedvalue_set.order_by("pk").values_list(
+            "pk", "name", "value", "unit"
+        )
+    )
+    payload = json.dumps([layer.pk, features_digest, aggregates], default=str)
+    return hashlib.sha256(payload.encode()).hexdigest()[:32]
+
+
+def mark_private_result_uncacheable(response, layer):
+    """Keep layers of unpublished scenarios out of browser caches."""
+    if layer.scenario.publication_status != Scenario.STATUS_PUBLISHED:
+        response["Cache-Control"] = "private, no-store"
+    return response
+
+
+class ResultLayerGeoJSONAPI(APIView):
+    """GeoJSON feature collection of a scenario result layer for Leaflet maps."""
+
+    permission_classes = (AllowAny,)
 
     def get(self, request, layer_name):
-        try:
-            layer = Layer.objects.select_related("scenario").get(table_name=layer_name)
-        except Layer.DoesNotExist:
-            return Response({"error": "Layer not found"}, status=404)
-
+        layer = get_visible_result_layer(request.user, layer_name)
         feature_collection = layer.get_feature_collection()
-        features = feature_collection.objects.all()
-
-        # Dynamically configure serializer for the result table model
-        serializer_class = BaseResultMapSerializer
-        serializer_class.Meta.model = feature_collection
-
-        serializer = serializer_class(features, many=True)
-        data = {
-            "catchment_id": layer.scenario.catchment_id,
-            "region_id": layer.scenario.region_id,
-            "geoJson": serializer.data,
-        }
-
-        return Response(data)
+        meta = type(
+            "Meta", (BaseResultMapSerializer.Meta,), {"model": feature_collection}
+        )
+        serializer_class = type(
+            "ResultLayerSerializer", (BaseResultMapSerializer,), {"Meta": meta}
+        )
+        serializer = serializer_class(feature_collection.objects.all(), many=True)
+        response = Response(serializer.data)
+        response["X-Data-Version"] = result_layer_version(layer)
+        return mark_private_result_uncacheable(response, layer)
 
 
-class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
+class ResultLayerVersionAPI(APIView):
+    """Version token used by maps.js to revalidate cached result geometries."""
+
+    permission_classes = (AllowAny,)
+
+    def get(self, request, layer_name):
+        layer = get_visible_result_layer(request.user, layer_name)
+        response = Response({"version": result_layer_version(layer)})
+        return mark_private_result_uncacheable(response, layer)
+
+
+class ScenarioResultView(ScenarioMapMixin, UserCreatedObjectDetailView):
     """
     View with summaries of the results of each algorithm and a total summary.
     """
@@ -964,15 +1069,30 @@ class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
         context = super().get_context_data(**kwargs)
         scenario = self.object
         result = ScenarioResult(scenario)
-        context["layers"] = [layer.as_dict() for layer in result.layers]
+        context["result_layers"] = (
+            result.layers.select_related("feedstock", "algorithm__geodataset")
+            .prefetch_related(
+                Prefetch(
+                    "layeraggregatedvalue_set",
+                    queryset=LayerAggregatedValue.objects.order_by("pk"),
+                )
+            )
+            .order_by("pk")
+        )
         context["charts"] = result.get_charts()
+        context.update(scenario_presentation_context(scenario, self.request.user))
         return context
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
         if scenario.status == ScenarioStatus.Status.RUNNING:
-            context = {"scenario": scenario, "task_list": {"tasks": []}}
+            context = {
+                "object": scenario,
+                "scenario": scenario,
+                "task_list": {"tasks": []},
+                **scenario_presentation_context(scenario, request.user),
+            }
             for task in RunningTask.objects.filter(
                 scenario=scenario, algorithm__isnull=False
             ).select_related("algorithm"):
@@ -988,20 +1108,39 @@ class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
             return render(
                 request,
                 "evaluation_failed.html",
-                {"scenario": scenario},
+                {
+                    "object": scenario,
+                    "scenario": scenario,
+                    **scenario_presentation_context(scenario, request.user),
+                },
             )
         context = self.get_context_data()
         return self.render_to_response(context)
 
 
-class ScenarioEvaluationProgressView(DetailView):
-    """
-    The page users land on if a scenario is being calculated. The progress of the evaluation is shown and upon
-    finishing the calculation, the user is redirected to the result page.
-    """
+class ScenarioEvaluationProgressView(RedirectView):
+    """The result page shows the progress, failure or results of a scenario."""
 
-    template_name = "evaluation_progress.html"
+    pattern_name = "scenario-result"
+
+
+@method_decorator(never_cache, name="dispatch")
+class ScenarioEvaluationStatusView(UserCreatedObjectDetailView):
+    """Whether a scenario is still evaluating, and the Celery state of each algorithm."""
+
     model = Scenario
+
+    def get(self, request, *args, **kwargs):
+        scenario = self.get_object()
+        tasks = RunningTask.objects.filter(scenario=scenario, algorithm__isnull=False)
+        return JsonResponse(
+            {
+                "running": scenario.status == ScenarioStatus.Status.RUNNING,
+                "tasks": {
+                    str(task.uuid): AsyncResult(str(task.uuid)).status for task in tasks
+                },
+            }
+        )
 
 
 class ScenarioResultDetailMapView(MapMixin, DetailView):
@@ -1012,23 +1151,61 @@ class ScenarioResultDetailMapView(MapMixin, DetailView):
     template_name = "result_detail_map.html"
 
     def get_object(self, **kwargs):
-        scenario = get_object_or_404(Scenario, id=self.kwargs.get("pk"))
+        visible_scenarios = filter_queryset_for_user(
+            Scenario.objects.all(), self.request.user
+        )
+        scenario = get_object_or_404(visible_scenarios, id=self.kwargs.get("pk"))
         algorithm = get_object_or_404(
             InventoryAlgorithm, id=self.kwargs.get("algorithm_pk")
         )
         feedstock = get_object_or_404(Material, id=self.kwargs.get("feedstock_pk"))
         return get_object_or_404(
-            Layer, scenario=scenario, algorithm=algorithm, feedstock=feedstock
+            Layer.objects.select_related("scenario", "algorithm__geodataset"),
+            scenario=scenario,
+            algorithm=algorithm,
+            feedstock=feedstock,
         )
 
     def get_region_feature_id(self):
-        return self.object.algorithm.geodataset.region.id
+        return self.object.scenario.region_id
 
     def get_catchment_feature_id(self):
-        return self.object.scenario.catchment.id
+        return self.object.scenario.catchment_id
+
+    def get_features_feature_id(self):
+        return None
+
+    def get_features_geometries_url(self):
+        return reverse(
+            "data-result-layer", kwargs={"layer_name": self.object.table_name}
+        )
+
+    def get_override_params(self):
+        params = super().get_override_params()
+        params["load_features"] = True
+        params["features_layer_details_url_template"] = ""
+        params["features_layer_summary_url"] = ""
+        return params
 
     def get_map_title(self):
         return f"{self.object.scenario.name}: {self.object.algorithm.geodataset.name}"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        scenario = self.object.scenario
+        context.update(
+            build_breadcrumb_context(
+                module_label="Inventories",
+                module_url=reverse("inventories-explorer"),
+                section_label="Scenarios",
+                section_url=reverse("scenario-list"),
+                object_label=scenario.name,
+                object_url=reverse("scenario-result", kwargs={"pk": scenario.pk}),
+                action_label="Result map",
+                page_title=self.get_map_title(),
+            )
+        )
+        return context
 
 
 @login_required

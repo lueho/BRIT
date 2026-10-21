@@ -29,6 +29,7 @@ from django.views.generic.detail import SingleObjectMixin
 
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
+from processes.models import Process
 from utils.file_export.views import (
     GenericUserCreatedObjectExportView,
     SingleObjectFileExportView,
@@ -112,6 +113,7 @@ from .forms import (
     SampleModalModelForm,
     SampleModelForm,
     SampleQuickCreateForm,
+    SampleSectionFormSet,
     SampleSeriesAddTemporalDistributionModalModelForm,
     SampleSeriesModalModelForm,
     SampleSeriesModelForm,
@@ -168,7 +170,7 @@ def _visible_or_none(model, obj, user):
 
 
 class MaterialsExplorerView(TemplateView):
-    template_name = "materials_dashboard.html"
+    template_name = "materials_explorer.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -213,18 +215,18 @@ class MaterialsDiagramView(TemplateView):
 class MaterialCategoryPublishedListView(PublishedObjectFilterView):
     model = MaterialCategory
     filterset_class = MaterialCategoryListFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class MaterialCategoryPrivateListView(PrivateObjectFilterView):
     model = MaterialCategory
     filterset_class = MaterialCategoryListFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class MaterialCategoryReviewListView(ReviewObjectListView):
     model = MaterialCategory
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class MaterialCategoryCreateView(UserCreatedObjectCreateView):
@@ -303,7 +305,7 @@ class MaterialPublishedListView(PublishedObjectFilterView):
     filterset_class = MaterialListFilter
     queryset = Material.objects.prefetch_related("categories")
     template_name = "materials/material_list.html"
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class MaterialPrivateListView(PrivateObjectFilterView):
@@ -311,7 +313,7 @@ class MaterialPrivateListView(PrivateObjectFilterView):
     filterset_class = MaterialListFilter
     queryset = Material.objects.prefetch_related("categories")
     template_name = "materials/material_list.html"
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class MaterialReviewListView(ReviewObjectFilterView):
@@ -319,7 +321,7 @@ class MaterialReviewListView(ReviewObjectFilterView):
     filterset_class = MaterialListFilter
     queryset = Material.objects.prefetch_related("categories")
     template_name = "materials/material_list.html"
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class MaterialCreateView(UserCreatedObjectCreateView):
@@ -367,6 +369,23 @@ class MaterialDetailView(UserCreatedObjectDetailView):
         ).count()
         context["related_samples_list_url"] = (
             f"{reverse('sample-list')}?substrate_material={self.object.pk}"
+        )
+        processes = filter_queryset_for_user(
+            Process.objects.filter(
+                pk__in=self.object.process_materials.values("process_id")
+            ),
+            user,
+        ).order_by("name", "pk")
+        (
+            context["related_processes"],
+            context["related_processes_total"],
+            context["related_processes_more"],
+        ) = _capped_related(processes)
+        context["related_processes_published_total"] = processes.filter(
+            publication_status="published"
+        ).count()
+        context["related_processes_list_url"] = (
+            f"{reverse('processes:process-list')}?material={self.object.pk}"
         )
         return context
 
@@ -497,18 +516,18 @@ class SampleSubstrateMaterialQuickCreateView(
 class ComponentPublishedListView(PublishedObjectFilterView):
     model = MaterialComponent
     filterset_class = MaterialComponentListFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class ComponentPrivateListView(PrivateObjectFilterView):
     model = MaterialComponent
     filterset_class = MaterialComponentListFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class ComponentReviewListView(ReviewObjectListView):
     model = MaterialComponent
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class ComponentCreateView(UserCreatedObjectCreateView):
@@ -647,18 +666,18 @@ class ComponentAutocompleteView(UserCreatedObjectAutocompleteView):
 class MaterialComponentGroupPublishedListView(PublishedObjectFilterView):
     model = MaterialComponentGroup
     filterset_class = MaterialComponentGroupListFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class MaterialComponentGroupPrivateListView(PrivateObjectFilterView):
     model = MaterialComponentGroup
     filterset_class = MaterialComponentGroupListFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class MaterialComponentGroupReviewListView(ReviewObjectListView):
     model = MaterialComponentGroup
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class MaterialComponentGroupCreateView(UserCreatedObjectCreateView):
@@ -751,18 +770,18 @@ class MaterialComponentGroupAutocompleteView(UserCreatedObjectAutocompleteView):
 class MaterialPropertyPublishedListView(PublishedObjectFilterView):
     model = MaterialProperty
     filterset_class = MaterialPropertyListFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class MaterialPropertyPrivateListView(PrivateObjectFilterView):
     model = MaterialProperty
     filterset_class = MaterialPropertyListFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class MaterialPropertyReviewListView(ReviewObjectListView):
     model = MaterialProperty
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class MaterialPropertyCreateView(UserCreatedObjectCreateView):
@@ -985,18 +1004,18 @@ class ComponentMeasurementModalDeleteView(UserCreatedObjectModalDeleteView):
 class AnalyticalMethodPublishedListView(PublishedObjectFilterView):
     model = AnalyticalMethod
     filterset_class = AnalyticalMethodListFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class AnalyticalMethodPrivateListView(PrivateObjectFilterView):
     model = AnalyticalMethod
     filterset_class = AnalyticalMethodListFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class AnalyticalMethodReviewListView(ReviewObjectListView):
     model = AnalyticalMethod
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class AnalyticalMethodCreateView(UserCreatedObjectCreateView):
@@ -1057,19 +1076,19 @@ class AnalyticalMethodAutocompleteView(UserCreatedObjectAutocompleteView):
 class SampleSeriesPublishedListView(PublishedObjectFilterView):
     model = SampleSeries
     filterset_class = SampleSeriesFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class SampleSeriesPrivateListView(PrivateObjectFilterView):
     model = SampleSeries
     filterset_class = SampleSeriesFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class SampleSeriesReviewListView(ReviewObjectFilterView):
     model = SampleSeries
     filterset_class = SampleSeriesFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class SampleSeriesCreateView(UserCreatedObjectCreateView):
@@ -1198,21 +1217,21 @@ class SampleGroupPublishedListView(PublishedObjectFilterView):
     queryset = SampleGroup.objects.annotate(
         member_count=Count("samples", filter=Q(samples__publication_status="published"))
     )
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class SampleGroupPrivateListView(PrivateObjectFilterView):
     model = SampleGroup
     filterset_class = SampleGroupFilter
     queryset = SampleGroup.objects.annotate(member_count=Count("samples"))
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class SampleGroupReviewListView(ReviewObjectFilterView):
     model = SampleGroup
     filterset_class = SampleGroupFilter
     queryset = SampleGroup.objects.annotate(member_count=Count("samples"))
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class SampleGroupCreateView(UserCreatedObjectCreateView):
@@ -1313,7 +1332,7 @@ def get_sample_representation_urls():
     """Return the URLs for the sample representation switcher.
 
     The switcher offers true peer representations of the same sample dataset
-    (list and gallery). The Explorer dashboard is a separate
+    (list and gallery). The explorer is a separate
     navigation level and is intentionally not part of this set.
     """
     return {
@@ -1405,7 +1424,7 @@ def build_sample_card_data(samples):
 class SampleRepresentationMixin:
     model = Sample
     filterset_class = SampleFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
     def get_queryset(self):
         queryset = (
@@ -1482,19 +1501,19 @@ class SampleReviewGalleryView(SampleRepresentationMixin, ReviewObjectFilterView)
 class SamplePublishedListView(SampleRepresentationMixin, PublishedObjectFilterView):
     model = Sample
     filterset_class = PublishedSampleFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class SamplePrivateListView(SampleRepresentationMixin, PrivateObjectFilterView):
     model = Sample
     filterset_class = UserOwnedSampleFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class SampleReviewListView(SampleRepresentationMixin, ReviewObjectFilterView):
     model = Sample
     filterset_class = SampleFilter
-    dashboard_url = reverse_lazy("materials-explorer")
+    explorer_url = reverse_lazy("materials-explorer")
 
 
 class SampleListFileExportView(GenericUserCreatedObjectExportView):
@@ -1773,7 +1792,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
             {
                 "representation_mode": "detail",
                 "list_type": "published",
-                "dashboard_url": reverse_lazy("materials-explorer"),
+                "explorer_url": reverse_lazy("materials-explorer"),
                 "public_map_url": None,
                 "private_map_url": None,
                 "review_map_url": None,
@@ -1865,6 +1884,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
             component_measurements
         )
         primary_source = self.object.sources.first()
+        sample_authors = self.object.visible_ordered_authors(self.request.user)
         review_timeline = self._build_review_timeline()
         related = self._build_related_samples(limit=8)
 
@@ -1899,6 +1919,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
             "grouped_measurements": grouped_measurements,
             "charts": self._build_composition_charts(display_compositions),
             "primary_source": primary_source,
+            "sample_authors": sample_authors,
             "sample_policy": sample_policy,
             "review_timeline": review_timeline,
             "related_samples": related,
@@ -2081,6 +2102,7 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
                 self.object,
                 self.section,
                 self.request,
+                formset_class=SampleSectionFormSet,
             )
         return self.inlines
 
@@ -2133,7 +2155,13 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
                     "message": message,
                     "html": render_to_string(
                         "materials/includes/sample_section_summary.html",
-                        {"object": self.object, "section": self.section},
+                        {
+                            "object": self.object,
+                            "section": self.section,
+                            "sample_authors": self.object.visible_ordered_authors(
+                                self.request.user
+                            ),
+                        },
                         request=self.request,
                     ),
                 }
@@ -2344,19 +2372,32 @@ def ensure_derived_composition_settings(sample, owner):
     for composition in sample.compositions.order_by("order", "id"):
         composition_settings_by_group.setdefault(composition.group_id, composition)
 
-    default_component = MaterialComponent.objects.default()
-    for measurement in sample.component_measurements.select_related("group").order_by(
-        "group__name", "group_id", "id"
-    ):
+    other_component = MaterialComponent.objects.other()
+    groups = {}
+    bases_by_group = defaultdict(set)
+    for measurement in sample.component_measurements.select_related(
+        "group", "component"
+    ).order_by("group__name", "group_id", "id"):
         if measurement.group_id in composition_settings_by_group:
             continue
-        composition_settings_by_group[measurement.group_id] = (
-            Composition.objects.create(
-                owner=owner,
-                sample=sample,
-                group=measurement.group,
-                fractions_of=default_component,
-            )
+        groups.setdefault(measurement.group_id, measurement.group)
+        if (
+            measurement.component_id != other_component.pk
+            and not measurement.component.is_aggregate
+        ):
+            bases_by_group[measurement.group_id].add(measurement.basis_component_id)
+
+    default_component = MaterialComponent.objects.default()
+    for group_id, group in groups.items():
+        bases = bases_by_group[group_id]
+        fractions_of_id = (
+            next(iter(bases)) if len(bases) == 1 and None not in bases else None
+        )
+        composition_settings_by_group[group_id] = Composition.objects.create(
+            owner=owner,
+            sample=sample,
+            group=group,
+            fractions_of_id=fractions_of_id or default_component.pk,
         )
 
     return composition_settings_by_group

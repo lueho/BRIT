@@ -5,7 +5,12 @@
 selector with a consistent label.
 """
 
+from copy import deepcopy
+from functools import lru_cache
 from urllib.parse import urlencode
+
+from django.conf import settings
+from django.urls import get_urlconf
 
 from .map_configs import MAP_CONFIGS
 from .pages import MAP_PAGES, MAP_SET_LABELS
@@ -483,9 +488,8 @@ def resolve_map_set(country, nuts_prefix="", nuts_level=""):
     return country
 
 
-def build_map_selection_context(
-    reverse_func, selected_map_set="DE", selected_theme="orga_level"
-):
+def _resolved_map_selection(reverse_func):
+    """Resolve all selector URLs — expensive, only depends on ``reverse_func``."""
     map_sets = []
     themes_by_map_set = {}
     for map_set, map_selection in WASTE_ATLAS_MAP_SELECTIONS.items():
@@ -511,15 +515,42 @@ def build_map_selection_context(
                 "country": MAP_SET_REGION_SCOPES[map_set]["country"],
                 "nuts_prefix": MAP_SET_REGION_SCOPES[map_set]["nuts_prefix"],
                 "nuts_level": MAP_SET_REGION_SCOPES[map_set]["nuts_level"],
-                "selected": map_set == selected_map_set,
             }
         )
     _add_generic_theme_fallbacks(themes_by_map_set, reverse_func)
+    return map_sets, themes_by_map_set
+
+
+def _resolved_urlconf():
+    """The urlconf ``reverse`` would use — thread-local override or default."""
+    return get_urlconf() or settings.ROOT_URLCONF
+
+
+@lru_cache(maxsize=32)
+def _map_selection_base(reverse_func, urlconf):
+    """Resolved selector structure shared across calls.
+
+    The registry is static, so resolving ~600 URLs once per reverse function
+    and urlconf is enough; callers get a ``deepcopy`` and apply their
+    per-request selection flags on top.
+    """
+    return _resolved_map_selection(reverse_func)
+
+
+def build_map_selection_context(
+    reverse_func, selected_map_set="DE", selected_theme="orga_level"
+):
+    map_sets, themes_by_map_set = deepcopy(
+        _map_selection_base(reverse_func, _resolved_urlconf())
+    )
+    for entry in map_sets:
+        entry["selected"] = entry["value"] == selected_map_set
     return {
         "map_selection_map_sets": map_sets,
         "map_selection_themes_by_map_set": themes_by_map_set,
         "map_selection_waste_categories": MAP_SELECTION_WASTE_CATEGORIES,
         "map_selection_years": MAP_SELECTION_YEARS,
+        "atlas_urlconf": _resolved_urlconf(),
         "selected_map_set": selected_map_set,
         "selected_map_theme": selected_theme,
         "selected_waste_category": _selected_waste_category(
@@ -622,16 +653,10 @@ def _directory_region_context(map_set, themes, reverse_func):
     }
 
 
-def build_overview_directory_context(reverse_func, selected_region=None):
-    """Build the registry-driven overview directory grouped by region tab.
-
-    The directory is generated entirely from ``MAP_PAGES`` (via
-    ``build_map_selection_context``) so it can never drift from the routed map
-    pages. Each region tab lists its map sets, and each map set's themes are
-    grouped into ordered sections using the full ``THEME_LABELS``.
-    """
-    selection = build_map_selection_context(reverse_func)
-    themes_by_map_set = selection["map_selection_themes_by_map_set"]
+@lru_cache(maxsize=32)
+def _overview_directory_base(reverse_func, urlconf):
+    """Resolved directory groups shared across calls (see ``_map_selection_base``)."""
+    _map_sets, themes_by_map_set = _map_selection_base(reverse_func, urlconf)
 
     groups = []
     for group in OVERVIEW_REGION_GROUPS:
@@ -656,9 +681,22 @@ def build_overview_directory_context(reverse_func, selected_region=None):
                 for entry in OVERVIEW_EUROPE_MAPS
             ]
         groups.append(group_context)
+    return groups
 
+
+def build_overview_directory_context(reverse_func, selected_region=None):
+    """Build the registry-driven overview directory grouped by region tab.
+
+    The directory is generated entirely from ``MAP_PAGES`` (via
+    ``build_map_selection_context``) so it can never drift from the routed map
+    pages. Each region tab lists its map sets, and each map set's themes are
+    grouped into ordered sections using the full ``THEME_LABELS``.
+    """
     return {
-        "directory_region_groups": groups,
+        "directory_region_groups": deepcopy(
+            _overview_directory_base(reverse_func, _resolved_urlconf())
+        ),
+        "atlas_urlconf": _resolved_urlconf(),
         "directory_waste_categories": MAP_SELECTION_WASTE_CATEGORIES,
         "directory_selected_region": resolve_overview_region(selected_region),
     }

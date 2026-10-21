@@ -3,65 +3,66 @@
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 {% block title %}
-    BRIT | CLOSECYCLE Showcases
+  BRIT | CLOSECYCLE Showcases
 {% endblock title %}
 {% block list_intro %}
-    <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
-         role="region"
-         aria-label="Module introduction">
-        <div class="flex-grow-1">
-            <strong><i class="fas fa-sync-alt me-1"></i> CLOSECYCLE</strong>
-            <p class="mb-0 small text-muted">
-                Showcases of circular economy approaches for biogenic residues
-                across different European regions.
-            </p>
-        </div>
-        <button type="button"
-                class="btn-close ms-3"
-                data-bs-dismiss="alert"
-                aria-label="Dismiss"></button>
+  <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
+       role="region"
+       aria-label="Module introduction">
+    <div class="flex-grow-1">
+      <strong><i class="fas fa-sync-alt me-1"></i> CLOSECYCLE</strong>
+      <p class="mb-0 small text-muted">
+        Showcases of circular economy approaches for biogenic residues
+        across different European regions.
+      </p>
     </div>
+    <button type="button"
+            class="btn-close ms-3"
+            data-bs-dismiss="alert"
+            aria-label="Dismiss"></button>
+  </div>
 {% endblock list_intro %}
 {% block list_card_header %}
-    <strong>Showcases</strong>
+  <strong>Showcases</strong>
 {% endblock list_card_header %}
 {% block list_table %}
-    <div class="collection-list-min-height">
-        <div class="table-responsive">
-            <table class="table modern-table">
-                <thead>
-                    <tr>
-                        <th>Showcase</th>
-                        {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for object in object_list %}
-                        <tr>
-                            <td data-label="Showcase" class="ps-3">
-                                <a href="{% detail_or_review_url object use_back=True %}"
-                                   class="text-decoration-none">
-                                    <strong class="d-block">{{ object.name }}</strong>
-                                    <span class="text-muted small">{{ object.region.name }}
-                                        {% if object.description %}
-                                            ·
-                                            {{ object.description|truncatewords:15 }}
-                                        {% endif %}
-                                    </span>
-                                </a>
-                            </td>
-                            {% if object_list.model|is_user_created %}
-                                <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
-                            {% endif %}
-                        </tr>
-                    {% empty %}
-                        {% include "includes/list_empty_state.html" %}
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+  <div class="collection-list-min-height">
+    <div class="table-responsive">
+      <table class="table modern-table">
+        <thead>
+          <tr>
+            <th>Showcase</th>
+            {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for object in object_list %}
+            <tr>
+              <td data-label="Showcase" class="ps-3">
+                <a href="{% detail_or_review_url object use_back=True %}"
+                   class="text-decoration-none">
+                  <strong class="d-block">{{ object.name }}</strong>
+                  {% if object.theme_info %}<span class="badge text-bg-light">{{ object.theme_info.label }}</span>{% endif %}
+                  <span class="text-muted small">{{ object.region.name }}
+                    {% if object.description %}
+                      ·
+                      {{ object.description|truncatewords:15 }}
+                    {% endif %}
+                  </span>
+                </a>
+              </td>
+              {% if object_list.model|is_user_created %}
+                <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+              {% endif %}
+            </tr>
+          {% empty %}
+            {% include "includes/list_empty_state.html" %}
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+  </div>
 {% endblock list_table %}
 {% block learning_pane_body %}
-    {% include "closecycle/includes/learning_materials.html" %}
+  {% include "closecycle/includes/learning_materials.html" %}
 {% endblock learning_pane_body %}

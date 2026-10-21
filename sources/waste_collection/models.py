@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from bibliography.models import Source
-from distributions.models import Period, TemporalDistribution
+from distributions.models import Period
 from maps.models import Catchment
 from materials.models import Material, MaterialCategory, MaterialManager, Sample
 from utils.object_management.models import (
@@ -101,7 +101,12 @@ class WasteCategory(NamedUserCreatedObject):
 
 class WasteComponentManager(MaterialManager):
     def get_queryset(self):
-        return super().get_queryset().filter(categories__name="Biowaste component")
+        return (
+            super()
+            .get_queryset()
+            .filter(categories__name="Biowaste component")
+            .distinct()
+        )
 
 
 class WasteComponent(Material):
@@ -114,7 +119,9 @@ class WasteComponent(Material):
 @receiver(post_save, sender=WasteComponent)
 def add_material_category(sender, instance, created, **kwargs):
     if created:
-        category = MaterialCategory.objects.get(name="Biowaste component")
+        category = MaterialCategory.objects.get(
+            name="Biowaste component", owner=get_default_owner()
+        )
         instance.categories.add(category)
         instance.save()
 
@@ -159,10 +166,25 @@ def check_url_valid(sender, instance, created, **kwargs):
 
 class CollectionSeasonManager(UserCreatedObjectManager):
     def get_queryset(self):
-        distribution = TemporalDistribution.objects.get(
-            owner=get_default_owner(), name="Months of the year"
+        # Filter by join instead of fetching owner and distribution eagerly:
+        # get_queryset runs on every CollectionSeason.objects access, so those
+        # two lookups cost two queries each time.
+        username = getattr(settings, "DEFAULT_OBJECT_OWNER_USERNAME", None)
+        if not username:
+            username = getattr(settings, "ADMIN_USERNAME", None)
+        if not username:
+            raise RuntimeError(
+                "Neither DEFAULT_OBJECT_OWNER_USERNAME in settings "
+                "nor ADMIN_USERNAME env var is set."
+            )
+        return (
+            super()
+            .get_queryset()
+            .filter(
+                distribution__name="Months of the year",
+                distribution__owner__username=username,
+            )
         )
-        return super().get_queryset().filter(distribution=distribution)
 
 
 class CollectionSeason(Period):
@@ -1008,6 +1030,12 @@ class CollectionPropertyValue(PropertyValue):
         default=False,
         help_text="True when this value was computed from another property (e.g. total ↔ specific via population).",
     )
+
+    def get_breadcrumb_object_label(self):
+        label = f"{self.property}: {self.display_average}"
+        if self.standard_deviation:
+            label += f" ± {self.display_standard_deviation}"
+        return label
 
     @property
     def year_outside_collection_period(self):

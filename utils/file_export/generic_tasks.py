@@ -1,4 +1,5 @@
 import logging
+from types import SimpleNamespace
 
 from celery import shared_task
 from django.contrib.auth import get_user_model
@@ -72,7 +73,12 @@ def export_user_created_object_to_file(
         else:
             base_qs = spec.model.objects.all()
 
-    qs = spec.filterset(qdict, queryset=base_qs).qs
+    # Filtersets with user-dependent filters (e.g. visible related names) read
+    # ``request.user``; give them the export's user instead of no request.
+    from django.contrib.auth.models import AnonymousUser
+
+    request = SimpleNamespace(user=user or AnonymousUser())
+    qs = spec.filterset(qdict, queryset=base_qs, request=request).qs
     total = qs.count()
 
     # Report initial state

@@ -37,7 +37,6 @@ from utils.tests.testcases import (
 from utils.tests.testrunner import serial_test
 
 from ..models import (
-    Attribute,
     Catchment,
     GeoDataset,
     GeoDatasetRuntimeConfiguration,
@@ -465,7 +464,7 @@ class LocationCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
     model = Location
     add_scope_query_param_to_list_urls = True
 
-    view_dashboard_name = "maps-dashboard"
+    view_explorer_name = "maps-explorer"
     view_create_name = "location-create"
     view_published_list_name = "location-list"
     view_private_list_name = "location-list-owned"
@@ -493,7 +492,7 @@ class RegionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     model = Region
     add_scope_query_param_to_list_urls = True
 
-    view_dashboard_name = "maps-dashboard"
+    view_explorer_name = "maps-explorer"
     view_create_name = "region-create"
     view_published_list_name = "region-list"
     view_private_list_name = "region-list-owned"
@@ -578,7 +577,7 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     model = Catchment
     model_add_permission = "add_catchment"
 
-    view_dashboard_name = "maps-dashboard"
+    view_explorer_name = "maps-explorer"
     view_create_name = "catchment-create"
     view_published_list_name = "catchment-list"
     view_private_list_name = "catchment-list-owned"
@@ -1450,40 +1449,6 @@ class NutsAndLauCatchmentPedigreeAPITestCase(ViewSetWithPermissionsTestCase):
         self.assertIn("id_level_4", response.data)
 
 
-# ----------- Attribute CRUD -------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class AttributeCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
-    modal_detail_view = True
-    modal_update_view = True
-    modal_create_view = True
-    add_scope_query_param_to_list_urls = True
-
-    model = Attribute
-
-    view_dashboard_name = "maps-dashboard"
-    view_create_name = "attribute-create"
-    view_modal_create_name = "attribute-create-modal"
-    view_published_list_name = "attribute-list"
-    view_private_list_name = "attribute-list-owned"
-    view_detail_name = "attribute-detail"
-    view_modal_detail_name = "attribute-detail-modal"
-    view_update_name = "attribute-update"
-    view_modal_update_name = "attribute-update-modal"
-    view_delete_name = "attribute-delete-modal"
-
-    create_object_data = {
-        "name": "Test Attribute",
-        "unit": "Test Unit",
-    }
-    update_object_data = {
-        "name": "Updated Test Attribute",
-        "unit": "Updated Test Unit",
-        "description": "Updated description",
-    }
-
-
 # ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -1499,7 +1464,7 @@ class RegionAttributeValueCRUDViewsTestCase(
 
     model = RegionAttributeValue
 
-    view_dashboard_name = "maps-dashboard"
+    view_explorer_name = "maps-explorer"
     view_create_name = "regionattributevalue-create"
     view_modal_create_name = "regionattributevalue-create-modal"
     view_detail_name = "regionattributevalue-detail"
@@ -2167,6 +2132,113 @@ class GeoJSONCachingTests(TestCase):
 
 
 @serial_test
+class LargeGeometryMemoryTests(TestCase):
+    def setUp(self):
+        self.cache = caches[settings.GEOJSON_CACHE]
+        self.cache.clear()
+        self.addCleanup(self.cache.clear)
+        self.region = Region(name="Large geometry")
+        self.region.geom = MultiPolygon(
+            Polygon(((0, 0), (1, 0), (1, 1), (0, 1), (0, 0)))
+        )
+        self.region.save()
+        self.url = reverse("api-region-geojson")
+
+    def test_single_complex_geometry_streams_without_loading_geos_objects(self):
+        with (
+            patch("maps.mixins.GEOJSON_MAX_BUFFERED_POINTS", 4, create=True),
+            CaptureQueriesContext(connection) as queries,
+        ):
+            response = self.client.get(self.url, {"id": self.region.pk})
+            self.assertTrue(response.streaming)
+            data = json.loads(b"".join(response.streaming_content))
+        self.assertEqual(response["X-Cache-Status"], "STREAM")
+        self.assertEqual(len(data["features"]), 1)
+        self.assertEqual(data["features"][0]["geometry"]["type"], "MultiPolygon")
+        geom_column = f'"{GeoPolygon._meta.db_table}"."geom"::bytea'
+        self.assertFalse(any(geom_column in q["sql"] for q in queries))
+        self.assertTrue(any("ST_AsGeoJSON" in q["sql"] for q in queries))
+
+    def test_large_head_does_not_serialize_geometry(self):
+        with (
+            patch("maps.mixins.GEOJSON_MAX_BUFFERED_POINTS", 4, create=True),
+            patch.object(
+                Region, "from_db", side_effect=AssertionError("loaded region")
+            ),
+        ):
+            response = self.client.head(self.url, {"id": self.region.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Cache-Status"], "STREAM")
+
+    def test_warmed_large_payload_is_served_without_coordinate_deserialization(self):
+        from maps.cache_warmup import warm_region_geojson_cache
+
+        with patch("maps.cache_warmup.GEOJSON_MAX_BUFFERED_POINTS", 4):
+            warm_region_geojson_cache()
+        with (
+            patch("maps.mixins.GEOJSON_MAX_BUFFERED_POINTS", 4),
+            patch.object(
+                RegionViewSet,
+                "get_geojson_serializer_class",
+                side_effect=AssertionError,
+            ),
+        ):
+            response = self.client.get(self.url, {"id": self.region.pk})
+            head = self.client.head(self.url, {"id": self.region.pk})
+        self.assertEqual(response["X-Cache-Status"], "HIT")
+        self.assertEqual(head["X-Cache-Status"], "HIT")
+        self.assertEqual(
+            json.loads(b"".join(response.streaming_content))["features"][0][
+                "properties"
+            ]["name"],
+            self.region.name,
+        )
+        self.assertEqual(head["X-Total-Count"], "1")
+
+    def test_rendered_cache_is_not_reused_after_data_version_changes(self):
+        from maps.cache_warmup import warm_region_geojson_cache
+
+        with patch("maps.cache_warmup.GEOJSON_MAX_BUFFERED_POINTS", 4):
+            warm_region_geojson_cache()
+        Region.objects.filter(pk=self.region.pk).update(
+            name="Changed geometry metadata",
+            lastmodified_at=timezone.now() + timedelta(days=1),
+        )
+        with patch("maps.mixins.GEOJSON_MAX_BUFFERED_POINTS", 4):
+            response = self.client.get(self.url, {"id": self.region.pk})
+            self.assertEqual(response["X-Cache-Status"], "STREAM")
+            data = json.loads(b"".join(response.streaming_content))
+        self.assertEqual(
+            data["features"][0]["properties"]["name"], "Changed geometry metadata"
+        )
+
+    def test_rendered_cache_is_not_reused_after_schema_version_changes(self):
+        from maps.cache_warmup import warm_region_geojson_cache
+
+        with patch("maps.cache_warmup.GEOJSON_MAX_BUFFERED_POINTS", 4):
+            warm_region_geojson_cache()
+        with (
+            patch("maps.mixins.GEOJSON_MAX_BUFFERED_POINTS", 4),
+            patch("maps.utils.GEOJSON_RENDERED_SCHEMA_VERSION", 3),
+        ):
+            response = self.client.get(self.url, {"id": self.region.pk})
+            self.assertEqual(response["X-Cache-Status"], "STREAM")
+            json.loads(b"".join(response.streaming_content))
+
+    def test_legacy_large_cache_is_not_deserialized(self):
+        key = get_region_cache_key(region_id=self.region.pk)
+        self.cache.set(key, {"features": ["legacy oversized payload"]})
+        with (
+            patch("maps.mixins.GEOJSON_MAX_BUFFERED_POINTS", 4, create=True),
+            patch.object(self.cache, "get", wraps=self.cache.get) as cache_get,
+        ):
+            response = self.client.get(self.url, {"id": self.region.pk})
+            self.assertTrue(response.streaming)
+            json.loads(b"".join(response.streaming_content))
+        self.assertNotIn(key, [call.args[0] for call in cache_get.call_args_list])
+
+
+@serial_test
 class StreamingGeoJSONTests(TestCase):
     """Tests for streaming GeoJSON response validity."""
 
@@ -2569,3 +2641,51 @@ class GeoJSONHeadTests(TestCase):
         self.assertFalse(hasattr(head, "data"))
         get = self.client.get(url, params)
         self.assertEqual(head["X-Data-Version"], get["X-Data-Version"])
+
+
+class MissingNamedDatasetMapViewTestCase(ViewWithPermissionsTestCase):
+    """Named filtered maps render an empty-state page instead of an error
+    when the optional GeoDataset has not been imported or configured."""
+
+    def assertDatasetUnavailable(self, url_name):
+        dataset_count = GeoDataset.objects.count()
+        response = self.client.get(reverse(url_name), follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dataset not configured")
+        self.assertContains(response, "import or configure this dataset")
+        self.assertEqual(GeoDataset.objects.count(), dataset_count)
+
+    def test_waste_collection_map_renders_unavailable_state(self):
+        self.assertDatasetUnavailable("WasteCollection")
+
+    def test_nantes_greenhouses_map_renders_unavailable_state(self):
+        self.assertDatasetUnavailable("NantesGreenhouses")
+
+    def test_hamburg_roadside_trees_map_renders_unavailable_state(self):
+        self.assertDatasetUnavailable("HamburgRoadsideTrees")
+
+    def test_nuts_region_map_renders_unavailable_state(self):
+        self.assertDatasetUnavailable("NutsRegion")
+
+    def test_private_named_map_still_requires_login(self):
+        response = self.client.get(reverse("WasteCollection-owned"))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith(settings.LOGIN_URL))
+
+    def test_missing_explicit_dataset_pk_returns_404(self):
+        response = self.client.get(reverse("geodataset-map", kwargs={"pk": 999999}))
+        self.assertEqual(response.status_code, 404)
+
+    def test_dataset_scoped_catchment_autocomplete_returns_empty(self):
+        Catchment.objects.create(
+            name="Unrelated Catchment", owner=self.owner, publication_status="published"
+        )
+
+        for url_name in (
+            "nantesgreenhouses-catchment-autocomplete",
+            "hamburgroadsidetrees-catchment-autocomplete",
+        ):
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name), data={"q": ""})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(json.loads(response.content)["results"], [])

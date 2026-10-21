@@ -1087,20 +1087,9 @@ class GeoDatasetColumnPolicy(models.Model):
         return f"{self.dataset}: {self.column_name}"
 
 
-class Attribute(PropertyBase):
-    """
-    Legacy maps quantitative definition kept during the ``RegionProperty`` rollout.
-    """
-
-    unit = models.CharField(max_length=127)
-
-    def __str__(self):
-        return f"{self.name} [{self.unit}]"
-
-
 class RegionProperty(PropertyBase):
     """
-    Maps-owned quantitative property definition that will replace ``Attribute``.
+    Maps-owned quantitative property definition for regional attributes.
     """
 
     allowed_units = models.ManyToManyField(
@@ -1129,10 +1118,6 @@ class CategoricalAttribute(NamedUserCreatedObject):
 class RegionAttributeValue(NumericMeasurementMixin, NamedUserCreatedObject):
     """
     Numeric regional measurement for the maps domain.
-
-    During the ``RegionProperty`` rollout this model now points at the
-    maps-owned ``RegionProperty`` table, while legacy ``Attribute`` rows are
-    retained temporarily for compatibility and data migration safety.
     """
 
     measurement_property_field = "property"

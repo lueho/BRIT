@@ -4,6 +4,7 @@ Comprehensive tests for all CRUD views following BRIT testing patterns.
 """
 
 import re
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -24,6 +25,7 @@ from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 from ..forms import PROCESS_SECTIONS
 from ..models import (
     Process,
+    ProcessAuthor,
     ProcessCategory,
     ProcessInfoResource,
     ProcessMaterial,
@@ -568,15 +570,13 @@ class ProcessMaintenanceViewsTestCase(TestCase):
                 any(f'FROM "{table}"' in query["sql"] for query in queries), table
             )
 
-    def test_inaccessible_category_and_parent_are_rejected(self):
+    def test_inaccessible_category_is_rejected(self):
         category = ProcessCategory.objects.create(
             name="Private category", owner=self.other
         )
-        parent = Process.objects.create(name="Private parent", owner=self.other)
         for data in (
             {"categories": [category.pk]},
             {"categories": [999999]},
-            {"parent": parent.pk},
         ):
             with self.subTest(data=data):
                 response = self.client.post(
@@ -629,41 +629,201 @@ class ProcessMaintenanceViewsTestCase(TestCase):
         self.assertGreater(row.order, 0)
 
 
-class ProcessDashboardViewTestCase(ViewWithPermissionsTestCase):
-    """Test the processes dashboard view."""
+class ProcessExplorerViewTestCase(TestCase):
+    """The Processes explorer follows the shared module explorer pattern."""
 
-    def test_get_http_200_ok_for_anonymous(self):
-        """Anonymous users can access the dashboard."""
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertEqual(200, response.status_code)
-
-    def test_get_http_200_ok_for_authenticated(self):
-        """Authenticated users can access the dashboard."""
-        self.client.force_login(self.member)
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertEqual(200, response.status_code)
-
-    def test_total_categories_reflects_user_visibility(self):
-        """The dashboard counter must use the same read policy as the lists
-        and autocomplete, so user-visible unpublished categories are counted."""
+    @classmethod
+    def setUpTestData(cls):
+        User = get_user_model()
+        cls.owner = User.objects.create_user(username="explorer-owner")
+        cls.moderator = User.objects.create_user(username="explorer-moderator")
+        cls.moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="processes",
+                codename="can_moderate_process",
+            )
+        )
+        cls.category = ProcessCategory.objects.create(
+            name="Thermochemical", owner=cls.owner, publication_status="published"
+        )
         ProcessCategory.objects.create(
-            name="Published Category",
-            owner=self.owner,
+            name="Hidden private category",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.published = Process.objects.create(
+            name="Published pyrolysis",
+            owner=cls.owner,
             publication_status="published",
         )
-        ProcessCategory.objects.create(name="Member Category", owner=self.member)
-        ProcessCategory.objects.create(name="Outsider Category", owner=self.outsider)
-
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertEqual(1, response.context["total_categories"])
-
-        self.client.force_login(self.member)
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertEqual(2, response.context["total_categories"])
-        self.assertEqual(
-            {"Published Category", "Member Category"},
-            {category.name for category in response.context["categories_with_counts"]},
+        cls.published.categories.add(cls.category)
+        cls.private = Process.objects.create(
+            name="Private gasification",
+            owner=cls.owner,
+            publication_status="private",
         )
+        cls.private.categories.add(cls.category)
+        Process.objects.create(
+            name="Pending torrefaction",
+            owner=cls.owner,
+            publication_status="review",
+        )
+
+    def test_explorer_renders_shared_card_pattern(self):
+        response = self.client.get(reverse("processes:explorer"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "processes/explorer.html")
+        self.assertContains(response, "Processes Explorer")
+        self.assertContains(response, "explorer-card")
+        self.assertContains(response, "explorer-section-heading")
+        self.assertContains(response, reverse("processes:process-list"))
+        self.assertContains(response, reverse("processes:processcategory-list"))
+
+    def test_counts_cover_published_objects_only(self):
+        response = self.client.get(reverse("processes:explorer"))
+
+        self.assertEqual(response.context["process_count"], 1)
+        self.assertEqual(response.context["category_count"], 1)
+
+    def test_top_categories_count_published_processes_and_link_to_list(self):
+        response = self.client.get(reverse("processes:explorer"))
+
+        categories = list(response.context["top_categories"])
+        self.assertEqual(categories, [self.category])
+        self.assertEqual(categories[0].process_count, 1)
+        self.assertContains(
+            response,
+            escape(
+                f"{reverse('processes:process-list')}"
+                f"?categories={self.category.pk}&scope=published"
+            ),
+        )
+        self.assertNotContains(response, "Hidden private category")
+
+    def test_recent_processes_hide_unpublished_processes(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("processes:explorer"))
+
+        self.assertEqual(list(response.context["recent_processes"]), [self.published])
+        self.assertContains(response, "Published pyrolysis")
+
+    def test_anonymous_sees_no_personal_or_review_cards(self):
+        response = self.client.get(reverse("processes:explorer"))
+
+        self.assertNotContains(response, reverse("processes:process-list-owned"))
+        self.assertNotContains(response, reverse("processes:process-list-review"))
+        self.assertNotContains(response, reverse("processes:process-create"))
+
+    def test_owner_sees_own_processes_card(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("processes:explorer"))
+
+        self.assertEqual(response.context["my_process_count"], 3)
+        self.assertContains(
+            response, f"{reverse('processes:process-list-owned')}?scope=private"
+        )
+        self.assertNotContains(response, reverse("processes:process-list-review"))
+
+    def test_own_processes_count_matches_private_list_with_editor_grants(self):
+        from django.contrib.contenttypes.models import ContentType
+
+        from utils.object_management.models import ObjectEditorGrant
+
+        shared = Process.objects.create(
+            name="Shared hydrothermal carbonisation",
+            owner=self.moderator,
+            publication_status="private",
+        )
+        ObjectEditorGrant.objects.create(
+            content_type=ContentType.objects.get_for_model(Process),
+            object_id=shared.pk,
+            editor=self.owner,
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse("processes:explorer"))
+        private_list = self.client.get(
+            reverse("processes:process-list-owned"), {"scope": "private"}
+        )
+
+        self.assertEqual(response.context["my_process_count"], 4)
+        self.assertEqual(
+            response.context["my_process_count"],
+            private_list.context["paginator"].count,
+        )
+
+    def test_moderator_sees_review_card(self):
+        self.client.force_login(self.moderator)
+        response = self.client.get(reverse("processes:explorer"))
+
+        self.assertEqual(response.context["review_count"], 1)
+        self.assertContains(
+            response, f"{reverse('processes:process-list-review')}?scope=review"
+        )
+
+    def test_add_actions_require_permissions(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("processes:explorer"))
+        self.assertNotContains(response, reverse("processes:process-create"))
+
+        self.owner.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="processes", codename="add_process"
+            )
+        )
+        self.owner = get_user_model().objects.get(pk=self.owner.pk)
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("processes:explorer"))
+        self.assertContains(response, reverse("processes:process-create"))
+        self.assertNotContains(response, reverse("processes:processcategory-create"))
+
+    def test_explorer_uses_module_label_in_title_and_breadcrumb(self):
+        response = self.client.get(reverse("processes:explorer"))
+
+        self.assertContains(response, "BRIT | Processes")
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Processes</li>',
+            html=True,
+        )
+
+    def test_list_breadcrumb_module_links_to_explorer(self):
+        response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+
+        self.assertContains(
+            response,
+            f'<a href="{reverse("processes:explorer")}">Processes</a>',
+            html=True,
+        )
+
+    def test_legacy_dashboard_permanently_redirects_to_explorer(self):
+        response = self.client.get("/processes/dashboard/", {"scope": "published"})
+
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(
+            response["Location"], f"{reverse('processes:explorer')}?scope=published"
+        )
+
+    def test_list_views_link_back_to_explorer(self):
+        self.client.force_login(self.owner)
+        for url_name, scope in (
+            ("processes:process-list", "published"),
+            ("processes:processcategory-list", "published"),
+            ("processes:processcategory-list-owned", "private"),
+        ):
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name), {"scope": scope})
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(
+                    response,
+                    f'<a class="btn btn-sm btn-outline-secondary" '
+                    f'href="{reverse("processes:explorer")}" title="Open Explorer">'
+                    f'<i class="fas fa-table-cells-large"></i> Explorer</a>',
+                    html=True,
+                )
 
 
 # ==============================================================================
@@ -679,10 +839,12 @@ class ProcessCategoryCRUDViewsTestCase(
     modal_detail_view = True
     modal_update_view = True
     modal_create_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = ProcessCategory
 
-    view_dashboard_name = "processes:dashboard"
+    view_explorer_name = "processes:explorer"
+
     view_create_name = "processes:processcategory-create"
     view_modal_create_name = "processes:processcategory-create-modal"
     view_published_list_name = "processes:processcategory-list"
@@ -799,8 +961,8 @@ class ProcessCategoryCRUDViewsTestCase(
         self.assertContains(response, "Pilot-scale process equipment.")
         self.assertContains(response, "Image: BRIT team, CC BY 4.0.")
 
-    def test_list_shows_published_process_count(self):
-        """Category list should count published processes assigned to the category."""
+    def test_list_shows_categories_without_process_counts(self):
+        """The category catalogue lists categories without discovery counters."""
         published_process = Process.objects.create(
             name="Published category process",
             owner=self.owner_user,
@@ -818,7 +980,8 @@ class ProcessCategoryCRUDViewsTestCase(
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Published Test Category")
-        self.assertContains(response, "1 process")
+        self.assertNotContains(response, "1 process<")
+        self.assertNotContains(response, "2 processes")
 
     def test_private_detail_shows_private_processes(self):
         """Private category detail should show associated private processes."""
@@ -835,7 +998,7 @@ class ProcessCategoryCRUDViewsTestCase(
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Processes in This Category (1)")
+        self.assertContains(response, "Processes in This Category")
         self.assertContains(response, "Private category process")
 
 
@@ -868,7 +1031,7 @@ class ProcessListEmptyStateTestCase(ViewWithPermissionsTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No items match your current filters.")
+        self.assertContains(response, "No processes match your current filters.")
         self.assertContains(response, ">Reset filters</a>")
 
 
@@ -896,7 +1059,8 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
     model = Process
 
-    view_dashboard_name = "processes:dashboard"
+    view_explorer_name = "processes:explorer"
+
     view_create_name = "processes:process-create"
     view_modal_create_name = "processes:process-create-modal"
     view_published_list_name = "processes:process-list"
@@ -1202,7 +1366,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertEqual(response.context["section_anchors"], [])
         for section in ("facts", "description", "technology", "bibliography"):
             self.assertNotContains(response, f'id="{section}"')
-        self.assertNotContains(response, "Download PDF version")
+        self.assertNotContains(response, "Download supplementary PDF")
 
     def test_detail_view_hides_additional_resources_without_links(self):
         self.client.force_login(self.owner_user)
@@ -1227,7 +1391,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Download PDF version")
+        self.assertContains(response, "Download supplementary PDF")
         self.assertContains(
             response, self.published_object.supplementary_document_download_url
         )
@@ -1397,7 +1561,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.unpublished_object.name)
 
-    def test_detail_view_sorts_bibliography_alphabetically(self):
+    def test_detail_view_sorts_bibliography_by_workspace_order(self):
         zebra_source = Source.objects.create(
             title="Zebra Source",
             abbreviation="Zebra",
@@ -1411,6 +1575,9 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
             publication_status="published",
         )
         self.published_object.sources.add(zebra_source, alpha_source)
+        self.published_object.process_sources.filter(source=zebra_source).update(
+            order=1
+        )
         self.client.force_login(self.owner_user)
 
         response = self.client.get(
@@ -1696,17 +1863,6 @@ class ProcessDetailRelatedVisibilityTestCase(ViewWithPermissionsTestCase):
             owner=cls.owner,
             publication_status="published",
         )
-        cls.secret_parent = Process.objects.create(
-            name="Secret Parent Process", owner=cls.outsider
-        )
-        cls.published.parent = cls.secret_parent
-        cls.published.save()
-
-        cls.secret_variant = Process.objects.create(
-            name="Secret Variant Process",
-            owner=cls.outsider,
-            parent=cls.published,
-        )
         cls.secret_category = ProcessCategory.objects.create(
             name="Secret Category", owner=cls.outsider
         )
@@ -1723,20 +1879,16 @@ class ProcessDetailRelatedVisibilityTestCase(ViewWithPermissionsTestCase):
             title="Secret Source", owner=cls.outsider
         )
         ProcessSource.objects.create(process=cls.published, source=cls.secret_source)
+        cls.secret_author = Author.objects.create(
+            last_names="Secretauthor",
+            contact_email="secret-author@example.com",
+            owner=cls.outsider,
+        )
+        cls.published.authors.add(cls.secret_author)
 
         cls.detail_url = reverse(
             "processes:process-detail", kwargs={"pk": cls.published.pk}
         )
-
-    def test_anonymous_does_not_see_private_parent(self):
-        response = self.client.get(self.detail_url)
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Secret Parent Process")
-
-    def test_anonymous_does_not_see_private_variant(self):
-        response = self.client.get(self.detail_url)
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Secret Variant Process")
 
     def test_anonymous_does_not_see_private_category(self):
         response = self.client.get(self.detail_url)
@@ -1753,22 +1905,75 @@ class ProcessDetailRelatedVisibilityTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Secret Source")
 
+    def test_anonymous_does_not_see_private_author(self):
+        """Private contributor names and contact emails must not leak."""
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secretauthor")
+        self.assertNotContains(response, "secret-author@example.com")
+
     def test_non_owner_member_does_not_see_private_related(self):
         self.client.force_login(self.member)
         response = self.client.get(self.detail_url)
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Secret Variant Process")
-        self.assertNotContains(response, "Secret Parent Process")
         self.assertNotContains(response, "Secret Category")
         self.assertNotContains(response, "Secret Material")
         self.assertNotContains(response, "Secret Source")
+        self.assertNotContains(response, "Secretauthor")
 
-    def test_variant_owner_sees_own_private_variant(self):
+    def test_owner_sees_own_private_category(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.detail_url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Secret Variant Process")
         self.assertContains(response, "Secret Category")
+
+    def test_detail_page_has_no_hierarchy_sections(self):
+        visible_category = ProcessCategory.objects.create(
+            name="Visible Category",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.published.categories.add(visible_category)
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        for label in ("Parent process", "Sibling processes", "Process variants"):
+            self.assertNotContains(response, label)
+        self.assertNotContains(response, "sdv2-related")
+        self.assertContains(response, "Visible Category")
+
+    def test_edit_workspace_has_no_parent_field(self):
+        draft = Process.objects.create(name="Editable Draft", owner=self.owner)
+        self.client.force_login(self.owner)
+        response = self.client.get(f"{draft.get_absolute_url()}?mode=edit")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="parent"')
+        self.assertNotContains(response, "Parent process")
+
+    def test_list_page_has_no_parent_metadata(self):
+        response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+        self.assertNotContains(response, "Variant of")
+        self.assertNotContains(response, "parent process")
+
+    def test_review_page_has_no_hierarchy_labels(self):
+        declined = Process.objects.create(
+            name="Declined Process",
+            owner=self.owner,
+            publication_status="declined",
+        )
+        self.client.force_login(self.owner)
+        review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(Process).pk,
+                "object_id": declined.pk,
+            },
+        )
+        response = self.client.get(review_url)
+        self.assertEqual(response.status_code, 200)
+        for label in ("Parent process", "Sibling processes", "Process variants"):
+            self.assertNotContains(response, label)
 
 
 class ProcessDetailReviewPanelTestCase(ViewWithPermissionsTestCase):
@@ -1860,42 +2065,48 @@ class ProcessCategoryDetailVisibilityTestCase(ViewWithPermissionsTestCase):
         self.assertNotContains(response, "Own Secret Process")
 
 
-class ProcessDashboardVisibilityTestCase(ViewWithPermissionsTestCase):
-    """Dashboard counters must use the same read policy as the lists."""
+class ProcessCategoryReviewDetailTestCase(ViewWithPermissionsTestCase):
+    """A category review page must list the processes in that category."""
 
-    member_permissions = ["add_process"]
-
-    def test_total_processes_reflects_user_visibility(self):
-        Process.objects.create(
-            name="Published Process",
-            owner=self.owner,
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.moderator = get_user_model().objects.create_user(
+            username="category_moderator"
+        )
+        cls.moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="processes",
+                codename="can_moderate_processcategory",
+            )
+        )
+        cls.review_category = ProcessCategory.objects.create(
+            name="Pulping",
+            owner=cls.outsider,
+            publication_status="review",
+        )
+        cls.review_process = Process.objects.create(
+            name="Pulping Process",
+            owner=cls.outsider,
             publication_status="published",
         )
-        Process.objects.create(name="Member Process", owner=self.member)
-        Process.objects.create(name="Outsider Process", owner=self.outsider)
+        cls.review_process.categories.add(cls.review_category)
+        cls.review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(
+                    ProcessCategory
+                ).pk,
+                "object_id": cls.review_category.pk,
+            },
+        )
 
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertEqual(1, response.context["total_processes"])
-
-        self.client.force_login(self.member)
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertEqual(2, response.context["total_processes"])
-
-    def test_quick_actions_hidden_for_anonymous(self):
-        response = self.client.get(reverse("processes:dashboard"))
+    def test_review_detail_shows_processes_in_category(self):
+        self.client.force_login(self.moderator)
+        response = self.client.get(self.review_url)
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, reverse("processes:process-create"))
-
-    def test_quick_actions_hidden_without_add_permission(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertNotContains(response, reverse("processes:process-create"))
-        self.assertNotContains(response, reverse("processes:processcategory-create"))
-
-    def test_quick_actions_visible_with_add_permission(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse("processes:dashboard"))
-        self.assertContains(response, reverse("processes:process-create"))
+        self.assertContains(response, "Pulping Process")
+        self.assertNotContains(response, "No processes in this category yet.")
 
 
 class ProcessFilterViewQuerysetTests(TestCase):
@@ -2020,24 +2231,26 @@ class ProcessWorkshopJourneyViewsTestCase(TestCase):
             review_response, "<strong>Processes in review</strong>", html=True
         )
 
-    def test_detail_nav_links_back_to_owned_list_for_authenticated_users(self):
+    def test_detail_nav_shows_compact_discovery_links_for_all_readers(self):
         published = Process.objects.create(
             name="Published workshop process",
             owner=self.moderator,
             publication_status="published",
         )
         url = reverse("processes:process-detail", kwargs={"pk": published.pk})
-        owned_url = f"{reverse('processes:process-list-owned')}?scope=private"
+        catalogue_url = reverse("processes:processcategory-list")
 
-        response = self.client.get(url)
-        self.assertContains(response, f'href="{owned_url}"')
-        self.assertContains(response, "My processes")
-
-        self.client.logout()
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "My processes")
-        self.assertNotContains(response, reverse("processes:process-list-owned"))
+        for user in (self.participant, None):
+            with self.subTest(user=user):
+                if user is None:
+                    self.client.logout()
+                else:
+                    self.client.force_login(user)
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, f'href="{catalogue_url}?scope=published"')
+                self.assertContains(response, "Categories")
+                self.assertNotContains(response, "My processes")
 
     def test_edit_workspace_jump_nav_matches_rendered_sections(self):
         process = self.create_draft()
@@ -2228,3 +2441,472 @@ class ProcessWorkshopJourneyViewsTestCase(TestCase):
         )
         self.assertNotContains(published_response, "Workshop full-page process")
         self.assertNotIn(process, published_response.context["object_list"])
+
+
+class ProcessCategoryOptionsViewTestCase(ViewWithPermissionsTestCase):
+    """The options endpoint must answer 200 and respect the read policy."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.published_category = ProcessCategory.objects.create(
+            name="Options Published Category",
+            owner=cls.outsider,
+            publication_status="published",
+        )
+        cls.private_category = ProcessCategory.objects.create(
+            name="Options Private Category", owner=cls.outsider
+        )
+        cls.archived_category = ProcessCategory.objects.create(
+            name="Options Archived Category",
+            owner=cls.owner,
+            publication_status="archived",
+        )
+        cls.url = reverse("processes:processcategory-options")
+
+    def test_options_endpoint_does_not_500(self):
+        """Missing permission_required used to raise ImproperlyConfigured."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_options_exclude_foreign_private_and_archived(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, "Options Published Category")
+        self.assertNotContains(response, "Options Private Category")
+        self.assertNotContains(response, "Options Archived Category")
+
+    def test_options_show_own_private_to_owner(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertContains(response, "Options Private Category")
+
+    def test_options_exclude_own_archived(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "Options Archived Category")
+
+
+class ProcessListBulkAccessTestCase(ViewWithPermissionsTestCase):
+    """Bulk manage-access controls on the private process list."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.process = Process.objects.create(name="Bulk target", owner=cls.owner)
+
+    def test_private_list_renders_bulk_toolbar_and_checkboxes(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("processes:process-list-owned"), {"scope": "private"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="bulk-access-form"')
+        self.assertContains(response, 'name="items"')
+
+    def test_private_list_places_bulk_toolbar_in_options_pane(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("processes:process-list-owned"), {"scope": "private"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        pane_start = content.index('id="options-pane"')
+        pane_end = content.index('id="learning-pane"')
+        self.assertIn('id="bulk-access-form"', content[pane_start:pane_end])
+        self.assertNotIn('id="bulk-access-form"', content[:pane_start])
+
+    def test_rows_are_keyboard_navigable(self):
+        Process.objects.create(
+            name="Keyboard target",
+            owner=self.owner,
+            publication_status="published",
+        )
+        response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'role="link"')
+        self.assertContains(response, 'tabindex="0"')
+
+    def test_published_list_hides_bulk_controls(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+        self.assertNotContains(response, 'id="bulk-access-form"')
+        self.assertNotContains(response, 'name="items"')
+
+
+class ProcessCategoryModalDeleteRedirectTestCase(ViewWithPermissionsTestCase):
+    """Deleting a category from its own detail page must not redirect back to it."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.category = ProcessCategory.objects.create(
+            name="Doomed Category", owner=cls.owner
+        )
+
+    def test_delete_with_next_to_own_detail_redirects_to_scoped_list(self):
+        self.client.force_login(self.owner)
+        detail_url = self.category.get_absolute_url()
+        delete_url = f"{self.category.modal_delete_url}?next={detail_url}"
+        response = self.client.post(delete_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            response["Location"].startswith(detail_url),
+            "delete redirect must not point back at the deleted object",
+        )
+        self.assertEqual(
+            response["Location"],
+            f"{reverse('processes:processcategory-list-owned')}?scope=private",
+        )
+
+    def test_delete_with_absolute_next_to_own_detail_redirects_to_scoped_list(self):
+        self.client.force_login(self.owner)
+        detail_url = f"http://testserver{self.category.get_absolute_url()}?tab=info"
+        response = self.client.post(
+            self.category.modal_delete_url, {"next": detail_url}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            f"{reverse('processes:processcategory-list-owned')}?scope=private",
+        )
+
+    def test_delete_with_unrelated_next_redirects_there(self):
+        other = ProcessCategory.objects.create(name="Survivor", owner=self.owner)
+        self.client.force_login(self.owner)
+        next_url = f"http://testserver{other.get_absolute_url()}"
+        response = self.client.post(self.category.modal_delete_url, {"next": next_url})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], next_url)
+
+
+class ListRowNavigationTestCase(ViewWithPermissionsTestCase):
+    """Clickable list rows must not navigate when a nested control is used."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.process = Process.objects.create(name="Row process", owner=cls.owner)
+        cls.category = ProcessCategory.objects.create(
+            name="Row category", owner=cls.owner
+        )
+
+    def _row_handlers(self, response):
+        html = response.content.decode()
+        return re.findall(r'<tr tabindex="0"[^>]*>', html)
+
+    def test_rows_ignore_clicks_and_keys_from_nested_controls(self):
+        self.client.force_login(self.owner)
+        for url in (
+            reverse("processes:process-list-owned"),
+            reverse("processes:processcategory-list-owned"),
+        ):
+            with self.subTest(url=url):
+                response = self.client.get(url, {"scope": "private"})
+                self.assertEqual(response.status_code, 200)
+                rows = self._row_handlers(response)
+                self.assertEqual(len(rows), 1)
+                row = rows[0]
+                self.assertIn(
+                    "onclick=\"if(!event.target.closest('a,button,input,select,"
+                    "textarea,label,form,.dropdown-menu'))",
+                    row,
+                )
+                self.assertIn('onkeydown="if(event.target===this&&', row)
+                self.assertNotIn('onclick="window.location', row)
+
+
+class ProcessExplorerRecentOrderingTestCase(TestCase):
+    def test_recent_processes_are_most_recently_modified_first(self):
+        from django.contrib.auth.models import AnonymousUser
+        from django.test import RequestFactory
+        from django.utils import timezone
+
+        from ..views import ProcessExplorerView
+
+        owner = get_user_model().objects.create(username="dash-owner")
+        older = Process.objects.create(
+            name="AAA older", owner=owner, publication_status="published"
+        )
+        newer = Process.objects.create(
+            name="ZZZ newer", owner=owner, publication_status="published"
+        )
+        Process.objects.filter(pk=older.pk).update(
+            lastmodified_at=timezone.now() - timezone.timedelta(days=2)
+        )
+        Process.objects.filter(pk=newer.pk).update(lastmodified_at=timezone.now())
+        request = RequestFactory().get("/")
+        request.user = AnonymousUser()
+        view = ProcessExplorerView()
+        view.setup(request)
+        context = view.get_context_data()
+        self.assertEqual([newer, older], list(context["recent_processes"]))
+
+
+class ProcessDetailOrderingAndGroupingTestCase(ViewWithPermissionsTestCase):
+    """Stable parameter grouping and editor-defined bibliography order."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.process = Process.objects.create(
+            name="Ordered Process",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.url = reverse("processes:process-detail", kwargs={"pk": cls.process.pk})
+
+    def test_parameters_by_type_uses_stable_enum_keys(self):
+        """Context keys must be raw parameter values, not translated labels."""
+        ProcessOperatingParameter.objects.create(
+            process=self.process,
+            parameter=ProcessOperatingParameter.Parameter.YIELD,
+            value_min=Decimal("10"),
+            value_max=Decimal("20"),
+        )
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            ProcessOperatingParameter.Parameter.YIELD,
+            response.context["parameters_by_type"],
+        )
+        self.assertContains(response, ">Yield</dt>")
+
+    def test_bibliography_keeps_workspace_order(self):
+        """Sources render in the explicit order maintained in the editor."""
+        source_b = Source.objects.create(
+            title="B Source",
+            abbreviation="B",
+            owner=self.owner,
+            publication_status="published",
+        )
+        source_a = Source.objects.create(
+            title="A Source",
+            abbreviation="A",
+            owner=self.owner,
+            publication_status="published",
+        )
+        ProcessSource.objects.create(process=self.process, source=source_b, order=1)
+        ProcessSource.objects.create(process=self.process, source=source_a, order=2)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["bibliography_sources"], [source_b, source_a])
+
+
+class ProcessContributorMotivationViewsTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user_model = get_user_model()
+        cls.participant = user_model.objects.create_user(username="workshop-author")
+        cls.participant.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="processes",
+                codename__in=["add_process", "change_process"],
+            )
+        )
+        cls.feed_material = Material.objects.create(
+            name="Motivation feedstock",
+            owner=cls.participant,
+            publication_status="published",
+        )
+        cls.product_material = Material.objects.create(
+            name="Motivation product",
+            owner=cls.participant,
+            publication_status="published",
+        )
+
+    def setUp(self):
+        self.client.force_login(self.participant)
+        self.process = Process.objects.create(
+            owner=self.participant,
+            name="Motivation draft",
+            short_description="Recorded during the workshop",
+        )
+
+    def detail_url(self, process=None, mode=None):
+        url = reverse(
+            "processes:process-detail", kwargs={"pk": (process or self.process).pk}
+        )
+        return f"{url}?mode={mode}" if mode else url
+
+    def section_url(self, section):
+        url = reverse("processes:process-update", kwargs={"pk": self.process.pk})
+        return f"{url}?section={section}"
+
+    @staticmethod
+    def material_payload(material):
+        return {
+            "process_materials-TOTAL_FORMS": "1",
+            "process_materials-INITIAL_FORMS": "0",
+            "process_materials-0-material": str(material.pk),
+            "process_materials-0-quantity_value": "",
+            "process_materials-0-quantity_unit": "",
+        }
+
+    def test_reading_view_does_not_display_owner(self):
+        response = self.client.get(self.detail_url())
+
+        self.assertNotContains(response, "Editor</span>")
+        self.assertNotContains(response, "Contributed by")
+
+    def test_published_reading_view_does_not_display_owner_for_anonymous_visitors(
+        self,
+    ):
+        Process.objects.filter(pk=self.process.pk).update(
+            publication_status="published"
+        )
+        self.client.logout()
+
+        response = self.client.get(self.detail_url())
+
+        self.assertNotContains(response, "Editor</span>")
+        self.assertNotContains(response, "workshop-author")
+        self.assertNotContains(response, "Contributed by")
+
+    def test_reading_view_labels_contributors_as_corresponding_authors(self):
+        author = Author.objects.create(
+            first_names="Ada",
+            last_names="Example",
+            owner=self.participant,
+            publication_status="published",
+        )
+        ProcessAuthor.objects.create(process=self.process, author=author)
+
+        response = self.client.get(self.detail_url())
+
+        self.assertContains(response, "Corresponding authors")
+        self.assertContains(response, "Example, Ada")
+
+    def test_reading_view_shows_last_update(self):
+        Process.objects.filter(pk=self.process.pk).update(
+            lastmodified_at=datetime(2026, 3, 14, 9, 30, tzinfo=UTC)
+        )
+
+        response = self.client.get(self.detail_url())
+
+        self.assertContains(response, "Last updated")
+        self.assertContains(response, "2026-03-14")
+
+    def test_section_save_refreshes_last_update(self):
+        stale = datetime(2020, 1, 1, tzinfo=UTC)
+        Process.objects.filter(pk=self.process.pk).update(lastmodified_at=stale)
+
+        self.client.post(
+            self.section_url("inputs"),
+            self.material_payload(self.feed_material),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.process.refresh_from_db()
+        self.assertGreater(self.process.lastmodified_at, stale)
+
+    def test_edit_mode_shows_progress_and_suggests_inputs_first(self):
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        self.assertEqual(response.context["section_progress"]["filled"], 1)
+        self.assertEqual(
+            response.context["section_progress"]["total"], len(PROCESS_SECTIONS)
+        )
+        self.assertContains(response, "data-workspace-progress")
+        self.assertContains(
+            response, f"1 of {len(PROCESS_SECTIONS)} sections have content"
+        )
+        self.assertContains(response, 'href="#workspace-section-inputs"')
+
+    def test_progress_suggests_outputs_after_inputs(self):
+        ProcessMaterial.objects.create(
+            process=self.process, material=self.feed_material, role="input"
+        )
+
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        self.assertEqual(response.context["section_progress"]["filled"], 2)
+        self.assertEqual(response.context["section_progress"]["next"]["key"], "outputs")
+
+    def test_progress_does_not_require_short_description_after_core_flow(self):
+        Process.objects.filter(pk=self.process.pk).update(short_description="")
+        for role, material in (
+            ("input", self.feed_material),
+            ("output", self.product_material),
+        ):
+            ProcessMaterial.objects.create(
+                process=self.process, material=material, role=role
+            )
+
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        progress = response.context["section_progress"]
+        self.assertEqual(progress["filled"], 2)
+        self.assertEqual(progress["next"]["key"], "overview")
+
+    def test_progress_counts_overview_with_category_but_no_short_description(self):
+        Process.objects.filter(pk=self.process.pk).update(short_description="")
+        self.process.categories.add(
+            ProcessCategory.objects.create(
+                name="Motivation category",
+                owner=self.participant,
+                publication_status="published",
+            )
+        )
+
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        progress = response.context["section_progress"]
+        self.assertEqual(progress["filled"], 1)
+        self.assertEqual(progress["next"]["key"], "inputs")
+
+    def test_overview_suggestion_mentions_short_description_or_category(self):
+        Process.objects.filter(pk=self.process.pk).update(short_description="")
+        for role, material in (
+            ("input", self.feed_material),
+            ("output", self.product_material),
+        ):
+            ProcessMaterial.objects.create(
+                process=self.process, material=material, role=role
+            )
+
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        self.assertContains(response, "add a short description or a category.")
+
+    def test_progress_counts_optional_enrichment_sections(self):
+        ProcessMaterial.objects.create(
+            process=self.process, material=self.feed_material, role="input"
+        )
+        ProcessMaterial.objects.create(
+            process=self.process, material=self.product_material, role="output"
+        )
+        ProcessOperatingParameter.objects.create(
+            process=self.process, parameter="temperature", nominal_value=40
+        )
+        Process.objects.filter(pk=self.process.pk).update(mechanism="Mixing")
+
+        response = self.client.get(self.detail_url(mode="edit"))
+
+        progress = response.context["section_progress"]
+        self.assertEqual(progress["filled"], 5)
+        self.assertEqual(progress["next"]["key"], "references")
+
+    def test_section_save_returns_refreshed_progress(self):
+        response = self.client.post(
+            self.section_url("inputs"),
+            self.material_payload(self.feed_material),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        payload = response.json()
+        self.assertTrue(payload["saved"])
+        self.assertIn(
+            f"2 of {len(PROCESS_SECTIONS)} sections have content",
+            payload["progress_html"],
+        )
+        self.assertIn('href="#workspace-section-outputs"', payload["progress_html"])
+
+    def test_reading_view_has_no_progress_hint(self):
+        response = self.client.get(self.detail_url())
+
+        self.assertNotContains(response, "data-workspace-progress")

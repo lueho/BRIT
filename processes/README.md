@@ -9,8 +9,7 @@ For planned future work, see `PRODUCTION_ROADMAP.md`.
 
 ### Main entry points
 
-- Dashboard: `processes:dashboard`
-- Explorer alias: `processes:processes-explorer`
+- Explorer: `processes:explorer` (`/processes/explorer/`); the unnamed legacy `/processes/dashboard/` permanently redirects to it
 - Category list: `processes:processcategory-list`
 - Process list: `processes:process-list`
 - Process type alias: `processes:processtype-list`
@@ -43,7 +42,6 @@ Users can:
 
 The main process detail view aggregates the current process data model, including:
 
-- Parent/variant relationships
 - Categories
 - Input and output materials
 - Operating parameters grouped by parameter type
@@ -75,7 +73,7 @@ This follows the shared four-eyes review pattern used across BRIT.
 
 ### Important model behavior
 
-- `Process` supports parent/child variant relationships
+- `Process` is grouped by `ProcessCategory` memberships; a process can belong to multiple categories
 - `Process` groups materials through the `ProcessMaterial` through-model
 - `Process` exposes convenience accessors such as `input_materials` and `output_materials`
 - `ProcessOperatingParameter` stores typed parameters with optional nominal and range values
@@ -87,7 +85,6 @@ This follows the shared four-eyes review pattern used across BRIT.
 The module uses TomSelect-based form fields for related-object selection.
 Current autocomplete-backed fields include:
 
-- Parent process
 - Process categories
 - Materials
 - Units
@@ -99,7 +96,8 @@ The main forms live in `processes/forms.py` and follow the shared BRIT `SimpleMo
 
 The canonical current templates are:
 
-- `processes/dashboard.html`
+- `processes/explorer.html`
+- `processes/processcategory_catalogue.html`
 - `processes/processcategory_list.html`
 - `processes/processcategory_detail.html`
 - `processes/processcategory_form.html`
@@ -123,7 +121,6 @@ Current custom API actions include:
 - Process materials
 - Process parameters
 - Process parameters grouped by type
-- Process variants
 - Process sources
 - Processes grouped by category
 - Processes grouped by mechanism

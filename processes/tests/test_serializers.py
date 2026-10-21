@@ -140,10 +140,22 @@ class ProcessListSerializerTestCase(TestCase):
     def setUp(self):
         self.owner = get_user_model().objects.create(username="test_user")
         self.category = ProcessCategory.objects.create(
-            name="Thermochemical", owner=self.owner
+            name="Thermochemical",
+            owner=self.owner,
+            publication_status="published",
         )
-        self.author_1 = Author.objects.create(first_names="Ada", last_names="Lovelace")
-        self.author_2 = Author.objects.create(first_names="Grace", last_names="Hopper")
+        self.author_1 = Author.objects.create(
+            first_names="Ada",
+            last_names="Lovelace",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.author_2 = Author.objects.create(
+            first_names="Grace",
+            last_names="Hopper",
+            owner=self.owner,
+            publication_status="published",
+        )
 
         self.process = Process.objects.create(
             name="Pyrolysis",
@@ -174,10 +186,22 @@ class ProcessDetailSerializerTestCase(TestCase):
     def setUp(self):
         self.owner = get_user_model().objects.create(username="test_user")
         self.category = ProcessCategory.objects.create(
-            name="Thermochemical", owner=self.owner
+            name="Thermochemical",
+            owner=self.owner,
+            publication_status="published",
         )
-        self.author_1 = Author.objects.create(first_names="Ada", last_names="Lovelace")
-        self.author_2 = Author.objects.create(first_names="Grace", last_names="Hopper")
+        self.author_1 = Author.objects.create(
+            first_names="Ada",
+            last_names="Lovelace",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.author_2 = Author.objects.create(
+            first_names="Grace",
+            last_names="Hopper",
+            owner=self.owner,
+            publication_status="published",
+        )
 
         self.process = Process.objects.create(
             name="Pyrolysis",
@@ -191,8 +215,12 @@ class ProcessDetailSerializerTestCase(TestCase):
         self.process.authors.add(self.author_1, self.author_2)
 
         # Add materials
-        self.material_in = Material.objects.create(name="Wood Chips", owner=self.owner)
-        self.material_out = Material.objects.create(name="Bio-oil", owner=self.owner)
+        self.material_in = Material.objects.create(
+            name="Wood Chips", owner=self.owner, publication_status="published"
+        )
+        self.material_out = Material.objects.create(
+            name="Bio-oil", owner=self.owner, publication_status="published"
+        )
 
         ProcessMaterial.objects.create(
             process=self.process,

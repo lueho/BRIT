@@ -4,8 +4,9 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from utils.object_management.models import User
+from utils.tests.testcases import ScopedSelectionFilterTestMixin
 
-from ..filters import AuthorFilterSet, SourceFilter
+from ..filters import AuthorFilterSet, LicenceListFilter, SourceFilter
 from ..models import Author, Licence, Source, SourceAuthor
 
 
@@ -118,22 +119,57 @@ class AuthorFilterSetTestCase(TestCase):
         cls.organization = Author.objects.create(
             author_type="organization",
             organization_name="European Environment Agency",
+            organization_abbreviation="EEA",
             publication_status="published",
         )
 
-    def test_filter_by_organization_name(self):
+    def filter_qs(self, params):
         factory = RequestFactory()
-        request = factory.get("/", {"organization_name": "Environment"})
-        qs = AuthorFilterSet(request.GET, Author.objects.all()).qs
+        request = factory.get("/", params)
+        return AuthorFilterSet(request.GET, Author.objects.all()).qs
+
+    def test_filter_by_organization_name(self):
+        qs = self.filter_qs({"organization_name": "Environment"})
         self.assertIn(self.organization, qs)
         self.assertNotIn(self.person, qs)
 
     def test_filter_by_last_names_still_works_for_persons(self):
-        factory = RequestFactory()
-        request = factory.get("/", {"last_names": "Lovelace"})
-        qs = AuthorFilterSet(request.GET, Author.objects.all()).qs
+        qs = self.filter_qs({"last_names": "Lovelace"})
         self.assertIn(self.person, qs)
         self.assertNotIn(self.organization, qs)
+
+    def test_q_matches_person_last_names(self):
+        qs = self.filter_qs({"q": "Lovelace"})
+        self.assertIn(self.person, qs)
+        self.assertNotIn(self.organization, qs)
+
+    def test_q_matches_person_first_names(self):
+        qs = self.filter_qs({"q": "Ada"})
+        self.assertIn(self.person, qs)
+        self.assertNotIn(self.organization, qs)
+
+    def test_q_matches_organization_name(self):
+        qs = self.filter_qs({"q": "Environment"})
+        self.assertIn(self.organization, qs)
+        self.assertNotIn(self.person, qs)
+
+    def test_q_matches_organization_abbreviation(self):
+        qs = self.filter_qs({"q": "EEA"})
+        self.assertIn(self.organization, qs)
+        self.assertNotIn(self.person, qs)
+
+    def test_q_matches_across_person_and_organization(self):
+        qs = self.filter_qs({"q": "e"})
+        self.assertIn(self.person, qs)
+        self.assertIn(self.organization, qs)
+
+    def test_q_blank_returns_unfiltered(self):
+        qs = self.filter_qs({"q": "   "})
+        self.assertEqual(Author.objects.count(), qs.count())
+
+    def test_q_without_match_returns_empty(self):
+        qs = self.filter_qs({"q": "no-such-needle"})
+        self.assertEqual(0, qs.count())
 
 
 class SourceModelFilterSetOrganizationTestCase(TestCase):
@@ -364,3 +400,10 @@ class SourceFilterScopeTestCase(TestCase):
         fs = SourceFilter(queryset=Source.objects.none())
         for name in ("author", "licence"):
             self.assertFalse(fs.filters[name].field.widget.filter_by)
+
+
+class LicenceListFilterScopedSelectionTestCase(
+    ScopedSelectionFilterTestMixin, TestCase
+):
+    filterset_class = LicenceListFilter
+    model = Licence

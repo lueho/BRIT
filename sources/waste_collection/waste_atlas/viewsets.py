@@ -257,7 +257,7 @@ _COLLECTION_SYSTEM_PRIORITY = {
     "No separate collection": 7,
 }
 
-# Attribute IDs for population data (maps_attribute table)
+# RegionProperty IDs for population data
 POPULATION_ATTRIBUTE_ID = 3
 POPULATION_DENSITY_ATTRIBUTE_ID = 2
 

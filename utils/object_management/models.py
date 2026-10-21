@@ -1,6 +1,6 @@
 from ambient_toolbox.models import CommonInfo
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
@@ -11,13 +11,10 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 
 from ..models import CRUDUrlsMixin
+from ..transaction_scope import current_scope, scope_is_active
 
 
-def get_default_owner():
-    """
-    Returns the default owner User instance, using DEFAULT_OBJECT_OWNER_USERNAME or ADMIN_USERNAME.
-    Raises RuntimeError if the user does not exist.
-    """
+def _default_owner_username():
     username = getattr(settings, "DEFAULT_OBJECT_OWNER_USERNAME", None)
     if not username:
         username = getattr(settings, "ADMIN_USERNAME", None)
@@ -25,6 +22,15 @@ def get_default_owner():
         raise RuntimeError(
             "Neither DEFAULT_OBJECT_OWNER_USERNAME in settings nor ADMIN_USERNAME env var is set."
         )
+    return username
+
+
+def get_default_owner():
+    """
+    Returns the default owner User instance, using DEFAULT_OBJECT_OWNER_USERNAME or ADMIN_USERNAME.
+    Raises RuntimeError if the user does not exist.
+    """
+    username = _default_owner_username()
     try:
         return User.objects.get(username=username)
     except User.DoesNotExist as err:
@@ -33,8 +39,22 @@ def get_default_owner():
         ) from err
 
 
+# The owner field default runs on every ownerless UserCreatedObject
+# instantiation; the pk is cached per username and cleared by the User
+# post_save/post_delete/post_migrate receivers in signals.py. Each entry is
+# only reused while the atomic blocks it was read in are still open, so a pk
+# read inside a rolled-back transaction is never served afterwards.
+_default_owner_pk_cache = {}
+
+
 def get_default_owner_pk():
-    return get_default_owner().pk
+    username = _default_owner_username()
+    entry = _default_owner_pk_cache.get(username)
+    if entry is not None and scope_is_active(entry[1]):
+        return entry[0]
+    pk = get_default_owner().pk
+    _default_owner_pk_cache[username] = (pk, current_scope())
+    return pk
 
 
 STATUS_CHOICES = (
@@ -196,6 +216,49 @@ class ObjectEditorGrant(models.Model):
         )
 
 
+class ObjectGroupEditorGrant(models.Model):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+    group = models.ForeignKey(
+        Group, on_delete=models.CASCADE, related_name="object_editor_grants"
+    )
+    granted_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["content_type", "object_id", "group"],
+                name="unique_group_editor_grant_per_object",
+            )
+        ]
+        indexes = [models.Index(fields=["content_type", "object_id"])]
+
+    def __str__(self):
+        return f"Edit access for {self.group} on {self.content_type} #{self.object_id}"
+
+    @classmethod
+    def for_object(cls, obj):
+        return cls.objects.filter(
+            content_type=ContentType.objects.get_for_model(obj.__class__),
+            object_id=obj.pk,
+        )
+
+
+def editor_grant_object_ids(model, user):
+    content_type = ContentType.objects.get_for_model(model)
+    individual_grants = ObjectEditorGrant.objects.filter(
+        content_type=content_type, editor=user
+    ).values_list("object_id", flat=True)
+    group_grants = ObjectGroupEditorGrant.objects.filter(
+        content_type=content_type, group__in=user.groups.all()
+    ).values_list("object_id", flat=True)
+    return individual_grants.union(group_grants)
+
+
 def annotate_owner_review_feedback(queryset, user):
     if not user or not user.is_authenticated:
         return queryset
@@ -264,10 +327,7 @@ class UserCreatedObjectQuerySet(models.QuerySet):
         )
 
     def _editor_grant_object_ids(self, user):
-        return ObjectEditorGrant.objects.filter(
-            content_type=ContentType.objects.get_for_model(self.model),
-            editor=user,
-        ).values("object_id")
+        return editor_grant_object_ids(self.model, user)
 
     def reviewable_by_user(self, user):
         if self._is_moderator(user):
@@ -360,6 +420,76 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
             models.Index(fields=["publication_status"]),
         ]
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        try:
+            index = field_names.index("publication_status")
+        except ValueError:
+            # Deferred load: the persisted status is unknown and signal
+            # handlers must fall back to conservative behaviour.
+            pass
+        else:
+            instance._loaded_publication_status = values[index]
+        return instance
+
+    def refresh_from_db(self, using=None, fields=None):
+        super().refresh_from_db(using=using, fields=fields)
+        if fields is None or "publication_status" in fields:
+            self._loaded_publication_status = self.publication_status
+
+    def _missing_approval_fields(self):
+        return [
+            name
+            for name, value in (
+                ("approved_at", self.approved_at),
+                ("approved_by", self.approved_by_id),
+            )
+            if value is None
+        ]
+
+    def _is_publishing_transition(self):
+        loaded_status = getattr(self, "_loaded_publication_status", None)
+        return (
+            self.publication_status == self.STATUS_PUBLISHED
+            and loaded_status != self.STATUS_PUBLISHED
+        )
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = list(update_fields)
+            kwargs["update_fields"] = update_fields
+        if (
+            update_fields is None or "publication_status" in update_fields
+        ) and self._is_publishing_transition():
+            # Direct ORM publishes bypass clean() and approve(); record the
+            # owner as approver, matching the pre-workflow backfill.
+            missing = self._missing_approval_fields()
+            if "approved_at" in missing:
+                self.approved_at = timezone.now()
+            if "approved_by" in missing:
+                self.approved_by_id = self.owner_id
+            if update_fields is not None:
+                update_fields.extend(
+                    name
+                    for name in ("approved_at", "approved_by")
+                    if name not in update_fields
+                )
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        if self._is_publishing_transition():
+            missing = self._missing_approval_fields()
+            if missing:
+                raise ValidationError(
+                    "Cannot set publication_status to 'published' without "
+                    f"approval metadata ({', '.join(missing)} missing). "
+                    "Use the review workflow's approve() method to publish "
+                    "objects."
+                )
+
     def _lock_and_validate_transition(self, expected_statuses, error_message):
         current_status = (
             self.__class__._default_manager.select_for_update()
@@ -415,17 +545,21 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         Approve this object, transitioning from review to published.
         Sets approved_at and approved_by.
         """
+        if user is None:
+            raise ValidationError(
+                "approve() requires the approving user so that approved_by is "
+                "always recorded."
+            )
         with transaction.atomic():
             self._lock_and_validate_transition(
                 (self.STATUS_REVIEW,), "Only objects in review can be approved."
             )
             self.publication_status = self.STATUS_PUBLISHED
             self.approved_at = timezone.now()
-            update_fields = ["publication_status", "approved_at"]
-            if user is not None:
-                self.approved_by = user
-                update_fields.append("approved_by")
-            self.save(update_fields=update_fields)
+            self.approved_by = user
+            self.save(
+                update_fields=["publication_status", "approved_at", "approved_by"]
+            )
 
     def reject(self):
         with transaction.atomic():
@@ -486,13 +620,40 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         """Revoke ``user``'s edit access to this object."""
         self.editor_grants.filter(editor=user).delete()
 
+    @property
+    def group_editor_grants(self):
+        return ObjectGroupEditorGrant.for_object(self)
+
+    @property
+    def editor_groups(self):
+        return Group.objects.filter(
+            object_editor_grants__content_type=ContentType.objects.get_for_model(
+                self.__class__
+            ),
+            object_editor_grants__object_id=self.pk,
+        )
+
+    def add_editor_group(self, group, granted_by=None):
+        grant, _ = ObjectGroupEditorGrant.objects.get_or_create(
+            content_type=ContentType.objects.get_for_model(self.__class__),
+            object_id=self.pk,
+            group=group,
+            defaults={"granted_by": granted_by},
+        )
+        return grant
+
+    def remove_editor_group(self, group):
+        self.group_editor_grants.filter(group=group).delete()
+
     def is_editable_by(self, user):
         """Return whether ``user`` is the owner or has an editor grant."""
         if not user or not getattr(user, "is_authenticated", False):
             return False
         if user.pk == self.owner_id:
             return True
-        return self.editor_grants.filter(editor=user).exists()
+        return self.__class__.objects.filter(
+            pk=self.pk, pk__in=editor_grant_object_ids(self.__class__, user)
+        ).exists()
 
     def transfer_ownership(self, new_owner, initiator=None):
         """Transfer ownership of this object to ``new_owner``.

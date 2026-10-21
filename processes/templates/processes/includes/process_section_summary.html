@@ -4,8 +4,6 @@
     <dt>Short description</dt><dd>{{ object.short_description|default:'Not added yet.'|linebreaksbr }}</dd>
     <dt>Categories</dt>
     <dd>{% for category in object.categories.all %}<a href="{{ category.get_absolute_url }}">{{ category.name }}</a>{% if not forloop.last %}, {% endif %}{% empty %}Not added yet.{% endfor %}</dd>
-    <dt>Parent process</dt>
-    <dd>{% if object.parent %}<a href="{{ object.parent.get_absolute_url }}">{{ object.parent.name }}</a>{% else %}Not added yet.{% endif %}</dd>
   </dl>
 {% elif section.key == 'technology' %}
   <dl class="mb-0">
@@ -55,7 +53,7 @@
     {% endfor %}
   </ul>
 {% elif section.key == 'references' %}
-  <h3 class="h6">Contributors</h3>
+  <h3 class="h6">Corresponding authors</h3>
   <ul class="list-unstyled">
     {% for link in object.process_authors.all %}
       <li class="mb-2">
@@ -64,7 +62,7 @@
         {% if link.author.contact_email %}<a href="mailto:{{ link.author.contact_email }}">{{ link.author.contact_email }}</a>{% endif %}
       </li>
     {% empty %}
-      <li class="text-muted">No contributors added yet.</li>
+      <li class="text-muted">No corresponding authors added yet.</li>
     {% endfor %}
   </ul>
   <h3 class="h6">Bibliography</h3>

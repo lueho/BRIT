@@ -3,6 +3,8 @@
 {% load user_created_object_tags %}
 {% block title %}BRIT | {{ header }}{% endblock %}
 {% block content %}
+  {% block list_intro %}
+  {% endblock list_intro %}
   <div class="row">
     <div class="col-lg-8 order-2 order-lg-1">
       <div class="card shadow mb-3">
@@ -87,10 +89,10 @@
                   {% endif %}
                 </div>
               {% endif %}
-              {% if dashboard_url %}
+              {% if explorer_url %}
                 <a class="btn btn-sm btn-outline-secondary ms-2"
-                   href="{{ dashboard_url }}"
-                   title="Open Explorer (dashboard)">
+                   href="{{ explorer_url }}"
+                   title="Open Explorer">
                   <i class="fas fa-table-cells-large"></i> Explorer
                 </a>
               {% endif %}
@@ -186,9 +188,9 @@
                     </a>
                   {% endif %}
                 {% endblock list_card_footer_create_link %}
-                {% if dashboard_url %}
+                {% if explorer_url %}
                   <a class="btn btn-outline-secondary w-100 mb-2"
-                     href="{{ dashboard_url }}">
+                     href="{{ explorer_url }}">
                     <i class="fas fa-table-cells-large"></i> Open Explorer
                   </a>
                 {% endif %}

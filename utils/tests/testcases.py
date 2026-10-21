@@ -2,7 +2,7 @@ from abc import ABC
 
 from django.conf import settings
 from django.contrib.auth.models import Permission
-from django.test import Client, TestCase
+from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -86,7 +86,7 @@ class AbstractTestCases:
 
         Subclasses **must** also define the relevant URL names for the views
         they intend to test (set the corresponding boolean flag to True):
-        - `view_dashboard_name`: URL name for the dashboard/overview view.
+        - `view_explorer_name`: URL name for the explorer view.
         - `view_create_name`: URL name for the standard CreateView.
         - `view_modal_create_name`: URL name for the modal CreateView.
         - `view_published_list_name`: URL name for the public ListView.
@@ -109,7 +109,7 @@ class AbstractTestCases:
         Test Execution Control:
         Set the following boolean flags to True/False to enable/disable tests
         for specific view types:
-        - `dashboard_view`
+        - `explorer_view`
         - `create_view`
         - `modal_create_view`
         - `public_list_view`
@@ -136,7 +136,7 @@ class AbstractTestCases:
         # This is an abstract class and should not be run as a test case directly
         __test__ = False
 
-        dashboard_view = True
+        explorer_view = True
         create_view = True
         modal_create_view = False
         public_list_view = True
@@ -150,7 +150,7 @@ class AbstractTestCases:
         model = None
         model_add_permission = None
 
-        view_dashboard_name = None
+        view_explorer_name = None
         view_create_name = None
         view_modal_create_name = None
         view_published_list_name = None
@@ -265,8 +265,8 @@ class AbstractTestCases:
         def setUp(self):
             self.client = Client()
 
-        def get_dashboard_url(self):
-            return reverse(self.view_dashboard_name)
+        def get_explorer_url(self):
+            return reverse(self.view_explorer_name)
 
         def get_create_url(self):
             return reverse(self.view_create_name)
@@ -353,8 +353,8 @@ class AbstractTestCases:
             )
             self.assertEqual(response.status_code, 200)
             body = response.content.decode()
-            if self.dashboard_view:
-                self.assertIn(self.get_dashboard_url(), body)
+            if self.explorer_view:
+                self.assertIn(self.get_explorer_url(), body)
             if self.create_view:
                 self.assertNotIn(self.get_create_url(), body)
             if self.private_list_view:
@@ -369,8 +369,8 @@ class AbstractTestCases:
                 follow=True,
             )
             self.assertEqual(response.status_code, 200)
-            if self.dashboard_view:
-                self.assertContains(response, self.get_dashboard_url())
+            if self.explorer_view:
+                self.assertContains(response, self.get_explorer_url())
             if self.create_view:
                 if self.allow_create_for_any_authenticated_user:
                     self.assertContains(response, self.get_create_url())
@@ -390,8 +390,8 @@ class AbstractTestCases:
                 follow=True,
             )
             self.assertEqual(response.status_code, 200)
-            if self.dashboard_view:
-                self.assertContains(response, self.get_dashboard_url())
+            if self.explorer_view:
+                self.assertContains(response, self.get_explorer_url())
             if self.create_view:
                 if self.allow_create_for_any_authenticated_user:
                     self.assertContains(response, self.get_create_url())
@@ -412,8 +412,8 @@ class AbstractTestCases:
             )
             self.assertEqual(response.status_code, 200)
             body = response.content.decode()
-            if self.dashboard_view:
-                self.assertIn(self.get_dashboard_url(), body)
+            if self.explorer_view:
+                self.assertIn(self.get_explorer_url(), body)
             if self.create_view:
                 self.assertIn(self.get_create_url(), body)
             if self.private_list_view:
@@ -438,8 +438,8 @@ class AbstractTestCases:
             )
             self.assertEqual(response.status_code, 200)
             body = response.content.decode()
-            if self.dashboard_view:
-                self.assertIn(self.get_dashboard_url(), body)
+            if self.explorer_view:
+                self.assertIn(self.get_explorer_url(), body)
             if self.create_view:
                 if self.allow_create_for_any_authenticated_user:
                     self.assertIn(self.get_create_url(), body)
@@ -458,8 +458,8 @@ class AbstractTestCases:
             )
             self.assertEqual(response.status_code, 200)
             body = response.content.decode()
-            if self.dashboard_view:
-                self.assertIn(self.get_dashboard_url(), body)
+            if self.explorer_view:
+                self.assertIn(self.get_explorer_url(), body)
             if self.create_view:
                 if self.allow_create_for_any_authenticated_user:
                     self.assertIn(self.get_create_url(), body)
@@ -477,8 +477,8 @@ class AbstractTestCases:
                 follow=True,
             )
             self.assertEqual(response.status_code, 200)
-            if self.dashboard_view:
-                self.assertContains(response, self.get_dashboard_url())
+            if self.explorer_view:
+                self.assertContains(response, self.get_explorer_url())
             if self.create_view:
                 self.assertContains(response, self.get_create_url())
             if self.public_list_view:
@@ -796,6 +796,15 @@ class AbstractTestCases:
                 self.assertNotContains(
                     response, self.get_delete_url(self.published_object.pk)
                 )
+
+        def test_modal_detail_view_does_not_offer_back_to_modal(self):
+            """The modal's own URL is no result list to return to."""
+            if not self.modal_detail_view:
+                self.skipTest("Modal detail view is not enabled for this test case.")
+            url = self.get_modal_detail_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            self.assertNotContains(response, "back=")
 
         def test_modal_detail_view_published_as_authenticated_owner(self):
             if not self.modal_detail_view:
@@ -1342,3 +1351,71 @@ class AbstractTestCases:
             self.assertRedirects(
                 response, self.get_delete_success_url(publication_status="private")
             )
+
+
+class ScopedSelectionFilterTestMixin:
+    """Selections carried across list scopes stay valid and match only themselves.
+
+    Mix into a ``TestCase`` and set ``filterset_class`` and ``model``. The list
+    scope toggle keeps other query parameters, so a pk picked in one scope is
+    submitted again with another scope.
+    """
+
+    filterset_class = None
+    model = None
+    field = "name"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        slug = cls.__name__.lower()
+        cls.scope_user = User.objects.create_user(username=f"scope-{slug}")
+        cls.scope_other = User.objects.create_user(username=f"scope-other-{slug}")
+        cls.published_choice = cls.create_choice(
+            "Shared scope name", cls.scope_other, "published"
+        )
+        cls.same_name_review = cls.create_choice(
+            "Shared scope name", cls.scope_user, "review"
+        )
+        cls.foreign_private = cls.create_choice(
+            "Foreign private choice", cls.scope_other, "private"
+        )
+
+    @classmethod
+    def create_choice(cls, name, owner, publication_status):
+        return cls.model.objects.create(
+            name=name, owner=owner, publication_status=publication_status
+        )
+
+    def build_filter(self, data):
+        request = RequestFactory().get("/", data)
+        request.user = self.scope_user
+        return self.filterset_class(
+            data=request.GET,
+            queryset=self.filterset_class._meta.model.objects.all(),
+            request=request,
+        )
+
+    def test_selection_from_other_scope_is_valid_and_matches_only_itself(self):
+        filtr = self.build_filter(
+            {"scope": "review", self.field: self.published_choice.pk}
+        )
+
+        self.assertTrue(filtr.form.is_valid(), filtr.form.errors)
+        self.assertEqual(list(filtr.qs), [])
+
+    def test_selection_in_its_own_scope_matches_itself(self):
+        filtr = self.build_filter(
+            {"scope": "review", self.field: self.same_name_review.pk}
+        )
+
+        self.assertTrue(filtr.form.is_valid(), filtr.form.errors)
+        self.assertEqual(list(filtr.qs), [self.same_name_review])
+
+    def test_invisible_selection_is_rejected(self):
+        filtr = self.build_filter(
+            {"scope": "review", self.field: self.foreign_private.pk}
+        )
+
+        self.assertFalse(filtr.form.is_valid())
+        self.assertIn(self.field, filtr.form.errors)

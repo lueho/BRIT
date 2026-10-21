@@ -17,6 +17,7 @@ from utils.object_management.templatetags.moderation_tags import (
     has_pending_review_items_for_user,
     markdown_to_html,
     safe_back_url,
+    safe_next_url,
 )
 
 
@@ -178,6 +179,25 @@ class SafeBackUrlTagTests(SimpleTestCase):
 
                 self.assertEqual(url, "")
 
+    def test_back_url_to_modal_fragment_is_dropped(self):
+        for modal_path in (
+            "/materials/componentgroups/5/modal/",
+            "/object_management/modal/approve/1/2/",
+            "/materials/componentgroups/5/mo%64al/",
+            "/materials/componentgroups/5/mo%2564al/",
+        ):
+            with self.subTest(modal_path=modal_path):
+                url = self.back_url(
+                    "/materials/componentgroups/5/?back=" + quote(modal_path, safe="")
+                )
+
+                self.assertEqual(url, "")
+
+    def test_back_url_with_modal_in_query_only_is_returned(self):
+        url = self.back_url("/x/?back=" + quote("/materials/samples/?q=modal", safe=""))
+
+        self.assertEqual(url, "/materials/samples/?q=modal")
+
     def test_long_ordinary_filtered_back_url_is_returned(self):
         filters = urlencode(
             [("scope", "published")]
@@ -192,6 +212,30 @@ class SafeBackUrlTagTests(SimpleTestCase):
 
     def test_without_request_returns_empty(self):
         self.assertEqual(safe_back_url({}), "")
+
+
+class SafeNextUrlTagTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def next_url(self, value):
+        request = self.factory.get("/waste_collection/collections/1/", {"next": value})
+        return safe_next_url({"request": request})
+
+    def test_same_host_path_is_returned(self):
+        self.assertEqual(
+            self.next_url("/waste_collection/collections/map/?catchment=1"),
+            "/waste_collection/collections/map/?catchment=1",
+        )
+
+    def test_javascript_url_is_rejected(self):
+        self.assertEqual(self.next_url("javascript:alert(1)"), "")
+
+    def test_external_url_is_rejected(self):
+        self.assertEqual(self.next_url("https://evil.example/"), "")
+
+    def test_without_request_returns_empty(self):
+        self.assertEqual(safe_next_url({}), "")
 
 
 class ContextNavNoFollowTests(SimpleTestCase):

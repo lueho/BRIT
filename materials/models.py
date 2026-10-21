@@ -11,7 +11,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import dateformat, timezone
 
-from bibliography.models import Source
+from bibliography.models import Author, Source
 from distributions.models import TemporalDistribution, Timestep
 from utils.object_management.models import (
     NamedUserCreatedObject,
@@ -20,6 +20,7 @@ from utils.object_management.models import (
     UserCreatedObjectQuerySet,
     get_default_owner,
 )
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import (
     NumericMeasurementMixin,
     PropertyBase,
@@ -40,6 +41,18 @@ class MeasurementValueQualifier(models.TextChoices):
     BELOW_DETECTION_LIMIT = "below_detection_limit", "Below detection limit"
     RANGE = "range", "Range"
     ESTIMATED = "estimated", "Estimated"
+
+
+class MeasurementLimitType(models.TextChoices):
+    """Analytical limit a stated limit value refers to (LOD/MDL < LOQ < RL)."""
+
+    LOD = "lod", "Limit of detection (LOD)"
+    MDL = "mdl", "Method detection limit (MDL)"
+    LOQ = "loq", "Limit of quantification (LOQ)"
+    RL = "rl", "Reporting limit (RL)"
+
+
+DETECTION_LIMIT_TYPES = frozenset({MeasurementLimitType.LOD, MeasurementLimitType.MDL})
 
 
 def get_sample_substrate_category_name():
@@ -77,10 +90,14 @@ def get_or_create_sample_substrate_category():
         category = _find_sample_substrate_category(name)
         if category is not None:
             return category, False
+        owner = get_default_owner()
         category = MaterialCategory.objects.create(
             name=name,
             description="Category for substrate materials used in sample filtering.",
+            owner=owner,
             publication_status=UserCreatedObject.STATUS_PUBLISHED,
+            approved_at=timezone.now(),
+            approved_by=owner,
         )
     return category, True
 
@@ -371,8 +388,11 @@ class AnalyticalMethod(NamedUserCreatedObject):
             action = getattr(source, config["handler"], None)
             if not callable(action):
                 continue
+            if action_name == "approve" and actor is None:
+                # approve() requires the approving user for the audit trail.
+                continue
             try:
-                if action_name == "approve" and actor is not None:
+                if action_name == "approve":
                     action(user=actor)
                 else:
                     action()
@@ -666,13 +686,27 @@ class MeasurementMetadataMixin(models.Model):
         choices=MeasurementValueQualifier.choices,
         default=MeasurementValueQualifier.EXACT,
     )
+    limit_type = models.CharField(
+        max_length=8,
+        choices=MeasurementLimitType.choices,
+        blank=True,
+        help_text=(
+            "Analytical limit the limit value refers to: limit of detection (LOD) "
+            "or method detection limit (MDL) < limit of quantification (LOQ) < "
+            "reporting limit (RL)."
+        ),
+    )
     detection_limit = models.DecimalField(
+        "limit value",
         max_digits=30,
         decimal_places=15,
         null=True,
         blank=True,
+        help_text="Analytical limit in the measurement unit; see limit type.",
     )
-    raw_detection_limit = models.CharField(max_length=255, blank=True)
+    raw_detection_limit = models.CharField(
+        "raw limit value", max_length=255, blank=True
+    )
     analysis_date = models.DateTimeField(null=True, blank=True)
     analysis_laboratory = models.CharField(max_length=255, blank=True)
     comment = models.TextField(
@@ -687,6 +721,7 @@ class MeasurementMetadataMixin(models.Model):
         return {
             "raw_value": self.raw_value,
             "value_qualifier": self.value_qualifier,
+            "limit_type": self.limit_type,
             "detection_limit": self.detection_limit,
             "raw_detection_limit": self.raw_detection_limit,
             "analysis_date": self.analysis_date,
@@ -731,6 +766,46 @@ class MeasurementMetadataMixin(models.Model):
         return (
             self.raw_detection_limit or ""
         ).strip() or self._format_measurement_number(self.detection_limit)
+
+    @builtin_property
+    def effective_limit_type(self):
+        if self.limit_type:
+            return self.limit_type
+        if self.value_qualifier == MeasurementValueQualifier.BELOW_DETECTION_LIMIT:
+            return MeasurementLimitType.LOD
+        return ""
+
+    @builtin_property
+    def limit_label(self):
+        limit_type = self.effective_limit_type
+        if limit_type in MeasurementLimitType.values:
+            return MeasurementLimitType(limit_type).label
+        if limit_type or self.display_detection_limit:
+            return "Limit (type not specified)"
+        return ""
+
+    @builtin_property
+    def limit_abbreviation(self):
+        limit_type = self.effective_limit_type
+        if limit_type in MeasurementLimitType.values:
+            return limit_type.upper()
+        return "Limit" if self.limit_label else ""
+
+    def clean(self):
+        super().clean()
+        if (
+            self.value_qualifier == MeasurementValueQualifier.BELOW_DETECTION_LIMIT
+            and self.limit_type
+            and self.limit_type not in DETECTION_LIMIT_TYPES
+        ):
+            raise ValidationError(
+                {
+                    "limit_type": (
+                        "'Below detection limit' refers to an LOD or MDL. Use "
+                        "'Less than' for values below the LOQ or reporting limit."
+                    )
+                }
+            )
 
 
 class MaterialPropertyValue(
@@ -988,6 +1063,16 @@ class Sample(NamedUserCreatedObject):
         help_text="If the sample represents a specific time step in a series, select it here.",
     )
     sources = models.ManyToManyField(Source)
+    authors = models.ManyToManyField(
+        Author,
+        blank=True,
+        through="SampleAuthor",
+        related_name="samples",
+        help_text=(
+            "Corresponding authors or data contributors shown on the sample "
+            "detail page."
+        ),
+    )
     sample_groups = models.ManyToManyField(
         SampleGroup,
         related_name="samples",
@@ -1045,6 +1130,25 @@ class Sample(NamedUserCreatedObject):
 
     def get_property_values_queryset(self):
         return self.property_values.all()
+
+    def ordered_authors(self):
+        return self.sample_authors.order_by(
+            "position", "author_id", "id"
+        ).select_related("author")
+
+    def authors_ordered(self):
+        return [link.author for link in self.ordered_authors()]
+
+    def visible_ordered_authors(self, user):
+        """Ordered author links whose author ``user`` may read."""
+        links = list(self.ordered_authors())
+        visible_ids = set(
+            filter_queryset_for_user(
+                Author.objects.filter(pk__in={link.author_id for link in links}),
+                user,
+            ).values_list("pk", flat=True)
+        )
+        return [link for link in links if link.author_id in visible_ids]
 
     @property
     def group_ids(self):
@@ -1235,7 +1339,42 @@ class Sample(NamedUserCreatedObject):
             for measurement in self.component_measurements.all():
                 measurement.duplicate(creator, sample=duplicate)
 
+            SampleAuthor.objects.bulk_create(
+                SampleAuthor(sample=duplicate, author_id=link.author_id, position=index)
+                for index, link in enumerate(
+                    self.visible_ordered_authors(creator), start=1
+                )
+            )
+
             return duplicate
+
+
+class SampleAuthor(models.Model):
+    """Ordered author/contributor assignment for a sample."""
+
+    sample = models.ForeignKey(
+        Sample,
+        on_delete=models.CASCADE,
+        related_name="sample_authors",
+    )
+    author = models.ForeignKey(
+        Author,
+        on_delete=models.PROTECT,
+        related_name="sample_author_links",
+    )
+    position = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        ordering = ["position", "author_id", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sample", "author"],
+                name="materials_sampleauthor_unique_author",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.sample}: {self.author}"
 
 
 class SampleExternalRecord(models.Model):

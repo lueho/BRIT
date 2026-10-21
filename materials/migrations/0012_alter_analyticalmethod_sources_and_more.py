@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("bibliography", "0009_rename_source_bibtex_fields"),
+        ("bibliography", "0001_squashed_0012"),
         ("materials", "0011_make_standard_deviation_optional"),
     ]
 

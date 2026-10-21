@@ -11,8 +11,7 @@
       {% is_moderator_for_any_model user as is_moderator %}
       {% if is_moderator %}
         <div class="sb-sidenav-menu-heading">Moderation</div>
-        <a class="nav-link {% if '/object_management/review/' in request.path %}active{% endif %}"
-           href="{% url 'object_management:review_dashboard' %}">
+        <a class="nav-link{% nav_active 'object_management' %}" href="{% url 'object_management:review_dashboard' %}">
           <div class="sb-nav-link-icon">
             <i class="fas fa-clipboard-check"></i>
           </div>
@@ -25,83 +24,71 @@
           {% endif %}
         </a>
       {% endif %}
-      {% user_in_group user "process-team" as can_view_processes %}
       <div class="sb-sidenav-menu-heading">Tools</div>
-      <a class="nav-link {% if '/maps/' in request.path %}active{% endif %}"
-         href="{% url 'maps_list' %}">
+      <a class="nav-link{% nav_active 'maps' %}" href="{% url 'maps_list' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-globe-europe"></i>
         </div>
         <span class="sb-nav-link-text">Maps</span>
       </a>
-      <a class="nav-link {% if '/materials/' in request.path %}active{% endif %}"
-         href="{% url 'sample-list' %}">
+      <a class="nav-link{% nav_active 'materials' %}" href="{% url 'sample-list' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-leaf"></i>
         </div>
         <span class="sb-nav-link-text">Materials</span>
       </a>
-      <a class="nav-link {% if '/sources/' in request.path %}active{% endif %}"
-         href="{% url 'sources-explorer' %}">
+      <a class="nav-link{% nav_active 'sources' %}" href="{% url 'sources-explorer' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-expand-arrows-alt"></i>
         </div>
         <span class="sb-nav-link-text">Sources</span>
       </a>
-      {% if can_view_processes %}
-        <a class="nav-link {% if '/processes/' in request.path %}active{% endif %}"
-           href="{% url 'processes:process-list' %}">
+      {% if perms.processes.access_app_feature %}
+        <a class="nav-link{% nav_active 'processes' %}" href="{% url 'processes:process-list' %}">
           <div class="sb-nav-link-icon">
             <i class="fas fa-flask"></i>
           </div>
           <span class="sb-nav-link-text">Processes</span>
         </a>
       {% endif %}
-      <a class="nav-link {% if '/inventories/' in request.path %}active{% endif %}"
-         href="{% url 'scenario-list' %}">
+      <a class="nav-link{% nav_active 'inventories' %}" href="{% url 'scenario-list' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-chart-bar"></i>
         </div>
         <span class="sb-nav-link-text">Inventories</span>
       </a>
-      <a class="nav-link {% if '/bibliography/' in request.path %}active{% endif %}"
-         href="{% url 'bibliography-explorer' %}">
+      <a class="nav-link{% nav_active 'bibliography' %}" href="{% url 'source-list' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-book"></i>
         </div>
         <span class="sb-nav-link-text">Bibliography</span>
       </a>
       <div class="sb-sidenav-menu-heading">Sites</div>
-      <a class="nav-link {% if '/waste-atlas/' in request.path %}active{% endif %}"
-         href="{% url 'waste-atlas-overview' %}">
+      <a class="nav-link{% nav_active 'waste-atlas' %}" href="{% url 'waste-atlas-overview' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-map-marked-alt"></i>
         </div>
         <span class="sb-nav-link-text">Waste Atlas</span>
       </a>
-      <a class="nav-link {% if '/learning/' in request.path %}active{% endif %}"
-         href="{% url 'learning' %}">
+      <a class="nav-link{% nav_active 'learning' %}" href="{% url 'learning' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-graduation-cap"></i>
         </div>
         <span class="sb-nav-link-text">Learning</span>
       </a>
-      <a class="nav-link {% if '/r-analysis/' in request.path %}active{% endif %}"
-         href="{% url 'r-analysis' %}">
+      <a class="nav-link{% nav_active 'r-analysis' %}" href="{% url 'r-analysis' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-chart-line"></i>
         </div>
         <span class="sb-nav-link-text">R Analysis</span>
       </a>
-      <a class="nav-link {% if '/about/' in request.path %}active{% endif %}"
-         href="{% url 'about' %}">
+      <a class="nav-link{% nav_active 'about' %}" href="{% url 'about' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-info-circle"></i>
         </div>
         <span class="sb-nav-link-text">About</span>
       </a>
-      <a class="nav-link {% if '/privacy_policy/' in request.path %}active{% endif %}"
-         href="{% url 'privacypolicy' %}">
+      <a class="nav-link{% nav_active 'privacy' %}" href="{% url 'privacypolicy' %}">
         <div class="sb-nav-link-icon">
           <i class="fas fa-shield-alt"></i>
         </div>

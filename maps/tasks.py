@@ -99,8 +99,24 @@ def warm_all_geojson_caches(
 
     try:
         if queue_subtasks:
-            queued = warm_base_geojson_caches.apply_async(kwargs=base_kwargs)
-            results["maps"] = {"status": "queued", "task_id": queued.id}
+            task_ids = []
+            for level in base_kwargs["nuts_levels"]:
+                queued = warm_base_geojson_caches.apply_async(
+                    kwargs={
+                        "nuts_levels": [level],
+                        "regions_limit": None,
+                        "nuts_limit": nuts_limit,
+                    }
+                )
+                task_ids.append(queued.id)
+            queued = warm_base_geojson_caches.apply_async(
+                kwargs={
+                    "nuts_levels": None,
+                    "regions_limit": base_kwargs["regions_limit"],
+                }
+            )
+            task_ids.append(queued.id)
+            results["maps"] = {"status": "queued", "task_ids": task_ids}
         else:
             results["maps"] = _warm_base_geojson_caches(**base_kwargs)
     except Exception as e:

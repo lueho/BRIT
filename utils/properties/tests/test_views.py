@@ -11,7 +11,7 @@ from ..models import Property, Unit
 class UnitCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Unit
 
-    view_dashboard_name = "properties-dashboard"
+    view_explorer_name = "properties-explorer"
     view_create_name = "unit-create"
     view_published_list_name = "unit-list"
     view_private_list_name = "unit-list-owned"
@@ -111,7 +111,7 @@ class UnitAutocompleteViewTestCase(ViewWithPermissionsTestCase):
 class PropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Property
 
-    view_dashboard_name = "properties-dashboard"
+    view_explorer_name = "properties-explorer"
     view_create_name = "property-create"
     view_published_list_name = "property-list"
     view_private_list_name = "property-list-owned"

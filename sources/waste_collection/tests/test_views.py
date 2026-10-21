@@ -86,7 +86,11 @@ from sources.waste_collection.waste_atlas.templatetags.atlas_tags import (
     RENDER_TIME_RESOLVED_KEYS,
 )
 from utils.file_export.generic_tasks import export_user_created_object_to_file
-from utils.object_management.models import ObjectEditorGrant, ReviewAction
+from utils.object_management.models import (
+    ObjectEditorGrant,
+    ReviewAction,
+    get_default_owner,
+)
 from utils.properties.models import Property, Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
@@ -148,7 +152,7 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 
     model = Collector
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collector-create"
     view_modal_create_name = "collector-create-modal"
     view_published_list_name = "collector-list"
@@ -356,7 +360,7 @@ class CollectionSystemCRUDViewsTestCase(
 
     model = CollectionSystem
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collectionsystem-create"
     view_modal_create_name = "collectionsystem-create-modal"
     view_published_list_name = "collectionsystem-list"
@@ -385,7 +389,7 @@ class WasteCategoryCRUDViewsTestCase(
 
     model = WasteCategory
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "wastecategory-create"
     view_modal_create_name = "wastecategory-create-modal"
     view_published_list_name = "wastecategory-list"
@@ -414,7 +418,7 @@ class WasteComponentCRUDViewsTestCase(
 
     model = WasteComponent
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "wastecomponent-create"
     view_modal_create_name = "wastecomponent-create-modal"
     view_published_list_name = "wastecomponent-list"
@@ -430,8 +434,10 @@ class WasteComponentCRUDViewsTestCase(
 
     @classmethod
     def create_related_objects(cls):
-        MaterialCategory.objects.create(
-            name="Biowaste component", publication_status="published"
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         return {}
 
@@ -453,7 +459,7 @@ class FeeSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     model = FeeSystem
     add_scope_query_param_to_list_urls = True
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "feesystem-create"
     view_published_list_name = "feesystem-list"
     view_private_list_name = "feesystem-list-owned"
@@ -478,7 +484,7 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     model = WasteFlyer
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_published_list_name = "wasteflyer-list"
     view_private_list_name = "wasteflyer-list-owned"
     view_detail_name = "wasteflyer-detail"
@@ -570,7 +576,7 @@ class CollectionFrequencyCRUDViewsTestCase(
 
     model = CollectionFrequency
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collectionfrequency-create"
     view_published_list_name = "collectionfrequency-list"
     view_private_list_name = "collectionfrequency-list-owned"
@@ -785,7 +791,7 @@ class CollectionPropertyValueCRUDViewsTestCase(
 
     model = CollectionPropertyValue
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collectionpropertyvalue-create"
     view_detail_name = "collectionpropertyvalue-detail"
     view_update_name = "collectionpropertyvalue-update"
@@ -1017,7 +1023,7 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
 
     model = AggregatedCollectionPropertyValue
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "aggregatedcollectionpropertyvalue-create"
     view_detail_name = "aggregatedcollectionpropertyvalue-detail"
     view_update_name = "aggregatedcollectionpropertyvalue-update"
@@ -1189,7 +1195,7 @@ class CollectionCatchmentCRUDViewsTestCase(
     model = CollectionCatchment
     model_add_permission = "add_collectioncatchment"
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_published_list_name = "collectioncatchment-list"
     view_private_list_name = "collectioncatchment-list-owned"
     view_create_name = "collectioncatchment-create"
@@ -1376,6 +1382,110 @@ class CollectionListQueryTestCase(TestCase):
 
         self.assertEqual(actual, [obj.pk for obj in self.published[:20]])
 
+    def test_letter_filter_narrows_list_to_matching_initials(self):
+        # bulk_create keeps the explicit name; save() would auto-generate it.
+        zebra = Collection.objects.bulk_create(
+            [
+                Collection(
+                    name="Zebra collection",
+                    owner=self.owner,
+                    publication_status="published",
+                    valid_from=date(2024, 2, 1),
+                    catchment=self.catchment,
+                    collector=self.collector,
+                    waste_category=self.category,
+                    collection_system=self.system,
+                )
+            ]
+        )[0]
+
+        page = self.get_page(views.CollectionPublishedListView, data={"letter": "Z"})
+        self.assertEqual(page.paginator.count, 1)
+        self.assertEqual([obj.pk for obj in page.object_list], [zebra.pk])
+
+        page = self.get_page(views.CollectionPublishedListView, data={"letter": "R"})
+        self.assertEqual(page.paginator.count, 25)
+
+    def test_letter_index_is_exposed_and_marks_active_letter(self):
+        request = RequestFactory().get(
+            "/collections/", {"scope": "published", "letter": "R"}
+        )
+        request.user = AnonymousUser()
+        response = views.CollectionPublishedListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        index = {
+            entry["letter"]: entry for entry in response.context_data["letter_index"]
+        }
+        self.assertTrue(index["R"]["enabled"])
+        self.assertTrue(index["R"]["active"])
+        self.assertFalse(index["B"]["enabled"])
+
+    def test_review_route_applies_letter_filter_and_index(self):
+        moderator = User.objects.create_user(username="letter-moderator")
+        moderator.user_permissions.add(
+            Permission.objects.get_or_create(
+                codename="can_moderate_collection",
+                content_type=ContentType.objects.get_for_model(Collection),
+                defaults={"name": "Can moderate collections"},
+            )[0]
+        )
+        river, zebra = Collection.objects.bulk_create(
+            [
+                Collection(
+                    name=name,
+                    owner=self.other_owner,
+                    publication_status="review",
+                    valid_from=date(2024, 1, 1),
+                    catchment=self.catchment,
+                    collector=self.collector,
+                    waste_category=self.category,
+                    collection_system=self.system,
+                )
+                for name in ("River collection", "Zebra collection")
+            ]
+        )
+        self.client.force_login(moderator)
+
+        response = self.client.get(
+            reverse("collection-list-review"), {"scope": "review", "letter": "R"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result_pks = {obj.pk for obj in response.context["object_list"]}
+        self.assertIn(river.pk, result_pks)
+        self.assertNotIn(zebra.pk, result_pks)
+        index = {entry["letter"]: entry for entry in response.context["letter_index"]}
+        self.assertTrue(index["R"]["active"])
+        self.assertTrue(index["Z"]["enabled"])
+
+    def test_filter_form_carries_active_letter(self):
+        response = self.client.get(
+            reverse("collection-list"), {"scope": "published", "letter": "R"}
+        )
+
+        self.assertContains(
+            response, '<input type="hidden" name="letter" value="R">', html=True
+        )
+
+    def test_filter_form_has_no_letter_input_without_active_letter(self):
+        response = self.client.get(reverse("collection-list"), {"scope": "published"})
+
+        self.assertNotContains(response, 'name="letter"')
+
+    def test_private_list_places_bulk_access_form_in_options_pane(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("collection-list-owned"), {"scope": "private"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        pane_start = content.index('id="options-pane"')
+        pane_end = content.index('id="learning-pane"')
+        self.assertIn('id="bulk-access-form"', content[pane_start:pane_end])
+        self.assertNotIn('id="bulk-access-form"', content[:pane_start])
+
     def test_explicit_ordering_is_preserved(self):
         page = self.get_page(
             views.CollectionPublishedListView, ordering=("-valid_from", "-id")
@@ -1398,11 +1508,11 @@ class CollectionListQueryTestCase(TestCase):
                 self.assertEqual(obj.collection_system.name, "List system")
 
     @override_settings(GOOGLE_ANALYTICS_KEY="")
-    def test_anonymous_list_renders_with_nine_queries(self):
+    def test_anonymous_list_renders_with_ten_queries(self):
         request = RequestFactory().get("/collections/", {"scope": "published"})
         request.user = AnonymousUser()
 
-        with self.assertNumQueries(9):
+        with self.assertNumQueries(10):
             response = views.CollectionPublishedListView.as_view()(request)
             response.render()
 
@@ -1426,7 +1536,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     model = Collection
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collection-create"
     view_published_list_name = "collection-list"
     view_private_list_name = "collection-list-owned"
@@ -1491,8 +1601,10 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     @classmethod
     def create_related_objects(cls):
-        MaterialCategory.objects.create(
-            name="Biowaste component", publication_status="published"
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         catchment = CollectionCatchment.objects.create(
             name="Test catchment", publication_status="published"
@@ -2104,8 +2216,10 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
 
-        cls.material_category = MaterialCategory.objects.create(
-            name="Biowaste component", publication_status="published"
+        cls.material_category, _ = MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed material 1", publication_status="published"
@@ -2475,7 +2589,7 @@ class CollectionVersionLinkVisibilityTestCase(TestCase):
 
 
 class CollectionStatYearIndicatorTestCase(TestCase):
-    """The detail page flags statistics whose year lies outside the valid period."""
+    """Multi-year statistics are a feature: only the CPV detail page flags them."""
 
     @classmethod
     def setUpTestData(cls):
@@ -2507,23 +2621,15 @@ class CollectionStatYearIndicatorTestCase(TestCase):
             reverse("collection-detail", kwargs={"pk": self.collection.pk})
         )
 
-    def test_detail_flags_stat_year_before_valid_from(self):
-        self._cpv(2019)
+    def test_detail_does_not_flag_stat_years_outside_period(self):
+        for year in (2019, 2021, 2023):
+            self._cpv(year)
         response = self._get_detail()
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "outside the collection validity period")
-
-    def test_detail_flags_stat_year_after_valid_until(self):
-        self._cpv(2023)
-        response = self._get_detail()
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "outside the collection validity period")
-
-    def test_detail_does_not_flag_stat_year_within_period(self):
-        self._cpv(2021)
-        response = self._get_detail()
-        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "(2019)")
+        self.assertContains(response, "(2023)")
         self.assertNotContains(response, "outside the collection validity period")
+        self.assertNotContains(response, "fa-triangle-exclamation")
 
     def test_cpv_detail_flags_out_of_period_year(self):
         cpv = self._cpv(2015)
@@ -2542,8 +2648,10 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
 
-        cls.material_category = MaterialCategory.objects.create(
-            name="Biowaste component", publication_status="published"
+        cls.material_category, _ = MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed material 1", publication_status="published"
@@ -3332,7 +3440,9 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
         # Ensure a MaterialCategory (materials.models) for "Biowaste component" exists
         # This might be used by signals or other underlying logic.
         MaterialCategory.objects.get_or_create(
-            name="Biowaste component", publication_status="published"
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
 
         # Create a test user with necessary permissions
@@ -3359,7 +3469,9 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
         # This is distinct from the MaterialCategory above.
         cls.biowaste_component_material_category, _ = (
             MaterialCategory.objects.get_or_create(
-                name="Biowaste component", defaults={"owner": cls.user}
+                owner=get_default_owner(),
+                name="Biowaste component",
+                defaults={"publication_status": "published"},
             )
         )
 
@@ -3629,7 +3741,9 @@ class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
             name="Bio-waste for GroupBy Test"
         )
 
-        MaterialCategory.objects.get_or_create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
 
         cls.waste_component = WasteComponent.objects.create(
             name="Food scraps for GroupBy Test"
@@ -4791,6 +4905,29 @@ class WasteAtlasMapViewsTestCase(TestCase):
             with self.subTest(page=page["name"]):
                 response = self.client.get(reverse(page["name"]))
                 self.assertIsNotNone(self._map_config(response))
+
+    def test_repeated_page_render_skips_cached_selector_fragments(self):
+        """The ~600-entry selector/tree loops are fragment-cached: a second
+        render of the same page must not evaluate them again."""
+        from django.core.cache import cache
+        from django.template.defaulttags import ForNode
+
+        cache.clear()
+        url = reverse("waste-atlas-germany-collection-system-map")
+        renders = []
+
+        original_render = ForNode.render
+
+        def counting_render(node, context):
+            renders.append(node)
+            return original_render(node, context)
+
+        with patch.object(ForNode, "render", counting_render):
+            self.client.get(url)
+            first_pass = len(renders)
+            renders.clear()
+            self.client.get(url)
+        self.assertLess(len(renders), first_pass)
 
     def test_region_property_map_does_not_link_to_an_unrelated_collection(self):
         response = self.client.get(
@@ -6397,7 +6534,9 @@ class CollectionCSVRendererTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        MaterialCategory.objects.create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed Material 1"
         )
@@ -6553,7 +6692,9 @@ class CollectionXLSXRendererTestCase(TestCase):
         )
         member.user_permissions.add(permission)
 
-        MaterialCategory.objects.create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed Material 1"
         )
@@ -6652,7 +6793,9 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         MaterialCategory.objects.get_or_create(
-            name="Biowaste component", publication_status="published"
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         cls.catchment = CollectionCatchment.objects.create(
             name="Catchment", publication_status="published"
@@ -6669,7 +6812,9 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
         cls.allowed_material = WasteComponent.objects.create(
             name="Allowed", publication_status="published"
         )
-        biowaste_cat = MaterialCategory.objects.get(name="Biowaste component")
+        biowaste_cat = MaterialCategory.objects.get(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material.categories.add(biowaste_cat)
         cls.frequency = CollectionFrequency.objects.create(
             name="Frequency", publication_status="published"
@@ -6760,7 +6905,9 @@ class CollectionInlineWasteFieldsSaveTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         MaterialCategory.objects.get_or_create(
-            name="Biowaste component", publication_status="published"
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         cls.catchment = CollectionCatchment.objects.create(
             name="Catchment", publication_status="published"
@@ -6780,7 +6927,9 @@ class CollectionInlineWasteFieldsSaveTestCase(TestCase):
         cls.forbidden_material = WasteComponent.objects.create(
             name="Forbidden", publication_status="published"
         )
-        biowaste_cat = MaterialCategory.objects.get(name="Biowaste component")
+        biowaste_cat = MaterialCategory.objects.get(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material.categories.add(biowaste_cat)
         cls.forbidden_material.categories.add(biowaste_cat)
         cls.frequency = CollectionFrequency.objects.create(
@@ -7004,3 +7153,213 @@ class CollectionImporterBinConfigurationTestCase(TestCase):
         col.refresh_from_db()
         self.assertEqual(col.established, 2010)
         col.delete()
+
+
+class CollectionDetailBackLinkTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.collection = Collection.objects.create(
+            name="BackLinkCollection", publication_status="published"
+        )
+        cls.collector = Collector.objects.create(
+            name="BackLinkCollector", publication_status="published"
+        )
+
+    def detail_urls(self):
+        return (
+            reverse("collection-detail", kwargs={"pk": self.collection.pk}),
+            reverse("collector-detail", kwargs={"pk": self.collector.pk}),
+        )
+
+    def test_back_link_to_result_list_is_shown(self):
+        list_url = reverse("collection-list") + "?scope=published"
+        for detail_url in self.detail_urls():
+            with self.subTest(detail_url=detail_url):
+                response = self.client.get(detail_url, {"back": list_url})
+
+                self.assertContains(response, "Back to results")
+                self.assertContains(
+                    response, f'href="{list_url.replace("&", "&amp;")}"'
+                )
+
+    def test_unsafe_or_modal_back_link_is_hidden(self):
+        for detail_url in self.detail_urls():
+            for back in (
+                f"{detail_url}modal/",
+                "https://evil.example/x",
+                "javascript:alert(1)",
+            ):
+                with self.subTest(detail_url=detail_url, back=back):
+                    response = self.client.get(detail_url, {"back": back})
+
+                    self.assertNotContains(response, "Back to results")
+                    self.assertNotContains(response, "?next=javascript")
+
+
+class CollectionDetailV2LayoutTestCase(TestCase):
+    """The collection detail page uses the shared ``detail_v2`` (sdv2) layout."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="v2-collection-owner")
+        cls.catchment = CollectionCatchment.objects.create(
+            name="V2 Catchment", publication_status="published"
+        )
+        cls.collector = Collector.objects.create(
+            name="V2 Collector", publication_status="published"
+        )
+        cls.system = CollectionSystem.objects.create(
+            name="V2 Collection System", publication_status="published"
+        )
+        cls.category = WasteCategory.objects.create(
+            name="V2 Biowaste", publication_status="published"
+        )
+        cls.collection = Collection.objects.create(
+            owner=cls.owner,
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.system,
+            waste_category=cls.category,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+        cls.url = reverse("collection-detail", kwargs={"pk": cls.collection.pk})
+
+    def test_detail_uses_v2_layout(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="sdv2"')
+        self.assertContains(response, "sdv2-hero")
+        self.assertContains(
+            response,
+            f'<h1 class="sdv2-hero-title">{self.collection.name}</h1>',
+            html=True,
+        )
+        self.assertContains(response, "sdv2-hero-meta")
+        # The legacy card/options-pane shell is gone.
+        self.assertNotContains(response, "detail-layout-card")
+        self.assertNotContains(response, 'id="options-pane"')
+
+    def test_detail_shows_action_rail_for_authenticated_user(self):
+        staff = User.objects.create_user(username="v2-staff", is_staff=True)
+        self.client.force_login(staff)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="sdv2-rail"')
+        self.assertContains(response, "sdv2-status-pill")
+        self.assertContains(response, "sdv2-actions-menu")
+        self.assertContains(
+            response,
+            reverse("collection-update", kwargs={"pk": self.collection.pk}),
+        )
+
+    def test_anonymous_detail_keeps_collection_navigation(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'class="sdv2-rail"')
+        self.assertContains(response, 'aria-label="Collection navigation"')
+        self.assertContains(response, 'aria-label="View on map"')
+        self.assertContains(response, reverse("wastecollection-explorer"))
+
+    def test_map_link_ignores_unsafe_next_url(self):
+        response = self.client.get(self.url, {"next": "javascript:alert(1)"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "javascript:alert")
+        self.assertContains(
+            response,
+            f"{reverse('WasteCollection')}?id={self.collection.pk}&load_features=true",
+        )
+
+    def test_map_link_keeps_safe_next_url(self):
+        map_url = f"{reverse('WasteCollection')}?catchment=1"
+        response = self.client.get(self.url, {"next": map_url})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{map_url}"')
+
+    def test_detail_renders_map_outside_review_mode(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "map-container")
+        self.assertContains(response, 'id="mapConfig"')
+
+    def test_review_detail_uses_v2_layout(self):
+        staff = User.objects.create_user(username="v2-reviewer", is_staff=True)
+        self.client.force_login(staff)
+        content_type = ContentType.objects.get_for_model(Collection)
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={
+                    "content_type_id": content_type.pk,
+                    "object_id": self.collection.pk,
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sdv2-hero")
+        self.assertNotContains(response, "detail-layout-card")
+
+
+class CollectionPropertyValueDetailV2LayoutTestCase(TestCase):
+    """The CPV detail page uses the shared ``detail_v2`` (sdv2) layout."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="v2-cpv-owner")
+        cls.collection = Collection.objects.create(
+            owner=cls.owner,
+            valid_from=date(2020, 1, 1),
+            valid_until=date(2022, 12, 31),
+            publication_status="published",
+        )
+        cls.prop = Property.objects.create(
+            name="Specific waste collected (v2)", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="V2 Indicator Unit", publication_status="published"
+        )
+        cls.cpv = CollectionPropertyValue.objects.create(
+            collection=cls.collection,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2015,
+            average=12.3456789,
+            publication_status="published",
+        )
+        cls.url = reverse("collectionpropertyvalue-detail", kwargs={"pk": cls.cpv.pk})
+
+    def test_detail_uses_v2_layout(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="sdv2"')
+        self.assertContains(response, "sdv2-hero")
+        self.assertNotContains(response, "detail-layout-card")
+        self.assertNotContains(response, 'id="options-pane"')
+
+    def test_anonymous_detail_keeps_collection_property_navigation(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'class="sdv2-rail"')
+        self.assertContains(response, 'aria-label="Collection property navigation"')
+        self.assertContains(response, reverse("wastecollection-explorer"))
+
+    def test_value_is_rounded_for_display(self):
+        response = self.client.get(self.url)
+
+        self.assertContains(response, "12.3")
+        self.assertNotContains(response, "12.345")
+
+    def test_out_of_period_year_uses_subtle_indicator(self):
+        response = self.client.get(self.url)
+
+        self.assertContains(response, "outside the collection validity period")
+        self.assertNotContains(response, "fa-triangle-exclamation")

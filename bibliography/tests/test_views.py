@@ -1,7 +1,9 @@
 import json
+import time
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission
+from django.core import signing
 from django.db.models.signals import post_save
 from django.urls import reverse
 from django.utils.html import escape
@@ -33,7 +35,7 @@ class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
     model = Author
 
-    view_dashboard_name = "bibliography-explorer"
+    view_explorer_name = "bibliography-explorer"
     view_create_name = "author-create"
     view_modal_create_name = "author-create-modal"
     view_published_list_name = "author-list"
@@ -291,7 +293,7 @@ class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
     model = Licence
 
-    view_dashboard_name = "bibliography-explorer"
+    view_explorer_name = "bibliography-explorer"
     view_create_name = "licence-create"
     view_modal_create_name = "licence-create-modal"
     view_published_list_name = "licence-list"
@@ -313,12 +315,12 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     model = Source
     add_scope_query_param_to_list_urls = True
 
-    view_dashboard_name = "bibliography-explorer"
+    view_explorer_name = "bibliography-explorer"
 
     modal_detail_view = True
     modal_create_view = True
 
-    view_dashboard_name = "bibliography-explorer"
+    view_explorer_name = "bibliography-explorer"
     view_create_name = "source-create"
     view_modal_create_name = "source-create-modal"
     view_published_list_name = "source-list"
@@ -375,6 +377,7 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             "data:text/html,test",
             "http://testserver/bibliography/sources/",
             "/\\external.example/",
+            "/bibliography/sources/1/modal/",
         ):
             with self.subTest(back=back):
                 self.client.logout()
@@ -388,6 +391,39 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
                 self.assertContains(response, 'aria-label="Source navigation"')
                 self.assertContains(response, "All sources")
                 self.assertContains(response, "Bibliography explorer")
+
+    def test_list_letter_filter_narrows_by_citation_key(self):
+        zeta = Source.objects.create(
+            owner=self.owner_user,
+            publication_status="published",
+            title="Zeta source",
+            citation_key="ZETA",
+            type="online",
+            url="https://zeta.example.org",
+        )
+
+        response = self.client.get(
+            reverse("source-list"), {"scope": "published", "letter": "Z"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result_pks = {obj.pk for obj in response.context["object_list"]}
+        self.assertIn(zeta.pk, result_pks)
+        self.assertNotIn(self.published_object.pk, result_pks)
+
+    def test_list_renders_letter_index(self):
+        response = self.client.get(reverse("source-list"), {"scope": "published"})
+
+        self.assertContains(response, 'aria-label="Filter by first letter"')
+
+    def test_list_filter_form_carries_active_letter(self):
+        response = self.client.get(
+            reverse("source-list"), {"scope": "published", "letter": "Z"}
+        )
+
+        self.assertContains(
+            response, '<input type="hidden" name="letter" value="Z">', html=True
+        )
 
     @classmethod
     def setUpTestData(cls):
@@ -572,6 +608,19 @@ class SourceReviewListRegressionTest(ViewWithPermissionsTestCase):
             [(f"{reverse('source-list-review')}?scope=review", 302)],
         )
         self.assertContains(response, self.review_source.title)
+
+    def test_row_action_dropdown_escapes_table_scroll_container(self):
+        self.client.force_login(self.member)
+
+        response = self.client.get(reverse("source-list-review"), {"scope": "review"})
+
+        self.assertContains(response, self.review_source.title)
+        self.assertContains(
+            response,
+            """data-bs-popper-config='{"strategy":"fixed"}'""",
+            html=False,
+        )
+        self.assertNotContains(response, 'data-bs-container="body"', html=False)
 
     def test_private_list_uses_dedicated_review_route_for_scope_toggle(self):
         self.client.force_login(self.member)
@@ -1053,6 +1102,71 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(created_author.first_names, "Ada")
         self.assertEqual(created_author.last_names, "Lovelace")
 
+    def test_failed_source_creation_does_not_leave_orphan_authors(self):
+        """Inline authors must not persist when the source create fails."""
+        add_author_permission = Permission.objects.get(codename="add_author")
+        self.member.user_permissions.add(add_author_permission)
+        self.client.force_login(self.member)
+
+        with patch.object(Source.objects, "create") as mock_create:
+            mock_create.side_effect = RuntimeError("simulated failure")
+            with (
+                self.assertLogs("django.request", level="ERROR"),
+                self.assertRaises(RuntimeError),
+            ):
+                self.client.post(
+                    reverse("source-quick-create"),
+                    data=json.dumps(
+                        {
+                            "title": "Inline source",
+                            "authors": [
+                                {"first_names": "Ada", "last_names": "Lovelace"}
+                            ],
+                        }
+                    ),
+                    content_type="application/json",
+                )
+
+        self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
+        self.assertEqual(Source.objects.count(), 0)
+
+    def test_author_error_rolls_back_authors_created_earlier_in_request(self):
+        add_author_permission = Permission.objects.get(codename="add_author")
+        self.member.user_permissions.add(add_author_permission)
+        self.client.force_login(self.member)
+
+        add_author_checks = []
+
+        def has_perm_revoked_after_first_author(user, perm, obj=None):
+            if perm != "bibliography.add_author":
+                return True
+            add_author_checks.append(perm)
+            return len(add_author_checks) == 1
+
+        with patch.object(
+            User,
+            "has_perm",
+            autospec=True,
+            side_effect=has_perm_revoked_after_first_author,
+        ):
+            response = self.client.post(
+                reverse("source-quick-create"),
+                data=json.dumps(
+                    {
+                        "title": "Inline source",
+                        "authors": [
+                            {"first_names": "Ada", "last_names": "Lovelace"},
+                            {"first_names": "Grace", "last_names": "Hopper"},
+                        ],
+                    }
+                ),
+                content_type="application/json",
+            )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
+        self.assertEqual(Source.objects.count(), 0)
+
     def test_post_http_201_creates_source_with_new_organisation_author(self):
         add_author_permission = Permission.objects.get(codename="add_author")
         self.member.user_permissions.add(add_author_permission)
@@ -1085,6 +1199,42 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
             created_author.organization_name, "European Environment Agency"
         )
 
+    def test_post_http_201_creates_source_with_mixed_new_authors(self):
+        add_author_permission = Permission.objects.get(codename="add_author")
+        self.member.user_permissions.add(add_author_permission)
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps(
+                {
+                    "title": "Inline source",
+                    "authors": [
+                        {"first_names": "Ada", "last_names": "Lovelace"},
+                        {
+                            "author_type": "organization",
+                            "organization_name": "European Environment Agency",
+                        },
+                    ],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        source = Source.objects.get(pk=response.json()["id"])
+        self.assertEqual(source.sourceauthors.count(), 2)
+
+        person_author = source.sourceauthors.get(position=1).author
+        self.assertEqual(person_author.author_type, "person")
+        self.assertEqual(person_author.last_names, "Lovelace")
+
+        organisation_author = source.sourceauthors.get(position=2).author
+        self.assertEqual(organisation_author.author_type, "organization")
+        self.assertEqual(
+            organisation_author.organization_name, "European Environment Agency"
+        )
+
     def test_delete_http_302_redirect_to_login_for_anonymous(self):
         self.client.force_login(self.member)
         source = Source.objects.create(owner=self.member, title="To delete")
@@ -1109,6 +1259,162 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Source.objects.filter(pk=source.pk).exists())
+
+    def _quick_create_with_authors(self, authors, title="Inline source"):
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps({"title": title, "authors": authors}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201)
+        return response.json()
+
+    def _quick_delete(self, payload):
+        return self.client.delete(
+            reverse("source-quick-create"),
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+    def test_delete_with_cleanup_token_removes_authors_created_with_source(self):
+        self.member.user_permissions.add(Permission.objects.get(codename="add_author"))
+        self.client.force_login(self.member)
+        existing = Author.objects.create(
+            owner=self.member, first_names="Grace", last_names="Hopper"
+        )
+        created = self._quick_create_with_authors(
+            [{"id": existing.pk}, {"first_names": "Ada", "last_names": "Lovelace"}]
+        )
+
+        response = self._quick_delete(
+            {
+                "id": created["id"],
+                "author_cleanup_token": created["author_cleanup_token"],
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Source.objects.filter(pk=created["id"]).exists())
+        self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
+        self.assertTrue(Author.objects.filter(pk=existing.pk).exists())
+
+    def test_delete_keeps_created_author_unlinked_from_source_beforehand(self):
+        self.member.user_permissions.add(Permission.objects.get(codename="add_author"))
+        self.client.force_login(self.member)
+        created = self._quick_create_with_authors(
+            [{"first_names": "Ada", "last_names": "Lovelace"}]
+        )
+        SourceAuthor.objects.filter(source_id=created["id"]).delete()
+
+        response = self._quick_delete(
+            {
+                "id": created["id"],
+                "author_cleanup_token": created["author_cleanup_token"],
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Author.objects.filter(last_names="Lovelace").exists())
+
+    def test_delete_accepts_cleanup_token_older_than_a_day(self):
+        self.member.user_permissions.add(Permission.objects.get(codename="add_author"))
+        self.client.force_login(self.member)
+        three_days_ago = signing.b62_encode(int(time.time()) - 3 * 86400)
+        with patch.object(
+            signing.TimestampSigner, "timestamp", return_value=three_days_ago
+        ):
+            created = self._quick_create_with_authors(
+                [{"first_names": "Ada", "last_names": "Lovelace"}]
+            )
+
+        response = self._quick_delete(
+            {
+                "id": created["id"],
+                "author_cleanup_token": created["author_cleanup_token"],
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
+
+    def test_delete_keeps_created_authors_still_used_by_a_source_or_process(self):
+        from processes.models import Process, ProcessAuthor
+
+        self.member.user_permissions.add(Permission.objects.get(codename="add_author"))
+        self.client.force_login(self.member)
+        created = self._quick_create_with_authors(
+            [
+                {"first_names": "Ada", "last_names": "Lovelace"},
+                {"first_names": "Grace", "last_names": "Hopper"},
+            ]
+        )
+        other_source = Source.objects.create(owner=self.member, title="Other")
+        other_source.sourceauthors.create(
+            author=Author.objects.get(last_names="Lovelace"), position=1
+        )
+        process = Process.objects.create(name="Process", owner=self.member)
+        ProcessAuthor.objects.create(
+            process=process, author=Author.objects.get(last_names="Hopper")
+        )
+
+        response = self._quick_delete(
+            {
+                "id": created["id"],
+                "author_cleanup_token": created["author_cleanup_token"],
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Source.objects.filter(pk=created["id"]).exists())
+        self.assertTrue(Author.objects.filter(last_names="Lovelace").exists())
+        self.assertTrue(Author.objects.filter(last_names="Hopper").exists())
+
+    def test_delete_ignores_author_ids_without_a_matching_cleanup_token(self):
+        self.member.user_permissions.add(Permission.objects.get(codename="add_author"))
+        self.client.force_login(self.member)
+        first = self._quick_create_with_authors(
+            [{"first_names": "Ada", "last_names": "Lovelace"}], title="First"
+        )
+        second = Source.objects.create(owner=self.member, title="Second")
+        unrelated = Author.objects.create(
+            owner=self.member, first_names="Grace", last_names="Hopper"
+        )
+
+        forged = self._quick_delete(
+            {
+                "id": second.pk,
+                "author_ids": [unrelated.pk],
+                "author_cleanup_token": first["author_cleanup_token"],
+            }
+        )
+        tampered = self._quick_delete(
+            {"id": first["id"], "author_cleanup_token": "not-a-valid-token"}
+        )
+
+        self.assertEqual(forged.status_code, 200)
+        self.assertEqual(tampered.status_code, 200)
+        self.assertFalse(
+            Source.objects.filter(pk__in=[first["id"], second.pk]).exists()
+        )
+        self.assertTrue(Author.objects.filter(pk=unrelated.pk).exists())
+        self.assertTrue(Author.objects.filter(last_names="Lovelace").exists())
+
+    def test_delete_keeps_authors_when_no_cleanup_token_is_sent(self):
+        self.client.force_login(self.member)
+        source = Source.objects.create(owner=self.member, title="To delete")
+        author = Author.objects.create(
+            owner=self.member, first_names="Ada", last_names="Lovelace"
+        )
+        source.sourceauthors.create(author=author, position=1)
+
+        response = self.client.delete(
+            reverse("source-quick-create"),
+            data=json.dumps({"id": source.pk}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Author.objects.filter(pk=author.pk).exists())
 
     def test_delete_http_404_cannot_delete_another_users_source(self):
         self.client.force_login(self.member)

@@ -5,6 +5,7 @@ from unittest.mock import patch
 from urllib.parse import quote
 from uuid import uuid4
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
@@ -17,7 +18,7 @@ from django.utils import timezone
 from django.utils.html import escape
 from factory.django import mute_signals
 
-from bibliography.models import Source
+from bibliography.models import Author, Source
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import Location, Region
 from utils.object_management.models import (
@@ -40,8 +41,10 @@ from ..models import (
     MaterialProperty,
     MaterialPropertyGroup,
     MaterialPropertyValue,
+    MeasurementLimitType,
     MeasurementValueQualifier,
     Sample,
+    SampleAuthor,
     SampleExternalRecord,
     SampleGroup,
     SampleSeries,
@@ -53,7 +56,7 @@ from ..views import DETAIL_RELATED_LIMIT, SampleSubstrateMaterialQuickCreateView
 User = get_user_model()
 
 
-class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
+class MaterialExplorerViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "change_material"
 
     def test_get_http_200_ok_for_anonymous(self):
@@ -101,6 +104,24 @@ class BaseMaterialProxyAutocompleteViewTestCase(TestCase):
         names = [item["name"] for item in response.json()["results"]]
         self.assertIn(self.component.name, names)
         self.assertNotIn(self.material.name, names)
+
+
+class MaterialListNameWidgetSelectionTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.material = Material.objects.create(
+            name="Grass from nature reserve",
+            publication_status="published",
+        )
+
+    def test_selected_material_renders_when_list_search_does_not_match_it(self):
+        response = self.client.get(
+            reverse("material-list"),
+            {"q": "grass clippings", "scope": "published", "name": self.material.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f"allOptions['{self.material.pk}']")
 
 
 class SampleSubstrateMaterialAutocompleteViewTestCase(TestCase):
@@ -769,7 +790,7 @@ class MaterialCategoryCRUDViewsTestCase(
 
     model = MaterialCategory
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialcategory-create"
     view_modal_create_name = "materialcategory-create-modal"
     view_published_list_name = "materialcategory-list"
@@ -796,7 +817,7 @@ class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
 
     model = Material
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "material-create"
     view_modal_create_name = "material-create-modal"
     view_published_list_name = "material-list"
@@ -833,7 +854,7 @@ class MaterialComponentCRUDViewsTestCase(
 
     model = MaterialComponent
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialcomponent-create"
     view_modal_create_name = "materialcomponent-create-modal"
     view_published_list_name = "materialcomponent-list"
@@ -870,7 +891,7 @@ class MaterialComponentGroupCRUDViewsTestCase(
 
     model = MaterialComponentGroup
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialcomponentgroup-create"
     view_modal_create_name = "materialcomponentgroup-create-modal"
     view_published_list_name = "materialcomponentgroup-list"
@@ -907,7 +928,7 @@ class MaterialPropertyCRUDViewsTestCase(
 
     model = MaterialProperty
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialproperty-create"
     view_modal_create_name = "materialproperty-create-modal"
     view_published_list_name = "materialproperty-list"
@@ -1971,7 +1992,7 @@ class AnalyticalMethodCRUDViewsTestCase(
 
     model = AnalyticalMethod
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "analyticalmethod-create"
     view_published_list_name = "analyticalmethod-list"
     view_private_list_name = "analyticalmethod-list-owned"
@@ -2102,7 +2123,7 @@ class SampleSeriesCRUDViewsTestCase(
 
     model = SampleSeries
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "sampleseries-create"
     view_modal_create_name = "sampleseries-create-modal"
     view_published_list_name = "sampleseries-list"
@@ -2989,7 +3010,7 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
     model = Sample
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "sample-create"
     view_modal_create_name = "sample-create-modal"
     view_published_list_name = "sample-list"
@@ -3219,8 +3240,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="published"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3238,8 +3259,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="published"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3257,8 +3278,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="private"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3276,8 +3297,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="private"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3380,6 +3401,7 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertContains(response, 'data-workspace-section="sampling"')
         self.assertContains(response, 'data-workspace-section="analysis"')
         self.assertContains(response, 'data-workspace-section="sources"')
+        self.assertContains(response, 'data-workspace-section="contributors"')
         self.assertNotContains(response, "TOTAL_FORMS")
 
     def test_edit_workspace_not_offered_to_non_owner_of_private_sample(self):
@@ -3503,6 +3525,78 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertFalse(response.json()["saved"])
         self.assertIn("series", response.json()["html"])
 
+    def test_contributors_section_adds_ordered_authors(self):
+        author = Author.objects.create(
+            first_names="Ada",
+            last_names="Example",
+            owner=self.owner,
+            publication_status="published",
+        )
+        response = self.client.post(
+            self.section_url("contributors"),
+            {
+                "sample_authors-TOTAL_FORMS": "1",
+                "sample_authors-INITIAL_FORMS": "0",
+                "sample_authors-0-author": str(author.pk),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        link = self.sample.sample_authors.get()
+        self.assertEqual(link.author, author)
+        self.assertEqual(link.position, 1)
+
+    def test_contributors_summary_hides_authors_not_visible_to_editor(self):
+        secret = Author.objects.create(
+            last_names="Secretauthor",
+            contact_email="secret-summary-author@example.com",
+            owner=self.other,
+        )
+        SampleAuthor.objects.create(sample=self.sample, author=secret, position=1)
+        author = Author.objects.create(
+            last_names="Visibleauthor", owner=self.owner, publication_status="published"
+        )
+        response = self.client.post(
+            self.section_url("contributors"),
+            {
+                "sample_authors-TOTAL_FORMS": "1",
+                "sample_authors-INITIAL_FORMS": "0",
+                "sample_authors-0-author": str(author.pk),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        html = response.json()["html"]
+        self.assertIn("Visibleauthor", html)
+        self.assertNotIn("Secretauthor", html)
+        self.assertNotIn("secret-summary-author@example.com", html)
+
+        workspace = self.client.get(f"{self.sample.get_absolute_url()}?mode=edit")
+        self.assertNotContains(workspace, "Secretauthor")
+        self.assertNotContains(workspace, "secret-summary-author@example.com")
+        page = workspace.content.decode()
+        start = page.index('id="workspace-section-contributors"')
+        summary = page[start : page.index('id="workspace-editor-contributors"', start)]
+        self.assertIn("Visibleauthor", summary)
+        self.assertNotIn("No corresponding authors added yet", summary)
+
+    def test_contributors_reject_author_not_visible_to_editor(self):
+        locked = Author.objects.create(last_names="Locked", owner=self.other)
+        response = self.client.post(
+            self.section_url("contributors"),
+            {
+                "sample_authors-TOTAL_FORMS": "1",
+                "sample_authors-INITIAL_FORMS": "0",
+                "sample_authors-0-author": str(locked.pk),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(response.json()["saved"])
+        self.assertFalse(self.sample.sample_authors.exists())
+
     def test_unknown_section_returns_404(self):
         response = self.client.get(self.section_url("bogus"))
         self.assertEqual(response.status_code, 404)
@@ -3523,6 +3617,60 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertFalse(data["saved"])
         self.sample.refresh_from_db()
         self.assertEqual(self.sample.name, "Pilot sample")
+
+
+class SampleDetailAttributionTestCase(ViewWithPermissionsTestCase):
+    """Sample detail attribution: bibliography authors, not the owner."""
+
+    member_permissions = ["add_sample", "change_sample"]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.material = Material.objects.create(
+            owner=cls.owner,
+            name="Attribution material",
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Attributed sample",
+            material=cls.material,
+            standalone=True,
+            publication_status="published",
+        )
+        cls.author = Author.objects.create(
+            first_names="Saskia",
+            last_names="Hertel",
+            institution="HAW Hamburg",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        SampleAuthor.objects.create(sample=cls.sample, author=cls.author)
+        cls.url = reverse("sample-detail", kwargs={"pk": cls.sample.pk})
+
+    def test_detail_labels_contributors_as_corresponding_authors(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, "Corresponding authors")
+        self.assertContains(response, "Hertel, Saskia")
+        self.assertContains(response, "HAW Hamburg")
+
+    def test_detail_does_not_display_owner_prominently(self):
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "Editor</span>")
+        self.assertNotContains(response, "Contributed by")
+
+    def test_anonymous_does_not_see_private_author(self):
+        secret = Author.objects.create(
+            last_names="Secretauthor",
+            contact_email="secret-sample-author@example.com",
+            owner=self.outsider,
+        )
+        SampleAuthor.objects.create(sample=self.sample, author=secret)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secretauthor")
+        self.assertNotContains(response, "secret-sample-author@example.com")
 
 
 class SampleMeasurementWorkspaceTestCase(TestCase):
@@ -3748,6 +3896,54 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         new = self.sample.component_measurements.get(component=self.moisture)
         self.assertEqual(list(new.sources.all()), [self.source])
 
+    def test_measurements_post_changes_group_of_existing_row(self):
+        other_group = MaterialComponentGroup.objects.create(
+            owner=self.editor,
+            name="Carbohydrates",
+            publication_status="published",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(self.measurement.pk),
+                        group=str(other_group.pk),
+                        component=str(self.moisture.pk),
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(response.json()["saved"])
+        self.measurement.refresh_from_db()
+        self.assertEqual(self.measurement.group, other_group)
+        self.assertEqual(self.measurement.component, self.moisture)
+
+    def test_measurements_post_rejects_change_to_inaccessible_group(self):
+        locked = MaterialComponentGroup.objects.create(
+            owner=self.editor,
+            name="Locked group",
+            publication_status="private",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(self.measurement.pk), group=str(locked.pk)
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.measurement.refresh_from_db()
+        self.assertEqual(self.measurement.group, self.group)
+
     def test_measurements_post_invalid_rows_roll_back_everything(self):
         response = self.client.post(
             self.section_url("measurements"),
@@ -3849,6 +4045,162 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         self.assertEqual(value.property, self.property)
         self.assertEqual(value.owner, self.owner)
         self.assertEqual(value.average, Decimal("312.5"))
+
+    def test_properties_editor_offers_comment_field(self):
+        response = self.client.get(
+            self.section_url("properties"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("property_values-__prefix__-comment", response.json()["html"])
+
+    def test_measurements_editor_offers_limit_fields(self):
+        response = self.client.get(
+            self.section_url("measurements"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 200)
+        html = response.json()["html"]
+        for field in ("value_qualifier", "limit_type", "detection_limit"):
+            self.assertIn(f"component_measurements-__prefix__-{field}", html)
+
+    def test_measurements_post_saves_reporting_limit(self):
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        average="0.8",
+                        value_qualifier="less_than",
+                        limit_type="rl",
+                        detection_limit="0.8",
+                    )
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        measurement = self.sample.component_measurements.exclude(
+            pk=self.measurement.pk
+        ).get()
+        self.assertEqual(measurement.value_qualifier, "less_than")
+        self.assertEqual(measurement.limit_type, "rl")
+        self.assertEqual(measurement.detection_limit, Decimal("0.8"))
+        self.assertEqual(measurement.display_value, "<0.8")
+
+    def test_measurements_post_drops_stale_raw_limit_text(self):
+        measurement = ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=self.group,
+            component=self.component,
+            unit=self.unit,
+            average=Decimal("0.1"),
+            raw_value="(0,1)<LD=6,57",
+            value_qualifier=MeasurementValueQualifier.BELOW_DETECTION_LIMIT,
+            detection_limit=Decimal("6.57"),
+            raw_detection_limit="6,57",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(measurement.pk),
+                        average="0.8",
+                        value_qualifier="less_than",
+                        limit_type="rl",
+                        detection_limit="0.8",
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"], response.json())
+        measurement.refresh_from_db()
+        self.assertEqual(measurement.raw_value, "")
+        self.assertEqual(measurement.raw_detection_limit, "")
+        self.assertEqual(measurement.display_value, "<0.8")
+        self.assertEqual(measurement.display_detection_limit, "0.8")
+
+    def test_measurements_post_limit_type_change_drops_raw_limit_text(self):
+        measurement = ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=self.group,
+            component=self.component,
+            unit=self.unit,
+            average=Decimal("0.1"),
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            limit_type=MeasurementLimitType.LOD,
+            detection_limit=Decimal("6.57"),
+            raw_detection_limit="LD=6,57",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(measurement.pk),
+                        average="0.1",
+                        value_qualifier="less_than",
+                        limit_type="rl",
+                        detection_limit="6.57",
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertTrue(response.json()["saved"], response.json())
+        measurement.refresh_from_db()
+        self.assertEqual(measurement.limit_type, "rl")
+        self.assertEqual(measurement.raw_detection_limit, "")
+        self.assertEqual(measurement.display_detection_limit, "6.57")
+
+    def test_properties_post_saves_limit_type(self):
+        response = self.client.post(
+            self.section_url("properties"),
+            self.property_formset(
+                [
+                    {
+                        "property": str(self.property.pk),
+                        "average": "0.5",
+                        "unit": str(self.unit.pk),
+                        "value_qualifier": "less_than",
+                        "limit_type": "loq",
+                        "detection_limit": "0.5",
+                    }
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        value = self.sample.property_values.get()
+        self.assertEqual(value.limit_type, "loq")
+        self.assertEqual(value.detection_limit, Decimal("0.5"))
+
+    def test_properties_post_saves_comment(self):
+        response = self.client.post(
+            self.section_url("properties"),
+            self.property_formset(
+                [
+                    {
+                        "property": str(self.property.pk),
+                        "average": "312.5",
+                        "unit": str(self.unit.pk),
+                        "comment": "calculated; C approximated as OM/1.8",
+                    }
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        value = self.sample.property_values.get()
+        self.assertEqual(value.comment, "calculated; C approximated as OM/1.8")
 
 
 # ----------- Sample utilities -----------------------------------------------------------------------------------------
@@ -4429,7 +4781,7 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
     model = Composition
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "composition-create"
     view_modal_create_name = "composition-create-modal"
     view_detail_name = "composition-detail"
@@ -5178,6 +5530,57 @@ class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
             reordered_content.index(f'id="group-{self.chemical_group.pk}"'),
         )
 
+    def test_order_down_creates_settings_with_measured_basis(self):
+        dry_matter = MaterialComponent.objects.create(
+            owner=self.member,
+            name="Dry Matter",
+            publication_status="published",
+        )
+        volatile_solids = MaterialComponent.objects.create(
+            owner=self.member,
+            name="Volatile Solids",
+            publication_status="published",
+        )
+        self.sample.component_measurements.filter(group=self.chemical_group).update(
+            basis_component=dry_matter
+        )
+        organic_measurements = self.sample.component_measurements.filter(
+            group=self.organic_group
+        ).order_by("id")
+        organic_measurements.filter(pk=organic_measurements[0].pk).update(
+            basis_component=dry_matter
+        )
+        organic_measurements.filter(pk=organic_measurements[1].pk).update(
+            basis_component=volatile_solids
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "derived-composition-order-down",
+                kwargs={"sample_pk": self.sample.pk, "group_pk": self.organic_group.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        settings_by_group = {
+            composition.group_id: composition.fractions_of
+            for composition in self.sample.compositions.all()
+        }
+        self.assertEqual(settings_by_group[self.chemical_group.pk], dry_matter)
+        self.assertEqual(
+            settings_by_group[self.organic_group.pk],
+            MaterialComponent.objects.default(),
+        )
+
+        detail_response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+        self.assertNotContains(
+            detail_response,
+            "The configured composition basis differs from the measurement basis.",
+        )
+
     def test_order_down_redirects_to_next_url(self):
         self.client.force_login(self.member)
         next_url = (
@@ -5537,6 +5940,30 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "Reset filters")
         self.assertNotContains(response, "Create your first material")
         self.assertNotContains(response, "Log in to create")
+
+    def test_private_material_list_places_bulk_access_form_in_options_pane(self):
+        self.client.force_login(self.regular_user)
+        response = self.client.get(reverse("material-list-owned") + "?scope=private")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        pane_start = content.index('id="options-pane"')
+        self.assertIn('id="bulk-access-form"', content[pane_start:])
+        self.assertNotIn('id="bulk-access-form"', content[:pane_start])
+
+    def test_private_sample_list_hides_access_heading_with_toolbar(self):
+        self.client.force_login(self.regular_user)
+        response = self.client.get(reverse("sample-list-owned") + "?scope=private")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertNotIn('name="items"', content)
+        toolbar_start = content.index('id="bulk-access-toolbar"')
+        heading = content.index("Manage access for selected items")
+        form_start = content.index('id="bulk-access-form"')
+        self.assertLess(toolbar_start, heading)
+        self.assertLess(heading, form_start)
+        self.assertIn("getElementById('bulk-access-toolbar')", content)
 
     def test_material_review_list_renders_filter_context_for_staff(self):
         Material.objects.create(
@@ -6322,6 +6749,7 @@ class EmptyStateViewsTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<td class="sdv2-num sdv2-edit-cell">')
         self.assertContains(
             response,
             reverse(
@@ -6592,6 +7020,39 @@ class EmptyStateViewsTestCase(TestCase):
         )
         return sample, group
 
+    def test_v2_properties_table_shows_property_value_comment(self):
+        sample, _group = self._create_sample_with_composition_and_property()
+        prop = sample.property_values.get()
+        prop.comment = "Calculated from dry-matter measurements"
+        prop.save()
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        properties_section = content[content.index('id="properties"') :]
+        properties_section = properties_section[: properties_section.index("</table>")]
+        self.assertIn('<th scope="col">Comments</th>', properties_section)
+        self.assertIn(
+            '<td class="sdv2-comment-cell">Calculated from dry-matter measurements</td>',
+            properties_section,
+        )
+
+    def test_v2_properties_table_shows_dash_for_empty_property_comment(self):
+        sample, _group = self._create_sample_with_composition_and_property()
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+
+        content = response.content.decode()
+        row = content[content.index('id="property-') :]
+        row = row[: row.index("</tr>")]
+        self.assertEqual(row.count("<td"), 6)
+        self.assertIn("<td>—</td>", row)
+
     def test_v2_anchor_nav_links_sections_for_all_users(self):
         sample, group = self._create_sample_with_composition_and_property()
         url = reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
@@ -6706,12 +7167,15 @@ class EmptyStateViewsTestCase(TestCase):
             publication_status="published",
         )
         default_group = MaterialComponentGroup.objects.default()
+        unit_percent, _ = Unit.objects.get_or_create(
+            owner=self.staff_user, name="%", defaults={"symbol": "percent"}
+        )
         ComponentMeasurement.objects.create(
             owner=self.staff_user,
             sample=sample,
             group=default_group,
             component=MaterialComponent.objects.default(),
-            unit=Unit.objects.filter(name="%").first(),
+            unit=unit_percent,
             average=Decimal("100.0"),
         )
 
@@ -7827,9 +8291,11 @@ class MaterialsReviewDetailAccessTests(TestCase):
         response = self.client.get(self._review_detail_url(self.review_sample))
         self.assertEqual(response.status_code, 403)
 
-    def test_anonymous_cannot_access_review_detail(self):
-        response = self.client.get(self._review_detail_url(self.review_sample))
-        self.assertEqual(response.status_code, 403)
+    def test_anonymous_is_redirected_to_login_for_review_detail(self):
+        url = self._review_detail_url(self.review_sample)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"{settings.LOGIN_URL}?next={url}")
 
 
 class SampleDetailTemplateReviewUITests(TestCase):
@@ -9331,6 +9797,16 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
                     "detection_limit": Decimal("6.57"),
                 },
             ),
+            (
+                "Below reporting limit",
+                {
+                    "average": Decimal("0.8"),
+                    "raw_value": "<0.8",
+                    "value_qualifier": MeasurementValueQualifier.LESS_THAN,
+                    "limit_type": MeasurementLimitType.RL,
+                    "detection_limit": Decimal("0.8"),
+                },
+            ),
             ("Exact zero", {"average": Decimal("0")}),
             (
                 "Hostile raw",
@@ -9378,7 +9854,21 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
                 self.assertContains(response, "<strong>&lt;0.1</strong>")
                 self.assertContains(response, "<strong>&gt;1450</strong>")
                 self.assertContains(response, "Below detection limit")
-                self.assertContains(response, "Detection limit: 6.57 %")
+                self.assertContains(response, "Limit of detection (LOD): 6.57 %")
+                self.assertContains(response, "Reporting limit (RL): 0.8 %")
+                self.assertContains(response, "Limit (type not specified): 6.57 %")
+                self.assertNotContains(response, "Detection limit: 6.57")
+                self.assertContains(
+                    response,
+                    '<details class="sdv2-limit">'
+                    '<summary title="Reporting limit (RL): 0.8 %">RL</summary>'
+                    '<span class="sdv2-limit-detail">Reporting limit (RL): 0.8 %</span>'
+                    "</details>",
+                    html=True,
+                )
+                self.assertNotContains(
+                    response, '<span class="sdv2-sd">Reporting limit (RL)'
+                )
                 self.assertContains(response, "<strong>0</strong>")
                 self.assertContains(response, "<strong>&lt;0.25</strong>")
                 self.assertNotContains(response, '<img src=x onerror="alert(31337)">')
@@ -9392,7 +9882,17 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
         self.assertIn("&lt;0.1", html)
         self.assertIn("&gt;1450", html)
         self.assertIn("Below detection limit", html)
-        self.assertIn("Detection limit: 6.57", html)
+        self.assertIn(
+            '<span class="visually-hidden">Limit of detection (LOD)</span>: 6.57',
+            html,
+        )
+        self.assertInHTML(
+            '<span class="text-muted small">'
+            '<span aria-hidden="true">RL</span>'
+            '<span class="visually-hidden">Reporting limit (RL)</span>'
+            ": 0.8 percent</span>",
+            html,
+        )
         self.assertIn(escape(self.hostile_raw), html)
         self.assertNotIn('<img src=x onerror="alert(31337)">', html)
 
@@ -9401,7 +9901,10 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
             {"object": self.sample, "section": {"key": "properties"}},
         )
         self.assertIn("&lt;0.25", html)
-        self.assertIn("Detection limit: 6.57", html)
+        self.assertIn(
+            '<span class="visually-hidden">Limit (type not specified)</span>: 6.57',
+            html,
+        )
 
 
 class SampleCompositionSafetyViewTestCase(TestCase):
@@ -9565,7 +10068,7 @@ class SampleGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
     model = SampleGroup
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "samplegroup-create"
     view_modal_create_name = "samplegroup-create-modal"
     view_published_list_name = "samplegroup-list"
@@ -9923,3 +10426,77 @@ class SampleListFilterByGroupTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "List member sample")
         self.assertNotContains(response, "List other sample")
+
+
+class MaterialDetailUsedInProcessesTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from processes.models import Process, ProcessMaterial
+
+        user_model = get_user_model()
+        cls.owner = user_model.objects.create_user(username="material-owner")
+        cls.drafter = user_model.objects.create_user(username="process-drafter")
+        cls.material = Material.objects.create(
+            name="Shared straw", owner=cls.owner, publication_status="published"
+        )
+        cls.unused_material = Material.objects.create(
+            name="Unused straw", owner=cls.owner, publication_status="published"
+        )
+        cls.published_process = Process.objects.create(
+            name="Published pulping", owner=cls.owner, publication_status="published"
+        )
+        cls.private_process = Process.objects.create(
+            name="Private pelleting", owner=cls.drafter, publication_status="private"
+        )
+        ProcessMaterial.objects.create(
+            process=cls.published_process, material=cls.material, role="input"
+        )
+        ProcessMaterial.objects.create(
+            process=cls.published_process, material=cls.material, role="output"
+        )
+        ProcessMaterial.objects.create(
+            process=cls.private_process, material=cls.material, role="output"
+        )
+
+    def get_detail(self, material=None):
+        return self.client.get(
+            reverse("material-detail", kwargs={"pk": (material or self.material).pk})
+        )
+
+    def test_anonymous_visitor_sees_only_published_processes(self):
+        response = self.get_detail()
+
+        self.assertContains(response, "Used in processes")
+        self.assertContains(
+            response,
+            reverse(
+                "processes:process-detail", kwargs={"pk": self.published_process.pk}
+            ),
+        )
+        self.assertNotContains(response, "Private pelleting")
+        self.assertEqual(
+            list(response.context["related_processes"]), [self.published_process]
+        )
+        self.assertEqual(response.context["related_processes_total"], 1)
+
+    def test_section_links_to_published_processes_list_filtered_by_material(self):
+        response = self.get_detail()
+
+        list_url = f"{reverse('processes:process-list')}?material={self.material.pk}"
+        self.assertEqual(response.context["related_processes_list_url"], list_url)
+        self.assertEqual(response.context["related_processes_published_total"], 1)
+        self.assertContains(response, f'href="{list_url}"')
+
+    def test_process_owner_also_sees_own_private_process(self):
+        self.client.force_login(self.drafter)
+
+        response = self.get_detail()
+
+        self.assertContains(response, "Private pelleting")
+        self.assertEqual(response.context["related_processes_total"], 2)
+
+    def test_unused_material_shows_empty_state(self):
+        response = self.get_detail(self.unused_material)
+
+        self.assertContains(response, "Used in processes")
+        self.assertContains(response, "No process uses this material yet.")

@@ -34,7 +34,6 @@
                    data-autocomplete-url="{% url widget.autocomplete_url %}"
                    data-quick-create-url="{% url 'source-quick-create' %}"
                    data-author-autocomplete-url="{% url 'author-autocomplete' %}"
-                   data-author-quick-create-url="{% url 'author-quick-create' %}"
                    data-label-field="{{ widget.label_field }}"
                    data-target-select="{{ widget.attrs.id }}">
         </div>
@@ -56,11 +55,12 @@
                 <input type="text"
                        id="{{ widget.attrs.id }}_authors"
                        class="form-control form-control-sm source-author-tomselect-add"
-                       placeholder="Search or type name, then press Enter to add"
-                       data-author-autocomplete-url="{% url 'author-autocomplete' %}"
-                       data-author-quick-create-url="{% url 'author-quick-create' %}">
+                       placeholder="Search or type a name, then pick an option"
+                       data-author-autocomplete-url="{% url 'author-autocomplete' %}">
                 <p class="text-muted small mt-1 mb-0">
-                    For organisations or single names, type the full name and press Enter. For persons, use "Last, First" format.
+                    Type a name, then choose <em>Create person</em> or <em>Create organization</em> in the list.
+                    For persons you can type "First Last" or "Last, First".
+                    New authors are only saved once you click "Add source".
                 </p>
             </div>
             <div class="mb-2">

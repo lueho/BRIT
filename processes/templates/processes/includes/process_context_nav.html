@@ -1,23 +1,10 @@
-{% load moderation_tags %}
+{% load process_navigation %}
 <nav class="sdv2-context-nav" aria-label="Process navigation">
-  {% safe_back_url as back_url %}
+  {% process_return_url as back_url %}
   {% if back_url %}
     <a class="sdv2-btn sdv2-btn-ghost" href="{{ back_url }}" rel="nofollow">
       <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to results
     </a>
   {% endif %}
-  <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'processes:process-list' %}?scope=published">
-    <i class="fas fa-list" aria-hidden="true"></i> All processes
-  </a>
-  {% if user.is_authenticated %}
-    <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'processes:process-list-owned' %}?scope=private">
-      <i class="fas fa-user" aria-hidden="true"></i> My processes
-    </a>
-  {% endif %}
-  <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'processes:processcategory-list' %}">
-    <i class="fas fa-tags" aria-hidden="true"></i> Process categories
-  </a>
-  <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'processes:processes-explorer' %}">
-    <i class="fas fa-table-cells-large" aria-hidden="true"></i> Processes explorer
-  </a>
+  {% process_discovery_nav "processes" compact=True %}
 </nav>
