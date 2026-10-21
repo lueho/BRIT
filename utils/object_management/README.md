@@ -12,6 +12,26 @@ This package provides the core infrastructure for managing user-created objects 
 - [Views and ViewSets](#views-and-viewsets)
 - [Testing](#testing)
 
+## Django Admin Adapter Checkpoint
+
+Part 8 of the draft authorization stack adds `PolicyAdminMixin` and
+`PolicyOwnedInlineMixin` in `admin.py`; governed registrations must use them.
+They delegate visibility, authority, reference checks and root revisions to
+the shared policy/services rather than treating staff or child model grants
+as application bypasses. Runtime configuration's administrator-only
+specialization remains additive to parent authority and lifecycle checks.
+
+The standard delete action now uses confirmation, cascade-safe previews,
+fresh per-record authorization and accurate results. Review history is
+read-only, including for superusers; approval goes through the application's
+revision-bound review workspace, not an admin bulk approval action.
+
+See the [implementation map](../../docs/02_developer_guide/user_created_objects.md#django-admin-migration-part-8-draft)
+and [user workflow](../../docs/01_user_guide/admin_workflows.md). This checkpoint
+does not complete domain writers, generated-data activation or release
+hardening. The explicitly labelled legacy guidance below is not a competing
+authorization contract.
+
 ## Base Models
 
 ### UserCreatedObject

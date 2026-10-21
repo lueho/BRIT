@@ -19,4 +19,5 @@ class UnitAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
 
 @admin.register(Property)
 class PropertyAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
     filter_horizontal = ("allowed_units",)
