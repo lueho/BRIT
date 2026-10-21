@@ -1587,8 +1587,12 @@ class CollectionModelFormPermissionTestCase(TestCase):
     def setUp(self):
         """Set up test users and objects."""
         self.default_owner = get_default_owner()
-        self.user1 = User.objects.create_user(username="user1", password="testpass")
-        self.user2 = User.objects.create_user(username="user2", password="testpass")
+        self.user1 = User.objects.create_user(
+            username="user1",
+        )
+        self.user2 = User.objects.create_user(
+            username="user2",
+        )
 
         # Create published objects that user2 can access
         self.catchment = CollectionCatchment.objects.create(

@@ -25,10 +25,10 @@ class MapPageChromeTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(username="layout-user", password="secret")
-        cls.staff = User.objects.create_user(
-            username="layout-staff", password="secret", is_staff=True
+        cls.user = User.objects.create_user(
+            username="layout-user",
         )
+        cls.staff = User.objects.create_user(username="layout-staff", is_staff=True)
 
     def setUp(self):
         self.client.force_login(self.user)

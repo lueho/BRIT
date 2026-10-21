@@ -558,7 +558,6 @@ class SampleSerializerTestCase(TestCase):
     def setUpTestData(cls):
         cls.owner = get_user_model().objects.create_user(
             username="sample-serializer-owner",
-            password="test123",
         )
         material = Material.objects.create(
             name="Test Material",
@@ -828,7 +827,7 @@ class MeasurementQualifierSerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.owner = get_user_model().objects.create_user(
-            username="qualifier-serializer-owner", password="test123"
+            username="qualifier-serializer-owner",
         )
         cls.material = Material.objects.create(
             name="Qualifier material", owner=cls.owner

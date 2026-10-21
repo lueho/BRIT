@@ -26,12 +26,10 @@ class PendingReviewSignalTagTests(TestCase):
     def setUpTestData(cls):
         cls.user = get_user_model().objects.create_user(
             username="moderation-tag-staff",
-            password="irrelevant",
             is_staff=True,
         )
         cls.owner = get_user_model().objects.create_user(
             username="moderation-tag-owner",
-            password="irrelevant",
         )
 
         with mute_signals(post_save, pre_save):

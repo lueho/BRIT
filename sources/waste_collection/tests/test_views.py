@@ -4937,7 +4937,9 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(username="atlas-user", password="secret")
+        cls.user = User.objects.create_user(
+            username="atlas-user",
+        )
 
     def setUp(self):
         self.client.force_login(self.user)
@@ -5450,9 +5452,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
     def _login_staff(self):
         self.client.force_login(
-            User.objects.create_user(
-                username="conflicts-staff", password="secret", is_staff=True
-            )
+            User.objects.create_user(username="conflicts-staff", is_staff=True)
         )
 
     def test_data_conflicts_overview_renders_for_staff(self):
@@ -5479,7 +5479,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
     def test_data_conflicts_overview_denies_non_staff_users(self):
         non_atlas_user = User.objects.create_user(
-            username="non-atlas-user-conflicts", password="secret"
+            username="non-atlas-user-conflicts",
         )
         self.client.force_login(non_atlas_user)
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
@@ -5498,7 +5498,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
             reverse("waste-atlas-change-map", args=["DE", "collection_system"]),
         ]
         outsider = User.objects.create_user(
-            username="non-atlas-user", password="secret"
+            username="non-atlas-user",
         )
 
         for url in routes:
@@ -5531,9 +5531,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertNotContains(response, reverse("waste-atlas-change-map-overview"))
         self.assertNotContains(response, reverse("waste-atlas-data-conflicts-overview"))
 
-        staff = User.objects.create_user(
-            username="atlas-staff", password="secret", is_staff=True
-        )
+        staff = User.objects.create_user(username="atlas-staff", is_staff=True)
         self.client.force_login(staff)
 
         response = self.client.get(reverse("waste-atlas-overview"))
@@ -5683,7 +5681,7 @@ class GenericMapTemplateTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
-            username="generic-atlas-user", password="secret"
+            username="generic-atlas-user",
         )
 
     def _render_generic(self, config_key, query=None):
@@ -5883,13 +5881,15 @@ class CollectionCascadeMixinTestCase(TestCase):
 
         # Create users
         cls.owner = User.objects.create_user(
-            username="owner", email="owner@test.com", password="pass"
+            username="owner",
+            email="owner@test.com",
         )
         cls.other_owner = User.objects.create_user(
-            username="other", email="other@test.com", password="pass"
+            username="other",
+            email="other@test.com",
         )
         cls.staff = User.objects.create_user(
-            username="staff", email="staff@test.com", password="pass", is_staff=True
+            username="staff", email="staff@test.com", is_staff=True
         )
 
         # Create base data

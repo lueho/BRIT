@@ -29,7 +29,6 @@ class SampleCompositionNormalizationTestCase(TestCase):
     def setUpTestData(cls):
         cls.owner = get_user_model().objects.create_user(
             username="sample-normalization-owner",
-            password="test123",
         )
         cls.material = Material.objects.create(
             name="Test Material",
