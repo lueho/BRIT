@@ -75,6 +75,7 @@ from sources.waste_collection.forms import (
     WasteFlyerFormSetHelper,
     WasteFlyerModalModelForm,
     WasteFlyerModelForm,
+    preserve_bibliographic_sources_through_formset,
 )
 from sources.waste_collection.frequency_service import (
     CollectionFrequencyScheduleService,
@@ -781,21 +782,7 @@ class CollectionPropertyValueCreateView(
     def forms_valid(self, form, formset):
         form.instance.owner = self.request.user
         self.object = form.save()
-
-        # Capture bibliographic sources saved by the form before the formset
-        # overwrites the sources M2M via .set() with only WasteFlyer objects.
-        bibliographic_sources = list(
-            self.object.sources.exclude(type="waste_flyer").values_list("pk", flat=True)
-        )
-
-        # Update formset's parent_object so it can set the M2M relationship
-        formset.parent_object = self.object
-        formset.save()
-
-        # Re-add bibliographic sources that were wiped by formset.save()
-        if bibliographic_sources:
-            self.object.sources.add(*bibliographic_sources)
-
+        preserve_bibliographic_sources_through_formset(self.object, formset)
         return HttpResponseRedirect(self.get_success_url())
 
     def forms_invalid(self, form, formset):
@@ -880,21 +867,7 @@ class CollectionPropertyValueUpdateView(
             instance.collection = anchor
 
         self.object = form.save()
-
-        # Capture bibliographic sources saved by the form before the formset
-        # overwrites the sources M2M via .set() with only WasteFlyer objects.
-        bibliographic_sources = list(
-            self.object.sources.exclude(type="waste_flyer").values_list("pk", flat=True)
-        )
-
-        # Update formset's parent_object so it can set the M2M relationship
-        formset.parent_object = self.object
-        formset.save()
-
-        # Re-add bibliographic sources that were wiped by formset.save()
-        if bibliographic_sources:
-            self.object.sources.add(*bibliographic_sources)
-
+        preserve_bibliographic_sources_through_formset(self.object, formset)
         return HttpResponseRedirect(self.get_success_url())
 
     def forms_invalid(self, form, formset):
@@ -995,22 +968,7 @@ class AggregatedCollectionPropertyValueUpdateView(
 
         if form.is_valid() and formset.is_valid():
             self.object = form.save()
-
-            # Capture bibliographic sources saved by the form before the formset
-            # overwrites the sources M2M via .set() with only WasteFlyer objects.
-            bibliographic_sources = list(
-                self.object.sources.exclude(type="waste_flyer").values_list(
-                    "pk", flat=True
-                )
-            )
-
-            formset.parent_object = self.object
-            formset.save()
-
-            # Re-add bibliographic sources that were wiped by formset.save()
-            if bibliographic_sources:
-                self.object.sources.add(*bibliographic_sources)
-
+            preserve_bibliographic_sources_through_formset(self.object, formset)
             return HttpResponseRedirect(self.get_success_url())
         else:
             return self.render_to_response(
