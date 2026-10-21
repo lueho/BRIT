@@ -831,6 +831,24 @@ class SourceAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(len(returned_ids), len(set(returned_ids)))
         self.assertIn(target_source.pk, returned_ids)
 
+    def test_label_abbreviation_returns_short_source_labels(self):
+        source = Source.objects.create(
+            owner=self.member,
+            title="A Rather Long Source Title That Makes Tall Selection Chips",
+            abbreviation="SRC1",
+            publication_status="published",
+        )
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("source-autocomplete"),
+            {"q": "Rather Long", "label": "abbreviation"},
+        )
+        self.assertEqual(response.status_code, 200)
+        result = next(r for r in response.json()["results"] if r["id"] == source.pk)
+        self.assertEqual(result["label"], "SRC1")
+        self.assertEqual(result["text"], "SRC1")
+        self.assertEqual(result["selected_text"], "SRC1")
+
     def test_scope_filter_published_excludes_private_sources_for_staff(self):
         """The source filter widgets send ``f=scope__name=<scope>``. Under the
         published scope, private sources must not be suggested — even to staff,
