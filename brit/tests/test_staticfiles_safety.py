@@ -553,7 +553,7 @@ class CheckManifestFilesTests(StaticfilesSafetyTestBase):
         return {"paths": {"a.css": "a.1.css", "b.css": "b.2.css"}}
 
     def test_reads_all_pages(self):
-        for name in ("a.1.css", "b.2.css", "extra.css"):
+        for name in ("a.css", "a.1.css", "b.css", "b.2.css", "extra.css"):
             self.remote._save(name, ContentFile(b"x"))
         client, paginator = self._install_paginator(page_size=1)
 
@@ -580,6 +580,14 @@ class CheckManifestFilesTests(StaticfilesSafetyTestBase):
         self._install_paginator()
 
         with self.assertRaises(CommandError):
+            check_manifest_files(self.storage, self._manifest())
+
+    def test_reports_missing_original_assets(self):
+        for name in ("a.1.css", "b.css", "b.2.css"):
+            self.remote._save(name, ContentFile(b"x"))
+        self._install_paginator()
+
+        with self.assertRaisesMessage(CommandError, "a.css"):
             check_manifest_files(self.storage, self._manifest())
 
     def test_rejects_unsafe_location(self):

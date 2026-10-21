@@ -96,9 +96,8 @@ def check_manifest_files(storage, manifest):
                     f"Storage listing returned an object outside {prefix!r}: {key!r}"
                 )
             remote_names.add(key[len(prefix) :])
-    missing = sorted(
-        name for name in manifest["paths"].values() if name not in remote_names
-    )
+    referenced = set(manifest["paths"]) | set(manifest["paths"].values())
+    missing = sorted(referenced - remote_names)
     if missing:
         preview = ", ".join(missing[:5])
         raise CommandError(
