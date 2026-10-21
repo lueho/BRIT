@@ -4,7 +4,6 @@ from django.core.exceptions import ValidationError
 from django.utils.html import format_html, format_html_join
 
 from .models import (
-    Attribute,
     Catchment,
     CatchmentRevision,
     CategoricalAttribute,
@@ -33,11 +32,6 @@ class GeoDatasetRuntimeConfigurationInline(admin.StackedInline):
 class GeoDatasetColumnPolicyInline(admin.TabularInline):
     model = GeoDatasetColumnPolicy
     extra = 0
-
-
-@admin.register(Attribute)
-class AttributeModelAdmin(admin.ModelAdmin):
-    search_fields = ["name"]
 
 
 @admin.register(RegionProperty)

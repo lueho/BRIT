@@ -5,16 +5,6 @@ from maps.registry import register_source_domain_map_mount_listener
 
 from .router import router
 from .views import (
-    AttributeAutocompleteView,
-    AttributeCreateView,
-    AttributeDetailView,
-    AttributeModalCreateView,
-    AttributeModalDeleteView,
-    AttributeModalDetailView,
-    AttributeModalUpdateView,
-    AttributePrivateListView,
-    AttributePublishedListView,
-    AttributeUpdateView,
     CatchmentAutocompleteView,
     CatchmentCreateDrawCustomView,
     CatchmentCreateMergeLauView,
@@ -145,51 +135,6 @@ urlpatterns = [
         "geodatasets/autocomplete/",
         GeoDataSetAutocompleteView.as_view(),
         name="geodataset-autocomplete",
-    ),
-    path("attributes/", AttributePublishedListView.as_view(), name="attribute-list"),
-    path(
-        "attributes/user/",
-        AttributePrivateListView.as_view(),
-        name="attribute-list-owned",
-    ),
-    path("attributes/create/", AttributeCreateView.as_view(), name="attribute-create"),
-    path(
-        "attributes/create/modal/",
-        AttributeModalCreateView.as_view(),
-        name="attribute-create-modal",
-    ),
-    path(
-        "attributes/<int:pk>/", AttributeDetailView.as_view(), name="attribute-detail"
-    ),
-    path(
-        "attributes/<int:pk>/modal/",
-        AttributeModalDetailView.as_view(),
-        name="attribute-detail-modal",
-    ),
-    path(
-        "attributes/<int:pk>/update/",
-        AttributeUpdateView.as_view(),
-        name="attribute-update",
-    ),
-    path(
-        "attributes/<int:pk>/update/modal/",
-        AttributeModalUpdateView.as_view(),
-        name="attribute-update-modal",
-    ),
-    path(
-        "attributes/<int:pk>/delete/modal/",
-        AttributeModalDeleteView.as_view(),
-        name="attribute-delete-modal",
-    ),
-    # Slashless alias for clients that learned the pre-slash URL.
-    path(
-        "attributes/<int:pk>/delete/modal",
-        AttributeModalDeleteView.as_view(),
-    ),
-    path(
-        "attributes/autocomplete/",
-        AttributeAutocompleteView.as_view(),
-        name="attribute-autocomplete",
     ),
     path(
         "region-properties/autocomplete/",
