@@ -3872,6 +3872,16 @@ var WasteAtlasChoropleth = (function () {
     if (btnPNG) btnPNG.addEventListener('click', function () { exportPNG(_exportFileBase() + '.png'); });
   }
 
+  function _matchesSearch(haystack, query) {
+    var text = String(haystack || '').toLowerCase();
+    var terms = String(query || '').trim().toLowerCase().split(/\s+/);
+    if (!terms[0]) return true;
+    return terms.every(function (term) {
+      var escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp('(?:^|[^\\p{L}\\p{N}])' + escapedTerm, 'u').test(text);
+    });
+  }
+
   function initOverviewDirectory() {
     var tabList = document.getElementById('atlas-region-tabs');
     var categorySelect = document.getElementById('atlas-directory-category');
@@ -3880,6 +3890,8 @@ var WasteAtlasChoropleth = (function () {
 
     var directory = document.querySelector('.atlas-directory');
     if (directory) directory.classList.add('atlas-directory--enhanced');
+    var emptyState = document.querySelector('.atlas-directory-empty');
+    var defaultEmptyText = emptyState ? emptyState.textContent.trim() : '';
 
     var params = new URLSearchParams(window.location.search);
 
@@ -3940,7 +3952,7 @@ var WasteAtlasChoropleth = (function () {
 
     function applyFilters() {
       var category = categorySelect ? categorySelect.value : '';
-      var query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+      var query = searchInput ? searchInput.value.trim() : '';
       var panes = document.querySelectorAll('#atlas-region-tab-content .atlas-region-pane');
       panes.forEach(function (pane) {
         var activeSet = activeMapSet(pane);
@@ -3948,15 +3960,20 @@ var WasteAtlasChoropleth = (function () {
           ? activeSet.getAttribute('data-region-value')
           : '';
         var visibleInPane = 0;
+        var otherMatches = 0;
         pane.querySelectorAll('.atlas-map-link').forEach(function (link) {
           var linkCategory = link.getAttribute('data-category') || '';
           var haystack = link.getAttribute('data-search') || link.textContent || '';
           var matches = (!category || linkCategory === '' || linkCategory === category)
-            && (!query || haystack.toLowerCase().indexOf(query) !== -1);
+            && _matchesSearch(haystack, query);
           link.hidden = !matches;
           var linkMapSet = link.getAttribute('data-map-set') || '';
-          if (matches && (!linkMapSet || linkMapSet === activeSetValue)) {
-            visibleInPane += 1;
+          if (matches) {
+            if (!linkMapSet || linkMapSet === activeSetValue) {
+              visibleInPane += 1;
+            } else {
+              otherMatches += 1;
+            }
           }
         });
         pane.querySelectorAll('.atlas-link-group').forEach(function (group) {
@@ -3996,7 +4013,22 @@ var WasteAtlasChoropleth = (function () {
           }
         });
         var emptyEl = pane.querySelector('.atlas-directory-empty');
-        if (emptyEl) emptyEl.hidden = visibleInPane !== 0;
+        if (emptyEl) {
+          emptyEl.textContent = defaultEmptyText;
+          if (visibleInPane === 0 && otherMatches > 0) {
+            var activeSetTitle = activeSet
+              && activeSet.querySelector('.atlas-directory-region-title');
+            var activeSetLabel = activeSetTitle && activeSetTitle.textContent.trim();
+            if (activeSetLabel) {
+              var mapLabel = otherMatches === 1 ? 'map' : 'maps';
+              emptyEl.textContent = 'No maps in ' + activeSetLabel
+                + ' match these filters. Other map sets have ' + otherMatches
+                + ' matching ' + mapLabel
+                + ' — see the highlighted counts above.';
+            }
+          }
+          emptyEl.hidden = visibleInPane !== 0;
+        }
       });
     }
 
@@ -4200,6 +4232,9 @@ var WasteAtlasChoropleth = (function () {
     setRenderDefaults: setRenderDefaults,
     initSelectorControls: initSelectorControls,
     initOverviewDirectory: initOverviewDirectory,
+    directory: {
+      matchesSearch: _matchesSearch
+    },
     initShell: initShell,
     selectorNavigationTarget: _selectorNavigationTarget,
     exportSVG: exportSVG,
