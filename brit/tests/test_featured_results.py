@@ -318,6 +318,7 @@ class BritEuResultsPageTests(TestCase):
             "position: relative",
             "aspect-ratio: 16 / 9",
             "flex-shrink: 0",
+            "max-height: 11rem",
         ):
             self.assertIn(fragment, cover.group(1))
         cover_img = re.search(
@@ -331,8 +332,14 @@ class BritEuResultsPageTests(TestCase):
             r"\.discovery-page \.discovery-logo-interreg\s*\{([^}]*)\}", css
         )
         self.assertIsNotNone(interreg)
-        for fragment in ("width: 100%", "max-width: 32rem", "max-height: none"):
-            self.assertIn(fragment, interreg.group(1))
+        interreg_declarations = {
+            declaration.strip()
+            for declaration in interreg.group(1).split(";")
+            if declaration.strip()
+        }
+        for declaration in ("width: auto", "max-width: 100%", "max-height: 5rem"):
+            self.assertIn(declaration, interreg_declarations)
+        self.assertNotIn("width: 100%", interreg_declarations)
         secondary = re.search(
             r"\.discovery-page \.discovery-logo-secondary\s*\{([^}]*)\}", css
         )

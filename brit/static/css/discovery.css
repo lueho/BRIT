@@ -54,6 +54,7 @@
   position: relative;
   display: block;
   flex-shrink: 0;
+  max-height: 11rem;
   aspect-ratio: 16 / 9;
   background: var(--sdv2-surface);
   border-bottom: 1px solid var(--sdv2-border);
@@ -110,9 +111,9 @@
 
 .discovery-page .discovery-logo-interreg {
   flex-shrink: 0;
-  width: 100%;
-  max-width: 32rem;
-  max-height: none;
+  width: auto;
+  max-width: 100%;
+  max-height: 5rem;
 }
 
 .discovery-page .discovery-logo-secondary {
