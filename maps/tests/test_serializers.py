@@ -17,6 +17,7 @@ from ..models import (
     RegionProperty,
 )
 from ..serializers import MapConfigurationSerializer, NutsRegionSummarySerializer
+from ..viewsets import NutsRegionViewSet
 
 
 class MapConfigurationSerializerTestCase(TestCase):
@@ -490,3 +491,10 @@ class NutsRegionSummarySerializerTestCase(TestCase):
         self.assertEqual(
             data["urban_rural_remoteness"], "intermediate, close to a city"
         )
+
+    def test_summary_fields_do_not_query_per_region_when_prefetched(self):
+        """The viewset queryset must satisfy the summary fields without N+1."""
+        regions = list(NutsRegionViewSet.queryset.filter(pk=self.region.pk))
+        with self.assertNumQueries(0):
+            data = NutsRegionSummarySerializer(regions, many=True).data
+        self.assertEqual(len(data), 1)
