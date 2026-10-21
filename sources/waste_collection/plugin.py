@@ -40,7 +40,6 @@ plugin = SourceDomainPlugin(
         ),
     ),
     sitemap_items=(
-        "/waste_collection/",
         "/waste_collection/collectors/",
         "/waste_collection/collectors/create/",
         "/waste_collection/collectors/create/modal/",

@@ -24,7 +24,6 @@ plugin = SourceDomainPlugin(
     sitemap_items=(
         "/maps/nantes/cultures/",
         "/maps/nantes/cultures/create/",
-        "/maps/nantes/greenhouses/data/",
         "/maps/nantes/greenhouses/map/",
         "/maps/nantes/greenhouses/export/",
         "/maps/nantes/greenhouses/catchment_autocomplete/",
@@ -33,7 +32,6 @@ plugin = SourceDomainPlugin(
         "/maps/nantes/growthcycles/create_inline/",
         "/case_studies/nantes/cultures/",
         "/case_studies/nantes/cultures/create/",
-        "/case_studies/nantes/greenhouses/data/",
         "/case_studies/nantes/greenhouses/map/",
         "/case_studies/nantes/greenhouses/export/",
         "/case_studies/nantes/greenhouses/catchment_autocomplete/",

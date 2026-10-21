@@ -41,11 +41,9 @@ plugin = SourceDomainPlugin(
         ),
     ),
     sitemap_items=(
-        "/maps/hamburg/roadside_trees/data/",
         "/maps/hamburg/roadside_trees/map/",
         "/maps/hamburg/roadside_trees/export/",
         "/maps/hamburg/roadside_trees/catchment_autocomplete/",
-        "/case_studies/hamburg/roadside_trees/data/",
         "/case_studies/hamburg/roadside_trees/map/",
         "/case_studies/hamburg/roadside_trees/export/",
         "/case_studies/hamburg/roadside_trees/catchment_autocomplete/",

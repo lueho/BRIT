@@ -4,9 +4,11 @@ from cookie_consent.models import Cookie, CookieGroup
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
-from django.urls import reverse
+from django.urls import Resolver404, resolve, reverse
 
-from brit.sitemap_items import SITEMAP_ITEMS
+from brit.sitemap_registry import get_sitemap_items
+
+SITEMAP_ITEMS = get_sitemap_items()
 
 
 class ListEmptyStateTemplateTests(SimpleTestCase):
@@ -82,6 +84,26 @@ class SitemapItemsTestCase(SimpleTestCase):
     def test_stale_nantes_roadside_tree_sitemap_entries_are_absent(self):
         self.assertNotIn("/maps/nantes/roadside_trees/export/", SITEMAP_ITEMS)
         self.assertNotIn("/case_studies/nantes/roadside_trees/export/", SITEMAP_ITEMS)
+
+
+class SitemapIntegrityTests(SimpleTestCase):
+    """Every sitemap entry must stay a live route (issue #144)."""
+
+    def test_all_sitemap_entries_resolve(self):
+        unresolved = []
+        for item in SITEMAP_ITEMS:
+            try:
+                resolve(item)
+            except Resolver404:
+                unresolved.append(item)
+        self.assertEqual(
+            unresolved,
+            [],
+            f"Sitemap entries pointing at removed routes: {unresolved}",
+        )
+
+    def test_sitemap_entries_are_unique(self):
+        self.assertEqual(len(SITEMAP_ITEMS), len(set(SITEMAP_ITEMS)))
 
 
 class CookieConsentTemplateHardeningTests(TestCase):
