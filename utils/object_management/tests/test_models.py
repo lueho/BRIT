@@ -159,6 +159,17 @@ class ReviewWorkflowModelTests(TestCase):
         self.assertIsNotNone(self.collection.approved_at)
         self.assertEqual(self.collection.approved_by, self.owner)
 
+    def test_partial_publish_save_writes_explicit_approval_metadata(self):
+        approved_at = timezone.now() - datetime.timedelta(days=1)
+        self.collection.publication_status = UserCreatedObject.STATUS_PUBLISHED
+        self.collection.approved_at = approved_at
+        self.collection.approved_by = self.moderator
+        self.collection.save(update_fields=["publication_status"])
+
+        self.collection.refresh_from_db()
+        self.assertEqual(self.collection.approved_at, approved_at)
+        self.assertEqual(self.collection.approved_by, self.moderator)
+
     def test_direct_publish_keeps_existing_approval_metadata(self):
         approved_at = timezone.now() - datetime.timedelta(days=1)
         category = WasteCategory.objects.create(

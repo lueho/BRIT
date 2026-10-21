@@ -442,7 +442,9 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
                 self.approved_by_id = self.owner_id
             if update_fields is not None:
                 update_fields.extend(
-                    name for name in missing if name not in update_fields
+                    name
+                    for name in ("approved_at", "approved_by")
+                    if name not in update_fields
                 )
         super().save(*args, **kwargs)
 
