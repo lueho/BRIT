@@ -118,6 +118,18 @@ class ProcessMaintenanceViewsTestCase(TestCase):
         response = self.client.get(self.section_url())
         self.assertEqual(response.context["form"].fields["name"].label, "Title")
 
+    def test_overview_categories_select_omits_the_empty_option(self):
+        category = ProcessCategory.objects.create(
+            name="Biochemical conversion",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.process.categories.add(category)
+        response = self.client.get(self.section_url("overview"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Biochemical conversion")
+        self.assertNotContains(response, '<option value="">---------</option>')
+
     def test_title_change_is_persisted_and_returned_for_the_heading(self):
         response = self.client.post(
             self.section_url(),
