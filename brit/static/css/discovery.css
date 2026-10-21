@@ -156,6 +156,8 @@
 }
 
 .discovery-page a.discovery-feature-external {
+  align-self: flex-start;
+  margin-top: -0.25rem;
   font-size: 13px;
   font-weight: 600;
   color: var(--sdv2-accent-derived);
@@ -183,7 +185,7 @@
 
 .discovery-page .discovery-map-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
   gap: 0.75rem;
   margin-bottom: 0.75rem;
 }

@@ -15,6 +15,12 @@
       <a href="{% url feature.url_name %}">{{ feature.title }}</a>
     </h3>
     <p class="discovery-feature-text">{{ feature.description }}</p>
+    {% if feature.external_link %}
+      <a class="discovery-feature-external"
+         href="{{ feature.external_link.url }}"
+         target="_blank"
+         rel="noopener noreferrer">{{ feature.external_link.label }} <i class="fas fa-external-link-alt" aria-hidden="true"></i><span class="visually-hidden">(opens in a new tab)</span></a>
+    {% endif %}
     {% if feature.logos %}
       <div class="discovery-branding">
         {% for logo in feature.logos %}
@@ -29,12 +35,6 @@
     <div class="discovery-feature-actions">
       <a class="sdv2-btn sdv2-btn-primary discovery-feature-cta"
          href="{% url feature.url_name %}">{{ feature.cta_label }} <i class="fas fa-arrow-right ms-1" aria-hidden="true"></i></a>
-      {% if feature.external_link %}
-        <a class="discovery-feature-external"
-           href="{{ feature.external_link.url }}"
-           target="_blank"
-           rel="noopener noreferrer">{{ feature.external_link.label }} <i class="fas fa-external-link-alt" aria-hidden="true"></i><span class="visually-hidden">(opens in a new tab)</span></a>
-      {% endif %}
     </div>
   </div>
 </article>
