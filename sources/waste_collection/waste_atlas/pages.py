@@ -8,7 +8,7 @@ and the database-backed JS map configuration key.
 ``MAP_PAGES``; ``map_selection.py`` derives the region/theme selector from it.
 """
 
-from utils.external_urls import ABFALLATLAS_URL
+from utils.external_urls import ABFALLATLAS_URL as ABFALLATLAS_URL
 
 # Region scope shared by all pages of a map set.
 # ``selector_set`` is the map-set key shown in the region selector
