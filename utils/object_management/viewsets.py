@@ -113,6 +113,48 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
             previous_status=previous_status,
         )
 
+    def _execute_review_action(
+        self,
+        request,
+        *,
+        permission_method,
+        permission_error,
+        model_method,
+        model_method_kwargs,
+        action_name,
+        review_action,
+        success_message,
+    ):
+        """Shared execution pattern for review workflow actions."""
+        obj = self.get_object()
+
+        # Enforce object-level permissions
+        self.check_object_permissions(request, obj)
+
+        permission = UserCreatedObjectPermission()
+        if not getattr(permission, permission_method)(request, obj):
+            return Response(
+                {"error": permission_error},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            previous_status = getattr(obj, "publication_status", None)
+            getattr(obj, model_method)(**model_method_kwargs)
+            self._post_review_action(
+                request,
+                obj,
+                action_name=action_name,
+                review_action=review_action,
+                previous_status=previous_status,
+            )
+            return Response(
+                {"status": f"{self.queryset.model.__name__} {success_message}"},
+                status=status.HTTP_200_OK,
+            )
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(
         detail=True, methods=["post"], permission_classes=[UserCreatedObjectPermission]
     )
@@ -120,38 +162,16 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         """
         Allows owners to register an object for review.
         """
-        obj = self.get_object()
-
-        # Enforce object-level permissions
-        self.check_object_permissions(request, obj)
-
-        permission = UserCreatedObjectPermission()
-        if not permission.has_submit_permission(request, obj):
-            return Response(
-                {
-                    "error": "You do not have permission to submit this object for review."
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        try:
-            previous_status = getattr(obj, "publication_status", None)
-            obj.register_for_review()
-            self._post_review_action(
-                request,
-                obj,
-                action_name="submit_for_review",
-                review_action=ReviewAction.ACTION_SUBMITTED,
-                previous_status=previous_status,
-            )
-            return Response(
-                {
-                    "status": f"{self.queryset.model.__name__} has been submitted for review."
-                },
-                status=status.HTTP_200_OK,
-            )
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return self._execute_review_action(
+            request,
+            permission_method="has_submit_permission",
+            permission_error="You do not have permission to submit this object for review.",
+            model_method="register_for_review",
+            model_method_kwargs={},
+            action_name="submit_for_review",
+            review_action=ReviewAction.ACTION_SUBMITTED,
+            success_message="has been submitted for review.",
+        )
 
     @action(
         detail=True, methods=["post"], permission_classes=[UserCreatedObjectPermission]
@@ -160,38 +180,16 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         """
         Allows owners to withdraw an object from review.
         """
-        obj = self.get_object()
-
-        # Enforce object-level permissions
-        self.check_object_permissions(request, obj)
-
-        permission = UserCreatedObjectPermission()
-        if not permission.has_withdraw_permission(request, obj):
-            return Response(
-                {
-                    "error": "You do not have permission to withdraw this object from review."
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        try:
-            previous_status = getattr(obj, "publication_status", None)
-            obj.withdraw_from_review()
-            self._post_review_action(
-                request,
-                obj,
-                action_name="withdraw_from_review",
-                review_action=ReviewAction.ACTION_WITHDRAWN,
-                previous_status=previous_status,
-            )
-            return Response(
-                {
-                    "status": f"{self.queryset.model.__name__} has been withdrawn from review."
-                },
-                status=status.HTTP_200_OK,
-            )
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return self._execute_review_action(
+            request,
+            permission_method="has_withdraw_permission",
+            permission_error="You do not have permission to withdraw this object from review.",
+            model_method="withdraw_from_review",
+            model_method_kwargs={},
+            action_name="withdraw_from_review",
+            review_action=ReviewAction.ACTION_WITHDRAWN,
+            success_message="has been withdrawn from review.",
+        )
 
     @action(
         detail=True, methods=["post"], permission_classes=[UserCreatedObjectPermission]
@@ -201,39 +199,17 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         Approve an object in 'review' state.
         Only accessible to moderators.
         """
-        obj = self.get_object()
-
-        # Enforce object-level permissions
-        self.check_object_permissions(request, obj)
-
-        permission = UserCreatedObjectPermission()
-        if not permission.has_approve_permission(request, obj):
-            return Response(
-                {"error": "You do not have permission to approve this object."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        try:
-            previous_status = getattr(obj, "publication_status", None)
-            obj.approve(
-                user=request.user
-            )  # Utilize the model's approve method for consistency
-            self._post_review_action(
-                request,
-                obj,
-                action_name="approve",
-                review_action=ReviewAction.ACTION_APPROVED,
-                previous_status=previous_status,
-            )
-            # TODO: Implement notification to the owner
-            return Response(
-                {
-                    "status": f"{self.queryset.model.__name__} has been approved and is now published."
-                },
-                status=status.HTTP_200_OK,
-            )
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        # TODO: Implement notification to the owner
+        return self._execute_review_action(
+            request,
+            permission_method="has_approve_permission",
+            permission_error="You do not have permission to approve this object.",
+            model_method="approve",
+            model_method_kwargs={"user": request.user},
+            action_name="approve",
+            review_action=ReviewAction.ACTION_APPROVED,
+            success_message="has been approved and is now published.",
+        )
 
     @action(
         detail=True, methods=["post"], permission_classes=[UserCreatedObjectPermission]
@@ -243,37 +219,17 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         Reject an object in 'review' state.
         Only accessible to moderators.
         """
-        obj = self.get_object()
-
-        # Enforce object-level permissions
-        self.check_object_permissions(request, obj)
-
-        permission = UserCreatedObjectPermission()
-        if not permission.has_reject_permission(request, obj):
-            return Response(
-                {"error": "You do not have permission to reject this object."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        try:
-            previous_status = getattr(obj, "publication_status", None)
-            obj.reject()
-            self._post_review_action(
-                request,
-                obj,
-                action_name="reject",
-                review_action=ReviewAction.ACTION_REJECTED,
-                previous_status=previous_status,
-            )
-            # TODO: Implement notification to the owner
-            return Response(
-                {
-                    "status": f"{self.queryset.model.__name__} has been rejected and is now private."
-                },
-                status=status.HTTP_200_OK,
-            )
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        # TODO: Implement notification to the owner
+        return self._execute_review_action(
+            request,
+            permission_method="has_reject_permission",
+            permission_error="You do not have permission to reject this object.",
+            model_method="reject",
+            model_method_kwargs={},
+            action_name="reject",
+            review_action=ReviewAction.ACTION_REJECTED,
+            success_message="has been rejected and is now private.",
+        )
 
     @action(
         detail=True, methods=["post"], permission_classes=[UserCreatedObjectPermission]

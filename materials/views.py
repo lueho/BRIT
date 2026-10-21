@@ -1680,8 +1680,8 @@ class SampleDetailView(UserCreatedObjectDetailView):
             charts[f"composition-chart-{composition['id']}"] = chart_dict
         return charts
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+    def _fetch_sample_data(self):
+        """Serialize the sample and fetch measurements/compositions for context."""
         data = SampleModelSerializer(
             self.object, context={"request": self.request}
         ).data
@@ -1722,9 +1722,12 @@ class SampleDetailView(UserCreatedObjectDetailView):
             component_measurements=component_measurements,
             composition_settings_by_group=composition_settings_by_group,
         )
-        charts = self._build_composition_charts(compositions)
+        return data, property_values, component_measurements, compositions
 
-        sample_summary = {
+    def _build_sample_summary(
+        self, component_measurements, property_values, compositions
+    ):
+        return {
             "component_measurement_count": len(component_measurements),
             "component_measurement_group_count": len(
                 {measurement.group_id for measurement in component_measurements}
@@ -1736,17 +1739,9 @@ class SampleDetailView(UserCreatedObjectDetailView):
             "sample_source_count": self.object.sources.count(),
         }
 
-        sample_completeness = self._build_completeness_checks(
-            self.object,
-            sample_summary,
-            property_values,
-            component_measurements,
-        )
-        sample_workflow = self._build_workflow_summary(sample_completeness)
-        sample_policy = get_object_policy(
-            self.request.user, self.object, request=self.request
-        )
-        sample_layout_mode = (
+    @staticmethod
+    def _determine_layout_mode(sample_policy):
+        return (
             "workspace"
             if any(
                 (
@@ -1761,6 +1756,27 @@ class SampleDetailView(UserCreatedObjectDetailView):
             )
             else "explore"
         )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        data, property_values, component_measurements, compositions = (
+            self._fetch_sample_data()
+        )
+        charts = self._build_composition_charts(compositions)
+        sample_summary = self._build_sample_summary(
+            component_measurements, property_values, compositions
+        )
+        sample_completeness = self._build_completeness_checks(
+            self.object,
+            sample_summary,
+            property_values,
+            component_measurements,
+        )
+        sample_workflow = self._build_workflow_summary(sample_completeness)
+        sample_policy = get_object_policy(
+            self.request.user, self.object, request=self.request
+        )
+        sample_layout_mode = self._determine_layout_mode(sample_policy)
 
         data["compositions"] = compositions
 

@@ -53,9 +53,12 @@ from .models import (
     LETTERLESS_SURNAME_MESSAGE,
     SOURCE_TYPES,
     Author,
+    AuthorCreationDenied,
     Licence,
     Source,
     author_name_has_letter,
+    find_or_create_author,
+    normalize_author_name_part,
 )
 from .serializers import HyperlinkedSourceSerializer, SourceCreateSerializer
 from .tasks import check_source_url, check_source_urls
@@ -475,11 +478,6 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
     permission_required = "bibliography.add_source"
     author_cleanup_salt = "bibliography.source-quick-create.author-cleanup"
 
-    @staticmethod
-    def _normalize_name_part(value):
-        """Normalize whitespace for name parts in request payloads."""
-        return " ".join(str(value or "").split())
-
     def _resolve_authors(self, request, payload):
         """Resolve payload authors to Author objects preserving payload order.
 
@@ -492,6 +490,15 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         resolved_authors = []
         resolved_ids = set()
         created_author_ids = []
+
+        permission_error = JsonResponse(
+            {
+                "error": (
+                    "You need permission to create authors for inline source creation."
+                )
+            },
+            status=403,
+        )
 
         for raw_author in raw_authors:
             if not isinstance(raw_author, dict):
@@ -507,73 +514,53 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
             else:
                 author_type = raw_author.get("author_type", "person")
                 if author_type == "organization":
-                    organization_name = self._normalize_name_part(
+                    organization_name = normalize_author_name_part(
                         raw_author.get("organization_name")
                     )
                     if not author_name_has_letter(organization_name):
                         continue
 
-                    author = Author.objects.filter(
-                        author_type="organization",
-                        organization_name__iexact=organization_name,
-                    ).first()
-
-                    if author is None:
-                        if not request.user.has_perm("bibliography.add_author"):
-                            return (
-                                [],
-                                [],
-                                JsonResponse(
-                                    {
-                                        "error": (
-                                            "You need permission to create authors "
-                                            "for inline source creation."
-                                        )
-                                    },
-                                    status=403,
-                                ),
-                            )
-
-                        author = Author.objects.create(
-                            owner=request.user,
-                            author_type="organization",
-                            organization_name=organization_name,
+                    try:
+                        author, created = find_or_create_author(
+                            request.user,
+                            filters={
+                                "author_type": "organization",
+                                "organization_name__iexact": organization_name,
+                            },
+                            create_kwargs={
+                                "author_type": "organization",
+                                "organization_name": organization_name,
+                            },
                         )
+                    except AuthorCreationDenied:
+                        return [], [], permission_error
+                    if created:
                         created_author_ids.append(author.pk)
                 else:
-                    first_names = self._normalize_name_part(
+                    first_names = normalize_author_name_part(
                         raw_author.get("first_names")
                     )
-                    last_names = self._normalize_name_part(raw_author.get("last_names"))
+                    last_names = normalize_author_name_part(
+                        raw_author.get("last_names")
+                    )
                     if not author_name_has_letter(last_names):
                         continue
 
-                    author = Author.objects.filter(
-                        first_names__iexact=first_names,
-                        last_names__iexact=last_names,
-                    ).first()
-
-                    if author is None:
-                        if not request.user.has_perm("bibliography.add_author"):
-                            return (
-                                [],
-                                [],
-                                JsonResponse(
-                                    {
-                                        "error": (
-                                            "You need permission to create authors "
-                                            "for inline source creation."
-                                        )
-                                    },
-                                    status=403,
-                                ),
-                            )
-
-                        author = Author.objects.create(
-                            owner=request.user,
-                            first_names=first_names,
-                            last_names=last_names,
+                    try:
+                        author, created = find_or_create_author(
+                            request.user,
+                            filters={
+                                "first_names__iexact": first_names,
+                                "last_names__iexact": last_names,
+                            },
+                            create_kwargs={
+                                "first_names": first_names,
+                                "last_names": last_names,
+                            },
                         )
+                    except AuthorCreationDenied:
+                        return [], [], permission_error
+                    if created:
                         created_author_ids.append(author.pk)
 
             if author and author.pk not in resolved_ids:

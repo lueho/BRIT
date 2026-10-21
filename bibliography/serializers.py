@@ -15,10 +15,13 @@ from .models import (
     LETTERLESS_ORGANIZATION_NAME_MESSAGE,
     LETTERLESS_SURNAME_MESSAGE,
     Author,
+    AuthorCreationDenied,
     Licence,
     Source,
     SourceAuthor,
     author_name_has_letter,
+    find_or_create_author,
+    normalize_author_name_part,
 )
 
 
@@ -166,36 +169,36 @@ class SourceCreateSerializer(ModelSerializer):
                         {"authors": [f"Author id {raw_author_id} does not exist."]}
                     ) from exc
             else:
-                first_names = " ".join(
-                    str(author_data.get("first_names") or "").split()
-                )
-                last_names = " ".join(str(author_data.get("last_names") or "").split())
+                first_names = normalize_author_name_part(author_data.get("first_names"))
+                last_names = normalize_author_name_part(author_data.get("last_names"))
                 author_type = author_data.get("author_type", "person")
-                organization_name = " ".join(
-                    str(author_data.get("organization_name") or "").split()
+                organization_name = normalize_author_name_part(
+                    author_data.get("organization_name")
                 )
-                organization_abbreviation = " ".join(
-                    str(author_data.get("organization_abbreviation") or "").split()
+                organization_abbreviation = normalize_author_name_part(
+                    author_data.get("organization_abbreviation")
                 )
-                author = Author.objects.filter(
-                    author_type=author_type,
-                    first_names__iexact=first_names,
-                    last_names__iexact=last_names,
-                    organization_name__iexact=organization_name,
-                ).first()
-                if author is None:
-                    if not owner.has_perm("bibliography.add_author"):
-                        raise PermissionDenied(
-                            "You need permission to create authors for source creation."
-                        )
-                    author = Author.objects.create(
-                        owner=owner,
-                        first_names=first_names,
-                        last_names=last_names,
-                        author_type=author_type,
-                        organization_name=organization_name,
-                        organization_abbreviation=organization_abbreviation,
+                try:
+                    author, _ = find_or_create_author(
+                        owner,
+                        filters={
+                            "author_type": author_type,
+                            "first_names__iexact": first_names,
+                            "last_names__iexact": last_names,
+                            "organization_name__iexact": organization_name,
+                        },
+                        create_kwargs={
+                            "first_names": first_names,
+                            "last_names": last_names,
+                            "author_type": author_type,
+                            "organization_name": organization_name,
+                            "organization_abbreviation": organization_abbreviation,
+                        },
                     )
+                except AuthorCreationDenied as exc:
+                    raise PermissionDenied(
+                        "You need permission to create authors for source creation."
+                    ) from exc
 
             if author.pk not in author_ids:
                 authors.append(author)

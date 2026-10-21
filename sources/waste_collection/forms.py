@@ -436,6 +436,22 @@ class WasteFlyerFormSet(M2MInlineFormSet):
         return child_objects
 
 
+def preserve_bibliographic_sources_through_formset(obj, formset):
+    """Save *formset* against *obj* without wiping non-flyer sources.
+
+    ``M2MInlineFormSet.save()`` replaces the whole ``sources`` relation with
+    only the submitted WasteFlyer objects, so bibliographic sources must be
+    captured beforehand and re-added afterwards.
+    """
+    bibliographic_sources = list(
+        obj.sources.exclude(type="waste_flyer").values_list("pk", flat=True)
+    )
+    formset.parent_object = obj
+    formset.save()
+    if bibliographic_sources:
+        obj.sources.add(*bibliographic_sources)
+
+
 class CollectionPropertyValueModelFormHelper(FormHelper):
     form_tag = False
     layout = Layout(

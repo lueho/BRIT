@@ -15,7 +15,16 @@ from .bibtex import (
     BibtexArticleParseError,
     parse_bibtex_article_entries,
 )
-from .models import Author, Licence, Source, SourceAuthor, author_name_has_letter
+from .models import (
+    Author,
+    AuthorCreationDenied,
+    Licence,
+    Source,
+    SourceAuthor,
+    author_name_has_letter,
+    find_or_create_author,
+    normalize_author_name_part,
+)
 
 
 class AuthorModelForm(SimpleModelForm):
@@ -172,12 +181,12 @@ class SourceBibtexArticleImportForm(SimpleForm):
 
         for parsed_author in parsed_authors:
             author_type = parsed_author.get("author_type", "person")
-            first_names = " ".join(str(parsed_author.get("first_names") or "").split())
-            last_names = " ".join(str(parsed_author.get("last_names") or "").split())
-            organization_name = " ".join(
-                str(parsed_author.get("organization_name") or "").split()
+            first_names = normalize_author_name_part(parsed_author.get("first_names"))
+            last_names = normalize_author_name_part(parsed_author.get("last_names"))
+            organization_name = normalize_author_name_part(
+                parsed_author.get("organization_name")
             )
-            suffix = " ".join(str(parsed_author.get("suffix") or "").split())
+            suffix = normalize_author_name_part(parsed_author.get("suffix"))
             if author_type == "organization":
                 if not author_name_has_letter(organization_name):
                     continue
@@ -188,33 +197,35 @@ class SourceBibtexArticleImportForm(SimpleForm):
                 continue
 
             if author_type == "organization":
-                author_queryset = Author.objects.filter(
-                    author_type=author_type,
-                    organization_name__iexact=organization_name,
-                )
+                filters = {
+                    "author_type": author_type,
+                    "organization_name__iexact": organization_name,
+                }
             else:
-                author_queryset = Author.objects.filter(
-                    author_type=author_type,
-                    first_names__iexact=first_names,
-                    last_names__iexact=last_names,
-                )
+                filters = {
+                    "author_type": author_type,
+                    "first_names__iexact": first_names,
+                    "last_names__iexact": last_names,
+                }
             if suffix:
-                author_queryset = author_queryset.filter(suffix__iexact=suffix)
+                filters["suffix__iexact"] = suffix
 
-            author = author_queryset.first()
-            if author is None:
-                if not owner.has_perm("bibliography.add_author"):
-                    raise ValidationError(
-                        "You need permission to create missing authors from BibTeX imports."
-                    )
-                author = Author.objects.create(
-                    owner=owner,
-                    author_type=author_type,
-                    first_names=first_names,
-                    last_names=last_names,
-                    organization_name=organization_name,
-                    suffix=suffix,
+            try:
+                author, _ = find_or_create_author(
+                    owner,
+                    filters=filters,
+                    create_kwargs={
+                        "author_type": author_type,
+                        "first_names": first_names,
+                        "last_names": last_names,
+                        "organization_name": organization_name,
+                        "suffix": suffix,
+                    },
                 )
+            except AuthorCreationDenied as exc:
+                raise ValidationError(
+                    "You need permission to create missing authors from BibTeX imports."
+                ) from exc
 
             if author.pk not in author_ids:
                 authors.append(author)
