@@ -14,7 +14,7 @@ from brit.featured import (
     ECN_FACTSHEETS_URL,
     FEATURED_DESTINATIONS,
 )
-from brit.sitemap_items import BASE_SITEMAP_ITEMS
+from brit.sitemap_registry import get_sitemap_items
 from sources.waste_collection.waste_atlas.pages import ABFALLATLAS_URL, MAP_PAGES
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -342,7 +342,7 @@ class BritEuResultsPageTests(TestCase):
             '<li aria-current="page" class="breadcrumb-item active">BRIT-EU results</li>',
             html=True,
         )
-        self.assertIn("/projects/brit-eu/", BASE_SITEMAP_ITEMS)
+        self.assertIn("/projects/brit-eu/", get_sitemap_items())
 
     def test_five_curated_map_links_scoped_to_maps_section(self):
         response = self.client.get(reverse("brit-eu-results"))
