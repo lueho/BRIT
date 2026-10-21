@@ -93,7 +93,7 @@ class FeaturedRegistryTests(TestCase):
             {
                 "waste-atlas": (
                     "fa-map-marked-alt",
-                    {"label": "abfallatlas.de", "url": ABFALLATLAS_URL},
+                    {"label": "abfall-atlas.de", "url": ABFALLATLAS_URL},
                 ),
                 "brit-eu": (
                     "fa-chart-bar",
@@ -102,7 +102,7 @@ class FeaturedRegistryTests(TestCase):
                 "closecycle": ("fa-recycle", None),
             },
         )
-        self.assertEqual(ABFALLATLAS_URL, "https://abfallatlas.de/")
+        self.assertEqual(ABFALLATLAS_URL, "https://www.abfall-atlas.de/")
         self.assertEqual(ECN_BRIT_EU_URL, "https://www.compostnetwork.info/brit-eu/")
         self.assertEqual(
             ECN_FACTSHEETS_URL,
@@ -462,14 +462,15 @@ class BritEuResultsPageTests(TestCase):
 
 
 class WasteAtlasOverviewExternalLinkTests(TestCase):
-    def test_non_staff_overview_shows_abfallatlas_link_but_hides_staff_actions(self):
+    def test_non_staff_overview_shows_abfall_atlas_link_but_hides_staff_actions(self):
         response = self.client.get(reverse("waste-atlas-overview"))
         html = response.content.decode()
 
         self.assertEqual(response.status_code, 200)
         self.assertRegex(
             html,
-            r'href="https://abfallatlas\.de/"\s+target="_blank"\s+rel="noopener noreferrer"',
+            r'href="https://www\.abfall-atlas\.de/"\s+target="_blank"\s+rel="noopener noreferrer"',
         )
+        self.assertContains(response, "abfall-atlas.de")
         self.assertNotContains(response, reverse("waste-atlas-change-map-overview"))
         self.assertNotContains(response, reverse("waste-atlas-data-conflicts-overview"))

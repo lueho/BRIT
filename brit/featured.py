@@ -20,7 +20,7 @@ FEATURED_DESTINATIONS = (
         "image_width": 1280,
         "image_height": 720,
         "logos": (),
-        "external_link": {"label": "abfallatlas.de", "url": ABFALLATLAS_URL},
+        "external_link": {"label": "abfall-atlas.de", "url": ABFALLATLAS_URL},
     },
     {
         "slug": "brit-eu",

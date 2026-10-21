@@ -5339,8 +5339,9 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertRegex(
             response.content.decode(),
-            r'href="https://abfallatlas\.de/"\s+target="_blank"\s+rel="noopener noreferrer"',
+            r'href="https://www\.abfall-atlas\.de/"\s+target="_blank"\s+rel="noopener noreferrer"',
         )
+        self.assertContains(response, "abfall-atlas.de")
         self.assertNotContains(response, 'id="atlas-tools-menu"')
         self.assertNotContains(response, reverse("waste-atlas-change-map-overview"))
         self.assertNotContains(response, reverse("waste-atlas-data-conflicts-overview"))
