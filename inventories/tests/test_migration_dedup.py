@@ -4,6 +4,10 @@ migrations (inventories 0009 / layer_manager 0004).
 The functions are exercised directly with the real app registry: the state
 they expect (feedstock already repointed to the material, the old series
 preserved in ``sample_series``) is built straight in the test database.
+
+These are one-off data-migration helpers. Once the migrations have been
+applied in all environments (or folded into a squashed baseline), this file
+should be removed — the helpers can never run again.
 """
 
 import importlib

@@ -1,11 +1,13 @@
 from datetime import datetime
 from decimal import Decimal
+from unittest.mock import MagicMock, patch
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AnonymousUser, User
 from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
 from maps.models import Location, Region
+from utils.file_export.generic_tasks import export_user_created_object_to_file
 from utils.properties.models import Unit
 
 from ..filters import (
@@ -349,6 +351,89 @@ class SampleFilterTestCase(TestCase):
             list(filtr.qs),
             [self.sample_substrate, self.sample_equivalent],
         )
+
+    def test_q_matches_published_sample_group_name(self):
+        group = SampleGroup.objects.create(
+            name="CLOSECYCLE", publication_status="published"
+        )
+        self.sample_substrate.sample_groups.add(group)
+        Sample.objects.create(name="Other sample", material=self.non_substrate_material)
+
+        filtr = SampleFilter(
+            data={"q": "closec"},
+            queryset=Sample.objects.all(),
+        )
+
+        self.assertEqual(list(filtr.qs), [self.sample_substrate])
+
+    def test_q_does_not_match_private_sample_group_name_for_anonymous(self):
+        group = SampleGroup.objects.create(name="Hidden group")
+        sample = Sample.objects.create(
+            name="Published grouped sample",
+            material=self.substrate_material,
+            publication_status="published",
+        )
+        sample.sample_groups.add(group)
+        request = RequestFactory().get("/")
+        request.user = AnonymousUser()
+
+        filtr = SampleFilter(
+            data={"q": "Hidden"},
+            queryset=Sample.objects.all(),
+            request=request,
+        )
+
+        self.assertNotIn(sample, filtr.qs)
+
+    def test_q_matches_own_private_sample_group_name(self):
+        alice = User.objects.create(username="group_owner_alice")
+        group = SampleGroup.objects.create(name="Alice private group", owner=alice)
+        sample = Sample.objects.create(
+            name="Alice grouped sample",
+            material=self.substrate_material,
+            owner=alice,
+            publication_status="private",
+        )
+        sample.sample_groups.add(group)
+        request = RequestFactory().get("/")
+        request.user = alice
+
+        filtr = SampleFilter(
+            data={"q": "Alice private", "scope": "private"},
+            queryset=Sample.objects.filter(owner=alice),
+            request=request,
+        )
+
+        self.assertIn(sample, filtr.qs)
+
+    @patch("utils.file_export.storages.get_file_export_storage")
+    @patch("utils.file_export.storages.write_file_for_download", return_value="url")
+    def test_export_task_matches_own_private_sample_group_name(
+        self, mock_write, mock_storage
+    ):
+        mock_storage.return_value.size.return_value = 0
+        alice = User.objects.create(username="export_group_owner_alice")
+        group = SampleGroup.objects.create(name="Trial Q", owner=alice)
+        sample = Sample.objects.create(
+            name="Alice exported sample",
+            material=self.substrate_material,
+            owner=alice,
+            publication_status="private",
+        )
+        sample.sample_groups.add(group)
+        task_self = MagicMock()
+        task_self.request.id = "sample-group-export"
+
+        export_user_created_object_to_file.run.__func__(
+            task_self,
+            "materials.Sample",
+            "csv",
+            {"q": ["Trial Q"]},
+            {"user_id": alice.pk, "list_type": "private"},
+        )
+
+        exported = mock_write.call_args.args[1]
+        self.assertEqual([row["id"] for row in exported], [sample.pk])
 
     def test_q_combines_with_other_filters(self):
         filtr = SampleFilter(

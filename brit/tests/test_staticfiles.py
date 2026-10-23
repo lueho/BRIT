@@ -26,7 +26,7 @@ class StaticStorageCacheBustingTests(SimpleTestCase):
     def test_static_storage_uses_manifest_hashed_filenames(self):
         self.assertTrue(issubclass(StaticStorage, S3ManifestStaticStorage))
 
-    def test_static_storage_skips_unchanged_files(self):
+    def test_static_storage_disables_file_overwrite(self):
         self.assertFalse(StaticStorage.file_overwrite)
 
     def test_static_storage_still_overwrites_manifest(self):

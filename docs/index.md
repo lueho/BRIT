@@ -5,7 +5,9 @@ This index is the entry point for project documentation. Each topic has a clear 
 ## Where to Look
 
 - **User-facing tasks**
-  Start with [How-Tos](01_user_guide/howtos.md).
+  Start with [How-Tos](01_user_guide/howtos.md). For sharing, workspace
+  scopes, and the review workflow, see
+  [Sharing and Collaboration](01_user_guide/sharing_and_collaboration.md).
 
 - **Development workflow and day-to-day commands**
   Use the [Developer Guide](02_developer_guide/README.md), especially [Guidelines](02_developer_guide/guidelines.md). For public app versus internal tooling boundaries, use [Repository Boundaries](02_developer_guide/repository_boundaries.md). For agent memory offloading and context hygiene, use [Context Retention](02_developer_guide/context_retention.md).

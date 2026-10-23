@@ -1,0 +1,61 @@
+{% comment %}
+  Grouped property-value list for the collection detail page (detail_v2
+  layout). Used for both direct collection property values and aggregated
+  values across the version chain.
+
+  Context (pass via include-with):
+    values        - iterable of CollectionPropertyValue or
+                    AggregatedCollectionPropertyValue records
+    empty_message - text rendered when values is empty
+    value_suffix  - optional suffix after each value, e.g. "(aggregated)"
+{% endcomment %}
+{% load moderation_tags %}
+{% if values %}
+  {% regroup values by property as property_groups %}
+  {% for prop in property_groups %}
+    <section class="cdv2-prop-group">
+      <h3 class="cdv2-prop-title">{{ prop.grouper.name|title }}</h3>
+      <ul class="cdv2-prop-values">
+        {% for val in prop.list|dictsortreversed:"year" %}
+          <li class="cdv2-prop-value">
+            {% object_policy val as val_policy %}
+            {% include "object_management/review_status_icon.html" with object=val policy=val_policy %}
+            <a href="{{ val.get_absolute_url }}">
+              {% if val.standard_deviation %}
+                {{ val.display_average }} ± {{ val.display_standard_deviation }} {{ val.unit.name }} ({{ val.year }})
+              {% else %}
+                {{ val.display_average }} {{ val.unit.name }} ({{ val.year }})
+              {% endif %}
+              {% if value_suffix %} {{ value_suffix }}{% endif %}
+              {% if val.is_derived %}<span class="text-muted fst-italic">(derived)</span>{% endif %}
+            </a>
+            {% if val_policy.can_submit_review or val_policy.can_withdraw_review or val_policy.can_approve or val_policy.can_reject %}
+              <span class="cdv2-prop-actions">
+                {% if val_policy.can_submit_review %}
+                  <a class="sdv2-btn sdv2-btn-sm modal-link"
+                     href="{% url 'object_management:submit_for_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request|path_without_return_params|urlencode }}">
+                    <i class="fas fa-paper-plane" aria-hidden="true"></i> Submit for review
+                  </a>
+                {% endif %}
+                {% if val_policy.can_withdraw_review %}
+                  <a class="sdv2-btn sdv2-btn-sm sdv2-btn-ghost modal-link"
+                     href="{% url 'object_management:withdraw_from_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request|path_without_return_params|urlencode }}">
+                    <i class="fas fa-rotate-left" aria-hidden="true"></i> Withdraw
+                  </a>
+                {% endif %}
+                {% if val_policy.can_approve or val_policy.can_reject %}
+                  <a class="sdv2-btn sdv2-btn-sm sdv2-btn-ghost"
+                     href="{% url 'object_management:review_item_detail' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ object.get_absolute_url|urlencode }}">
+                    <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
+                  </a>
+                {% endif %}
+              </span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endfor %}
+{% else %}
+  <p class="sdv2-related-empty">{{ empty_message }}</p>
+{% endif %}

@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     dependencies = [
         (
             "bibliography",
-            "0011_author_author_type_author_organization_abbreviation_and_more",
+            "0001_squashed_0012",
         ),
         ("materials", "0023_remove_component_kind"),
         ("waste_collection", "0007_alter_collectioncountoptions_options"),

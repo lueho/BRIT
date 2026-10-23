@@ -4,6 +4,7 @@ from rest_framework_gis.fields import GeometrySerializerMethodField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from sources.waste_collection.models import CollectionCatchment
+from utils.serializers import SimplifiedGeometryMixin
 
 from .models import WasteAtlasRenderingSettings
 
@@ -23,13 +24,15 @@ def _round_one_decimal(value):
     return round(value, 1)
 
 
-class CatchmentGeometrySerializer(GeoFeatureModelSerializer):
+class CatchmentGeometrySerializer(SimplifiedGeometryMixin, GeoFeatureModelSerializer):
     """GeoJSON serializer for catchments that have waste collections.
 
     Returns catchment id, name, type, and the region border geometry.
     Supports optional geometry simplification via the ``simplified_geom``
     annotation added by the viewset queryset.
     """
+
+    geom_fallback_attrs = ("simplified_geom", "atlas_geom", "geom")
 
     catchment_id = serializers.IntegerField(source="id")
     catchment_name = serializers.CharField(source="name")
@@ -82,14 +85,6 @@ class CatchmentGeometrySerializer(GeoFeatureModelSerializer):
         if not collections:
             return None
         return reverse("collection-detail", kwargs={"pk": collections[0].pk})
-
-    def get_geom(self, instance):
-        """Return simplified geometry if available, otherwise original."""
-        if hasattr(instance, "simplified_geom") and instance.simplified_geom:
-            return instance.simplified_geom
-        if hasattr(instance, "atlas_geom") and instance.atlas_geom:
-            return instance.atlas_geom
-        return getattr(instance, "geom", None)
 
 
 class CatchmentPopulationSerializer(serializers.Serializer):

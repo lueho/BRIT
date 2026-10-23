@@ -54,6 +54,8 @@ class SampleBoundMutationViewSetMixin:
             previous_sample_id,
             self.sample_policy_key,
             request=self.request,
+            obj=instance,
+            model=self.get_queryset().model,
         ):
             raise PermissionDenied("You cannot add data to this sample.")
 

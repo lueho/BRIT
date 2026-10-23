@@ -1,27 +1,17 @@
-import os
-import subprocess
-import sys
-
 from django.test import SimpleTestCase
+
+from brit.tests.probes import run_settings_probe
+
+_PRODUCTION_ENV = {
+    "DJANGO_SETTINGS_MODULE": "brit.settings.heroku",
+    "REDIS_URL": "redis://localhost:6379/0",
+    "SECRET_KEY": "test-secret-key",
+}
 
 
 class ProductionCacheLoggingSettingsTests(SimpleTestCase):
     def run_production_script(self, script):
-        environment = os.environ.copy()
-        environment["DJANGO_SETTINGS_MODULE"] = "brit.settings.heroku"
-        environment["REDIS_URL"] = "redis://localhost:6379/0"
-        environment["SECRET_KEY"] = "test-secret-key"
-        return subprocess.run(
-            [
-                sys.executable,
-                "-c",
-                script,
-            ],
-            capture_output=True,
-            check=False,
-            env=environment,
-            text=True,
-        )
+        return run_settings_probe(script, env=_PRODUCTION_ENV)
 
     def test_ignored_redis_exceptions_are_logged(self):
         completed = self.run_production_script(

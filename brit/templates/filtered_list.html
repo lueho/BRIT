@@ -47,11 +47,11 @@
                     </a>
                     <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
                        role="button"
-                       title="Show only my items"
+                       title="Show my workspace items (owned by me or shared with me)"
                        aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
                        {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
                        href="{{ private_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
-                      Mine
+                      Workspace
                     </a>
                     {% if user|can_moderate:object_list.model and review_representation_url %}
                       <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
@@ -66,10 +66,13 @@
                   </div>
                 {% endif %}
               {% endblock scope_toggle %}
+              {% if list_type == 'private' and private_representation_url %}
+                {% include "object_management/workspace_nav.html" with workspace_base_url=private_representation_url %}
+              {% endif %}
               {% if dashboard_url %}
                 <a class="btn btn-sm btn-outline-secondary"
-                   href="{{ dashboard_url }}"
-                   title="Open Explorer (dashboard)">
+                   href="{{ explorer_url }}"
+                   title="Open Explorer">
                   <i class="fas fa-table-cells-large"></i> Explorer
                 </a>
               {% endif %}
@@ -102,10 +105,10 @@
                 </div>
               {% endif %}
             {% endblock active_filters %}
+            {% block list_letter_index %}
+              {% include "partials/letter_index.html" %}
+            {% endblock list_letter_index %}
             {% block list_table %}
-              {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
-                {% include "object_management/bulk_access_toolbar.html" %}
-              {% endif %}
               <div class="table-responsive">
                 <table class="table modern-table">
                   {% block list_table_head %}
@@ -249,6 +252,7 @@
                   {% block filter_body %}
                     <form method="get">
                       {% crispy filter.form %}
+                      {% include "partials/letter_index_input.html" %}
                       <div class="d-flex justify-content-end gap-2 mt-2">
                         <button id="btn-filter"
                                 class="btn btn-sm btn-primary submit-filter"
@@ -269,7 +273,8 @@
                      tabindex="0">
                   {% block options_pane_body %}
                     {% block list_card_footer_create_link %}
-                      {% if create_permission in perms or user.is_staff %}
+                      {% model_creation_policy object_list.model as create_policy %}
+                      {% if create_policy.allowed %}
                         <a class="btn btn-success w-100 mb-2"
                            href="{{ object_list.model.create_url }}"
                            aria-label="Create new {{ object_list.model.get_verbose_name }}">
@@ -282,6 +287,9 @@
                     {% endblock list_card_export_actions %}
                     {% block list_card_options_dropdown_additional_links %}
                     {% endblock list_card_options_dropdown_additional_links %}
+                    {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
+                      {% include "object_management/bulk_access_toolbar.html" with heading="Manage access for selected items" heading_class="mt-3 mb-1" %}
+                    {% endif %}
                     {% if not user.is_authenticated %}
                       <p class="text-muted small mt-3 mb-0">Log in to enable export and additional options.</p>
                     {% endif %}

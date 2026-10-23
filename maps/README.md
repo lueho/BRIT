@@ -31,7 +31,8 @@ The Maps module is a core component of the Bioresource Inventory Tool (BRIT) tha
 
 ### Data Management
 - **GeoDataset**: Holds metadata about geographic datasets
-- **Attribute**: Defines attributes that can be attached to map features
+- **RegionProperty**: Defines numeric attributes that can be attached to regions
+- **CategoricalAttribute**: Defines categorical attributes for regions
 - **RegionAttributeValue**: Attaches numeric values to regions
 - **RegionAttributeTextValue**: Attaches text values to regions
 
@@ -55,8 +56,8 @@ erDiagram
     NutsRegion ||--o{ LauRegion : "contains"
     NutsRegion ||--o{ NutsRegion : "parent_of"
 
-    Attribute ||--o{ RegionAttributeValue : "defines"
-    Attribute ||--o{ RegionAttributeTextValue : "defines"
+    RegionProperty ||--o{ RegionAttributeValue : "defines"
+    CategoricalAttribute ||--o{ RegionAttributeTextValue : "defines"
 
     Catchment ||--o{ Catchment : "parent_of"
     Catchment ||--o{ CatchmentRevision : "has_boundary_history"
