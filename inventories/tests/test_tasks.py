@@ -138,27 +138,28 @@ class InventoryTaskFailureTests(TestCase):
 
 
 class InventoryRunSerializationTests(TestCase):
-    def setUp(self):
-        self.region = Region.objects.create(name="Serialization Region")
-        self.scenario = Scenario.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(name="Serialization Region")
+        cls.scenario = Scenario.objects.create(
             name="Serialization Scenario",
-            region=self.region,
+            region=cls.region,
         )
-        self.geodataset = GeoDataset.objects.create(
+        cls.geodataset = GeoDataset.objects.create(
             name="Serialization Dataset",
-            region=self.region,
+            region=cls.region,
         )
-        self.algorithm = InventoryAlgorithm.objects.create(
+        cls.algorithm = InventoryAlgorithm.objects.create(
             name="Serialization Algorithm",
             function_name="serialization_algorithm",
-            geodataset=self.geodataset,
+            geodataset=cls.geodataset,
         )
-        self.other_algorithm = InventoryAlgorithm.objects.create(
+        cls.other_algorithm = InventoryAlgorithm.objects.create(
             name="Removed Algorithm",
             function_name="removed_algorithm",
-            geodataset=self.geodataset,
+            geodataset=cls.geodataset,
         )
-        self.feedstock = Material.objects.create(name="Serialization Material")
+        cls.feedstock = Material.objects.create(name="Serialization Material")
 
     def create_layer(self, algorithm, staged=False):
         return Layer.all_objects.create(

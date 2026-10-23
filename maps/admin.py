@@ -1,10 +1,15 @@
 from django.contrib import admin, messages
 from django.contrib.gis.admin import GISModelAdmin
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.utils.html import format_html, format_html_join
 
+from utils.object_management.admin import (
+    PolicyAdminMixin,
+    PolicyOwnedInlineMixin,
+)
+from utils.object_management.services import perform_transition
+
 from .models import (
-    Attribute,
     Catchment,
     CatchmentRevision,
     CategoricalAttribute,
@@ -24,61 +29,58 @@ from .models import (
 from .runtime_adapters import get_dataset_runtime_adapter
 
 
-class GeoDatasetRuntimeConfigurationInline(admin.StackedInline):
+class GeoDatasetRuntimeConfigurationInline(PolicyOwnedInlineMixin, admin.StackedInline):
     model = GeoDatasetRuntimeConfiguration
     extra = 0
     max_num = 1
+    policy_administrator_only = True
 
 
-class GeoDatasetColumnPolicyInline(admin.TabularInline):
+class GeoDatasetColumnPolicyInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = GeoDatasetColumnPolicy
     extra = 0
-
-
-@admin.register(Attribute)
-class AttributeModelAdmin(admin.ModelAdmin):
-    search_fields = ["name"]
+    policy_administrator_only = True
 
 
 @admin.register(RegionProperty)
-class RegionPropertyModelAdmin(admin.ModelAdmin):
-    search_fields = ["name"]
-    filter_horizontal = ["allowed_units"]
+class RegionPropertyModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
+    search_fields = ("name",)
+    filter_horizontal = ("allowed_units",)
 
 
 @admin.register(CategoricalAttribute)
-class CategoricalAttributeModelAdmin(admin.ModelAdmin):
-    search_fields = ["name"]
+class CategoricalAttributeModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
+    search_fields = ("name",)
 
 
 @admin.register(Catchment)
-class CatchmentModelAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["region", "parent_region", "parent"]
-    search_fields = ["name"]
+class CatchmentModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
+    autocomplete_fields = ("region", "parent_region", "parent")
+    search_fields = ("name",)
 
 
 @admin.register(CatchmentRevision)
-class CatchmentRevisionModelAdmin(GISModelAdmin):
-    actions = ["submit_selected_for_review", "approve_selected"]
-    list_display = [
+class CatchmentRevisionModelAdmin(PolicyAdminMixin, GISModelAdmin):
+    actions = ("submit_selected_for_review",)
+    list_display = (
         "name",
         "catchment",
         "effective_from",
         "effective_to",
         "change_reason",
         "publication_status",
-    ]
-    list_filter = ["publication_status", "change_reason"]
-    search_fields = ["name", "catchment__name", "description"]
-    autocomplete_fields = ["catchment", "members", "sources"]
-    filter_horizontal = ["predecessors"]
-    readonly_fields = [
+    )
+    list_filter = ("publication_status", "change_reason")
+    search_fields = ("name", "catchment__name", "description")
+    autocomplete_fields = ("catchment", "members", "sources")
+    filter_horizontal = ("predecessors",)
+    readonly_fields = (
         "geom_hash",
         "publication_status",
         "submitted_at",
         "approved_at",
         "approved_by",
-    ]
+    )
 
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = list(super().get_readonly_fields(request, obj))
@@ -98,21 +100,14 @@ class CatchmentRevisionModelAdmin(GISModelAdmin):
 
     @admin.action(description="Submit selected revisions for review")
     def submit_selected_for_review(self, request, queryset):
-        self._transition_selected(request, queryset, "submit_for_review")
-
-    @admin.action(description="Approve selected revisions")
-    def approve_selected(self, request, queryset):
-        self._transition_selected(request, queryset, "approve", user=request.user)
-
-    def _transition_selected(self, request, queryset, transition, **kwargs):
         completed = 0
         for revision in queryset.order_by("effective_from", "pk"):
             try:
-                getattr(revision, transition)(**kwargs)
-            except ValidationError as error:
+                perform_transition(request.user, revision, "submit")
+            except (PermissionDenied, ValidationError) as error:
                 self.message_user(
                     request,
-                    f"{revision}: {'; '.join(error.messages)}",
+                    f"{revision}: {error}",
                     level=messages.ERROR,
                 )
             else:
@@ -120,18 +115,18 @@ class CatchmentRevisionModelAdmin(GISModelAdmin):
         if completed:
             self.message_user(
                 request,
-                f"Updated {completed} catchment revision(s).",
+                f"Submitted {completed} catchment revision(s) for review.",
                 level=messages.SUCCESS,
             )
 
 
 @admin.register(GeoDataset)
-class GeoDatasetModelAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["region"]
-    list_display = ["name", "model_name", "region"]
-    readonly_fields = ["relation_column_review"]
-    search_fields = ["name", "model_name", "region__name"]
-    inlines = [GeoDatasetRuntimeConfigurationInline, GeoDatasetColumnPolicyInline]
+class GeoDatasetModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
+    autocomplete_fields = ("region",)
+    list_display = ("name", "model_name", "region")
+    readonly_fields = ("relation_column_review",)
+    search_fields = ("name", "model_name", "region__name")
+    inlines = (GeoDatasetRuntimeConfigurationInline, GeoDatasetColumnPolicyInline)
 
     @admin.display(description="Local relation column review")
     def relation_column_review(self, obj):
@@ -182,76 +177,78 @@ class GeoDatasetModelAdmin(admin.ModelAdmin):
 
 
 @admin.register(GeoDatasetRuntimeConfiguration)
-class GeoDatasetRuntimeConfigurationAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["dataset"]
-    list_display = [
+class GeoDatasetRuntimeConfigurationAdmin(PolicyAdminMixin, admin.ModelAdmin):
+    policy_administrator_only = True
+    autocomplete_fields = ("dataset",)
+    list_display = (
         "dataset",
         "backend_type",
         "runtime_model_name",
         "schema_name",
         "relation_name",
-    ]
-    search_fields = [
+    )
+    search_fields = (
         "dataset__name",
         "runtime_model_name",
         "schema_name",
         "relation_name",
-    ]
+    )
 
 
 @admin.register(GeoDatasetColumnPolicy)
-class GeoDatasetColumnPolicyAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["dataset"]
-    list_display = [
+class GeoDatasetColumnPolicyAdmin(PolicyAdminMixin, admin.ModelAdmin):
+    policy_administrator_only = True
+    autocomplete_fields = ("dataset",)
+    list_display = (
         "dataset",
         "column_name",
         "is_visible",
         "is_filterable",
         "is_searchable",
         "is_exportable",
-    ]
-    search_fields = ["dataset__name", "column_name", "display_label"]
+    )
+    search_fields = ("dataset__name", "column_name", "display_label")
 
 
 @admin.register(Location)
-class LocationModelAdmin(admin.ModelAdmin):
-    search_fields = ["name"]
+class LocationModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
+    search_fields = ("name",)
 
 
 @admin.register(MapLayerStyle)
-class LayerStyleModelAdmin(admin.ModelAdmin):
-    search_fields = ["name"]
+class LayerStyleModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
+    search_fields = ("name",)
 
 
 @admin.register(MapLayerConfiguration)
-class LayerModelAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["style"]
-    search_fields = ["name"]
+class LayerModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
+    autocomplete_fields = ("style",)
+    search_fields = ("name",)
 
 
 @admin.register(MapConfiguration)
-class MapConfigurationModelAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["layers"]
-    search_fields = ["name"]
+class MapConfigurationModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
+    autocomplete_fields = ("layers",)
+    search_fields = ("name",)
 
 
 @admin.register(ModelMapConfiguration)
 class ModelMapConfigurationModelAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["map_config"]  # TODO autocomplete for model_name
+    autocomplete_fields = ("map_config",)  # TODO autocomplete for model_name
 
 
 @admin.register(Region)
-class RegionModelAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["composed_of"]
-    raw_id_fields = ["borders"]
-    search_fields = ["name"]
+class RegionModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
+    autocomplete_fields = ("composed_of",)
+    raw_id_fields = ("borders",)
+    search_fields = ("name",)
 
 
 @admin.register(RegionAttributeValue)
-class RegionAttributeValueModelAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["region", "property", "unit"]
+class RegionAttributeValueModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
+    autocomplete_fields = ("region", "property", "unit", "sources")
 
 
 @admin.register(RegionAttributeTextValue)
-class RegionAttributeTextValueModelAdmin(admin.ModelAdmin):
-    autocomplete_fields = ["region", "categorical_attribute"]
+class RegionAttributeTextValueModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
+    autocomplete_fields = ("region", "categorical_attribute")

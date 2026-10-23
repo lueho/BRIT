@@ -41,7 +41,6 @@ from utils.properties.forms import NumericMeasurementFieldsFormMixin
 
 from .models import (
     BACKEND_TYPE_CHOICES,
-    Attribute,
     Catchment,
     GeoDataset,
     GeoDatasetColumnPolicy,
@@ -279,17 +278,12 @@ class RegionModelForm(SimpleModelForm):
         return instance
 
 
-class AttributeModelForm(SimpleModelForm):
-    class Meta:
-        model = Attribute
-        fields = ("name", "unit", "description")
-
-
-class AttributeModalModelForm(ModalModelFormMixin, AttributeModelForm):
-    pass
-
-
-class RegionAttributeValueModelForm(NumericMeasurementFieldsFormMixin, SimpleModelForm):
+class RegionAttributeValueModelForm(
+    NumericMeasurementFieldsFormMixin,
+    UserCreatedObjectFormMixin,
+    SourcesFieldMixin,
+    SimpleModelForm,
+):
     measurement_field_names = ("value", "standard_deviation")
 
     region = TomSelectModelChoiceField(
@@ -332,7 +326,15 @@ class RegionAttributeValueModelForm(NumericMeasurementFieldsFormMixin, SimpleMod
 
     class Meta:
         model = RegionAttributeValue
-        fields = ("region", "property", "unit", "date", "value", "standard_deviation")
+        fields = (
+            "region",
+            "property",
+            "unit",
+            "date",
+            "value",
+            "standard_deviation",
+            "sources",
+        )
 
 
 class RegionAttributeValueModalModelForm(

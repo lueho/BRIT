@@ -16,7 +16,7 @@ import logging
 from collections import defaultdict
 
 from django.apps import apps
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 logger = logging.getLogger(__name__)
@@ -66,37 +66,34 @@ class Command(BaseCommand):
             module_path = f"{app_config.name}.utils"
             try:
                 utils_module = importlib.import_module(module_path)
-
-                # Look for a function matching our naming convention
-                init_func = getattr(utils_module, "ensure_initial_data", None)
-
-                # If not found, look for other common patterns
-                if not init_func:
-                    # List of possible function names to try
-                    possible_names = [
-                        "ensure_all_data",
-                        "initialize_data",
-                        "setup_initial_data",
-                    ]
-
-                    for name in possible_names:
-                        if hasattr(utils_module, name):
-                            init_func = getattr(utils_module, name)
-                            break
-
-                # If we found an initialization function, store it
-                if init_func and callable(init_func):
-                    # Check for dependencies
-                    dependencies = getattr(
-                        utils_module, "INITIALIZATION_DEPENDENCIES", []
-                    )
-                    found_initializers.append(
-                        (app_config.label, init_func, dependencies)
-                    )
-
-            except (ImportError, AttributeError):
+            except ModuleNotFoundError as exc:
                 # No utils module or no initialization function
-                pass
+                if exc.name == module_path:
+                    continue
+                raise
+
+            # Look for a function matching our naming convention
+            init_func = getattr(utils_module, "ensure_initial_data", None)
+
+            # If not found, look for other common patterns
+            if not init_func:
+                # List of possible function names to try
+                possible_names = [
+                    "ensure_all_data",
+                    "initialize_data",
+                    "setup_initial_data",
+                ]
+
+                for name in possible_names:
+                    if hasattr(utils_module, name):
+                        init_func = getattr(utils_module, name)
+                        break
+
+            # If we found an initialization function, store it
+            if init_func and callable(init_func):
+                # Check for dependencies
+                dependencies = getattr(utils_module, "INITIALIZATION_DEPENDENCIES", [])
+                found_initializers.append((app_config.label, init_func, dependencies))
 
         return found_initializers
 
@@ -110,6 +107,8 @@ class Command(BaseCommand):
         Returns:
             List of (app_label, init_func) tuples in dependency order
         """
+        installed_labels = {app_config.label for app_config in apps.get_app_configs()}
+
         # Build dependency graph
         graph = defaultdict(list)
         all_nodes = set()
@@ -121,6 +120,12 @@ class Command(BaseCommand):
         # Add dependencies
         for app_label, _, dependencies in initializers:
             for dep in dependencies:
+                if dep not in installed_labels:
+                    raise CommandError(
+                        f"App '{app_label}' declares unknown initialization "
+                        f"dependency '{dep}'. Dependencies must be labels of "
+                        f"installed apps."
+                    )
                 graph[dep].append(app_label)
                 all_nodes.add(dep)  # In case a dependency doesn't have an initializer
 
@@ -132,14 +137,13 @@ class Command(BaseCommand):
         def visit(node):
             if node in temp_marked:
                 # This is a circular dependency
-                logger.error(f"Circular dependency detected for app '{node}'")
-                return
+                raise CommandError(f"Circular dependency detected for app '{node}'")
 
             if node not in visited:
                 temp_marked.add(node)
 
                 # Visit all dependencies
-                for neighbor in graph.get(node, []):
+                for neighbor in sorted(graph.get(node, [])):
                     visit(neighbor)
 
                 temp_marked.remove(node)
@@ -147,7 +151,7 @@ class Command(BaseCommand):
                 sorted_apps.append(node)
 
         # Visit all nodes
-        for node in all_nodes:
+        for node in sorted(all_nodes):
             if node not in visited:
                 visit(node)
 

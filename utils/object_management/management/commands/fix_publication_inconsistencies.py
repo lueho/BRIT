@@ -64,8 +64,8 @@ class Command(BaseCommand):
 
         # 1. Find published objects with missing approval metadata
         published_missing_approval = model_class.objects.filter(
+            Q(approved_at__isnull=True) | Q(approved_by__isnull=True),
             publication_status=UserCreatedObject.STATUS_PUBLISHED,
-            approved_at__isnull=True,
         )
 
         if published_missing_approval.exists():
@@ -79,8 +79,11 @@ class Command(BaseCommand):
             if not dry_run:
                 now = timezone.now()
                 for obj in published_missing_approval:
-                    obj.approved_at = now
-                    obj.save(update_fields=["approved_at"])
+                    if obj.approved_at is None:
+                        obj.approved_at = obj.created_at or now
+                    if obj.approved_by_id is None:
+                        obj.approved_by_id = obj.owner_id
+                    obj.save(update_fields=["approved_at", "approved_by"])
                 self.stdout.write(self.style.SUCCESS(f"Fixed {count} objects"))
         else:
             self.stdout.write(
@@ -116,17 +119,23 @@ class Command(BaseCommand):
                 )
             )
 
-        # 3. Report any objects with approval metadata but not published
+        # 3. Report any objects with approval metadata that were never
+        # published. Archived objects keep their approval audit trail.
         invalid_approval = model_class.objects.filter(
-            ~Q(publication_status=UserCreatedObject.STATUS_PUBLISHED),
-            approved_at__isnull=False,
+            Q(approved_at__isnull=False) | Q(approved_by__isnull=False),
+        ).exclude(
+            publication_status__in=(
+                UserCreatedObject.STATUS_PUBLISHED,
+                UserCreatedObject.STATUS_ARCHIVED,
+            )
         )
 
         if invalid_approval.exists():
             count = invalid_approval.count()
             self.stdout.write(
                 self.style.WARNING(
-                    f"Found {count} {model_name} with approval metadata but not published. "
+                    f"Found {count} {model_name} with approval metadata but not "
+                    "published or archived. "
                     "This is an inconsistent state."
                 )
             )

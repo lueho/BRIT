@@ -15,9 +15,11 @@ from decimal import Decimal
 from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 
 from .models import ReviewAction
+from .registry import review_target
 from .review_hooks import get_review_context_enrichments
 
 logger = logging.getLogger(__name__)
@@ -33,7 +35,18 @@ def build_review_context(
     include_history: bool = True,
     history_limit: int = 15,
 ) -> dict[str, Any]:
-    """Serialize all authoritative domain data for a reviewable object."""
+    """Serialize all authoritative domain data for a reviewable object.
+
+    A generated projection serializes its validated source evidence — the
+    source's fields, history, review feedback, and revision identify the
+    actual review candidate — with an additive ``projection`` marker
+    pointing back at the requested row. A generated row with invalid
+    provenance has no review surface and fails closed.
+    """
+    requested = obj
+    obj = review_target(obj)
+    if obj is None:
+        raise PermissionDenied("invalid_parent")
     content_type = ContentType.objects.get_for_model(obj.__class__)
     context: dict[str, Any] = {
         "object": {
@@ -47,6 +60,7 @@ def build_review_context(
             "owner_id": getattr(obj, "owner_id", None),
             "submitted_at": _serialize_value(getattr(obj, "submitted_at", None)),
             "approved_at": _serialize_value(getattr(obj, "approved_at", None)),
+            "content_revision": getattr(obj, "content_revision", None),
         },
         "fields": _serialize_model_fields(obj),
         "related_display": _serialize_related_display(obj),
@@ -68,6 +82,13 @@ def build_review_context(
         context["review_history"] = [
             _serialize_review_action(action) for action in history
         ]
+
+    if obj is not requested:
+        context["projection"] = {
+            "object_id": requested.pk,
+            "derived_from": obj.pk,
+            "read_only": True,
+        }
 
     return context
 
@@ -109,6 +130,8 @@ def _serialize_review_action(action: ReviewAction | None) -> dict[str, Any] | No
     return {
         "action": action.action,
         "comment": action.comment,
+        "content_revision": action.content_revision,
+        "changed_fields": action.changed_fields,
         "user_id": action.user_id,
         "username": action.user.username,
         "created_at": _serialize_value(action.created_at),

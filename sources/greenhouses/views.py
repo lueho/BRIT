@@ -1,13 +1,13 @@
 from crispy_forms.helper import FormHelper
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.http import HttpResponse, HttpResponseRedirect
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.views.generic import UpdateView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
-from maps.models import Catchment, GeoDataset
-from maps.views import GeoDataSetPublishedFilteredMapView
+from maps.views import CatchmentAutocompleteView, GeoDataSetPublishedFilteredMapView
 from materials.models import Composition, MaterialComponentGroup
 from sources.greenhouses.filters import (
     CultureListFilter,
@@ -34,10 +34,9 @@ from sources.greenhouses.models import (
 )
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.modal import is_ajax
-from utils.object_management.permissions import (
-    filter_queryset_for_user,
-    get_object_policy,
-)
+from utils.object_management.permissions import filter_queryset_for_user
+from utils.object_management.policy import decide
+from utils.object_management.services import content_mutation
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -154,21 +153,36 @@ class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateWithInlinesView)
     def get_success_url(self):
         return self.object.get_absolute_url()
 
+    def form_valid(self, form):
+        greenhouse = form.cleaned_data["greenhouse"]
+        decision = decide(
+            self.request.user, "create", GreenhouseGrowthCycle, parent=greenhouse
+        )
+        if not decision.allowed:
+            raise PermissionDenied(decision.reason)
+        with content_mutation(
+            self.request.user, greenhouse, action="edit"
+        ) as locked_greenhouse:
+            form.instance.greenhouse = locked_greenhouse
+            response = super().form_valid(form)
+            for timestepset in self.object.growthtimestepset_set.filter(
+                owner__isnull=True
+            ):
+                timestepset.owner = self.request.user
+                timestepset.save(update_fields=["owner"])
+        return response
 
-class GrowthCycleModalCreateView(UserPassesTestMixin, UserCreatedObjectModalCreateView):
+
+class GrowthCycleModalCreateView(UserCreatedObjectModalCreateView):
     form_class = GrowthCycleCreateForm
-    permission_required = "greenhouses.add_greenhousegrowthcycle"
     greenhouse = None
 
     def dispatch(self, request, *args, **kwargs):
         self.greenhouse = get_object_or_404(Greenhouse, pk=kwargs["pk"])
         return super().dispatch(request, *args, **kwargs)
 
-    def test_func(self):
-        policy = get_object_policy(
-            self.request.user, self.greenhouse, request=self.request
-        )
-        return policy["can_manage_samples"]
+    def get_policy_parent(self):
+        return self.greenhouse
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -205,12 +219,14 @@ class GrowthCycleModalCreateView(UserPassesTestMixin, UserCreatedObjectModalCrea
             return HttpResponse(status=204)
 
         form.instance.group_settings = group_settings
-        form.instance.owner = self.request.user
-        self.object = form.save()
+        return super().form_valid(form)
+
+    def _call_super_form_valid(self, form):
+        response = super()._call_super_form_valid(form)
         for timestep in form.cleaned_data["timesteps"]:
             self.object.add_timestep(timestep)
         self.object.greenhouse.sort_growth_cycles()
-        return HttpResponseRedirect(self.get_success_url())
+        return response
 
 
 class GrowthCycleDetailView(UserCreatedObjectDetailView):
@@ -247,6 +263,12 @@ class GrowthTimeStepSetModalUpdateView(
     fields = []
     template_name = "modal_form_with_formset.html"
 
+    def form_valid(self, form):
+        with content_mutation(self.request.user, self.object, action="edit") as locked:
+            form.instance = locked
+            self.object = locked
+            return super().form_valid(form)
+
     def get_context_data(self, **kwargs):
         inline_helper = GrowthShareFormSetHelper()
         inline_helper.form_tag = False
@@ -262,15 +284,19 @@ class GrowthTimeStepSetModalUpdateView(
         return super().get_context_data(**context)
 
 
-class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
+class UpdateGreenhouseGrowthCycleValuesView(
+    LoginRequiredMixin, UserOwnsObjectMixin, UpdateView
+):
     model = GreenhouseGrowthCycle
     form_class = UpdateGreenhouseGrowthCycleValuesForm
     template_name = "greenhouses/greenhouse_growth_cycle_update_values.html"
     object = None
 
     def form_valid(self, form):
-        form.instance.owner = self.request.user
-        return super().form_valid(form)
+        with content_mutation(self.request.user, self.object, action="edit") as locked:
+            form.instance = locked
+            self.object = locked
+            return super().form_valid(form)
 
     def get_object(self, **kwargs):
         return GreenhouseGrowthCycle.objects.get(id=self.kwargs.get("cycle_pk"))
@@ -278,20 +304,9 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse("greenhouse-detail", kwargs={"pk": self.kwargs.get("pk")})
 
-    def get_initial(self):
-        return {"material": self.object.material, "component": self.object.component}
 
-
-class NantesGreenhousesCatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
-    model = Catchment
+class NantesGreenhousesCatchmentAutocompleteView(CatchmentAutocompleteView):
     geodataset_model_name = "NantesGreenhouses"
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        dataset_region = GeoDataset.objects.get(
-            model_name=self.geodataset_model_name
-        ).region
-        return queryset.filter(region__borders__geom__within=dataset_region.geom)
 
 
 class GreenhousesPublishedMapView(GeoDataSetPublishedFilteredMapView):

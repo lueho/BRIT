@@ -72,7 +72,9 @@ class PopulationImportAPITestCase(APITestCase):
             lau_id="03454026",
             lau_name="Lingen (Ems)",
         )
-        cls.importer = User.objects.create_user("importer", password="pw")
+        cls.importer = User.objects.create_user(
+            "importer",
+        )
         for codename in (
             "add_populationobservation",
             "change_populationobservation",
@@ -85,7 +87,9 @@ class PopulationImportAPITestCase(APITestCase):
                     content_type__app_label="population",
                 )
             )
-        cls.no_perm_user = User.objects.create_user("nobody", password="pw")
+        cls.no_perm_user = User.objects.create_user(
+            "nobody",
+        )
 
     def setUp(self):
         self.url = reverse("population:import")

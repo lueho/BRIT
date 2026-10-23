@@ -9,6 +9,7 @@ from factory.django import mute_signals
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import Region
 from materials.models import MaterialCategory
+from utils.object_management.models import get_default_owner
 from utils.properties.models import Property
 from utils.tests.testcases import ScopedSelectionFilterTestMixin
 
@@ -332,7 +333,9 @@ class CollectionFilterMetadataTestCase(TestCase):
                 )
             ]
         )
-        MaterialCategory.objects.get_or_create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.material = WasteComponent.objects.create(
             name="Choice alpha", owner=cls.owner
         )
@@ -581,7 +584,9 @@ class CollectionFilterTestCase(TestCase):
         )
         cls.collection1.add_predecessor(cls.predecessor_collection)
 
-        MaterialCategory.objects.get_or_create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
 
         cls.allowed_material_a = WasteComponent.objects.create(name="Filter Allowed A")
         cls.allowed_material_b = WasteComponent.objects.create(name="Filter Allowed B")
@@ -1037,7 +1042,9 @@ class WasteComponentListFilterScopedSelectionTestCase(
 
     @classmethod
     def setUpTestData(cls):
-        MaterialCategory.objects.get_or_create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         super().setUpTestData()
 
 

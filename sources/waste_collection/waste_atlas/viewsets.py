@@ -44,6 +44,7 @@ from maps.utils import get_or_set_cache
 from sources.waste_collection.derived_values import (
     convert_total_to_specific,
     get_derived_property_config,
+    preferred_measurement_queryset,
 )
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
@@ -52,7 +53,14 @@ from sources.waste_collection.models import (
     CollectionPropertyValue,
     Collector,
 )
-from utils.object_management.models import UserCreatedObject
+from utils.object_management.policy import (
+    PUBLIC_READ_STATES,
+    is_active_actor,
+    is_admin,
+    is_moderator,
+    scope_queryset,
+    visible_queryset,
+)
 
 from .params import parse_atlas_year, parse_nuts_prefix_list, parse_year
 from .serializers import (
@@ -92,38 +100,22 @@ from .serializers import (
     geometry_simplify_tolerance,
 )
 
-_PUBLISHED = UserCreatedObject.STATUS_PUBLISHED
-_ARCHIVED = UserCreatedObject.STATUS_ARCHIVED
 # Archived collections were necessarily published before being archived
 # (``UserCreatedObject.archive`` only transitions from ``published`` and the
 # collection version workflow archives superseded predecessors).  They are
 # therefore safe to expose in historical, year-scoped maps so that older
 # atlas years remain available after newer versions supersede them, without
 # leaking private/review/declined data.
-_PUBLIC_VISIBLE = (
-    UserCreatedObject.STATUS_PUBLISHED,
-    UserCreatedObject.STATUS_ARCHIVED,
-)
-_STAFF_VISIBLE = (
-    UserCreatedObject.STATUS_PUBLISHED,
-    UserCreatedObject.STATUS_ARCHIVED,
-    UserCreatedObject.STATUS_REVIEW,
-    UserCreatedObject.STATUS_PRIVATE,
-)
-_ALL_STATUSES = (*_STAFF_VISIBLE, UserCreatedObject.STATUS_DECLINED)
-
-
-def _is_staff(user):
-    return user is not None and user.is_staff
+_PUBLIC_VISIBLE = PUBLIC_READ_STATES
 
 
 def is_maintainer(user):
-    """Whether ``user`` may see review-stage data and maintainer aids."""
-    return bool(
-        user is not None
-        and user.is_authenticated
-        and (user.is_staff or user.has_perm("waste_collection.can_moderate_collection"))
-    )
+    """Whether ``user`` may see review-stage data and maintainer aids.
+
+    The Django staff flag alone confers nothing: the capability is explicit
+    site administration or active collection moderation.
+    """
+    return is_admin(user) or is_moderator(user, Collection)
 
 
 def _effective_scope(user=None, scope=None):
@@ -131,76 +123,96 @@ def _effective_scope(user=None, scope=None):
         if scope is None:
             scope = user.query_params.get("scope")
         user = user.user
-    if scope == "mine" and user is not None and user.is_authenticated:
-        return "mine", user
-    if scope == "review" and (
-        _is_staff(user)
-        or (
-            user is not None
-            and user.has_perm("waste_collection.can_moderate_collection")
-        )
+    return ("published" if scope is None else scope), user
+
+
+def _public_historical_qs(actor, qs):
+    """Rows authorized through the core public-historical scopes.
+
+    Membership delegates to ``scope_queryset`` so generated projections
+    follow the lifecycle of their linked raw source instead of stale
+    copied status fields.
+    """
+    return qs.filter(
+        Q(pk__in=scope_queryset(actor, qs, "published").values("pk"))
+        | Q(pk__in=scope_queryset(actor, qs, "archived").values("pk"))
+    )
+
+
+def _atlas_queryset(model, user=None):
+    """Resolve the request scope through the shared authorization core.
+
+    Every actor defaults to the public historical scope (published plus
+    archived). ``all`` is explicit administrator-only; unknown scopes fail
+    closed through ``scope_queryset`` rather than falling back to public.
+    """
+    scope, actor = _effective_scope(user)
+    qs = model._default_manager.all()
+    if scope == "published":
+        return _public_historical_qs(actor, qs)
+    if scope == "all":
+        return visible_queryset(actor, qs) if is_admin(actor) else qs.none()
+    return scope_queryset(actor, qs, "private" if scope == "mine" else scope)
+
+
+def _supporting_queryset(model, user=None):
+    """Visible evidence rows for scoped Atlas queries.
+
+    Public historical rows are always included; explicit workspace/review
+    scopes add the records the actor may see through core scopes. Private
+    evidence keeps its own governance: collection moderation alone never
+    exposes another user's private CPV/ACPV/revision rows.
+    """
+    scope, actor = _effective_scope(user)
+    qs = model._default_manager.all()
+    if scope in (
+        "mine",
+        "private",
+        "owned",
+        "shared",
+        "review",
+        "declined",
+        "archived",
     ):
-        return "review", user
-    if scope == "all" and _is_staff(user):
-        return "all", user
-    if scope is not None:
-        return "published", user
-    return ("staff" if _is_staff(user) else "published"), user
-
-
-def _visible_statuses(user=None):
-    scope, _user = _effective_scope(user)
-    if scope == "all" or scope == "mine":
-        return _ALL_STATUSES
-    if scope == "staff":
-        return _STAFF_VISIBLE
-    if scope == "review":
-        return (UserCreatedObject.STATUS_REVIEW,)
-    return _PUBLIC_VISIBLE
+        core_scope = "private" if scope == "mine" else scope
+        public_ids = _public_historical_qs(actor, qs).values("pk")
+        scoped_ids = scope_queryset(actor, qs, core_scope).values("pk")
+        return visible_queryset(actor, qs).filter(
+            Q(pk__in=public_ids) | Q(pk__in=scoped_ids)
+        )
+    return _atlas_queryset(model, user)
 
 
 def _collection_qs(user=None):
-    return Collection.objects.filter(_publication_q(user))
+    return _atlas_queryset(Collection, user)
 
 
 def _publication_q(user=None, prefix=""):
-    """Return a Q filter for publication_status on a related collection path.
+    """Return a Q filter scoping rows to collections visible in the scope.
 
     *prefix* is the ORM lookup prefix ending with ``__`` when non-empty,
     e.g. ``"collections__"`` for reverse-FK through catchments.
     """
-    scope, owner = _effective_scope(user)
-    if scope == "mine":
-        return Q(**{f"{prefix}owner": owner})
-    return Q(**{f"{prefix}publication_status__in": _visible_statuses(user)})
+    return Q(**{f"{prefix}pk__in": _collection_qs(user).values("pk")})
 
 
 def _revision_q(user=None):
-    scope, owner = _effective_scope(user)
-    if scope == "mine":
-        return Q(publication_status__in=_PUBLIC_VISIBLE) | Q(owner=owner)
-    if scope == "review":
-        return Q(
-            publication_status__in=(*_PUBLIC_VISIBLE, UserCreatedObject.STATUS_REVIEW)
-        )
-    return Q(publication_status__in=_visible_statuses(user))
+    return Q(pk__in=_supporting_queryset(CatchmentRevision, user).values("pk"))
 
 
 def _property_value_q(user=None):
-    scope, owner = _effective_scope(user)
-    if scope == "mine":
-        return Q(collection__owner=owner) & (
-            Q(publication_status__in=_PUBLIC_VISIBLE) | Q(owner=owner)
-        )
-    if scope == "review":
-        return Q(
-            collection__publication_status__in=(
-                *_PUBLIC_VISIBLE,
-                UserCreatedObject.STATUS_REVIEW,
-            ),
-            publication_status__in=(*_PUBLIC_VISIBLE, UserCreatedObject.STATUS_REVIEW),
-        )
-    return Q(publication_status__in=_visible_statuses(user))
+    """Membership Q for CPVs feeding Atlas measurement statistics.
+
+    Combines the source-aware supporting membership with readable
+    collection visibility, then applies the purpose-specific manual
+    preference so a visible manual measurement supersedes the generated
+    alternative of the same key.
+    """
+    _scope, actor = _effective_scope(user)
+    supporting = _supporting_queryset(CollectionPropertyValue, user).filter(
+        collection_id__in=visible_queryset(actor, Collection.objects.all()).values("pk")
+    )
+    return Q(pk__in=preferred_measurement_queryset(supporting).values("pk"))
 
 
 def _map_property_value_q(user=None):
@@ -208,14 +220,11 @@ def _map_property_value_q(user=None):
 
 
 def _map_aggregated_property_value_q(user=None):
-    scope, owner = _effective_scope(user)
-    if scope == "mine":
-        return Q(publication_status__in=_PUBLIC_VISIBLE) | Q(owner=owner)
-    if scope == "review":
-        return Q(
-            publication_status__in=(*_PUBLIC_VISIBLE, UserCreatedObject.STATUS_REVIEW)
+    return Q(
+        pk__in=_supporting_queryset(AggregatedCollectionPropertyValue, user).values(
+            "pk"
         )
-    return Q(publication_status__in=_visible_statuses(user))
+    )
 
 
 # Material IDs for food waste classification (Karte 4)
@@ -243,7 +252,7 @@ WEEKLY_BP_ACCESS_DAYS_PROPERTY_NAME = "weekly bring-point access days"
 BIOWASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME = "total biowaste in residual waste"
 FOOD_WASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME = "total food waste in residual waste"
 PERCENTAGE_UNIT_NAME = "%"
-SPECIFIC_AMOUNT_UNIT_NAME = "kg/(cap.*a)"
+SPECIFIC_AMOUNT_UNIT_NAME = "kg/(cap·a)"
 
 # Priority for picking the primary collection system per catchment.
 # Lower number = higher priority.
@@ -257,7 +266,7 @@ _COLLECTION_SYSTEM_PRIORITY = {
     "No separate collection": 7,
 }
 
-# Attribute IDs for population data (maps_attribute table)
+# RegionProperty IDs for population data
 POPULATION_ATTRIBUTE_ID = 3
 POPULATION_DENSITY_ATTRIBUTE_ID = 2
 
@@ -295,7 +304,7 @@ class GeoJSONAnonThrottleMixin:
 
 
 class IsMaintainer(permissions.BasePermission):
-    """Staff and collection moderators, who curate the data behind the maps."""
+    """Administrators and active collection moderators curating atlas data."""
 
     def has_permission(self, request, view):
         return is_maintainer(request.user)
@@ -574,8 +583,10 @@ def _change_overlay_cache_key(from_ids, from_year, to_ids, to_year, user=None):
 
     The involved catchments plus the number and latest modification of their
     revisions version the key, so editing, adding or removing a snapshot yields
-    a different key instead of serving a stale overlay.  Visibility only depends
-    on whether the requester is staff, so the key does not need the user.
+    a different key instead of serving a stale overlay.  Only anonymous or
+    inactive requests share this cache entry — authenticated requests bypass
+    it entirely because an identity key cannot protect against grant
+    revocation — so the ``authz-v1`` namespace marks public-historical data.
 
     Geometry taken from the legacy Region fallback cannot be versioned this way,
     which is why cached overlays also expire after
@@ -598,6 +609,7 @@ def _change_overlay_cache_key(from_ids, from_year, to_ids, to_year, user=None):
     scope, owner = _effective_scope(user)
     identity = owner.pk if scope == "mine" else ""
     return (
+        "authz-v1:"
         f"waste_atlas_change_overlay:{from_year}:{to_year}:{scope}:{identity}:{digest}"
     )
 
@@ -1152,12 +1164,20 @@ class CatchmentViewSet(WasteAtlasGenericViewSet):
         if rejection_response is not None:
             return rejection_response
 
-        payload, _hit = get_or_set_cache(
-            _change_overlay_cache_key(from_ids, from_year, to_ids, to_year, request),
-            lambda: _build_change_geometry(
+        def generate_overlay():
+            return _build_change_geometry(
                 _revision_snapshots(from_ids, from_year, request),
                 _revision_snapshots(to_ids, to_year, request),
-            ),
+            )
+
+        # Authenticated requests must not share the public overlay cache:
+        # identity keys cannot protect against grant revocation. Inactive
+        # requests are treated as public by core and may share it.
+        if is_active_actor(request.user):
+            return Response(generate_overlay())
+        payload, _hit = get_or_set_cache(
+            _change_overlay_cache_key(from_ids, from_year, to_ids, to_year, request),
+            generate_overlay,
             timeout=_CHANGE_OVERLAY_CACHE_TIMEOUT,
         )
         return Response(payload)

@@ -144,7 +144,7 @@ class SourceDomainHubRoutingTestCase(SimpleTestCase):
     def test_registry_exposes_plugin_declared_sitemap_items(self):
         sitemap_items = get_source_domain_sitemap_items()
 
-        self.assertIn("/maps/nantes/greenhouses/export/", sitemap_items)
+        self.assertIn("/maps/nantes/greenhouses/map/", sitemap_items)
         self.assertIn("/waste_collection/collections/", sitemap_items)
         self.assertNotIn("/maps/nantes/roadside_trees/export/", sitemap_items)
         self.assertNotIn("/case_studies/nantes/roadside_trees/export/", sitemap_items)
@@ -340,8 +340,8 @@ class GreenhousesPluginIntegrationTestCase(SimpleTestCase):
     def test_greenhouses_plugin_exposes_sitemap_metadata(self):
         plugin = get_source_domain_plugin("greenhouses")
 
-        self.assertIn("/maps/nantes/greenhouses/export/", plugin.sitemap_items)
-        self.assertIn("/case_studies/nantes/greenhouses/export/", plugin.sitemap_items)
+        self.assertIn("/maps/nantes/greenhouses/map/", plugin.sitemap_items)
+        self.assertIn("/case_studies/nantes/greenhouses/map/", plugin.sitemap_items)
         self.assertNotIn("/maps/nantes/roadside_trees/export/", plugin.sitemap_items)
 
     def test_greenhouses_plugin_exposes_dataset_runtime_compatibility(self):
@@ -394,7 +394,7 @@ class WasteCollectionPluginIntegrationTestCase(SimpleTestCase):
         plugin = get_source_domain_plugin("waste_collection")
 
         self.assertIn("/waste_collection/collections/", plugin.sitemap_items)
-        self.assertIn("/waste_collection/collections/export/", plugin.sitemap_items)
+        self.assertIn("/waste_collection/collections/map/", plugin.sitemap_items)
 
     def test_waste_collection_plugin_exposes_geojson_cache_warmer_metadata(self):
         plugin = get_source_domain_plugin("waste_collection")
