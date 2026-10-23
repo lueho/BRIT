@@ -28,7 +28,12 @@ def ensure_initial_data(stdout=None):
     """
     from utils.object_management.models import get_default_owner
 
-    from .models import MapConfiguration, MapLayerConfiguration, MapLayerStyle
+    from .models import (
+        MapConfiguration,
+        MapLayerConfiguration,
+        MapLayerStyle,
+        NutsVintage,
+    )
 
     owner = get_default_owner()
 
@@ -37,6 +42,20 @@ def ensure_initial_data(stdout=None):
             print(msg, file=stdout)
 
     created = {}
+
+    vintage, vintage_created = NutsVintage.objects.get_or_create(
+        year=2021,
+        defaults={
+            "is_current": not NutsVintage.objects.filter(is_current=True).exists(),
+            "source_release": "GISCO NUTS 2021",
+        },
+    )
+    if not NutsVintage.objects.filter(is_current=True).exists():
+        vintage.is_current = True
+        vintage.save(update_fields=["is_current"])
+    created["initial_nuts_vintage"] = vintage_created
+    if vintage_created:
+        log("Created initial NUTS 2021 vintage")
 
     # Default Region Layer Style
     default_region_style, region_style_created = MapLayerStyle.objects.get_or_create(

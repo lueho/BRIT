@@ -24,6 +24,16 @@ import utils.object_management.signals as object_management_signals
 BASELINES = {
     "properties": "0001_squashed_0010",
     "materials": "0001_squashed_0032",
+    "waste_atlas": "0001_squashed_0027",
+    "maps": "0001_squashed_0020",
+    "processes": "0001_squashed_0016",
+    "inventories": "0001_squashed_0008",
+    "distributions": "0001_squashed_0004",
+    "layer_manager": "0001_squashed_0004",
+    "object_management": "0001_squashed_0006",
+    "closecycle": "0001_squashed_0007",
+    "population": "0001_squashed_0002",
+    "waste_collection": "0001_squashed_0008",
 }
 
 ORIGINALS = {
@@ -39,6 +49,133 @@ ORIGINALS = {
         "0008_materialproperty_unit_optional",
         "0009_collection_point_property",
         "0010_remove_property_unit",
+    ],
+    "waste_atlas": [
+        "0001_initial",
+        "0002_seed_map_configurations",
+        "0003_seed_target_waste_category",
+        "0004_drop_file_base_from_map_configurations",
+        "0004_seed_residual_waste_composition_maps",
+        "0005_merge_20260730_1555",
+        "0006_add_residual_collection_amount_acpv_overlay",
+        "0006_wasteatlasrenderingsettings",
+        "0007_add_waste_ratio_aggregated_overlay",
+        "0007_seed_rendering_settings",
+        "0008_drop_redundant_no_data_color",
+        "0009_drop_placement_coupled_legend_columns",
+        "0010_wasteatlasrenderingsettings_change_boundary_changed_color",
+        "0011_wasteatlasrenderingsettings_export_legend_item_flow",
+        "0012_wasteatlasrenderingsettings_acpv_hatch_color_and_more",
+        "0013_centralize_acpv_marker_appearance",
+        "0014_alter_wasteatlasrenderingsettings_export_legend_item_flow",
+        "0014_seed_rp_map_configurations",
+        "0015_merge_legend_flow_and_rp_configurations",
+        "0016_distinguish_no_collection_from_no_door_to_door",
+        "0017_disable_connection_rate_quartiles",
+        "0018_configure_connection_rate_boundaries",
+        "0019_include_all_connection_rates_in_quartiles",
+        "0020_reclassify_min_bin_sizes",
+        "0021_hide_absent_min_bin_size_categories",
+        "0022_add_access_control_legend_note",
+        "0023_add_organic_amount_no_collection",
+        "0024_group_access_control_export_legend",
+        "0025_compact_system_access_control_legend",
+        "0026_add_organic_ratio_no_collection",
+        "0027_move_stored_urls_to_atlas_prefix",
+    ],
+    "maps": [
+        "0001_initial",
+        "0002_attribute_approved_at_attribute_approved_by_and_more",
+        "0003_alter_attribute_publication_status_and_more",
+        "0004_region_type_field",
+        "0005_alter_attribute_publication_status_and_more",
+        "0006_split_categorical_attributes",
+        "0007_alter_attribute_options",
+        "0008_regionattributevalue_unit",
+        "0009_regionproperty",
+        "0010_regionattributevalue_regionproperty",
+        "0011_alter_regionproperty_options",
+        "0012_geodataset_runtime_metadata",
+        "0013_alter_geodatasetcolumnpolicy_id_and_more",
+        "0014_alter_geodatasetcolumnpolicy_options_and_more",
+        "0015_geodatasetcolumnpolicy_is_popup",
+        "0016_alter_nutsregion_options_nutsvintage_and_more",
+        "0017_catchment_revisions",
+        "0018_remove_regionproperty_unit_and_more",
+        "0019_region_name_en",
+        "0020_delete_attribute",
+    ],
+    "processes": [
+        "0001_initial",
+        "0002_processcategory_process_processinforesource_and_more",
+        "0003_refine_process_models",
+        "0004_rename_processmat_process_r_0d0e2b_idx_processes_p_process_807014_idx_and_more",
+        "0005_add_moderation_permissions",
+        "0006_alter_process_publication_status_and_more",
+        "0007_alter_process_options_process_author_and_more",
+        "0008_process_supplementary_document",
+        "0009_processcategory_supplementary_document",
+        "0010_process_image_metadata",
+        "0011_process_authors",
+        "0012_move_process_contact_details_to_authors",
+        "0013_process_sources",
+        "0014_process_author_source_formsets",
+        "0015_processauthor_ordering",
+        "0016_remove_process_parent",
+    ],
+    "inventories": [
+        "0001_initial",
+        "0002_scenario_approved_at_scenario_approved_by_and_more",
+        "0003_alter_scenario_publication_status",
+        "0004_alter_scenario_publication_status",
+        "0005_update_greenhouses_source_module",
+        "0006_alter_scenariostatus_options",
+        "0007_scenariostatus_failed_algorithm_and_more",
+        "0008_inventoryalgorithmparametervalue_is_custom",
+    ],
+    "distributions": [
+        "0001_initial",
+        "0002_period_approved_at_period_approved_by_and_more",
+        "0003_alter_period_publication_status_and_more",
+        "0004_alter_period_publication_status_and_more",
+    ],
+    "layer_manager": [
+        "0001_initial",
+        "0002_unique_layer_field_name_data_type",
+        "0003_layer_staged",
+        "0004_layer_feedstock_material",
+    ],
+    "object_management": [
+        "0001_initial",
+        "0002_reviewlog",
+        "0003_alter_reviewaction_action_delete_reviewlog",
+        "0004_objecteditorgrant",
+        "0005_objectgroupeditorgrant",
+        "0005_reviewnotificationmute",
+        "0006_merge_review_notification_mute",
+    ],
+    "closecycle": [
+        "0001_initial",
+        "0002_showcase_approved_at_showcase_approved_by_and_more",
+        "0003_alter_showcase_publication_status",
+        "0004_alter_showcase_publication_status",
+        "0005_showcase_catchment_showcase_sample_series_and_more",
+        "0006_showcase_geom",
+        "0007_showcase_theme",
+    ],
+    "population": [
+        "0001_initial",
+        "0002_alter_populationestimate_region_and_more",
+    ],
+    "waste_collection": [
+        "0001_initial",
+        "0002_rename_sortingmethod_binconfiguration_and_more",
+        "0003_fix_sweden_2024_valid_until",
+        "0004_add_access_control_to_collection",
+        "0005_replace_access_control_with_bp_pap",
+        "0006_rename_connection_type_to_participation_policy",
+        "0007_alter_collectioncountoptions_options",
+        "0008_collection_list_order_index",
     ],
     "materials": [
         "0001_initial",
@@ -81,6 +218,16 @@ ORIGINALS = {
 ORIGINAL_TIPS = {
     "properties": "0010_remove_property_unit",
     "materials": "0032_sampleauthor_sample_authors_and_more",
+    "waste_atlas": "0027_move_stored_urls_to_atlas_prefix",
+    "maps": "0020_delete_attribute",
+    "processes": "0016_remove_process_parent",
+    "inventories": "0008_inventoryalgorithmparametervalue_is_custom",
+    "distributions": "0004_alter_period_publication_status_and_more",
+    "layer_manager": "0004_layer_feedstock_material",
+    "object_management": "0006_merge_review_notification_mute",
+    "closecycle": "0007_showcase_theme",
+    "population": "0002_alter_populationestimate_region_and_more",
+    "waste_collection": "0008_collection_list_order_index",
 }
 
 MODEL_ORDER = {
@@ -103,15 +250,157 @@ MODEL_ORDER = {
         "sampleauthor",
         "sampleexternalrecord",
     ],
+    "waste_atlas": ["wasteatlasmapconfiguration", "wasteatlasrenderingsettings"],
+    "maps": [
+        "geopolygon",
+        "region",
+        "catchment",
+        "categoricalattribute",
+        "geodataset",
+        "geodatasetruntimeconfiguration",
+        "georeferencedcatchment",
+        "georeferencedregion",
+        "nutsregion",
+        "location",
+        "mapconfiguration",
+        "maplayerconfiguration",
+        "maplayerstyle",
+        "modelmapconfiguration",
+        "nutsvintage",
+        "regionattributetextvalue",
+        "regionproperty",
+        "regionattributevalue",
+        "geodatasetcolumnpolicy",
+        "georeferencednutsregion",
+        "lauregion",
+        "catchmentrevision",
+    ],
+    "processes": [
+        "apppermission",
+        "process",
+        "processauthor",
+        "processcategory",
+        "processinforesource",
+        "processlink",
+        "processmaterial",
+        "processoperatingparameter",
+        "processsource",
+    ],
+    "inventories": [
+        "inventoryalgorithm",
+        "inventoryalgorithmparameter",
+        "inventoryalgorithmparametervalue",
+        "scenario",
+        "runningtask",
+        "inventoryamountshare",
+        "scenarioinventoryconfiguration",
+        "scenariostatus",
+    ],
+    "distributions": ["temporaldistribution", "timestep", "period"],
+    "layer_manager": [
+        "distributionset",
+        "distributionshare",
+        "layer",
+        "layeraggregateddistribution",
+        "layeraggregatedvalue",
+        "layerfield",
+    ],
+    "object_management": [
+        "objecteditorgrant",
+        "objectgroupeditorgrant",
+        "reviewaction",
+        "reviewnotificationmute",
+    ],
+    "closecycle": [
+        "biogasplantssweden",
+        "showcase",
+        "showcasematerial",
+        "showcaseprocess",
+    ],
+    "population": [
+        "populationdataset",
+        "populationestimate",
+        "populationimportrun",
+        "populationobservation",
+        "populationestimatecomponent",
+    ],
+    "waste_collection": [
+        "collectioncatchment",
+        "collectionseason",
+        "wasteflyer",
+        "wastecomponent",
+        "binconfiguration",
+        "collection",
+        "aggregatedcollectionpropertyvalue",
+        "collectionfrequency",
+        "collectioncountoptions",
+        "collectionsystem",
+        "collector",
+        "feesystem",
+        "wastecategory",
+        "collectionpropertyvalue",
+    ],
 }
 
-MATERIALS_DEPENDENCIES = [
-    ("bibliography", "0001_squashed_0012"),
-    ("distributions", "0001_initial"),
-    ("maps", "0019_region_name_en"),
-    ("properties", "0001_squashed_0010"),
-    migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-]
+BASELINE_DEPENDENCIES = {
+    "properties": [migrations.swappable_dependency(settings.AUTH_USER_MODEL)],
+    "materials": [
+        ("bibliography", "0001_squashed_0012"),
+        ("distributions", "0001_squashed_0004"),
+        ("maps", "0001_squashed_0020"),
+        ("properties", "0001_squashed_0010"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ],
+    "waste_atlas": [],
+    "maps": [
+        ("bibliography", "0001_squashed_0012"),
+        ("contenttypes", "0002_remove_content_type_name"),
+        ("properties", "0001_squashed_0010"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ],
+    "processes": [
+        ("bibliography", "0001_squashed_0012"),
+        ("materials", "0001_squashed_0032"),
+        ("properties", "0001_squashed_0010"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ],
+    "inventories": [
+        ("bibliography", "0001_squashed_0012"),
+        ("distributions", "0001_squashed_0004"),
+        ("maps", "0001_squashed_0020"),
+        ("materials", "0001_squashed_0032"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ],
+    "distributions": [migrations.swappable_dependency(settings.AUTH_USER_MODEL)],
+    "layer_manager": [
+        ("distributions", "0001_squashed_0004"),
+        ("inventories", "0001_squashed_0008"),
+        ("materials", "0001_squashed_0032"),
+    ],
+    "object_management": [
+        ("auth", "0012_alter_user_first_name_max_length"),
+        ("contenttypes", "0002_remove_content_type_name"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ],
+    "closecycle": [
+        ("maps", "0001_squashed_0020"),
+        ("materials", "0001_squashed_0032"),
+        ("processes", "0001_squashed_0016"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ],
+    "population": [
+        ("bibliography", "0001_squashed_0012"),
+        ("maps", "0001_squashed_0020"),
+    ],
+    "waste_collection": [
+        ("bibliography", "0001_squashed_0012"),
+        ("distributions", "0001_squashed_0004"),
+        ("maps", "0001_squashed_0020"),
+        ("materials", "0001_squashed_0032"),
+        ("properties", "0001_squashed_0010"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ],
+}
 
 
 class SchemaOnlyBaselineGraphTests(SimpleTestCase):
@@ -142,13 +431,10 @@ class SchemaOnlyBaselineGraphTests(SimpleTestCase):
 
     def test_baseline_dependencies(self):
         loader = MigrationLoader(None)
-        properties = loader.disk_migrations[("properties", BASELINES["properties"])]
-        self.assertEqual(
-            properties.dependencies,
-            [migrations.swappable_dependency(settings.AUTH_USER_MODEL)],
-        )
-        materials = loader.disk_migrations[("materials", BASELINES["materials"])]
-        self.assertCountEqual(materials.dependencies, MATERIALS_DEPENDENCIES)
+        for app, expected in BASELINE_DEPENDENCIES.items():
+            with self.subTest(app=app):
+                baseline = loader.disk_migrations[(app, BASELINES[app])]
+                self.assertCountEqual(baseline.dependencies, expected)
 
     def test_fresh_plan_contains_only_baseline_per_app(self):
         loader = MigrationLoader(None)
@@ -187,9 +473,13 @@ class SchemaOnlyBaselineGraphTests(SimpleTestCase):
                     operation, (migrations.RunPython, migrations.RunSQL)
                 )
                 if isinstance(operation, migrations.AddField):
+                    field = operation.field
                     self.assertTrue(
-                        operation.field.many_to_many,
-                        f"{app} AddField {operation.name} is not many-to-many",
+                        field.many_to_many
+                        or field.null
+                        or not (field.has_default() and callable(field.default)),
+                        f"{app} AddField {operation.name} evaluates a "
+                        "callable default during schema setup",
                     )
 
     def test_baseline_state_matches_original_tip_per_app(self):
@@ -219,9 +509,20 @@ class SchemaOnlyBaselineGraphTests(SimpleTestCase):
         current_state = ProjectState.from_apps(apps)
         detector = MigrationAutodetector(migrated_state, current_state)
         changes = detector._detect_changes()
+        dynamic_apps = {"layer_manager"}
         for app in BASELINES:
             with self.subTest(app=app):
-                self.assertFalse(changes.get(app), changes.get(app))
+                ops = changes.get(app, [])
+                if app in dynamic_apps:
+                    static_models = {
+                        key[1] for key in migrated_state.models if key[0] == app
+                    }
+                    ops = [
+                        op
+                        for op in ops
+                        if getattr(op, "model_name", op.name).lower() in static_models
+                    ]
+                self.assertFalse(ops, ops)
 
 
 class ControlledDatabaseBootstrapBase(SimpleTestCase):
@@ -297,16 +598,14 @@ class ControlledDatabaseBootstrapBase(SimpleTestCase):
         with fresh.cursor() as cursor:
             cursor.execute(
                 "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = 'public' AND ("
-                "table_name LIKE 'materials!_%' ESCAPE '!' OR "
-                "table_name LIKE 'properties!_%' ESCAPE '!' OR "
-                "table_name = 'auth_user')"
+                "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' "
+                "AND table_name NOT IN ('django_migrations', 'spatial_ref_sys')"
             )
             names = [row[0] for row in cursor.fetchall()]
         for name in names:
             with fresh.cursor() as cursor:
-                cursor.execute(f'SELECT * FROM "{name}" ORDER BY 1')
-                tables[name] = sorted(cursor.fetchall())
+                cursor.execute(f'SELECT to_jsonb(t)::text FROM "{name}" t')
+                tables[name] = sorted(row[0] for row in cursor.fetchall())
         return tables
 
     def _applied(self, fresh):
@@ -349,7 +648,7 @@ class FreshBootstrapSchemaTests(ControlledDatabaseBootstrapBase):
 
             from django.contrib.auth.models import User
 
-            from maps.models import GeoDataset
+            from maps.models import GeoDataset, NutsVintage
             from materials.models import (
                 MaterialCategory,
                 MaterialComponent,
@@ -372,6 +671,7 @@ class FreshBootstrapSchemaTests(ControlledDatabaseBootstrapBase):
             MaterialComponent.objects.get(name="Other")
             self.assertFalse(GeoDataset.objects.exists())
             self.assertFalse(Collection.objects.exists())
+            self.assertEqual(NutsVintage.current().year, 2021)
 
             admin = User.objects.get(username="schema-admin")
             self.assertTrue(admin.check_password("adm-secret"))
@@ -560,16 +860,21 @@ class AdoptedHistoryBootstrapTests(ControlledDatabaseBootstrapBase):
                 recorder.record_unapplied(app, baseline)
 
             before = self._snapshot(fresh)
+            for table in (
+                "auth_user",
+                "materials_basematerial",
+                "maps_nutsvintage",
+                "maps_maplayerstyle",
+                "object_management_reviewaction",
+            ):
+                self.assertIn(table, before)
             applied_before = self._applied(fresh)
             history_before = list(
                 recorder.migration_qs.order_by("id").values(
                     "id", "app", "name", "applied"
                 )
             )
-            markers = {
-                ("properties", BASELINES["properties"]),
-                ("materials", BASELINES["materials"]),
-            }
+            markers = set(BASELINES.items())
 
             executor = MigrationExecutor(fresh)
             executor.loader.check_consistent_history(fresh)
@@ -585,7 +890,7 @@ class AdoptedHistoryBootstrapTests(ControlledDatabaseBootstrapBase):
             )
             self.assertEqual(history_after_first[: len(history_before)], history_before)
             marker_rows = history_after_first[len(history_before) :]
-            self.assertEqual(len(marker_rows), 2)
+            self.assertEqual(len(marker_rows), len(markers))
             self.assertEqual(
                 {(row["app"], row["name"]) for row in marker_rows}, markers
             )
@@ -606,7 +911,9 @@ class AdoptedHistoryBootstrapTests(ControlledDatabaseBootstrapBase):
             for captured in (first, second):
                 for query in captured.captured_queries:
                     sql = query["sql"]
-                    if '"materials_' in sql or '"properties_' in sql:
+                    if sql.lstrip().startswith(
+                        ("CREATE TABLE", "ALTER TABLE", "DROP TABLE", "CREATE INDEX")
+                    ):
                         touched.append(sql)
             self.assertEqual(touched, [])
             self.assertEqual(before, self._snapshot(fresh))
