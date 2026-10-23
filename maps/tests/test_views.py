@@ -9,9 +9,10 @@ from unittest.mock import Mock, patch
 from urllib.parse import urlencode, urlparse, urlunparse
 
 from django.conf import settings
-from django.contrib.auth.models import AnonymousUser, User
+from django.contrib.auth.models import User
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.core.cache import caches
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.db import connection
 from django.middleware.common import CommonMiddleware
@@ -19,14 +20,14 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
-from rest_framework import serializers
 from rest_framework.renderers import JSONRenderer
 from rest_framework.request import Request
-from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework.test import APIRequestFactory
 from rest_framework.viewsets import ModelViewSet
 
 from bibliography.models import Source
-from maps.mixins import GeoJSONMixin
+from maps.mixins import CachedGeoJSONMixin
+from maps.serializers import RegionGeoFeatureModelSerializer
 from maps.views import CatchmentCreateMergeLauView
 from utils.properties.models import Unit
 from utils.tests.testcases import (
@@ -1766,185 +1767,6 @@ class ClearGeojsonCacheViewTest(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
-class DummyGeoJSONSerializer(serializers.Serializer):
-    """Dummy serializer for testing GeoJSONMixin."""
-
-    def to_representation(self, instance):
-        return {"type": "Feature", "properties": {}, "geometry": None}
-
-    @property
-    def data(self):
-        return {"type": "FeatureCollection", "features": []}
-
-
-class MockGeoJSONViewSet(GeoJSONMixin, ModelViewSet):
-    """Minimal viewset used only for unit tests."""
-
-    queryset = Mock()
-    geojson_serializer_class = DummyGeoJSONSerializer
-
-    def filter_queryset(self, queryset):
-        return queryset
-
-
-class GeoJSONMixinTestCase(TestCase):
-    """Unit tests for GeoJSONMixin behaviour."""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.user = User.objects.create_user(username="testuser")
-
-    def setUp(self):
-        self.factory = APIRequestFactory()
-        self.viewset = MockGeoJSONViewSet()
-        self.viewset.format_kwarg = None
-
-        request = self.factory.get("/")
-        force_authenticate(request, self.user)
-        self.viewset.request = Request(request)
-
-    def _make_request(self, url="/api/test/geojson/", user=None, **query_params):
-        request = self.factory.get(url, query_params)
-        user = user or self.user
-        force_authenticate(request, user=user)
-        return Request(request)
-
-    def test_geojson_requires_serializer_class(self):
-        class IncompleteViewSet(GeoJSONMixin, ModelViewSet):
-            pass
-
-        viewset = IncompleteViewSet()
-        with self.assertRaises(AssertionError):
-            viewset.get_geojson_serializer_class()
-
-    def test_get_geojson_serializer_class(self):
-        self.assertIs(
-            self.viewset.get_geojson_serializer_class(),
-            self.viewset.geojson_serializer_class,
-        )
-
-    def test_get_geojson_serializer(self):
-        mock_serializer_class = Mock()
-        self.viewset.get_geojson_serializer_class = Mock(
-            return_value=mock_serializer_class
-        )
-        self.viewset.get_serializer_context = Mock(return_value={"request": None})
-
-        data = [{"foo": "bar"}]
-        self.viewset.get_geojson_serializer(data, many=True)
-
-        self.viewset.get_geojson_serializer_class.assert_called_once()
-        mock_serializer_class.assert_called_once_with(
-            data, many=True, context={"request": None}
-        )
-
-    def test_geojson_uses_parent_get_queryset(self):
-        request = self._make_request()
-        filtered_qs = Mock()
-
-        self.viewset.get_queryset = Mock(return_value=filtered_qs)
-        self.viewset.filter_queryset = Mock(return_value=filtered_qs)
-
-        serializer_mock = Mock()
-        serializer_mock.data = {"hello": "world"}
-        self.viewset.get_geojson_serializer = Mock(return_value=serializer_mock)
-
-        response = self.viewset.geojson(request)
-
-        self.viewset.get_queryset.assert_called_once()
-        self.viewset.filter_queryset.assert_called_once_with(filtered_qs)
-        self.viewset.get_geojson_serializer.assert_called_once_with(
-            filtered_qs, many=True
-        )
-        self.assertDictEqual(response.data, {"hello": "world"})
-
-    def test_scope_parameter_handling(self):
-        test_scopes = ["published", "private", "invalid"]
-
-        for scope in test_scopes:
-            with self.subTest(scope=scope):
-                request = self._make_request(scope=scope)
-                filtered_qs = Mock()
-
-                self.viewset.get_queryset = Mock(return_value=filtered_qs)
-                self.viewset.filter_queryset = Mock(return_value=filtered_qs)
-
-                mock_serializer = Mock()
-                mock_serializer.data = {"type": "FeatureCollection", "features": []}
-                self.viewset.get_geojson_serializer = Mock(return_value=mock_serializer)
-
-                response = self.viewset.geojson(request)
-
-                self.viewset.get_queryset.assert_called_once()
-                self.viewset.filter_queryset.assert_called_once_with(filtered_qs)
-                self.viewset.get_geojson_serializer.assert_called_once_with(
-                    filtered_qs, many=True
-                )
-                self.assertIsInstance(response.data, dict)
-
-    def test_authentication_handling(self):
-        test_users = [
-            (self.user, "authenticated"),
-            (AnonymousUser(), "unauthenticated"),
-        ]
-
-        for user, auth_status in test_users:
-            with self.subTest(auth_status=auth_status):
-                request = self._make_request(user=user)
-                filtered_qs = Mock()
-
-                self.viewset.get_queryset = Mock(return_value=filtered_qs)
-                self.viewset.filter_queryset = Mock(return_value=filtered_qs)
-
-                mock_serializer = Mock()
-                mock_serializer.data = {"type": "FeatureCollection", "features": []}
-                self.viewset.get_geojson_serializer = Mock(return_value=mock_serializer)
-
-                response = self.viewset.geojson(request)
-
-                self.viewset.get_queryset.assert_called_once()
-                self.viewset.filter_queryset.assert_called_once_with(filtered_qs)
-                self.viewset.get_geojson_serializer.assert_called_once_with(
-                    filtered_qs, many=True
-                )
-                self.assertIsInstance(response.data, dict)
-
-    def test_empty_queryset_handling(self):
-        request = self._make_request()
-
-        empty_qs = Mock()
-        self.viewset.get_queryset = Mock(return_value=empty_qs)
-        self.viewset.filter_queryset = Mock(return_value=empty_qs)
-
-        mock_serializer = Mock()
-        mock_serializer.data = {"type": "FeatureCollection", "features": []}
-        self.viewset.get_geojson_serializer = Mock(return_value=mock_serializer)
-
-        response = self.viewset.geojson(request)
-
-        self.assertIsInstance(response.data, dict)
-
-    def test_serializer_error_handling(self):
-        request = self._make_request()
-
-        qs = Mock()
-        qs.filter = Mock(return_value=qs)
-        self.viewset.get_queryset = Mock(return_value=qs)
-        self.viewset.filter_queryset = Mock(return_value=qs)
-
-        error_serializer = Mock(spec=DummyGeoJSONSerializer)
-
-        def data_property_raiser(self):
-            raise serializers.ValidationError("Test error")
-
-        type(error_serializer).data = property(data_property_raiser)
-
-        self.viewset.get_geojson_serializer = Mock(return_value=error_serializer)
-
-        with self.assertRaises(serializers.ValidationError):
-            self.viewset.geojson(request)
-
-
 def _redis_geojson_test_caches():
     parsed = urlparse(os.environ.get("REDIS_URL", "redis://localhost:6379/0"))
     location = urlunparse(parsed._replace(path="/14", query=""))
@@ -2357,6 +2179,18 @@ class StreamingGeoJSONTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotEqual(response["X-Cache-Status"], "REJECT")
+
+    def test_streaming_requires_geojson_geometry_field(self):
+        """The serializer-per-feature fallback is gone: streaming without a
+        declared database geometry field must fail loudly."""
+
+        class BareViewSet(CachedGeoJSONMixin, ModelViewSet):
+            queryset = Region.objects.none()
+            serializer_class = RegionGeoFeatureModelSerializer
+
+        view = BareViewSet()
+        with self.assertRaises(ImproperlyConfigured):
+            list(view._stream_geojson(Region.objects.none()))
 
     def test_unknown_query_parameter_does_not_bound_large_request(self):
         with patch(

@@ -105,7 +105,7 @@ class CollectionListPagination(PageNumberPagination):
 
 
 class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
-    """Collection viewset that integrates with GeoJSONMixin and UserCreatedObjectViewSet.
+    """Collection viewset that integrates with CachedGeoJSONMixin and UserCreatedObjectViewSet.
 
     Provides the standard CRUD operations for collections, plus:
     - GeoJSON endpoint with scope-based filtering
@@ -1529,6 +1529,9 @@ class CollectorViewSet(CachedGeoJSONMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = CollectorGeometrySerializer
     permission_classes = [permissions.AllowAny]
     filterset_fields = ["id", "catchment__region__country"]
+    # ``Collector.geom`` is a property over the catchment's region borders;
+    # the rendered path needs the underlying database field path.
+    geojson_geometry_field = "catchment__region__borders__geom"
 
     def get_queryset(self):
         """

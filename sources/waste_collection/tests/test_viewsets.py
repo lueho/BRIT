@@ -58,7 +58,7 @@ from utils.properties.models import Property, Unit
 
 class CollectionViewSetTestCase(APITestCase):
     """
-    Integration tests for CollectionViewSet with GeoJSONMixin and UserCreatedObjectViewSet.
+    Integration tests for CollectionViewSet with CachedGeoJSONMixin and UserCreatedObjectViewSet.
     Covers GeoJSON endpoint filtering and model permission enforcement for creation.
     """
 
@@ -905,6 +905,64 @@ class CollectionViewSetTestCase(APITestCase):
                     else:
                         self.assertNotIn("X-Data-Version", head)
         self.client.force_authenticate(user=None)
+
+
+class CollectorGeoJSONRenderedPathTests(APITestCase):
+    """Collector GeoJSON streams database-rendered geometry like the other
+    ``CachedGeoJSONMixin`` viewsets."""
+
+    @classmethod
+    def setUpTestData(cls):
+        borders = GeoPolygon.objects.create(
+            geom="MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))"
+        )
+        cls.region = Region.objects.create(
+            name="Collector Region", country="DE", borders=borders
+        )
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Collector Catchment", region=cls.region
+        )
+        cls.collector = Collector.objects.create(
+            name="Geo Collector", catchment=cls.catchment
+        )
+        cls.url = reverse("api-collector-geojson")
+
+    def test_geojson_streams_database_rendered_geometry(self):
+        with (
+            patch("maps.mixins.STREAMING_THRESHOLD", 0),
+            CaptureQueriesContext(connection) as queries,
+        ):
+            response = self.client.get(
+                self.url, {"id": self.collector.pk}, REMOTE_ADDR="10.9.10.1"
+            )
+            self.assertTrue(response.streaming)
+            data = json.loads(b"".join(response.streaming_content))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["X-Cache-Status"], "STREAM")
+        self.assertTrue(any("ST_AsGeoJSON" in q["sql"] for q in queries))
+        feature = data["features"][0]
+        self.assertEqual(feature["geometry"]["type"], "MultiPolygon")
+        self.assertEqual(feature["properties"]["collector"], "Geo Collector")
+        self.assertEqual(feature["properties"]["catchment"], "Collector Catchment")
+
+    def test_geojson_bbox_limits_features(self):
+        """bbox must filter through the catchment's region borders.
+
+        ``Collector.geom`` is a model property, not a field, so the bbox
+        filter has to resolve the underlying relation path instead.
+        """
+        inside = self.client.get(
+            self.url, {"bbox": "-1,-1,2,2"}, REMOTE_ADDR="10.9.10.2"
+        )
+        outside = self.client.get(
+            self.url, {"bbox": "10,10,20,20"}, REMOTE_ADDR="10.9.10.3"
+        )
+
+        self.assertEqual(inside.status_code, status.HTTP_200_OK)
+        self.assertEqual(inside["X-Total-Count"], "1")
+        self.assertEqual(outside.status_code, status.HTTP_200_OK)
+        self.assertEqual(outside["X-Total-Count"], "0")
 
 
 class CollectionReviewActionApiTestCase(APITestCase):
