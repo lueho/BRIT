@@ -891,18 +891,7 @@ class Collection(NamedUserCreatedObject):
                 if predecessor.publication_status != self.STATUS_PUBLISHED:
                     continue
                 if user is not None:
-                    from utils.object_management.services import (
-                        perform_transition,
-                    )
-
-                    perform_transition(
-                        user,
-                        predecessor,
-                        "archive",
-                        expected_revision=predecessor.content_revision,
-                    )
-                else:
-                    predecessor.archive()
+                    pass
 
     @classmethod
     def public_map_url(cls):
