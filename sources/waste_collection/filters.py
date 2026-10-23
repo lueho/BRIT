@@ -621,9 +621,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
 
     @staticmethod
     def filter_valid_on(qs, _, value):
-        return qs.filter(
-            Q(valid_from__lte=value), Q(valid_until__gte=value) | Q(valid_until=None)
-        )
+        return qs.valid_on(value)
 
     @staticmethod
     def filter_waste_category(qs, _, values):

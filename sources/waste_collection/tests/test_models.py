@@ -159,6 +159,17 @@ class CollectionCatchmentTestCase(TestCase):
         collections = self.catchment.downstream_collections
         self.assertNotIn(self.unrelated_collection, collections)
 
+    def test_downstream_collections_is_cached_per_instance(self):
+        """Repeated access within one object lifecycle must not re-query (#246)."""
+        list(self.catchment.downstream_collections)
+        with self.assertNumQueries(0):
+            list(self.catchment.downstream_collections)
+
+    def test_upstream_collections_is_cached_per_instance(self):
+        list(self.grandchild_catchment.upstream_collections)
+        with self.assertNumQueries(0):
+            list(self.grandchild_catchment.upstream_collections)
+
     def test_upstream_collections_includes_collections_from_all_ancestor_catchments(
         self,
     ):
@@ -281,6 +292,23 @@ class CollectionTestCase(TestCase):
 
     def test_collection_is_named_automatically_on_creation(self):
         self.assertEqual("Catchment Category System 2024", self.collection.name)
+
+    def test_effective_allowed_materials_is_cached_per_instance(self):
+        """Repeated access within one object lifecycle must not re-query (#246)."""
+        self.collection.allowed_materials.add(
+            WasteComponent.objects.create(name="Allowed cached test")
+        )
+        list(self.collection.effective_allowed_materials)
+        with self.assertNumQueries(0):
+            list(self.collection.effective_allowed_materials)
+
+    def test_effective_forbidden_materials_is_cached_per_instance(self):
+        self.collection.forbidden_materials.add(
+            WasteComponent.objects.create(name="Forbidden cached test")
+        )
+        list(self.collection.effective_forbidden_materials)
+        with self.assertNumQueries(0):
+            list(self.collection.effective_forbidden_materials)
 
     def test_collection_name_is_updated_on_model_update(self):
         self.collection.collection_system = CollectionSystem.objects.create(

@@ -40,7 +40,7 @@ class CollectionCatchment(Catchment):
             catchment__region__borders__geom__within=self.region.borders.geom
         )
 
-    @property
+    @cached_property
     def downstream_collections(self):
         qs = Collection.objects.filter(
             catchment__in=self.descendants(include_self=True)
@@ -50,7 +50,7 @@ class CollectionCatchment(Catchment):
         )
         return qs
 
-    @property
+    @cached_property
     def upstream_collections(self):
         qs = Collection.objects.filter(catchment__in=self.ancestors())
         qs = qs.select_related(
@@ -566,11 +566,11 @@ class Collection(NamedUserCreatedObject):
     def effective_waste_category(self):
         return self.waste_category
 
-    @property
+    @cached_property
     def effective_allowed_materials(self):
         return self.allowed_materials.all()
 
-    @property
+    @cached_property
     def effective_forbidden_materials(self):
         return self.forbidden_materials.all()
 
