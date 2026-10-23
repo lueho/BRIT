@@ -7,15 +7,14 @@ build:
 release:
   image: web
   command:
-    - python manage.py migrate --noinput
-    - python manage.py collectstatic --noinput
+    - python manage.py migrate --noinput && python manage.py ensure_initial_data --app waste_atlas && python manage.py collectstatic_safe --noinput --manifest-output /tmp/brit-staticfiles.json && python manage.py verify_staticfiles --manifest /tmp/brit-staticfiles.json
 run:
   # Container deploys don't get WEB_CONCURRENCY, so gunicorn defaulted to a
   # single sync worker: one slow request queued everything behind it until
   # Heroku's 30s router timeout cut in (H12 storm during the Oct 2026 crawler
   # burst). One process with four threads avoids duplicating application
   # memory; request recycling limits retained allocations between workloads.
-  web: gunicorn $DJANGO_WSGI --bind 0.0.0.0:$PORT --worker-class gthread --workers 1 --threads 4 --keep-alive 0 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile -
+  web: gunicorn $DJANGO_WSGI --bind 0.0.0.0:$PORT --worker-class brit.gunicorn.SocketTimeoutThreadWorker --workers 1 --threads 4 --keep-alive 0 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile -
   worker:
     image: web
     command:

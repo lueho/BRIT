@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Maps | {{ map_title|default:model_name }}
+{% endblock title %}
+
+{% block content %}
+    <div class="alert alert-warning" role="alert">
+        <h4 class="alert-heading">Dataset not configured</h4>
+        <p>
+            The dataset for this map has not been imported or configured yet.
+            You can import or configure this dataset to use this map.
+        </p>
+    </div>
+{% endblock content %}

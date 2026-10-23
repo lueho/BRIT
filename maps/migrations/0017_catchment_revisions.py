@@ -83,7 +83,7 @@ def backfill_catchment_revisions(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("bibliography", "0010_author_contact_details"),
+        ("bibliography", "0001_squashed_0012"),
         ("maps", "0016_alter_nutsregion_options_nutsvintage_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]

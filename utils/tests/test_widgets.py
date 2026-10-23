@@ -2,10 +2,24 @@ from django.forms.widgets import HiddenInput
 from django.test import TestCase
 
 from ..widgets import (
+    CreateEnabledTomSelectModelMultipleWidget,
+    CreateEnabledTomSelectModelWidget,
     NullableRangeSliderWidget,
     RangeSliderWidget,
     SourceListWidget,
 )
+
+
+class CreateEnabledTomSelectWidgetTestCase(TestCase):
+    def test_media_includes_ui_utils(self):
+        """Inline-create error reporting falls back to ``showInlineAlert``
+        from ``js/ui_utils.min.js``, so the widget must ship it."""
+        for widget_class in (
+            CreateEnabledTomSelectModelWidget,
+            CreateEnabledTomSelectModelMultipleWidget,
+        ):
+            media = str(widget_class().media)
+            self.assertIn("js/ui_utils.min.js", media)
 
 
 class RangeSliderWidgetTestCase(TestCase):

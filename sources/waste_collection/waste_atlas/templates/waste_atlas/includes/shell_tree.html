@@ -16,7 +16,7 @@
   {% for group in directory_region_groups %}
     <details class="atlas-tree-region"
              data-region="{{ group.id }}"
-             {% if group.id == directory_selected_region %}open{% endif %}>
+             {% if not atlas_tree_overview_active and group.id == directory_selected_region %}open{% endif %}>
       <summary class="atlas-tree-region-summary">{{ group.label }}</summary>
       {% if group.europe_maps %}
         <div class="atlas-tree-section">

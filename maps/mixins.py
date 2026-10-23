@@ -1,9 +1,13 @@
-import json
-
 from django.conf import settings
 from django.contrib.gis.geos import Polygon
 from django.core.cache import caches
-from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.exceptions import (
+    FieldDoesNotExist,
+    ImproperlyConfigured,
+)
+from django.core.exceptions import (
+    ValidationError as DjangoValidationError,
+)
 from django.db.models import BigIntegerField, Count, Max, Min
 from django.db.models.expressions import RawSQL
 from django.http import StreamingHttpResponse
@@ -12,6 +16,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .utils import (
+    AUTHZ_GEOJSON_CACHE_PREFIX,
     GEOJSON_MAX_BUFFERED_POINTS,
     geojson_version_aggregates,
     geojson_version_token,
@@ -183,14 +188,61 @@ class CachedGeoJSONMixin:
         except (ValueError, TypeError):
             return None
 
+    def _audience_cache_key(self, request, cache_key):
+        """Return the cache key authorized for this request, or ``None``.
+
+        For registry reviewable/owned queryset models, record visibility is
+        per-actor: authenticated requests bypass every cache read/write path
+        so access and revocation are evaluated on each request, while
+        anonymous requests use a dedicated namespace that cannot consume keys
+        warmed by unscoped legacy or authenticated traffic. Unregistered and
+        public-catalogue models keep their existing cache behavior.
+        """
+        try:
+            model = self.get_queryset().model
+        except Exception:
+            return None
+        from utils.object_management.models import UserCreatedObject
+        from utils.object_management.registry import KIND_PUBLIC_CATALOGUE, model_policy
+
+        policy = model_policy(model)
+        if policy is None:
+            if model is not None and issubclass(model, UserCreatedObject):
+                return None
+            return cache_key
+        if policy.kind == KIND_PUBLIC_CATALOGUE:
+            return cache_key
+        user = getattr(request, "user", None)
+        if not getattr(user, "is_authenticated", False):
+            return f"{AUTHZ_GEOJSON_CACHE_PREFIX}{cache_key}"
+        return None
+
     def _apply_bbox_filter(self, queryset, bbox):
         """Apply bounding box filter to queryset if bbox is provided."""
         if bbox is None:
             return queryset
-        # Try common geometry field names
-        for field in ["geom", "geometry", "catchment__region__borders__geom"]:
-            if hasattr(queryset.model, field.split("__")[0]):
-                return queryset.filter(**{f"{field}__intersects": bbox})
+        # Try the declared geometry paths first, then common field names.
+        # ``geojson_point_field`` holds the raw geometry path when
+        # ``geojson_geometry_field`` is an annotation (e.g. a simplified
+        # geometry), and intersecting on the raw field keeps the spatial
+        # index usable. Only real model fields qualify: geometry-exposing
+        # properties (e.g. ``geom`` on Region/Collector/Collection) would
+        # otherwise be filtered on directly and raise FieldError.
+        candidates = [
+            self.geojson_point_field,
+            self.geojson_geometry_field,
+            "geom",
+            "geometry",
+            "catchment__region__borders__geom",
+        ]
+        for field in candidates:
+            if not field:
+                continue
+            try:
+                queryset.model._meta.get_field(field.split("__")[0])
+            except FieldDoesNotExist:
+                continue
+            return queryset.filter(**{f"{field}__intersects": bbox})
         return queryset
 
     def get_geojson_queryset_with_bbox(self, request):
@@ -379,62 +431,36 @@ class CachedGeoJSONMixin:
         browser pay a reader.read() cycle per feature, which dominates
         end-to-end load time for datasets with small features.
         """
+        if not self.geojson_geometry_field:
+            raise ImproperlyConfigured(
+                f"{type(self).__name__} must set geojson_geometry_field to "
+                "stream GeoJSON"
+            )
+
         # Get the serializer class (not instance)
         get_serializer_class = getattr(
             self, "get_geojson_serializer_class", self.get_serializer_class
         )
         serializer_class = get_serializer_class()
 
-        if self.geojson_geometry_field:
-            chunks = iter_geojson_features(
-                queryset,
-                serializer_class,
-                self.geojson_geometry_field,
-                context={"request": self.request},
-                geometry_defer_field=self.geojson_point_field,
-            )
-            buffer = bytearray()
-            try:
-                for chunk in chunks:
-                    buffer.extend(chunk)
-                    if len(buffer) >= STREAM_CHUNK_BYTES:
-                        yield bytes(buffer)
-                        buffer.clear()
-                if buffer:
+        chunks = iter_geojson_features(
+            queryset,
+            serializer_class,
+            self.geojson_geometry_field,
+            context={"request": self.request},
+            geometry_defer_field=self.geojson_point_field,
+        )
+        buffer = bytearray()
+        try:
+            for chunk in chunks:
+                buffer.extend(chunk)
+                if len(buffer) >= STREAM_CHUNK_BYTES:
                     yield bytes(buffer)
-            finally:
-                chunks.close()
-            return
-
-        parts = ['{"type": "FeatureCollection", "features": [']
-        parts_size = len(parts[0])
-
-        first = True
-        for obj in queryset.iterator(chunk_size=1000):
-            try:
-                serializer = serializer_class(obj, context={"request": self.request})
-                feature_json = json.dumps(serializer.data)
-            except Exception as e:
-                # Log error but continue streaming
-                import logging
-
-                logging.getLogger(__name__).warning(
-                    "Error serializing feature %s: %s", getattr(obj, "pk", "?"), e
-                )
-                continue
-            if not first:
-                parts.append(",")
-                parts_size += 1
-            first = False
-            parts.append(feature_json)
-            parts_size += len(feature_json)
-            if parts_size >= STREAM_CHUNK_BYTES:
-                yield "".join(parts)
-                parts = []
-                parts_size = 0
-
-        parts.append("]}")
-        yield "".join(parts)
+                    buffer.clear()
+            if buffer:
+                yield bytes(buffer)
+        finally:
+            chunks.close()
 
     @action(detail=False, methods=["get", "head"])
     def version(self, request, *args, **kwargs):
@@ -474,6 +500,7 @@ class CachedGeoJSONMixin:
         use_stream = request.query_params.get("stream", "").lower() == "true"
         bbox = self._parse_bbox(request)
         cache_key = self.get_cache_key(request)
+        scoped_key = self._audience_cache_key(request, cache_key)
         geojson_cache = caches[getattr(settings, "GEOJSON_CACHE", "default")]
 
         geometry_heavy = False
@@ -485,8 +512,8 @@ class CachedGeoJSONMixin:
             )
             if rejection_response is not None:
                 return rejection_response
-            if not use_stream and not bbox:
-                rendered_key = rendered_geojson_cache_key(cache_key, stats["version"])
+            if not use_stream and not bbox and scoped_key is not None:
+                rendered_key = rendered_geojson_cache_key(scoped_key, stats["version"])
                 payload = (
                     geojson_cache.has_key(rendered_key)
                     if request.method == "HEAD"
@@ -507,16 +534,20 @@ class CachedGeoJSONMixin:
                     )
                     return response
 
-        # Try cache first (unless streaming is explicitly requested)
-        if not use_stream and not bbox and not geometry_heavy:
+        if (
+            not use_stream
+            and not bbox
+            and not geometry_heavy
+            and scoped_key is not None
+        ):
             if request.method == "HEAD":
                 head_response = self._cached_geojson_head(
-                    request, geojson_cache, cache_key
+                    request, geojson_cache, scoped_key
                 )
                 if head_response is not None:
                     return head_response
             else:
-                data = geojson_cache.get(cache_key)
+                data = geojson_cache.get(scoped_key)
                 if data is not None:
                     data_version = self.get_dataset_version(request)
                     response = Response(data)
@@ -586,10 +617,9 @@ class CachedGeoJSONMixin:
         )
         data = serializer.data
 
-        # Cache the result if no bbox filter
-        if not bbox:
+        if not bbox and scoped_key is not None:
             timeout = getattr(self, "cache_timeout", None)
-            set_geojson_cache_payload(geojson_cache, cache_key, data, timeout=timeout)
+            set_geojson_cache_payload(geojson_cache, scoped_key, data, timeout=timeout)
 
         response = Response(data)
         response["X-Cache-Status"] = "MISS"
@@ -609,62 +639,3 @@ class CachedGeoJSONMixin:
         Falls back to get_serializer_class if not defined.
         """
         return self.get_serializer_class()
-
-
-class GeoJSONMixin:
-    """
-    Mixin to add GeoJSON endpoint to a viewset.
-
-    To use this mixin, the viewset must:
-    1. Define a `geojson_serializer_class` attribute or override get_geojson_serializer_class()
-    2. Be used with a viewset that handles permissions and filtering via get_queryset()
-
-    The GeoJSON endpoint relies on the viewset's get_queryset() method to handle
-    permission-based filtering, and supports a `scope` parameter to determine
-    which objects to include.
-    """
-
-    geojson_serializer_class = None
-
-    @action(detail=False, methods=["get"])
-    def geojson(self, request, *args, **kwargs):
-        """
-        Return GeoJSON data with scope-based filtering.
-
-        Relies on the viewset's get_queryset() method to handle filtering.
-        The viewset should check for the 'geojson' action and handle the scope parameter.
-        """
-        # Get base queryset - the parent viewset should handle filtering based on scope
-        queryset = self.get_queryset()
-
-        # Apply standard filtering (search, ordering, etc.)
-        queryset = self.filter_queryset(queryset)
-
-        serializer = self.get_geojson_serializer(queryset, many=True)
-        return Response(serializer.data)
-
-    def get_geojson_serializer(self, *args, **kwargs):
-        """
-        Return the GeoJSON serializer instance.
-        """
-        serializer_class = self.get_geojson_serializer_class()
-        kwargs.setdefault("context", self.get_geojson_serializer_context())
-        return serializer_class(*args, **kwargs)
-
-    def get_geojson_serializer_context(self):
-        """
-        Return the context to use for the GeoJSON serializer.
-        Defaults to using the serializer context from the parent viewset.
-        """
-        return self.get_serializer_context()
-
-    def get_geojson_serializer_class(self):
-        """
-        Return the class to use for the GeoJSON serializer.
-        Defaults to using `geojson_serializer_class` attribute.
-        """
-        assert self.geojson_serializer_class is not None, (
-            f"'{self.__class__.__name__}' should either include a `geojson_serializer_class` attribute, "
-            "or override the `get_geojson_serializer_class()` method."
-        )
-        return self.geojson_serializer_class

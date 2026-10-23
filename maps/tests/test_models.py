@@ -1,16 +1,18 @@
 import contextlib
 import logging
 
+from django.apps import apps
 from django.contrib.gis.geos import GEOSGeometry, Point
+from django.db import models
 from django.db.models import QuerySet
 from django.test import TestCase
 from django.urls import reverse
 
+from bibliography.models import Source
 from maps.models import GeoPolygon
 from utils.properties.models import PropertyBase, Unit
 
 from ..models import (
-    Attribute,
     Catchment,
     CategoricalAttribute,
     GeoDataset,
@@ -187,8 +189,9 @@ class CatchmentPostDeleteTestCase(TestCase):
 
 
 class GeoDatasetModelTestCase(TestCase):
-    def setUp(self):
-        self.region = Region.objects.create(name="Test Region")
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(name="Test Region")
 
     def test_get_map_url_uses_dataset_scoped_map_route(self):
         dataset = GeoDataset.objects.create(name="Dataset", region=self.region)
@@ -370,12 +373,35 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
 
         self.assertEqual(value.measurement_unit_label, unit.name)
 
+    def test_sources_m2m_is_available_for_provenance(self):
+        source = Source.objects.create(title="Regional statistics yearbook")
+        value = RegionAttributeValue.objects.create(
+            region=Region.objects.create(name="Test Region"),
+            property=RegionProperty.objects.create(name="Population density"),
+            value=123.321,
+        )
 
-class AttributePropertyBaseContractTestCase(TestCase):
-    def test_attribute_uses_shared_property_base_contract(self):
-        attribute = Attribute.objects.create(name="Population density", unit="1/km²")
+        value.sources.add(source)
 
-        self.assertIsInstance(attribute, PropertyBase)
+        self.assertQuerySetEqual(value.sources.all(), [source])
+
+
+class LegacyAttributeRemovalTestCase(TestCase):
+    def test_legacy_attribute_model_is_removed(self):
+        with self.assertRaises(LookupError):
+            apps.get_model("maps", "Attribute")
+
+    def test_no_property_base_subclass_uses_unit_charfield(self):
+        offenders = [
+            subclass.__name__
+            for subclass in PropertyBase.__subclasses__()
+            if any(
+                field.name == "unit" and isinstance(field, models.CharField)
+                for field in subclass._meta.get_fields()
+            )
+        ]
+
+        self.assertEqual(offenders, [])
 
 
 class RegionPropertyBaseContractTestCase(TestCase):

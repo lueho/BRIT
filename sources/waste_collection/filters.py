@@ -424,7 +424,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
     )
     collections_per_year = CollectionsPerYearFilter(label="Collections per year")
     spec_waste_collected = SpecWasteCollectedFilter(
-        label="Specific waste collected [kg/(cap.*a)]",
+        label="Specific waste collected [kg/(cap·a)]",
     )
     fee_system = ModelChoiceFilter(
         queryset=FeeSystem.objects.all(),

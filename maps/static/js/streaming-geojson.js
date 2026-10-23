@@ -469,8 +469,10 @@ async function fetchFeatureGeometriesWithProgress(params) {
                 const message = `Too many requests. Please wait ${error.retryAfter} seconds and try again.`;
                 if (typeof displayErrorMessage === 'function') {
                     displayErrorMessage({ message });
+                } else if (typeof showInlineAlert === 'function') {
+                    showInlineAlert(document.getElementById('map') || document.body, message);
                 } else {
-                    alert(message);
+                    console.error(message);
                 }
             } else if (typeof displayErrorMessage === 'function') {
                 displayErrorMessage(error);

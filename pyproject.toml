@@ -32,6 +32,7 @@ dependencies = [
     # File storage and processing
     "django-storages>=1.14.6",
     "boto3>=1.43.6",
+    "collectfasta==3.3.5",
     "pillow>=12.3.0",
     "openpyxl>=3.1.5",
     "xlsxwriter>=3.2.9",

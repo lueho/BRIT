@@ -303,8 +303,8 @@ At the moment, the `sources` hub provides a small but useful set of integration 
   - the explorer view consumes registry-built plugin card metadata instead of hard-coded domain counts
 - root URL composition in `brit.urls`
   - plugin-declared public mounts, legacy redirects, and map mounts are included without hard-coded domain imports
-- sitemap composition in `brit.sitemap_items`
-  - plugin-declared sitemap entries are appended dynamically through the registry
+- sitemap composition in `brit.sitemap_registry`
+  - plugin-declared sitemap entries are forwarded into the core sitemap registry during source-domain registry initialization
 - GeoJSON warming in `maps.tasks` and `maps.management.commands.warm_geojson_cache`
   - core orchestration iterates plugin-declared warmers instead of importing domain tasks directly
 - export registration from source-domain `AppConfig.ready()`

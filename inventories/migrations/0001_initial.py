@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("bibliography", "0001_initial"),
+        ("bibliography", "0001_squashed_0012"),
         ("distributions", "0001_initial"),
         ("maps", "0001_initial"),
         ("materials", "0001_initial"),

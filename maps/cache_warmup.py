@@ -17,6 +17,7 @@ from maps.serializers import (
     RegionGeoFeatureModelSerializer,
 )
 from maps.utils import (
+    AUTHZ_GEOJSON_CACHE_PREFIX,
     GEOJSON_MAX_BUFFERED_POINTS,
     cache_rendered_geojson,
     geojson_version_aggregates,
@@ -26,6 +27,7 @@ from maps.utils import (
     rendered_geojson_cache_key,
     set_geojson_cache_payload,
 )
+from utils.object_management.policy import visible_queryset
 
 logger = logging.getLogger(__name__)
 
@@ -92,15 +94,20 @@ def warm_nuts_geojson_cache(nuts_levels=None, limit=None):
         queryset = NutsRegion.objects.filter(levl_code=level)
         if vintage:
             queryset = queryset.in_vintage(vintage)
+        queryset = visible_queryset(None, queryset)
         if limit:
             queryset = queryset[:limit]
 
         # Fetch the IDs up front: warming a large entry may close the
         # connection, which would invalidate a server-side cursor.
         for region_id in list(queryset.values_list("pk", flat=True)):
-            cache_key = get_nuts_region_cache_key(nuts_id=region_id, version=year)
-            entry_queryset = NutsRegion.objects.filter(pk=region_id).select_related(
-                "borders"
+            cache_key = (
+                f"{AUTHZ_GEOJSON_CACHE_PREFIX}"
+                f"{get_nuts_region_cache_key(nuts_id=region_id, version=year)}"
+            )
+            entry_queryset = visible_queryset(
+                None,
+                NutsRegion.objects.filter(pk=region_id).select_related("borders"),
             )
             warmed += _warm_geojson_entry(
                 geojson_cache,
@@ -112,7 +119,10 @@ def warm_nuts_geojson_cache(nuts_levels=None, limit=None):
 
         # Also cache the per-level collection
         if not limit:
-            cache_key = get_nuts_region_cache_key(level=level, version=year)
+            cache_key = (
+                f"{AUTHZ_GEOJSON_CACHE_PREFIX}"
+                f"{get_nuts_region_cache_key(level=level, version=year)}"
+            )
             _warm_geojson_entry(
                 geojson_cache,
                 cache_key,
@@ -153,7 +163,7 @@ def warm_region_geojson_cache(limit=None, max_points=None):
     # the geometries up front would load every oversized geometry into the
     # worker before it is skipped.
     candidates = (
-        Region.objects.filter(borders__isnull=False)
+        visible_queryset(None, Region.objects.filter(borders__isnull=False))
         .annotate(num_points=NumPoints("borders__geom"))
         .order_by("-num_points")
         .values_list("id", "name", "num_points")[:limit]
@@ -169,8 +179,12 @@ def warm_region_geojson_cache(limit=None, max_points=None):
 
     warmed = 0
     for region_id in eligible_ids:
-        queryset = Region.objects.filter(pk=region_id).select_related("borders")
-        cache_key = get_region_cache_key(region_id=region_id)
+        queryset = visible_queryset(
+            None, Region.objects.filter(pk=region_id).select_related("borders")
+        )
+        cache_key = (
+            f"{AUTHZ_GEOJSON_CACHE_PREFIX}{get_region_cache_key(region_id=region_id)}"
+        )
         warmed += _warm_geojson_entry(
             geojson_cache, cache_key, queryset, RegionGeoFeatureModelSerializer, timeout
         )

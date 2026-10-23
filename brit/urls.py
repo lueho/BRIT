@@ -14,15 +14,14 @@ from sources.registry import (
 from .sitemaps import DynamicViewSitemap, HomepageSitemap
 from .views import (
     AboutView,
+    BritEUResultsView,
     CacheTestView,
     HomeView,
     LearningView,
     PrivacyPolicyView,
     RAnalysisView,
     download_r_analysis_client,
-    get_session,
     health_check,
-    set_session,
 )
 
 admin.autodiscover()
@@ -43,6 +42,11 @@ urlpatterns = [
     path("about/", AboutView.as_view(), name="about"),
     path("learning/", LearningView.as_view(), name="learning"),
     path("r-analysis/", RAnalysisView.as_view(), name="r-analysis"),
+    path(
+        "projects/brit-eu/",
+        BritEUResultsView.as_view(),
+        name="brit-eu-results",
+    ),
     path(
         "r-analysis/BRIT_Datenanalyse.R",
         download_r_analysis_client,
@@ -81,8 +85,6 @@ urlpatterns = [
         TemplateView.as_view(template_name="robots.txt", content_type="text/plain"),
     ),
     path("cache-test/", CacheTestView.as_view(), name="cache_test"),
-    path("set_session/", set_session, name="set_session"),
-    path("get_session/", get_session, name="get_session"),
 ]
 
 if settings.DEBUG:

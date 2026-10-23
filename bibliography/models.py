@@ -25,6 +25,29 @@ def author_name_has_letter(value):
     return any(char.isalpha() for char in str(value or ""))
 
 
+def normalize_author_name_part(value):
+    """Collapse whitespace in an author name part from a payload."""
+    return " ".join(str(value or "").split())
+
+
+class AuthorCreationDenied(Exception):
+    """Raised when author creation is needed but the owner lacks permission."""
+
+
+def find_or_create_author(owner, *, filters, create_kwargs):
+    """Find an author by ``filters`` or create it (needs add_author permission).
+
+    Returns ``(author, created)``. Raises :class:`AuthorCreationDenied` when
+    the author is missing and ``owner`` may not create authors.
+    """
+    author = Author.objects.filter(**filters).first()
+    if author is not None:
+        return author, False
+    if not owner.has_perm("bibliography.add_author"):
+        raise AuthorCreationDenied("permission")
+    return Author.objects.create(owner=owner, **create_kwargs), True
+
+
 class Author(UserCreatedObject):
     author_type = models.CharField(
         max_length=20, choices=AUTHOR_TYPES, default="person"
@@ -336,86 +359,6 @@ class Source(UserCreatedObject):
     @property
     def authors_ordered(self):
         return [sa.author for sa in self.ordered_authors()]
-
-    def cascade_review_action(self, action_name, actor=None, previous_status=None):
-        """Cascade review actions to linked authors.
-
-        When a source is submitted for review, its private/declined authors
-        also enter review so reviewers can examine them.  When a source is
-        approved, its review-status authors are also published.
-
-        Withdraw and reject only cascade to an author when *no* other linked
-        source is still in review or published — otherwise the author may be
-        needed by the other source.  Published authors are never touched.
-        """
-        action_map = {
-            "submit_for_review": {
-                "from": [
-                    UserCreatedObject.STATUS_PRIVATE,
-                    UserCreatedObject.STATUS_DECLINED,
-                ],
-                "handler": "submit_for_review",
-            },
-            "approve": {
-                "from": [UserCreatedObject.STATUS_REVIEW],
-                "handler": "approve",
-            },
-            "withdraw_from_review": {
-                "from": [UserCreatedObject.STATUS_REVIEW],
-                "handler": "withdraw_from_review",
-                "guard": True,
-            },
-            "reject": {
-                "from": [UserCreatedObject.STATUS_REVIEW],
-                "handler": "reject",
-                "guard": True,
-            },
-        }
-        config = action_map.get(action_name)
-        if not config:
-            return
-
-        for author in self.authors.filter(publication_status__in=config["from"]):
-            if config.get("guard"):
-                # Only cascade withdraw/reject if no other linked source is
-                # still in review or published.
-                other_active = (
-                    author.sources.exclude(pk=self.pk)
-                    .filter(
-                        publication_status__in=[
-                            UserCreatedObject.STATUS_REVIEW,
-                            UserCreatedObject.STATUS_PUBLISHED,
-                        ]
-                    )
-                    .exists()
-                )
-                if other_active:
-                    continue
-            action = getattr(author, config["handler"], None)
-            if not callable(action):
-                continue
-            try:
-                if action_name == "approve" and actor is not None:
-                    action(user=actor)
-                else:
-                    action()
-            except Exception:
-                continue
-
-    def affected_author_count(self, action_name):
-        """Return the number of linked authors that will be affected by a
-        cascade review action.  Used by the UI to show a notice."""
-        action_map = {
-            "submit_for_review": [
-                UserCreatedObject.STATUS_PRIVATE,
-                UserCreatedObject.STATUS_DECLINED,
-            ],
-            "approve": [UserCreatedObject.STATUS_REVIEW],
-        }
-        statuses = action_map.get(action_name)
-        if not statuses:
-            return 0
-        return self.authors.filter(publication_status__in=statuses).count()
 
     def __str__(self):
         return self.citation_key or self.title or f"Source #{self.pk}"

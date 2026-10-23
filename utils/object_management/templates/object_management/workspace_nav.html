@@ -1,0 +1,30 @@
+{% comment %}
+Shared workspace sub-navigation for private-scope lists.
+
+Requires ``workspace_base_url``: the URL of the model's private (workspace)
+list route. Preserves the current query parameters except ``scope``, ``id``,
+``page`` and ``publication_status``, matching the scope-toggle pattern. The
+active entry follows the ``scope`` query parameter; no parameter means the
+full workspace view.
+{% endcomment %}
+{% with workspace_scope=request.GET.scope|default:"private" %}
+<nav aria-label="Workspace records" class="mt-2">
+  <ul class="nav nav-pills">
+    <li class="nav-item">
+      <a class="nav-link py-1 {% if workspace_scope == 'private' %}active{% endif %}"
+         {% if workspace_scope == 'private' %}aria-current="page"{% endif %}
+         href="{{ workspace_base_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">All workspace records</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link py-1 {% if workspace_scope == 'owned' %}active{% endif %}"
+         {% if workspace_scope == 'owned' %}aria-current="page"{% endif %}
+         href="{{ workspace_base_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=owned">Owned by me</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link py-1 {% if workspace_scope == 'shared' %}active{% endif %}"
+         {% if workspace_scope == 'shared' %}aria-current="page"{% endif %}
+         href="{{ workspace_base_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=shared">Shared with me</a>
+    </li>
+  </ul>
+</nav>
+{% endwith %}

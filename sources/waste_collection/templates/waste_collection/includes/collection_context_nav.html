@@ -1,0 +1,50 @@
+{% comment %}
+  Context navigation for the collection detail page (detail_v2 layout).
+  Renders a "Back to results" link when the request carries a `back`
+  query parameter, a list/map representation toggle, and a link to the
+  waste collection explorer.
+{% endcomment %}
+{% load moderation_tags %}
+<nav class="sdv2-context-nav" aria-label="Collection navigation">
+  {% safe_back_url as back_url %}
+  {% safe_next_url as next_url %}
+  {% if back_url %}
+    <a class="sdv2-btn sdv2-btn-ghost" href="{{ back_url }}" rel="nofollow">
+      <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to results
+    </a>
+  {% endif %}
+  {% if not request.GET.review %}
+    <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
+      {% if object.list_url %}
+        <a class="btn btn-outline-secondary"
+           href="{{ object.list_url }}"
+           title="View as list"
+           aria-label="View as list"><i class="fas fa-list-ul"></i></a>
+      {% else %}
+        <a class="btn btn-outline-secondary"
+           href="{% url 'collection-list' %}"
+           title="View as list"
+           aria-label="View as list"><i class="fas fa-list-ul"></i></a>
+      {% endif %}
+      {% if review_mode %}
+        <a class="btn btn-outline-secondary"
+           href="{% url 'WasteCollection-review' %}?id={{ object.id }}&load_features=true&scope=review"
+           title="View on map"
+           aria-label="View on map"><i class="fas fa-map"></i></a>
+      {% elif next_url %}
+        <a class="btn btn-outline-secondary"
+           href="{{ next_url }}"
+           title="View on map"
+           aria-label="View on map"><i class="fas fa-map"></i></a>
+      {% else %}
+        <a class="btn btn-outline-secondary"
+           href="{% url 'WasteCollection' %}?id={{ object.id }}&load_features=true&scope={{ object.publication_status }}"
+           title="View on map"
+           aria-label="View on map"><i class="fas fa-map"></i></a>
+      {% endif %}
+    </div>
+  {% endif %}
+  <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'wastecollection-explorer' %}">
+    <i class="fas fa-table-cells-large" aria-hidden="true"></i> Explorer
+  </a>
+</nav>

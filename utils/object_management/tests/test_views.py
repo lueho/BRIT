@@ -4,6 +4,7 @@ from typing import get_type_hints
 from unittest.mock import patch
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
@@ -17,6 +18,7 @@ from django.core.exceptions import (
 from django.db import DatabaseError, connection
 from django.db.models.signals import post_save, pre_save
 from django.http import HttpResponse, HttpResponseRedirect
+from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import NoReverseMatch, reverse
@@ -60,6 +62,7 @@ from utils.object_management.views import (
     WithdrawFromReviewView,
 )
 from utils.properties.models import Property, Unit
+from utils.views import LetterIndexMixin
 
 from ..views import (
     FilterDefaultsMixin,
@@ -342,7 +345,12 @@ class ReviewWorkflowViewTests(TestCase):
         # Moderator should be able to approve an object in review
         self.client.force_login(self.moderator)
         with mute_signals(post_save, pre_save):
-            response = self.client.post(url)
+            response = self.client.post(
+                url,
+                {
+                    "expected_revision": self.review_collection.content_revision,
+                },
+            )
         self.assertEqual(response.status_code, 302)  # Redirect after success
 
         # Refresh from database
@@ -544,6 +552,20 @@ class ReviewDetailAccessTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 403)
 
+    def test_anonymous_is_redirected_to_login(self):
+        """Anonymous visitors (e.g. following a notification e-mail link or a
+        mail-scanner prefetch) are sent to the login page like on every other
+        restricted page instead of receiving a hard 403."""
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={"content_type_id": self.ct_id, "object_id": self.obj_review.id},
+        )
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"{settings.LOGIN_URL}?next={url}")
+
     def test_review_detail_renders_markdown_comments(self):
         """Markdown comments are rendered as HTML in the review panel."""
         ReviewAction.objects.create(
@@ -633,6 +655,9 @@ class ReviewExceptionHandlingTests(TestCase):
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(username="exc-owner")
         cls.staff = User.objects.create_user(username="exc-staff", is_staff=True)
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.moderator = User.objects.create_user(username="exc-moderator")
         cls.collection_ct_id = ContentType.objects.get_for_model(Collection).id
         cls.source_ct_id = ContentType.objects.get_for_model(Source).id
@@ -805,26 +830,35 @@ class ReviewExceptionHandlingTests(TestCase):
             with self.assertRaises(RuntimeError):
                 self.client.post(self._submit_url())
 
-    def test_submit_post_survives_audit_log_db_failure(self):
+    def test_submit_post_propagates_audit_log_db_failure_and_rolls_back(self):
         self.client.force_login(self.owner)
         with (
-            patch("utils.object_management.helpers.ReviewAction") as review_action,
-            self.assertLogs("utils.object_management.helpers", level="WARNING") as logs,
+            patch("utils.object_management.services.ReviewAction") as review_action,
+            self.assertLogs("django.request", level="ERROR"),
         ):
             review_action.objects.create.side_effect = DatabaseError("boom")
-            response = self.client.post(self._submit_url())
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("Failed to create ReviewAction", "\n".join(logs.output))
+            with self.assertRaises(DatabaseError):
+                self.client.post(self._submit_url())
+        self.private_collection.refresh_from_db()
+        self.assertEqual(
+            self.private_collection.publication_status,
+            UserCreatedObject.STATUS_PRIVATE,
+        )
 
     def test_submit_post_propagates_unexpected_audit_log_errors(self):
         self.client.force_login(self.owner)
         with (
-            patch("utils.object_management.helpers.ReviewAction") as review_action,
+            patch("utils.object_management.services.ReviewAction") as review_action,
             self.assertLogs("django.request", level="ERROR"),
         ):
             review_action.objects.create.side_effect = RuntimeError("boom")
             with self.assertRaises(RuntimeError):
                 self.client.post(self._submit_url())
+        self.private_collection.refresh_from_db()
+        self.assertEqual(
+            self.private_collection.publication_status,
+            UserCreatedObject.STATUS_PRIVATE,
+        )
 
     def test_submit_post_propagates_unexpected_message_errors(self):
         self.client.force_login(self.owner)
@@ -840,11 +874,12 @@ class ReviewExceptionHandlingTests(TestCase):
 
     # --- BaseReviewActionView.post_action_hook ---
 
-    def test_submit_post_propagates_unexpected_cascade_errors(self):
+    def test_submit_post_propagates_unexpected_transition_service_errors(self):
         self.client.force_login(self.owner)
         with (
-            patch.object(
-                Collection, "cascade_review_action", side_effect=RuntimeError("boom")
+            patch(
+                "utils.object_management.views.perform_transition",
+                side_effect=RuntimeError("boom"),
             ),
             self.assertLogs("django.request", level="ERROR"),
         ):
@@ -865,7 +900,7 @@ class ReviewExceptionHandlingTests(TestCase):
 
     # --- BaseReviewActionModalView.get_context_data ---
 
-    def test_approve_modal_propagates_unexpected_cascade_count_errors(self):
+    def test_approve_modal_propagates_unexpected_policy_errors(self):
         self.client.force_login(self.moderator)
         url = reverse(
             "object_management:approve_item_modal",
@@ -875,8 +910,9 @@ class ReviewExceptionHandlingTests(TestCase):
             },
         )
         with (
-            patch.object(
-                Source, "affected_author_count", side_effect=RuntimeError("boom")
+            patch(
+                "utils.object_management.permissions.decide",
+                side_effect=RuntimeError("boom"),
             ),
             self.assertLogs("django.request", level="ERROR"),
         ):
@@ -1021,11 +1057,11 @@ class FilterDefaultsMixinTest(TestCase):
         ):
             with self.subTest(view=view_class.__name__):
                 request = self.factory.get("/filtered/")
-                request.user = (
-                    AnonymousUser()
-                    if scope == "published"
-                    else User(pk=1, is_staff=True)
-                )
+                if scope == "published":
+                    request.user = AnonymousUser()
+                else:
+                    request.user = User(pk=1)
+                    request.user.has_perm = lambda *args, **kwargs: True
 
                 with self.assertNumQueries(0):
                     response = view_class.as_view()(request)
@@ -1093,6 +1129,163 @@ class PublishedObjectsFilterViewTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context_data["filter"].data, {"name": ["Other name"]})
+
+
+class MockLetterIndexFilterView(LetterIndexMixin, PublishedObjectFilterView):
+    model = Property
+    filterset_class = MockFilterSet
+
+
+class LetterIndexMixinTestCase(TestCase):
+    """Tests for the opt-in A-Z 'starts with' navigation on filtered lists."""
+
+    ALL_NAMES = {"Alpha", "alpine", "Beta", "Gamma", "7eleven"}
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="letter-index-owner")
+        for name in cls.ALL_NAMES:
+            Property.objects.create(
+                name=name, owner=cls.owner, publication_status="published"
+            )
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.view_callable = MockLetterIndexFilterView.as_view()
+
+    def get_response(self, query="?letter=", **view_kwargs):
+        request = self.factory.get(f"/properties/{query}")
+        request.user = AnonymousUser()
+        callable_ = (
+            MockLetterIndexFilterView.as_view(**view_kwargs)
+            if view_kwargs
+            else self.view_callable
+        )
+        return callable_(request)
+
+    def names_of(self, response):
+        return {obj.name for obj in response.context_data["object_list"]}
+
+    def index_of(self, response):
+        return {
+            entry["letter"]: entry for entry in response.context_data["letter_index"]
+        }
+
+    @staticmethod
+    def published_names(**filters):
+        return set(
+            Property.objects.filter(publication_status="published")
+            .filter(**filters)
+            .values_list("name", flat=True)
+        )
+
+    def expected_enabled_letters(self, **filters):
+        initials = set()
+        for name in self.published_names(**filters):
+            initial = (name[:1] or "").upper()
+            initials.add(initial if initial.isascii() and initial.isalpha() else "#")
+        return initials
+
+    def enabled_letters(self, response):
+        return {
+            entry["letter"]
+            for entry in response.context_data["letter_index"]
+            if entry["enabled"]
+        }
+
+    def test_no_letter_returns_all_objects(self):
+        response = self.get_response()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.names_of(response), self.published_names())
+        self.assertIsNone(response.context_data["letter_active"])
+
+    def test_letter_filters_objects_case_insensitively(self):
+        for letter in ("A", "a"):
+            with self.subTest(letter=letter):
+                response = self.get_response(f"?letter={letter}")
+                self.assertEqual(self.names_of(response), {"Alpha", "alpine"})
+                self.assertEqual(response.context_data["letter_active"], "A")
+
+    def test_hash_letter_selects_names_with_non_letter_initials(self):
+        response = self.get_response("?letter=%23")
+        self.assertEqual(self.names_of(response), {"7eleven"})
+        self.assertEqual(response.context_data["letter_active"], "#")
+
+    def test_letter_with_no_matches_returns_empty_list(self):
+        response = self.get_response("?letter=Q")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.names_of(response), set())
+
+    def test_invalid_letter_params_are_ignored(self):
+        for query in ("?letter=AB", "?letter=1", "?letter=*", "?letter=++"):
+            with self.subTest(query=query):
+                response = self.get_response(query)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(self.names_of(response), self.published_names())
+                self.assertIsNone(response.context_data["letter_active"])
+
+    def test_letter_index_flags_letters_with_and_without_results(self):
+        response = self.get_response()
+        index = self.index_of(response)
+
+        self.assertEqual(len(index), 27)
+        self.assertEqual(
+            self.enabled_letters(response), self.expected_enabled_letters()
+        )
+        for entry in index.values():
+            self.assertFalse(entry["active"])
+
+    def test_letter_index_marks_active_letter(self):
+        response = self.get_response("?letter=b")
+        index = self.index_of(response)
+
+        self.assertEqual(response.context_data["letter_active"], "B")
+        self.assertTrue(index["B"]["active"])
+        self.assertTrue(index["B"]["enabled"])
+        self.assertFalse(index["A"]["active"])
+
+    def test_letter_index_reflects_other_active_filters(self):
+        response = self.get_response("?name=alp")
+
+        self.assertTrue(self.index_of(response)["A"]["enabled"])
+        self.assertEqual(
+            self.enabled_letters(response),
+            self.expected_enabled_letters(name__icontains="alp"),
+        )
+
+    def test_letter_filter_combines_with_other_filters(self):
+        response = self.get_response("?name=a&letter=B")
+        self.assertEqual(self.names_of(response), {"Beta"})
+
+    def test_letter_filter_applies_before_pagination(self):
+        response = self.get_response("?letter=A", paginate_by=1)
+
+        self.assertEqual(response.context_data["paginator"].count, 2)
+        self.assertEqual(len(response.context_data["object_list"]), 1)
+        self.assertEqual(self.names_of(response), {"Alpha"})
+
+    def test_letter_index_partial_links_preserve_filters_and_drop_page(self):
+        request = self.factory.get("/properties/?name=x&page=3&letter=A")
+        context = {
+            "letter_active": "B",
+            "letter_index": [
+                {"letter": "A", "enabled": True, "active": False},
+                {"letter": "B", "enabled": True, "active": True},
+                {"letter": "C", "enabled": False, "active": False},
+            ],
+        }
+        html = render_to_string("partials/letter_index.html", context, request=request)
+
+        self.assertIn('href="?name=x&amp;letter=B"', html)
+        self.assertIn('href="?name=x"', html)  # 'All' clears letter and page
+        self.assertNotIn("page=3", html)
+        # Disabled letters are not links
+        self.assertIn('<span class="page-link">C</span>', html)
+
+    def test_letter_index_partial_renders_nothing_without_index(self):
+        request = self.factory.get("/properties/")
+        html = render_to_string("partials/letter_index.html", {}, request=request)
+        self.assertEqual(html.strip(), "")
 
 
 class OwnerReviewFeedbackQueryTests(TestCase):
@@ -1314,6 +1507,12 @@ class SharedListScopeCountTestCase(TestCase):
         cls.staff = User.objects.create_user(
             username="scope-count-staff", is_staff=True
         )
+        cls.staff.user_permissions.add(
+            Permission.objects.get(
+                codename="can_moderate_property",
+                content_type=ContentType.objects.get_for_model(Property),
+            )
+        )
         cls.other = User.objects.create_user(username="scope-count-other")
         Property.objects.bulk_create(
             [
@@ -1338,6 +1537,7 @@ class SharedListScopeCountTestCase(TestCase):
 
     def test_lists_only_count_the_filtered_paginator_results(self):
         ContentType.objects.get_for_model(Property)
+        self.staff.has_perm("properties.can_moderate_property")
         for view_class, user, expected, query_budget in (
             (PublishedObjectFilterView, AnonymousUser(), 2, 1),
             (PublishedObjectFilterView, self.staff, 2, 3),
@@ -1445,7 +1645,7 @@ class BreadcrumbContractViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            f'<a href="{reverse("properties-dashboard")}">Properties</a>',
+            f'<a href="{reverse("properties-explorer")}">Properties</a>',
             html=True,
         )
         self.assertContains(
@@ -1466,7 +1666,7 @@ class BreadcrumbContractViewTests(TestCase):
 
 
 class ReadAccessArchivedDetailTests(TestCase):
-    """Ensure archived objects' detail views are NOT publicly accessible."""
+    """Archived objects are retained public historical data."""
 
     @classmethod
     def setUpTestData(cls):
@@ -1479,11 +1679,11 @@ class ReadAccessArchivedDetailTests(TestCase):
                 publication_status=UserCreatedObject.STATUS_ARCHIVED,
             )
 
-    def test_archived_detail_is_not_public(self):
+    def test_archived_detail_is_publicly_readable(self):
         url = reverse("collection-detail", kwargs={"pk": self.archived.id})
-        # Unauthenticated request should be redirected to login (302)
+        # Archived stays publicly readable like published data.
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
 
 
 class DetailViewObjectCachingTests(TestCase):
@@ -1626,11 +1826,19 @@ class ReviewWorkflowModalViewTests(TestCase):
         )
 
         self.client.force_login(self.moderator)
-        response = self.client.get(url)
+        response = self.client.get(
+            url,
+            {"expected_revision": self.review_collection.content_revision},
+        )
         self.assertEqual(response.status_code, 200)
 
         with mute_signals(post_save, pre_save):
-            response = self.client.post(url)
+            response = self.client.post(
+                url,
+                {
+                    "expected_revision": self.review_collection.content_revision,
+                },
+            )
         self.assertEqual(response.status_code, 302)
 
         self.review_collection.refresh_from_db()
@@ -1687,10 +1895,13 @@ class CollectionPropertyValueReviewDashboardTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.staff_user = User.objects.create_user(
-            username="staff", password="test123", is_staff=True
+        cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
+        cls.owner_user = User.objects.create_user(
+            username="owner",
         )
-        cls.owner_user = User.objects.create_user(username="owner", password="test123")
+        cls.staff_user.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
 
         cls.unit = Unit.objects.create(name="kg")
         cls.property = Property.objects.create(name="Test Property")
@@ -1775,6 +1986,15 @@ class ReviewDashboardPaginationQueryTests(TestCase):
     def setUpTestData(cls):
         cls.staff = User.objects.create_user(username="queue-staff", is_staff=True)
         cls.owner = User.objects.create_user(username="queue-owner")
+        # The queue persona intentionally holds model moderation rights;
+        # is_staff alone is not an application access route.
+        for model in (Property, Collection, Source):
+            cls.staff.user_permissions.add(
+                Permission.objects.get(
+                    content_type=ContentType.objects.get_for_model(model),
+                    codename=f"can_moderate_{model._meta.model_name}",
+                )
+            )
         cls.now = (timezone.now() - timedelta(days=1)).replace(
             hour=12, minute=0, second=0, microsecond=0
         )
@@ -1964,7 +2184,7 @@ class ReviewDashboardPaginationQueryTests(TestCase):
 
     def test_page_loading_rechecks_review_status_after_reference_selection(self):
         view = self.get_view()
-        hydrate = view._hydrate_review_references
+        hydrate = view.collector.hydrate
 
         def approve_before_loading(references, querysets):
             Property.objects.filter(pk=self.properties[0].pk).update(
@@ -1976,9 +2196,7 @@ class ReviewDashboardPaginationQueryTests(TestCase):
             patch.object(
                 view, "get_available_models", return_value=[Property, Collection]
             ),
-            patch.object(
-                view, "_hydrate_review_references", side_effect=approve_before_loading
-            ),
+            patch.object(view.collector, "hydrate", side_effect=approve_before_loading),
         ):
             response = view.get(view.request)
 
@@ -2005,18 +2223,21 @@ class ReviewDashboardViewTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner_user = User.objects.create_user(username="owner", password="test123")
+        cls.owner_user = User.objects.create_user(
+            username="owner",
+        )
         cls.moderator_user = User.objects.create_user(
-            username="moderator", password="test123"
+            username="moderator",
         )
         cls.collection_moderator = User.objects.create_user(
-            username="collection_moderator", password="test123"
+            username="collection_moderator",
         )
         cls.regular_user = User.objects.create_user(
-            username="regular", password="test123"
+            username="regular",
         )
-        cls.staff_user = User.objects.create_user(
-            username="staff", password="test123", is_staff=True
+        cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
+        cls.staff_user.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
         )
 
         collection_ct = ContentType.objects.get_for_model(Collection)
@@ -2219,7 +2440,7 @@ class ReviewDashboardViewTests(TestCase):
 
     def test_model_type_filter_hides_models_with_only_own_review_items(self):
         owner = User.objects.create_user(
-            username="collector_owner_only", password="test123"
+            username="collector_owner_only",
         )
         collector_ct = ContentType.objects.get_for_model(Collector)
         collector_permission, _ = Permission.objects.get_or_create(
@@ -2262,7 +2483,7 @@ class ReviewDashboardViewTests(TestCase):
 
     def test_dashboard_includes_temporal_distribution_with_plain_manager(self):
         owner = User.objects.create_user(
-            username="distribution_owner", password="test123"
+            username="distribution_owner",
         )
         TemporalDistribution.objects.create(
             name="Review Distribution",
@@ -2280,7 +2501,9 @@ class ReviewDashboardViewTests(TestCase):
         )
 
     def test_dashboard_includes_catchment_with_custom_manager(self):
-        owner = User.objects.create_user(username="catchment_owner", password="test123")
+        owner = User.objects.create_user(
+            username="catchment_owner",
+        )
         region = Region.objects.create(name="Review Region", country="DE", owner=owner)
         Catchment.objects.create(
             name="Review Catchment",
@@ -2297,7 +2520,9 @@ class ReviewDashboardViewTests(TestCase):
         self.assertTrue(any(isinstance(item, Catchment) for item in review_items))
 
     def test_dashboard_includes_collector_from_nested_sources_app(self):
-        owner = User.objects.create_user(username="collector_owner", password="test123")
+        owner = User.objects.create_user(
+            username="collector_owner",
+        )
         Collector.objects.create(
             name="Review Collector",
             owner=owner,
@@ -2391,10 +2616,10 @@ class ReviewDashboardFilterTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.moderator = User.objects.create_user(
-            username="moderator", password="test123", is_staff=True
+        cls.moderator = User.objects.create_user(username="moderator", is_staff=True)
+        cls.owner = User.objects.create_user(
+            username="owner",
         )
-        cls.owner = User.objects.create_user(username="owner", password="test123")
 
         with mute_signals(post_save, pre_save):
             cls.collection_a = Collection.objects.create(

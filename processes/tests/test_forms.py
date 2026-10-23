@@ -61,26 +61,31 @@ class ProcessCategoryFormTestCase(TestCase):
 class ProcessFormTestCase(TestCase):
     """Test Process forms."""
 
-    def setUp(self):
-        self.category = ProcessCategory.objects.create(name="Test Category")
-        self.author_1 = Author.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.author_1 = Author.objects.create(
             first_names="Ada",
             last_names="Lovelace",
         )
-        self.author_2 = Author.objects.create(
+        cls.author_2 = Author.objects.create(
             first_names="Grace",
             last_names="Hopper",
         )
-        self.source_1 = Source.objects.create(
+        cls.source_1 = Source.objects.create(
             title="Source One",
             abbreviation="S1",
             publication_status="published",
         )
-        self.source_2 = Source.objects.create(
+        cls.source_2 = Source.objects.create(
             title="Source Two",
             abbreviation="S2",
             publication_status="published",
         )
+
+    def setUp(self):
+        # test_multiple_categories_are_saved saves the category, so it is
+        # created per test instead of shared via setUpTestData.
+        self.category = ProcessCategory.objects.create(name="Test Category")
 
     def test_valid_form(self):
         """Valid data should create a valid form."""
@@ -324,20 +329,21 @@ class ProcessFormTestCase(TestCase):
 class ProcessMaterialFormSetTestCase(TestCase):
     """Test ProcessMaterial inline formset."""
 
-    def setUp(self):
-        self.owner = get_user_model().objects.create(username="test_user")
-        self.process = Process.objects.create(name="Test Process", owner=self.owner)
-        self.material = Material.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create(username="test_user")
+        cls.process = Process.objects.create(name="Test Process", owner=cls.owner)
+        cls.material = Material.objects.create(
             name="Test Material",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
-        self.unit = Unit.objects.create(
+        cls.unit = Unit.objects.create(
             name="kg",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
-        self.formset_class = inlineformset_factory(
+        cls.formset_class = inlineformset_factory(
             Process,
             ProcessMaterial,
             form=ProcessMaterialInlineForm,
@@ -390,15 +396,16 @@ class ProcessMaterialFormSetTestCase(TestCase):
 class ProcessOperatingParameterFormSetTestCase(TestCase):
     """Test ProcessOperatingParameter inline formset."""
 
-    def setUp(self):
-        self.owner = get_user_model().objects.create(username="test_user")
-        self.process = Process.objects.create(name="Test Process", owner=self.owner)
-        self.unit = Unit.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create(username="test_user")
+        cls.process = Process.objects.create(name="Test Process", owner=cls.owner)
+        cls.unit = Unit.objects.create(
             name="°C",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
-        self.formset_class = inlineformset_factory(
+        cls.formset_class = inlineformset_factory(
             Process,
             ProcessOperatingParameter,
             form=ProcessOperatingParameterInlineForm,

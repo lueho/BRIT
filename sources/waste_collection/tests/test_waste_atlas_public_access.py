@@ -11,6 +11,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from sources.waste_collection.models import Collection
+from utils.object_management.models import ReviewAction
 
 API = "/waste_collection/waste-atlas/api/"
 BAD_YEARS = ["0", "-5", "20000", "99999999999999999999", "abc", "2024.5", ""]
@@ -58,6 +59,13 @@ class WasteAtlasConflictAccessTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user("conflict-user")
+        cls.admin = User.objects.create_user("conflict-admin", is_staff=True)
+        cls.admin.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(ReviewAction),
+                codename="administer_objects",
+            )
+        )
         cls.staff = User.objects.create_user("conflict-staff", is_staff=True)
         cls.moderator = User.objects.create_user("conflict-moderator")
         cls.moderator.user_permissions.add(
@@ -77,12 +85,18 @@ class WasteAtlasConflictAccessTests(APITestCase):
             self.client.get(self.endpoint).status_code, status.HTTP_403_FORBIDDEN
         )
 
-    def test_staff_and_moderators_may_read_conflicts(self):
-        for user in (self.staff, self.moderator):
+    def test_admins_and_moderators_may_read_conflicts(self):
+        for user in (self.admin, self.moderator):
             self.client.force_login(user)
             self.assertEqual(
                 self.client.get(self.endpoint).status_code, status.HTTP_200_OK
             )
+
+    def test_plain_staff_may_not_read_conflicts(self):
+        self.client.force_login(self.staff)
+        self.assertEqual(
+            self.client.get(self.endpoint).status_code, status.HTTP_403_FORBIDDEN
+        )
 
 
 class WasteAtlasThrottleIdentityTests(APITestCase):
@@ -129,7 +143,7 @@ class WasteAtlasPublicPagesTests(TestCase):
         change_map = reverse("waste-atlas-change-map", args=["DE", "collection_system"])
         self.assertEqual(self.client.get(change_map).status_code, 200)
 
-    def test_maintainer_pages_still_require_staff(self):
+    def test_maintainer_pages_still_require_admin_capability(self):
         pages = (
             reverse("waste-atlas-data-conflicts-overview"),
             reverse("waste-atlas-map-configuration-list"),
@@ -141,21 +155,42 @@ class WasteAtlasPublicPagesTests(TestCase):
         for url in pages:
             with self.subTest(url=url, user="plain"):
                 self.assertEqual(self.client.get(url).status_code, 403)
+        self.client.force_login(User.objects.create_user("plainstaff", is_staff=True))
+        for url in pages:
+            with self.subTest(url=url, user="plainstaff"):
+                self.assertEqual(self.client.get(url).status_code, 403)
 
-    def test_anonymous_visitors_only_get_the_published_scope(self):
+    def test_anonymous_visitors_only_get_public_historical_data(self):
         url = reverse("waste-atlas-germany-collection-system-map")
         response = self.client.get(url, {"scope": "all"})
-        self.assertEqual(_map_config(response)["scope"], "published")
+        # The requested scope is forwarded to the map config; the API resolves
+        # it to no records for unauthorized actors rather than falling back
+        # to public data silently widening.
+        self.assertEqual(_map_config(response)["scope"], "all")
         self.assertNotContains(response, 'value="mine"')
         self.assertNotContains(response, 'value="all"')
         self.assertNotContains(response, "Edit configuration")
+        self.assertEqual(
+            self.client.get(
+                reverse("api-waste-atlas-collection-system-list"),
+                {"country": "DE", "year": 2024, "scope": "all"},
+            ).json(),
+            [],
+        )
 
     def test_conflict_overlay_is_only_offered_to_maintainers(self):
         url = reverse("waste-atlas-germany-collection-system-map")
         self.assertNotIn("conflictUrl", _map_config(self.client.get(url)))
         self.client.force_login(User.objects.create_user("plain-2"))
         self.assertNotIn("conflictUrl", _map_config(self.client.get(url)))
-        self.client.force_login(User.objects.create_user("staff", is_staff=True))
+        moderator = User.objects.create_user("overlay-moderator")
+        moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
+        )
+        self.client.force_login(moderator)
         self.assertIn("conflictUrl", _map_config(self.client.get(url)))
 
 
@@ -209,10 +244,12 @@ class WasteAtlasVendorScriptTests(TestCase):
 
 class WasteAtlasDiscoverabilityTests(TestCase):
     def test_overview_is_listed_in_the_sitemap(self):
-        from brit.sitemap_items import SITEMAP_ITEMS
+        from brit.sitemap_registry import get_sitemap_items
 
-        self.assertIn(reverse("waste-atlas-overview"), SITEMAP_ITEMS)
-        self.assertNotIn(reverse("waste-atlas-data-conflicts-overview"), SITEMAP_ITEMS)
+        self.assertIn(reverse("waste-atlas-overview"), get_sitemap_items())
+        self.assertNotIn(
+            reverse("waste-atlas-data-conflicts-overview"), get_sitemap_items()
+        )
 
     def test_sitemap_entry_is_publicly_reachable(self):
         self.assertEqual(

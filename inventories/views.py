@@ -42,6 +42,7 @@ from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
 )
+from utils.object_management.policy import decide
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -171,13 +172,13 @@ class InventoryAlgorithmAutocompleteView(AutocompleteModelView):
 class PublishedScenarioFilterView(PublishedObjectFilterView):
     model = Scenario
     filterset_class = ScenarioFilterSet
-    dashboard_url = reverse_lazy("inventories-explorer")
+    explorer_url = reverse_lazy("inventories-explorer")
 
 
 class PrivateScenarioFilterView(PrivateObjectFilterView):
     model = Scenario
     filterset_class = ScenarioFilterSet
-    dashboard_url = reverse_lazy("inventories-explorer")
+    explorer_url = reverse_lazy("inventories-explorer")
 
 
 class ScenarioCreateView(UserCreatedObjectCreateView):
@@ -434,18 +435,35 @@ def get_evaluation_status(request, task_id=None):
     return JsonResponse(result, status=200)
 
 
+class ScenarioEditPermissionMixin:
+    """test_func checking ``can_edit`` on the scenario named by ``scenario_kwarg``."""
+
+    scenario_kwarg = "scenario_pk"
+    scenario = None
+
+    def test_func(self):
+        self.scenario = get_object_or_404(
+            Scenario, id=self.kwargs.get(self.scenario_kwarg)
+        )
+        policy = get_object_policy(
+            self.request.user, self.scenario, request=self.request
+        )
+        return policy["can_edit"]
+
+
 class ScenarioAddInventoryAlgorithmView(
-    LoginRequiredMixin, UserPassesTestMixin, TemplateResponseMixin, ModelFormMixin, View
+    LoginRequiredMixin,
+    ScenarioEditPermissionMixin,
+    UserPassesTestMixin,
+    TemplateResponseMixin,
+    ModelFormMixin,
+    View,
 ):
     model = ScenarioInventoryConfiguration
     form_class = ScenarioInventoryConfigurationAddForm
     template_name = "scenario_configuration_add.html"
     object = None
-
-    def test_func(self):
-        scenario = get_object_or_404(Scenario, id=self.kwargs.get("pk"))
-        policy = get_object_policy(self.request.user, scenario, request=self.request)
-        return policy["can_edit"]
+    scenario_kwarg = "pk"
 
     def post(self, request, *args, **kwargs):
         scenario = get_object_or_404(Scenario, id=self.kwargs.get("pk"))
@@ -678,17 +696,17 @@ class ScenarioAddInventoryAlgorithmView(
 
 
 class ScenarioAlgorithmConfigurationUpdateView(
-    LoginRequiredMixin, UserPassesTestMixin, TemplateResponseMixin, ModelFormMixin, View
+    LoginRequiredMixin,
+    ScenarioEditPermissionMixin,
+    UserPassesTestMixin,
+    TemplateResponseMixin,
+    ModelFormMixin,
+    View,
 ):
     model = ScenarioInventoryConfiguration
     form_class = ScenarioInventoryConfigurationUpdateForm
     template_name = "scenario_configuration_update.html"
     object = None
-
-    def test_func(self):
-        scenario = get_object_or_404(Scenario, id=self.kwargs.get("scenario_pk"))
-        policy = get_object_policy(self.request.user, scenario, request=self.request)
-        return policy["can_edit"]
 
     def post(self, request, *args, **kwargs):
         scenario = get_object_or_404(Scenario, id=self.kwargs.get("scenario_pk"))
@@ -742,18 +760,11 @@ class ScenarioAlgorithmConfigurationUpdateView(
 
 
 class ScenarioRemoveInventoryAlgorithmView(
-    LoginRequiredMixin, UserPassesTestMixin, View
+    LoginRequiredMixin, ScenarioEditPermissionMixin, UserPassesTestMixin, View
 ):
     scenario = None
     algorithm = None
     feedstock = None
-
-    def test_func(self):
-        self.scenario = get_object_or_404(Scenario, id=self.kwargs.get("scenario_pk"))
-        policy = get_object_policy(
-            self.request.user, self.scenario, request=self.request
-        )
-        return policy["can_edit"]
 
     def get(self, request, *args, **kwargs):
         self.scenario = get_object_or_404(Scenario, id=self.kwargs.get("scenario_pk"))
@@ -972,13 +983,7 @@ def download_scenario_summary(request, scenario_pk):
         scenario = Scenario.objects.get(id=scenario_pk)
     except Scenario.DoesNotExist:
         raise Http404 from None
-    policy = get_object_policy(request.user, scenario, request=request)
-    if not (
-        policy["is_owner"]
-        or policy["is_published"]
-        or policy["is_staff"]
-        or policy["is_moderator"]
-    ):
+    if not decide(request.user, "read", scenario).allowed:
         return HttpResponseForbidden()
     file_name = f"scenario_{scenario_pk}_summary.json"
     with io.StringIO(json.dumps(scenario.summary_dict(), indent=4)) as file:
@@ -1214,13 +1219,7 @@ def download_scenario_result_summary(request, scenario_pk):
         scenario = Scenario.objects.get(id=scenario_pk)
     except Scenario.DoesNotExist:
         raise Http404 from None
-    policy = get_object_policy(request.user, scenario, request=request)
-    if not (
-        policy["is_owner"]
-        or policy["is_published"]
-        or policy["is_staff"]
-        or policy["is_moderator"]
-    ):
+    if not decide(request.user, "read", scenario).allowed:
         return HttpResponseForbidden()
     result = ScenarioResult(scenario)
     with io.StringIO(json.dumps(result.summary_dict(), indent=4)) as file:

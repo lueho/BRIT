@@ -14,6 +14,14 @@ MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
 MEDIA_URL = "/media/"
 FILE_EXPORT_USE_LOCAL_STORAGE = True
 
+STORAGES["default"] = {
+    "BACKEND": "django.core.files.storage.FileSystemStorage",
+    "OPTIONS": {"location": str(MEDIA_ROOT)},
+}
+
+if not EMAIL_HOST:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
 # Only install debug toolbar if not running tests
 TESTING = "test" in sys.argv
 

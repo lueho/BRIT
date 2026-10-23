@@ -1,295 +1,188 @@
+"""Source/Author review independence and citation integrity.
+
+Authors linked to a Source are independent reviewable records: Source
+lifecycle transitions must not mutate their state or audit history, and the
+citation link remains an ordered, readable surface.
+"""
+
+from django.contrib.auth.models import Permission, User
+from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_save
 from django.test import TestCase
 from factory.django import mute_signals
 
 from bibliography.models import Author, Source, SourceAuthor
+from utils.object_management.models import ReviewAction
+from utils.object_management.services import perform_transition
+
+
+def _perm(model, codename):
+    return Permission.objects.get(
+        codename=codename, content_type=ContentType.objects.get_for_model(model)
+    )
+
+
+def _actions_for(obj):
+    return ReviewAction.objects.filter(
+        content_type=ContentType.objects.get_for_model(obj.__class__),
+        object_id=obj.pk,
+    )
 
 
 class SourceAuthorReviewCascadeTest(TestCase):
-    """Ensure Source review actions cascade to linked Authors."""
+    """A Source's review actions must not cascade to linked Authors."""
 
-    @classmethod
-    def setUpTestData(cls):
-        from django.contrib.auth import get_user_model
+    def setUp(self):
+        self.owner = User.objects.create_user(username="cascade-owner")
+        self.moderator = User.objects.create_user(username="cascade-moderator")
+        self.moderator.user_permissions.add(_perm(Source, "can_moderate_source"))
 
-        User = get_user_model()
-        cls.django_user = User.objects.create_user(username="reviewer")
-
-    def _make_source(self, status="private", title="Test Source"):
+    def _make_source(self, status="private", title="Test Source", owner=None):
         with mute_signals(post_save):
-            return Source.objects.create(title=title, publication_status=status)
+            return Source.objects.create(
+                title=title,
+                owner=owner or self.owner,
+                publication_status=status,
+            )
 
-    def _make_author(self, status="private", first="John", last="Doe"):
+    def _make_author(self, status="private", first="John", last="Doe", owner=None):
         with mute_signals(post_save):
             return Author.objects.create(
-                first_names=first, last_names=last, publication_status=status
+                first_names=first,
+                last_names=last,
+                owner=owner or self.owner,
+                publication_status=status,
             )
 
     def _link(self, source, author, position=1):
         SourceAuthor.objects.create(source=source, author=author, position=position)
 
-    def _run_cascade(self, source, action_name, user=None):
-        """Invoke cascade_review_action the same way the view layer does."""
-        source.cascade_review_action(
-            action_name=action_name,
-            actor=user or self.django_user,
-            previous_status=None,
+    def _assert_authors_untouched(self, authors):
+        for author, expected_status in authors:
+            author.refresh_from_db()
+            self.assertEqual(author.publication_status, expected_status)
+            self.assertFalse(_actions_for(author).exists())
+
+    def _submit(self, source):
+        perform_transition(self.owner, source, "submit")
+        source.refresh_from_db()
+
+    def _approve(self, source):
+        perform_transition(
+            self.moderator,
+            source,
+            "approve",
+            expected_revision=source.content_revision,
         )
+        source.refresh_from_db()
 
-    # -- submit_for_review -------------------------------------------------
+    def _reject(self, source):
+        perform_transition(self.moderator, source, "reject")
+        source.refresh_from_db()
 
-    def test_submit_cascades_to_private_authors(self):
+    def _withdraw(self, source):
+        perform_transition(self.owner, source, "withdraw")
+        source.refresh_from_db()
+
+    def test_submit_does_not_touch_linked_authors(self):
         source = self._make_source()
-        author = self._make_author(status="private")
-        self._link(source, author)
+        authors = [
+            (self._make_author(status="private"), "private"),
+            (self._make_author(status="declined", first="A", last="One"), "declined"),
+            (self._make_author(status="review", first="B", last="Two"), "review"),
+            (
+                self._make_author(status="published", first="C", last="Three"),
+                "published",
+            ),
+        ]
+        for position, (author, _) in enumerate(authors, start=1):
+            self._link(source, author, position=position)
+        self._submit(source)
+        self.assertEqual(source.publication_status, "review")
+        self._assert_authors_untouched(authors)
 
-        self._run_cascade(source, "submit_for_review")
+    def test_approve_does_not_touch_linked_authors(self):
+        source = self._make_source(status="review")
+        authors = [
+            (self._make_author(status="private"), "private"),
+            (self._make_author(status="review", first="B", last="Two"), "review"),
+            (
+                self._make_author(status="published", first="C", last="Three"),
+                "published",
+            ),
+        ]
+        for position, (author, _) in enumerate(authors, start=1):
+            self._link(source, author, position=position)
+        self._approve(source)
+        self.assertEqual(source.publication_status, "published")
+        for author, _ in authors:
+            author.refresh_from_db()
+            self.assertIsNone(author.approved_by)
+        self._assert_authors_untouched(authors)
 
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "review")
+    def test_reject_does_not_touch_linked_authors(self):
+        source = self._make_source(status="review")
+        authors = [
+            (self._make_author(status="review", first="B", last="Two"), "review"),
+            (self._make_author(status="private"), "private"),
+        ]
+        for position, (author, _) in enumerate(authors, start=1):
+            self._link(source, author, position=position)
+        self._reject(source)
+        self.assertEqual(source.publication_status, "declined")
+        self._assert_authors_untouched(authors)
 
-    def test_submit_cascades_to_declined_authors(self):
+    def test_withdraw_does_not_touch_linked_authors(self):
+        source = self._make_source(status="review")
+        authors = [
+            (self._make_author(status="review", first="B", last="Two"), "review"),
+            (
+                self._make_author(status="published", first="C", last="Three"),
+                "published",
+            ),
+        ]
+        for position, (author, _) in enumerate(authors, start=1):
+            self._link(source, author, position=position)
+        self._withdraw(source)
+        self.assertEqual(source.publication_status, "private")
+        self._assert_authors_untouched(authors)
+
+    def test_transitions_are_noop_when_no_authors(self):
         source = self._make_source()
-        author = self._make_author(status="declined")
-        self._link(source, author)
-
-        self._run_cascade(source, "submit_for_review")
-
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "review")
-
-    def test_submit_does_not_touch_published_authors(self):
-        source = self._make_source()
-        author = self._make_author(status="published")
-        self._link(source, author)
-
-        self._run_cascade(source, "submit_for_review")
-
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "published")
-
-    def test_submit_does_not_touch_review_authors(self):
-        source = self._make_source()
-        author = self._make_author(status="review")
-        self._link(source, author)
-
-        self._run_cascade(source, "submit_for_review")
-
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "review")
-
-    # -- approve -----------------------------------------------------------
-
-    def test_approve_cascades_to_review_authors(self):
-        source = self._make_source()
-        author = self._make_author(status="review")
-        self._link(source, author)
-
-        self._run_cascade(source, "approve")
-
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "published")
-        self.assertEqual(author.approved_by, self.django_user)
-
-    def test_approve_does_not_touch_private_authors(self):
-        source = self._make_source()
-        author = self._make_author(status="private")
-        self._link(source, author)
-
-        self._run_cascade(source, "approve")
-
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "private")
-
-    def test_approve_does_not_touch_published_authors(self):
-        source = self._make_source()
-        author = self._make_author(status="published")
-        self._link(source, author)
-
-        self._run_cascade(source, "approve")
-
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "published")
-
-    # -- withdraw_from_review ---------------------------------------------
-
-    def test_withdraw_cascades_to_review_authors_when_no_other_source(self):
-        source = self._make_source()
-        author = self._make_author(status="review")
-        self._link(source, author)
-
-        self._run_cascade(source, "withdraw_from_review")
-
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "private")
-
-    def test_withdraw_does_not_cascade_when_other_source_in_review(self):
-        source_a = self._make_source(title="A")
-        source_b = self._make_source(status="review", title="B")
-        author = self._make_author(status="review")
-        self._link(source_a, author, position=1)
-        self._link(source_b, author, position=1)
-
-        self._run_cascade(source_a, "withdraw_from_review")
-
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "review")
-
-    def test_withdraw_does_not_cascade_when_other_source_published(self):
-        source_a = self._make_source(title="A")
-        source_b = self._make_source(status="published", title="B")
-        author = self._make_author(status="review")
-        self._link(source_a, author, position=1)
-        self._link(source_b, author, position=1)
-
-        self._run_cascade(source_a, "withdraw_from_review")
-
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "review")
-
-    def test_withdraw_does_not_touch_published_authors(self):
-        source = self._make_source()
-        author = self._make_author(status="published")
-        self._link(source, author)
-
-        self._run_cascade(source, "withdraw_from_review")
-
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "published")
-
-    # -- reject ------------------------------------------------------------
-
-    def test_reject_cascades_to_review_authors_when_no_other_source(self):
-        source = self._make_source()
-        author = self._make_author(status="review")
-        self._link(source, author)
-
-        self._run_cascade(source, "reject")
-
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "declined")
-
-    def test_reject_does_not_cascade_when_other_source_in_review(self):
-        source_a = self._make_source(title="A")
-        source_b = self._make_source(status="review", title="B")
-        author = self._make_author(status="review")
-        self._link(source_a, author, position=1)
-        self._link(source_b, author, position=1)
-
-        self._run_cascade(source_a, "reject")
-
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "review")
-
-    def test_reject_does_not_touch_published_authors(self):
-        source = self._make_source()
-        author = self._make_author(status="published")
-        self._link(source, author)
-
-        self._run_cascade(source, "reject")
-
-        author.refresh_from_db()
-        self.assertEqual(author.publication_status, "published")
-
-    # -- no authors --------------------------------------------------------
-
-    def test_cascade_is_noop_when_no_authors(self):
-        source = self._make_source()
-        # Should not raise
-        self._run_cascade(source, "submit_for_review")
-        self._run_cascade(source, "approve")
-        self._run_cascade(source, "withdraw_from_review")
-        self._run_cascade(source, "reject")
-
-    # -- multiple authors --------------------------------------------------
-
-    def test_submit_cascades_to_multiple_authors(self):
-        source = self._make_source()
-        a1 = self._make_author(status="private", first="A", last="One")
-        a2 = self._make_author(status="declined", first="B", last="Two")
-        a3 = self._make_author(status="published", first="C", last="Three")
-        self._link(source, a1, position=1)
-        self._link(source, a2, position=2)
-        self._link(source, a3, position=3)
-
-        self._run_cascade(source, "submit_for_review")
-
-        a1.refresh_from_db()
-        a2.refresh_from_db()
-        a3.refresh_from_db()
-        self.assertEqual(a1.publication_status, "review")
-        self.assertEqual(a2.publication_status, "review")
-        self.assertEqual(a3.publication_status, "published")
-
-    def test_approve_cascades_to_multiple_review_authors(self):
-        source = self._make_source()
-        a1 = self._make_author(status="review", first="A", last="One")
-        a2 = self._make_author(status="review", first="B", last="Two")
-        a3 = self._make_author(status="private", first="C", last="Three")
-        self._link(source, a1, position=1)
-        self._link(source, a2, position=2)
-        self._link(source, a3, position=3)
-
-        self._run_cascade(source, "approve")
-
-        a1.refresh_from_db()
-        a2.refresh_from_db()
-        a3.refresh_from_db()
-        self.assertEqual(a1.publication_status, "published")
-        self.assertEqual(a2.publication_status, "published")
-        self.assertEqual(a3.publication_status, "private")
+        self._submit(source)
+        self._approve(source)
+        archived_or_published = source.publication_status
+        self.assertEqual(archived_or_published, "published")
 
 
-class SourceAffectedAuthorCountTest(TestCase):
-    """Tests for Source.affected_author_count() used by the UI."""
+class SourceAuthorCitationTest(TestCase):
+    """Citation links stay ordered and independently readable."""
 
-    def _make_source(self, status="private", title="Test Source"):
+    def _make_source(self, title="Test Source"):
         with mute_signals(post_save):
-            return Source.objects.create(title=title, publication_status=status)
+            return Source.objects.create(title=title, publication_status="private")
 
-    def _make_author(self, status="private", first="John", last="Doe"):
+    def _make_author(self, first="John", last="Doe"):
         with mute_signals(post_save):
             return Author.objects.create(
-                first_names=first, last_names=last, publication_status=status
+                first_names=first, last_names=last, publication_status="private"
             )
 
     def _link(self, source, author, position=1):
         SourceAuthor.objects.create(source=source, author=author, position=position)
 
-    def test_count_for_submit_includes_private_and_declined(self):
+    def test_ordered_authors_follow_positions(self):
         source = self._make_source()
-        a1 = self._make_author(status="private", first="A", last="One")
-        a2 = self._make_author(status="declined", first="B", last="Two")
-        a3 = self._make_author(status="published", first="C", last="Three")
-        a4 = self._make_author(status="review", first="D", last="Four")
-        self._link(source, a1, position=1)
-        self._link(source, a2, position=2)
-        self._link(source, a3, position=3)
-        self._link(source, a4, position=4)
+        a1 = self._make_author(first="B", last="One")
+        a2 = self._make_author(first="A", last="Two")
+        self._link(source, a1, position=2)
+        self._link(source, a2, position=1)
+        self.assertEqual(source.authors_ordered, [a2, a1])
 
-        self.assertEqual(source.affected_author_count("submit_for_review"), 2)
-
-    def test_count_for_approve_includes_review_only(self):
+    def test_author_count_matches_links(self):
         source = self._make_source()
-        a1 = self._make_author(status="review", first="A", last="One")
-        a2 = self._make_author(status="review", first="B", last="Two")
-        a3 = self._make_author(status="private", first="C", last="Three")
-        a4 = self._make_author(status="published", first="D", last="Four")
-        self._link(source, a1, position=1)
-        self._link(source, a2, position=2)
-        self._link(source, a3, position=3)
-        self._link(source, a4, position=4)
-
-        self.assertEqual(source.affected_author_count("approve"), 2)
-
-    def test_count_returns_zero_for_no_authors(self):
-        source = self._make_source()
-        self.assertEqual(source.affected_author_count("submit_for_review"), 0)
-        self.assertEqual(source.affected_author_count("approve"), 0)
-
-    def test_count_returns_zero_for_unsupported_action(self):
-        source = self._make_source()
-        a1 = self._make_author(status="review", first="A", last="One")
-        self._link(source, a1, position=1)
-        self.assertEqual(source.affected_author_count("withdraw_from_review"), 0)
-        self.assertEqual(source.affected_author_count("reject"), 0)
+        self.assertEqual(source.authors.count(), 0)
+        self._link(source, self._make_author(first="A", last="One"), position=1)
+        self._link(source, self._make_author(first="B", last="Two"), position=2)
+        self.assertEqual(source.authors.count(), 2)
+        self.assertEqual(source.sourceauthors.count(), 2)

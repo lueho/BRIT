@@ -18,6 +18,7 @@ from maps.models import (
     Region,
 )
 from maps.signals import get_geojson_cache
+from maps.utils import rendered_geojson_cache_key
 from utils.tests.testcases import ViewWithPermissionsTestCase
 
 from ..models import HamburgRoadsideTrees
@@ -136,6 +137,25 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Total-Count"], "1")
+
+    def test_geojson_streaming_renders_geometry_in_database(self):
+        url = reverse("api-hamburg-roadside-trees-geojson")
+        with (
+            patch("maps.mixins.STREAMING_THRESHOLD", 0),
+            CaptureQueriesContext(connection) as queries,
+        ):
+            response = self.client.get(
+                url,
+                {"id": self.tree.pk, "stream": "true"},
+                REMOTE_ADDR="10.9.9.10",
+            )
+            self.assertTrue(response.streaming)
+            data = json.loads(b"".join(response.streaming_content))
+
+        self.assertEqual(response["X-Cache-Status"], "STREAM")
+        self.assertTrue(any("ST_AsGeoJSON" in q["sql"] for q in queries))
+        self.assertEqual(data["features"][0]["geometry"]["type"], "Point")
+        self.assertEqual(data["features"][0]["id"], self.tree.pk)
 
     def test_geojson_version_with_range_filters_returns_200(self):
         response = self.client.get(
@@ -315,7 +335,9 @@ class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
         version = self.client.get(
             reverse("api-hamburg-roadside-trees-version"), REMOTE_ADDR="10.9.8.3"
         ).json()["version"]
-        cache_key = f"tree_geojson:all:dv:{version}"
+        cache_key = rendered_geojson_cache_key(
+            f"tree_geojson:all:dv:{version}", version
+        )
         self.assertEqual(cache.get(f"{cache_key}:count"), 1)
 
         url = reverse("api-hamburg-roadside-trees-geojson")

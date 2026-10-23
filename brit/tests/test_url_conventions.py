@@ -17,7 +17,6 @@ from django.urls.resolvers import RoutePattern
 
 SLASHLESS_COMPATIBILITY_ROUTES = frozenset(
     {
-        "maps/attributes/<int:pk>/delete/modal",
         "maps/attribute_values/<int:pk>/delete/modal",
         "materials/sample_series/create/modal",
         "materials/samples/<int:pk>/add_property",
