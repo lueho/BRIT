@@ -1132,6 +1132,11 @@ class RegionAttributeValue(NumericMeasurementMixin, NamedUserCreatedObject):
     region = models.ForeignKey(Region, on_delete=models.PROTECT)
     property = models.ForeignKey(RegionProperty, on_delete=models.PROTECT)
     unit = models.ForeignKey(Unit, on_delete=models.PROTECT, blank=True, null=True)
+    sources = models.ManyToManyField(
+        Source,
+        blank=True,
+        help_text="Sources or references for this property value.",
+    )
     date = models.DateField(blank=True, null=True)
     value = models.FloatField(default=0.0)
     standard_deviation = models.FloatField(default=0.0, blank=True, null=True)

@@ -2,14 +2,13 @@
 Bootstraps a BRIT database from scratch.
 
 A fresh database normally only needs ``migrate`` followed by
-``ensure_initial_data``: the schema-only replacement migrations for
-``properties`` and ``materials`` contain no data operations, and the
-required default rows are created by the app initializers. The original
-migration files and the ``replaces`` metadata stay available so that
-databases with fully applied legacy histories adopt the replacements
-automatically. Databases with a partially applied legacy history cannot
-use the replacements yet, so for them this command keeps the older staged
-sequence that interleaves schema and data setup.
+``ensure_initial_data``: the schema-only replacement migrations contain no
+data operations, and the required default rows are created by the app
+initializers. The original migration files and the ``replaces`` metadata
+stay available so that databases with fully applied legacy histories adopt
+the replacements automatically. Databases with a partially applied legacy
+history cannot use the replacements yet, so for them this command keeps
+the older staged sequence that interleaves schema and data setup.
 """
 
 from django.core.management import call_command
@@ -46,10 +45,7 @@ class Command(BaseCommand):
 
     def _requires_legacy_bootstrap(self):
         loader = MigrationLoader(connection)
-        return any(
-            key[0] in {"properties", "materials"} and key not in loader.graph.nodes
-            for key in loader.replacements
-        )
+        return any(key not in loader.graph.nodes for key in loader.replacements)
 
     def handle(self, *args, **options):
         forwarded = {

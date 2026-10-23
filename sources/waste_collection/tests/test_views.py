@@ -1194,6 +1194,7 @@ class CollectionCatchmentCRUDViewsTestCase(
 
     allow_create_for_any_authenticated_user = True
     add_scope_query_param_to_list_urls = True
+    create_view_post = False
 
     create_object_data = {"name": "Test Catchment"}
     update_object_data = {"name": "Updated Test Catchment"}
@@ -1213,19 +1214,6 @@ class CollectionCatchmentCRUDViewsTestCase(
                 name="Test Region", publication_status="published"
             )
         }
-
-    # -----------------------
-    # CreateView Test Cases
-    # -----------------------
-
-    def test_create_view_post_as_authenticated_without_permission(self):
-        self.skipTest("Post method is not implemented for this view.")
-
-    def test_create_view_post_as_authenticated_with_permission(self):
-        self.skipTest("Post method is not implemented for this view.")
-
-    def test_create_view_post_as_staff_user(self):
-        self.skipTest("Post method is not implemented for this view.")
 
 
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------

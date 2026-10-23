@@ -14,6 +14,16 @@ LEGACY_HELPER = (
 SQUASHED_KEYS = {
     ("properties", "0001_squashed_0010"),
     ("materials", "0001_squashed_0032"),
+    ("waste_atlas", "0001_squashed_0027"),
+    ("maps", "0001_squashed_0020"),
+    ("processes", "0001_squashed_0016"),
+    ("inventories", "0001_squashed_0008"),
+    ("distributions", "0001_squashed_0004"),
+    ("layer_manager", "0001_squashed_0004"),
+    ("object_management", "0001_squashed_0006"),
+    ("closecycle", "0001_squashed_0007"),
+    ("population", "0001_squashed_0002"),
+    ("waste_collection", "0001_squashed_0008"),
 }
 
 

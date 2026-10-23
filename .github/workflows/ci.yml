@@ -58,10 +58,16 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # django.contrib.gis loads GDAL/GEOS via ctypes, so the runtime shared
+      # libraries are enough — the ~110-package -dev chain is not needed.
+      # Package names are for Ubuntu 24.04 (noble); bump when the runner moves.
       - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgdal-dev gdal-bin
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 update
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            install -y --no-install-recommends libgdal34t64 libgeos-c1t64
 
       - uses: astral-sh/setup-uv@v7
         with:
@@ -111,25 +117,34 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgdal-dev gdal-bin
+      - uses: docker/setup-buildx-action@v3
 
-      - uses: astral-sh/setup-uv@v7
+      # Tests run inside the same image as dev/prod, so GDAL/GEOS versions
+      # match and no apt/uv setup on the runner is needed. Layer cache makes
+      # rebuilds fast as long as dependency inputs are unchanged.
+      - name: Build dev image
+        uses: docker/build-push-action@v6
         with:
-          enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --locked --dev
+          context: .
+          target: dev
+          build-args: |
+            INSTALL_DEV=true
+            INSTALL_PDF_PARSING=true
+          load: true
+          tags: brit-web-ci
+          cache-from: type=gha,scope=brit-web-ci
+          cache-to: type=gha,mode=max,scope=brit-web-ci
 
       - name: Run tests
-        env:
-          DJANGO_SETTINGS_MODULE: brit.settings.testrunner
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_HOST: localhost
-          POSTGRES_PORT: 5432
-          REDIS_URL: redis://localhost:6379/0
-          SECRET_KEY: ci-test-key-not-secret
-        run: uv run python manage.py test --settings=brit.settings.testrunner --parallel 2 --noinput
+        run: |
+          docker run --rm --network host \
+            --volume "$GITHUB_WORKSPACE:/app" \
+            --env DJANGO_SETTINGS_MODULE=brit.settings.testrunner \
+            --env POSTGRES_USER=postgres \
+            --env POSTGRES_PASSWORD=postgres \
+            --env POSTGRES_HOST=localhost \
+            --env POSTGRES_PORT=5432 \
+            --env REDIS_URL=redis://localhost:6379/0 \
+            --env SECRET_KEY=ci-test-key-not-secret \
+            brit-web-ci \
+            python manage.py test --settings=brit.settings.testrunner --parallel 2 --noinput

@@ -5652,8 +5652,8 @@ class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
         )
 
 
-class EmptyStateViewsTestCase(TestCase):
-    """Test empty state messaging and CTAs across Materials views."""
+class SampleDetailPresentationMixin:
+    """Shared fixtures for the sample-detail and list-presentation tests."""
 
     @classmethod
     def setUpTestData(cls):
@@ -5689,6 +5689,10 @@ class EmptyStateViewsTestCase(TestCase):
             owner=self.staff_user,
             publication_status="published",
         )
+
+
+class EmptyStateViewsTestCase(SampleDetailPresentationMixin, TestCase):
+    """Test empty state messaging and CTAs across Materials views."""
 
     def test_material_list_empty_anonymous_shows_login_hint(self):
         category = self._create_unused_category()
@@ -5804,6 +5808,148 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No properties yet")
         self.assertContains(response, "Add the first property")
+
+    def test_sample_detail_empty_mass_measurements_anonymous(self):
+        sample = Sample.objects.create(
+            name="Massless Sample",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No composition data yet")
+        self.assertContains(
+            response,
+            "Composition groups appear here once component measurements can be normalized",
+        )
+        self.assertNotContains(
+            response,
+            f"{reverse('componentmeasurement-create')}?sample={sample.pk}",
+        )
+
+    def test_sample_detail_empty_mass_measurements_owner_sees_cta_with_permission(self):
+        sample = Sample.objects.create(
+            name="Massless Sample",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.regular_user,
+            publication_status="private",
+        )
+        content_type = ContentType.objects.get_for_model(ComponentMeasurement)
+        permission, _ = Permission.objects.get_or_create(
+            codename="add_componentmeasurement",
+            content_type=content_type,
+            defaults={"name": "Can add component measurement"},
+        )
+        self.regular_user.user_permissions.add(permission)
+        sample.compositions.all().delete()
+
+        self.client.force_login(self.regular_user)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Add measurement")
+
+    def test_sample_detail_empty_compositions_owner_sees_manual_and_measurement_actions(
+        self,
+    ):
+        sample = Sample.objects.create(
+            name="Compositionless Sample",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.regular_user,
+            publication_status="private",
+        )
+        content_type = ContentType.objects.get_for_model(ComponentMeasurement)
+        permission, _ = Permission.objects.get_or_create(
+            codename="add_componentmeasurement",
+            content_type=content_type,
+            defaults={"name": "Can add component measurement"},
+        )
+        self.regular_user.user_permissions.add(permission)
+        composition_permission, _ = Permission.objects.get_or_create(
+            codename="add_composition",
+            content_type=ContentType.objects.get_for_model(Composition),
+            defaults={"name": "Can add composition"},
+        )
+        self.regular_user.user_permissions.add(composition_permission)
+        sample.compositions.all().delete()
+
+        self.client.force_login(self.regular_user)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No composition data yet")
+        self.assertContains(
+            response,
+            "Composition groups appear here once component measurements can be normalized",
+        )
+        self.assertContains(response, "Add composition")
+        self.assertContains(response, "Add measurement")
+
+    def test_analytical_method_list_empty_anonymous(self):
+        response = self.client.get(
+            reverse("analyticalmethod-list") + "?scope=published&name=no-match-token"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No items match your current filters.")
+        self.assertContains(response, "Log in to create new analytical methods.")
+
+    def test_analytical_method_list_empty_staff_shows_create_cta(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.get(
+            reverse("analyticalmethod-list-owned")
+            + "?scope=private&name=no-match-token"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, "Create your first analytical method to get started."
+        )
+
+    def test_reset_filter_link_preserves_scope(self):
+        scopes = ["published", "private", "review"]
+        for scope in scopes:
+            with self.subTest(scope=scope):
+                self.client.force_login(self.staff_user)
+                url = reverse("material-list") + f"?scope={scope}"
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+
+                expected_reset_url = f"?scope={scope}"
+                self.assertContains(response, expected_reset_url)
+
+    def test_empty_state_with_existing_reset_behavior(self):
+        Material.objects.create(
+            name="Test Material",
+            type="material",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        empty_category = self._create_unused_category()
+
+        self.client.force_login(self.staff_user)
+        response = self.client.get(
+            reverse("material-list") + f"?scope=published&category={empty_category.pk}"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No items match your current filters.")
+        self.assertContains(response, "Reset filters")
+
+        reset_url = reverse("material-list") + "?scope=published"
+        response = self.client.get(reset_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Test Material")
+
+
+class SampleDetailV2PresentationTestCase(SampleDetailPresentationMixin, TestCase):
+    """Sample detail v2 chrome: hero, rails, toolbar, anchor nav, actions, and metadata."""
 
     def test_sample_detail_shows_sample_identity_block_and_summary(self):
         sample = Sample.objects.create(
@@ -7025,89 +7171,9 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "Manage access")
         self.assertContains(response, "Description present")
 
-    def test_sample_detail_empty_mass_measurements_anonymous(self):
-        sample = Sample.objects.create(
-            name="Massless Sample",
-            material=Material.objects.create(name="Test Material", type="material"),
-            owner=self.staff_user,
-            publication_status="published",
-        )
-        sample.compositions.all().delete()
 
-        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No composition data yet")
-        self.assertContains(
-            response,
-            "Composition groups appear here once component measurements can be normalized",
-        )
-        self.assertNotContains(
-            response,
-            f"{reverse('componentmeasurement-create')}?sample={sample.pk}",
-        )
-
-    def test_sample_detail_empty_mass_measurements_owner_sees_cta_with_permission(self):
-        sample = Sample.objects.create(
-            name="Massless Sample",
-            material=Material.objects.create(name="Test Material", type="material"),
-            owner=self.regular_user,
-            publication_status="private",
-        )
-        content_type = ContentType.objects.get_for_model(ComponentMeasurement)
-        permission, _ = Permission.objects.get_or_create(
-            codename="add_componentmeasurement",
-            content_type=content_type,
-            defaults={"name": "Can add component measurement"},
-        )
-        self.regular_user.user_permissions.add(permission)
-        sample.compositions.all().delete()
-
-        self.client.force_login(self.regular_user)
-        response = self.client.get(
-            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Add measurement")
-
-    def test_sample_detail_empty_compositions_owner_sees_manual_and_measurement_actions(
-        self,
-    ):
-        sample = Sample.objects.create(
-            name="Compositionless Sample",
-            material=Material.objects.create(name="Test Material", type="material"),
-            owner=self.regular_user,
-            publication_status="private",
-        )
-        content_type = ContentType.objects.get_for_model(ComponentMeasurement)
-        permission, _ = Permission.objects.get_or_create(
-            codename="add_componentmeasurement",
-            content_type=content_type,
-            defaults={"name": "Can add component measurement"},
-        )
-        self.regular_user.user_permissions.add(permission)
-        composition_permission, _ = Permission.objects.get_or_create(
-            codename="add_composition",
-            content_type=ContentType.objects.get_for_model(Composition),
-            defaults={"name": "Can add composition"},
-        )
-        self.regular_user.user_permissions.add(composition_permission)
-        sample.compositions.all().delete()
-
-        self.client.force_login(self.regular_user)
-        response = self.client.get(
-            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No composition data yet")
-        self.assertContains(
-            response,
-            "Composition groups appear here once component measurements can be normalized",
-        )
-        self.assertContains(response, "Add composition")
-        self.assertContains(response, "Add measurement")
+class SampleDetailCompositionDisplayTestCase(SampleDetailPresentationMixin, TestCase):
+    """How the sample detail page derives and displays composition values."""
 
     def test_sample_detail_shows_default_composition(self):
         sample = Sample.objects.create(
@@ -7619,60 +7685,6 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "Volatile solids")
         self.assertContains(response, "Canonical: Organic matter")
         self.assertContains(response, "↔ Organic matter")
-
-    def test_analytical_method_list_empty_anonymous(self):
-        response = self.client.get(
-            reverse("analyticalmethod-list") + "?scope=published&name=no-match-token"
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No items match your current filters.")
-        self.assertContains(response, "Log in to create new analytical methods.")
-
-    def test_analytical_method_list_empty_staff_shows_create_cta(self):
-        self.client.force_login(self.staff_user)
-        response = self.client.get(
-            reverse("analyticalmethod-list-owned")
-            + "?scope=private&name=no-match-token"
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response, "Create your first analytical method to get started."
-        )
-
-    def test_reset_filter_link_preserves_scope(self):
-        scopes = ["published", "private", "review"]
-        for scope in scopes:
-            with self.subTest(scope=scope):
-                self.client.force_login(self.staff_user)
-                url = reverse("material-list") + f"?scope={scope}"
-                response = self.client.get(url)
-                self.assertEqual(response.status_code, 200)
-
-                expected_reset_url = f"?scope={scope}"
-                self.assertContains(response, expected_reset_url)
-
-    def test_empty_state_with_existing_reset_behavior(self):
-        Material.objects.create(
-            name="Test Material",
-            type="material",
-            owner=self.staff_user,
-            publication_status="published",
-        )
-
-        empty_category = self._create_unused_category()
-
-        self.client.force_login(self.staff_user)
-        response = self.client.get(
-            reverse("material-list") + f"?scope=published&category={empty_category.pk}"
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No items match your current filters.")
-        self.assertContains(response, "Reset filters")
-
-        reset_url = reverse("material-list") + "?scope=published"
-        response = self.client.get(reset_url)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Test Material")
 
 
 class MaterialsReviewWorkflowTests(TestCase):
