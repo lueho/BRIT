@@ -14,6 +14,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 from django.db.models import BooleanField, ExpressionWrapper, F, Q
 from django.db.models.aggregates import Count
+from django.forms.models import construct_instance
 from django.http import (
     Http404,
     HttpResponseRedirect,
@@ -36,16 +37,19 @@ from utils.file_export.views import (
 )
 from utils.forms import workspace_section_formsets
 from utils.modal import BSModalFormView, BSModalUpdateView
-from utils.object_management.access import (
-    UserCreatedObjectReadAccessMixin,
-    UserOwnsObjectMixin,
-)
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
     user_is_moderator_for_model,
     visible_related_object,
+)
+from utils.object_management.policy import decide
+from utils.object_management.services import (
+    content_mutation,
+    is_independent_evidence_model,
+    record_creation,
+    save_evidence_formset_rows,
 )
 from utils.object_management.views import (
     PrivateObjectFilterView,
@@ -60,7 +64,9 @@ from utils.object_management.views import (
     UserCreatedObjectModalDeleteView,
     UserCreatedObjectModalDetailView,
     UserCreatedObjectModalUpdateView,
+    UserCreatedObjectReadAccessMixin,
     UserCreatedObjectUpdateView,
+    UserOwnsObjectMixin,
 )
 from utils.properties.models import Unit
 from utils.properties.units import UnitConversionError
@@ -492,13 +498,16 @@ class SampleSubstrateMaterialQuickCreateView(
             try:
                 with transaction.atomic():
                     material = Material.objects.create(owner=request.user, name=name)
+                    material.categories.add(substrate_category)
+                    record_creation(request.user, material)
                 created = True
             except IntegrityError:
                 material = self.get_owner_material(name)
                 if material is None:
                     raise
 
-        material.categories.add(substrate_category)
+        if not created:
+            material.categories.add(substrate_category)
 
         return JsonResponse(
             {
@@ -905,9 +914,13 @@ class SampleBoundCreateMixin(UserPassesTestMixin):
         self.sample = get_object_or_404(Sample, pk=sample_pk)
         return self.sample
 
+    def get_policy_parent(self):
+        """The fetched Sample is the policy parent for owned-child creates."""
+        return self.get_sample()
+
     def test_func(self):
-        policy = get_object_policy(self.request.user, self.sample, request=self.request)
-        return policy[self.sample_policy_key]
+        model = getattr(self, "model", None) or self.form_class._meta.model
+        return decide(self.request.user, "create", model, parent=self.sample).allowed
 
     def form_valid(self, form):
         form.instance.sample = self.sample
@@ -1307,10 +1320,7 @@ class EditableAutocompleteMixin:
     """Restricts autocomplete results to objects the request user may edit."""
 
     def hook_queryset(self, queryset):
-        user = self.request.user
-        if user.is_staff:
-            return super().hook_queryset(queryset)
-        return super().hook_queryset(queryset).editable_by_user(user)
+        return super().hook_queryset(queryset).editable_by_user(self.request.user)
 
 
 class EditableSampleGroupAutoCompleteView(
@@ -2157,12 +2167,37 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
         return super().render_to_response(context, **response_kwargs)
 
     def form_valid(self, form):
-        validity = [inline.is_valid() for inline in self.get_inlines()]
+        inlines = self.get_inlines()
+        validity = [inline.is_valid() for inline in inlines]
         if not all(validity):
             return self.form_invalid(form)
-        self.object = form.save()
-        for inline in self.get_inlines():
-            inline.save()
+        evidence_inlines = [
+            inline
+            for inline in inlines
+            if is_independent_evidence_model(getattr(inline, "model", None))
+        ]
+        other_inlines = [inline for inline in inlines if inline not in evidence_inlines]
+        with transaction.atomic():
+            if self.section.get("fields") or other_inlines:
+                with content_mutation(
+                    self.request.user, self.object, action="edit"
+                ) as locked_object:
+                    self.object = locked_object
+                    if self.section.get("fields"):
+                        form.instance = locked_object
+                        # Re-run validation against the locked instance so
+                        # clean_* hooks that write non-declared attributes
+                        # (e.g. datetime_precision) land on the saved row.
+                        form.full_clean()
+                        if form.errors:
+                            return self.form_invalid(form)
+                        construct_instance(form, locked_object)
+                        self.object = form.save()
+                    for inline in other_inlines:
+                        inline.instance = locked_object
+                        inline.save()
+            for inline in evidence_inlines:
+                save_evidence_formset_rows(self.request.user, inline, self.object)
         message = "Saved privately." if self.object.is_private else "Changes saved."
         if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return JsonResponse(
@@ -2282,19 +2317,19 @@ class SampleRelationMutationPermissionMixin:
     def form_valid(self, form):
         sample = form.cleaned_data["sample"]
         instance = form.instance
+        persisted = None
         original_sample_id = None
         if instance.pk is not None:
-            original_sample_id = (
-                instance.__class__._base_manager.filter(pk=instance.pk)
-                .values_list("sample_id", flat=True)
-                .get()
-            )
+            persisted = instance.__class__._base_manager.filter(pk=instance.pk).first()
+            if persisted is not None:
+                original_sample_id = persisted.sample_id
         if not can_add_data_to_sample(
             self.request.user,
             sample,
             original_sample_id,
             self.sample_policy_key,
             request=self.request,
+            obj=persisted if persisted is not None else instance,
         ):
             raise PermissionDenied("You cannot add data to this sample.")
         return super().form_valid(form)
@@ -2351,10 +2386,14 @@ class CompositionModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CompositionOrderUpView(UserOwnsObjectMixin, SingleObjectMixin, RedirectView):
+class _CompositionOrderView(UserOwnsObjectMixin, SingleObjectMixin, RedirectView):
+    """POST-only reorder adapter; mutation runs inside the parent boundary."""
+
     model = Composition
     object = None
-    permission_required = "materials.change_composition"
+
+    def _reorder(self, composition):
+        raise NotImplementedError
 
     def get_redirect_url(self, *args, **kwargs):
         next_url = get_safe_next_url(self.request)
@@ -2363,26 +2402,23 @@ class CompositionOrderUpView(UserOwnsObjectMixin, SingleObjectMixin, RedirectVie
         return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
 
     def get(self, request, *args, **kwargs):
+        return self.http_method_not_allowed(request)
+
+    def post(self, request, *args, **kwargs):
         self.object = self.get_object()
-        self.object.order_up()
-        return super().get(request, *args, **kwargs)
+        with content_mutation(request.user, self.object, action="edit") as locked:
+            self._reorder(locked)
+        return HttpResponseRedirect(self.get_redirect_url())
 
 
-class CompositionOrderDownView(UserOwnsObjectMixin, SingleObjectMixin, RedirectView):
-    model = Composition
-    object = None
-    permission_required = "materials.change_composition"
+class CompositionOrderUpView(_CompositionOrderView):
+    def _reorder(self, composition):
+        composition.order_up()
 
-    def get_redirect_url(self, *args, **kwargs):
-        next_url = get_safe_next_url(self.request)
-        if next_url:
-            return next_url
-        return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
 
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        self.object.order_down()
-        return super().get(request, *args, **kwargs)
+class CompositionOrderDownView(_CompositionOrderView):
+    def _reorder(self, composition):
+        composition.order_down()
 
 
 def ensure_derived_composition_settings(sample, owner):
@@ -2450,39 +2486,40 @@ class _DerivedCompositionOrderView(
             return next_url
         return reverse("sample-detail", kwargs={"pk": self.get_sample().pk})
 
-
-class DerivedCompositionOrderUpView(_DerivedCompositionOrderView):
     def get(self, request, *args, **kwargs):
+        return self.http_method_not_allowed(request)
+
+    def _reorder(self, composition):
+        raise NotImplementedError
+
+    def post(self, request, *args, **kwargs):
         sample = self.get_sample()
         group = self.get_group()
-        composition_settings_by_group = ensure_derived_composition_settings(
-            sample, request.user
-        )
-        composition_settings_by_group[group.pk].order_up()
-        return super().get(request, *args, **kwargs)
+        with content_mutation(request.user, sample, action="edit") as locked:
+            composition_settings_by_group = ensure_derived_composition_settings(
+                locked, request.user
+            )
+            self._reorder(composition_settings_by_group[group.pk])
+        return HttpResponseRedirect(self.get_redirect_url())
+
+
+class DerivedCompositionOrderUpView(_DerivedCompositionOrderView):
+    def _reorder(self, composition):
+        composition.order_up()
 
 
 class DerivedCompositionOrderDownView(_DerivedCompositionOrderView):
-    def get(self, request, *args, **kwargs):
-        sample = self.get_sample()
-        group = self.get_group()
-        composition_settings_by_group = ensure_derived_composition_settings(
-            sample, request.user
-        )
-        composition_settings_by_group[group.pk].order_down()
-        return super().get(request, *args, **kwargs)
+    def _reorder(self, composition):
+        composition.order_down()
 
 
 # ----------- Materials/Components/Groups Relation -----------------------------------------------------------------
 
 
-class AddCompositionView(
-    PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUpdateView
-):
+class AddCompositionView(UserPassesTestMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = SampleSeries
     form_class = AddCompositionModalForm
     template_name = "modal_form.html"
-    permission_required = "materials.add_composition"
     success_message = "Composition successfully added."
 
     def get_context_data(self, **kwargs):
@@ -2495,10 +2532,35 @@ class AddCompositionView(
         )
         return context
 
+    def test_func(self):
+        return decide(self.request.user, "edit", self.get_object()).allowed
+
     def form_valid(self, form):
-        self.get_object().add_component_group(
-            form.cleaned_data["group"], fractions_of=form.cleaned_data["fractions_of"]
+        group = form.cleaned_data["group"]
+        fractions_of = (
+            form.cleaned_data["fractions_of"] or MaterialComponent.objects.default()
         )
+        actor = self.request.user
+        for reference in (group, fractions_of):
+            decision = decide(actor, "read", reference)
+            if not decision.allowed:
+                raise PermissionDenied(decision.reason)
+        with transaction.atomic():
+            with content_mutation(
+                actor, self.get_object(), action="edit"
+            ) as locked_series:
+                for sample in locked_series.samples.order_by("pk"):
+                    with content_mutation(
+                        actor, sample, action="edit"
+                    ) as locked_sample:
+                        if locked_sample.series_id != locked_series.pk:
+                            raise PermissionDenied("invalid_parent")
+                        Composition.objects.create(
+                            owner=actor,
+                            group=group,
+                            sample=locked_sample,
+                            fractions_of=fractions_of,
+                        )
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -2537,9 +2599,21 @@ class AddSeasonalVariationView(
         return context
 
     def form_valid(self, form):
-        self.get_object().add_temporal_distribution(
-            form.cleaned_data["temporal_distribution"]
-        )
+        composition = self.get_object()
+        series = composition.sample.series
+        distribution = form.cleaned_data["temporal_distribution"]
+        decision = decide(self.request.user, "edit", series)
+        if not decision.allowed:
+            raise PermissionDenied(decision.reason)
+        create_decision = decide(self.request.user, "create", Sample)
+        if not create_decision.allowed:
+            raise PermissionDenied(create_decision.reason)
+        with transaction.atomic():
+            known_sample_ids = set(series.samples.values_list("pk", flat=True))
+            with content_mutation(self.request.user, series, action="edit"):
+                series.add_temporal_distribution(distribution)
+            for sample in series.samples.exclude(pk__in=known_sample_ids):
+                record_creation(self.request.user, sample)
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
@@ -2578,8 +2652,24 @@ class RemoveSeasonalVariationView(UserCreatedObjectDetailView):
         return self.get_object().get_absolute_url()
 
     def post(self, request, *args, **kwargs):
+        composition = self.get_object()
+        series = composition.sample.series
+        decision = decide(request.user, "edit", series)
+        if not decision.allowed:
+            raise PermissionDenied(decision.reason)
+        distribution = self.get_distribution()
         success_url = self.get_success_url()
-        self.get_object().remove_temporal_distribution(self.get_distribution())
+        with transaction.atomic():
+            doomed = [
+                sample
+                for timestep in distribution.timestep_set.all()
+                for sample in series.samples.filter(timestep=timestep)
+            ]
+            for sample in doomed:
+                with content_mutation(request.user, sample, action="delete") as locked:
+                    locked.delete()
+            with content_mutation(request.user, series, action="edit"):
+                series.temporal_distributions.remove(distribution)
         return HttpResponseRedirect(success_url)
 
 

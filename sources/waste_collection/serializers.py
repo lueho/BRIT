@@ -11,6 +11,7 @@ from distributions.models import TemporalDistribution, Timestep
 from maps.models import RegionAttributeValue
 from materials.models import Material
 from sources.waste_collection import models
+from sources.waste_collection.derived_values import preferred_measurement_queryset
 from sources.waste_collection.description_formatting import (
     flatten_collection_description,
     normalize_collection_description,
@@ -741,8 +742,8 @@ class CollectionAnalysisListSerializer(serializers.ListSerializer):
         collection_values = defaultdict(list)
         aggregated_values = defaultdict(list)
         if chain_ids and child.include_collection_metrics:
-            for value in models.Collection.visible_collectionpropertyvalues(
-                chain_ids, user
+            for value in preferred_measurement_queryset(
+                models.Collection.visible_collectionpropertyvalues(chain_ids, user)
             ):
                 collection_values[anchor_of[value.collection_id]].append(value)
             for anchor, values in collection_values.items():
@@ -934,7 +935,9 @@ class CollectionPropertyValueSerializer(serializers.ModelSerializer):
     property_name = serializers.CharField(source="property.name", read_only=True)
     unit_name = serializers.CharField(source="unit.name", read_only=True)
     unit_symbol = serializers.CharField(source="unit.symbol", read_only=True)
-    publication_status = serializers.CharField(read_only=True)
+    is_derived = serializers.BooleanField(read_only=True)
+    derived_from = serializers.PrimaryKeyRelatedField(read_only=True)
+    publication_status = serializers.SerializerMethodField()
 
     class Meta:
         model = models.CollectionPropertyValue
@@ -949,8 +952,15 @@ class CollectionPropertyValueSerializer(serializers.ModelSerializer):
             "average",
             "standard_deviation",
             "is_derived",
+            "derived_from",
             "publication_status",
         )
+
+    def get_publication_status(self, obj):
+        """Lifecycle display follows the raw source for generated rows."""
+        if obj.is_derived and obj.derived_from_id is not None:
+            return obj.derived_from.publication_status
+        return obj.publication_status
 
 
 class CollectionImportRecordSerializer(serializers.Serializer):

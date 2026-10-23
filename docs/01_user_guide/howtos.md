@@ -19,6 +19,9 @@ This page is a quick navigation aid for common BRIT tasks. Detailed commands liv
 - **Understand exports**
   See [Exporting User-Created Objects](file_export.md).
 
+- **Understand sharing, workspace scopes, and review**
+  See [Sharing and Collaboration](sharing_and_collaboration.md).
+
 ## Where Different Information Lives
 
 - **Development commands**

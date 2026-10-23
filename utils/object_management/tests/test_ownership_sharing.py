@@ -46,6 +46,12 @@ class EditorGrantModelTests(TestCase):
         cls.owner = User.objects.create_user(username="owner")
         cls.editor = User.objects.create_user(username="editor")
         cls.other = User.objects.create_user(username="other")
+        change_perm = Permission.objects.get(
+            codename="change_collection",
+            content_type=ContentType.objects.get_for_model(Collection),
+        )
+        cls.owner.user_permissions.add(change_perm)
+        cls.editor.user_permissions.add(change_perm)
         cls.collection = Collection.objects.create(
             name="Test Collection",
             owner=cls.owner,
@@ -105,6 +111,9 @@ class EditorPermissionTests(TestCase):
         cls.editor = User.objects.create_user(username="editor")
         cls.other = User.objects.create_user(username="other")
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.collection = Collection.objects.create(
             name="Test Collection",
             owner=cls.owner,
@@ -183,12 +192,9 @@ class EditorPermissionTests(TestCase):
         moderator_editor = User.objects.get(pk=self.editor.pk)  # reset perm cache
         self.collection.publication_status = UserCreatedObject.STATUS_REVIEW
         self.collection.save()
-        request = self._request(
-            moderator_editor,
-            data={"publication_status": UserCreatedObject.STATUS_PUBLISHED},
-        )
+        request = self._request(moderator_editor, method="POST")
         self.assertTrue(
-            self.permission.has_object_permission(request, None, self.collection)
+            self.permission.has_approve_permission(request, self.collection)
         )
 
     def test_editor_who_is_moderator_can_edit_private_content(self):
@@ -230,10 +236,10 @@ class EditorPermissionTests(TestCase):
             publication_status=UserCreatedObject.STATUS_PRIVATE,
         )
         ContentType.objects.get_for_model(Collection)  # warm ContentType cache
-        self.assertTrue(self.permission._is_editor(self.editor, self.collection))
+        self.assertTrue(self.permission.is_editor(self.editor, self.collection))
         with self.assertNumQueries(0):
-            self.assertTrue(self.permission._is_editor(self.editor, self.collection))
-            self.assertFalse(self.permission._is_editor(self.editor, other_collection))
+            self.assertTrue(self.permission.is_editor(self.editor, self.collection))
+            self.assertFalse(self.permission.is_editor(self.editor, other_collection))
 
     def test_transfer_ownership_permission(self):
         for user, expected in [
@@ -271,6 +277,9 @@ class EditorObjectPolicyTests(TestCase):
         cls.editor = User.objects.create_user(username="editor")
         cls.other = User.objects.create_user(username="other")
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.collection = Collection.objects.create(
             name="Test Collection",
             owner=cls.owner,
@@ -332,6 +341,9 @@ class OwnershipSharingViewTests(TestCase):
             username="other",
         )
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.collection = Collection.objects.create(
             name="Test Collection",
             owner=cls.owner,

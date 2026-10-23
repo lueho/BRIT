@@ -7,11 +7,11 @@ from sources.greenhouses.models import (
     GrowthShare,
     GrowthTimeStepSet,
 )
-from utils.object_management.admin import NamedUserCreatedObjectAdmin
+from utils.object_management.admin import NamedUserCreatedObjectAdmin, PolicyAdminMixin
 
 
 @admin.register(Greenhouse)
-class GreenhouseAdmin(NamedUserCreatedObjectAdmin):
+class GreenhouseAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "heated",
@@ -32,12 +32,12 @@ class GreenhouseAdmin(NamedUserCreatedObjectAdmin):
 
 
 @admin.register(Culture)
-class CultureAdmin(NamedUserCreatedObjectAdmin):
+class CultureAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "residue", "owner", "publication_status")
 
 
 @admin.register(GreenhouseGrowthCycle)
-class GreenhouseGrowthCycleAdmin(admin.ModelAdmin):
+class GreenhouseGrowthCycleAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "cycle_number",
@@ -51,13 +51,13 @@ class GreenhouseGrowthCycleAdmin(admin.ModelAdmin):
 
 
 @admin.register(GrowthTimeStepSet)
-class GrowthTimeStepSetAdmin(admin.ModelAdmin):
+class GrowthTimeStepSetAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("__str__", "timestep", "growth_cycle", "owner")
     ordering = ("growth_cycle", "timestep")
 
 
 @admin.register(GrowthShare)
-class GrowthShareAdmin(admin.ModelAdmin):
+class GrowthShareAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "component",

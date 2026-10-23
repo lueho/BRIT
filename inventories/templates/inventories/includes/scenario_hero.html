@@ -59,7 +59,7 @@
             <a class="dropdown-item" href="{% url 'scenario-list-owned' %}"><i class="fas fa-fw fa-list me-2" aria-hidden="true"></i>My scenarios</a>
           </li>
         {% endif %}
-        {% if policy.is_owner or policy.is_staff %}
+        {% if policy.can_read %}
           <li>
             <a class="dropdown-item" href="{% url 'scenario-download-summary' object.pk %}"><i class="fas fa-fw fa-file-arrow-down me-2" aria-hidden="true"></i>Download definition file</a>
           </li>

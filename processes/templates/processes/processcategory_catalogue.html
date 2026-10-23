@@ -81,7 +81,7 @@
             <a class="btn btn-sm btn-outline-secondary"
                href="{% url 'processes:processcategory-list-review' %}?scope=review">Categories in review</a>
           {% endif %}
-          {% if create_permission in perms or user.is_staff %}
+          {% if create_permission in perms %}
             <a class="btn btn-sm btn-outline-success"
                href="{% url 'processes:processcategory-create' %}">Add category</a>
           {% endif %}

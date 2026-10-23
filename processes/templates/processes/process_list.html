@@ -39,7 +39,7 @@
 {% endblock list_card_header %}
 
 {% block list_primary_actions %}
-    {% if create_permission in perms or user.is_staff %}
+    {% if create_permission in perms %}
         <a class="btn btn-primary btn-sm"
            href="{% url 'processes:process-create' %}">
             <i class="fas fa-plus"></i> Add process
@@ -134,7 +134,7 @@
                                         </div>
                                         {% if not user.is_authenticated %}
                                             <div class="small mb-2">Log in to create new processes.</div>
-                                        {% elif create_permission in perms or user.is_staff %}
+                                        {% elif create_permission in perms %}
                                             <div class="small mb-2">Create your first process to get started.</div>
                                         {% endif %}
                                         {% if user|can_moderate:object_list.model %}
@@ -144,7 +144,7 @@
                                 </tr>
                             {% elif not user.is_authenticated %}
                                 {% include "includes/list_empty_state.html" with hint="Log in to create new processes." %}
-                            {% elif create_permission in perms or user.is_staff %}
+                            {% elif create_permission in perms %}
                                 {% include "includes/list_empty_state.html" with hint="Create your first process to get started." %}
                             {% else %}
                                 {% include "includes/list_empty_state.html" %}

@@ -360,55 +360,6 @@ class AnalyticalMethod(NamedUserCreatedObject):
             return f"{self.name} (Ont: {self.ontology_uri})"
         return self.name
 
-    def cascade_review_action(self, action_name, actor=None, previous_status=None):
-        """Cascade review actions to linked sources.
-
-        Analytical method review actions are propagated to all linked sources so
-        reviewers can access collaborator references in the review UI.
-        """
-        action_map = {
-            "submit_for_review": {
-                "from": [
-                    UserCreatedObject.STATUS_PRIVATE,
-                    UserCreatedObject.STATUS_DECLINED,
-                ],
-                "handler": "submit_for_review",
-            },
-            "withdraw_from_review": {
-                "from": [UserCreatedObject.STATUS_REVIEW],
-                "handler": "withdraw_from_review",
-            },
-            "approve": {
-                "from": [UserCreatedObject.STATUS_REVIEW],
-                "handler": "approve",
-            },
-            "reject": {
-                "from": [UserCreatedObject.STATUS_REVIEW],
-                "handler": "reject",
-            },
-        }
-        config = action_map.get(action_name)
-        if not config:
-            return
-
-        sources_qs = self.sources.filter(
-            publication_status__in=config["from"],
-        )
-        for source in sources_qs:
-            action = getattr(source, config["handler"], None)
-            if not callable(action):
-                continue
-            if action_name == "approve" and actor is None:
-                # approve() requires the approving user for the audit trail.
-                continue
-            try:
-                if action_name == "approve":
-                    action(user=actor)
-                else:
-                    action()
-            except Exception:
-                continue
-
 
 class SampleSeries(NamedUserCreatedObject):
     """
