@@ -1,10 +1,13 @@
 "use strict";
 
 (function () {
-    if (window.__britTomSelectInlineCreateInitialized) {
+    // Symbol-keyed guard: idempotent across double-includes without adding a
+    // string-named global to window.
+    const initialized = Symbol.for('brit.tomSelectInlineCreateInitialized');
+    if (globalThis[initialized]) {
         return;
     }
-    window.__britTomSelectInlineCreateInitialized = true;
+    globalThis[initialized] = true;
 
     const selector = 'select[data-tomselect-create-url]';
 

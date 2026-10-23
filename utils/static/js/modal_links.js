@@ -33,5 +33,6 @@ if (document.readyState === "loading") {
     wireModalLinks();
 }
 
-// Expose for dynamic pages that load fragments later (optional)
-window.wireModalLinks = wireModalLinks;
+// Dynamic pages that inject fragments later request a rewire via this event
+// instead of a global function.
+document.addEventListener('brit:rewire-modal-links', wireModalLinks);

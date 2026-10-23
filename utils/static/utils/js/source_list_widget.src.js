@@ -25,10 +25,8 @@ function addSourceToList(listElement, sourceId, sourceLabel, selectElement) {
     link.textContent = sourceLabel;
     titleDiv.appendChild(link);
 
-    // Wire modal links if the function exists
-    if (window.wireModalLinks) {
-        window.wireModalLinks();
-    }
+    // Wire modal links after insertion so the new link gets bound.
+    document.dispatchEvent(new CustomEvent('brit:rewire-modal-links'));
 
     // Remove button
     const removeBtn = document.createElement('button');

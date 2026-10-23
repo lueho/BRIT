@@ -4,6 +4,11 @@ import test from "node:test";
 import vm from "node:vm";
 
 const source = readFileSync(new URL("./nuts_region_map.js", import.meta.url), "utf8");
+// In production the base template loads the shared helpers before this file.
+const formatUtilsSource = readFileSync(
+    new URL("../../../utils/static/js/format_utils.js", import.meta.url),
+    "utf8"
+);
 
 function deferred() {
     let resolve, reject;
@@ -58,6 +63,7 @@ function setup() {
         unlockFilter: () => { calls.unlockFilter += 1; },
     };
     vm.createContext(sandbox);
+    vm.runInContext(formatUtilsSource, sandbox);
     vm.runInContext(source, sandbox);
     const realUnlockForm = sandbox.unlockForm;
     sandbox.unlockForm = () => { calls.unlockForm += 1; return realUnlockForm(); };
