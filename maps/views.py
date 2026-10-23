@@ -2,18 +2,20 @@ from types import SimpleNamespace
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
-from django.core.exceptions import BadRequest, ImproperlyConfigured
+from django.core.exceptions import BadRequest
 from django.db import transaction
 from django.db.models import Q, Subquery, Value
 from django.db.models.functions import Coalesce, NullIf
 from django.forms import formset_factory
 from django.http import Http404, JsonResponse, StreamingHttpResponse
+from django.template.response import TemplateResponse
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.views import View
 from django.views.generic import DetailView, TemplateView
 from django.views.generic.edit import FormMixin
 from django_filters.views import FilterView
-from rest_framework.exceptions import NotFound, ParseError
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from rest_framework.exceptions import AuthenticationFailed, NotFound, ParseError
 from rest_framework.views import APIView, Response
 
 from maps.mixins import (
@@ -56,7 +58,6 @@ from utils.object_management.views import (
 from utils.views import BreadcrumbContextMixin
 
 from .filters import (
-    AttributeListFilter,
     CatchmentFilterSet,
     GeoDataSetFilterSet,
     LocationListFilter,
@@ -64,8 +65,6 @@ from .filters import (
     RegionFilterSet,
 )
 from .forms import (
-    AttributeModalModelForm,
-    AttributeModelForm,
     CatchmentCreateDrawCustomForm,
     CatchmentCreateMergeLauForm,
     CatchmentModelForm,
@@ -79,7 +78,6 @@ from .forms import (
     build_local_relation_filter_form,
 )
 from .models import (
-    Attribute,
     Catchment,
     GeoDataset,
     GeoPolygon,
@@ -94,6 +92,7 @@ from .models import (
     RegionProperty,
 )
 from .signals import clear_geojson_cache_pattern
+from .throttling import GeoJSONAnonThrottle
 from .validation import RegionCompositionError, validate_region_composition
 
 # Query parameters that are navigation/control hints rather than dataset
@@ -378,10 +377,22 @@ class MapMixin:
         return context
 
 
-class MapsDashboardView(BreadcrumbContextMixin, TemplateView):
-    template_name = "maps_dashboard.html"
+class MapsExplorerView(BreadcrumbContextMixin, TemplateView):
+    template_name = "maps_explorer.html"
     breadcrumb_module_label = "Maps"
     breadcrumb_page_title = "Maps"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        published = {"publication_status": "published"}
+        context["dataset_count"] = GeoDataset.objects.filter(**published).count()
+        context["region_count"] = Region.objects.filter(**published).count()
+        context["catchment_count"] = Catchment.objects.filter(**published).count()
+        context["location_count"] = Location.objects.filter(**published).count()
+        context["nuts_count"] = (
+            NutsRegion.objects.in_vintage().filter(**published).count()
+        )
+        return context
 
 
 # ----------- GeoDataSet CRUD ------------------------------------------------------------------------------------------
@@ -391,7 +402,7 @@ class MapsDashboardView(BreadcrumbContextMixin, TemplateView):
 class GeoDataSetRepresentationMixin:
     model = GeoDataset
     filterset_class = GeoDataSetFilterSet
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
     def get_default_filters(self):
         defaults = super().get_default_filters()
@@ -562,17 +573,9 @@ class GeoDataSetRuntimePermissionMixin:
             return self._dataset
         dataset_pk = self.kwargs.get("pk")
         try:
-            self._dataset = (
-                GeoDataset.objects.select_related(
-                    "region", "map_configuration", "runtime_configuration"
-                )
-                .prefetch_related("sources", "column_policies")
-                .get(pk=dataset_pk)
-            )
+            self._dataset = GeoDataset.with_map_relations().get(pk=dataset_pk)
         except GeoDataset.DoesNotExist as err:
-            raise ImproperlyConfigured(
-                f"No GeoDataset with pk {dataset_pk} found."
-            ) from err
+            raise Http404(f"No GeoDataset with pk {dataset_pk} found.") from err
         return self._dataset
 
     def add_current_query_params(self, url):
@@ -663,6 +666,7 @@ class GeoDataSetRuntimePermissionMixin:
 class FilteredMapMixin(MapMixin):
     model_name = None  # TODO: Remove this for pk
     template_name = "filtered_map.html"
+    dataset_unavailable_template_name = "maps/dataset_unavailable.html"
 
     def get_features_feature_id(self):
         # Filtered maps show the whole (filtered) features layer, not a single
@@ -671,31 +675,28 @@ class FilteredMapMixin(MapMixin):
 
     def get_dataset(self):
         dataset_pk = self.kwargs.get("pk")
+        queryset = GeoDataset.with_map_relations()
         if dataset_pk is not None:
             try:
-                return (
-                    GeoDataset.objects.select_related(
-                        "region", "map_configuration", "runtime_configuration"
-                    )
-                    .prefetch_related("sources", "column_policies")
-                    .get(pk=dataset_pk)
-                )
+                return queryset.get(pk=dataset_pk)
             except GeoDataset.DoesNotExist as err:
-                raise ImproperlyConfigured(
-                    f"No GeoDataset with pk {dataset_pk} found."
-                ) from err
-        try:
-            return (
-                GeoDataset.objects.select_related(
-                    "region", "map_configuration", "runtime_configuration"
+                raise Http404(f"No GeoDataset with pk {dataset_pk} found.") from err
+        return queryset.get(model_name=self.model_name)
+
+    def get(self, request, *args, **kwargs):
+        if self.kwargs.get("pk") is None and self.model_name:
+            try:
+                self.get_dataset()
+            except GeoDataset.DoesNotExist:
+                return TemplateResponse(
+                    request,
+                    self.dataset_unavailable_template_name,
+                    {
+                        "map_title": self.get_map_title(),
+                        "model_name": self.model_name,
+                    },
                 )
-                .prefetch_related("sources", "column_policies")
-                .get(model_name=self.model_name)
-            )
-        except GeoDataset.DoesNotExist as err:
-            raise ImproperlyConfigured(
-                f"No GeoDataset with model_name {self.model_name} found."
-            ) from err
+        return super().get(request, *args, **kwargs)
 
     def get_region_feature_id(self):
         return self.get_dataset().region_id
@@ -733,7 +734,7 @@ class GeoDataSetRuntimeMapView(
         self.get_runtime_adapter().configure_view(self)
         self.object = dataset
         self.map_title = dataset.name
-        self.dashboard_url = dataset.get_absolute_url()
+        self.explorer_url = dataset.get_absolute_url()
 
     def get(self, request, *args, **kwargs):
         adapter = self.get_runtime_adapter()
@@ -760,7 +761,7 @@ class GeoDataSetRuntimeMapView(
         context_update = {
             "object": dataset,
             "dataset": dataset,
-            "dashboard_url": dataset.get_absolute_url(),
+            "explorer_url": dataset.get_absolute_url(),
             "public_map_url": dataset.get_map_url(),
             "private_map_url": dataset.get_map_url(),
             "review_map_url": dataset.get_map_url(),
@@ -836,13 +837,13 @@ class GeoDataSetRuntimeTableView(
                 }
                 for obj in context["object_list"]
             ],
-            "dashboard_url": dataset.get_absolute_url(),
+            "explorer_url": dataset.get_absolute_url(),
             "map_url": self.add_current_query_params(dataset.get_map_url()),
             "public_map_url": dataset.get_map_url(),
             "private_map_url": dataset.get_map_url(),
             "review_map_url": dataset.get_map_url(),
             "breadcrumb_module_label": "Maps",
-            "breadcrumb_module_url": reverse("maps-dashboard"),
+            "breadcrumb_module_url": reverse("maps-explorer"),
             "breadcrumb_section_label": "GeoDatasets",
             "breadcrumb_section_url": reverse("geodataset-list"),
             "breadcrumb_object_label": dataset.name,
@@ -923,7 +924,7 @@ class GeoDataSetRuntimeFeatureDetailView(
                     for policy in column_policies
                 ],
                 "breadcrumb_module_label": "Maps",
-                "breadcrumb_module_url": reverse("maps-dashboard"),
+                "breadcrumb_module_url": reverse("maps-explorer"),
                 "breadcrumb_section_label": "GeoDatasets",
                 "breadcrumb_section_url": reverse("geodataset-list"),
                 "breadcrumb_object_label": dataset.name,
@@ -938,8 +939,22 @@ class GeoDataSetRuntimeFeatureDetailView(
 class GeoDataSetRuntimeFeatureGeoJSONView(
     GeoDataSetRuntimePermissionMixin, UserPassesTestMixin, APIView
 ):
-    authentication_classes = []
+    authentication_classes = [SessionAuthentication]
     permission_classes = []
+    throttle_classes = [GeoJSONAnonThrottle]
+
+    def dispatch(self, request, *args, **kwargs):
+        # The visibility check in UserPassesTestMixin runs before DRF
+        # authentication, so resolve a valid token user first. Invalid tokens
+        # stay anonymous rather than turning public datasets into 401s.
+        if not request.user.is_authenticated and "HTTP_AUTHORIZATION" in request.META:
+            try:
+                token_auth = TokenAuthentication().authenticate(request)
+            except AuthenticationFailed:
+                token_auth = None
+            if token_auth is not None:
+                request.user = token_auth[0]
+        return super().dispatch(request, *args, **kwargs)
 
     def get(self, request, *args, **kwargs):
         adapter = self.get_runtime_adapter()
@@ -1041,13 +1056,13 @@ class GeoDataSetAutocompleteView(UserCreatedObjectAutocompleteView):
 class LocationPublishedListView(PublishedObjectFilterView):
     model = Location
     filterset_class = LocationListFilter
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class LocationPrivateListView(PrivateObjectFilterView):
     model = Location
     filterset_class = LocationListFilter
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class LocationAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -1079,13 +1094,13 @@ class LocationModalDeleteView(UserCreatedObjectModalDeleteView):
 class RegionPublishedFilterView(PublishedObjectFilterView):
     model = Region
     filterset_class = RegionFilterSet
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class RegionPrivateFilterView(PrivateObjectFilterView):
     model = Region
     filterset_class = RegionFilterSet
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class RegionMapView(LoginRequiredMixin, MapMixin, FilterView):
@@ -1173,13 +1188,13 @@ class RegionModalDeleteView(UserCreatedObjectModalDeleteView):
 class CatchmentPublishedFilterView(PublishedObjectFilterView):
     model = Catchment
     filterset_class = CatchmentFilterSet
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class CatchmentPrivateFilterView(PrivateObjectFilterView):
     model = Catchment
     filterset_class = CatchmentFilterSet
-    dashboard_url = reverse_lazy("maps-dashboard")
+    explorer_url = reverse_lazy("maps-explorer")
 
 
 class CatchmentDetailView(MapMixin, UserCreatedObjectDetailView):
@@ -1324,14 +1339,18 @@ class CatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
         return super().filter_by_lookup(queryset, lookup, value)
 
     def get_region(self):
-        return GeoDataset.objects.get(model_name=self.geodataset_model_name).region
+        try:
+            return GeoDataset.objects.get(model_name=self.geodataset_model_name).region
+        except GeoDataset.DoesNotExist:
+            return None
 
     def get_queryset(self):
         queryset = super().get_queryset()
         if self.geodataset_model_name:
-            queryset = queryset.filter(
-                region__borders__geom__within=self.get_region().geom
-            )
+            region = self.get_region()
+            if region is None:
+                return queryset.none()
+            queryset = queryset.filter(region__borders__geom__within=region.geom)
         return queryset
 
 
@@ -1580,29 +1599,58 @@ class NutsRegionPublishedMapView(GeoDataSetPublishedFilteredMapView):
     map_title = "NUTS Regions"
 
 
-class NutsRegionPedigreeAPI(APIView):
-    """
-    This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
-    region and not the geometry.
-    """
+class BasePedigreeAPI(APIView):
+    """Shared validation and traversal helpers for the pedigree option APIs."""
 
     authentication_classes = []
     permission_classes = []
 
     @staticmethod
-    def get(request):
+    def validate_params(request, object_label):
         if "id" not in request.query_params:
             raise ParseError(
-                'Query parameter "id" missing. Must provide valid id of NUTS region.'
+                f'Query parameter "id" missing. Must provide valid {object_label}.'
             )
-
         if "direction" not in request.query_params or request.query_params[
             "direction"
         ] not in ("children", "parents"):
             raise ParseError(
                 'Missing or wrong query parameter "direction". Options: "parents", "children"'
             )
+        return request.query_params["direction"]
 
+    @staticmethod
+    def traverse_children(instance, serializer_cls, prefetch=None):
+        data = {}
+        for lvl in range(instance.levl_code + 1, 4):
+            qs = NutsRegion.objects.filter(
+                levl_code=lvl,
+                nuts_id__startswith=instance.nuts_id,
+                version=instance.version_id,
+            )
+            if prefetch:
+                qs = qs.prefetch_related(prefetch)
+            data[f"id_level_{lvl}"] = serializer_cls(qs, many=True).data
+        return data
+
+    @staticmethod
+    def traverse_parents(instance, serializer_cls):
+        data = {}
+        for lvl in range(instance.levl_code - 1, -1, -1):
+            instance = instance.parent
+            data[f"id_level_{lvl}"] = serializer_cls(instance).data
+        return data
+
+
+class NutsRegionPedigreeAPI(BasePedigreeAPI):
+    """
+    This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
+    region and not the geometry.
+    """
+
+    @staticmethod
+    def get(request):
+        direction = BasePedigreeAPI.validate_params(request, "id of NUTS region")
         try:
             instance = NutsRegion.objects.get(id=request.query_params["id"])
         except NutsRegion.DoesNotExist as err:
@@ -1610,50 +1658,26 @@ class NutsRegionPedigreeAPI(APIView):
                 "A NUTS region with the provided id does not exist."
             ) from err
 
-        data = {}
-
-        if request.query_params["direction"] == "children":
-            for lvl in range(instance.levl_code + 1, 4):
-                qs = NutsRegion.objects.filter(
-                    levl_code=lvl,
-                    nuts_id__startswith=instance.nuts_id,
-                    version=instance.version_id,
-                )
-                serializer = NutsRegionOptionSerializer(qs, many=True)
-                data[f"id_level_{lvl}"] = serializer.data
-
-        if request.query_params["direction"] == "parents":
-            for lvl in range(instance.levl_code - 1, -1, -1):
-                instance = instance.parent
-                serializer = NutsRegionOptionSerializer(instance)
-                data[f"id_level_{lvl}"] = serializer.data
-
+        if direction == "children":
+            data = BasePedigreeAPI.traverse_children(
+                instance, NutsRegionOptionSerializer
+            )
+        else:
+            data = BasePedigreeAPI.traverse_parents(
+                instance, NutsRegionOptionSerializer
+            )
         return Response(data)
 
 
-class NutsAndLauCatchmentPedigreeAPI(APIView):
+class NutsAndLauCatchmentPedigreeAPI(BasePedigreeAPI):
     """
     This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
     region and not the geometry.
     """
 
-    authentication_classes = []
-    permission_classes = []
-
     @staticmethod
     def get(request):
-        if "id" not in request.query_params:
-            raise ParseError(
-                'Query parameter "id" missing. Must provide valid catchment id.'
-            )
-
-        if "direction" not in request.query_params or request.query_params[
-            "direction"
-        ] not in ("children", "parents"):
-            raise ParseError(
-                'Missing or wrong query parameter "direction". Options: "parents", "children"'
-            )
-
+        direction = BasePedigreeAPI.validate_params(request, "catchment id")
         try:
             catchment = Catchment.objects.get(id=request.query_params["id"])
             instance = catchment.region.nutsregion
@@ -1662,89 +1686,25 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
                 "A NUTS region with the provided id does not exist."
             ) from err
 
-        data = {}
-
-        if request.query_params["direction"] == "children":
-            for lvl in range(instance.levl_code + 1, 4):
-                # Prefetch needed: serializer accesses region_ptr.catchment_set in get_id
-                qs = NutsRegion.objects.filter(
-                    levl_code=lvl,
-                    nuts_id__startswith=instance.nuts_id,
-                    version=instance.version_id,
-                ).prefetch_related("region_ptr__catchment_set")
-                serializer = NutsRegionCatchmentOptionSerializer(qs, many=True)
-                data[f"id_level_{lvl}"] = serializer.data
+        if direction == "children":
+            # Prefetch needed: serializer accesses region_ptr.catchment_set in get_id
+            data = BasePedigreeAPI.traverse_children(
+                instance,
+                NutsRegionCatchmentOptionSerializer,
+                prefetch="region_ptr__catchment_set",
+            )
             data["id_level_4"] = []
             if instance.levl_code == 3:
                 # Prefetch needed: serializer accesses region_ptr.catchment_set
                 qs = LauRegion.objects.filter(nuts_parent=instance).prefetch_related(
                     "region_ptr__catchment_set"
                 )
-                serializer = LauRegionOptionSerializer(qs, many=True)
-                data["id_level_4"] = serializer.data
-
-        if request.query_params["direction"] == "parents":
-            for lvl in range(instance.levl_code - 1, -1, -1):
-                instance = instance.parent
-                serializer = NutsRegionCatchmentOptionSerializer(instance)
-                data[f"id_level_{lvl}"] = serializer.data
-
+                data["id_level_4"] = LauRegionOptionSerializer(qs, many=True).data
+        else:
+            data = BasePedigreeAPI.traverse_parents(
+                instance, NutsRegionCatchmentOptionSerializer
+            )
         return Response(data)
-
-
-# ----------- Attribute CRUD -------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class AttributePublishedListView(PublishedObjectFilterView):
-    model = Attribute
-    filterset_class = AttributeListFilter
-    dashboard_url = reverse_lazy("maps-dashboard")
-
-
-class AttributePrivateListView(PrivateObjectFilterView):
-    model = Attribute
-    filterset_class = AttributeListFilter
-    dashboard_url = reverse_lazy("maps-dashboard")
-
-
-class AttributeAutocompleteView(UserCreatedObjectAutocompleteView):
-    model = Attribute
-
-
-class AttributeCreateView(UserCreatedObjectCreateView):
-    form_class = AttributeModelForm
-    success_url = reverse_lazy("attribute-list")
-    permission_required = "maps.add_attribute"
-
-
-class AttributeModalCreateView(UserCreatedObjectModalCreateView):
-    form_class = AttributeModalModelForm
-    success_url = reverse_lazy("attribute-list")
-    permission_required = "maps.add_attribute"
-
-
-class AttributeDetailView(UserCreatedObjectDetailView):
-    template_name = "attribute_detail.html"
-    model = Attribute
-
-
-class AttributeModalDetailView(UserCreatedObjectModalDetailView):
-    model = Attribute
-
-
-class AttributeUpdateView(UserCreatedObjectUpdateView):
-    model = Attribute
-    form_class = AttributeModelForm
-
-
-class AttributeModalUpdateView(UserCreatedObjectModalUpdateView):
-    model = Attribute
-    form_class = AttributeModalModelForm
-
-
-class AttributeModalDeleteView(UserCreatedObjectModalDeleteView):
-    model = Attribute
 
 
 # ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------

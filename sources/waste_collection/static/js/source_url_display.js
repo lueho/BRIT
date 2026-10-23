@@ -48,31 +48,31 @@
 
     const timestamp = waybackMatch[1];
     const originalUrl = waybackMatch[2];
+    const date = `${timestamp.slice(0, 4)}-${timestamp.slice(4, 6)}-${timestamp.slice(6, 8)}`;
 
     try {
       const parsedOriginalUrl = new URL(originalUrl);
       const host = normalizeHost(parsedOriginalUrl.hostname);
       const path = compactPath(parsedOriginalUrl.pathname);
-      const date = `${timestamp.slice(0, 4)}-${timestamp.slice(4, 6)}-${timestamp.slice(6, 8)}`;
-      return `Archive ${date} · ${host}${path}`;
+      return { label: `${host}${path}`, archived: date };
     } catch (error) {
-      return `Archive · ${truncateMiddle(originalUrl, 64)}`;
+      return { label: truncateMiddle(originalUrl, 64), archived: date };
     }
   }
 
   function compactUrl(urlString) {
-    const waybackLabel = parseWaybackUrl(urlString);
-    if (waybackLabel) {
-      return waybackLabel;
+    const wayback = parseWaybackUrl(urlString);
+    if (wayback) {
+      return wayback;
     }
 
     try {
       const parsedUrl = new URL(urlString);
       const host = normalizeHost(parsedUrl.hostname);
       const path = compactPath(parsedUrl.pathname);
-      return `${host}${path}`;
+      return { label: `${host}${path}`, archived: null };
     } catch (error) {
-      return truncateMiddle(urlString, 72);
+      return { label: truncateMiddle(urlString, 72), archived: null };
     }
   }
 
@@ -82,13 +82,20 @@
       return;
     }
 
-    const label = compactUrl(href);
+    const compact = compactUrl(href);
     const labelContainer = anchor.querySelector(".source-url-label");
 
     if (labelContainer) {
-      labelContainer.textContent = label;
+      labelContainer.textContent = compact.label;
     } else {
-      anchor.textContent = label;
+      anchor.textContent = compact.label;
+    }
+
+    if (compact.archived) {
+      const archived = document.createElement("span");
+      archived.className = "source-url-archived";
+      archived.textContent = `archived ${compact.archived}`;
+      (labelContainer || anchor).appendChild(archived);
     }
 
     anchor.setAttribute("title", href);

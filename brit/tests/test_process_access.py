@@ -27,17 +27,19 @@ class ProcessNavigationPermissionTests(TestCase):
         self.user.user_permissions.add(self.permission)
         self.client.force_login(self.user)
         response = self.client.get(reverse("home"))
-        self.assertContains(response, "processes_cover_card.png")
+        self.assertContains(
+            response, f'href="{reverse("processes:process-list")}"', count=3
+        )
 
     def test_group_name_alone_does_not_show_module(self):
         self.user.groups.add(Group.objects.get_or_create(name="process-team")[0])
         self.client.force_login(self.user)
         response = self.client.get(reverse("home"))
-        self.assertNotContains(response, "processes_cover_card.png")
+        self.assertNotContains(response, f'href="{reverse("processes:process-list")}"')
 
     def test_anonymous_user_does_not_see_module(self):
         response = self.client.get(reverse("home"))
-        self.assertNotContains(response, "processes_cover_card.png")
+        self.assertNotContains(response, f'href="{reverse("processes:process-list")}"')
 
     def test_removing_membership_hides_module_on_next_request(self):
         self.user.groups.add(self.group)
@@ -45,5 +47,6 @@ class ProcessNavigationPermissionTests(TestCase):
         self.client.get(reverse("home"))
         self.user.groups.remove(self.group)
         self.assertNotContains(
-            self.client.get(reverse("home")), "processes_cover_card.png"
+            self.client.get(reverse("home")),
+            f'href="{reverse("processes:process-list")}"',
         )

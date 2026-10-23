@@ -4,12 +4,14 @@ import io
 import smtplib
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.sites.models import Site
-from django.test import RequestFactory, TestCase
+from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from registration.models import RegistrationProfile
 
+from users.models import UserProfile
 from users.views import RegistrationView
 
 SEND_EMAIL = "registration.models.RegistrationProfile.send_activation_email"
@@ -159,3 +161,79 @@ class CleanupExpiredRegistrationsTaskTests(TestCase):
         )
         self.assertFalse(User.objects.filter(username="stale").exists())
         self.assertTrue(User.objects.filter(username="admin").exists())
+
+
+class ReviewNotificationPreferenceViewTests(TestCase):
+    """Access and scope checks for the global opt-out preference."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            username="pref-user", email="pref@example.com"
+        )
+
+    def test_profile_page_defaults_enabled_without_creating_profile(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("user_profile"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["review_notifications_enabled"])
+        self.assertFalse(UserProfile.objects.filter(user=self.user).exists())
+
+    def test_post_only_changes_own_profile_even_with_forged_user_id(self):
+        other = User.objects.create_user(
+            username="other-pref", email="other-pref@example.com"
+        )
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("review_notification_preference"), data={"user": other.pk}
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(UserProfile.objects.get(user=self.user).review_notifications)
+        self.assertFalse(UserProfile.objects.filter(user=other).exists())
+
+    def test_get_on_preference_endpoint_returns_405_without_mutation(self):
+        self.client.force_login(self.user)
+        with self.assertLogs("django.request", level="WARNING") as logs:
+            response = self.client.get(reverse("review_notification_preference"))
+
+        self.assertEqual(response.status_code, 405)
+        output = "\n".join(logs.output)
+        self.assertIn("Method Not Allowed", output)
+        self.assertIn(reverse("review_notification_preference"), output)
+        self.assertFalse(UserProfile.objects.filter(user=self.user).exists())
+
+    def test_anonymous_post_redirects_to_login_without_profile(self):
+        response = self.client.post(reverse("review_notification_preference"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith("/users/login/"))
+        self.assertFalse(UserProfile.objects.exists())
+
+    def test_disabled_state_rendered_and_reenabled(self):
+        self.client.force_login(self.user)
+        self.client.post(reverse("review_notification_preference"))
+
+        response = self.client.get(reverse("user_profile"))
+        self.assertFalse(response.context["review_notifications_enabled"])
+
+        self.client.post(reverse("review_notification_preference"))
+        self.assertTrue(UserProfile.objects.get(user=self.user).review_notifications)
+
+    def test_preference_post_requires_csrf_token(self):
+        middleware = list(settings.MIDDLEWARE)
+        csrf = "django.middleware.csrf.CsrfViewMiddleware"
+        if csrf not in middleware:
+            middleware.append(csrf)
+        with override_settings(MIDDLEWARE=middleware):
+            client = Client(enforce_csrf_checks=True)
+            client.force_login(self.user)
+            with self.assertLogs("django.security.csrf", level="WARNING") as logs:
+                response = client.post(reverse("review_notification_preference"))
+
+        self.assertEqual(response.status_code, 403)
+        output = "\n".join(logs.output)
+        self.assertIn("CSRF", output)
+        self.assertIn(reverse("review_notification_preference"), output)
+        self.assertFalse(UserProfile.objects.filter(user=self.user).exists())

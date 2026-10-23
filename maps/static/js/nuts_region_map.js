@@ -2,23 +2,13 @@
 
 let isProgrammaticChange = false;
 
-const fieldConfig = {
-    nuts_id: {
-        include: true, format: (value) => value || ''
-    },
-    name: {
-        include: true, format: (value) => value || ''
-    },
-    population: {
-        include: true, format: (value) => value || ''
-    },
-    population_density: {
-        include: true, format: (value) => value || ''
-    },
-    urban_rural_remoteness: {
-        include: true, format: (value) => value || ''
-    },
-};
+const fieldConfig = createFieldConfig({
+    nuts_id: true,
+    name: true,
+    population: true,
+    population_density: true,
+    urban_rural_remoteness: true,
+});
 
 function lockForm() {
     document.querySelectorAll("select")

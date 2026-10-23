@@ -1,5 +1,7 @@
 from django.contrib import admin
 
+from utils.object_management.admin import NamedUserCreatedObjectAdmin, PolicyAdminMixin
+
 from .models import (
     AggregatedCollectionPropertyValue,
     BinConfiguration,
@@ -17,47 +19,33 @@ from .models import (
 
 
 @admin.register(Collector)
-class CollectorAdmin(admin.ModelAdmin):
+class CollectorAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "website", "catchment", "owner", "publication_status")
     search_fields = ("name", "description")
-    list_filter = ("publication_status",)
-    ordering = ("name",)
 
 
 @admin.register(CollectionSystem)
-class CollectionSystemAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class CollectionSystemAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(BinConfiguration)
-class BinConfigurationAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class BinConfigurationAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(WasteCategory)
-class WasteCategoryAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class WasteCategoryAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(WasteComponent)
-class WasteComponentAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class WasteComponentAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(WasteFlyer)
-class WasteFlyerAdmin(admin.ModelAdmin):
+class WasteFlyerAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("__str__", "url", "url_valid", "owner", "publication_status")
     search_fields = ("url", "title")
     list_filter = ("publication_status", "url_valid")
@@ -65,7 +53,7 @@ class WasteFlyerAdmin(admin.ModelAdmin):
 
 
 @admin.register(CollectionSeason)
-class CollectionSeasonAdmin(admin.ModelAdmin):
+class CollectionSeasonAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "distribution",
@@ -79,23 +67,18 @@ class CollectionSeasonAdmin(admin.ModelAdmin):
 
 
 @admin.register(CollectionFrequency)
-class CollectionFrequencyAdmin(admin.ModelAdmin):
+class CollectionFrequencyAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "type", "owner", "publication_status")
-    search_fields = ("name",)
     list_filter = ("publication_status", "type")
-    ordering = ("name",)
 
 
 @admin.register(FeeSystem)
-class FeeSystemAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class FeeSystemAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(Collection)
-class CollectionAdmin(admin.ModelAdmin):
+class CollectionAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "collector",
@@ -113,13 +96,12 @@ class CollectionAdmin(admin.ModelAdmin):
         "collection_system",
         "bin_configuration",
     )
-    ordering = ("name",)
     autocomplete_fields = ("sources",)
     filter_horizontal = ("samples", "flyers", "predecessors")
 
 
 @admin.register(CollectionPropertyValue)
-class CollectionPropertyValueAdmin(admin.ModelAdmin):
+class CollectionPropertyValueAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "collection",
@@ -136,7 +118,7 @@ class CollectionPropertyValueAdmin(admin.ModelAdmin):
 
 
 @admin.register(AggregatedCollectionPropertyValue)
-class AggregatedCollectionPropertyValueAdmin(admin.ModelAdmin):
+class AggregatedCollectionPropertyValueAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "property",

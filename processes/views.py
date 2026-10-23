@@ -9,18 +9,26 @@ from urllib.parse import urlsplit
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Prefetch, prefetch_related_objects
+from django.forms.models import construct_instance
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
-from django.views.generic import RedirectView, TemplateView
+from django.views.generic import TemplateView
 
 from bibliography.models import Author, Source
 from materials.models import Material
 from utils.forms import workspace_section_formsets
 from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import (
+    apply_scope_filter,
     filter_queryset_for_user,
     get_object_policy,
+    user_is_moderator_for_model,
+)
+from utils.object_management.services import (
+    content_mutation,
+    is_independent_evidence_model,
+    save_evidence_formset_rows,
 )
 from utils.object_management.views import (
     OwnedObjectModelSelectOptionsView,
@@ -58,71 +66,66 @@ from .models import (
     ProcessOperatingParameter,
     ProcessSource,
 )
-from .navigation import discovery_context
+from .navigation import (
+    categories_url,
+    category_process_list_url,
+    discovery_context,
+    process_scope_url,
+)
 from .querysets import with_process_count
 
 # ==============================================================================
-# Dashboard
+# Explorer
 # ==============================================================================
 
 
-class ProcessDashboardView(BreadcrumbContextMixin, TemplateView):
-    """Main dashboard for the processes module."""
+class ProcessExplorerView(BreadcrumbContextMixin, TemplateView):
+    """Explorer landing page for the processes module."""
 
-    template_name = "processes/dashboard.html"
+    template_name = "processes/explorer.html"
     breadcrumb_module_label = "Processes"
     breadcrumb_page_title = "Processes"
+    top_category_limit = 8
+    recent_process_limit = 5
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-
-        # Statistics: use the same read policy as the lists so counts match
-        # what the current user can actually see.
-        visible_processes = filter_queryset_for_user(Process.objects.all(), user)
-        context["total_processes"] = visible_processes.count()
-        visible_categories = filter_queryset_for_user(
-            ProcessCategory.objects.all(), user
-        )
-        context["total_categories"] = visible_categories.count()
-
-        # Recent processes
-        context["recent_processes"] = (
-            visible_processes.select_related("owner")
-            .prefetch_related("categories")
-            .order_by("-lastmodified_at")[:5]
+        published_processes = Process.objects.filter(publication_status="published")
+        published_categories = ProcessCategory.objects.filter(
+            publication_status="published"
         )
 
-        # Categories with process counts
-        context["categories_with_counts"] = with_process_count(
-            visible_categories, publication_status="published", user=user
-        ).order_by("-process_count")[:10]
+        context["process_count"] = published_processes.count()
+        context["category_count"] = published_categories.count()
+        top_categories = (
+            with_process_count(published_categories, publication_status="published")
+            .filter(process_count__gt=0)
+            .order_by("-process_count", "name")[: self.top_category_limit]
+        )
+        for category in top_categories:
+            category.process_list_url = category_process_list_url(category, "published")
+        context["top_categories"] = top_categories
+        context["recent_processes"] = published_processes.order_by("-lastmodified_at")[
+            : self.recent_process_limit
+        ]
+        context["categories_url"] = categories_url("published")
 
-        # User's private processes if authenticated
         if user.is_authenticated:
-            context["my_processes"] = Process.objects.filter(owner=user).order_by(
-                "-lastmodified_at"
-            )[:5]
-            context["can_add_process"] = user.has_perm("processes.add_process")
-            context["can_add_processcategory"] = user.has_perm(
-                "processes.add_processcategory"
-            )
-        else:
-            context["can_add_process"] = False
-            context["can_add_processcategory"] = False
-
+            context["my_process_count"] = apply_scope_filter(
+                Process.objects.all(), "private", user=user
+            ).count()
+            context["my_processes_url"] = process_scope_url("private")
+        if user_is_moderator_for_model(user, Process):
+            context["review_count"] = apply_scope_filter(
+                Process.objects.all(), "review", user=user
+            ).count()
+            context["review_processes_url"] = process_scope_url("review")
+        context["can_add_process"] = user.has_perm("processes.add_process")
+        context["can_add_processcategory"] = user.has_perm(
+            "processes.add_processcategory"
+        )
         return context
-
-
-class ProcessDiscoveryRedirectView(RedirectView):
-    """Redirect legacy dashboard/explorer URLs to the category catalogue."""
-
-    permanent = False
-
-    def get_redirect_url(self, *args, **kwargs):
-        url = reverse("processes:processcategory-list")
-        query = self.request.GET.urlencode()
-        return f"{url}?{query}" if query else url
 
 
 # ==============================================================================
@@ -157,7 +160,7 @@ class ProcessCategoryListViewMixin:
 
     model = ProcessCategory
     template_name = "processes/processcategory_list.html"
-    dashboard_url = None
+    explorer_url = reverse_lazy("processes:explorer")
     context_object_name = "categories"
     filterset_class = ProcessCategoryFilter
     paginate_by = 20
@@ -363,8 +366,7 @@ class ProcessFilterViewMixin:
 
     model = Process
     template_name = "processes/process_list.html"
-    dashboard_url = None
-    breadcrumb_module_url = reverse_lazy("processes:process-list")
+    explorer_url = reverse_lazy("processes:explorer")
     context_object_name = "processes"
     filterset_class = ProcessFilter
     paginate_by = 20
@@ -767,12 +769,31 @@ class ProcessUpdateView(UserCreatedObjectUpdateView):
         return super().render_to_response(context, **response_kwargs)
 
     def form_valid(self, form):
-        validity = [inline.is_valid() for inline in self.get_inlines()]
+        inlines = self.get_inlines()
+        validity = [inline.is_valid() for inline in inlines]
         if not all(validity):
             return self.form_invalid(form)
-        self.object = form.save()
-        for inline in self.get_inlines():
-            inline.save()
+        evidence_inlines = [
+            inline
+            for inline in inlines
+            if is_independent_evidence_model(getattr(inline, "model", None))
+        ]
+        other_inlines = [inline for inline in inlines if inline not in evidence_inlines]
+        with transaction.atomic():
+            if self.section.get("fields") or other_inlines:
+                with content_mutation(
+                    self.request.user, self.object, action="edit"
+                ) as locked_object:
+                    self.object = locked_object
+                    if self.section.get("fields"):
+                        form.instance = locked_object
+                        construct_instance(form, locked_object)
+                        self.object = form.save()
+                    for inline in other_inlines:
+                        inline.instance = locked_object
+                        inline.save()
+            for inline in evidence_inlines:
+                save_evidence_formset_rows(self.request.user, inline, self.object)
         if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
             context = {"object": self.object, "section": self.section}
             if "role" in self.section:

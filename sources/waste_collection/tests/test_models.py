@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from unittest.mock import patch
 
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db.models import signals
 from django.test import TestCase
@@ -59,7 +60,9 @@ class InitialDataTestCase(TestCase):
 class WasteComponentManagerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        category = MaterialCategory.objects.create(name="Biowaste component")
+        category, _ = MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.waste_component = WasteComponent.objects.create(name="Kitchen waste")
         cls.material_component = MaterialComponent.objects.create(name="Carbon")
         cls.material_component.categories.add(category)
@@ -70,6 +73,52 @@ class WasteComponentManagerTestCase(TestCase):
             self.material_component.pk,
             WasteComponent.objects.values_list("pk", flat=True),
         )
+
+    def test_component_with_same_named_categories_is_listed_once(self):
+        other_owner = User.objects.create(username="other-owner")
+        other_category = MaterialCategory.objects.create(
+            owner=other_owner, name="Biowaste component"
+        )
+        self.waste_component.categories.add(other_category)
+        self.assertEqual(
+            self.waste_component.categories.filter(name="Biowaste component").count(),
+            2,
+        )
+        self.assertEqual(
+            list(
+                WasteComponent.objects.filter(pk=self.waste_component.pk).values_list(
+                    "pk", flat=True
+                )
+            ),
+            [self.waste_component.pk],
+        )
+        self.assertEqual(
+            WasteComponent.objects.filter(pk=self.waste_component.pk).count(), 1
+        )
+        self.assertEqual(
+            WasteComponent.objects.get(pk=self.waste_component.pk),
+            self.waste_component,
+        )
+
+    def test_component_classified_only_by_other_owner_is_listed_once(self):
+        other_owner = User.objects.create(username="other-owner")
+        other_category = MaterialCategory.objects.create(
+            owner=other_owner, name="Biowaste component"
+        )
+        material = Material.objects.create(
+            name="Legacy classified material", type="material"
+        )
+        material.categories.add(other_category)
+        self.assertEqual(
+            list(
+                WasteComponent.objects.filter(pk=material.pk).values_list(
+                    "pk", flat=True
+                )
+            ),
+            [material.pk],
+        )
+        self.assertEqual(material.categories.count(), 1)
+        self.assertFalse(material.categories.filter(owner=get_default_owner()).exists())
 
 
 class CollectionCatchmentTestCase(TestCase):
@@ -127,24 +176,25 @@ class WasteFlyerTestCase(TestCase):
 
 
 class WasteFlyerUrlCheckSignalTestCase(TestCase):
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.catchment = CollectionCatchment.objects.create(name="Signal Catchment")
-        self.collection_system = CollectionSystem.objects.create(name="Signal System")
-        self.category = WasteCategory.objects.create(name="Signal Category")
-        self.collection = Collection.objects.create(
-            owner=self.owner,
-            catchment=self.catchment,
-            collection_system=self.collection_system,
-            waste_category=self.category,
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_default_owner()
+        cls.catchment = CollectionCatchment.objects.create(name="Signal Catchment")
+        cls.collection_system = CollectionSystem.objects.create(name="Signal System")
+        cls.category = WasteCategory.objects.create(name="Signal Category")
+        cls.collection = Collection.objects.create(
+            owner=cls.owner,
+            catchment=cls.catchment,
+            collection_system=cls.collection_system,
+            waste_category=cls.category,
             valid_from=date(2024, 1, 1),
         )
-        self.property = Property.objects.create(
-            owner=self.owner,
+        cls.property = Property.objects.create(
+            owner=cls.owner,
             name="Signal Property",
         )
-        self.unit = Unit.objects.create(owner=self.owner, name="kg", symbol="kg")
-        self.property.allowed_units.add(self.unit)
+        cls.unit = Unit.objects.create(owner=cls.owner, name="kg", symbol="kg")
+        cls.property.allowed_units.add(cls.unit)
 
     @patch("sources.waste_collection.models.celery.current_app.send_task")
     def test_collection_flyer_add_schedules_wasteflyer_url_check(self, mock_send_task):
@@ -886,11 +936,16 @@ class CollectionReviewCascadeTransitionTestCase(TestCase):
             publication_status="published"
         )
 
+        approver = User.objects.create_user(username="cascade-approver")
         with self.assertLogs("sources.waste_collection.models", "WARNING") as logs:
-            Collection._apply_review_action_transition([stale, other], "approve")
+            Collection._apply_review_action_transition(
+                [stale, other], "approve", actor=approver
+            )
 
         other.refresh_from_db()
         self.assertEqual(other.publication_status, "published")
+        self.assertIsNotNone(other.approved_at)
+        self.assertEqual(other.approved_by_id, approver.pk)
         self.assertEqual(len(logs.records), 1)
         self.assertIn(str(stale.pk), logs.output[0])
 

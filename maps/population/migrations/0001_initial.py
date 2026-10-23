@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("bibliography", "0010_author_contact_details"),
+        ("bibliography", "0001_squashed_0012"),
         ("maps", "0015_geodatasetcolumnpolicy_is_popup"),
     ]
 

@@ -9,7 +9,8 @@ share the right-hand panel, using the same ``sidebar-tabs`` pattern as
 
 from pathlib import Path
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
+from django.contrib.contenttypes.models import ContentType
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
@@ -25,10 +26,19 @@ class MapPageChromeTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(username="layout-user", password="secret")
-        cls.staff = User.objects.create_user(
-            username="layout-staff", password="secret", is_staff=True
+        cls.user = User.objects.create_user(
+            username="layout-user",
         )
+        from utils.object_management.models import ReviewAction
+
+        cls.admin = User.objects.create_user(username="layout-admin", is_staff=True)
+        cls.admin.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type=ContentType.objects.get_for_model(ReviewAction),
+            )
+        )
+        cls.staff = User.objects.create_user(username="layout-staff", is_staff=True)
 
     def setUp(self):
         self.client.force_login(self.user)
@@ -112,7 +122,7 @@ class MapPageChromeTests(TestCase):
 
     def test_options_pane_groups_actions_under_side_group_titles(self):
         """Export and administration actions each carry a group title."""
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
         content = self._content()
         pane = self._section(
             content, 'id="atlas-options-pane"', "</div>\n        </div>"
@@ -186,8 +196,16 @@ class MapPageChromeTests(TestCase):
         self.assertIn('id="atlas-tree-toggle"', content)
         self.assertIn('aria-controls="atlas-tree"', content)
 
-    def test_edit_configuration_lives_in_the_options_pane_for_staff(self):
-        self.client.force_login(self.staff)
+    def test_map_page_keeps_the_current_tree_region_open(self):
+        content = self._content()
+
+        self.assertRegex(
+            content,
+            r'<details class="atlas-tree-region"[^>]*\bopen\b',
+        )
+
+    def test_edit_configuration_lives_in_the_options_pane_for_admins(self):
+        self.client.force_login(self.admin)
         content = self._content()
 
         header = self._section(content, '<header class="atlas-context"', "</header>")
@@ -198,7 +216,14 @@ class MapPageChromeTests(TestCase):
         self.assertIn("Edit configuration", pane)
         self.assertIn("/configurations/", pane)
 
-    def test_non_staff_see_no_configuration_entry(self):
+    def test_non_admin_users_see_no_configuration_entry(self):
+        content = self._content()
+
+        self.assertNotIn("Edit configuration", content)
+
+        self.client.force_login(
+            User.objects.create_user("layout-plainstaff", is_staff=True)
+        )
         content = self._content()
 
         self.assertNotIn("Edit configuration", content)

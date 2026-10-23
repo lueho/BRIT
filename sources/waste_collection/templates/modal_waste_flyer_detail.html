@@ -1,8 +1,6 @@
-<div class="modal-header">
-    <h5 class="modal-title">{{ object.abbreviation }}</h5>
-    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-</div>
-<div class="modal-body">
+{% extends "modal_base.html" %}
+{% block modal_title %}{{ object.abbreviation }}{% endblock %}
+{% block modal_body %}
     {% for key, value in source_dict.items %}
         {% if value.text %}
             <p><strong>{{ key }}</strong><br>
@@ -14,12 +12,4 @@
             </p>
         {% endif %}
     {% endfor %}
-</div>
-
-<div class="modal-footer">
-    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
-</div>
-
-
-
-
+{% endblock %}

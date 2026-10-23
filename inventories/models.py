@@ -753,6 +753,13 @@ class Scenario(NamedUserCreatedObject):
 
 
 class InventoryAmountShare(models.Model):
+    """Seasonal production shares entered per scenario and feedstock.
+
+    Manually maintained input data: hamburg_roadside_tree_production reads
+    these shares via feedstock.inventoryamountshare_set to render the
+    "Seasonal production per component" distribution chart.
+    """
+
     owner = models.ForeignKey(User, default=1, on_delete=models.CASCADE)
     scenario = models.ForeignKey(Scenario, null=True, on_delete=models.CASCADE)
     feedstock = models.ForeignKey(SampleSeries, null=True, on_delete=models.CASCADE)

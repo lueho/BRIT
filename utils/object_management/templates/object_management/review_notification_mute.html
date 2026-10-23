@@ -1,0 +1,27 @@
+{% extends 'base_single_card.html' %}
+
+{% block title %}Review notifications{% endblock %}
+
+{% block card_header %}Review notifications{% endblock %}
+
+{% block card_body %}
+
+    {% if muted %}
+        <p>E-mail notifications for "{{ object }}" are currently disabled for you.</p>
+    {% else %}
+        <p>You currently receive e-mail notifications for "{{ object }}".</p>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ review_url }}">
+        <button type="submit" class="btn btn-primary w-100">
+            {% if muted %}
+                Enable e-mails for this item
+            {% else %}
+                Disable e-mails for this item
+            {% endif %}
+        </button>
+    </form>
+
+{% endblock card_body %}

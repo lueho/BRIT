@@ -20,6 +20,11 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1", "testserver"]
 
 INTERNAL_IPS = ["127.0.0.1"]
 
+# Test users are created without usable passwords and authenticate via
+# force_login/force_authenticate. The few tests that verify password behavior
+# only need a fast hasher, not a secure one.
+PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",

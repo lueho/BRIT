@@ -12,16 +12,17 @@ from ..models import Process, ProcessCategory, ProcessMaterial
 class ProcessCategoryFilterTestCase(TestCase):
     """Test ProcessCategory filters."""
 
-    def setUp(self):
-        self.owner = get_user_model().objects.create(username="test_user")
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create(username="test_user")
         ProcessCategory.objects.create(
-            name="Thermochemical", owner=self.owner, publication_status="published"
+            name="Thermochemical", owner=cls.owner, publication_status="published"
         )
         ProcessCategory.objects.create(
-            name="Biochemical", owner=self.owner, publication_status="published"
+            name="Biochemical", owner=cls.owner, publication_status="published"
         )
         ProcessCategory.objects.create(
-            name="Physical", owner=self.owner, publication_status="draft"
+            name="Physical", owner=cls.owner, publication_status="draft"
         )
 
     def test_filter_by_name(self):
@@ -51,39 +52,40 @@ class ProcessCategoryFilterTestCase(TestCase):
 class ProcessFilterTestCase(TestCase):
     """Test Process filters."""
 
-    def setUp(self):
-        self.owner = get_user_model().objects.create(username="test_user")
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create(username="test_user")
 
-        self.category1 = ProcessCategory.objects.create(
-            name="Thermochemical", owner=self.owner, publication_status="published"
+        cls.category1 = ProcessCategory.objects.create(
+            name="Thermochemical", owner=cls.owner, publication_status="published"
         )
-        self.category2 = ProcessCategory.objects.create(
-            name="Biochemical", owner=self.owner, publication_status="published"
+        cls.category2 = ProcessCategory.objects.create(
+            name="Biochemical", owner=cls.owner, publication_status="published"
         )
 
-        self.process1 = Process.objects.create(
+        cls.process1 = Process.objects.create(
             name="Pyrolysis",
             mechanism="Thermal Decomposition",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
-        self.process1.categories.add(self.category1)
+        cls.process1.categories.add(cls.category1)
 
-        self.process2 = Process.objects.create(
+        cls.process2 = Process.objects.create(
             name="Gasification",
             mechanism="Partial Oxidation",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
-        self.process2.categories.add(self.category1)
+        cls.process2.categories.add(cls.category1)
 
-        self.process3 = Process.objects.create(
+        cls.process3 = Process.objects.create(
             name="Anaerobic Digestion",
             mechanism="Fermentation",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
-        self.process3.categories.add(self.category2)
+        cls.process3.categories.add(cls.category2)
 
     def test_filter_by_name(self):
         """Filter should find processes by name."""

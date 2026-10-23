@@ -237,6 +237,31 @@ def _on_editor_group_membership_change(sender, action, **kwargs):
         _invalidate_editor_grant_caches()
 
 
+@receiver(post_delete)
+def delete_review_notification_mutes_on_delete(sender, instance, **kwargs):
+    """Remove notification mutes pointing at a deleted UserCreatedObject."""
+    try:
+        from utils.object_management.models import (
+            ReviewNotificationMute,
+            UserCreatedObject,
+        )
+
+        if not (
+            isinstance(sender, type)
+            and issubclass(sender, UserCreatedObject)
+            and not sender._meta.abstract
+        ):
+            return
+
+        ReviewNotificationMute.objects.filter(
+            content_type=ContentType.objects.get_for_model(sender),
+            object_id=instance.pk,
+        ).delete()
+    except Exception:
+        # Be defensive - if mute cleanup fails, don't break the delete operation
+        pass
+
+
 def _clear_moderator_caches():
     """Clear moderation cache for all users who might be moderators."""
     try:

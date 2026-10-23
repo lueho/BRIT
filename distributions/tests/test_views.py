@@ -3,7 +3,7 @@ from utils.tests.testcases import AbstractTestCases
 
 
 class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
-    dashboard_view = False
+    explorer_view = False
     public_list_view = False
     private_list_view = False
     create_view = False
