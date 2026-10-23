@@ -23,6 +23,7 @@ from brit.gunicorn import (
     _TimeoutClosingParser,
 )
 from brit.tests.probes import run_settings_probe
+from utils.tests.testrunner import serial_test
 
 
 class ProductionSecretKeyTests(SimpleTestCase):
@@ -102,6 +103,7 @@ class ProductionReleasePhaseTests(SimpleTestCase):
         self.assertEqual(verify.split("--manifest", 1)[1].strip(), receipt)
 
 
+@serial_test
 class ProductionWebMemoryTests(SimpleTestCase):
     def setUp(self):
         deployment = (Path(settings.BASE_DIR) / "heroku.yml").read_text()

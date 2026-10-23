@@ -5613,28 +5613,16 @@ class WasteAtlasMapPageSweepMixin:
 
     # ---- registry / structural --------------------------------------------
 
-    def test_every_map_page_route_resolves(self):
-        """Every page registered in MAP_PAGES returns a 200 response."""
-        for page in self._sweep_pages():
-            with self.subTest(page=page["name"]):
-                response = self.client.get(reverse(page["name"]))
-                self.assertEqual(response.status_code, 200)
-
-    def test_every_map_page_renders_atlas_config_json(self):
-        """Every map page injects the atlas-config JSON script tag."""
-        for page in self._sweep_pages():
-            with self.subTest(page=page["name"]):
-                response = self.client.get(reverse(page["name"]))
-                self.assertIsNotNone(self._map_config(response))
-
-    def test_every_map_page_forwards_its_config_key_to_the_renderer(self):
-        """The rendered config matches MAP_CONFIGS for the page's config_key."""
+    def test_every_map_page_resolves_and_forwards_its_config(self):
+        """Every registered page returns 200, injects the atlas-config JSON
+        script tag, and forwards its MAP_CONFIGS config_key to the renderer."""
         # Keys the template tag replaces at render time: runtime scope,
         # page-level overrides, and DB-editable legend keys.
         runtime_keys = {"country", "year", "nutsPrefix", "nutsLevel"}
         for page in self._sweep_pages():
             with self.subTest(page=page["name"]):
                 response = self.client.get(reverse(page["name"]))
+                self.assertEqual(response.status_code, 200)
                 cfg = self._map_config(response)
                 stored = MAP_CONFIGS[page["config_key"]]
                 overridden = set(page.get("overrides", {}))
