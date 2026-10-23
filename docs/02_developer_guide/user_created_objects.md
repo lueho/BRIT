@@ -194,6 +194,16 @@ Map-configuration pages require explicit application administration; conflict ai
 
 Live-browser verification with representative snapshot data, legacy archive provenance, geography fallbacks and cross-reference visibility, wider version-graph locking, remaining domain/HTML/formset/importer writers, generated values and rollout hardening remain open. This checkpoint does not close those objectives or establish deployment readiness.
 
+## Governed programmatic collection updates
+
+*Part 9c draft runtime checkpoint - not a deployment claim.*
+
+The programmatic collection update route and its legacy alias use `content_mutation` on the freshly locked collection. Expected identity values are conflict guards, never authorization inputs; mismatches return 409 without a write. Authorized owner, direct/group editor and administrator edits use the same capability/lifecycle policy, retain review state/history, and record one meaningful root revision/audit across scalar and M2M changes.
+
+Shared reference validation governs submitted related records. Existing flyer reuse requires its own read access but not add capability; new flyers require their own create capability before persistence, are private and owned by the acting user, and have a creation audit. Compound failures roll back root, relations, new flyers and new events.
+
+The shared flyer helper also serves collection create/version reference attachment; their root persistence and frequency creation remain un-migrated. HTML/formset/importer writers, generated profiles/evidence extraction, browser/runtime and rollout gates remain open.
+
 ## Legacy moderator checks (pre-migration)
 
 - Per-model moderation rights use `can_moderate_<model>`.

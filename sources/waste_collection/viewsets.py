@@ -65,7 +65,9 @@ from sources.waste_collection.services import (
     resolve_evidence_definitions,
     resolve_flyer,
 )
-from utils.object_management.permissions import apply_scope_filter
+from utils.object_management.permissions import (
+    apply_scope_filter,
+)
 from utils.object_management.policy import (
     PUBLIC_READ_STATES,
     decide,
@@ -74,9 +76,11 @@ from utils.object_management.policy import (
     visible_queryset,
 )
 from utils.object_management.services import (
+    _fresh_actor,
     content_mutation,
     perform_transition,
     record_creation,
+    validate_references,
 )
 from utils.object_management.viewsets import UserCreatedObjectViewSet
 
@@ -521,13 +525,21 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         replace_sources=False,
         replace_flyers=False,
     ):
-        """Attach bibliography sources and flyer URLs to ``collection``."""
+        """Attach bibliography sources and flyer URLs to ``collection``.
+
+        Every submitted source must be readable by the acting user; flyer
+        URLs resolve through the shared flyer service, which enforces read
+        access on existing rows and create capability plus actor ownership
+        on new rows.
+        """
         if sources is not None:
             sources = list(sources)
             cls._require_readable_references(actor, [("source", sources)])
         if flyer_urls is not None:
             flyer_urls = list(flyer_urls)
 
+        if sources:
+            validate_references(actor, list(sources))
         if sources is not None:
             if replace_sources:
                 collection.sources.set(sources)
@@ -538,7 +550,8 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         for url in flyer_urls or []:
             if len(url) > 2083:
                 continue
-            flyers.append(cls._resolve_flyer(actor, url))
+            flyer, _created = resolve_flyer(actor, url)
+            flyers.append(flyer)
 
         if flyer_urls is not None:
             if replace_flyers:
@@ -686,6 +699,8 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             "min_bin_size",
             "required_bin_capacity",
             "required_bin_capacity_reference",
+            "access_control_bp",
+            "access_control_pap",
             "description",
         )
         CollectionViewSet._require_readable_references(
@@ -898,20 +913,27 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        with content_mutation(actor, collection, action="edit") as fresh:
-            mismatches = self._collection_identity_mismatches(fresh, data)
-            if mismatches:
-                return Response(
-                    {
-                        "detail": "Target collection no longer matches the expected identity.",
-                        "mismatches": mismatches,
-                    },
-                    status=status.HTTP_409_CONFLICT,
-                )
-            self._apply_collection_mutation_update(fresh, data, actor)
+        try:
+            with content_mutation(actor, collection, action="edit") as locked:
+                mismatches = self._collection_identity_mismatches(locked, data)
+                if mismatches:
+                    return Response(
+                        {
+                            "detail": "Target collection no longer matches the expected identity.",
+                            "mismatches": mismatches,
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                actor = _fresh_actor(request.user)
+                validate_references(actor, data)
+                self._apply_collection_mutation_update(locked, data, actor)
+        except DjangoValidationError as exc:
+            raise ValidationError(
+                getattr(exc, "message_dict", None) or exc.messages
+            ) from exc
 
         response_payload = {
-            **self._serialize_mutation_response(fresh, False),
+            **self._serialize_mutation_response(locked, False),
             "updated": True,
         }
 
@@ -1139,7 +1161,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 collection,
                 sources=data.get("sources", []),
                 flyer_urls=data.get("flyer_urls", []),
-                actor=actor,
+                actor=self._require_authenticated_actor(request),
             )
             record_creation(actor, collection)
             submitted = self._submit_for_review_if_requested(
@@ -1273,7 +1295,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 collection,
                 sources=data.get("sources", default_sources),
                 flyer_urls=data.get("flyer_urls", default_flyer_urls),
-                actor=actor,
+                actor=self._require_authenticated_actor(request),
             )
             submitted = self._submit_for_review_if_requested(
                 request,
