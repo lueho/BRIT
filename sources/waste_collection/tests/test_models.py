@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from unittest.mock import patch
 
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db.models import signals
 from django.test import TestCase
@@ -10,6 +11,7 @@ from distributions.models import Period, TemporalDistribution, Timestep
 from materials.models import Material, MaterialCategory, MaterialComponent
 from utils.object_management.models import get_default_owner
 from utils.properties.models import Property, Unit
+from utils.tests.testcases import ensure_test_default_owner
 
 from ..models import (
     AggregatedCollectionPropertyValue,
@@ -128,6 +130,7 @@ class WasteFlyerTestCase(TestCase):
 
 class WasteFlyerUrlCheckSignalTestCase(TestCase):
     def setUp(self):
+        ensure_test_default_owner()
         self.owner = get_default_owner()
         self.catchment = CollectionCatchment.objects.create(name="Signal Catchment")
         self.collection_system = CollectionSystem.objects.create(name="Signal System")
@@ -545,6 +548,7 @@ class CollectionVersioningHelpersTestCase(TestCase):
 class CollectionStatisticsAccessorsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.catchment = CollectionCatchment.objects.create(name="C")
         cls.system = CollectionSystem.objects.create(name="S")
         cls.category = WasteCategory.objects.create(name="Cat")
@@ -593,12 +597,10 @@ class CollectionStatisticsAccessorsTestCase(TestCase):
         self.assertEqual(len(anon_list), 1)
         self.assertEqual(anon_list[0].pk, v_succ.pk)
 
-        # Owner-like visibility: simulate staff/owner by passing a dummy user with is_staff=True
-        class U:
-            is_staff = True
-            is_authenticated = True
-
-        full_list = self.succ.collectionpropertyvalues_for_display(user=U())
+        # Owner-like visibility needs the real private-row owner: staff
+        # alone is not private access.
+        owner = get_default_owner()
+        full_list = self.succ.collectionpropertyvalues_for_display(user=owner)
         self.assertEqual(len(full_list), 1)  # dedup keeps published due to ordering
         self.assertEqual(full_list[0].pk, v_succ.pk)
 
@@ -631,13 +633,17 @@ class CollectionStatisticsAccessorsTestCase(TestCase):
         anon = self.root.aggregatedcollectionpropertyvalues_for_display(user=None)
         self.assertEqual([a.year for a in anon], [2021])
 
-        # Staff sees both, order by (property, unit, year, publication_order, -created_at, -pk)
-        class U:
-            is_staff = True
-            is_authenticated = True
-
-        both = self.succ.aggregatedcollectionpropertyvalues_for_display(user=U())
+        # The real owner of the private row sees both; a staff-only
+        # non-owner still sees only the published row.
+        owner = get_default_owner()
+        both = self.succ.aggregatedcollectionpropertyvalues_for_display(user=owner)
         self.assertEqual({a.year for a in both}, {2020, 2021})
+
+        staff_only = User.objects.create_user("staff-viewer", is_staff=True)
+        staff_list = self.succ.aggregatedcollectionpropertyvalues_for_display(
+            user=staff_only
+        )
+        self.assertEqual({a.year for a in staff_list}, {2021})
 
     def test_collectionpropertyvalues_for_display_published_tie_prefers_latest_version(
         self,
