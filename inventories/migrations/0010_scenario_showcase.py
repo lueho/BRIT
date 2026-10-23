@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("closecycle", "0005_showcase_catchment_showcase_sample_series_and_more"),
+        ("closecycle", "0001_squashed_0007"),
         ("inventories", "0009_feedstock_material"),
     ]
 
