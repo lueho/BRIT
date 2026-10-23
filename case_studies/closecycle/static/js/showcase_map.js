@@ -2,16 +2,10 @@
 
 // Load 'lib/turf-inside/inside.min.js' script before this
 
-const fieldConfig = {
-    name: {
-        include: true,
-        format: (value) => value || ''
-    },
-    description: {
-        include: true,
-        format: (value) => value || ''
-    },
-};
+const fieldConfig = createFieldConfig({
+    name: true,
+    description: true,
+});
 
 function isSafeLocalUrl(url) {
     return typeof url === 'string'
@@ -316,20 +310,16 @@ function createFeaturesLayer(geoJson, geometryType) {
     });
 }
 
+// Polygons are demoted so code-labelled markers stay clickable on top;
+// selecting a polygon therefore does not raise it above markers.
 function resetFeatureStyles(featureGroup) {
-    featureGroup.resetStyle();
-    featureGroup.eachLayer(layer => {
-        if (layer instanceof L.Polygon && typeof layer.bringToBack === 'function') {
-            layer.bringToBack();
-        }
-    });
+    resetMapFeatureStyles(featureGroup, { demote: 'polygons' });
 }
 
 function selectFeature(layer) {
-    layer.setStyle({ "color": "#f49a33" });
-    if (!(layer instanceof L.Polygon) && typeof layer.bringToFront === 'function') {
-        layer.bringToFront();
-    }
+    selectMapFeature(layer, {
+        promote: l => !(l instanceof L.Polygon),
+    });
 }
 
 function isMarkerLayer(layer) {
@@ -432,10 +422,6 @@ function featureClickHandler(e, featureGroup) {
     });
     renderPilotRegions(selectedPilots.map(layer => layer.feature.properties.pilot_region));
 
-    // Store intersecting features globally to access in handleShowcaseClick
-    window.intersectingFeatures = intersectingFeatures;
-    window.featureGroup = featureGroup; // Store featureGroup globally
-
     // Check number of intersecting regions
     if (intersectingFeatures.size === 1) {
         // If only one region, fetch and render the summary for that feature only
@@ -473,7 +459,7 @@ function featureClickHandler(e, featureGroup) {
                 link.textContent = feature.name;
                 link.addEventListener('click', (event) => {
                     event.preventDefault();
-                    handleShowcaseClick(feature.id);
+                    handleShowcaseClick(feature.id, intersectingFeatures, featureGroup);
                 });
                 popupContent.appendChild(link);
                 popupContent.appendChild(document.createElement('br'));
@@ -490,9 +476,9 @@ function featureClickHandler(e, featureGroup) {
     }
 }
 
-async function handleShowcaseClick(id) {
-    resetFeatureStyles(window.featureGroup);
-    const layers = window.intersectingFeatures.get(id) || [];
+async function handleShowcaseClick(id, intersectingFeatures, featureGroup) {
+    resetFeatureStyles(featureGroup);
+    const layers = intersectingFeatures.get(id) || [];
     layers.forEach(layer => selectFeature(layer));
     fetchShowcaseSummary(id);
     map.closePopup();

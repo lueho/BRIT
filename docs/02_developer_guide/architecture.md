@@ -40,6 +40,15 @@ This document provides a durable, high-level view of BRIT architecture. It is in
   through concrete models, serializers, or app-startup registration. Shared utilities
   must not import source-domain or reference-data apps for optional domain features.
 
+- **App-owned sitemap contributions**
+  The sitemap is composed in `brit.sitemap_registry`. Each app registers the public,
+  indexable routes it owns from `AppConfig.ready()`; the curated tuple lives in the
+  app's own `sitemap.py` next to its URLconf. Source-domain plugins declare
+  `sitemap_items` on their `SourceDomainPlugin` instead and are forwarded by
+  `sources.registry`. Create/modal forms, autocompletes, user-scoped lists, and API
+  endpoints do not belong in the sitemap; a test asserts every entry still resolves
+  and serves a public HTML page to anonymous requests.
+
 - **Bibliography-backed attribution**
   Models that expose `sources` relations own those `bibliography.Source` fields in their
   concrete app. `utils.properties` provides numeric measurement helpers only and does

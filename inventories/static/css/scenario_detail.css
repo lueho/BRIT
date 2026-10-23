@@ -124,6 +124,10 @@
   min-width: 0;
 }
 
+.sri-parameters td:last-child {
+  white-space: nowrap;
+}
+
 .sri-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));

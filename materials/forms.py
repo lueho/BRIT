@@ -7,6 +7,7 @@ from django.forms import (
     DateTimeField,
     DateTimeInput,
     ModelChoiceField,
+    ModelForm,
     TextInput,
 )
 from django.urls import reverse
@@ -17,7 +18,7 @@ from django_tomselect.forms import (
     TomSelectModelMultipleChoiceField,
 )
 
-from bibliography.models import Source
+from bibliography.models import Author, Source
 from distributions.models import TemporalDistribution
 from maps.models import Location, Region
 from utils.forms import (
@@ -31,6 +32,7 @@ from utils.forms import (
     SourcesFieldMixin,
     UserCreatedObjectFormMixin,
     WorkspaceReferenceScopeMixin,
+    WorkspaceSectionFormSet,
     configure_tomselect_inline_create,
     image_metadata_section,
 )
@@ -48,7 +50,9 @@ from .models import (
     MaterialComponentGroup,
     MaterialProperty,
     MaterialPropertyValue,
+    MeasurementValueQualifier,
     Sample,
+    SampleAuthor,
     SampleGroup,
     SampleSeries,
     get_or_create_sample_substrate_category,
@@ -65,17 +69,17 @@ class MaterialCategoryModalModelForm(ModalModelFormMixin, MaterialCategoryModelF
     pass
 
 
-class MaterialModelForm(SimpleModelForm):
+class MaterialModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     class Meta:
         model = Material
-        fields = ("name", "description", "categories")
+        fields = ("name", "abbreviation", "description", "categories")
 
 
 class MaterialModalModelForm(ModalModelFormMixin, MaterialModelForm):
     pass
 
 
-class ComponentModelForm(SimpleModelForm):
+class ComponentModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     comparable_component = TomSelectModelChoiceField(
         queryset=MaterialComponent.objects.all(),
         required=False,
@@ -103,7 +107,14 @@ class ComponentModelForm(SimpleModelForm):
 
     class Meta:
         model = MaterialComponent
-        fields = ("name", "description", "comparable_component", "is_aggregate")
+        fields = (
+            "name",
+            "abbreviation",
+            "description",
+            "categories",
+            "comparable_component",
+            "is_aggregate",
+        )
 
 
 class ComponentModalModelForm(ModalModelFormMixin, ComponentModelForm):
@@ -155,7 +166,40 @@ class MaterialPropertyModalModelForm(ModalModelFormMixin, MaterialPropertyModelF
     pass
 
 
+class MeasurementLimitFieldsFormMixin:
+    """Edit value qualifier and analytical limit; drop raw text it supersedes."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "value_qualifier" in self.fields:
+            self.fields["value_qualifier"].required = False
+        if "detection_limit" in self.fields:
+            self.fields["detection_limit"].label = "Limit value"
+            self.fields[
+                "detection_limit"
+            ].help_text = "Stated analytical limit in the measurement unit."
+        if "limit_type" in self.fields:
+            self.fields["limit_type"].help_text = (
+                "LOD/MDL < LOQ < RL. Values below the LOQ or reporting limit are "
+                "entered as 'Less than'."
+            )
+
+    def clean_value_qualifier(self):
+        return (
+            self.cleaned_data.get("value_qualifier") or MeasurementValueQualifier.EXACT
+        )
+
+    def _post_clean(self):
+        changed = set(self.changed_data)
+        if changed & {"average", "value_qualifier"}:
+            self.instance.raw_value = ""
+        if changed & {"detection_limit", "limit_type"}:
+            self.instance.raw_detection_limit = ""
+        super()._post_clean()
+
+
 class ComponentMeasurementModelForm(
+    MeasurementLimitFieldsFormMixin,
     NumericMeasurementFieldsFormMixin,
     UserCreatedObjectFormMixin,
     SourcesFieldMixin,
@@ -217,6 +261,9 @@ class ComponentMeasurementModelForm(
             "average",
             "standard_deviation",
             "sample_size",
+            "value_qualifier",
+            "limit_type",
+            "detection_limit",
             "comment",
         )
 
@@ -290,6 +337,7 @@ class ComponentMeasurementSectionForm(
 
 
 class MaterialPropertyValueModelForm(
+    MeasurementLimitFieldsFormMixin,
     NumericMeasurementFieldsFormMixin,
     UserCreatedObjectFormMixin,
     SourcesFieldMixin,
@@ -355,6 +403,10 @@ class MaterialPropertyValueModelForm(
             "sources",
             "average",
             "standard_deviation",
+            "value_qualifier",
+            "limit_type",
+            "detection_limit",
+            "comment",
         )
 
     def clean(self):
@@ -490,11 +542,9 @@ class SampleSeriesModalModelForm(ModalModelFormMixin, SampleSeriesModelForm):
 
 
 def _editable_by(queryset, user):
-    if getattr(user, "is_staff", False):
-        return queryset.all()
-    if getattr(user, "is_authenticated", False):
-        return queryset.editable_by_user(user)
-    return queryset.none()
+    from utils.object_management.policy import editable_queryset
+
+    return editable_queryset(user, queryset)
 
 
 def _sample_groups_editable_by(user):
@@ -883,6 +933,28 @@ class SampleQuickCreateForm(SampleMaintenanceForm):
         fields = ("name", "material", "datetime", "standalone", "series")
 
 
+class SampleAuthorSectionForm(WorkspaceReferenceScopeMixin, ModelForm):
+    """One corresponding-author row in the Sample maintenance workspace."""
+
+    author = QuerysetTomSelectModelChoiceField(
+        queryset=Author.objects.all(),
+        config=TomSelectConfig(
+            url="author-autocomplete",
+            label_field="label",
+        ),
+        label="Author",
+    )
+
+    class Meta:
+        model = SampleAuthor
+        fields = ("author",)
+
+
+class SampleSectionFormSet(WorkspaceSectionFormSet):
+    reference_fields = {SampleAuthor: "author"}
+    position_fields = {SampleAuthor: "position"}
+
+
 SAMPLE_SECTIONS = {
     "overview": {
         "label": "Overview",
@@ -922,6 +994,18 @@ SAMPLE_SECTIONS = {
     "sources": {
         "label": "Sources",
         "fields": ("sources",),
+    },
+    "contributors": {
+        "label": "Corresponding authors",
+        "forms": (
+            (
+                SampleAuthorSectionForm,
+                {
+                    "heading": "Corresponding authors",
+                    "add_label": "Add corresponding author",
+                },
+            ),
+        ),
     },
     "measurements": {
         "label": "Component measurements",

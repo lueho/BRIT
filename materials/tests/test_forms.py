@@ -7,6 +7,7 @@ from django.db.models.signals import post_save
 from django.http import QueryDict
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
+from django.utils.datastructures import MultiValueDict
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.forms import TomSelectModelChoiceField
 from factory.django import mute_signals
@@ -21,6 +22,7 @@ from ..forms import (
     ComponentGroupModelForm,
     ComponentMeasurementModelForm,
     ComponentModelForm,
+    MaterialModelForm,
     MaterialPropertyModelForm,
     MaterialPropertyValueModelForm,
     SampleGroupModelForm,
@@ -59,10 +61,8 @@ class AddComponentGroupModalModelFormTestCase(TestCase):
         Material.objects.create(name="Test Material")
         MaterialComponentGroup.objects.create(name="Test Group 1")
         MaterialComponentGroup.objects.create(name="Test Group 2")
-
-    def setUp(self):
-        self.material = Material.objects.get(name="Test Material")
-        self.group1 = MaterialComponentGroup.objects.get(name="Test Group 1")
+        cls.material = Material.objects.get(name="Test Material")
+        cls.group1 = MaterialComponentGroup.objects.get(name="Test Group 1")
 
     def test_initial_group_queryset_has_only_unused_groups(self):
         sample_series = SampleSeries.objects.create(material=self.material)
@@ -82,6 +82,13 @@ class AddComponentGroupModalModelFormTestCase(TestCase):
                 id=MaterialComponent.objects.default().id
             ).order_by("id"),
         )
+
+
+class MaterialModelFormTestCase(TestCase):
+    def test_form_includes_abbreviation_field(self):
+        form = MaterialModelForm()
+
+        self.assertIn("abbreviation", form.fields)
 
 
 class ComponentModelFormTestCase(TestCase):
@@ -107,6 +114,16 @@ class ComponentModelFormTestCase(TestCase):
         form = ComponentModelForm()
 
         self.assertEqual(form.fields["comparable_component"].label, "Compared as")
+
+    def test_form_includes_abbreviation_field(self):
+        form = ComponentModelForm()
+
+        self.assertIn("abbreviation", form.fields)
+
+    def test_form_includes_categories_field(self):
+        form = ComponentModelForm()
+
+        self.assertIn("categories", form.fields)
 
 
 class MaterialPropertyModelFormTestCase(TestCase):
@@ -226,8 +243,37 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
             form.cleaned_data["basis_component"], self.property.default_basis_component
         )
 
+    def test_form_includes_comment_field(self):
+        form = MaterialPropertyValueModelForm()
+        self.assertIn("comment", form.fields)
+
+    def test_form_includes_limit_fields(self):
+        form = MaterialPropertyValueModelForm()
+        for field in ("value_qualifier", "limit_type", "detection_limit"):
+            self.assertIn(field, form.fields)
+
 
 class ComponentMeasurementModelFormTestCase(TestCase):
+    def test_form_includes_limit_fields(self):
+        form = ComponentMeasurementModelForm()
+        for field in ("value_qualifier", "limit_type", "detection_limit"):
+            self.assertIn(field, form.fields)
+        self.assertEqual(form.fields["detection_limit"].label, "Limit value")
+
+    def test_below_detection_limit_rejects_quantification_and_reporting_limits(self):
+        for limit_type in ("loq", "rl"):
+            with self.subTest(limit_type=limit_type):
+                form = ComponentMeasurementModelForm(
+                    data=MultiValueDict(
+                        {
+                            "value_qualifier": ["below_detection_limit"],
+                            "limit_type": [limit_type],
+                        }
+                    )
+                )
+                form.is_valid()
+                self.assertTrue(form.has_error("limit_type"))
+
     def test_standard_deviation_is_optional(self):
         form = ComponentMeasurementModelForm()
 
@@ -248,7 +294,7 @@ class ComponentMeasurementModelFormTestCase(TestCase):
         g_per_kg = Unit.objects.create(name="g/kg", symbol="g/kg")
         mg_per_l = Unit.objects.create(name="mg/L", symbol="mg/L")
         volume_percent, _ = Unit.objects.update_or_create(
-            name="vol.-%", defaults={"symbol": "volume_percent"}
+            name="vol%", defaults={"symbol": "volume_percent"}
         )
 
         queryset = ComponentMeasurementModelForm().fields["unit"].queryset

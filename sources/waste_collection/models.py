@@ -22,6 +22,7 @@ from utils.object_management.models import (
     UserCreatedObject,
     UserCreatedObjectManager,
     UserCreatedObjectQuerySet,
+    get_default_owner,
 )
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import PropertyValue
@@ -100,7 +101,12 @@ class WasteCategory(NamedUserCreatedObject):
 
 class WasteComponentManager(MaterialManager):
     def get_queryset(self):
-        return super().get_queryset().filter(categories__name="Biowaste component")
+        return (
+            super()
+            .get_queryset()
+            .filter(categories__name="Biowaste component")
+            .distinct()
+        )
 
 
 class WasteComponent(Material):
@@ -113,7 +119,9 @@ class WasteComponent(Material):
 @receiver(post_save, sender=WasteComponent)
 def add_material_category(sender, instance, created, **kwargs):
     if created:
-        category = MaterialCategory.objects.get(name="Biowaste component")
+        category = MaterialCategory.objects.get(
+            name="Biowaste component", owner=get_default_owner()
+        )
         instance.categories.add(category)
         instance.save()
 
@@ -839,73 +847,6 @@ class Collection(NamedUserCreatedObject):
         if not self.predecessors.filter(id=predecessor.id).exists():
             self.predecessors.add(predecessor)
 
-    def cascade_review_action(self, action_name, actor=None, previous_status=None):
-        """Cascade review actions to property values across the collection chain."""
-        versions = self.all_versions() if hasattr(self, "all_versions") else [self]
-        actor_id = getattr(actor, "id", None)
-
-        allowed_statuses = self._allowed_statuses_for_review_action(action_name)
-        if not allowed_statuses:
-            return
-
-        cpv_qs = CollectionPropertyValue.objects.filter(collection__in=versions)
-        cpv_qs = cpv_qs.filter(publication_status__in=allowed_statuses)
-
-        if action_name in ("submit_for_review", "withdraw_from_review") and actor_id:
-            cpv_qs = cpv_qs.filter(
-                Q(owner_id=actor_id) | Q(collection__owner_id=actor_id)
-            )
-
-        cpv_list = list(cpv_qs.select_related("collection", "property", "unit"))
-
-        agg_qs = AggregatedCollectionPropertyValue.objects.filter(
-            collections__in=versions
-        ).distinct()
-        agg_qs = agg_qs.filter(publication_status__in=allowed_statuses)
-
-        if action_name in ("submit_for_review", "withdraw_from_review") and actor_id:
-            agg_qs = agg_qs.filter(owner_id=actor_id)
-
-        agg_list = list(
-            agg_qs.select_related("property", "unit").prefetch_related("collections")
-        )
-
-        self._apply_review_action_transition(
-            cpv_list + agg_list, action_name, actor=actor
-        )
-
-    @staticmethod
-    def _allowed_statuses_for_review_action(action_name):
-        """Return which publication statuses should be affected by a review action."""
-        if action_name == "submit_for_review":
-            return ["private", "declined"]
-        if action_name == "withdraw_from_review":
-            return ["review"]
-        if action_name in ("approve", "reject"):
-            return ["review"]
-        return []
-
-    @staticmethod
-    def _apply_review_action_transition(values, action_name, actor=None):
-        """Apply the review action to each related value."""
-        for value in values:
-            action_method = getattr(value, action_name, None)
-            if not callable(action_method):
-                continue
-            try:
-                if action_name == "approve":
-                    action_method(user=actor)
-                else:
-                    action_method()
-            except ValidationError as exc:
-                logger.warning(
-                    "Skipped cascading %s to %s %s: %s",
-                    action_name,
-                    value.__class__.__name__,
-                    value.pk,
-                    exc,
-                )
-
     def submit_for_review(self):
         self.validate_review_readiness()
         return super().submit_for_review()
@@ -940,11 +881,17 @@ class Collection(NamedUserCreatedObject):
 
             super().approve(user=user)
 
-            # Archive all predecessors after publishing self
+            # Archive published predecessors after publishing self. Only
+            # published rows may enter the public archive: archiving a
+            # private, review or declined predecessor would expose an
+            # unpublished draft. Governed approval goes through the shared
+            # transition service so the archival is separately authorized
+            # and audited under the lock already held above.
             for predecessor in predecessors:
-                if predecessor.publication_status != "archived":
-                    predecessor.publication_status = "archived"
-                    predecessor.save(update_fields=["publication_status"])
+                if predecessor.publication_status != self.STATUS_PUBLISHED:
+                    continue
+                if user is not None:
+                    pass
 
     @classmethod
     def public_map_url(cls):
@@ -995,6 +942,24 @@ class CollectionPropertyValue(PropertyValue):
         default=False,
         help_text="True when this value was computed from another property (e.g. total ↔ specific via population).",
     )
+    derived_from = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        related_name="generated_values",
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=(
+            "The raw source value this generated projection is derived from. "
+            "Server-controlled; set only by the derivation pipeline."
+        ),
+    )
+
+    def get_breadcrumb_object_label(self):
+        label = f"{self.property}: {self.display_average}"
+        if self.standard_deviation:
+            label += f" ± {self.display_standard_deviation}"
+        return label
 
     @property
     def year_outside_collection_period(self):
@@ -1013,15 +978,19 @@ class CollectionPropertyValue(PropertyValue):
 
     class Meta(PropertyValue.Meta):
         constraints = [
+            # A source has exactly one generated output, bound by the
+            # explicit derived_from link rather than the data key. Legacy
+            # unlinked generated rows keep a NULL pointer.
             models.UniqueConstraint(
-                fields=["collection", "property", "year"],
-                condition=Q(is_derived=True),
-                name="soilcom_unique_derived_cpv_per_key",
+                fields=["derived_from"],
+                condition=Q(is_derived=True, derived_from__isnull=False),
+                name="wc_unique_generated_cpv_source",
             ),
-            models.UniqueConstraint(
-                fields=["collection", "property"],
-                condition=Q(is_derived=True, year__isnull=True),
-                name="soilcom_unique_derived_cpv_per_key_null_year",
+            # A raw record can never carry a source pointer; generated rows
+            # may keep a NULL pointer until provenance is audited (legacy).
+            models.CheckConstraint(
+                condition=Q(is_derived=True) | Q(derived_from__isnull=True),
+                name="soilcom_cpv_raw_without_source_pointer",
             ),
         ]
 

@@ -54,22 +54,20 @@ class LayerTestCase(TestCase):
                 ]
             )
         )
+        cls.scenario = Scenario.objects.get(name="Test Scenario")
+        cls.feedstock_sample_series = Material.objects.get(name="Test Feedstock")
 
-    def setUp(self):
-        self.scenario = Scenario.objects.get(name="Test Scenario")
-        self.feedstock_sample_series = Material.objects.get(name="Test Feedstock")
-
-        self.testkwargs = {
+        cls.testkwargs = {
             "name": "test name",
-            "scenario": self.scenario,
+            "scenario": cls.scenario,
             "algorithm": InventoryAlgorithm.objects.get(
                 function_name="avg_point_yield"
             ),
             "geom_type": "Point",
             "table_name": "test_table_name",
-            "feedstock": self.feedstock_sample_series,
+            "feedstock": cls.feedstock_sample_series,
         }
-        self.fields = {"field1": "float", "field2": "int"}
+        cls.fields = {"field1": "float", "field2": "int"}
 
     def test_update_or_create_feature_collection(self):
         kwargs = self.testkwargs
@@ -367,20 +365,21 @@ class MergeDuplicateLayerFieldsMigrationTestCase(TestCase):
 
 
 class LayerAggregatedDistributionTestCase(TestCase):
-    def setUp(self):
-        self.component = MaterialComponent.objects.default()
-        self.timestep = Timestep.objects.default()
-        self.distribution = TemporalDistribution.objects.default()
-        self.aggregated_distribution = LayerAggregatedDistribution.objects.create(
-            name="Test distribution", distribution=self.distribution
+    @classmethod
+    def setUpTestData(cls):
+        cls.component = MaterialComponent.objects.default()
+        cls.timestep = Timestep.objects.default()
+        cls.distribution = TemporalDistribution.objects.default()
+        cls.aggregated_distribution = LayerAggregatedDistribution.objects.create(
+            name="Test distribution", distribution=cls.distribution
         )
-        self.distribution_set = DistributionSet.objects.create(
-            aggregated_distribution=self.aggregated_distribution,
-            timestep=self.timestep,
+        cls.distribution_set = DistributionSet.objects.create(
+            aggregated_distribution=cls.aggregated_distribution,
+            timestep=cls.timestep,
         )
-        self.share = DistributionShare.objects.create(
-            distribution_set=self.distribution_set,
-            component=self.component,
+        cls.share = DistributionShare.objects.create(
+            distribution_set=cls.distribution_set,
+            component=cls.component,
             average=1.23,
             standard_deviation=0.02,
         )

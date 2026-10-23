@@ -957,54 +957,6 @@ async function getFeatureDetails(fid) {
     }
 }
 
-function formatHeader(key) {
-    return key
-        .replace(/([A-Z])/g, ' $1')
-        .replace(/_/g, ' ')
-        .replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase())
-        .trim();
-}
-
-function formatList(value, separator) {
-    if (!value) {
-        return '';
-    }
-    const items = value.split(separator).filter(item => item.trim());
-    if (items.length === 0) {
-        return '';
-    }
-
-    return `<ul class="list-disc pl-4">
-        ${items.map(item => `<li>${item.trim()}</li>`).join('')}
-    </ul>`;
-}
-
-function truncateUrl(url, maxLength = 40) {
-    return url.length > maxLength ? url.substring(0, maxLength) + '...' : url;
-}
-
-function formatUrls(urlString) {
-    if (!urlString) {
-        return '';
-    }
-    const urls = urlString.split(', ').filter(Boolean);
-    if (urls.length === 0) {
-        return '';
-    }
-
-    return urls
-        .map(url => `<li>
-            <a href="${url}"
-               title="${url}"
-               target="_blank" 
-               rel="noopener noreferrer"
-               class="url-link hover:text-blue-600">
-                ${truncateUrl(url)}
-            </a>
-        </li>`)
-        .join('');
-}
-
 function renderFeatureDetails(data) {
     const container = document.getElementById('summary-container');
     if (!container) {
@@ -1327,16 +1279,15 @@ function loadLayers(params) {
     }
 }
 
+// selectFeature and resetFeatureStyles delegate to the shared helpers in
+// map_feature_utils.js. Pages override these hooks to change the style or the
+// promote/demote behaviour.
 function selectFeature(feature) {
-    feature.bringToFront();
-    feature.setStyle({
-        "color": "#f49a33",
-    });
+    selectMapFeature(feature);
 }
 
 function resetFeatureStyles(featureGroup) {
-    featureGroup.resetStyle();
-    featureGroup.bringToBack();
+    resetMapFeatureStyles(featureGroup);
 }
 
 // Leaflet guesses its default marker icon path from leaflet.css, which fails

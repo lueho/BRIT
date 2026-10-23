@@ -12,7 +12,12 @@ resolve_or_create_unit = import_module(
 
 class ResolveOrCreateUnitTestCase(TestCase):
     """Legacy free-text unit labels are resolved into ``Unit`` rows before the
-    ``unit`` char field is dropped from ``Property`` and ``MaterialProperty``."""
+    ``unit`` char field is dropped from ``Property`` and ``MaterialProperty``.
+
+    This exercises a one-off data-migration helper directly. Once migration
+    0010 has been applied in all environments (or folded into a squashed
+    baseline), this test class should be removed together with the helper's
+    relevance — the migration can never run again."""
 
     @classmethod
     def setUpTestData(cls):

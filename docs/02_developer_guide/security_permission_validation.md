@@ -33,6 +33,34 @@ Groups are permission bundles, not conditionals embedded in views. Direct user p
 
 For independently reviewable user-created records:
 
+
+## Architecture
+
+Authorization is capability AND object access AND lifecycle eligibility. Django model permissions express capabilities. Ownership and individual/group editor grants express object access. Publication states constrain actions. Neither ownership nor a model permission alone gives unrestricted write access.
+
+One request-independent decision core supplies action decisions, UI capabilities, and visibility restrictions. HTML views, modal/quick-create endpoints, DRF, reference validation, exports, and background business actions must delegate to it. Adapters may narrow a decision but may not broaden it. Routes and templates describe available presentations; the existence of a URL is never an authorization condition. Unknown models/actions fail closed and configuration checks report missing classifications.
+
+Decision responses expose a boolean and a stable reason code. UI explanations use those codes without disclosing inaccessible objects or unrelated group membership. Public endpoints enforce the decision at mutation time; hiding a button is not a security boundary. Raw ORM utilities are trusted internals, not public authorization APIs.
+
+## Actors and roles
+
+An active authenticated actor is required for all non-public access and mutations. Inactive users receive no privileged access. Published and archived domain records may be read anonymously. Archived means retained, previously published content, not a privacy or withdrawal state.
+
+- Owner: the record's current owner.
+- Object editor: an active user holding an individual grant or belonging to a group with an editor grant on this record. This is not the model-wide group named `editors`.
+- Contributor: a role with explicit add/change/delete/view capabilities for the supported user-content models and the reusable records needed by their workflows.
+- Curator/librarian: explicitly scoped shared-reference management capabilities.
+- Moderator: `can_moderate_<model>` for specified models; moderation does not imply ordinary content editing.
+- Administrator: an explicit application role, using `object_management.administer_objects`; active superusers have administrative object access. Administration does not bypass immutable states, revision checks, or four-eyes review.
+- Staff: `is_staff` means Django-admin eligibility only. It supplies no application bypass or moderation capability by itself.
+- Service/specialized roles: narrowly scoped capabilities. Existing importers with custom write permissions retain their explicitly documented service boundaries.
+
+Groups are permission bundles, not conditionals embedded in views. Direct user permissions remain effective. The version-controlled role manifest declares supported bundles and model classifications; new models never receive permissions by discovery alone. Role inspection is read-only by default. Reconciliation requires an explicit apply mode, reports additions and removals, and does not silently revoke unmanaged production grants. Creation of permission rows after migration is separate from deliberate role reconciliation.
+
+## Read policy
+
+For independently reviewable user-created records:
+
 | Actor | Visible records |
 |---|---|
 | Anonymous/inactive | Published and archived |

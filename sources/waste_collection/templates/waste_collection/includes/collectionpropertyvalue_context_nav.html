@@ -1,0 +1,26 @@
+{% comment %}
+  Context navigation for the collection property value detail page
+  (detail_v2 layout), shared by the authenticated rail and anonymous view.
+{% endcomment %}
+{% load moderation_tags %}
+<nav class="sdv2-context-nav" aria-label="Collection property navigation">
+  {% safe_back_url as back_url %}
+  {% if back_url %}
+    <a class="sdv2-btn sdv2-btn-ghost" href="{{ back_url }}" rel="nofollow">
+      <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to results
+    </a>
+  {% endif %}
+  {% if back_collection %}
+    <a class="sdv2-btn sdv2-btn-ghost" href="{{ back_collection.get_absolute_url }}">
+      <i class="fas fa-database" aria-hidden="true"></i> Collection
+    </a>
+  {% endif %}
+  {% if object.list_url %}
+    <a class="sdv2-btn sdv2-btn-ghost" href="{{ object.list_url }}">
+      <i class="fas fa-list-ul" aria-hidden="true"></i> List
+    </a>
+  {% endif %}
+  <a class="sdv2-btn sdv2-btn-ghost" href="{% url 'wastecollection-explorer' %}">
+    <i class="fas fa-table-cells-large" aria-hidden="true"></i> Explorer
+  </a>
+</nav>

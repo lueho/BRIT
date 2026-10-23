@@ -478,7 +478,10 @@ PROCESS_SECTIONS = {
         "forms": (
             (
                 ProcessAuthorSectionForm,
-                {"heading": "Contributors", "add_label": "Add contributor"},
+                {
+                    "heading": "Corresponding authors",
+                    "add_label": "Add corresponding author",
+                },
             ),
             (
                 ProcessSourceSectionForm,

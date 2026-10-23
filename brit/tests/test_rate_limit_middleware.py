@@ -84,6 +84,31 @@ class AnonymousRateLimitMiddlewareTests(SimpleTestCase):
 
         self.assertEqual(self.middleware(self.request()).status_code, 200)
 
+    def test_geodataset_feature_geojson_is_exempt(self):
+        """A geodataset map streams its features from features.geojson,
+        which carries the subnet-aware GeoJSON throttle; the site-wide cap
+        must not double-count it."""
+        path = "/maps/geodatasets/42/features.geojson"
+        for _ in range(LIMIT * 3):
+            self.assertEqual(self.middleware(self.request(path)).status_code, 200)
+
+        self.assertEqual(self.middleware(self.request()).status_code, 200)
+
+    def test_other_geodataset_routes_are_still_limited(self):
+        for path in (
+            "/maps/geodatasets/42/",
+            "/maps/geodatasets/42/map/",
+            "/maps/geodatasets/42/filter-options/year/",
+            "/maps/geodatasets/42/features.geojson/extra",
+            "/maps/geodatasets/x/features.geojson",
+        ):
+            with self.subTest(path=path):
+                cache.clear()
+                for _ in range(LIMIT):
+                    self.middleware(self.request(path))
+
+                self.assertEqual(self.middleware(self.request(path)).status_code, 429)
+
     def test_unthrottled_actions_of_map_data_apis_are_still_limited(self):
         """List, detail and summaries actions of the same viewsets carry no
         DRF throttle, so they keep the site-wide anonymous cap."""

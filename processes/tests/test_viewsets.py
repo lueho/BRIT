@@ -22,17 +22,18 @@ from ..models import (
 class ProcessCategoryViewSetTestCase(APITestCase):
     """Test ProcessCategory API endpoints."""
 
-    def setUp(self):
-        self.owner = get_user_model().objects.create(username="test_user")
-        self.category1 = ProcessCategory.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create(username="test_user")
+        cls.category1 = ProcessCategory.objects.create(
             name="Thermochemical",
             description="Test description",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
-        self.category2 = ProcessCategory.objects.create(
+        cls.category2 = ProcessCategory.objects.create(
             name="Biochemical",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
 
@@ -73,66 +74,67 @@ class ProcessCategoryViewSetTestCase(APITestCase):
 class ProcessViewSetTestCase(APITestCase):
     """Test Process API endpoints."""
 
-    def setUp(self):
-        self.owner = get_user_model().objects.create(username="test_user")
-        self.category = ProcessCategory.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create(username="test_user")
+        cls.category = ProcessCategory.objects.create(
             name="Thermochemical",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
 
-        self.process1 = Process.objects.create(
+        cls.process1 = Process.objects.create(
             name="Pyrolysis",
             short_description="Thermal decomposition",
             mechanism="Thermal Decomposition",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
-        self.process1.categories.add(self.category)
+        cls.process1.categories.add(cls.category)
 
-        self.process2 = Process.objects.create(
+        cls.process2 = Process.objects.create(
             name="Gasification",
             mechanism="Partial Oxidation",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
 
         # Add materials
-        self.material_in = Material.objects.create(
+        cls.material_in = Material.objects.create(
             name="Wood Chips",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
-        self.material_out = Material.objects.create(
+        cls.material_out = Material.objects.create(
             name="Bio-oil",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
 
         ProcessMaterial.objects.create(
-            process=self.process1,
-            material=self.material_in,
+            process=cls.process1,
+            material=cls.material_in,
             role=ProcessMaterial.Role.INPUT,
         )
         ProcessMaterial.objects.create(
-            process=self.process1,
-            material=self.material_out,
+            process=cls.process1,
+            material=cls.material_out,
             role=ProcessMaterial.Role.OUTPUT,
         )
 
         # Add operating parameters
-        self.unit = Unit.objects.create(
+        cls.unit = Unit.objects.create(
             name="°C",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status="published",
         )
 
         ProcessOperatingParameter.objects.create(
-            process=self.process1,
+            process=cls.process1,
             parameter=ProcessOperatingParameter.Parameter.TEMPERATURE,
             value_min=Decimal("400"),
             value_max=Decimal("700"),
-            unit=self.unit,
+            unit=cls.unit,
         )
 
     def test_list_processes(self):
