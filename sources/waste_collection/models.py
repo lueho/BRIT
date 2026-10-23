@@ -534,7 +534,17 @@ class Collection(NamedUserCreatedObject):
     objects = CollectionQuerySet.as_manager()
 
     class Meta(NamedUserCreatedObject.Meta):
-        indexes = [models.Index(fields=["name", "id"], name="collection_name_id_idx")]
+        indexes = [
+            models.Index(fields=["name", "id"], name="collection_name_id_idx"),
+            # Meta.indexes replaces the abstract base's list, so the shared
+            # publication_status index must be re-declared explicitly.
+            models.Index(
+                fields=["publication_status"], name="collection_pub_status_idx"
+            ),
+            models.Index(
+                fields=["valid_from", "valid_until"], name="collection_validity_idx"
+            ),
+        ]
 
     VERSION_REVIEW_FIELD_NAMES = (
         "catchment",
@@ -1063,6 +1073,12 @@ class CollectionPropertyValue(PropertyValue):
                 fields=["collection", "property"],
                 condition=Q(is_derived=True, year__isnull=True),
                 name="soilcom_unique_derived_cpv_per_key_null_year",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["collection", "property", "year", "is_derived"],
+                name="cpv_sync_lookup_idx",
             ),
         ]
 
