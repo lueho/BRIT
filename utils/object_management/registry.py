@@ -30,7 +30,6 @@ REVIEWABLE_MODELS = frozenset(
         "greenhouses.greenhousegrowthcycle",
         "greenhouses.growthshare",
         "inventories.scenario",
-        "maps.attribute",
         "maps.catchment",
         "maps.catchmentrevision",
         "maps.categoricalattribute",
