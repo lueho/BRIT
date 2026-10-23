@@ -15,7 +15,7 @@ from .models import ReviewAction
 from .permissions import UserCreatedObjectPermission
 from .review_context import build_review_context
 from .review_hooks import get_review_update_context
-from .views import ReviewDashboardView
+from .review_queue import ReviewItemCollector
 
 
 class ReviewQueueAPIView(APIView):
@@ -26,12 +26,10 @@ class ReviewQueueAPIView(APIView):
     def get(self, request):
         """List review queue items using existing dashboard logic."""
         django_request = getattr(request, "_request", request)
-        dashboard_view = ReviewDashboardView()
-        dashboard_view.request = django_request
-        dashboard_view.paginate_by = 50
-        dashboard_view._available_models_cache = None
-
-        items = dashboard_view.collect_review_items()
+        collector = ReviewItemCollector(
+            request.user, getattr(django_request, "GET", None), page_size=50
+        )
+        items = collector.collect()
         payload = [self._serialize_item(request.user, item) for item in items]
 
         return Response({"count": len(payload), "results": payload})

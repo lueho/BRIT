@@ -36,12 +36,12 @@ from maps.serializers import (
     RegionGeoFeatureModelSerializer,
 )
 from utils.forms import TomSelectFormsetHelper
+from utils.object_management.access import CreateUserObjectMixin
 from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
 )
 from utils.object_management.views import (
-    CreateUserObjectMixin,
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
     PublishedObjectFilterView,

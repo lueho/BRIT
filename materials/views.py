@@ -36,6 +36,10 @@ from utils.file_export.views import (
 )
 from utils.forms import workspace_section_formsets
 from utils.modal import BSModalFormView, BSModalUpdateView
+from utils.object_management.access import (
+    UserCreatedObjectReadAccessMixin,
+    UserOwnsObjectMixin,
+)
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.permissions import (
     filter_queryset_for_user,
@@ -56,9 +60,7 @@ from utils.object_management.views import (
     UserCreatedObjectModalDeleteView,
     UserCreatedObjectModalDetailView,
     UserCreatedObjectModalUpdateView,
-    UserCreatedObjectReadAccessMixin,
     UserCreatedObjectUpdateView,
-    UserOwnsObjectMixin,
 )
 from utils.properties.models import Unit
 from utils.properties.units import UnitConversionError

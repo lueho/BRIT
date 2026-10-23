@@ -33,6 +33,7 @@ from sources.greenhouses.models import (
 )
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.modal import is_ajax
+from utils.object_management.access import UserOwnsObjectMixin
 from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
@@ -47,7 +48,6 @@ from utils.object_management.views import (
     UserCreatedObjectModalDeleteView,
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
-    UserOwnsObjectMixin,
 )
 from utils.views import NextOrSuccessUrlMixin
 

@@ -53,10 +53,13 @@ from utils.object_management.permissions import (
     UserCreatedObjectPermission,
     get_object_policy,
 )
+from utils.object_management.review_queue import (
+    ReviewItemCollector,
+    ReviewItemReference,
+)
 from utils.object_management.views import (
     BaseReviewActionView,
     ReviewDashboardView,
-    ReviewItemReference,
     SubmitForReviewView,
     UserCreatedObjectCreateView,
     WithdrawFromReviewView,
@@ -618,18 +621,22 @@ class ReviewPipelineTypeHintTests(TestCase):
                 )
 
     def test_review_dashboard_pipeline_methods_are_annotated(self):
-        for method_name in (
-            "get_available_models",
-            "_get_review_references",
-            "_hydrate_review_references",
-            "collect_review_items",
-            "has_review_items",
-            "get_queryset",
-            "_apply_database_review_filters",
-            "_apply_requested_ordering",
+        for cls, method_name in (
+            (ReviewItemCollector, "available_models"),
+            (ReviewItemCollector, "references"),
+            (ReviewItemCollector, "hydrate"),
+            (ReviewItemCollector, "collect"),
+            (ReviewItemCollector, "has_review_items"),
+            (ReviewItemCollector, "fallback_queryset"),
+            (ReviewItemCollector, "in_review_queryset_for_model"),
+            (ReviewItemCollector, "_apply_database_review_filters"),
+            (ReviewItemCollector, "_apply_requested_ordering"),
+            (ReviewDashboardView, "get_available_models"),
+            (ReviewDashboardView, "collect_review_items"),
+            (ReviewDashboardView, "get_queryset"),
         ):
             with self.subTest(method=method_name):
-                hints = get_type_hints(getattr(ReviewDashboardView, method_name))
+                hints = get_type_hints(getattr(cls, method_name))
                 self.assertIn("return", hints)
 
     def test_review_item_reference_is_a_typed_namedtuple(self):
@@ -700,8 +707,8 @@ class ReviewExceptionHandlingTests(TestCase):
             with (
                 self.subTest(exception=exc),
                 patch.object(
-                    ReviewDashboardView,
-                    "_in_review_queryset_for_model",
+                    ReviewItemCollector,
+                    "in_review_queryset_for_model",
                     side_effect=exc,
                 ),
             ):
@@ -710,36 +717,36 @@ class ReviewExceptionHandlingTests(TestCase):
     def test_available_models_propagates_unexpected_errors(self):
         view = self._dashboard_view()
         with patch.object(
-            ReviewDashboardView,
-            "_in_review_queryset_for_model",
+            ReviewItemCollector,
+            "in_review_queryset_for_model",
             side_effect=RuntimeError("boom"),
         ):
             with self.assertRaises(RuntimeError):
                 view.get_available_models()
 
-    # --- ReviewDashboardView._get_review_references ---
+    # --- ReviewItemCollector.references ---
 
     def test_review_references_propagates_unexpected_errors(self):
-        view = self._dashboard_view()
+        collector = ReviewItemCollector(self.staff)
         with patch.object(
-            ReviewDashboardView,
-            "_in_review_queryset_for_model",
+            ReviewItemCollector,
+            "in_review_queryset_for_model",
             side_effect=RuntimeError("boom"),
         ):
             with self.assertRaises(RuntimeError):
-                view._get_review_references([Collection])
+                collector.references([Collection])
 
-    # --- ReviewDashboardView.has_review_items ---
+    # --- ReviewItemCollector.has_review_items ---
 
     def test_has_review_items_propagates_unexpected_errors(self):
-        view = self._dashboard_view()
+        collector = ReviewItemCollector(self.staff)
         with patch.object(
-            ReviewDashboardView,
-            "_in_review_queryset_for_model",
+            ReviewItemCollector,
+            "in_review_queryset_for_model",
             side_effect=RuntimeError("boom"),
         ):
             with self.assertRaises(RuntimeError):
-                view.has_review_items()
+                collector.has_review_items()
 
     # --- BaseReviewActionView._is_review_detail_url ---
 
@@ -2138,7 +2145,7 @@ class ReviewDashboardPaginationQueryTests(TestCase):
 
     def test_page_loading_rechecks_review_status_after_reference_selection(self):
         view = self.get_view()
-        hydrate = view._hydrate_review_references
+        hydrate = view.collector.hydrate
 
         def approve_before_loading(references, querysets):
             Property.objects.filter(pk=self.properties[0].pk).update(
@@ -2150,9 +2157,7 @@ class ReviewDashboardPaginationQueryTests(TestCase):
             patch.object(
                 view, "get_available_models", return_value=[Property, Collection]
             ),
-            patch.object(
-                view, "_hydrate_review_references", side_effect=approve_before_loading
-            ),
+            patch.object(view.collector, "hydrate", side_effect=approve_before_loading),
         ):
             response = view.get(view.request)
 
@@ -2517,11 +2522,11 @@ class ReviewDashboardViewTests(TestCase):
         with (
             patch.object(view, "get_available_models", return_value=[Collection]),
             patch.object(
-                view,
-                "_in_review_queryset_for_model",
+                ReviewItemCollector,
+                "in_review_queryset_for_model",
                 side_effect=FieldError("boom"),
             ),
-            self.assertLogs("utils.object_management.views", level="WARNING"),
+            self.assertLogs("utils.object_management.review_queue", level="WARNING"),
         ):
             review_items = view.collect_review_items()
 
@@ -2538,7 +2543,9 @@ class ReviewDashboardViewTests(TestCase):
         with (
             patch.object(view, "get_available_models", return_value=[]),
             patch.object(
-                view, "_get_fallback_queryset", return_value=fallback_queryset
+                ReviewItemCollector,
+                "fallback_queryset",
+                return_value=fallback_queryset,
             ),
         ):
             kwargs = view.get_filterset_kwargs(view.filterset_class)
@@ -2556,7 +2563,9 @@ class ReviewDashboardViewTests(TestCase):
         with (
             patch.object(view, "get_available_models", return_value=[]),
             patch.object(
-                view, "_get_fallback_queryset", return_value=fallback_queryset
+                ReviewItemCollector,
+                "fallback_queryset",
+                return_value=fallback_queryset,
             ),
         ):
             queryset = view.get_queryset()
