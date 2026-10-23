@@ -4243,6 +4243,9 @@ var WasteAtlasChoropleth = (function () {
     exportElementPNG: exportElementPNG,
     transforms: transforms,
     changes: {
+      catchmentUrl: _changeCatchmentUrl,
+      records: _changeRecords,
+      categories: _changeCategories,
       numericRecords: _numericChangeRecords,
       renderConfig: _changeRenderConfig
     },
