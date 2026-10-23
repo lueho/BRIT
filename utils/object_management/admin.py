@@ -921,7 +921,6 @@ class PolicyOwnedInlineMixin:
                 validate_references(actor, bound_form.cleaned_data)
 
 
-@admin.register(ReviewAction)
 class NamedUserCreatedObjectAdmin(admin.ModelAdmin):
     """Shared admin configuration for NamedUserCreatedObject subclasses."""
 
@@ -931,6 +930,7 @@ class NamedUserCreatedObjectAdmin(admin.ModelAdmin):
     ordering = ("name",)
 
 
+@admin.register(ReviewAction)
 class ReviewActionAdmin(admin.ModelAdmin):
     """Read-only audit log: review events are append-only, even for superusers.
 

@@ -49,7 +49,7 @@ class LicenceAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
 
 @admin.register(Source)
 class SourceAdmin(PolicyAdminMixin, admin.ModelAdmin):
-    inlines = SourceAuthorInline
+    inlines = (SourceAuthorInline,)
     list_display = (
         "citation_key",
         "title",
