@@ -4,9 +4,9 @@
      href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
     <i class="fas fa-user-group"></i> Manage access
   </a>
-{% elif policy.can_read and user.is_authenticated %}
+{% elif policy.can_read and user.is_authenticated and user.is_active %}
   <a class="btn btn-outline-secondary w-100 mb-2 modal-link"
      href="{% url 'object_management:your_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
-    <i class="fas fa-user-check"></i> Your access
+    <i class="fas fa-circle-info"></i> Your access
   </a>
 {% endif %}

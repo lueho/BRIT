@@ -6,10 +6,18 @@ from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsp
 from django import template
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
+from django.http import QueryDict
 from django.test import RequestFactory
 from django.urls import reverse
 from django.utils.html import escape, mark_safe
 from django.utils.http import url_has_allowed_host_and_scheme
+
+from utils.object_management.policy import (
+    decide,
+    is_active_actor,
+    object_access_routes,
+)
+from utils.object_management.registry import review_target
 
 register = template.Library()
 
@@ -575,3 +583,80 @@ def clear_all_moderation_cache():
     except Exception:
         # If cache clearing fails, it's not critical - the cache will expire
         pass
+
+
+_WORKSPACE_SCOPES = (
+    ("private", "All workspace records"),
+    ("owned", "Owned by me"),
+    ("shared", "Shared with me"),
+)
+_WORKSPACE_SCOPE_VALUES = frozenset(scope for scope, _label in _WORKSPACE_SCOPES)
+_WORKSPACE_STRIPPED_PARAMS = (
+    frozenset({"scope", "id", "page", "publication_status"}) | _RETURN_PATH_PARAMS
+)
+
+
+@register.simple_tag(takes_context=True)
+def workspace_scope_links(context, base_url):
+    """Workspace scope nav for filtered lists.
+
+    Returns three ``{"label", "url", "active"}`` entries for the canonical
+    workspace scopes. The requested scope controls only ``active`` — an
+    unknown value yields no active entry and never pretends access. Query
+    parameters from the base URL and the request are merged (multi-valued
+    keys preserved); scope/identity/pagination/return-path keys are dropped
+    so links stay canonical and non-recursive.
+    """
+    request = context.get("request")
+    user = getattr(request, "user", None)
+    if not is_active_actor(user):
+        return []
+    requested = request.GET.get("scope", "private")
+    active_scope = requested if requested in _WORKSPACE_SCOPE_VALUES else None
+
+    base = urlsplit(base_url)
+    merged = QueryDict(base.query, mutable=True)
+    for key in request.GET:
+        if key in _WORKSPACE_STRIPPED_PARAMS:
+            continue
+        merged.setlist(key, request.GET.getlist(key))
+    for key in tuple(merged.keys()):
+        if key in _WORKSPACE_STRIPPED_PARAMS:
+            del merged[key]
+
+    links = []
+    for scope, label in _WORKSPACE_SCOPES:
+        query = merged.copy()
+        query["scope"] = scope
+        links.append(
+            {
+                "label": label,
+                "url": urlunsplit(
+                    (
+                        base.scheme,
+                        base.netloc,
+                        base.path,
+                        query.urlencode(),
+                        base.fragment,
+                    )
+                ),
+                "active": active_scope == scope,
+            }
+        )
+    return links
+
+
+@register.simple_tag(takes_context=True)
+def workspace_access(context, obj):
+    """Recipient-facing access summary for ``obj``.
+
+    Returns ``{"owner": <governance owner user>, "routes": [...]}`` when an
+    active actor may read the record, else an empty mapping. Only the
+    actor's own routes are ever reported.
+    """
+    request = context.get("request")
+    user = getattr(request, "user", None)
+    if not is_active_actor(user) or not decide(user, "read", obj).allowed:
+        return {}
+    root = review_target(obj) or obj
+    return {"owner": root.owner, "routes": object_access_routes(user, obj)}

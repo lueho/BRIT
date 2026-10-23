@@ -1,28 +1,26 @@
 <div class="modal-header">
-  <h5 class="modal-title">{{ modal_title }}</h5>
-  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  <h5 class="modal-title">Your access</h5>
+  <button type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"></button>
 </div>
 <div class="modal-body">
   <p>
-    <strong>{{ object }}</strong><br>
-    {% if owner %}Owned by {{ owner.username }}.{% endif %}
+    Access to this {{ object.verbose_name }} is owned by
+    <strong>{{ governance_object.owner.username }}</strong>.
   </p>
-  <p>Your access is provided through:</p>
-  <ul>
-    {% for route in access_routes %}
-      <li>{{ route }}</li>
-    {% endfor %}
-  </ul>
-  <p>
-    {% if can_edit %}
-      You can edit this record while it remains in an editable state.
-    {% else %}
-      You have read-only access to this record.
-      {% if edit_explanation %}
-        <br><span class="text-muted">{{ edit_explanation }}</span>
-      {% endif %}
-    {% endif %}
-  </p>
+  {% if access_routes %}
+    <p>You can access this record through:</p>
+    <ul class="mb-3">
+      {% for route in access_routes %}<li>{{ route }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+  {% if edit_decision.allowed %}
+    <p class="mb-0">You may edit this record.</p>
+  {% else %}
+    <p class="mb-0 text-muted">{{ edit_explanation }}</p>
+  {% endif %}
 </div>
 <div class="modal-footer">
   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>

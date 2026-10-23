@@ -71,7 +71,7 @@
                   </a>
                   <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
                      role="button"
-                     title="Show my workspace items (owned by me or shared with me)"
+                     title="Show my workspace records"
                      aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
                      {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
                      href="{{ object_list.model.private_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
@@ -103,6 +103,9 @@
           </div>
         </div>
         <div class="card-body overflow-auto">
+          {% if list_type == 'private' and user.is_authenticated %}
+            {% include "includes/workspace_nav.html" %}
+          {% endif %}
           {% block list_card_body %}
             {% block list_table %}
               <table class="table modern-table">
