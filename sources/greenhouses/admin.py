@@ -7,10 +7,11 @@ from sources.greenhouses.models import (
     GrowthShare,
     GrowthTimeStepSet,
 )
+from utils.object_management.admin import NamedUserCreatedObjectAdmin
 
 
 @admin.register(Greenhouse)
-class GreenhouseAdmin(admin.ModelAdmin):
+class GreenhouseAdmin(NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "heated",
@@ -28,15 +29,11 @@ class GreenhouseAdmin(admin.ModelAdmin):
         "high_wire",
         "above_ground",
     )
-    ordering = ("name",)
 
 
 @admin.register(Culture)
-class CultureAdmin(admin.ModelAdmin):
+class CultureAdmin(NamedUserCreatedObjectAdmin):
     list_display = ("name", "residue", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
 
 
 @admin.register(GreenhouseGrowthCycle)

@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
 
+from utils.object_management.admin import NamedUserCreatedObjectAdmin
+
 from .models import (
     InventoryAlgorithm,
     InventoryAlgorithmParameter,
@@ -68,6 +70,15 @@ class ScenarioInventoryConfigurationAdmin(admin.ModelAdmin):
         "value",
     )
     ordering = ("scenario",)
+    autocomplete_fields = (
+        "scenario",
+        "feedstock",
+        "sample_series",
+        "geodataset",
+        "inventory_algorithm",
+        "inventory_parameter",
+        "inventory_value",
+    )
 
     @staticmethod
     def feedstock_link(obj):
@@ -113,7 +124,7 @@ class ScenarioInventoryConfigurationAdmin(admin.ModelAdmin):
 
 
 @admin.register(Scenario)
-class ScenarioAdmin(admin.ModelAdmin):
+class ScenarioAdmin(NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "region_link",
@@ -125,8 +136,6 @@ class ScenarioAdmin(admin.ModelAdmin):
         "publication_status",
     )
     search_fields = ("name", "description")
-    list_filter = ("publication_status",)
-    ordering = ("name",)
     autocomplete_fields = ("showcase",)
 
     @staticmethod

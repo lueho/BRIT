@@ -1,5 +1,7 @@
 from django.contrib import admin
 
+from utils.object_management.admin import NamedUserCreatedObjectAdmin
+
 from .models import (
     AnalyticalMethod,
     ComponentMeasurement,
@@ -66,15 +68,13 @@ class AnalyticalMethodAdmin(admin.ModelAdmin):
 
 
 @admin.register(Material)
-class MaterialAdmin(admin.ModelAdmin):
+class MaterialAdmin(NamedUserCreatedObjectAdmin):
     list_display = ("name", "abbreviation", "owner", "publication_status")
     search_fields = ("name", "abbreviation", "description")
-    list_filter = ("publication_status",)
-    ordering = ("name",)
 
 
 @admin.register(MaterialComponent)
-class MaterialComponentAdmin(admin.ModelAdmin):
+class MaterialComponentAdmin(NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "abbreviation",
@@ -85,19 +85,15 @@ class MaterialComponentAdmin(admin.ModelAdmin):
     )
     search_fields = ("name", "abbreviation", "description")
     list_filter = ("publication_status", "is_aggregate")
-    ordering = ("name",)
 
 
 @admin.register(MaterialComponentGroup)
-class MaterialComponentGroupAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class MaterialComponentGroupAdmin(NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(MaterialProperty)
-class MaterialPropertyAdmin(admin.ModelAdmin):
+class MaterialPropertyAdmin(NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "abbreviation",
@@ -109,16 +105,12 @@ class MaterialPropertyAdmin(admin.ModelAdmin):
     )
     search_fields = ("name", "abbreviation")
     list_filter = ("publication_status", "aggregation_kind", "group")
-    ordering = ("name",)
     filter_horizontal = ("allowed_units",)
 
 
 @admin.register(MaterialPropertyGroup)
-class MaterialPropertyGroupAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class MaterialPropertyGroupAdmin(NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(MaterialPropertyValue)
@@ -139,7 +131,7 @@ class MaterialPropertyValueAdmin(admin.ModelAdmin):
 
 
 @admin.register(SampleSeries)
-class SampleSeriesAdmin(admin.ModelAdmin):
+class SampleSeriesAdmin(NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "material",
@@ -150,20 +142,18 @@ class SampleSeriesAdmin(admin.ModelAdmin):
     )
     search_fields = ("name", "material__name")
     list_filter = ("publication_status", "publish", "standard")
-    ordering = ("name",)
 
 
 @admin.register(SampleGroup)
-class SampleGroupAdmin(admin.ModelAdmin):
+class SampleGroupAdmin(NamedUserCreatedObjectAdmin):
     list_display = ("name", "kind", "owner", "publication_status")
     search_fields = ("name", "description", "sources__title")
     list_filter = ("kind", "publication_status")
-    ordering = ("name",)
     autocomplete_fields = ("sources",)
 
 
 @admin.register(Sample)
-class SampleAdmin(admin.ModelAdmin):
+class SampleAdmin(NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "material",
@@ -175,10 +165,9 @@ class SampleAdmin(admin.ModelAdmin):
     )
     search_fields = ("name", "material__name", "location")
     list_filter = ("publication_status", "standalone", "sample_groups")
-    ordering = ("name",)
     autocomplete_fields = ("sources",)
     filter_horizontal = ("sample_groups",)
-    inlines = [SampleAuthorInline]
+    inlines = (SampleAuthorInline,)
 
 
 @admin.register(Composition)

@@ -1,5 +1,7 @@
 from django.contrib import admin
 
+from utils.object_management.admin import NamedUserCreatedObjectAdmin
+
 from .models import Showcase, ShowcaseMaterial, ShowcaseProcess
 
 
@@ -16,7 +18,7 @@ class ShowcaseProcessInline(admin.TabularInline):
 
 
 @admin.register(Showcase)
-class ShowcaseAdmin(admin.ModelAdmin):
+class ShowcaseAdmin(NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "theme",
@@ -27,6 +29,5 @@ class ShowcaseAdmin(admin.ModelAdmin):
     )
     search_fields = ("name", "description")
     list_filter = ("publication_status", "theme", "catchment")
-    ordering = ("name",)
     autocomplete_fields = ("catchment", "samples", "sample_series")
     inlines = (ShowcaseMaterialInline, ShowcaseProcessInline)
