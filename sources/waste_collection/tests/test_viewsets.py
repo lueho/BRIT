@@ -969,22 +969,6 @@ class CollectorGeoJSONRenderedPathTests(APITestCase):
         self.assertEqual(outside.status_code, status.HTTP_200_OK)
         self.assertEqual(outside["X-Total-Count"], "0")
 
-    def test_geojson_response_rotates_after_collector_edit(self):
-        first = self.client.get(self.url, REMOTE_ADDR="10.9.10.4")
-        self.assertEqual(first.status_code, status.HTTP_200_OK)
-        self.assertEqual(first["X-Cache-Status"], "MISS")
-
-        self.collector.name = "Renamed Collector"
-        self.collector.save()
-
-        second = self.client.get(self.url, REMOTE_ADDR="10.9.10.4")
-        self.assertEqual(second["X-Cache-Status"], "MISS")
-        self.assertNotEqual(second["X-Data-Version"], first["X-Data-Version"])
-        self.assertEqual(
-            second.data["features"][0]["properties"]["collector"],
-            "Renamed Collector",
-        )
-
     def test_geojson_streaming_does_not_query_relations_per_feature(self):
         """Streamed collectors must not issue per-row NUTS/LAU lookups.
 
@@ -1012,13 +996,35 @@ class CollectorGeoJSONRenderedPathTests(APITestCase):
         # issue one NUTS and one LAU query per feature (>= 10 extra here).
         self.assertLessEqual(len(queries), 6)
 
+    def test_geojson_response_rotates_after_collector_edit(self):
+        first = self.client.get(self.url, REMOTE_ADDR="10.9.10.8")
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(first["X-Cache-Status"], "MISS")
+
+        # lastmodified_at only rotates on a fresh write, and the version
+        # token truncates it to whole seconds — bump it explicitly like the
+        # region cache-rotation tests do.
+        self.collector.name = "Renamed Collector"
+        self.collector.save()
+        Collector.objects.filter(pk=self.collector.pk).update(
+            lastmodified_at=timezone.now() + timedelta(days=1)
+        )
+
+        second = self.client.get(self.url, REMOTE_ADDR="10.9.10.8")
+        self.assertEqual(second["X-Cache-Status"], "MISS")
+        self.assertNotEqual(second["X-Data-Version"], first["X-Data-Version"])
+        self.assertEqual(
+            second.data["features"][0]["properties"]["collector"],
+            "Renamed Collector",
+        )
+
 
 class CollectorGeoJSONVersionRotationTests(TransactionTestCase):
     """Border edits must rotate the collector dataset version.
 
     GeoPolygon has no modification timestamp, so the version fingerprint
     tracks each borders row's ``xmin``. Transaction ids only advance across
-    real commits, so these tests need TransactionTestCase autocommit.
+    real commits, so this test needs TransactionTestCase autocommit.
     """
 
     def setUp(self):
@@ -1051,28 +1057,6 @@ class CollectorGeoJSONVersionRotationTests(TransactionTestCase):
         second = self.client.get(self.url, REMOTE_ADDR="10.9.10.7")
         self.assertEqual(second["X-Cache-Status"], "MISS")
         self.assertNotEqual(second["X-Data-Version"], first["X-Data-Version"])
-
-    def test_geojson_response_rotates_after_collector_edit(self):
-        first = self.client.get(self.url, REMOTE_ADDR="10.9.10.8")
-        self.assertEqual(first.status_code, status.HTTP_200_OK)
-        self.assertEqual(first["X-Cache-Status"], "MISS")
-
-        # lastmodified_at only rotates on a fresh write, and the version
-        # token truncates it to whole seconds — bump it explicitly like the
-        # region cache-rotation tests do.
-        self.collector.name = "Renamed Collector"
-        self.collector.save()
-        Collector.objects.filter(pk=self.collector.pk).update(
-            lastmodified_at=timezone.now() + timedelta(days=1)
-        )
-
-        second = self.client.get(self.url, REMOTE_ADDR="10.9.10.8")
-        self.assertEqual(second["X-Cache-Status"], "MISS")
-        self.assertNotEqual(second["X-Data-Version"], first["X-Data-Version"])
-        self.assertEqual(
-            second.data["features"][0]["properties"]["collector"],
-            "Renamed Collector",
-        )
 
 
 class CollectionReviewActionApiTestCase(APITestCase):
