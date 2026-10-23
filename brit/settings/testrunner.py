@@ -126,8 +126,9 @@ EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 ADMINS = ["tests@example.com"]
 MANAGERS = ["tests@example.com"]
 
-# Use DB-backed sessions for parallel test safety
-SESSION_ENGINE = "django.contrib.sessions.backends.db"
+# Sessions travel inside the signed cookie, so logins and authenticated
+# requests skip the session table entirely and workers share no state.
+SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 
 LOGGING = {
     "version": 1,
