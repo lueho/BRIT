@@ -1,3 +1,5 @@
+import math
+
 from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
@@ -57,6 +59,19 @@ class InventoryAlgorithmParameterValueAdmin(admin.ModelAdmin):
     search_fields = ("name", "source")
     list_filter = ("default", "is_custom")
     ordering = ("parameter", "name")
+
+    def get_search_results(self, request, queryset, search_term):
+        """Also match the numeric value, which custom values display instead of a name."""
+        results, may_have_duplicates = super().get_search_results(
+            request, queryset, search_term
+        )
+        try:
+            number = float(search_term.strip())
+        except ValueError:
+            return results, may_have_duplicates
+        if not math.isfinite(number):
+            return results, may_have_duplicates
+        return results | queryset.filter(value=number), may_have_duplicates
 
 
 @admin.register(ScenarioInventoryConfiguration)
