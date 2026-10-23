@@ -931,6 +931,15 @@ class NamedUserCreatedObjectAdmin(admin.ModelAdmin):
 
 
 @admin.register(ReviewAction)
+class NamedUserCreatedObjectAdmin(admin.ModelAdmin):
+    """Shared admin configuration for NamedUserCreatedObject subclasses."""
+
+    list_display = ("name", "owner", "publication_status")
+    search_fields = ("name",)
+    list_filter = ("publication_status",)
+    ordering = ("name",)
+
+
 class ReviewActionAdmin(admin.ModelAdmin):
     """Read-only audit log: review events are append-only, even for superusers.
 
