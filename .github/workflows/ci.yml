@@ -111,4 +111,4 @@ jobs:
             --env REDIS_URL \
             --env SECRET_KEY \
             brit-web-ci \
-            python manage.py test --settings=brit.settings.testrunner --parallel 2 --noinput
+            python manage.py test --settings=brit.settings.testrunner --parallel 4 --noinput
