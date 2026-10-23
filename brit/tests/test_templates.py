@@ -71,6 +71,20 @@ class DeleteConfirmationTemplateTests(SimpleTestCase):
         self.assertNotIn("<2>", html)
 
 
+class SharedUiUtilsScriptTests(SimpleTestCase):
+    """``js/ui_utils.min.js`` provides fetchJson/pollTaskProgress/showInlineAlert
+    to export polling, TomSelect inline-create and map error handling, so both
+    base layouts must load it before any page-specific script uses it."""
+
+    def test_base_template_includes_ui_utils(self):
+        html = render_to_string("base.html")
+        self.assertIn("js/ui_utils.min.js", html)
+
+    def test_base_iframe_template_includes_ui_utils(self):
+        html = render_to_string("base_iframe.html")
+        self.assertIn("js/ui_utils.min.js", html)
+
+
 class SitemapItemsTestCase(SimpleTestCase):
     def test_sources_explorer_is_canonical_sitemap_entry(self):
         self.assertIn("/sources/explorer/", get_sitemap_items())

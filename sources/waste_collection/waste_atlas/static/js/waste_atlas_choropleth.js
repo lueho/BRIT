@@ -4178,7 +4178,9 @@ var WasteAtlasChoropleth = (function () {
       copyField.addEventListener('focus', function () { copyField.select(); });
       copyButton.addEventListener('click', function () {
         _copyPermalink(copyField, navigator.clipboard, function () {
-          return document.execCommand('copy');
+          // Clipboard API unavailable or rejected; the field stays selected so
+          // the user can copy manually (the button reports "Press Ctrl+C").
+          return false;
         }).then(function (copied) {
           copyButton.textContent = copied ? 'Copied' : 'Press Ctrl+C to copy';
           setTimeout(function () { copyButton.innerHTML = copyLabel; }, 2000);
@@ -4243,12 +4245,17 @@ var WasteAtlasChoropleth = (function () {
     exportElementPNG: exportElementPNG,
     transforms: transforms,
     changes: {
+      catchmentUrl: _changeCatchmentUrl,
+      records: _changeRecords,
+      categories: _changeCategories,
       numericRecords: _numericChangeRecords,
       renderConfig: _changeRenderConfig
     },
     collections: {
       detailUrl: _collectionDetailUrl,
-      openChoice: _openCollectionChoice
+      openChoice: _openCollectionChoice,
+      openInNewTab: _openCollectionInNewTab,
+      suppressAutoscroll: _suppressAutoscroll
     },
     quartiles: {
       apply: _applyQuartiles,

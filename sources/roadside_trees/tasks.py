@@ -4,7 +4,7 @@ from django.conf import settings
 
 from brit.celery import app
 from maps.signals import get_geojson_cache
-from maps.utils import set_geojson_cache_payload
+from maps.utils import cache_rendered_geojson, rendered_geojson_cache_key
 from sources.roadside_trees.geojson import (
     HamburgRoadsideTreeGeometrySerializer,
     HamburgRoadsideTrees,
@@ -36,23 +36,32 @@ def warm_roadside_tree_geojson_cache(self):
             return {"status": "skipped", "features_count": stats["count"]}
         dataset_version = stats["version"]
         qs = HamburgRoadsideTrees.objects.only("id", "geom").order_by()
-        serializer = HamburgRoadsideTreeGeometrySerializer(qs, many=True)
-        data = serializer.data
-        cache_key = f"tree_geojson:all:dv:{dataset_version}"
+        base_key = f"tree_geojson:all:dv:{dataset_version}"
+        cache_key = rendered_geojson_cache_key(base_key, dataset_version)
         cache = get_geojson_cache()
         timeout = getattr(settings, "GEOJSON_CACHE_TIMEOUT", 86400)
-        set_geojson_cache_payload(cache, cache_key, data, timeout=timeout)
-
-        feature_count = (
-            len(data.get("features", [])) if isinstance(data, dict) else len(data)
+        cached = cache.has_key(cache_key)
+        warmed = cached or cache_rendered_geojson(
+            cache,
+            cache_key,
+            qs,
+            HamburgRoadsideTreeGeometrySerializer,
+            "geom",
+            timeout=timeout,
         )
+        # The viewset reads only the rendered key now; drop any legacy
+        # serializer-payload entry stored under the same version.
+        cache.delete(base_key)
+        cache.delete(f"{base_key}:count")
+
+        feature_count = 0 if cached else stats["count"] or 0
         logger.info(
             "Roadside Trees GeoJSON cache warmed: %d features, key=%s",
             feature_count,
             cache_key,
         )
         return {
-            "status": "success",
+            "status": "success" if warmed else "skipped",
             "features_count": feature_count,
             "cache_key": cache_key,
         }

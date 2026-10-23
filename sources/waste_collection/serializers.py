@@ -115,7 +115,7 @@ class WasteCollectionGeometrySerializer(
         return category.name
 
 
-class CollectorGeometrySerializer(GeoFeatureModelSerializer):
+class CollectorGeometrySerializer(SimplifiedGeometryMixin, GeoFeatureModelSerializer):
     """
     GeoJSON serializer for Collectors with geometry and organizational level.
     Used by QGIS for map rendering.
@@ -125,6 +125,9 @@ class CollectorGeometrySerializer(GeoFeatureModelSerializer):
     collector = serializers.CharField(source="name", read_only=True)
     catchment = serializers.SerializerMethodField()
     orga_level = serializers.SerializerMethodField()
+    # ``Collector.geom`` is a property; without an explicit geometry field the
+    # geo field resolves to a ReadOnlyField that leaks the raw GEOS object.
+    geom = GeometrySerializerMethodField()
 
     class Meta:
         model = GeoreferencedCollector

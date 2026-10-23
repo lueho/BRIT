@@ -8,6 +8,7 @@ from django.db.models import QuerySet
 from django.test import TestCase
 from django.urls import reverse
 
+from bibliography.models import Source
 from maps.models import GeoPolygon
 from utils.properties.models import PropertyBase, Unit
 
@@ -371,6 +372,18 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         )
 
         self.assertEqual(value.measurement_unit_label, unit.name)
+
+    def test_sources_m2m_is_available_for_provenance(self):
+        source = Source.objects.create(title="Regional statistics yearbook")
+        value = RegionAttributeValue.objects.create(
+            region=Region.objects.create(name="Test Region"),
+            property=RegionProperty.objects.create(name="Population density"),
+            value=123.321,
+        )
+
+        value.sources.add(source)
+
+        self.assertQuerySetEqual(value.sources.all(), [source])
 
 
 class LegacyAttributeRemovalTestCase(TestCase):

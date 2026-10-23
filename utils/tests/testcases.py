@@ -111,6 +111,7 @@ class AbstractTestCases:
         for specific view types:
         - `explorer_view`
         - `create_view`
+        - `create_view_post`
         - `modal_create_view`
         - `public_list_view`
         - `private_list_view`
@@ -138,6 +139,7 @@ class AbstractTestCases:
 
         explorer_view = True
         create_view = True
+        create_view_post = True
         modal_create_view = False
         public_list_view = True
         private_list_view = True
@@ -600,6 +602,8 @@ class AbstractTestCases:
             self.assertRedirects(response, expected_redirect)
 
         def test_create_view_post_as_anonymous(self):
+            if not self.create_view_post:
+                self.skipTest("Create view does not accept POST for this test case.")
             if not self.create_view:
                 self.skipTest("Create view is not enabled for this test case.")
             url = self.get_create_url()
@@ -623,6 +627,8 @@ class AbstractTestCases:
                 )
 
         def test_create_view_post_as_authenticated_without_permission(self):
+            if not self.create_view_post:
+                self.skipTest("Create view does not accept POST for this test case.")
             if not self.create_view:
                 self.skipTest("Create view is not enabled for this test case.")
             self.client.force_login(self.non_owner_user)
@@ -649,6 +655,8 @@ class AbstractTestCases:
             self.assertEqual(response.status_code, 200)
 
         def test_create_view_post_as_authenticated_with_permission(self):
+            if not self.create_view_post:
+                self.skipTest("Create view does not accept POST for this test case.")
             if not self.create_view:
                 self.skipTest("Create view is not enabled for this test case.")
             self.client.force_login(self.user_with_add_perm)
@@ -671,6 +679,8 @@ class AbstractTestCases:
             self.assertEqual(response.status_code, 200)
 
         def test_create_view_post_as_staff_user(self):
+            if not self.create_view_post:
+                self.skipTest("Create view does not accept POST for this test case.")
             if not self.create_view:
                 self.skipTest("Create view is not enabled for this test case.")
             self.client.force_login(self.staff_user)

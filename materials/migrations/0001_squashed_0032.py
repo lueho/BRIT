@@ -52,8 +52,8 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("bibliography", "0001_squashed_0012"),
-        ("distributions", "0001_initial"),
-        ("maps", "0019_region_name_en"),
+        ("distributions", "0001_squashed_0004"),
+        ("maps", "0001_squashed_0020"),
         ("properties", "0001_squashed_0010"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
