@@ -856,7 +856,7 @@ class ComponentMeasurementTestCase(TestCase):
         sample = Sample.objects.create(name="Sample", material=material)
         group = MaterialComponentGroup.objects.create(name="Chemical elements")
         component = MaterialComponent.objects.create(name="Carbon")
-        for name, symbol in (("mg/L", "mg/L"), ("vol.-%", "volume_percent")):
+        for name, symbol in (("mg/L", "mg/L"), ("vol%", "volume_percent")):
             with self.subTest(unit=name):
                 unit, _ = Unit.objects.update_or_create(
                     name=name, defaults={"symbol": symbol}

@@ -76,7 +76,7 @@ class ComponentMeasurementWriteSerializerTestCase(TestCase):
 
     def test_rejects_volume_percent(self):
         unit, _ = Unit.objects.update_or_create(
-            name="vol.-%", defaults={"symbol": "volume_percent"}
+            name="vol%", defaults={"symbol": "volume_percent"}
         )
         serializer = ComponentMeasurementWriteSerializer(data=self._data(unit))
         self.assertFalse(serializer.is_valid())

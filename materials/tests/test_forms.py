@@ -294,7 +294,7 @@ class ComponentMeasurementModelFormTestCase(TestCase):
         g_per_kg = Unit.objects.create(name="g/kg", symbol="g/kg")
         mg_per_l = Unit.objects.create(name="mg/L", symbol="mg/L")
         volume_percent, _ = Unit.objects.update_or_create(
-            name="vol.-%", defaults={"symbol": "volume_percent"}
+            name="vol%", defaults={"symbol": "volume_percent"}
         )
 
         queryset = ComponentMeasurementModelForm().fields["unit"].queryset
