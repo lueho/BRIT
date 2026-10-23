@@ -75,6 +75,7 @@ from sources.waste_collection.forms import (
     WasteFlyerFormSetHelper,
     WasteFlyerModalModelForm,
     WasteFlyerModelForm,
+    preserve_bibliographic_sources_through_formset,
 )
 from sources.waste_collection.frequency_service import (
     CollectionFrequencyScheduleService,
@@ -125,7 +126,7 @@ from utils.object_management.views import (
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
 )
-from utils.views import BreadcrumbContextMixin
+from utils.views import BreadcrumbContextMixin, LetterIndexMixin
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +174,7 @@ def _frequency_display_context(frequency):
     if not frequency:
         return None
     frequency_rows = CollectionFrequencyScheduleService.rows_from_frequency(frequency)
-    rows = CollectionFrequencyScheduleService.display_rows(frequency)
+    rows = CollectionFrequencyScheduleService.display_rows_from_rows(frequency_rows)
     is_year_round = len(rows) == 1 and rows[0]["segment"] == "All year"
     return {
         "canonical_label": frequency.name,
@@ -186,7 +187,7 @@ def _frequency_display_context(frequency):
 
 
 class CollectionExplorerView(BreadcrumbContextMixin, TemplateView):
-    template_name = "wastecollection_dashboard.html"
+    template_name = "wastecollection_explorer.html"
     breadcrumb_parent_module_label = "Sources"
     breadcrumb_parent_module_url = reverse_lazy("sources-explorer")
     breadcrumb_module_label = "Waste Collection"
@@ -235,19 +236,19 @@ class CollectionDiagramView(TemplateView):
 class CollectorPublishedListView(PublishedObjectFilterView):
     model = Collector
     filterset_class = CollectorFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectorPrivateListView(PrivateObjectFilterView):
     model = Collector
     filterset_class = CollectorFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectorReviewFilterView(ReviewObjectFilterView):
     model = Collector
     filterset_class = CollectorFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
     def get_filterset_kwargs(self, filterset_class=None):
         kwargs = super().get_filterset_kwargs(filterset_class)
@@ -304,13 +305,13 @@ class CollectorAutocompleteView(UserCreatedObjectAutocompleteView):
 class CollectionSystemPublishedListView(PublishedObjectFilterView):
     model = CollectionSystem
     filterset_class = CollectionSystemListFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionSystemPrivateListView(PrivateObjectFilterView):
     model = CollectionSystem
     filterset_class = CollectionSystemListFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionSystemAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -356,13 +357,13 @@ class CollectionSystemModalDeleteView(UserCreatedObjectModalDeleteView):
 class WasteCategoryPublishedListView(PublishedObjectFilterView):
     model = WasteCategory
     filterset_class = WasteCategoryListFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class WasteCategoryPrivateListView(PrivateObjectFilterView):
     model = WasteCategory
     filterset_class = WasteCategoryListFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class WasteCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -408,13 +409,13 @@ class WasteCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
 class WasteComponentPublishedListView(PublishedObjectFilterView):
     model = WasteComponent
     filterset_class = WasteComponentListFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class WasteComponentPrivateListView(PrivateObjectFilterView):
     model = WasteComponent
     filterset_class = WasteComponentListFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class WasteComponentAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -460,13 +461,13 @@ class WasteComponentModalDeleteView(UserCreatedObjectModalDeleteView):
 class FeeSystemPublishedListView(PublishedObjectFilterView):
     model = FeeSystem
     filterset_class = FeeSystemListFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class FeeSystemPrivateListView(PrivateObjectFilterView):
     model = FeeSystem
     filterset_class = FeeSystemListFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class FeeSystemAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -498,14 +499,14 @@ class FeeSystemModalDeleteView(UserCreatedObjectModalDeleteView):
 class WasteFlyerPublishedFilterView(PublishedObjectFilterView):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
     ordering = "id"
 
 
 class WasteFlyerPrivateFilterView(PrivateObjectFilterView):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
     ordering = "id"
 
 
@@ -621,13 +622,13 @@ class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
 class FrequencyPublishedListView(PublishedObjectFilterView):
     model = CollectionFrequency
     filterset_class = CollectionFrequencyListFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class FrequencyPrivateListView(PrivateObjectFilterView):
     model = CollectionFrequency
     filterset_class = CollectionFrequencyListFilter
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class FrequencyScheduleMixin:
@@ -779,21 +780,7 @@ class CollectionPropertyValueCreateView(
     def forms_valid(self, form, formset):
         form.instance.owner = self.request.user
         self.object = form.save()
-
-        # Capture bibliographic sources saved by the form before the formset
-        # overwrites the sources M2M via .set() with only WasteFlyer objects.
-        bibliographic_sources = list(
-            self.object.sources.exclude(type="waste_flyer").values_list("pk", flat=True)
-        )
-
-        # Update formset's parent_object so it can set the M2M relationship
-        formset.parent_object = self.object
-        formset.save()
-
-        # Re-add bibliographic sources that were wiped by formset.save()
-        if bibliographic_sources:
-            self.object.sources.add(*bibliographic_sources)
-
+        preserve_bibliographic_sources_through_formset(self.object, formset)
         return HttpResponseRedirect(self.get_success_url())
 
     def forms_invalid(self, form, formset):
@@ -884,21 +871,7 @@ class CollectionPropertyValueUpdateView(
             instance.collection = anchor
 
         self.object = form.save()
-
-        # Capture bibliographic sources saved by the form before the formset
-        # overwrites the sources M2M via .set() with only WasteFlyer objects.
-        bibliographic_sources = list(
-            self.object.sources.exclude(type="waste_flyer").values_list("pk", flat=True)
-        )
-
-        # Update formset's parent_object so it can set the M2M relationship
-        formset.parent_object = self.object
-        formset.save()
-
-        # Re-add bibliographic sources that were wiped by formset.save()
-        if bibliographic_sources:
-            self.object.sources.add(*bibliographic_sources)
-
+        preserve_bibliographic_sources_through_formset(self.object, formset)
         return HttpResponseRedirect(self.get_success_url())
 
     def forms_invalid(self, form, formset):
@@ -999,22 +972,7 @@ class AggregatedCollectionPropertyValueUpdateView(
 
         if form.is_valid() and formset.is_valid():
             self.object = form.save()
-
-            # Capture bibliographic sources saved by the form before the formset
-            # overwrites the sources M2M via .set() with only WasteFlyer objects.
-            bibliographic_sources = list(
-                self.object.sources.exclude(type="waste_flyer").values_list(
-                    "pk", flat=True
-                )
-            )
-
-            formset.parent_object = self.object
-            formset.save()
-
-            # Re-add bibliographic sources that were wiped by formset.save()
-            if bibliographic_sources:
-                self.object.sources.add(*bibliographic_sources)
-
+            preserve_bibliographic_sources_through_formset(self.object, formset)
             return HttpResponseRedirect(self.get_success_url())
         else:
             return self.render_to_response(
@@ -1041,13 +999,13 @@ class AggregatedCollectionPropertyValueModalDeleteView(
 class CollectionCatchmentPublishedFilterView(PublishedObjectFilterView):
     model = CollectionCatchment
     filterset_class = CatchmentFilterSet
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionCatchmentPrivateFilterView(PrivateObjectFilterView):
     model = CollectionCatchment
     filterset_class = CatchmentFilterSet
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionCatchmentCreateView(CatchmentCreateView):
@@ -1122,7 +1080,7 @@ class CollectionCatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionListMixin:
+class CollectionListMixin(LetterIndexMixin):
     """Mixin providing optimized queryset for Collection list views."""
 
     ordering = ("name", "id")
@@ -1144,13 +1102,13 @@ class CollectionListMixin:
 class CollectionPublishedListView(CollectionListMixin, PublishedObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionPrivateListView(CollectionListMixin, PrivateObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionReviewListView(CollectionListMixin, ReviewObjectFilterView):
@@ -1747,10 +1705,10 @@ class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Collection
 
 
-class CollectionReviewFilterView(ReviewObjectFilterView):
+class CollectionReviewFilterView(CollectionListMixin, ReviewObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
 
     def get_filterset_kwargs(self, filterset_class=None):
         kwargs = super().get_filterset_kwargs(filterset_class)
@@ -2003,7 +1961,7 @@ class WasteCollectionPublishedMapView(
     filterset_class = CollectionFilterSet
     features_layer_api_basename = "api-waste-collection"
     map_title = "Household Waste Collections"
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
     dv_scope = "published"
 
     def get_filterset_kwargs(self, filterset_class=None):
@@ -2022,7 +1980,7 @@ class WasteCollectionPrivateMapView(
     filterset_class = CollectionFilterSet
     features_layer_api_basename = "api-waste-collection"
     map_title = "My Household Waste Collections"
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
     dv_scope = "private"
 
     def get_filterset_kwargs(self, filterset_class=None):
@@ -2042,7 +2000,7 @@ class WasteCollectionReviewMapView(
     filterset_class = CollectionFilterSet
     features_layer_api_basename = "api-waste-collection"
     map_title = "Collections in Review"
-    dashboard_url = reverse_lazy("wastecollection-explorer")
+    explorer_url = reverse_lazy("wastecollection-explorer")
     dv_scope = "review"
 
     def get_filterset_kwargs(self, filterset_class=None):

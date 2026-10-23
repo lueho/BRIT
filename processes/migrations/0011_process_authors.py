@@ -17,7 +17,7 @@ def copy_author_to_authors(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("bibliography", "0009_rename_source_bibtex_fields"),
+        ("bibliography", "0001_squashed_0012"),
         ("processes", "0010_process_image_metadata"),
     ]
 

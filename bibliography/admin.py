@@ -1,6 +1,10 @@
 from django.contrib import admin
 
-from utils.object_management.admin import PolicyAdminMixin, PolicyOwnedInlineMixin
+from utils.object_management.admin import (
+    NamedUserCreatedObjectAdmin,
+    PolicyAdminMixin,
+    PolicyOwnedInlineMixin,
+)
 
 from .models import Author, Licence, Source, SourceAuthor
 
@@ -39,16 +43,13 @@ class AuthorAdmin(PolicyAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(Licence)
-class LicenceAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class LicenceAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "reference_url", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
 
 
 @admin.register(Source)
 class SourceAdmin(PolicyAdminMixin, admin.ModelAdmin):
-    inlines = [SourceAuthorInline]
+    inlines = (SourceAuthorInline,)
     list_display = (
         "citation_key",
         "title",

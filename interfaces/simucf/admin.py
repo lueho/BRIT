@@ -1,13 +1,11 @@
 from django.contrib import admin
 
-from utils.object_management.admin import PolicyAdminMixin
+from utils.object_management.admin import NamedUserCreatedObjectAdmin, PolicyAdminMixin
 
 from .models import InputMaterial
 
 
 @admin.register(InputMaterial)
-class InputMaterialAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class InputMaterialAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "material", "series", "owner", "publication_status")
     search_fields = ("name", "material__name")
-    list_filter = ("publication_status",)
-    ordering = ("name",)

@@ -236,7 +236,7 @@ class SemanticUnitConversionTestCase(TestCase):
 
     def test_volume_percent_is_not_a_weight_fraction(self):
         volume, _ = Unit.objects.update_or_create(
-            name="vol.-%", defaults={"symbol": "volume_percent", "dimensionless": True}
+            name="vol%", defaults={"symbol": "volume_percent", "dimensionless": True}
         )
         mass = Unit.objects.create(name="wt%", symbol="percent", dimensionless=True)
         self.assertFalse(volume.is_weight_fraction)
@@ -250,7 +250,7 @@ class SemanticUnitConversionTestCase(TestCase):
         self.assertEqual(source.convert(Decimal("100"), target), Decimal("10"))
         with patch("utils.properties.models.get_unit_registry", return_value=None):
             self.assertEqual(source.convert(Decimal("100"), target), Decimal("10"))
-            volume = Unit(name="vol.-%", symbol="volume_percent")
+            volume = Unit(name="vol%", symbol="volume_percent")
             for left, right in ((volume, target), (target, volume)):
                 with self.assertRaises(UnitConversionError):
                     left.convert(Decimal("1"), right)

@@ -148,6 +148,7 @@ MEASUREMENT_METADATA_FIELDS = (
     "display_value",
     "value_qualifier",
     "raw_value",
+    "limit_type",
     "detection_limit",
     "raw_detection_limit",
 )
@@ -157,6 +158,7 @@ class MeasurementMetadataSerializerMixin(Serializer):
     display_value = ReadOnlyField()
     value_qualifier = ReadOnlyField()
     raw_value = ReadOnlyField()
+    limit_type = ReadOnlyField(source="effective_limit_type")
     detection_limit = ReadOnlyField()
     raw_detection_limit = ReadOnlyField()
 

@@ -7,8 +7,7 @@ from django.urls import reverse
 from django.views.generic import UpdateView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
-from maps.models import Catchment, GeoDataset
-from maps.views import GeoDataSetPublishedFilteredMapView
+from maps.views import CatchmentAutocompleteView, GeoDataSetPublishedFilteredMapView
 from materials.models import Composition, MaterialComponentGroup
 from sources.greenhouses.filters import (
     CultureListFilter,
@@ -306,16 +305,8 @@ class UpdateGreenhouseGrowthCycleValuesView(
         return reverse("greenhouse-detail", kwargs={"pk": self.kwargs.get("pk")})
 
 
-class NantesGreenhousesCatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
-    model = Catchment
+class NantesGreenhousesCatchmentAutocompleteView(CatchmentAutocompleteView):
     geodataset_model_name = "NantesGreenhouses"
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        dataset_region = GeoDataset.objects.get(
-            model_name=self.geodataset_model_name
-        ).region
-        return queryset.filter(region__borders__geom__within=dataset_region.geom)
 
 
 class GreenhousesPublishedMapView(GeoDataSetPublishedFilteredMapView):

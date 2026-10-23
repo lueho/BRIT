@@ -27,15 +27,14 @@ def _administer_objects_permission():
 class WasteAtlasMapConfigurationViewsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.admin = User.objects.create_user(
-            username="atlas-config-admin",
-            password="secret",
+        cls.staff = User.objects.create_user(
+            username="atlas-config-staff",
             is_staff=True,
         )
+        cls.admin = User.objects.create_user(username="atlas-config-admin")
         cls.admin.user_permissions.add(_administer_objects_permission())
         cls.regular_user = User.objects.create_user(
             username="atlas-config-user",
-            password="secret",
         )
 
     def _configuration(self):
@@ -585,7 +584,6 @@ class WasteAtlasExportFileNameTestCase(TestCase):
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
             username="atlas-export-user",
-            password="secret",
         )
 
     # (route name, expected fileBase) covering generic, country, sub-national,

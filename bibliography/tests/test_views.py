@@ -8,7 +8,11 @@ from django.utils.html import escape
 from factory.django import mute_signals
 
 from utils.object_management.models import User
-from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
+from utils.tests.testcases import (
+    AbstractTestCases,
+    CheckUrlButtonVisibilityTestMixin,
+    ViewWithPermissionsTestCase,
+)
 
 from ..models import Author, Licence, Source, SourceAuthor, check_url_valid
 
@@ -33,7 +37,7 @@ class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
     model = Author
 
-    view_dashboard_name = "bibliography-explorer"
+    view_explorer_name = "bibliography-explorer"
     view_create_name = "author-create"
     view_modal_create_name = "author-create-modal"
     view_published_list_name = "author-list"
@@ -291,7 +295,7 @@ class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
     model = Licence
 
-    view_dashboard_name = "bibliography-explorer"
+    view_explorer_name = "bibliography-explorer"
     view_create_name = "licence-create"
     view_modal_create_name = "licence-create-modal"
     view_published_list_name = "licence-list"
@@ -309,16 +313,19 @@ class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+class SourceCRUDViewsTestCase(
+    CheckUrlButtonVisibilityTestMixin,
+    AbstractTestCases.UserCreatedObjectCRUDViewTestCase,
+):
     model = Source
     add_scope_query_param_to_list_urls = True
 
-    view_dashboard_name = "bibliography-explorer"
+    view_explorer_name = "bibliography-explorer"
 
     modal_detail_view = True
     modal_create_view = True
 
-    view_dashboard_name = "bibliography-explorer"
+    view_explorer_name = "bibliography-explorer"
     view_create_name = "source-create"
     view_modal_create_name = "source-create-modal"
     view_published_list_name = "source-list"
@@ -390,6 +397,39 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
                 self.assertContains(response, "All sources")
                 self.assertContains(response, "Bibliography explorer")
 
+    def test_list_letter_filter_narrows_by_citation_key(self):
+        zeta = Source.objects.create(
+            owner=self.owner_user,
+            publication_status="published",
+            title="Zeta source",
+            citation_key="ZETA",
+            type="online",
+            url="https://zeta.example.org",
+        )
+
+        response = self.client.get(
+            reverse("source-list"), {"scope": "published", "letter": "Z"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result_pks = {obj.pk for obj in response.context["object_list"]}
+        self.assertIn(zeta.pk, result_pks)
+        self.assertNotIn(self.published_object.pk, result_pks)
+
+    def test_list_renders_letter_index(self):
+        response = self.client.get(reverse("source-list"), {"scope": "published"})
+
+        self.assertContains(response, 'aria-label="Filter by first letter"')
+
+    def test_list_filter_form_carries_active_letter(self):
+        response = self.client.get(
+            reverse("source-list"), {"scope": "published", "letter": "Z"}
+        )
+
+        self.assertContains(
+            response, '<input type="hidden" name="letter" value="Z">', html=True
+        )
+
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -450,20 +490,6 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             "sourceauthors-1-author": self.source_author_2.author.pk,
         }
 
-    def test_detail_view_unpublished_contains_check_url_button_for_owner(self):
-        self.client.force_login(self.owner_user)
-        response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
-        self.assertContains(response, "check url")
-
-    def test_detail_view_published_contains_check_url_button_for_owner(self):
-        self.client.force_login(self.owner_user)
-        response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertContains(response, "check url")
-
-    def test_detail_view_published_doesnt_contain_check_url_button_for_anonymous(self):
-        response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertNotContains(response, "check url")
-
     def test_detail_view_published_contains_check_url_button_for_staff(self):
         self.client.force_login(self.staff_user)
         response = self.client.get(self.get_detail_url(self.published_object.pk))
@@ -473,13 +499,6 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         self.client.force_login(self.util_objects["moderator"])
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertContains(response, "check url")
-
-    def test_detail_view_published_doesnt_contain_check_url_button_for_unprivileged_non_owner(
-        self,
-    ):
-        self.client.force_login(self.non_owner_user)
-        response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertNotContains(response, "check url")
 
     def test_create_source_without_author_succeeds(self):
         """
@@ -796,6 +815,24 @@ class SourceAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(len(returned_ids), len(set(returned_ids)))
         self.assertIn(target_source.pk, returned_ids)
 
+    def test_label_abbreviation_returns_short_source_labels(self):
+        source = Source.objects.create(
+            owner=self.member,
+            title="A Rather Long Source Title That Makes Tall Selection Chips",
+            abbreviation="SRC1",
+            publication_status="published",
+        )
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("source-autocomplete"),
+            {"q": "Rather Long", "label": "abbreviation"},
+        )
+        self.assertEqual(response.status_code, 200)
+        result = next(r for r in response.json()["results"] if r["id"] == source.pk)
+        self.assertEqual(result["label"], "SRC1")
+        self.assertEqual(result["text"], "SRC1")
+        self.assertEqual(result["selected_text"], "SRC1")
+
     def test_scope_filter_published_excludes_private_sources_for_staff(self):
         """The source filter widgets send ``f=scope__name=<scope>``. Under the
         published scope, private sources must not be suggested — even to staff,
@@ -1099,6 +1136,42 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
             created_author.organization_name, "European Environment Agency"
         )
 
+    def test_post_http_201_creates_source_with_mixed_new_authors(self):
+        add_author_permission = Permission.objects.get(codename="add_author")
+        self.member.user_permissions.add(add_author_permission)
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            reverse("source-quick-create"),
+            data=json.dumps(
+                {
+                    "title": "Inline source",
+                    "authors": [
+                        {"first_names": "Ada", "last_names": "Lovelace"},
+                        {
+                            "author_type": "organization",
+                            "organization_name": "European Environment Agency",
+                        },
+                    ],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        source = Source.objects.get(pk=response.json()["id"])
+        self.assertEqual(source.sourceauthors.count(), 2)
+
+        person_author = source.sourceauthors.get(position=1).author
+        self.assertEqual(person_author.author_type, "person")
+        self.assertEqual(person_author.last_names, "Lovelace")
+
+        organisation_author = source.sourceauthors.get(position=2).author
+        self.assertEqual(organisation_author.author_type, "organization")
+        self.assertEqual(
+            organisation_author.organization_name, "European Environment Agency"
+        )
+
     def test_delete_http_302_redirect_to_login_for_anonymous(self):
         self.client.force_login(self.member)
         source = Source.objects.create(owner=self.member, title="To delete")
@@ -1123,6 +1196,23 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Source.objects.filter(pk=source.pk).exists())
+
+    def test_delete_keeps_authors_when_no_cleanup_token_is_sent(self):
+        self.client.force_login(self.member)
+        source = Source.objects.create(owner=self.member, title="To delete")
+        author = Author.objects.create(
+            owner=self.member, first_names="Ada", last_names="Lovelace"
+        )
+        source.sourceauthors.create(author=author, position=1)
+
+        response = self.client.delete(
+            reverse("source-quick-create"),
+            data=json.dumps({"id": source.pk}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Author.objects.filter(pk=author.pk).exists())
 
     def test_delete_http_404_cannot_delete_another_users_source(self):
         self.client.force_login(self.member)

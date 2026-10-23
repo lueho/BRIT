@@ -294,12 +294,13 @@ class GroupAccessManagementTests(TestCase):
         csrf_client.force_login(self.owner)
         for action in ("add_editor_group", "remove_editor_group"):
             self.assertEqual(self.client.get(self.url(action)).status_code, 405)
-            self.assertEqual(
-                csrf_client.post(
+            with self.assertLogs("django.security.csrf", level="WARNING") as logs:
+                response = csrf_client.post(
                     self.url(action), {"group": self.group.name}
-                ).status_code,
-                403,
-            )
+                )
+            self.assertEqual(response.status_code, 403)
+            self.assertIn("CSRF cookie not set.", "\n".join(logs.output))
+            self.assertIn(self.url(action), "\n".join(logs.output))
         self.assertFalse(ObjectGroupEditorGrant.for_object(self.process).exists())
 
     def test_group_actions_reject_non_user_created_objects(self):

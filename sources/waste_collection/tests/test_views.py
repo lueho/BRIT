@@ -3,7 +3,7 @@ import csv
 import json
 import re
 import time
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from datetime import date, timedelta
 from io import BytesIO
 from unittest.mock import MagicMock, patch
@@ -22,6 +22,7 @@ from django.forms.formsets import BaseFormSet
 from django.http import JsonResponse
 from django.http.request import MultiValueDict, QueryDict
 from django.test import RequestFactory, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from factory.django import mute_signals
@@ -80,10 +81,18 @@ from sources.waste_collection.waste_atlas.templatetags.atlas_tags import (
     RENDER_TIME_RESOLVED_KEYS,
 )
 from utils.file_export.generic_tasks import export_user_created_object_to_file
-from utils.object_management.models import ObjectEditorGrant, ReviewAction
+from utils.object_management.models import (
+    ObjectEditorGrant,
+    ReviewAction,
+    get_default_owner,
+)
 from utils.object_management.services import perform_transition
 from utils.properties.models import Property, Unit
-from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
+from utils.tests.testcases import (
+    AbstractTestCases,
+    CheckUrlButtonVisibilityTestMixin,
+    ViewWithPermissionsTestCase,
+)
 
 from .. import views
 from ..forms import (
@@ -143,7 +152,7 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 
     model = Collector
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collector-create"
     view_modal_create_name = "collector-create-modal"
     view_published_list_name = "collector-list"
@@ -351,7 +360,7 @@ class CollectionSystemCRUDViewsTestCase(
 
     model = CollectionSystem
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collectionsystem-create"
     view_modal_create_name = "collectionsystem-create-modal"
     view_published_list_name = "collectionsystem-list"
@@ -380,7 +389,7 @@ class WasteCategoryCRUDViewsTestCase(
 
     model = WasteCategory
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "wastecategory-create"
     view_modal_create_name = "wastecategory-create-modal"
     view_published_list_name = "wastecategory-list"
@@ -409,7 +418,7 @@ class WasteComponentCRUDViewsTestCase(
 
     model = WasteComponent
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "wastecomponent-create"
     view_modal_create_name = "wastecomponent-create-modal"
     view_published_list_name = "wastecomponent-list"
@@ -425,8 +434,10 @@ class WasteComponentCRUDViewsTestCase(
 
     @classmethod
     def create_related_objects(cls):
-        MaterialCategory.objects.create(
-            name="Biowaste component", publication_status="published"
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         return {}
 
@@ -448,7 +459,7 @@ class FeeSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     model = FeeSystem
     add_scope_query_param_to_list_urls = True
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "feesystem-create"
     view_published_list_name = "feesystem-list"
     view_private_list_name = "feesystem-list-owned"
@@ -464,7 +475,10 @@ class FeeSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+class WasteFlyerCRUDViewsTestCase(
+    CheckUrlButtonVisibilityTestMixin,
+    AbstractTestCases.UserCreatedObjectCRUDViewTestCase,
+):
     create_view = False
     modal_detail_view = True
     update_view = False
@@ -473,7 +487,7 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     model = WasteFlyer
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_published_list_name = "wasteflyer-list"
     view_private_list_name = "wasteflyer-list-owned"
     view_detail_name = "wasteflyer-detail"
@@ -490,25 +504,6 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         self.client.force_login(self.staff_user)
         response = self.client.get(reverse("wasteflyer-list"), follow=True)
         self.assertContains(response, "Check URLs")
-
-    def test_detail_view_unpublished_contains_check_url_button_for_owner(self):
-        self.client.force_login(self.owner_user)
-        response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
-        self.assertContains(response, "check url")
-
-    def test_detail_view_published_contains_check_url_button_for_owner(self):
-        self.client.force_login(self.owner_user)
-        response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertContains(response, "check url")
-
-    def test_detail_view_published_doesnt_contain_check_url_button_for_anonymous(self):
-        response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertNotContains(response, "Check URLs")
-
-    def test_detail_view_published_doesnt_contain_check_url_button_for_non_owner(self):
-        self.client.force_login(self.non_owner_user)
-        response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertNotContains(response, "Check URLs")
 
     def test_create_wasteflyer_without_author_succeeds(self):
         self.client.force_login(self.user_with_add_perm)
@@ -565,7 +560,7 @@ class CollectionFrequencyCRUDViewsTestCase(
 
     model = CollectionFrequency
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collectionfrequency-create"
     view_published_list_name = "collectionfrequency-list"
     view_private_list_name = "collectionfrequency-list-owned"
@@ -780,7 +775,7 @@ class CollectionPropertyValueCRUDViewsTestCase(
 
     model = CollectionPropertyValue
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collectionpropertyvalue-create"
     view_detail_name = "collectionpropertyvalue-detail"
     view_update_name = "collectionpropertyvalue-update"
@@ -1012,7 +1007,7 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
 
     model = AggregatedCollectionPropertyValue
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "aggregatedcollectionpropertyvalue-create"
     view_detail_name = "aggregatedcollectionpropertyvalue-detail"
     view_update_name = "aggregatedcollectionpropertyvalue-update"
@@ -1184,7 +1179,7 @@ class CollectionCatchmentCRUDViewsTestCase(
     model = CollectionCatchment
     model_add_permission = "add_collectioncatchment"
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_published_list_name = "collectioncatchment-list"
     view_private_list_name = "collectioncatchment-list-owned"
     view_create_name = "collectioncatchment-create"
@@ -1194,6 +1189,7 @@ class CollectionCatchmentCRUDViewsTestCase(
 
     allow_create_for_any_authenticated_user = True
     add_scope_query_param_to_list_urls = True
+    create_view_post = False
 
     create_object_data = {"name": "Test Catchment"}
     update_object_data = {"name": "Updated Test Catchment"}
@@ -1213,19 +1209,6 @@ class CollectionCatchmentCRUDViewsTestCase(
                 name="Test Region", publication_status="published"
             )
         }
-
-    # -----------------------
-    # CreateView Test Cases
-    # -----------------------
-
-    def test_create_view_post_as_authenticated_without_permission(self):
-        self.skipTest("Post method is not implemented for this view.")
-
-    def test_create_view_post_as_authenticated_with_permission(self):
-        self.skipTest("Post method is not implemented for this view.")
-
-    def test_create_view_post_as_staff_user(self):
-        self.skipTest("Post method is not implemented for this view.")
 
 
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
@@ -1371,6 +1354,110 @@ class CollectionListQueryTestCase(TestCase):
 
         self.assertEqual(actual, [obj.pk for obj in self.published[:20]])
 
+    def test_letter_filter_narrows_list_to_matching_initials(self):
+        # bulk_create keeps the explicit name; save() would auto-generate it.
+        zebra = Collection.objects.bulk_create(
+            [
+                Collection(
+                    name="Zebra collection",
+                    owner=self.owner,
+                    publication_status="published",
+                    valid_from=date(2024, 2, 1),
+                    catchment=self.catchment,
+                    collector=self.collector,
+                    waste_category=self.category,
+                    collection_system=self.system,
+                )
+            ]
+        )[0]
+
+        page = self.get_page(views.CollectionPublishedListView, data={"letter": "Z"})
+        self.assertEqual(page.paginator.count, 1)
+        self.assertEqual([obj.pk for obj in page.object_list], [zebra.pk])
+
+        page = self.get_page(views.CollectionPublishedListView, data={"letter": "R"})
+        self.assertEqual(page.paginator.count, 25)
+
+    def test_letter_index_is_exposed_and_marks_active_letter(self):
+        request = RequestFactory().get(
+            "/collections/", {"scope": "published", "letter": "R"}
+        )
+        request.user = AnonymousUser()
+        response = views.CollectionPublishedListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        index = {
+            entry["letter"]: entry for entry in response.context_data["letter_index"]
+        }
+        self.assertTrue(index["R"]["enabled"])
+        self.assertTrue(index["R"]["active"])
+        self.assertFalse(index["B"]["enabled"])
+
+    def test_review_route_applies_letter_filter_and_index(self):
+        moderator = User.objects.create_user(username="letter-moderator")
+        moderator.user_permissions.add(
+            Permission.objects.get_or_create(
+                codename="can_moderate_collection",
+                content_type=ContentType.objects.get_for_model(Collection),
+                defaults={"name": "Can moderate collections"},
+            )[0]
+        )
+        river, zebra = Collection.objects.bulk_create(
+            [
+                Collection(
+                    name=name,
+                    owner=self.other_owner,
+                    publication_status="review",
+                    valid_from=date(2024, 1, 1),
+                    catchment=self.catchment,
+                    collector=self.collector,
+                    waste_category=self.category,
+                    collection_system=self.system,
+                )
+                for name in ("River collection", "Zebra collection")
+            ]
+        )
+        self.client.force_login(moderator)
+
+        response = self.client.get(
+            reverse("collection-list-review"), {"scope": "review", "letter": "R"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result_pks = {obj.pk for obj in response.context["object_list"]}
+        self.assertIn(river.pk, result_pks)
+        self.assertNotIn(zebra.pk, result_pks)
+        index = {entry["letter"]: entry for entry in response.context["letter_index"]}
+        self.assertTrue(index["R"]["active"])
+        self.assertTrue(index["Z"]["enabled"])
+
+    def test_filter_form_carries_active_letter(self):
+        response = self.client.get(
+            reverse("collection-list"), {"scope": "published", "letter": "R"}
+        )
+
+        self.assertContains(
+            response, '<input type="hidden" name="letter" value="R">', html=True
+        )
+
+    def test_filter_form_has_no_letter_input_without_active_letter(self):
+        response = self.client.get(reverse("collection-list"), {"scope": "published"})
+
+        self.assertNotContains(response, 'name="letter"')
+
+    def test_private_list_places_bulk_access_form_in_options_pane(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("collection-list-owned"), {"scope": "private"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        pane_start = content.index('id="options-pane"')
+        pane_end = content.index('id="learning-pane"')
+        self.assertIn('id="bulk-access-form"', content[pane_start:pane_end])
+        self.assertNotIn('id="bulk-access-form"', content[:pane_start])
+
     def test_explicit_ordering_is_preserved(self):
         page = self.get_page(
             views.CollectionPublishedListView, ordering=("-valid_from", "-id")
@@ -1393,11 +1480,11 @@ class CollectionListQueryTestCase(TestCase):
                 self.assertEqual(obj.collection_system.name, "List system")
 
     @override_settings(GOOGLE_ANALYTICS_KEY="")
-    def test_anonymous_list_renders_with_nine_queries(self):
+    def test_anonymous_list_renders_with_ten_queries(self):
         request = RequestFactory().get("/collections/", {"scope": "published"})
         request.user = AnonymousUser()
 
-        with self.assertNumQueries(9):
+        with self.assertNumQueries(10):
             response = views.CollectionPublishedListView.as_view()(request)
             response.render()
 
@@ -1421,7 +1508,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     model = Collection
 
-    view_dashboard_name = "wastecollection-explorer"
+    view_explorer_name = "wastecollection-explorer"
     view_create_name = "collection-create"
     view_published_list_name = "collection-list"
     view_private_list_name = "collection-list-owned"
@@ -1486,8 +1573,10 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     @classmethod
     def create_related_objects(cls):
-        MaterialCategory.objects.create(
-            name="Biowaste component", publication_status="published"
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         catchment = CollectionCatchment.objects.create(
             name="Test catchment", publication_status="published"
@@ -2099,8 +2188,10 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
 
-        cls.material_category = MaterialCategory.objects.create(
-            name="Biowaste component", publication_status="published"
+        cls.material_category, _ = MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed material 1", publication_status="published"
@@ -2529,8 +2620,10 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
 
-        cls.material_category = MaterialCategory.objects.create(
-            name="Biowaste component", publication_status="published"
+        cls.material_category, _ = MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed material 1", publication_status="published"
@@ -3319,7 +3412,9 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
         # Ensure a MaterialCategory (materials.models) for "Biowaste component" exists
         # This might be used by signals or other underlying logic.
         MaterialCategory.objects.get_or_create(
-            name="Biowaste component", publication_status="published"
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
 
         # Create a test user with necessary permissions
@@ -3346,7 +3441,9 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
         # This is distinct from the MaterialCategory above.
         cls.biowaste_component_material_category, _ = (
             MaterialCategory.objects.get_or_create(
-                name="Biowaste component", defaults={"owner": cls.user}
+                owner=get_default_owner(),
+                name="Biowaste component",
+                defaults={"publication_status": "published"},
             )
         )
 
@@ -3616,7 +3713,9 @@ class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
             name="Bio-waste for GroupBy Test"
         )
 
-        MaterialCategory.objects.get_or_create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
 
         cls.waste_component = WasteComponent.objects.create(
             name="Food scraps for GroupBy Test"
@@ -4238,6 +4337,120 @@ class CollectionFrequencyDisplayTestCase(TestCase):
         self.assertIn("Every 4 weeks", body)
         self.assertNotIn("4 collections during this period", body)
 
+    def test_frequency_display_context_issues_bounded_queries(self):
+        # One options query plus one month-span COUNT per season row; the
+        # schedule rows must not be built twice per page render.
+        with self.assertNumQueries(3):
+            views._frequency_display_context(self.frequency)
+
+
+class CollectionDetailQueryCountTestCase(TestCase):
+    """Bounded-query regression guards for collection detail views (#169)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create(username="query-guard-mod", is_staff=True)
+        distribution = TemporalDistribution.objects.get(name="Months of the year")
+        season, _ = CollectionSeason.objects.get_or_create(
+            distribution=distribution,
+            first_timestep=Timestep.objects.get(name="January"),
+            last_timestep=Timestep.objects.get(name="June"),
+        )
+        cls.frequency = CollectionFrequency.objects.create(
+            name="QC frequency", publication_status="published"
+        )
+        CollectionCountOptions.objects.create(
+            frequency=cls.frequency, season=season, standard=26, option_1=52
+        )
+        cls.catchment = CollectionCatchment.objects.create(
+            name="QC catchment", publication_status="published"
+        )
+        cls.collection = Collection.objects.create(
+            name="QC collection",
+            catchment=cls.catchment,
+            frequency=cls.frequency,
+            publication_status="published",
+        )
+        cls.source = Source.objects.create(
+            owner=cls.staff,
+            type="article",
+            title="QC source",
+            abbreviation="QCS",
+            publication_status="published",
+        )
+        cls.collection.sources.add(cls.source)
+        cls.flyer = WasteFlyer.objects.create(
+            abbreviation="QCF", url="https://www.qc-flyer.example"
+        )
+        cls.collection.flyers.add(cls.flyer)
+        cls.prop = Property.objects.create(
+            name="QC property", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(name="QC unit", publication_status="published")
+        for year in (2019, 2020, 2021):
+            cpv = CollectionPropertyValue.objects.create(
+                collection=cls.collection,
+                property=cls.prop,
+                unit=cls.unit,
+                year=year,
+                average=10,
+                publication_status="published",
+            )
+            cpv.sources.add(cls.source)
+        cls.agg = AggregatedCollectionPropertyValue.objects.create(
+            property=cls.prop,
+            unit=cls.unit,
+            year=2022,
+            average=20,
+            publication_status="published",
+        )
+        cls.agg.collections.add(cls.collection)
+        cls.agg.sources.add(cls.source)
+        cls.url = reverse("collection-detail", kwargs={"pk": cls.collection.pk})
+        cls.review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(Collection).pk,
+                "object_id": cls.collection.pk,
+            },
+        )
+
+    @override_settings(GOOGLE_ANALYTICS_KEY="")
+    def test_anonymous_detail_view_query_count_is_bounded(self):
+        with self.assertNumQueries(22):
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_review_detail_view_prefetches_source_relations(self):
+        """Source/flyer relations load via one prefetch each, not per row (#169).
+
+        The shared review context adds environment-dependent bookkeeping
+        queries (editor grants, per-model review badges), so this asserts the
+        N+1 regression signature directly instead of an exact total.
+        """
+        self.client.force_login(self.staff)
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get(self.review_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertLessEqual(len(ctx.captured_queries), 100)
+        source_tables = {
+            "waste_collection_collection_sources",
+            "waste_collection_collection_flyers",
+            "waste_collection_collectionpropertyvalue_sources",
+            "waste_collection_aggregatedcollectionpropertyvalue_sources",
+        }
+        per_table = defaultdict(int)
+        for query in ctx.captured_queries:
+            for table in source_tables:
+                if f'"{table}"' in query["sql"]:
+                    per_table[table] += 1
+        for table in source_tables:
+            self.assertLessEqual(
+                per_table[table],
+                1,
+                f"{table} queried {per_table[table]} times; expected one prefetch",
+            )
+
 
 class CollectionReviewDetailPropertiesTestCase(TestCase):
     @classmethod
@@ -4690,12 +4903,14 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
         self.assertNotIn("45.67 ± 1.24 ReviewRoundedUnit (", body)
 
 
-class WasteAtlasMapViewsTestCase(TestCase):
-    """Tests for Waste Atlas map pages rendered via template views."""
+class WasteAtlasMapViewTestBase(TestCase):
+    """Shared fixtures and helpers for waste atlas map view tests."""
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(username="atlas-user", password="secret")
+        cls.user = User.objects.create_user(
+            username="atlas-user",
+        )
 
     def setUp(self):
         self.client.force_login(self.user)
@@ -4709,6 +4924,20 @@ class WasteAtlasMapViewsTestCase(TestCase):
         )
         self.assertIsNotNone(match, "no atlas-config JSON found in response")
         return json.loads(match.group(1))
+
+    def _overview_pane(self, html, region_id):
+        start = html.index(f'id="atlas-{region_id}"')
+        end = html.find('<div class="tab-pane', start)
+        return html[start:] if end == -1 else html[start:end]
+
+    def _login_staff(self):
+        self.client.force_login(
+            User.objects.create_user(username="conflicts-staff", is_staff=True)
+        )
+
+
+class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
+    """Tests for Waste Atlas map pages rendered via template views."""
 
     def test_scope_controls_and_map_config_follow_permissions(self):
         url = reverse("waste-atlas-germany-collection-system-map")
@@ -4796,22 +5025,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, 'value="review" selected')
         self.assertNotContains(response, 'value="all"')
 
-    # ---- registry / structural --------------------------------------------
-
-    def test_every_map_page_route_resolves(self):
-        """Every page registered in MAP_PAGES returns a 200 response."""
-        for page in MAP_PAGES:
-            with self.subTest(page=page["name"]):
-                response = self.client.get(reverse(page["name"]))
-                self.assertEqual(response.status_code, 200)
-
-    def test_every_map_page_renders_atlas_config_json(self):
-        """Every map page injects the atlas-config JSON script tag."""
-        for page in MAP_PAGES:
-            with self.subTest(page=page["name"]):
-                response = self.client.get(reverse(page["name"]))
-                self.assertIsNotNone(self._map_config(response))
-
     def test_repeated_page_render_skips_cached_selector_fragments(self):
         """The ~600-entry selector/tree loops are fragment-cached: a second
         render of the same page must not evaluate them again."""
@@ -4850,26 +5063,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(
             self._map_config(response)["collectionDetailCategory"], "biowaste"
         )
-
-    def test_every_map_page_forwards_its_config_key_to_the_renderer(self):
-        """The rendered config matches MAP_CONFIGS for the page's config_key."""
-        # Keys the template tag replaces at render time: runtime scope,
-        # page-level overrides, and DB-editable legend keys.
-        runtime_keys = {"country", "year", "nutsPrefix", "nutsLevel"}
-        for page in MAP_PAGES:
-            with self.subTest(page=page["name"]):
-                response = self.client.get(reverse(page["name"]))
-                cfg = self._map_config(response)
-                stored = MAP_CONFIGS[page["config_key"]]
-                overridden = set(page.get("overrides", {}))
-                skip = RENDER_TIME_RESOLVED_KEYS | runtime_keys | overridden
-                for key, value in stored.items():
-                    if key in skip:
-                        continue
-                    expected = _expected_rendered_config_value(
-                        key, value, cfg["renderDefaults"]
-                    )
-                    self.assertEqual(cfg.get(key), expected)
 
     # ---- selector / context -----------------------------------------------
 
@@ -4941,34 +5134,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
             r'[^>]*data-map-set="SE"'
             r"[^>]*selected",
         )
-
-    # ---- region scope / lock ----------------------------------------------
-
-    def test_region_query_overrides_apply_only_to_unlocked_pages(self):
-        """Locked pages ignore country/nuts_prefix/nuts_level query overrides;
-        unlocked pages honour them."""
-        for page in MAP_PAGES:
-            with self.subTest(page=page["name"]):
-                response = self.client.get(
-                    reverse(page["name"]),
-                    {
-                        "country": "XX",
-                        "nuts_prefix": "ZZZZ",
-                        "nuts_level": "2",
-                    },
-                )
-                self.assertEqual(response.status_code, 200)
-                cfg = self._map_config(response)
-                if page["lock"]:
-                    self.assertEqual(cfg["country"], page["country"])
-                    if page.get("nuts_prefix"):
-                        self.assertEqual(cfg["nutsPrefix"], page["nuts_prefix"])
-                    if page.get("nuts_level"):
-                        self.assertEqual(cfg["nutsLevel"], int(page["nuts_level"]))
-                else:
-                    self.assertEqual(cfg["country"], "XX")
-                    self.assertEqual(cfg["nutsPrefix"], "ZZZZ")
-                    self.assertEqual(cfg["nutsLevel"], 2)
 
     def test_runtime_scope_overrides_stored_scope_values(self):
         """For unlocked pages, query params override stored country/year/nuts."""
@@ -5091,20 +5256,70 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(response.context["directory_selected_category"], "biowaste")
         self.assertEqual(response.context["directory_query"], "amount")
 
-    # ---- change-map tests -------------------------------------------------
+    def test_overview_uses_map_set_picker_and_topic_cards(self):
+        response = self.client.get(reverse("waste-atlas-overview"))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        groups = response.context["directory_region_groups"]
 
-    def test_change_maps_available_for_every_selector_theme(self):
+        germany = next(group for group in groups if group["id"] == "germany")
+        germany_pane = self._overview_pane(html, "germany")
+        expected_values = [region["value"] for region in germany["regions"]]
+        chips = re.findall(
+            r'<button\s+type="button"\s+class="atlas-mapset-chip"\s+'
+            r'data-map-set="([^"]+)"\s+aria-pressed="([^"]+)">',
+            germany_pane,
+        )
+        self.assertEqual([value for value, _pressed in chips], expected_values)
+        self.assertEqual(
+            [pressed for _value, pressed in chips].count("true"),
+            1,
+        )
+        self.assertEqual(chips[0][1], "true")
+        self.assertIn('data-map-set="DE-NW"', germany_pane)
+        self.assertIn('aria-label="Map sets in Germany"', germany_pane)
 
-        for map_set, selection in WASTE_ATLAS_MAP_SELECTIONS.items():
-            for theme in selection["themes"]:
-                with self.subTest(map_set=map_set, theme=theme):
-                    response = self.client.get(
-                        reverse("waste-atlas-change-map", args=[map_set, theme])
+        for group in groups:
+            with self.subTest(group=group["id"]):
+                pane = self._overview_pane(html, group["id"])
+                sections = re.findall(
+                    r'<section\s+class="atlas-directory-region atlas-mapset'
+                    r'( is-active)?"\s+data-region-value="([^"]+)"',
+                    pane,
+                )
+                self.assertEqual(
+                    [(value, bool(active)) for active, value in sections],
+                    [
+                        (region["value"], index == 0)
+                        for index, region in enumerate(group["regions"])
+                    ],
+                )
+                for region in group["regions"]:
+                    self.assertIn(
+                        f'<span class="atlas-mapset-meta">'
+                        f"{region['map_count']} maps</span>",
+                        pane,
                     )
-                    self.assertEqual(response.status_code, 200)
-                    cfg = self._map_config(response)
-                    self.assertTrue(cfg["changeMode"])
-                    self.assertIn("dataUrl", cfg)
+                    for section in region["sections"]:
+                        self.assertIn(
+                            f'class="fas fa-fw {section["icon"]}"',
+                            pane,
+                        )
+
+        catalonia = self._overview_pane(html, "catalonia")
+        self.assertNotIn('class="atlas-mapset-picker"', catalonia)
+        europe = self._overview_pane(html, "europe")
+        self.assertIn("Europe-wide maps", europe)
+        self.assertIn('class="atlas-link-group atlas-topic-card"', europe)
+
+    def test_overview_sidebar_tree_keeps_region_groups_collapsed(self):
+        response = self.client.get(reverse("waste-atlas-overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotRegex(
+            response.content.decode(),
+            r'<details class="atlas-tree-region"[^>]*\bopen\b',
+        )
 
     def test_change_map_preserves_region_scope(self):
         response = self.client.get(
@@ -5171,13 +5386,11 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
     def _login_staff(self):
         self.client.force_login(
-            User.objects.create_user(
-                username="conflicts-staff", password="secret", is_staff=True
-            )
+            User.objects.create_user(username="conflicts-staff", is_staff=True)
         )
 
     def _login_admin(self):
-        admin = User.objects.create_user(username="conflicts-admin", password="secret")
+        admin = User.objects.create_user(username="conflicts-admin")
         admin.user_permissions.add(
             Permission.objects.get(
                 codename="administer_objects",
@@ -5216,7 +5429,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
     def test_data_conflicts_overview_denies_non_staff_users(self):
         non_atlas_user = User.objects.create_user(
-            username="non-atlas-user-conflicts", password="secret"
+            username="non-atlas-user-conflicts",
         )
         self.client.force_login(non_atlas_user)
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
@@ -5235,7 +5448,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
             reverse("waste-atlas-change-map", args=["DE", "collection_system"]),
         ]
         outsider = User.objects.create_user(
-            username="non-atlas-user", password="secret"
+            username="non-atlas-user",
         )
 
         for url in routes:
@@ -5259,13 +5472,16 @@ class WasteAtlasMapViewsTestCase(TestCase):
     def test_overview_shows_maintainer_links_only_for_administrators(self):
         response = self.client.get(reverse("waste-atlas-overview"))
         self.assertEqual(response.status_code, 200)
+        self.assertRegex(
+            response.content.decode(),
+            r'href="https://www\.abfall-atlas\.de/"\s+target="_blank"\s+rel="noopener noreferrer"',
+        )
+        self.assertContains(response, "abfall-atlas.de")
         self.assertNotContains(response, 'id="atlas-tools-menu"')
         self.assertNotContains(response, reverse("waste-atlas-change-map-overview"))
         self.assertNotContains(response, reverse("waste-atlas-data-conflicts-overview"))
 
-        staff = User.objects.create_user(
-            username="atlas-staff", password="secret", is_staff=True
-        )
+        staff = User.objects.create_user(username="atlas-staff", is_staff=True)
         self.client.force_login(staff)
 
         response = self.client.get(reverse("waste-atlas-overview"))
@@ -5411,6 +5627,122 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, '<option value="2022"')
 
 
+class WasteAtlasMapPageSweepMixin:
+    """Render sweeps over a shard of the waste atlas page registry.
+
+    Rendering a map page costs roughly a second, so sweeping all of
+    ``MAP_PAGES`` in a single test case parks ~25 minutes of renders on
+    one parallel worker. These tests iterate a per-class shard of the
+    registry so the parallel test runner splits the work evenly.
+    """
+
+    shard_index = 0
+    shard_count = 4
+
+    @classmethod
+    def _sweep_pages(cls):
+        return MAP_PAGES[cls.shard_index :: cls.shard_count]
+
+    @classmethod
+    def _sweep_change_map_pairs(cls):
+        pairs = [
+            (map_set, theme)
+            for map_set, selection in WASTE_ATLAS_MAP_SELECTIONS.items()
+            for theme in selection["themes"]
+        ]
+        return pairs[cls.shard_index :: cls.shard_count]
+
+    # ---- registry / structural --------------------------------------------
+
+    def test_every_map_page_resolves_and_forwards_its_config(self):
+        """Every registered page returns 200, injects the atlas-config JSON
+        script tag, and forwards its MAP_CONFIGS config_key to the renderer."""
+        # Keys the template tag replaces at render time: runtime scope,
+        # page-level overrides, and DB-editable legend keys.
+        runtime_keys = {"country", "year", "nutsPrefix", "nutsLevel"}
+        for page in self._sweep_pages():
+            with self.subTest(page=page["name"]):
+                response = self.client.get(reverse(page["name"]))
+                self.assertEqual(response.status_code, 200)
+                cfg = self._map_config(response)
+                stored = MAP_CONFIGS[page["config_key"]]
+                overridden = set(page.get("overrides", {}))
+                skip = RENDER_TIME_RESOLVED_KEYS | runtime_keys | overridden
+                for key, value in stored.items():
+                    if key in skip:
+                        continue
+                    expected = _expected_rendered_config_value(
+                        key, value, cfg["renderDefaults"]
+                    )
+                    self.assertEqual(cfg.get(key), expected)
+
+    # ---- region scope / lock ----------------------------------------------
+
+    def test_region_query_overrides_apply_only_to_unlocked_pages(self):
+        """Locked pages ignore country/nuts_prefix/nuts_level query overrides;
+        unlocked pages honour them."""
+        for page in self._sweep_pages():
+            with self.subTest(page=page["name"]):
+                response = self.client.get(
+                    reverse(page["name"]),
+                    {
+                        "country": "XX",
+                        "nuts_prefix": "ZZZZ",
+                        "nuts_level": "2",
+                    },
+                )
+                self.assertEqual(response.status_code, 200)
+                cfg = self._map_config(response)
+                if page["lock"]:
+                    self.assertEqual(cfg["country"], page["country"])
+                    if page.get("nuts_prefix"):
+                        self.assertEqual(cfg["nutsPrefix"], page["nuts_prefix"])
+                    if page.get("nuts_level"):
+                        self.assertEqual(cfg["nutsLevel"], int(page["nuts_level"]))
+                else:
+                    self.assertEqual(cfg["country"], "XX")
+                    self.assertEqual(cfg["nutsPrefix"], "ZZZZ")
+                    self.assertEqual(cfg["nutsLevel"], 2)
+
+    # ---- change-map tests -------------------------------------------------
+
+    def test_change_maps_available_for_every_selector_theme(self):
+
+        for map_set, theme in self._sweep_change_map_pairs():
+            with self.subTest(map_set=map_set, theme=theme):
+                response = self.client.get(
+                    reverse("waste-atlas-change-map", args=[map_set, theme])
+                )
+                self.assertEqual(response.status_code, 200)
+                cfg = self._map_config(response)
+                self.assertTrue(cfg["changeMode"])
+                self.assertIn("dataUrl", cfg)
+
+
+class WasteAtlasMapPageSweep0Tests(
+    WasteAtlasMapPageSweepMixin, WasteAtlasMapViewTestBase
+):
+    shard_index = 0
+
+
+class WasteAtlasMapPageSweep1Tests(
+    WasteAtlasMapPageSweepMixin, WasteAtlasMapViewTestBase
+):
+    shard_index = 1
+
+
+class WasteAtlasMapPageSweep2Tests(
+    WasteAtlasMapPageSweepMixin, WasteAtlasMapViewTestBase
+):
+    shard_index = 2
+
+
+class WasteAtlasMapPageSweep3Tests(
+    WasteAtlasMapPageSweepMixin, WasteAtlasMapViewTestBase
+):
+    shard_index = 3
+
+
 class GenericMapTemplateTests(TestCase):
     """The generic map template renders any stored configuration as JSON.
 
@@ -5429,7 +5761,7 @@ class GenericMapTemplateTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
-            username="generic-atlas-user", password="secret"
+            username="generic-atlas-user",
         )
 
     def _render_generic(self, config_key, query=None):
@@ -5630,16 +5962,21 @@ class CollectionIndependentLifecycleTests(TestCase):
         super().setUpTestData()
 
         cls.owner = User.objects.create_user(
-            username="owner", email="owner@test.com", password="pass"
+            username="owner",
+            email="owner@test.com",
         )
         cls.other_owner = User.objects.create_user(
-            username="other", email="other@test.com", password="pass"
+            username="other",
+            email="other@test.com",
         )
         cls.moderator = User.objects.create_user(
-            username="moderator", email="moderator@test.com", password="pass"
+            username="moderator", email="moderator@test.com"
         )
         cls.moderator.user_permissions.add(
             Permission.objects.get(codename="can_moderate_collection")
+        )
+        cls.staff = User.objects.create_user(
+            username="staff", email="staff@test.com", is_staff=True
         )
 
         cls.catchment = CollectionCatchment.objects.create(
@@ -5914,9 +6251,10 @@ class CollectionIndependentLifecycleTests(TestCase):
 class ReviewSubmissionConsistencyTests(TestCase):
     """Regression tests ensuring review-submission timestamps remain consistent."""
 
-    def setUp(self):
-        self.owner = User.objects.create_user(username="owner")
-        self.moderator = User.objects.create_user(username="moderator", is_staff=True)
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner")
+        cls.moderator = User.objects.create_user(username="moderator", is_staff=True)
 
         content_type = ContentType.objects.get_for_model(Collection)
         permission, _ = Permission.objects.get_or_create(
@@ -5924,20 +6262,20 @@ class ReviewSubmissionConsistencyTests(TestCase):
             content_type=content_type,
             defaults={"name": "Can moderate collections"},
         )
-        self.moderator.user_permissions.add(permission)
+        cls.moderator.user_permissions.add(permission)
 
-        self.collection = Collection.objects.create(
+        cls.collection = Collection.objects.create(
             name="Test Collection",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status=Collection.STATUS_PRIVATE,
         )
-        self.source = Source.objects.create(
-            owner=self.owner,
+        cls.source = Source.objects.create(
+            owner=cls.owner,
             title="Review submission source",
             abbreviation="ReviewSubmissionSource",
             url="https://example.com/review-submission-source",
         )
-        self.collection.sources.add(self.source)
+        cls.collection.sources.add(cls.source)
 
     def test_initial_submission_consistency(self):
         self.client.force_login(self.owner)
@@ -6376,7 +6714,9 @@ class CollectionCSVRendererTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        MaterialCategory.objects.create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed Material 1"
         )
@@ -6532,7 +6872,9 @@ class CollectionXLSXRendererTestCase(TestCase):
         )
         member.user_permissions.add(permission)
 
-        MaterialCategory.objects.create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed Material 1"
         )
@@ -6631,7 +6973,9 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         MaterialCategory.objects.get_or_create(
-            name="Biowaste component", publication_status="published"
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         cls.catchment = CollectionCatchment.objects.create(
             name="Catchment", publication_status="published"
@@ -6648,7 +6992,9 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
         cls.allowed_material = WasteComponent.objects.create(
             name="Allowed", publication_status="published"
         )
-        biowaste_cat = MaterialCategory.objects.get(name="Biowaste component")
+        biowaste_cat = MaterialCategory.objects.get(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material.categories.add(biowaste_cat)
         cls.frequency = CollectionFrequency.objects.create(
             name="Frequency", publication_status="published"
@@ -6739,7 +7085,9 @@ class CollectionInlineWasteFieldsSaveTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         MaterialCategory.objects.get_or_create(
-            name="Biowaste component", publication_status="published"
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
         )
         cls.catchment = CollectionCatchment.objects.create(
             name="Catchment", publication_status="published"
@@ -6759,7 +7107,9 @@ class CollectionInlineWasteFieldsSaveTestCase(TestCase):
         cls.forbidden_material = WasteComponent.objects.create(
             name="Forbidden", publication_status="published"
         )
-        biowaste_cat = MaterialCategory.objects.get(name="Biowaste component")
+        biowaste_cat = MaterialCategory.objects.get(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material.categories.add(biowaste_cat)
         cls.forbidden_material.categories.add(biowaste_cat)
         cls.frequency = CollectionFrequency.objects.create(
@@ -7024,3 +7374,172 @@ class CollectionDetailBackLinkTestCase(TestCase):
 
                     self.assertNotContains(response, "Back to results")
                     self.assertNotContains(response, "?next=javascript")
+
+
+class CollectionDetailV2LayoutTestCase(TestCase):
+    """The collection detail page uses the shared ``detail_v2`` (sdv2) layout."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="v2-collection-owner")
+        cls.catchment = CollectionCatchment.objects.create(
+            name="V2 Catchment", publication_status="published"
+        )
+        cls.collector = Collector.objects.create(
+            name="V2 Collector", publication_status="published"
+        )
+        cls.system = CollectionSystem.objects.create(
+            name="V2 Collection System", publication_status="published"
+        )
+        cls.category = WasteCategory.objects.create(
+            name="V2 Biowaste", publication_status="published"
+        )
+        cls.collection = Collection.objects.create(
+            owner=cls.owner,
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.system,
+            waste_category=cls.category,
+            valid_from=date(2024, 1, 1),
+            publication_status="published",
+        )
+        cls.url = reverse("collection-detail", kwargs={"pk": cls.collection.pk})
+
+    def test_detail_uses_v2_layout(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="sdv2"')
+        self.assertContains(response, "sdv2-hero")
+        self.assertContains(
+            response,
+            f'<h1 class="sdv2-hero-title">{self.collection.name}</h1>',
+            html=True,
+        )
+        self.assertContains(response, "sdv2-hero-meta")
+        # The legacy card/options-pane shell is gone.
+        self.assertNotContains(response, "detail-layout-card")
+        self.assertNotContains(response, 'id="options-pane"')
+
+    def test_detail_shows_action_rail_for_authenticated_user(self):
+        staff = User.objects.create_user(username="v2-staff", is_staff=True)
+        self.client.force_login(staff)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="sdv2-rail"')
+        self.assertContains(response, "sdv2-status-pill")
+        self.assertContains(response, "sdv2-actions-menu")
+        self.assertContains(
+            response,
+            reverse("collection-update", kwargs={"pk": self.collection.pk}),
+        )
+
+    def test_anonymous_detail_keeps_collection_navigation(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'class="sdv2-rail"')
+        self.assertContains(response, 'aria-label="Collection navigation"')
+        self.assertContains(response, 'aria-label="View on map"')
+        self.assertContains(response, reverse("wastecollection-explorer"))
+
+    def test_map_link_ignores_unsafe_next_url(self):
+        response = self.client.get(self.url, {"next": "javascript:alert(1)"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "javascript:alert")
+        self.assertContains(
+            response,
+            f"{reverse('WasteCollection')}?id={self.collection.pk}&load_features=true",
+        )
+
+    def test_map_link_keeps_safe_next_url(self):
+        map_url = f"{reverse('WasteCollection')}?catchment=1"
+        response = self.client.get(self.url, {"next": map_url})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{map_url}"')
+
+    def test_detail_renders_map_outside_review_mode(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "map-container")
+        self.assertContains(response, 'id="mapConfig"')
+
+    def test_review_detail_uses_v2_layout(self):
+        staff = User.objects.create_user(username="v2-reviewer", is_staff=True)
+        self.client.force_login(staff)
+        content_type = ContentType.objects.get_for_model(Collection)
+        response = self.client.get(
+            reverse(
+                "object_management:review_item_detail",
+                kwargs={
+                    "content_type_id": content_type.pk,
+                    "object_id": self.collection.pk,
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "sdv2-hero")
+        self.assertNotContains(response, "detail-layout-card")
+
+
+class CollectionPropertyValueDetailV2LayoutTestCase(TestCase):
+    """The CPV detail page uses the shared ``detail_v2`` (sdv2) layout."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="v2-cpv-owner")
+        cls.collection = Collection.objects.create(
+            owner=cls.owner,
+            valid_from=date(2020, 1, 1),
+            valid_until=date(2022, 12, 31),
+            publication_status="published",
+        )
+        cls.prop = Property.objects.create(
+            name="Specific waste collected (v2)", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="V2 Indicator Unit", publication_status="published"
+        )
+        cls.cpv = CollectionPropertyValue.objects.create(
+            collection=cls.collection,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2015,
+            average=12.3456789,
+            publication_status="published",
+        )
+        cls.url = reverse("collectionpropertyvalue-detail", kwargs={"pk": cls.cpv.pk})
+
+    def test_detail_uses_v2_layout(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="sdv2"')
+        self.assertContains(response, "sdv2-hero")
+        self.assertNotContains(response, "detail-layout-card")
+        self.assertNotContains(response, 'id="options-pane"')
+
+    def test_anonymous_detail_keeps_collection_property_navigation(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'class="sdv2-rail"')
+        self.assertContains(response, 'aria-label="Collection property navigation"')
+        self.assertContains(response, reverse("wastecollection-explorer"))
+
+    def test_value_is_rounded_for_display(self):
+        response = self.client.get(self.url)
+
+        self.assertContains(response, "12.3")
+        self.assertNotContains(response, "12.345")
+
+    def test_out_of_period_year_uses_subtle_indicator(self):
+        response = self.client.get(self.url)
+
+        self.assertContains(response, "outside the collection validity period")
+        self.assertNotContains(response, "fa-triangle-exclamation")

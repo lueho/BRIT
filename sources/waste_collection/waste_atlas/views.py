@@ -22,7 +22,7 @@ from .map_selection import (
     resolve_map_set,
 )
 from .models import WasteAtlasMapConfiguration
-from .pages import MAP_PAGES, MAP_SET_LABELS
+from .pages import ABFALLATLAS_URL, MAP_PAGES, MAP_SET_LABELS
 from .params import (
     parse_atlas_year,
     parse_country,
@@ -425,6 +425,7 @@ class WasteAtlasOverviewView(TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        ctx["abfallatlas_url"] = ABFALLATLAS_URL
         ctx["selected_required_bin_capacity_reference"] = self.request.GET.get(
             "required_bin_capacity_reference",
             "person",

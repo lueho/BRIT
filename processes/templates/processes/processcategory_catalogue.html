@@ -27,6 +27,13 @@
                      aria-label="Search categories by name">
               <button type="submit" class="btn btn-sm btn-primary">Search</button>
             </form>
+            {% if explorer_url %}
+              <a class="btn btn-sm btn-outline-secondary"
+                 href="{{ explorer_url }}"
+                 title="Open Explorer">
+                <i class="fas fa-table-cells-large"></i> Explorer
+              </a>
+            {% endif %}
           </div>
         </div>
         <div class="card-body">

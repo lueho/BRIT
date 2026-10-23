@@ -328,13 +328,19 @@ class EditorObjectPolicyTests(TestCase):
 class OwnershipSharingViewTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="pw")
-        cls.new_owner = User.objects.create_user(username="new_owner", password="pw")
-        cls.editor = User.objects.create_user(username="editor", password="pw")
-        cls.other = User.objects.create_user(username="other", password="pw")
-        cls.staff = User.objects.create_user(
-            username="staff", password="pw", is_staff=True
+        cls.owner = User.objects.create_user(
+            username="owner",
         )
+        cls.new_owner = User.objects.create_user(
+            username="new_owner",
+        )
+        cls.editor = User.objects.create_user(
+            username="editor",
+        )
+        cls.other = User.objects.create_user(
+            username="other",
+        )
+        cls.staff = User.objects.create_user(username="staff", is_staff=True)
         cls.staff.user_permissions.add(
             Permission.objects.get(codename="administer_objects")
         )

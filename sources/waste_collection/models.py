@@ -22,6 +22,7 @@ from utils.object_management.models import (
     UserCreatedObject,
     UserCreatedObjectManager,
     UserCreatedObjectQuerySet,
+    get_default_owner,
 )
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import PropertyValue
@@ -100,7 +101,12 @@ class WasteCategory(NamedUserCreatedObject):
 
 class WasteComponentManager(MaterialManager):
     def get_queryset(self):
-        return super().get_queryset().filter(categories__name="Biowaste component")
+        return (
+            super()
+            .get_queryset()
+            .filter(categories__name="Biowaste component")
+            .distinct()
+        )
 
 
 class WasteComponent(Material):
@@ -113,7 +119,9 @@ class WasteComponent(Material):
 @receiver(post_save, sender=WasteComponent)
 def add_material_category(sender, instance, created, **kwargs):
     if created:
-        category = MaterialCategory.objects.get(name="Biowaste component")
+        category = MaterialCategory.objects.get(
+            name="Biowaste component", owner=get_default_owner()
+        )
         instance.categories.add(category)
         instance.save()
 
@@ -957,6 +965,12 @@ class CollectionPropertyValue(PropertyValue):
             "Server-controlled; set only by the derivation pipeline."
         ),
     )
+
+    def get_breadcrumb_object_label(self):
+        label = f"{self.property}: {self.display_average}"
+        if self.standard_deviation:
+            label += f" ± {self.display_standard_deviation}"
+        return label
 
     @property
     def year_outside_collection_period(self):

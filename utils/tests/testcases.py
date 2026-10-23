@@ -105,7 +105,7 @@ class AbstractTestCases:
 
         Subclasses **must** also define the relevant URL names for the views
         they intend to test (set the corresponding boolean flag to True):
-        - `view_dashboard_name`: URL name for the dashboard/overview view.
+        - `view_explorer_name`: URL name for the explorer view.
         - `view_create_name`: URL name for the standard CreateView.
         - `view_modal_create_name`: URL name for the modal CreateView.
         - `view_published_list_name`: URL name for the public ListView.
@@ -128,8 +128,9 @@ class AbstractTestCases:
         Test Execution Control:
         Set the following boolean flags to True/False to enable/disable tests
         for specific view types:
-        - `dashboard_view`
+        - `explorer_view`
         - `create_view`
+        - `create_view_post`
         - `modal_create_view`
         - `public_list_view`
         - `private_list_view`
@@ -155,8 +156,9 @@ class AbstractTestCases:
         # This is an abstract class and should not be run as a test case directly
         __test__ = False
 
-        dashboard_view = True
+        explorer_view = True
         create_view = True
+        create_view_post = True
         modal_create_view = False
         public_list_view = True
         private_list_view = True
@@ -169,7 +171,7 @@ class AbstractTestCases:
         model = None
         model_add_permission = None
 
-        view_dashboard_name = None
+        view_explorer_name = None
         view_create_name = None
         view_modal_create_name = None
         view_published_list_name = None
@@ -288,8 +290,8 @@ class AbstractTestCases:
         def setUp(self):
             self.client = Client()
 
-        def get_dashboard_url(self):
-            return reverse(self.view_dashboard_name)
+        def get_explorer_url(self):
+            return reverse(self.view_explorer_name)
 
         def get_create_url(self):
             return reverse(self.view_create_name)
@@ -376,8 +378,8 @@ class AbstractTestCases:
             )
             self.assertEqual(response.status_code, 200)
             body = response.content.decode()
-            if self.dashboard_view:
-                self.assertIn(self.get_dashboard_url(), body)
+            if self.explorer_view:
+                self.assertIn(self.get_explorer_url(), body)
             if self.create_view:
                 self.assertNotIn(self.get_create_url(), body)
             if self.private_list_view:
@@ -392,8 +394,8 @@ class AbstractTestCases:
                 follow=True,
             )
             self.assertEqual(response.status_code, 200)
-            if self.dashboard_view:
-                self.assertContains(response, self.get_dashboard_url())
+            if self.explorer_view:
+                self.assertContains(response, self.get_explorer_url())
             if self.create_view:
                 if self.allow_create_for_any_authenticated_user:
                     self.assertContains(response, self.get_create_url())
@@ -413,8 +415,8 @@ class AbstractTestCases:
                 follow=True,
             )
             self.assertEqual(response.status_code, 200)
-            if self.dashboard_view:
-                self.assertContains(response, self.get_dashboard_url())
+            if self.explorer_view:
+                self.assertContains(response, self.get_explorer_url())
             if self.create_view:
                 if self.allow_create_for_any_authenticated_user:
                     self.assertContains(response, self.get_create_url())
@@ -435,8 +437,8 @@ class AbstractTestCases:
             )
             self.assertEqual(response.status_code, 200)
             body = response.content.decode()
-            if self.dashboard_view:
-                self.assertIn(self.get_dashboard_url(), body)
+            if self.explorer_view:
+                self.assertIn(self.get_explorer_url(), body)
             if self.create_view:
                 self.assertIn(self.get_create_url(), body)
             if self.private_list_view:
@@ -461,8 +463,8 @@ class AbstractTestCases:
             )
             self.assertEqual(response.status_code, 200)
             body = response.content.decode()
-            if self.dashboard_view:
-                self.assertIn(self.get_dashboard_url(), body)
+            if self.explorer_view:
+                self.assertIn(self.get_explorer_url(), body)
             if self.create_view:
                 if self.allow_create_for_any_authenticated_user:
                     self.assertIn(self.get_create_url(), body)
@@ -481,8 +483,8 @@ class AbstractTestCases:
             )
             self.assertEqual(response.status_code, 200)
             body = response.content.decode()
-            if self.dashboard_view:
-                self.assertIn(self.get_dashboard_url(), body)
+            if self.explorer_view:
+                self.assertIn(self.get_explorer_url(), body)
             if self.create_view:
                 if self.allow_create_for_any_authenticated_user:
                     self.assertIn(self.get_create_url(), body)
@@ -500,8 +502,8 @@ class AbstractTestCases:
                 follow=True,
             )
             self.assertEqual(response.status_code, 200)
-            if self.dashboard_view:
-                self.assertContains(response, self.get_dashboard_url())
+            if self.explorer_view:
+                self.assertContains(response, self.get_explorer_url())
             if self.create_view:
                 self.assertContains(response, self.get_create_url())
             if self.public_list_view:
@@ -623,6 +625,8 @@ class AbstractTestCases:
             self.assertRedirects(response, expected_redirect)
 
         def test_create_view_post_as_anonymous(self):
+            if not self.create_view_post:
+                self.skipTest("Create view does not accept POST for this test case.")
             if not self.create_view:
                 self.skipTest("Create view is not enabled for this test case.")
             url = self.get_create_url()
@@ -646,6 +650,8 @@ class AbstractTestCases:
                 )
 
         def test_create_view_post_as_authenticated_without_permission(self):
+            if not self.create_view_post:
+                self.skipTest("Create view does not accept POST for this test case.")
             if not self.create_view:
                 self.skipTest("Create view is not enabled for this test case.")
             self.client.force_login(self.non_owner_user)
@@ -672,6 +678,8 @@ class AbstractTestCases:
             self.assertEqual(response.status_code, 200)
 
         def test_create_view_post_as_authenticated_with_permission(self):
+            if not self.create_view_post:
+                self.skipTest("Create view does not accept POST for this test case.")
             if not self.create_view:
                 self.skipTest("Create view is not enabled for this test case.")
             self.client.force_login(self.user_with_add_perm)
@@ -694,6 +702,8 @@ class AbstractTestCases:
             self.assertEqual(response.status_code, 200)
 
         def test_create_view_post_as_staff_user(self):
+            if not self.create_view_post:
+                self.skipTest("Create view does not accept POST for this test case.")
             if not self.create_view:
                 self.skipTest("Create view is not enabled for this test case.")
             self.client.force_login(self.staff_user)
@@ -1440,3 +1450,33 @@ class ScopedSelectionFilterTestMixin:
 
         self.assertFalse(filtr.form.is_valid())
         self.assertIn(self.field, filtr.form.errors)
+
+
+class CheckUrlButtonVisibilityTestMixin:
+    """Detail-view check-URL button visibility tests.
+
+    Mix into ``AbstractTestCases.UserCreatedObjectCRUDViewTestCase`` subclasses
+    whose detail template renders a check-URL button gated to the owner and
+    privileged users. ``check_url_button_text`` is the rendered button label.
+    """
+
+    check_url_button_text = "check url"
+
+    def test_detail_view_unpublished_contains_check_url_button_for_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
+        self.assertContains(response, self.check_url_button_text)
+
+    def test_detail_view_published_contains_check_url_button_for_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertContains(response, self.check_url_button_text)
+
+    def test_detail_view_published_doesnt_contain_check_url_button_for_anonymous(self):
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertNotContains(response, self.check_url_button_text)
+
+    def test_detail_view_published_doesnt_contain_check_url_button_for_non_owner(self):
+        self.client.force_login(self.non_owner_user)
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertNotContains(response, self.check_url_button_text)

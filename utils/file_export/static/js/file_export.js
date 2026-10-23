@@ -62,22 +62,13 @@ async function prepare_export(format) {
  * @returns {Promise<string>} The URL to be used for monitoring export progress.
  */
 async function start_export(exportUrl, format) {
-    try {
-        const response = await fetch(exportUrl);
-        if (!response.ok) {
-            throw new Error(`Network response was not ok: ${response.status}`);
-        }
-        const data = await response.json();
-        if (!data.task_id) {
-            throw new Error("Task ID missing in export response.");
-        }
-        const element = document.getElementById('export_' + format);
-        // Dynamically replace a placeholder ('0') in the progress URL with the actual task_id
-        return element.dataset.exportProgressUrl.replace(/\/0\//, `/${data.task_id}/`);
-    } catch (error) {
-        console.error("Error starting export:", error);
-        throw error;
+    const data = await fetchJson(exportUrl);
+    if (!data || !data.task_id) {
+        throw new Error("Task ID missing in export response.");
     }
+    const element = document.getElementById('export_' + format);
+    // Dynamically replace a placeholder ('0') in the progress URL with the actual task_id
+    return element.dataset.exportProgressUrl.replace(/\/0\//, `/${data.task_id}/`);
 }
 
 /**
@@ -85,33 +76,23 @@ async function start_export(exportUrl, format) {
  *
  * @param {string} url - The monitoring URL.
  * @param {string} format - The export format.
- * @param {number} count - The current poll count (used for UI animation).
  */
-async function monitor_export_progress(url, format, count = 0) {
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Monitoring response was not ok: ${response.status}`);
+function monitor_export_progress(url, format) {
+    pollTaskProgress(url, {
+        intervalMs: POLLING_INTERVAL_MS,
+        onActive: (data, count) => {
+            if (data.state !== "PENDING" && data.state !== "STARTED" && data.state !== "PROGRESS") {
+                console.warn("Unexpected export state:", data.state);
+            }
+            updateProcessingLink(format, count, data.state === "PROGRESS" ? data.details : null);
+        },
+        onSuccess: data => cleanup_export(true, data, format),
+        onFailure: data => cleanup_export(false, data, format),
+        onError: error => {
+            console.error("Error monitoring export progress:", error);
+            resetExportLink(format);
         }
-        const data = await response.json();
-        if (data.state === "PENDING" || data.state === "STARTED") {
-            updateProcessingLink(format, count + 1, null);
-            setTimeout(() => monitor_export_progress(url, format, count + 1), POLLING_INTERVAL_MS);
-        } else if (data.state === "PROGRESS") {
-            updateProcessingLink(format, count + 1, data.details);
-            setTimeout(() => monitor_export_progress(url, format, count + 1), POLLING_INTERVAL_MS);
-        } else if (data.state === "SUCCESS") {
-            cleanup_export(true, data, format);
-        } else if (data.state === "FAILURE") {
-            cleanup_export(false, data, format);
-        } else {
-            console.warn("Unexpected export state:", data.state);
-            setTimeout(() => monitor_export_progress(url, format, count + 1), POLLING_INTERVAL_MS);
-        }
-    } catch (error) {
-        console.error("Error monitoring export progress:", error);
-        resetExportLink(format);
-    }
+    });
 }
 
 /**

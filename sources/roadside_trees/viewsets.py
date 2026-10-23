@@ -29,6 +29,7 @@ class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     serializer_class = HamburgRoadsideTreeSimpleModelSerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
     filterset_class = HamburgRoadsideTreesFilterSet
+    geojson_geometry_field = "geom"
 
     custom_permission_required = {
         "list": None,
