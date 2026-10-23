@@ -639,7 +639,7 @@ class FreshBootstrapSchemaTests(ControlledDatabaseBootstrapBase):
 
             from django.contrib.auth.models import User
 
-            from maps.models import GeoDataset
+            from maps.models import GeoDataset, NutsVintage
             from materials.models import (
                 MaterialCategory,
                 MaterialComponent,
@@ -662,6 +662,7 @@ class FreshBootstrapSchemaTests(ControlledDatabaseBootstrapBase):
             MaterialComponent.objects.get(name="Other")
             self.assertFalse(GeoDataset.objects.exists())
             self.assertFalse(Collection.objects.exists())
+            self.assertEqual(NutsVintage.current().year, 2021)
 
             admin = User.objects.get(username="schema-admin")
             self.assertTrue(admin.check_password("adm-secret"))
