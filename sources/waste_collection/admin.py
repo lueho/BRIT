@@ -1,5 +1,7 @@
 from django.contrib import admin
 
+from utils.object_management.admin import NamedUserCreatedObjectAdmin
+
 from .models import (
     AggregatedCollectionPropertyValue,
     BinConfiguration,
@@ -17,43 +19,29 @@ from .models import (
 
 
 @admin.register(Collector)
-class CollectorAdmin(admin.ModelAdmin):
+class CollectorAdmin(NamedUserCreatedObjectAdmin):
     list_display = ("name", "website", "catchment", "owner", "publication_status")
     search_fields = ("name", "description")
-    list_filter = ("publication_status",)
-    ordering = ("name",)
 
 
 @admin.register(CollectionSystem)
-class CollectionSystemAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class CollectionSystemAdmin(NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(BinConfiguration)
-class BinConfigurationAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class BinConfigurationAdmin(NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(WasteCategory)
-class WasteCategoryAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class WasteCategoryAdmin(NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(WasteComponent)
-class WasteComponentAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class WasteComponentAdmin(NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(WasteFlyer)
@@ -79,23 +67,18 @@ class CollectionSeasonAdmin(admin.ModelAdmin):
 
 
 @admin.register(CollectionFrequency)
-class CollectionFrequencyAdmin(admin.ModelAdmin):
+class CollectionFrequencyAdmin(NamedUserCreatedObjectAdmin):
     list_display = ("name", "type", "owner", "publication_status")
-    search_fields = ("name",)
     list_filter = ("publication_status", "type")
-    ordering = ("name",)
 
 
 @admin.register(FeeSystem)
-class FeeSystemAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class FeeSystemAdmin(NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(Collection)
-class CollectionAdmin(admin.ModelAdmin):
+class CollectionAdmin(NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "collector",
@@ -113,7 +96,6 @@ class CollectionAdmin(admin.ModelAdmin):
         "collection_system",
         "bin_configuration",
     )
-    ordering = ("name",)
     autocomplete_fields = ("sources",)
     filter_horizontal = ("samples", "flyers", "predecessors")
 
