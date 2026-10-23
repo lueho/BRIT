@@ -10,7 +10,7 @@ from utils.object_management.models import (
     UserCreatedObjectManager,
 )
 
-from .utils import generate_citation_key
+from .utils import DOI_PATTERN, generate_citation_key, normalize_doi
 
 AUTHOR_TYPES = (("person", "Person"), ("organization", "Organization"))
 
@@ -511,7 +511,21 @@ class Source(UserCreatedObject):
             return f"{title_words[0]}{year_part}".strip()
         return f"Source{year_part}".strip()
 
+    def clean(self):
+        super().clean()
+        self.doi = normalize_doi(self.doi) or None
+        if self.doi and not DOI_PATTERN.match(self.doi):
+            raise ValidationError(
+                {
+                    "doi": (
+                        "Enter a bare DOI in the form 10.xxxx/..., without a "
+                        "resolver URL or 'doi:' prefix."
+                    )
+                }
+            )
+
     def save(self, *args, **kwargs):
+        self.doi = normalize_doi(self.doi) or None
         if not self.citation_key:
             self.citation_key = generate_citation_key(self)
         super().save(*args, **kwargs)
