@@ -60,8 +60,12 @@ ARG INSTALL_PDF_PARSING=false
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Minimum runtime OS libraries and non-root user setup
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Minimum runtime OS libraries and non-root user setup. Apt timeouts/retries
+# guard CI image builds against stalling mirror downloads.
+RUN apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 \
+    -o Acquire::https::Timeout=30 update \
+    && apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 \
+    -o Acquire::https::Timeout=30 install -y --no-install-recommends \
     libpq5 \
     libproj25 \
     libgdal32 \
