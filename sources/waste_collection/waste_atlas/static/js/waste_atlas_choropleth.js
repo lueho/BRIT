@@ -4178,7 +4178,9 @@ var WasteAtlasChoropleth = (function () {
       copyField.addEventListener('focus', function () { copyField.select(); });
       copyButton.addEventListener('click', function () {
         _copyPermalink(copyField, navigator.clipboard, function () {
-          return document.execCommand('copy');
+          // Clipboard API unavailable or rejected; the field stays selected so
+          // the user can copy manually (the button reports "Press Ctrl+C").
+          return false;
         }).then(function (copied) {
           copyButton.textContent = copied ? 'Copied' : 'Press Ctrl+C to copy';
           setTimeout(function () { copyButton.innerHTML = copyLabel; }, 2000);
