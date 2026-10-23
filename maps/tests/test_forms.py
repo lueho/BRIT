@@ -3,6 +3,7 @@ from django.forms import formset_factory
 from django.http import QueryDict
 from django.test import TestCase
 
+from bibliography.models import Source
 from utils.properties.models import Unit
 
 from ..forms import (
@@ -290,3 +291,28 @@ class RegionAttributeValueModelFormTestCase(TestCase):
         cleaned_data = form.clean()
 
         self.assertIsNone(cleaned_data["unit"])
+
+    def test_form_saves_selected_sources(self):
+        region = Region.objects.create(
+            name="Published Region", publication_status="published"
+        )
+        region_property = RegionProperty.objects.create(
+            name="Population density", publication_status="published"
+        )
+        source = Source.objects.create(title="Regional statistics yearbook")
+        data = QueryDict("", mutable=True)
+        data.update(
+            {
+                "region": str(region.pk),
+                "property": str(region_property.pk),
+                "date": "2024-01-01",
+                "value": "123.321",
+            }
+        )
+        data.setlist("sources", [str(source.pk)])
+
+        form = RegionAttributeValueModelForm(data=data)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        value = form.save()
+        self.assertQuerySetEqual(value.sources.all(), [source])
