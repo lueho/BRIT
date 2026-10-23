@@ -93,7 +93,11 @@ from utils.object_management.models import (
     get_default_owner,
 )
 from utils.properties.models import Property, Unit
-from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
+from utils.tests.testcases import (
+    AbstractTestCases,
+    CheckUrlButtonVisibilityTestMixin,
+    ViewWithPermissionsTestCase,
+)
 
 from .. import views
 from ..forms import (
@@ -476,7 +480,10 @@ class FeeSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+class WasteFlyerCRUDViewsTestCase(
+    CheckUrlButtonVisibilityTestMixin,
+    AbstractTestCases.UserCreatedObjectCRUDViewTestCase,
+):
     create_view = False
     modal_detail_view = True
     update_view = False
@@ -502,25 +509,6 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         self.client.force_login(self.staff_user)
         response = self.client.get(reverse("wasteflyer-list"), follow=True)
         self.assertContains(response, "Check URLs")
-
-    def test_detail_view_unpublished_contains_check_url_button_for_owner(self):
-        self.client.force_login(self.owner_user)
-        response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
-        self.assertContains(response, "check url")
-
-    def test_detail_view_published_contains_check_url_button_for_owner(self):
-        self.client.force_login(self.owner_user)
-        response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertContains(response, "check url")
-
-    def test_detail_view_published_doesnt_contain_check_url_button_for_anonymous(self):
-        response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertNotContains(response, "Check URLs")
-
-    def test_detail_view_published_doesnt_contain_check_url_button_for_non_owner(self):
-        self.client.force_login(self.non_owner_user)
-        response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertNotContains(response, "Check URLs")
 
     def test_create_wasteflyer_without_author_succeeds(self):
         self.client.force_login(self.user_with_add_perm)
