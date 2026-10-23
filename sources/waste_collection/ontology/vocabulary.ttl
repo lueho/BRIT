@@ -158,7 +158,7 @@ britvoc:scheme/unit a skos:ConceptScheme ;
 
 britvoc:concept/unit/kg-per-cap-a a skos:Concept ;
     skos:inScheme britvoc:scheme/unit ;
-    skos:prefLabel "kg/(cap.*a)"@en .
+    skos:prefLabel "kg/(cap·a)"@en .
 
 britvoc:concept/unit/mg-per-a a skos:Concept ;
     skos:inScheme britvoc:scheme/unit ;

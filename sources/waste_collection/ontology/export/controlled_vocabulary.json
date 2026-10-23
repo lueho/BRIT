@@ -219,7 +219,7 @@
       "scheme_uri": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/required-bin-capacity-reference"
     },
     "https://brit.bioresource-tools.net/vocab/soilcom/concept/unit/kg-per-cap-a": {
-      "label": "kg/(cap.*a)",
+      "label": "kg/(cap·a)",
       "notation": null,
       "scheme_uri": "https://brit.bioresource-tools.net/vocab/soilcom/scheme/unit"
     },
