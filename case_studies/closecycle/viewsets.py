@@ -1,14 +1,6 @@
 import hashlib
 
-from django.db.models import (
-    BigIntegerField,
-    CharField,
-    OuterRef,
-    StringAgg,
-    Subquery,
-    Value,
-)
-from django.db.models.expressions import RawSQL
+from django.db.models import CharField, StringAgg, Value
 from django.db.models.functions import Cast, Concat
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -20,6 +12,7 @@ from maps.mixins import (
 )
 from maps.models import Catchment, GeoPolygon, Region
 from maps.throttling import GeoJSONAnonThrottle
+from maps.utils import row_xmin_subquery
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.viewsets import AutoPermModelViewSet
 
@@ -67,18 +60,7 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     @staticmethod
     def _row_xmin(model, pk_ref):
         """Transaction id of the ``model`` row at ``pk_ref`` as text."""
-        return Cast(
-            Subquery(
-                model.objects.filter(pk=OuterRef(pk_ref))
-                .annotate(
-                    row_xmin=RawSQL(
-                        "xmin::text::bigint", [], output_field=BigIntegerField()
-                    )
-                )
-                .values("row_xmin")[:1]
-            ),
-            CharField(),
-        )
+        return Cast(row_xmin_subquery(model, pk_ref), CharField())
 
     def _version_aggregates(self):
         """Showcase GeoJSON also serializes the linked catchments, regions and

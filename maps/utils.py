@@ -11,7 +11,8 @@ from django.contrib.gis.db.models.functions import AsGeoJSON, NumPoints
 from django.core.cache import caches
 from django.core.cache.backends.base import DEFAULT_TIMEOUT
 from django.db import connections
-from django.db.models import Count, Max, Min, Sum
+from django.db.models import BigIntegerField, Count, Max, Min, OuterRef, Subquery, Sum
+from django.db.models.expressions import RawSQL
 from django.utils import timezone
 from rest_framework.serializers import ReadOnlyField
 from rest_framework.utils.encoders import JSONEncoder
@@ -370,6 +371,22 @@ GEOJSON_MAX_RENDERED_CACHE_BYTES = 8 * 1024 * 1024
 GEOJSON_RENDERED_SCHEMA_VERSION = 2
 GEOJSON_RENDER_SLOTS = BoundedSemaphore(2)
 GEOJSON_MAX_DB_RESULT_BYTES = 1024 * 1024
+
+
+def row_xmin_subquery(model, pk_ref):
+    """Subquery resolving the transaction id of the ``model`` row at ``pk_ref``.
+
+    ``xmin`` only exists on the row's own base table, so version inputs for
+    models without ``lastmodified_at`` (e.g. GeoPolygon borders) resolve it
+    through a per-row subquery that re-selects the row by primary key.
+    """
+    return Subquery(
+        model.objects.filter(pk=OuterRef(pk_ref))
+        .annotate(
+            row_xmin=RawSQL("xmin::text::bigint", [], output_field=BigIntegerField())
+        )
+        .values("row_xmin")[:1]
+    )
 
 
 def geojson_version_aggregates(geometry_field=None):
