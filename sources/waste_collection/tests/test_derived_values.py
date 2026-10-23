@@ -1261,3 +1261,108 @@ class DerivedValuesTestCase(TestCase):
         data = _get_green_waste_collection_amount("DE", 2024)
         row = next(r for r in data if r["catchment_id"] == catchment.pk)
         self.assertIsNone(row["amount"])
+
+    def test_backfill_preview_counts_match_write_for_frozen_counterparts(self):
+        """Dry-run classifies frozen/editable/manual counterparts like writes."""
+        collection, _ = self._create_collection("bf-frozen", population=1000)
+        region = collection.catchment.region
+        for year in (2025, 2026, 2027, 2028, 2029):
+            self._avg_population(region, year, 1000)
+
+        def source(year, status="private"):
+            return self._bulk_create_cpv(
+                name=f"source-{year}",
+                collection=collection,
+                property=self.property_specific,
+                unit=self.unit_specific,
+                year=year,
+                average=10.0,
+                publication_status=status,
+                is_derived=False,
+            )
+
+        source(2024)  # created
+        source(2025)  # editable private counterpart -> updated
+        source(2026, status="review")  # editable review counterpart -> updated
+        source(2027)  # published counterpart -> skipped
+        source(2028)  # archived counterpart -> skipped
+        self._bulk_create_cpv(  # manual counterpart -> skipped
+            name="manual-total-2029",
+            collection=collection,
+            property=self.property_total,
+            unit=self.unit_total,
+            year=2029,
+            average=30.0,
+            publication_status="published",
+            is_derived=False,
+        )
+        source(2029)
+        source(2030)  # no population -> skipped
+
+        stamp = timezone.now()
+        for year, frozen_status in ((2025, "private"), (2026, "review")):
+            self._bulk_create_cpv(
+                name=f"derived-total-{year}",
+                collection=collection,
+                property=self.property_total,
+                unit=self.unit_total,
+                year=year,
+                average=99.0,
+                publication_status=frozen_status,
+                is_derived=True,
+            )
+        for year, frozen_status in ((2027, "published"), (2028, "archived")):
+            self._bulk_create_cpv(
+                name=f"frozen-total-{year}",
+                collection=collection,
+                property=self.property_total,
+                unit=self.unit_total,
+                year=year,
+                average=50.0,
+                publication_status=frozen_status,
+                is_derived=True,
+                description=f"frozen snapshot {year}",
+            )
+        CollectionPropertyValue.objects.filter(
+            name__in=["frozen-total-2027", "frozen-total-2028"]
+        ).update(approved_at=stamp)
+
+        snapshot_before = list(
+            CollectionPropertyValue.objects.order_by("pk").values_list(
+                "pk",
+                "average",
+                "description",
+                "publication_status",
+                "approved_at",
+                "submitted_at",
+            )
+        )
+        dry_stats = backfill_derived_values(dry_run=True)
+        snapshot_after_preview = list(
+            CollectionPropertyValue.objects.order_by("pk").values_list(
+                "pk",
+                "average",
+                "description",
+                "publication_status",
+                "approved_at",
+                "submitted_at",
+            )
+        )
+        self.assertEqual(snapshot_after_preview, snapshot_before)
+
+        write_stats = backfill_derived_values(dry_run=False)
+        self.assertEqual(dry_stats, write_stats)
+        self.assertEqual(dry_stats, {"created": 1, "updated": 2, "skipped": 5})
+        for year in (2025, 2026):
+            editable = CollectionPropertyValue.objects.get(
+                collection=collection,
+                property=self.property_total,
+                year=year,
+                is_derived=True,
+            )
+            self.assertEqual(editable.average, 10.0)
+        for year in (2027, 2028):
+            frozen = CollectionPropertyValue.objects.get(name=f"frozen-total-{year}")
+            self.assertEqual(frozen.description, f"frozen snapshot {year}")
+            self.assertEqual(frozen.average, 50.0)
+            self.assertEqual(frozen.approved_at, stamp)

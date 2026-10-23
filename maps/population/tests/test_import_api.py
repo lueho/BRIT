@@ -14,7 +14,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from maps.models import LauRegion, NutsRegion
+from maps.models import LauRegion, NutsRegion, NutsVintage
 from maps.population.contracts import POPULATION_IMPORT_SCHEMA
 from maps.population.models import (
     PopulationDataset,
@@ -338,6 +338,94 @@ class PopulationImportAPITestCase(APITestCase):
             branch for branch in value_schema["anyOf"] if branch.get("type") == "number"
         ]
         self.assertEqual(number_branches, [{"type": "number", "minimum": 0}])
+
+    def test_omitted_metadata_preserved_per_field_and_on_updates(self):
+        """Each optional definition field may be omitted; updates still apply."""
+        response = self.post(_payload())
+        self.assertTrue(response.data["committed"])
+        original = PopulationDataset.objects.get()
+
+        year = 2024
+        for fields in (
+            ("external_id",),
+            ("source_unit",),
+            ("classification_version",),
+            ("external_id", "source_unit", "classification_version"),
+        ):
+            with self.subTest(fields=fields):
+                payload = _payload()
+                for field in fields:
+                    payload["dataset"].pop(field)
+                payload["observations"][0]["reference_period"] = str(year)
+                response = self.post(payload)
+                self.assertTrue(response.data["committed"], response.data)
+                dataset = PopulationDataset.objects.get()
+                self.assertEqual(dataset.source_code, original.source_code)
+                self.assertEqual(dataset.source_unit, original.source_unit)
+                self.assertEqual(
+                    dataset.classification_version,
+                    original.classification_version,
+                )
+                year += 1
+
+        # Existing observations still update with omitted metadata.
+        payload = _payload()
+        for field in ("external_id", "source_unit", "classification_version"):
+            payload["dataset"].pop(field)
+        payload["observations"][0]["value"] = "400"
+        response = self.post(payload)
+        self.assertTrue(response.data["committed"], response.data)
+        self.assertEqual(response.data["updated"], 1)
+        self.assertEqual(
+            PopulationObservation.objects.get(region=self.nuts3, year=2023).value,
+            Decimal("400000.000"),
+        )
+
+    def test_new_dataset_accepts_omitted_optional_metadata(self):
+        payload = _payload()
+        for field in ("external_id", "source_unit", "classification_version"):
+            payload["dataset"].pop(field)
+        # Per-observation vintage still qualifies geography.
+        response = self.post(payload)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        dataset = PopulationDataset.objects.get()
+        self.assertEqual(dataset.source_code, "")
+        self.assertEqual(dataset.source_unit, "")
+        self.assertEqual(dataset.classification_version, "")
+        self.assertEqual(PopulationObservation.objects.count(), 1)
+
+    def test_stored_classification_used_when_metadata_omitted(self):
+        """Omitted classification_version resolves via the stored dataset one."""
+        self.post(_payload())
+        vintage_2024 = NutsVintage.objects.create(year=2024)
+        NutsVintage.objects.exclude(pk=vintage_2024.pk).update(is_current=False)
+        vintage_2024.is_current = True
+        vintage_2024.save()
+        nuts3_2024 = NutsRegion.objects.create(
+            name="Grafschaft Bentheim 2024",
+            country="DE",
+            nuts_id="DE94A",
+            levl_code=3,
+            cntr_code="DE",
+            version=vintage_2024,
+        )
+
+        payload = _payload()
+        payload["dataset"].pop("classification_version")
+        payload["observations"][0].pop("region_version")
+        payload["observations"][0]["reference_period"] = "2024"
+        response = self.post(payload)
+        self.assertTrue(response.data["committed"], response.data)
+        self.assertEqual(
+            PopulationObservation.objects.get(year=2024).region_id,
+            self.nuts3.pk,
+        )
+        self.assertFalse(
+            PopulationObservation.objects.filter(region=nuts3_2024).exists()
+        )
+        self.assertEqual(
+            PopulationDataset.objects.get().classification_version, "NUTS2021"
+        )
 
     def test_dataset_name_and_canonical_flag_may_change_with_observations(self):
         self.post(_payload())
