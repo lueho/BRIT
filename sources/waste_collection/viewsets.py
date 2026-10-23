@@ -1587,15 +1587,18 @@ class CollectorViewSet(CachedGeoJSONMixin, viewsets.ReadOnlyModelViewSet):
         }
 
     def _version_timestamp(self, aggregates):
-        candidates = [
-            super()._version_timestamp(aggregates),
-            aggregates.get("max_borders_xmin") or 0,
-        ]
+        """Fingerprint combining every version input as its own segment.
+
+        The inputs are incomparable units (epoch seconds vs. transaction
+        ids), so taking a max would let whichever unit is numerically
+        largest dominate and silently drop changes in the others.
+        """
+        parts = [str(super()._version_timestamp(aggregates))]
         for key in ("max_catchment_mod", "max_region_mod"):
             modified = aggregates.get(key)
-            if modified:
-                candidates.append(int(modified.timestamp()))
-        return max(candidates)
+            parts.append(modified.isoformat() if modified else "")
+        parts.append(str(aggregates.get("max_borders_xmin") or 0))
+        return ":".join(parts)
 
     def get_cache_key(self, request):
         """Build cache key including country filter and dataset version."""
