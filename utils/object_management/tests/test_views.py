@@ -1861,10 +1861,10 @@ class CollectionPropertyValueReviewDashboardTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.staff_user = User.objects.create_user(
-            username="staff", password="test123", is_staff=True
+        cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
+        cls.owner_user = User.objects.create_user(
+            username="owner",
         )
-        cls.owner_user = User.objects.create_user(username="owner", password="test123")
 
         cls.unit = Unit.objects.create(name="kg")
         cls.property = Property.objects.create(name="Test Property")
@@ -2179,19 +2179,19 @@ class ReviewDashboardViewTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner_user = User.objects.create_user(username="owner", password="test123")
+        cls.owner_user = User.objects.create_user(
+            username="owner",
+        )
         cls.moderator_user = User.objects.create_user(
-            username="moderator", password="test123"
+            username="moderator",
         )
         cls.collection_moderator = User.objects.create_user(
-            username="collection_moderator", password="test123"
+            username="collection_moderator",
         )
         cls.regular_user = User.objects.create_user(
-            username="regular", password="test123"
+            username="regular",
         )
-        cls.staff_user = User.objects.create_user(
-            username="staff", password="test123", is_staff=True
-        )
+        cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
 
         collection_ct = ContentType.objects.get_for_model(Collection)
         collection_perm, _ = Permission.objects.get_or_create(
@@ -2393,7 +2393,7 @@ class ReviewDashboardViewTests(TestCase):
 
     def test_model_type_filter_hides_models_with_only_own_review_items(self):
         owner = User.objects.create_user(
-            username="collector_owner_only", password="test123"
+            username="collector_owner_only",
         )
         collector_ct = ContentType.objects.get_for_model(Collector)
         collector_permission, _ = Permission.objects.get_or_create(
@@ -2436,7 +2436,7 @@ class ReviewDashboardViewTests(TestCase):
 
     def test_dashboard_includes_temporal_distribution_with_plain_manager(self):
         owner = User.objects.create_user(
-            username="distribution_owner", password="test123"
+            username="distribution_owner",
         )
         TemporalDistribution.objects.create(
             name="Review Distribution",
@@ -2454,7 +2454,9 @@ class ReviewDashboardViewTests(TestCase):
         )
 
     def test_dashboard_includes_catchment_with_custom_manager(self):
-        owner = User.objects.create_user(username="catchment_owner", password="test123")
+        owner = User.objects.create_user(
+            username="catchment_owner",
+        )
         region = Region.objects.create(name="Review Region", country="DE", owner=owner)
         Catchment.objects.create(
             name="Review Catchment",
@@ -2471,7 +2473,9 @@ class ReviewDashboardViewTests(TestCase):
         self.assertTrue(any(isinstance(item, Catchment) for item in review_items))
 
     def test_dashboard_includes_collector_from_nested_sources_app(self):
-        owner = User.objects.create_user(username="collector_owner", password="test123")
+        owner = User.objects.create_user(
+            username="collector_owner",
+        )
         Collector.objects.create(
             name="Review Collector",
             owner=owner,
@@ -2565,10 +2569,10 @@ class ReviewDashboardFilterTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.moderator = User.objects.create_user(
-            username="moderator", password="test123", is_staff=True
+        cls.moderator = User.objects.create_user(username="moderator", is_staff=True)
+        cls.owner = User.objects.create_user(
+            username="owner",
         )
-        cls.owner = User.objects.create_user(username="owner", password="test123")
 
         with mute_signals(post_save, pre_save):
             cls.collection_a = Collection.objects.create(

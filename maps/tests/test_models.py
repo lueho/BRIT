@@ -188,8 +188,9 @@ class CatchmentPostDeleteTestCase(TestCase):
 
 
 class GeoDatasetModelTestCase(TestCase):
-    def setUp(self):
-        self.region = Region.objects.create(name="Test Region")
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(name="Test Region")
 
     def test_get_map_url_uses_dataset_scoped_map_route(self):
         dataset = GeoDataset.objects.create(name="Dataset", region=self.region)

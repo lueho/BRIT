@@ -1,8 +1,5 @@
 import hashlib
 import json
-import os
-import subprocess
-import sys
 import tempfile
 from io import StringIO
 from pathlib import Path
@@ -24,6 +21,7 @@ from brit.staticfiles import (
     load_static_manifest,
 )
 from brit.storages import StaticStorage
+from brit.tests.probes import run_settings_probe
 
 
 class AtomicManifestStorageTests(SimpleTestCase):
@@ -603,22 +601,19 @@ class CheckManifestFilesTests(StaticfilesSafetyTestBase):
 
 class GuardedCommandDiscoveryTests(SimpleTestCase):
     def _run_script(self, script, settings_module):
-        environment = os.environ.copy()
-        environment["DJANGO_SETTINGS_MODULE"] = settings_module
-        environment["SECRET_KEY"] = "test-secret-key"
-        environment["REDIS_URL"] = "redis://localhost:6379/0"
-        environment["AWS_STORAGE_BUCKET_NAME"] = "brit-test-assets"
-        environment["DATABASE_URL"] = (
-            "postgres://postgres:postgres@localhost:5432/postgres"
-        )
-        environment.pop("AWS_ACCESS_KEY_ID", None)
-        environment.pop("AWS_SECRET_ACCESS_KEY", None)
-        return subprocess.run(
-            [sys.executable, "-c", script],
-            capture_output=True,
-            check=False,
-            env=environment,
-            text=True,
+        return run_settings_probe(
+            script,
+            env={
+                "DJANGO_SETTINGS_MODULE": settings_module,
+                "SECRET_KEY": "test-secret-key",
+                "REDIS_URL": "redis://localhost:6379/0",
+                "AWS_STORAGE_BUCKET_NAME": "brit-test-assets",
+                "DATABASE_URL": (
+                    "postgres://postgres:postgres@localhost:5432/postgres"
+                ),
+                "AWS_ACCESS_KEY_ID": None,
+                "AWS_SECRET_ACCESS_KEY": None,
+            },
         )
 
     def test_production_discovers_safe_commands(self):

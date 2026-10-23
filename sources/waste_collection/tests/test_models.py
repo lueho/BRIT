@@ -176,24 +176,25 @@ class WasteFlyerTestCase(TestCase):
 
 
 class WasteFlyerUrlCheckSignalTestCase(TestCase):
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.catchment = CollectionCatchment.objects.create(name="Signal Catchment")
-        self.collection_system = CollectionSystem.objects.create(name="Signal System")
-        self.category = WasteCategory.objects.create(name="Signal Category")
-        self.collection = Collection.objects.create(
-            owner=self.owner,
-            catchment=self.catchment,
-            collection_system=self.collection_system,
-            waste_category=self.category,
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_default_owner()
+        cls.catchment = CollectionCatchment.objects.create(name="Signal Catchment")
+        cls.collection_system = CollectionSystem.objects.create(name="Signal System")
+        cls.category = WasteCategory.objects.create(name="Signal Category")
+        cls.collection = Collection.objects.create(
+            owner=cls.owner,
+            catchment=cls.catchment,
+            collection_system=cls.collection_system,
+            waste_category=cls.category,
             valid_from=date(2024, 1, 1),
         )
-        self.property = Property.objects.create(
-            owner=self.owner,
+        cls.property = Property.objects.create(
+            owner=cls.owner,
             name="Signal Property",
         )
-        self.unit = Unit.objects.create(owner=self.owner, name="kg", symbol="kg")
-        self.property.allowed_units.add(self.unit)
+        cls.unit = Unit.objects.create(owner=cls.owner, name="kg", symbol="kg")
+        cls.property.allowed_units.add(cls.unit)
 
     @patch("sources.waste_collection.models.celery.current_app.send_task")
     def test_collection_flyer_add_schedules_wasteflyer_url_check(self, mock_send_task):

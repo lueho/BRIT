@@ -1330,27 +1330,28 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
 
 
 class CollectionAddWasteSampleFormTestCase(TestCase):
-    def setUp(self):
-        self.material = Material.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.material = Material.objects.create(
             name="Test Material", publication_status="published"
         )
-        self.sample = Sample.objects.create(
+        cls.sample = Sample.objects.create(
             name="Test Sample",
-            material=self.material,
+            material=cls.material,
             series=SampleSeries.objects.create(
                 name="Test Series",
-                material=self.material,
+                material=cls.material,
                 publication_status="published",
             ),
             publication_status="published",
         )
-        self.other_sample = Sample.objects.create(
+        cls.other_sample = Sample.objects.create(
             name="Other Sample",
-            material=self.material,
-            series=self.sample.series,
+            material=cls.material,
+            series=cls.sample.series,
             publication_status="published",
         )
-        self.collection = Collection.objects.create(name="Sample Test Collection")
+        cls.collection = Collection.objects.create(name="Sample Test Collection")
 
     def test_form_is_valid_with_existing_sample(self):
         form = CollectionAddWasteSampleForm(data={"sample": self.sample.id})
@@ -1584,53 +1585,58 @@ class CollectionModelFormPermissionTestCase(TestCase):
     as part of the defense-in-depth security model.
     """
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         """Set up test users and objects."""
-        self.default_owner = get_default_owner()
-        self.user1 = User.objects.create_user(username="user1", password="testpass")
-        self.user2 = User.objects.create_user(username="user2", password="testpass")
+        cls.default_owner = get_default_owner()
+        cls.user1 = User.objects.create_user(
+            username="user1",
+        )
+        cls.user2 = User.objects.create_user(
+            username="user2",
+        )
 
         # Create published objects that user2 can access
-        self.catchment = CollectionCatchment.objects.create(
+        cls.catchment = CollectionCatchment.objects.create(
             name="Test Catchment",
-            owner=self.user1,
+            owner=cls.user1,
             publication_status="published",
         )
-        self.collector = Collector.objects.create(
+        cls.collector = Collector.objects.create(
             name="Test Collector",
-            owner=self.user1,
+            owner=cls.user1,
             publication_status="published",
         )
-        self.collection_system = CollectionSystem.objects.create(
+        cls.collection_system = CollectionSystem.objects.create(
             name="Test System",
-            owner=self.user1,
+            owner=cls.user1,
             publication_status="published",
         )
-        self.waste_category = WasteCategory.objects.create(
+        cls.waste_category = WasteCategory.objects.create(
             name="Test Category",
-            owner=self.user1,
+            owner=cls.user1,
             publication_status="published",
         )
 
         # Create a private source owned by user1 (not accessible to user2)
-        self.private_source = Source.objects.create(
-            owner=self.user1,
+        cls.private_source = Source.objects.create(
+            owner=cls.user1,
             title="Private Source",
             abbreviation="PRIV1",
             publication_status="private",
         )
 
         # Create a published source (accessible to everyone)
-        self.public_source = Source.objects.create(
-            owner=self.user1,
+        cls.public_source = Source.objects.create(
+            owner=cls.user1,
             title="Public Source",
             abbreviation="PUB1",
             publication_status="published",
         )
 
         # Create a private waste flyer owned by user1
-        self.private_flyer = WasteFlyer.objects.create(
-            owner=self.user1,
+        cls.private_flyer = WasteFlyer.objects.create(
+            owner=cls.user1,
             title="Private Flyer",
             abbreviation="PFLYER1",
             url="https://example.com/private",
@@ -1638,15 +1644,15 @@ class CollectionModelFormPermissionTestCase(TestCase):
         )
 
         # Create a published waste flyer
-        self.public_flyer = WasteFlyer.objects.create(
-            owner=self.user1,
+        cls.public_flyer = WasteFlyer.objects.create(
+            owner=cls.user1,
             title="Public Flyer",
             abbreviation="PFLYER2",
             url="https://example.com/public",
             publication_status="published",
         )
 
-        self.factory = RequestFactory()
+        cls.factory = RequestFactory()
 
     def test_form_rejects_private_source_from_other_user(self):
         """Test that form rejects a private source owned by another user."""

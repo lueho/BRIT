@@ -5328,16 +5328,14 @@ class ComponentOrderDownViewTestCase(ViewWithPermissionsTestCase):
         cls.sample = Sample.objects.get(
             series=cls.series, timestep=Timestep.objects.default()
         )
-
-    def setUp(self):
-        self.composition = Composition.objects.create(
-            owner=self.member,
-            sample=self.sample,
-            group=self.component_group,
-            fractions_of=self.default_component,
+        cls.composition = Composition.objects.create(
+            owner=cls.member,
+            sample=cls.sample,
+            group=cls.component_group,
+            fractions_of=cls.default_component,
         )
-        self.component = MaterialComponent.objects.create(
-            owner=self.member, name="Test Component"
+        cls.component = MaterialComponent.objects.create(
+            owner=cls.member, name="Test Component"
         )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -5870,13 +5868,12 @@ class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
 class EmptyStateViewsTestCase(TestCase):
     """Test empty state messaging and CTAs across Materials views."""
 
-    def setUp(self):
-        self.regular_user = User.objects.create_user(
-            username="regular", password="test123"
+    @classmethod
+    def setUpTestData(cls):
+        cls.regular_user = User.objects.create_user(
+            username="regular",
         )
-        self.staff_user = User.objects.create_user(
-            username="staff", password="test123", is_staff=True
-        )
+        cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
 
         content_types = {
             "material": ContentType.objects.get_for_model(Material),
@@ -5896,7 +5893,7 @@ class EmptyStateViewsTestCase(TestCase):
                 codename=f"add_{model_name}",
                 content_type=ct,
             )
-            self.staff_user.user_permissions.add(perm)
+            cls.staff_user.user_permissions.add(perm)
 
     def _create_unused_category(self):
         """Create a category guaranteed not to be assigned in this test."""
@@ -6162,7 +6159,9 @@ class EmptyStateViewsTestCase(TestCase):
                         self.assertNotContains(response, "2024-01-01")
 
     def _create_v2_owner_sample(self, name, status):
-        owner = User.objects.create_user(username=f"{name}-owner", password="test123")
+        owner = User.objects.create_user(
+            username=f"{name}-owner",
+        )
         return Sample.objects.create(
             name=name,
             material=Material.objects.create(name=f"{name} Material", type="material"),
@@ -6487,7 +6486,9 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "sdv2-properties")
 
     def test_v2_edit_mode_exposes_editorial_sections(self):
-        owner = User.objects.create_user(username="editorial-owner", password="test123")
+        owner = User.objects.create_user(
+            username="editorial-owner",
+        )
         change_perm, _ = Permission.objects.get_or_create(
             codename="change_sample",
             content_type=ContentType.objects.get_for_model(Sample),
@@ -6719,7 +6720,7 @@ class EmptyStateViewsTestCase(TestCase):
     def test_v2_superuser_can_add_data_to_published_sample(self):
         sample, _group = self._create_sample_with_composition_and_property()
         superuser = User.objects.create_superuser(
-            username="sample-superuser", password="test123"
+            username="sample-superuser",
         )
         self.client.force_login(superuser)
 
@@ -6912,7 +6913,9 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertNotContains(v2_response, "Classic view")
 
     def test_v2_rail_actions_dropdown_carries_secondary_editorial_actions(self):
-        owner = User.objects.create_user(username="dropdown-owner", password="test123")
+        owner = User.objects.create_user(
+            username="dropdown-owner",
+        )
         sample = Sample.objects.create(
             name="Dropdown Sample",
             material=Material.objects.create(name="Dropdown Material", type="material"),
@@ -7890,12 +7893,14 @@ class MaterialsReviewWorkflowTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="test123")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
         cls.moderator = User.objects.create_user(
-            username="moderator", password="test123"
+            username="moderator",
         )
         cls.regular_user = User.objects.create_user(
-            username="regular", password="test123"
+            username="regular",
         )
 
         # Add moderator permission for Sample
@@ -8216,11 +8221,15 @@ class MaterialsReviewDetailAccessTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="test123")
-        cls.moderator = User.objects.create_user(
-            username="moderator", password="test123"
+        cls.owner = User.objects.create_user(
+            username="owner",
         )
-        cls.other_user = User.objects.create_user(username="other", password="test123")
+        cls.moderator = User.objects.create_user(
+            username="moderator",
+        )
+        cls.other_user = User.objects.create_user(
+            username="other",
+        )
 
         sample_ct = ContentType.objects.get_for_model(Sample)
         cls.sample_ct_id = sample_ct.id
@@ -8303,8 +8312,12 @@ class SampleDetailTemplateReviewUITests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="test123")
-        cls.reviewer = User.objects.create_user(username="reviewer", password="test123")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
+        cls.reviewer = User.objects.create_user(
+            username="reviewer",
+        )
 
         with mute_signals(post_save, pre_save):
             cls.material = Material.objects.create(
@@ -8433,7 +8446,9 @@ class SampleSeriesDetailTemplateReviewUITests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="test123")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
 
         with mute_signals(post_save, pre_save):
             cls.material = Material.objects.create(
@@ -8482,12 +8497,12 @@ class MaterialsReviewDashboardTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="test123")
-        cls.staff = User.objects.create_user(
-            username="staff", password="test123", is_staff=True
+        cls.owner = User.objects.create_user(
+            username="owner",
         )
+        cls.staff = User.objects.create_user(username="staff", is_staff=True)
         cls.moderator = User.objects.create_user(
-            username="moderator", password="test123"
+            username="moderator",
         )
 
         sample_ct = ContentType.objects.get_for_model(Sample)
@@ -8559,9 +8574,11 @@ class ReviewActionLoggingTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="test123")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
         cls.moderator = User.objects.create_user(
-            username="moderator", password="test123"
+            username="moderator",
         )
 
         sample_ct = ContentType.objects.get_for_model(Sample)
@@ -9743,7 +9760,7 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(
-            username="qualifier-view-owner", password="test123"
+            username="qualifier-view-owner",
         )
         cls.material = Material.objects.create(
             owner=cls.owner,
@@ -9911,7 +9928,7 @@ class SampleCompositionSafetyViewTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(
-            username="composition-safety-owner", password="test123"
+            username="composition-safety-owner",
         )
         cls.material = Material.objects.create(
             owner=cls.owner,

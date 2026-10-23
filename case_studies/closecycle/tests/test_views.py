@@ -657,14 +657,15 @@ class ShowcaseGeoJSONVersionTestCase(TestCase):
     """The showcase GeoJSON serializes its region's name and borders, so the
     dataset version used for client cache revalidation must track them."""
 
-    def setUp(self):
-        self.region = Region.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region.objects.create(
             name="Showcase Region", publication_status="published"
         )
-        self.region.geom = MultiPolygon(Polygon.from_bbox((0, 0, 1, 1)))
-        self.region.save()
+        cls.region.geom = MultiPolygon(Polygon.from_bbox((0, 0, 1, 1)))
+        cls.region.save()
         Showcase.objects.create(
-            name="Showcase", region=self.region, publication_status="published"
+            name="Showcase", region=cls.region, publication_status="published"
         )
 
     def version(self):

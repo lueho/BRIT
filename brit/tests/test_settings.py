@@ -1,7 +1,4 @@
-import os
 import ssl
-import subprocess
-import sys
 from importlib import import_module
 
 from django.conf import settings
@@ -11,41 +8,30 @@ from brit.settings.settings import (
     _redis_connection_pool_kwargs,
     _redis_ssl_settings,
 )
+from brit.tests.probes import run_settings_probe
 
 
 class EnvironmentSettingsTests(SimpleTestCase):
-    def run_settings_assertions(self, environment, assertions):
-        return subprocess.run(
-            [
-                sys.executable,
-                "-c",
-                f"import brit.settings.settings as s; {assertions}",
-            ],
-            capture_output=True,
-            check=False,
-            env=environment,
-            text=True,
+    def run_settings_assertions(self, env, assertions):
+        return run_settings_probe(
+            f"import brit.settings.settings as s; {assertions}", env=env
         )
 
     def test_false_email_ssl_and_missing_admins_are_typed_safely(self):
-        environment = os.environ.copy()
-        environment["EMAIL_USE_SSL"] = "false"
-        environment.pop("ADMIN_NAME", None)
-        environment.pop("ADMIN_EMAIL", None)
         completed = self.run_settings_assertions(
-            environment,
+            {"EMAIL_USE_SSL": "false", "ADMIN_NAME": None, "ADMIN_EMAIL": None},
             "assert s.EMAIL_USE_SSL is False; assert s.ADMINS == []",
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
     def test_true_email_ssl_and_complete_admin_are_preserved(self):
-        environment = os.environ.copy()
-        environment["EMAIL_USE_SSL"] = "true"
-        environment["ADMIN_NAME"] = "BRIT operations"
-        environment["ADMIN_EMAIL"] = "operations@example.com"
         completed = self.run_settings_assertions(
-            environment,
+            {
+                "EMAIL_USE_SSL": "true",
+                "ADMIN_NAME": "BRIT operations",
+                "ADMIN_EMAIL": "operations@example.com",
+            },
             (
                 "assert s.EMAIL_USE_SSL is True; "
                 "assert s.ADMINS == [('BRIT operations', 'operations@example.com')]"
@@ -65,18 +51,9 @@ class RedisSettingsTests(SimpleTestCase):
         self.assertFalse(settings.DATABASES["default"]["ATOMIC_REQUESTS"])
 
     def test_raw_testrunner_database_settings_include_atomic_requests_default(self):
-        completed = subprocess.run(
-            [
-                sys.executable,
-                "-c",
-                (
-                    "import brit.settings.testrunner as t; "
-                    "assert t.DATABASES['default']['ATOMIC_REQUESTS'] is False"
-                ),
-            ],
-            capture_output=True,
-            check=False,
-            text=True,
+        completed = run_settings_probe(
+            "import brit.settings.testrunner as t; "
+            "assert t.DATABASES['default']['ATOMIC_REQUESTS'] is False"
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
@@ -98,47 +75,29 @@ class RedisSettingsTests(SimpleTestCase):
 
 class ProductionRedisSettingsTests(SimpleTestCase):
     def test_tls_redis_accepts_self_signed_certificates(self):
-        environment = os.environ.copy()
-        environment["REDIS_URL"] = "rediss://localhost:6379/0"
-        environment["SECRET_KEY"] = "test-secret-key"
-        completed = subprocess.run(
-            [
-                sys.executable,
-                "-c",
-                (
-                    "import ssl; import brit.settings.heroku as h; "
-                    "expected = {'ssl_cert_reqs': ssl.CERT_NONE}; "
-                    "assert h.CELERY_BROKER_USE_SSL == expected; "
-                    "assert h.CELERY_REDIS_BACKEND_USE_SSL == expected"
-                ),
-            ],
-            capture_output=True,
-            check=False,
-            env=environment,
-            text=True,
+        completed = run_settings_probe(
+            "import ssl; import brit.settings.heroku as h; "
+            "expected = {'ssl_cert_reqs': ssl.CERT_NONE}; "
+            "assert h.CELERY_BROKER_USE_SSL == expected; "
+            "assert h.CELERY_REDIS_BACKEND_USE_SSL == expected",
+            env={
+                "REDIS_URL": "rediss://localhost:6379/0",
+                "SECRET_KEY": "test-secret-key",
+            },
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
 
 class LocalSettingsTests(SimpleTestCase):
-    def run_local_assertions(self, environment, assertions):
-        return subprocess.run(
-            [
-                sys.executable,
-                "-c",
-                f"import brit.settings.local as s; {assertions}",
-            ],
-            capture_output=True,
-            check=False,
-            env=environment,
-            text=True,
+    def run_local_assertions(self, env, assertions):
+        return run_settings_probe(
+            f"import brit.settings.local as s; {assertions}", env=env
         )
 
     def test_local_uses_filesystem_media_storage(self):
-        environment = os.environ.copy()
         completed = self.run_local_assertions(
-            environment,
+            {},
             (
                 "assert s.STORAGES['default']['BACKEND'] == "
                 "'django.core.files.storage.FileSystemStorage'; "
@@ -150,10 +109,8 @@ class LocalSettingsTests(SimpleTestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
     def test_local_uses_console_email_backend_without_smtp_host(self):
-        environment = os.environ.copy()
-        environment.pop("EMAIL_HOST", None)
         completed = self.run_local_assertions(
-            environment,
+            {"EMAIL_HOST": None},
             (
                 "assert s.EMAIL_BACKEND == "
                 "'django.core.mail.backends.console.EmailBackend'"
@@ -163,10 +120,8 @@ class LocalSettingsTests(SimpleTestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
     def test_local_preserves_explicit_smtp_configuration(self):
-        environment = os.environ.copy()
-        environment["EMAIL_HOST"] = "smtp.example.org"
         completed = self.run_local_assertions(
-            environment,
+            {"EMAIL_HOST": "smtp.example.org"},
             (
                 "assert s.EMAIL_BACKEND == "
                 "'django.core.mail.backends.smtp.EmailBackend'; "

@@ -316,7 +316,9 @@ class GeoDatasetFunctionsAPITestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(username="fn-user", password="pass")
+        cls.user = User.objects.create_user(
+            username="fn-user",
+        )
         cls.region = Region.objects.create(
             name="FN Region", publication_status="published"
         )
@@ -379,7 +381,9 @@ class ScenarioGeodatasetAutocompleteRegionScopeTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(username="ac-user", password="pass")
+        cls.user = User.objects.create_user(
+            username="ac-user",
+        )
         cls.region = Region.objects.create(
             name="Scope Region", publication_status="published"
         )
@@ -418,7 +422,9 @@ class GenericAlgorithmAddViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="gen-owner", password="pass")
+        cls.owner = User.objects.create_user(
+            username="gen-owner",
+        )
         change_perm = Permission.objects.get(codename="change_scenario")
         cls.owner.user_permissions.add(change_perm)
         cls.region = Region.objects.create(
@@ -747,7 +753,9 @@ class GenericAlgorithmAddViewTestCase(TestCase):
     def test_private_geodataset_rejected_on_generic_post(self):
         """A private dataset of another user must not be configurable —
         generic execution would read and republish its features."""
-        stranger = User.objects.create_user(username="stranger", password="p")
+        stranger = User.objects.create_user(
+            username="stranger",
+        )
         private_dataset = GeoDataset.objects.create(
             name="Private dataset",
             owner=stranger,
@@ -778,7 +786,9 @@ class GenericAlgorithmAddViewTestCase(TestCase):
 
         from ..views import _get_posted_object_or_404
 
-        stranger = User.objects.create_user(username="stranger", password="p")
+        stranger = User.objects.create_user(
+            username="stranger",
+        )
         private_dataset = GeoDataset.objects.create(
             name="Private dataset",
             owner=stranger,
@@ -796,7 +806,9 @@ class GenericAlgorithmAddViewTestCase(TestCase):
     def test_functions_api_hides_private_dataset(self):
         """The functions API must not leak sampled values of private
         datasets to unrelated users."""
-        stranger = User.objects.create_user(username="stranger", password="p")
+        stranger = User.objects.create_user(
+            username="stranger",
+        )
         private_dataset = GeoDataset.objects.create(
             name="Private dataset",
             owner=stranger,
@@ -817,8 +829,12 @@ class GenericAlgorithmAddViewTestCase(TestCase):
 class ScenarioDownloadSummaryAuthTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="pass")
-        cls.other_user = User.objects.create_user(username="other", password="pass")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
+        cls.other_user = User.objects.create_user(
+            username="other",
+        )
         region = Region.objects.create(name="R", publication_status="published")
         catchment = Catchment.objects.create(
             name="C",
@@ -854,7 +870,9 @@ class ScenarioDownloadSummaryAuthTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_moderator_can_download(self):
-        moderator = User.objects.create_user(username="mod", password="pass")
+        moderator = User.objects.create_user(
+            username="mod",
+        )
         # get_for_model() is fed from a process-global cache that parallel test
         # workers inherit from their parent — query the row directly so the
         # permission is attached to the correct content type.
@@ -876,8 +894,12 @@ class ScenarioDownloadSummaryAuthTests(TestCase):
 class ScenarioDownloadResultSummaryAuthTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="pass")
-        cls.other_user = User.objects.create_user(username="other", password="pass")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
+        cls.other_user = User.objects.create_user(
+            username="other",
+        )
         region = Region.objects.create(name="R", publication_status="published")
         catchment = Catchment.objects.create(
             name="C",
@@ -916,7 +938,9 @@ class ScenarioDownloadResultSummaryAuthTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_moderator_can_download(self):
-        moderator = User.objects.create_user(username="mod", password="pass")
+        moderator = User.objects.create_user(
+            username="mod",
+        )
         # get_for_model() is fed from a process-global cache that parallel test
         # workers inherit from their parent — query the row directly so the
         # permission is attached to the correct content type.
@@ -951,7 +975,9 @@ class EvaluationStatusAuthTests(TestCase):
         mock_async.return_value.status = "PENDING"
         mock_async.return_value.result = None
         mock_async.return_value.info = None
-        user = User.objects.create_user(username="u", password="pass")
+        user = User.objects.create_user(
+            username="u",
+        )
         self.client.force_login(user)
         url = reverse("scenario-evaluation-status", kwargs={"task_id": "fake-task-id"})
         response = self.client.get(url)
@@ -967,8 +993,12 @@ class ScenarioAddAlgorithmAuthBypassTests(TestCase):
     def setUpTestData(cls):
         from django.contrib.auth.models import Permission
 
-        cls.owner_a = User.objects.create_user(username="owner_a", password="pass")
-        cls.owner_b = User.objects.create_user(username="owner_b", password="pass")
+        cls.owner_a = User.objects.create_user(
+            username="owner_a",
+        )
+        cls.owner_b = User.objects.create_user(
+            username="owner_b",
+        )
         # Grant change permission so the owner passes UserPassesTestMixin for
         # editing their own private scenario (mirrors the standard test setup).
         change_perm = Permission.objects.get(codename="change_scenario")
@@ -1037,7 +1067,9 @@ class ScenarioCustomParameterValueTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="pass")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
         change_perm = Permission.objects.get(codename="change_scenario")
         cls.owner.user_permissions.add(change_perm)
 
@@ -1328,7 +1360,9 @@ class ScenarioCustomParameterValueTests(TestCase):
             )
 
     def _other_users_custom_value(self):
-        stranger = User.objects.create_user(username="stranger", password="pass")
+        stranger = User.objects.create_user(
+            username="stranger",
+        )
         foreign_scenario = Scenario.objects.create(
             name="Foreign",
             owner=stranger,
@@ -1447,16 +1481,19 @@ class ScenarioCustomParameterValueTests(TestCase):
 
 
 class ScenarioDetailViewRunTestCase(TestCase):
-    def setUp(self):
-        self.owner = User.objects.create(username="scenario-run-owner")
-        self.owner.user_permissions.add(
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create(username="scenario-run-owner")
+        cls.owner.user_permissions.add(
             Permission.objects.get(codename="change_scenario")
         )
-        self.scenario = Scenario.objects.create(
+        cls.scenario = Scenario.objects.create(
             name="Run Scenario",
-            owner=self.owner,
+            owner=cls.owner,
             region=Region.objects.create(name="Run Region"),
         )
+
+    def setUp(self):
         self.client.force_login(self.owner)
 
     @patch("inventories.views.start_inventory_run")
@@ -1508,11 +1545,15 @@ class ScenarioDetailViewRunTestCase(TestCase):
 class ScenarioDetailRunAuthorizationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="pass")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
         cls.owner.user_permissions.add(
             Permission.objects.get(codename="change_scenario")
         )
-        cls.other_user = User.objects.create_user(username="other", password="pass")
+        cls.other_user = User.objects.create_user(
+            username="other",
+        )
         region = Region.objects.create(name="R", publication_status="published")
         catchment = Catchment.objects.create(
             name="C",
@@ -1589,13 +1630,13 @@ class ScenarioInventoryEditLinkTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="pass")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
         cls.owner.user_permissions.add(
             Permission.objects.get(codename="change_scenario")
         )
-        cls.staff = User.objects.create_user(
-            username="staff", password="pass", is_staff=True
-        )
+        cls.staff = User.objects.create_user(username="staff", is_staff=True)
         region = Region.objects.create(name="R", publication_status="published")
         catchment = Catchment.objects.create(
             name="C",
@@ -1676,7 +1717,9 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="pass")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
         change_perm = Permission.objects.get(codename="change_scenario")
         cls.owner.user_permissions.add(change_perm)
         cls.region = Region.objects.create(name="R", publication_status="published")
@@ -2501,7 +2544,9 @@ class ScenarioEnclosingRegionDatasetViewsTestCase(TestCase):
                 publication_status="published",
             )
 
-        cls.owner = User.objects.create_user(username="enc-owner", password="pass")
+        cls.owner = User.objects.create_user(
+            username="enc-owner",
+        )
         cls.owner.user_permissions.add(
             Permission.objects.get(codename="change_scenario")
         )

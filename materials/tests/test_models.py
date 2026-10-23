@@ -426,18 +426,20 @@ class SampleSeriesTestCase(TestCase):
             Sample.objects.create(
                 material=material1, series=sample_series, timestep=timestep2
             )
-
-    def setUp(self):
-        self.user = User.objects.get(username="standard_user")
-        self.material1 = Material.objects.get(name="Test Material 1")
-        self.sample0 = Sample.objects.get(timestep=Timestep.objects.default())
-        self.default_distribution = TemporalDistribution.objects.default()
-        self.custom_distribution = TemporalDistribution.objects.get(
+        cls.user = User.objects.get(username="standard_user")
+        cls.material1 = Material.objects.get(name="Test Material 1")
+        cls.sample0 = Sample.objects.get(timestep=Timestep.objects.default())
+        cls.default_distribution = TemporalDistribution.objects.default()
+        cls.custom_distribution = TemporalDistribution.objects.get(
             name="Custom Distribution"
         )
-        self.default_group = MaterialComponentGroup.objects.default()
-        self.custom_group = MaterialComponentGroup.objects.get(name="Custom Group")
-        self.default_component = MaterialComponent.objects.default()
+        cls.default_group = MaterialComponentGroup.objects.default()
+        cls.custom_group = MaterialComponentGroup.objects.get(name="Custom Group")
+        cls.default_component = MaterialComponent.objects.default()
+
+    def setUp(self):
+        # test_save_with_changed_material_updates_linked_samples saves the
+        # series, so it is created per test instead of shared via setUpTestData.
         self.sample_series = SampleSeries.objects.create(material=self.material1)
 
     def test_add_temporal_distribution(self):
@@ -793,14 +795,13 @@ class MaterialPropertyValueTestCase(TestCase):
 class MaterialPropertyValueCleanTestCase(TestCase):
     """Regression tests for MaterialPropertyValue.clean() unit validation (issue #100)."""
 
-    def setUp(self):
-        self.allowed_unit = Unit.objects.create(name="g/kg test")
-        self.other_unit = Unit.objects.create(name="mg/kg test")
-        self.prop_with_allowed = MaterialProperty.objects.create(name="Nitrogen test")
-        self.prop_with_allowed.allowed_units.add(self.allowed_unit)
-        self.prop_no_allowed = MaterialProperty.objects.create(
-            name="Free property test"
-        )
+    @classmethod
+    def setUpTestData(cls):
+        cls.allowed_unit = Unit.objects.create(name="g/kg test")
+        cls.other_unit = Unit.objects.create(name="mg/kg test")
+        cls.prop_with_allowed = MaterialProperty.objects.create(name="Nitrogen test")
+        cls.prop_with_allowed.allowed_units.add(cls.allowed_unit)
+        cls.prop_no_allowed = MaterialProperty.objects.create(name="Free property test")
 
     def test_clean_raises_when_unit_not_in_allowed_units(self):
         value = MaterialPropertyValue(
@@ -1026,15 +1027,13 @@ class SampleTestCase(TestCase):
         MaterialPropertyValue.objects.create(
             property=prop, average=Decimal("12.3"), standard_deviation=Decimal("0.321")
         )
-
-    def setUp(self):
-        self.sample = Sample.objects.get(timestep=Timestep.objects.default())
-        self.default_group = MaterialComponentGroup.objects.default()
-        self.default_component = MaterialComponent.objects.default()
-        self.composition = Composition.objects.create(
-            group=self.default_group,
-            sample=self.sample,
-            fractions_of=self.default_component,
+        cls.sample = Sample.objects.get(timestep=Timestep.objects.default())
+        cls.default_group = MaterialComponentGroup.objects.default()
+        cls.default_component = MaterialComponent.objects.default()
+        cls.composition = Composition.objects.create(
+            group=cls.default_group,
+            sample=cls.sample,
+            fractions_of=cls.default_component,
         )
 
     def test_duplicate_creates_new_instance_with_identical_field_values(self):
@@ -1579,23 +1578,21 @@ class CompositionTestCase(TestCase):
             Sample.objects.create(
                 material=material1, series=sample_series, timestep=main_step2
             )
-
-    def setUp(self):
-        self.user = User.objects.get(username="standard_user")
-        self.material1 = Material.objects.get(name="Test Material 1")
-        self.sample0 = Sample.objects.get(timestep=Timestep.objects.default())
-        self.default_distribution = TemporalDistribution.objects.default()
-        self.custom_distribution = TemporalDistribution.objects.get(
+        cls.user = User.objects.get(username="standard_user")
+        cls.material1 = Material.objects.get(name="Test Material 1")
+        cls.sample0 = Sample.objects.get(timestep=Timestep.objects.default())
+        cls.default_distribution = TemporalDistribution.objects.default()
+        cls.custom_distribution = TemporalDistribution.objects.get(
             name="Custom Distribution"
         )
-        self.default_group = MaterialComponentGroup.objects.default()
-        self.custom_group = MaterialComponentGroup.objects.get(name="Custom Group")
-        self.default_component = MaterialComponent.objects.default()
-        self.composition = Composition.objects.create(
-            owner=self.user,
-            group=self.default_group,
-            sample=self.sample0,
-            fractions_of=self.default_component,
+        cls.default_group = MaterialComponentGroup.objects.default()
+        cls.custom_group = MaterialComponentGroup.objects.get(name="Custom Group")
+        cls.default_component = MaterialComponent.objects.default()
+        cls.composition = Composition.objects.create(
+            owner=cls.user,
+            group=cls.default_group,
+            sample=cls.sample0,
+            fractions_of=cls.default_component,
         )
 
     def test_composition_create_with_signal(self):

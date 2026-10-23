@@ -19,12 +19,10 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
     def setUpTestData(cls):
         cls.staff = User.objects.create_user(
             username="atlas-config-staff",
-            password="secret",
             is_staff=True,
         )
         cls.regular_user = User.objects.create_user(
             username="atlas-config-user",
-            password="secret",
         )
 
     def _configuration(self):
@@ -574,7 +572,6 @@ class WasteAtlasExportFileNameTestCase(TestCase):
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
             username="atlas-export-user",
-            password="secret",
         )
 
     # (route name, expected fileBase) covering generic, country, sub-national,

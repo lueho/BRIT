@@ -4932,12 +4932,14 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
         self.assertNotIn("45.67 ± 1.24 ReviewRoundedUnit (", body)
 
 
-class WasteAtlasMapViewsTestCase(TestCase):
-    """Tests for Waste Atlas map pages rendered via template views."""
+class WasteAtlasMapViewTestBase(TestCase):
+    """Shared fixtures and helpers for waste atlas map view tests."""
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(username="atlas-user", password="secret")
+        cls.user = User.objects.create_user(
+            username="atlas-user",
+        )
 
     def setUp(self):
         self.client.force_login(self.user)
@@ -4956,6 +4958,15 @@ class WasteAtlasMapViewsTestCase(TestCase):
         start = html.index(f'id="atlas-{region_id}"')
         end = html.find('<div class="tab-pane', start)
         return html[start:] if end == -1 else html[start:end]
+
+    def _login_staff(self):
+        self.client.force_login(
+            User.objects.create_user(username="conflicts-staff", is_staff=True)
+        )
+
+
+class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
+    """Tests for Waste Atlas map pages rendered via template views."""
 
     def test_scope_controls_and_map_config_follow_permissions(self):
         url = reverse("waste-atlas-germany-collection-system-map")
@@ -5010,22 +5021,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, 'value="review" selected')
         self.assertNotContains(response, 'value="all"')
 
-    # ---- registry / structural --------------------------------------------
-
-    def test_every_map_page_route_resolves(self):
-        """Every page registered in MAP_PAGES returns a 200 response."""
-        for page in MAP_PAGES:
-            with self.subTest(page=page["name"]):
-                response = self.client.get(reverse(page["name"]))
-                self.assertEqual(response.status_code, 200)
-
-    def test_every_map_page_renders_atlas_config_json(self):
-        """Every map page injects the atlas-config JSON script tag."""
-        for page in MAP_PAGES:
-            with self.subTest(page=page["name"]):
-                response = self.client.get(reverse(page["name"]))
-                self.assertIsNotNone(self._map_config(response))
-
     def test_repeated_page_render_skips_cached_selector_fragments(self):
         """The ~600-entry selector/tree loops are fragment-cached: a second
         render of the same page must not evaluate them again."""
@@ -5064,26 +5059,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertEqual(
             self._map_config(response)["collectionDetailCategory"], "biowaste"
         )
-
-    def test_every_map_page_forwards_its_config_key_to_the_renderer(self):
-        """The rendered config matches MAP_CONFIGS for the page's config_key."""
-        # Keys the template tag replaces at render time: runtime scope,
-        # page-level overrides, and DB-editable legend keys.
-        runtime_keys = {"country", "year", "nutsPrefix", "nutsLevel"}
-        for page in MAP_PAGES:
-            with self.subTest(page=page["name"]):
-                response = self.client.get(reverse(page["name"]))
-                cfg = self._map_config(response)
-                stored = MAP_CONFIGS[page["config_key"]]
-                overridden = set(page.get("overrides", {}))
-                skip = RENDER_TIME_RESOLVED_KEYS | runtime_keys | overridden
-                for key, value in stored.items():
-                    if key in skip:
-                        continue
-                    expected = _expected_rendered_config_value(
-                        key, value, cfg["renderDefaults"]
-                    )
-                    self.assertEqual(cfg.get(key), expected)
 
     # ---- selector / context -----------------------------------------------
 
@@ -5155,34 +5130,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
             r'[^>]*data-map-set="SE"'
             r"[^>]*selected",
         )
-
-    # ---- region scope / lock ----------------------------------------------
-
-    def test_region_query_overrides_apply_only_to_unlocked_pages(self):
-        """Locked pages ignore country/nuts_prefix/nuts_level query overrides;
-        unlocked pages honour them."""
-        for page in MAP_PAGES:
-            with self.subTest(page=page["name"]):
-                response = self.client.get(
-                    reverse(page["name"]),
-                    {
-                        "country": "XX",
-                        "nuts_prefix": "ZZZZ",
-                        "nuts_level": "2",
-                    },
-                )
-                self.assertEqual(response.status_code, 200)
-                cfg = self._map_config(response)
-                if page["lock"]:
-                    self.assertEqual(cfg["country"], page["country"])
-                    if page.get("nuts_prefix"):
-                        self.assertEqual(cfg["nutsPrefix"], page["nuts_prefix"])
-                    if page.get("nuts_level"):
-                        self.assertEqual(cfg["nutsLevel"], int(page["nuts_level"]))
-                else:
-                    self.assertEqual(cfg["country"], "XX")
-                    self.assertEqual(cfg["nutsPrefix"], "ZZZZ")
-                    self.assertEqual(cfg["nutsLevel"], 2)
 
     def test_runtime_scope_overrides_stored_scope_values(self):
         """For unlocked pages, query params override stored country/year/nuts."""
@@ -5370,21 +5317,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
             r'<details class="atlas-tree-region"[^>]*\bopen\b',
         )
 
-    # ---- change-map tests -------------------------------------------------
-
-    def test_change_maps_available_for_every_selector_theme(self):
-
-        for map_set, selection in WASTE_ATLAS_MAP_SELECTIONS.items():
-            for theme in selection["themes"]:
-                with self.subTest(map_set=map_set, theme=theme):
-                    response = self.client.get(
-                        reverse("waste-atlas-change-map", args=[map_set, theme])
-                    )
-                    self.assertEqual(response.status_code, 200)
-                    cfg = self._map_config(response)
-                    self.assertTrue(cfg["changeMode"])
-                    self.assertIn("dataUrl", cfg)
-
     def test_change_map_preserves_region_scope(self):
         response = self.client.get(
             reverse("waste-atlas-change-map", args=["IT-ST", "biowaste_frequency"])
@@ -5446,15 +5378,6 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, '<option value="2020"')
         self.assertContains(response, '<option value="2022"')
 
-    # ---- data conflicts overview tests ------------------------------------
-
-    def _login_staff(self):
-        self.client.force_login(
-            User.objects.create_user(
-                username="conflicts-staff", password="secret", is_staff=True
-            )
-        )
-
     def test_data_conflicts_overview_renders_for_staff(self):
         self._login_staff()
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
@@ -5479,7 +5402,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
 
     def test_data_conflicts_overview_denies_non_staff_users(self):
         non_atlas_user = User.objects.create_user(
-            username="non-atlas-user-conflicts", password="secret"
+            username="non-atlas-user-conflicts",
         )
         self.client.force_login(non_atlas_user)
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
@@ -5498,7 +5421,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
             reverse("waste-atlas-change-map", args=["DE", "collection_system"]),
         ]
         outsider = User.objects.create_user(
-            username="non-atlas-user", password="secret"
+            username="non-atlas-user",
         )
 
         for url in routes:
@@ -5531,9 +5454,7 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertNotContains(response, reverse("waste-atlas-change-map-overview"))
         self.assertNotContains(response, reverse("waste-atlas-data-conflicts-overview"))
 
-        staff = User.objects.create_user(
-            username="atlas-staff", password="secret", is_staff=True
-        )
+        staff = User.objects.create_user(username="atlas-staff", is_staff=True)
         self.client.force_login(staff)
 
         response = self.client.get(reverse("waste-atlas-overview"))
@@ -5665,6 +5586,134 @@ class WasteAtlasMapViewsTestCase(TestCase):
         self.assertContains(response, '<option value="2022"')
 
 
+class WasteAtlasMapPageSweepMixin:
+    """Render sweeps over a shard of the waste atlas page registry.
+
+    Rendering a map page costs roughly a second, so sweeping all of
+    ``MAP_PAGES`` in a single test case parks ~25 minutes of renders on
+    one parallel worker. These tests iterate a per-class shard of the
+    registry so the parallel test runner splits the work evenly.
+    """
+
+    shard_index = 0
+    shard_count = 4
+
+    @classmethod
+    def _sweep_pages(cls):
+        return MAP_PAGES[cls.shard_index :: cls.shard_count]
+
+    @classmethod
+    def _sweep_change_map_pairs(cls):
+        pairs = [
+            (map_set, theme)
+            for map_set, selection in WASTE_ATLAS_MAP_SELECTIONS.items()
+            for theme in selection["themes"]
+        ]
+        return pairs[cls.shard_index :: cls.shard_count]
+
+    # ---- registry / structural --------------------------------------------
+
+    def test_every_map_page_route_resolves(self):
+        """Every page registered in MAP_PAGES returns a 200 response."""
+        for page in self._sweep_pages():
+            with self.subTest(page=page["name"]):
+                response = self.client.get(reverse(page["name"]))
+                self.assertEqual(response.status_code, 200)
+
+    def test_every_map_page_renders_atlas_config_json(self):
+        """Every map page injects the atlas-config JSON script tag."""
+        for page in self._sweep_pages():
+            with self.subTest(page=page["name"]):
+                response = self.client.get(reverse(page["name"]))
+                self.assertIsNotNone(self._map_config(response))
+
+    def test_every_map_page_forwards_its_config_key_to_the_renderer(self):
+        """The rendered config matches MAP_CONFIGS for the page's config_key."""
+        # Keys the template tag replaces at render time: runtime scope,
+        # page-level overrides, and DB-editable legend keys.
+        runtime_keys = {"country", "year", "nutsPrefix", "nutsLevel"}
+        for page in self._sweep_pages():
+            with self.subTest(page=page["name"]):
+                response = self.client.get(reverse(page["name"]))
+                cfg = self._map_config(response)
+                stored = MAP_CONFIGS[page["config_key"]]
+                overridden = set(page.get("overrides", {}))
+                skip = RENDER_TIME_RESOLVED_KEYS | runtime_keys | overridden
+                for key, value in stored.items():
+                    if key in skip:
+                        continue
+                    expected = _expected_rendered_config_value(
+                        key, value, cfg["renderDefaults"]
+                    )
+                    self.assertEqual(cfg.get(key), expected)
+
+    # ---- region scope / lock ----------------------------------------------
+
+    def test_region_query_overrides_apply_only_to_unlocked_pages(self):
+        """Locked pages ignore country/nuts_prefix/nuts_level query overrides;
+        unlocked pages honour them."""
+        for page in self._sweep_pages():
+            with self.subTest(page=page["name"]):
+                response = self.client.get(
+                    reverse(page["name"]),
+                    {
+                        "country": "XX",
+                        "nuts_prefix": "ZZZZ",
+                        "nuts_level": "2",
+                    },
+                )
+                self.assertEqual(response.status_code, 200)
+                cfg = self._map_config(response)
+                if page["lock"]:
+                    self.assertEqual(cfg["country"], page["country"])
+                    if page.get("nuts_prefix"):
+                        self.assertEqual(cfg["nutsPrefix"], page["nuts_prefix"])
+                    if page.get("nuts_level"):
+                        self.assertEqual(cfg["nutsLevel"], int(page["nuts_level"]))
+                else:
+                    self.assertEqual(cfg["country"], "XX")
+                    self.assertEqual(cfg["nutsPrefix"], "ZZZZ")
+                    self.assertEqual(cfg["nutsLevel"], 2)
+
+    # ---- change-map tests -------------------------------------------------
+
+    def test_change_maps_available_for_every_selector_theme(self):
+
+        for map_set, theme in self._sweep_change_map_pairs():
+            with self.subTest(map_set=map_set, theme=theme):
+                response = self.client.get(
+                    reverse("waste-atlas-change-map", args=[map_set, theme])
+                )
+                self.assertEqual(response.status_code, 200)
+                cfg = self._map_config(response)
+                self.assertTrue(cfg["changeMode"])
+                self.assertIn("dataUrl", cfg)
+
+
+class WasteAtlasMapPageSweep0Tests(
+    WasteAtlasMapPageSweepMixin, WasteAtlasMapViewTestBase
+):
+    shard_index = 0
+
+
+class WasteAtlasMapPageSweep1Tests(
+    WasteAtlasMapPageSweepMixin, WasteAtlasMapViewTestBase
+):
+    shard_index = 1
+
+
+class WasteAtlasMapPageSweep2Tests(
+    WasteAtlasMapPageSweepMixin, WasteAtlasMapViewTestBase
+):
+    shard_index = 2
+
+
+class WasteAtlasMapPageSweep3Tests(
+    WasteAtlasMapPageSweepMixin, WasteAtlasMapViewTestBase
+):
+    shard_index = 3
+
+
 class GenericMapTemplateTests(TestCase):
     """The generic map template renders any stored configuration as JSON.
 
@@ -5683,7 +5732,7 @@ class GenericMapTemplateTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
-            username="generic-atlas-user", password="secret"
+            username="generic-atlas-user",
         )
 
     def _render_generic(self, config_key, query=None):
@@ -5883,13 +5932,15 @@ class CollectionCascadeMixinTestCase(TestCase):
 
         # Create users
         cls.owner = User.objects.create_user(
-            username="owner", email="owner@test.com", password="pass"
+            username="owner",
+            email="owner@test.com",
         )
         cls.other_owner = User.objects.create_user(
-            username="other", email="other@test.com", password="pass"
+            username="other",
+            email="other@test.com",
         )
         cls.staff = User.objects.create_user(
-            username="staff", email="staff@test.com", password="pass", is_staff=True
+            username="staff", email="staff@test.com", is_staff=True
         )
 
         # Create base data
@@ -6263,9 +6314,10 @@ class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
 class ReviewSubmissionConsistencyTests(TestCase):
     """Regression tests ensuring review-submission timestamps remain consistent."""
 
-    def setUp(self):
-        self.owner = User.objects.create_user(username="owner")
-        self.moderator = User.objects.create_user(username="moderator", is_staff=True)
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner")
+        cls.moderator = User.objects.create_user(username="moderator", is_staff=True)
 
         content_type = ContentType.objects.get_for_model(Collection)
         permission, _ = Permission.objects.get_or_create(
@@ -6273,20 +6325,20 @@ class ReviewSubmissionConsistencyTests(TestCase):
             content_type=content_type,
             defaults={"name": "Can moderate collections"},
         )
-        self.moderator.user_permissions.add(permission)
+        cls.moderator.user_permissions.add(permission)
 
-        self.collection = Collection.objects.create(
+        cls.collection = Collection.objects.create(
             name="Test Collection",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status=Collection.STATUS_PRIVATE,
         )
-        self.source = Source.objects.create(
-            owner=self.owner,
+        cls.source = Source.objects.create(
+            owner=cls.owner,
             title="Review submission source",
             abbreviation="ReviewSubmissionSource",
             url="https://example.com/review-submission-source",
         )
-        self.collection.sources.add(self.source)
+        cls.collection.sources.add(cls.source)
 
     def test_initial_submission_consistency(self):
         self.client.force_login(self.owner)

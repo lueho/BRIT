@@ -16,10 +16,11 @@ from ..models import ReviewAction, UserCreatedObject
 class ReviewWorkflowModelTests(TestCase):
     """Test the model methods for the review workflow."""
 
-    def setUp(self):
-        self.owner = User.objects.create_user(username="owner")
-        self.moderator = User.objects.create_user(username="moderator")
-        self.regular_user = User.objects.create_user(username="regular")
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner")
+        cls.moderator = User.objects.create_user(username="moderator")
+        cls.regular_user = User.objects.create_user(username="regular")
 
         # Add moderator permissions
         content_type = ContentType.objects.get_for_model(Collection)
@@ -28,23 +29,27 @@ class ReviewWorkflowModelTests(TestCase):
             content_type=content_type,
             defaults={"name": "Can moderate collections"},
         )
-        self.moderator.user_permissions.add(permission)
+        cls.moderator.user_permissions.add(permission)
 
         # Create a test collection
-        self.category = WasteCategory.objects.create(
+        cls.category = WasteCategory.objects.create(
             name="Test Category",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status=UserCreatedObject.STATUS_PRIVATE,
         )
 
+        cls.source = Source.objects.create(
+            owner=cls.owner,
+            title="Review Workflow Model Source",
+        )
+
+    def setUp(self):
+        # The collection's review state is the mutation under test, so it is
+        # created per test instead of shared via setUpTestData.
         self.collection = Collection.objects.create(
             name="Test Collection",
             owner=self.owner,
             publication_status=UserCreatedObject.STATUS_PRIVATE,
-        )
-        self.source = Source.objects.create(
-            owner=self.owner,
-            title="Review Workflow Model Source",
         )
         self.collection.sources.add(self.source)
 
@@ -362,8 +367,9 @@ class ReviewWorkflowModelTests(TestCase):
 
 
 class BreadcrumbLabelModelTests(TestCase):
-    def setUp(self):
-        self.owner = User.objects.create_user(username="breadcrumb-model-owner")
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="breadcrumb-model-owner")
 
     def test_plural_breadcrumb_label_uses_model_metadata(self):
         self.assertEqual(Property.get_breadcrumb_plural_label(), "properties")

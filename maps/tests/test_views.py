@@ -66,7 +66,8 @@ class DummyMapView(MapMixin, DummyBaseView):
 
 
 class MapMixinTestCase(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         default_layer_style = MapLayerStyle.objects.create(
             color="#000000",
             weight=1,
@@ -89,14 +90,14 @@ class MapMixinTestCase(TestCase):
                     style=default_layer_style,
                 )
             )
-        self.map_config = MapConfiguration.objects.create(
+        cls.map_config = MapConfiguration.objects.create(
             name="Test Map Configuration",
             adjust_bounds_to_layer="features",
             load_features_layer_summary=True,
         )
-        self.map_config.layers.set(layers)
-        self.factory = RequestFactory()
-        self.view = DummyMapView()
+        cls.map_config.layers.set(layers)
+        cls.factory = RequestFactory()
+        cls.view = DummyMapView()
 
     def mock_reverse_side_effect(name, *args, **kwargs):
         if "-detail" in name:
@@ -1738,12 +1739,10 @@ class NutsRegionAutocompleteFilterParsingTestCase(ViewWithPermissionsTestCase):
 
 
 class ClearGeojsonCacheViewTest(TestCase):
-    def setUp(self):
-        self.staff_user = User.objects.create_user(username="staff")
-        self.staff_user.is_staff = True
-        self.staff_user.save()
-
-        self.non_staff_user = User.objects.create_user(username="nonstaff")
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
+        cls.non_staff_user = User.objects.create_user(username="nonstaff")
 
     @patch("maps.views.clear_geojson_cache_pattern")
     def test_clear_geojson_cache_as_staff(self, mock_clear):
@@ -2133,16 +2132,19 @@ class GeoJSONCachingTests(TestCase):
 
 @serial_test
 class LargeGeometryMemoryTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region(name="Large geometry")
+        cls.region.geom = MultiPolygon(
+            Polygon(((0, 0), (1, 0), (1, 1), (0, 1), (0, 0)))
+        )
+        cls.region.save()
+        cls.url = reverse("api-region-geojson")
+
     def setUp(self):
         self.cache = caches[settings.GEOJSON_CACHE]
         self.cache.clear()
         self.addCleanup(self.cache.clear)
-        self.region = Region(name="Large geometry")
-        self.region.geom = MultiPolygon(
-            Polygon(((0, 0), (1, 0), (1, 1), (0, 1), (0, 0)))
-        )
-        self.region.save()
-        self.url = reverse("api-region-geojson")
 
     def test_single_complex_geometry_streams_without_loading_geos_objects(self):
         with (
