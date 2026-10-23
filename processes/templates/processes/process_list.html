@@ -39,7 +39,7 @@
 {% endblock list_card_header %}
 
 {% block list_primary_actions %}
-    {% if create_permission in perms or user.is_staff %}
+    {% if create_permission in perms %}
         <a class="btn btn-primary btn-sm"
            href="{% url 'processes:process-create' %}">
             <i class="fas fa-plus"></i> Add process
@@ -81,9 +81,6 @@
 {% endblock scope_toggle %}
 
 {% block list_table %}
-    {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
-        {% include "object_management/bulk_access_toolbar.html" %}
-    {% endif %}
     <div class="collection-list-min-height">
         <div class="table-responsive">
             <table class="table modern-table">
@@ -137,7 +134,7 @@
                                         </div>
                                         {% if not user.is_authenticated %}
                                             <div class="small mb-2">Log in to create new processes.</div>
-                                        {% elif create_permission in perms or user.is_staff %}
+                                        {% elif create_permission in perms %}
                                             <div class="small mb-2">Create your first process to get started.</div>
                                         {% endif %}
                                         {% if user|can_moderate:object_list.model %}
@@ -147,7 +144,7 @@
                                 </tr>
                             {% elif not user.is_authenticated %}
                                 {% include "includes/list_empty_state.html" with hint="Log in to create new processes." %}
-                            {% elif create_permission in perms or user.is_staff %}
+                            {% elif create_permission in perms %}
                                 {% include "includes/list_empty_state.html" with hint="Create your first process to get started." %}
                             {% else %}
                                 {% include "includes/list_empty_state.html" %}
@@ -171,7 +168,15 @@
 {% endblock list_table %}
 
 {% block options_tab_button %}
+    {% if list_type == 'private' %}{{ block.super }}{% endif %}
 {% endblock options_tab_button %}
 
 {% block options_tab_pane %}
+    {% if list_type == 'private' %}{{ block.super }}{% endif %}
 {% endblock options_tab_pane %}
+
+{% block options_pane_body %}
+    {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
+        {% include "object_management/bulk_access_toolbar.html" with heading="Manage access for selected items" %}
+    {% endif %}
+{% endblock options_pane_body %}

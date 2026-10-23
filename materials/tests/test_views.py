@@ -5,6 +5,7 @@ from unittest.mock import patch
 from urllib.parse import quote
 from uuid import uuid4
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
@@ -17,7 +18,7 @@ from django.utils import timezone
 from django.utils.html import escape
 from factory.django import mute_signals
 
-from bibliography.models import Source
+from bibliography.models import Author, Source
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import Location, Region
 from utils.object_management.models import (
@@ -40,8 +41,10 @@ from ..models import (
     MaterialProperty,
     MaterialPropertyGroup,
     MaterialPropertyValue,
+    MeasurementLimitType,
     MeasurementValueQualifier,
     Sample,
+    SampleAuthor,
     SampleExternalRecord,
     SampleGroup,
     SampleSeries,
@@ -53,7 +56,7 @@ from ..views import DETAIL_RELATED_LIMIT, SampleSubstrateMaterialQuickCreateView
 User = get_user_model()
 
 
-class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
+class MaterialExplorerViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "change_material"
 
     def test_get_http_200_ok_for_anonymous(self):
@@ -347,430 +350,217 @@ class AnalyticalMethodReviewCascadeTest(TestCase):
             cls.published_source,
         )
 
-    def test_submit_cascades_to_all_sources(self):
-        """Submit for review cascades to all linked private/declined sources."""
+    def _make_method(self, name, status="private"):
+        return AnalyticalMethod.objects.create(
+            owner=self.owner, name=name, publication_status=status
+        )
+
+    def _make_source(
+        self, owner=None, status="private", abbreviation="S-X", title="Source"
+    ):
+        return Source.objects.create(
+            owner=owner or self.owner,
+            abbreviation=abbreviation,
+            title=title,
+            publication_status=status,
+        )
+
+    def _set_statuses(self, sources, status):
+        Source.objects.filter(pk__in=[source.pk for source in sources]).update(
+            publication_status=status
+        )
+
+    def _run_action(self, obj, action_attr_name, hook_status):
+        """Run a review action's cascade hook the way the view layer does."""
         request = self.factory.post("/")
         request.user = self.owner
-
         view = SubmitForReviewView()
         view.request = request
-        view.object = self.analytical_method
-        view.action_attr_name = "submit_for_review"
+        view.object = obj
+        view.action_attr_name = action_attr_name
+        view.post_action_hook(request, hook_status)
 
-        view.post_action_hook(request, "private")
+    def _assert_statuses(self, expected):
+        """Refresh each source and assert its publication status."""
+        for source, status in expected.items():
+            source.refresh_from_db()
+            self.assertEqual(
+                source.publication_status,
+                status,
+                f"{source.abbreviation}: expected status '{status}'",
+            )
 
-        self.owner_source.refresh_from_db()
-        self.owner_declined_source.refresh_from_db()
-        self.other_source.refresh_from_db()
-        self.published_source.refresh_from_db()
+    def test_submit_cascades_to_all_sources(self):
+        """Submit for review cascades to all linked private/declined sources."""
+        self._run_action(self.analytical_method, "submit_for_review", "private")
 
-        self.assertEqual(self.owner_source.publication_status, "review")
-        self.assertEqual(self.owner_declined_source.publication_status, "review")
-        self.assertEqual(self.other_source.publication_status, "review")
-        self.assertEqual(self.published_source.publication_status, "published")
+        self._assert_statuses(
+            {
+                self.owner_source: "review",
+                self.owner_declined_source: "review",
+                self.other_source: "review",
+                self.published_source: "published",
+            }
+        )
 
     def test_withdraw_cascades_to_sources_in_review(self):
         """Withdraw cascades to all linked sources in review."""
-        Source.objects.filter(
-            pk__in=[
-                self.owner_source.pk,
-                self.owner_declined_source.pk,
-                self.other_source.pk,
-            ]
-        ).update(publication_status="review")
+        self._set_statuses(
+            [self.owner_source, self.owner_declined_source, self.other_source],
+            "review",
+        )
 
-        request = self.factory.post("/")
-        request.user = self.owner
+        self._run_action(self.analytical_method, "withdraw_from_review", "review")
 
-        view = SubmitForReviewView()
-        view.request = request
-        view.object = self.analytical_method
-        view.action_attr_name = "withdraw_from_review"
-
-        view.post_action_hook(request, "review")
-
-        self.owner_source.refresh_from_db()
-        self.owner_declined_source.refresh_from_db()
-        self.other_source.refresh_from_db()
-        self.published_source.refresh_from_db()
-
-        self.assertEqual(self.owner_source.publication_status, "private")
-        self.assertEqual(self.owner_declined_source.publication_status, "private")
-        self.assertEqual(self.other_source.publication_status, "private")
-        self.assertEqual(self.published_source.publication_status, "published")
+        self._assert_statuses(
+            {
+                self.owner_source: "private",
+                self.owner_declined_source: "private",
+                self.other_source: "private",
+                self.published_source: "published",
+            }
+        )
 
     def test_approve_cascades_to_sources_in_review(self):
         """Approve cascades to all linked sources in review."""
-        Source.objects.filter(
-            pk__in=[
-                self.owner_source.pk,
-                self.owner_declined_source.pk,
-                self.other_source.pk,
-            ]
-        ).update(publication_status="review")
+        self._set_statuses(
+            [self.owner_source, self.owner_declined_source, self.other_source],
+            "review",
+        )
 
-        request = self.factory.post("/")
-        request.user = self.owner
+        self._run_action(self.analytical_method, "approve", "review")
 
-        view = SubmitForReviewView()
-        view.request = request
-        view.object = self.analytical_method
-        view.action_attr_name = "approve"
-
-        view.post_action_hook(request, "review")
-
-        self.owner_source.refresh_from_db()
-        self.owner_declined_source.refresh_from_db()
-        self.other_source.refresh_from_db()
-        self.published_source.refresh_from_db()
-
-        self.assertEqual(self.owner_source.publication_status, "published")
-        self.assertEqual(self.owner_declined_source.publication_status, "published")
-        self.assertEqual(self.other_source.publication_status, "published")
-        self.assertEqual(self.owner_source.approved_by, self.owner)
-        self.assertEqual(self.owner_declined_source.approved_by, self.owner)
-        self.assertEqual(self.other_source.approved_by, self.owner)
-        self.assertEqual(self.published_source.publication_status, "published")
+        self._assert_statuses(
+            {
+                self.owner_source: "published",
+                self.owner_declined_source: "published",
+                self.other_source: "published",
+                self.published_source: "published",
+            }
+        )
+        for source in (
+            self.owner_source,
+            self.owner_declined_source,
+            self.other_source,
+        ):
+            self.assertEqual(source.approved_by, self.owner)
 
     def test_reject_cascades_to_sources_in_review(self):
         """Reject cascades to all linked sources in review."""
-        Source.objects.filter(
-            pk__in=[
-                self.owner_source.pk,
-                self.owner_declined_source.pk,
-                self.other_source.pk,
-            ]
-        ).update(publication_status="review")
+        self._set_statuses(
+            [self.owner_source, self.owner_declined_source, self.other_source],
+            "review",
+        )
 
-        request = self.factory.post("/")
-        request.user = self.owner
+        self._run_action(self.analytical_method, "reject", "review")
 
-        view = SubmitForReviewView()
-        view.request = request
-        view.object = self.analytical_method
-        view.action_attr_name = "reject"
-
-        view.post_action_hook(request, "review")
-
-        self.owner_source.refresh_from_db()
-        self.owner_declined_source.refresh_from_db()
-        self.other_source.refresh_from_db()
-        self.published_source.refresh_from_db()
-
-        self.assertEqual(self.owner_source.publication_status, "declined")
-        self.assertEqual(self.owner_declined_source.publication_status, "declined")
-        self.assertEqual(self.other_source.publication_status, "declined")
-        self.assertEqual(self.published_source.publication_status, "published")
+        self._assert_statuses(
+            {
+                self.owner_source: "declined",
+                self.owner_declined_source: "declined",
+                self.other_source: "declined",
+                self.published_source: "published",
+            }
+        )
 
     def test_submit_with_no_sources(self):
         """Submit cascade is a no-op when no sources are linked."""
-        method = AnalyticalMethod.objects.create(
-            owner=self.owner,
-            name="Method Empty",
-            publication_status="private",
-        )
-        request = self.factory.post("/")
-        request.user = self.owner
+        method = self._make_method("Method Empty")
 
-        view = SubmitForReviewView()
-        view.request = request
-        view.object = method
-        view.action_attr_name = "submit_for_review"
-
-        view.post_action_hook(request, "private")
+        self._run_action(method, "submit_for_review", "private")
 
         self.assertEqual(method.sources.count(), 0)
 
     def test_submit_ignores_review_archived_and_unlinked_sources(self):
         """Submit cascade only affects linked private/declined sources."""
-        method = AnalyticalMethod.objects.create(
-            owner=self.owner,
-            name="Method Extra",
-            publication_status="private",
-        )
-        private_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-PRIV",
-            title="Private Source",
-            publication_status="private",
-        )
-        declined_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-DEC2",
-            title="Declined Source",
-            publication_status="declined",
-        )
-        review_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-REV2",
-            title="Review Source",
-            publication_status="review",
-        )
-        archived_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-ARCH",
-            title="Archived Source",
-            publication_status="archived",
-        )
-        unlinked_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-UNLINK",
-            title="Unlinked Source",
-            publication_status="private",
+        method = self._make_method("Method Extra")
+        linked = {
+            "private": self._make_source(abbreviation="S-PRIV", title="Private Source"),
+            "declined": self._make_source(
+                status="declined", abbreviation="S-DEC2", title="Declined Source"
+            ),
+            "review": self._make_source(
+                status="review", abbreviation="S-REV2", title="Review Source"
+            ),
+            "archived": self._make_source(
+                status="archived", abbreviation="S-ARCH", title="Archived Source"
+            ),
+        }
+        unlinked = self._make_source(abbreviation="S-UNLINK", title="Unlinked Source")
+        method.sources.add(*linked.values())
+
+        self._run_action(method, "submit_for_review", "private")
+
+        self._assert_statuses(
+            {
+                linked["private"]: "review",
+                linked["declined"]: "review",
+                linked["review"]: "review",
+                linked["archived"]: "archived",
+                unlinked: "private",
+            }
         )
 
-        method.sources.add(
-            private_source,
-            declined_source,
-            review_source,
-            archived_source,
+    def _method_with_mixed_sources(self, name):
+        """A method in review linked to sources in every publication status."""
+        method = self._make_method(name, status="review")
+        sources = {
+            "review": self._make_source(
+                status="review", abbreviation="S-REV", title="Review Source"
+            ),
+            "collaborator_review": self._make_source(
+                owner=self.other_owner,
+                status="review",
+                abbreviation="S-REV-C",
+                title="Collaborator Review",
+            ),
+            "private": self._make_source(
+                abbreviation="S-PRIV2", title="Private Source"
+            ),
+            "declined": self._make_source(
+                status="declined", abbreviation="S-DEC3", title="Declined Source"
+            ),
+            "published": self._make_source(
+                status="published", abbreviation="S-PUB2", title="Published Source"
+            ),
+            "archived": self._make_source(
+                status="archived", abbreviation="S-ARCH2", title="Archived Source"
+            ),
+        }
+        method.sources.add(*sources.values())
+        return method, sources
+
+    def _assert_non_review_sources_unchanged(self, action, expected_review_status):
+        """Run ``action`` and assert only sources in review change status."""
+        method, sources = self._method_with_mixed_sources(f"Method {action}")
+
+        self._run_action(method, action, "review")
+
+        self._assert_statuses(
+            {
+                sources["review"]: expected_review_status,
+                sources["collaborator_review"]: expected_review_status,
+                sources["private"]: "private",
+                sources["declined"]: "declined",
+                sources["published"]: "published",
+                sources["archived"]: "archived",
+            }
         )
-
-        request = self.factory.post("/")
-        request.user = self.owner
-
-        view = SubmitForReviewView()
-        view.request = request
-        view.object = method
-        view.action_attr_name = "submit_for_review"
-
-        view.post_action_hook(request, "private")
-
-        private_source.refresh_from_db()
-        declined_source.refresh_from_db()
-        review_source.refresh_from_db()
-        archived_source.refresh_from_db()
-        unlinked_source.refresh_from_db()
-
-        self.assertEqual(private_source.publication_status, "review")
-        self.assertEqual(declined_source.publication_status, "review")
-        self.assertEqual(review_source.publication_status, "review")
-        self.assertEqual(archived_source.publication_status, "archived")
-        self.assertEqual(unlinked_source.publication_status, "private")
+        return sources
 
     def test_withdraw_leaves_non_review_sources_unchanged(self):
         """Withdraw cascade only affects linked sources in review."""
-        method = AnalyticalMethod.objects.create(
-            owner=self.owner,
-            name="Method Withdraw",
-            publication_status="review",
-        )
-        review_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-REV3",
-            title="Review Source",
-            publication_status="review",
-        )
-        private_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-PRIV2",
-            title="Private Source",
-            publication_status="private",
-        )
-        declined_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-DEC3",
-            title="Declined Source",
-            publication_status="declined",
-        )
-        published_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-PUB2",
-            title="Published Source",
-            publication_status="published",
-        )
-        archived_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-ARCH2",
-            title="Archived Source",
-            publication_status="archived",
-        )
-
-        method.sources.add(
-            review_source,
-            private_source,
-            declined_source,
-            published_source,
-            archived_source,
-        )
-
-        request = self.factory.post("/")
-        request.user = self.owner
-
-        view = SubmitForReviewView()
-        view.request = request
-        view.object = method
-        view.action_attr_name = "withdraw_from_review"
-
-        view.post_action_hook(request, "review")
-
-        review_source.refresh_from_db()
-        private_source.refresh_from_db()
-        declined_source.refresh_from_db()
-        published_source.refresh_from_db()
-        archived_source.refresh_from_db()
-
-        self.assertEqual(review_source.publication_status, "private")
-        self.assertEqual(private_source.publication_status, "private")
-        self.assertEqual(declined_source.publication_status, "declined")
-        self.assertEqual(published_source.publication_status, "published")
-        self.assertEqual(archived_source.publication_status, "archived")
+        self._assert_non_review_sources_unchanged("withdraw_from_review", "private")
 
     def test_approve_leaves_non_review_sources_unchanged(self):
         """Approve cascade only affects linked sources in review."""
-        method = AnalyticalMethod.objects.create(
-            owner=self.owner,
-            name="Method Approve",
-            publication_status="review",
-        )
-        review_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-REV4",
-            title="Review Source",
-            publication_status="review",
-        )
-        collaborator_review = Source.objects.create(
-            owner=self.other_owner,
-            abbreviation="S-REV5",
-            title="Collaborator Review",
-            publication_status="review",
-        )
-        private_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-PRIV3",
-            title="Private Source",
-            publication_status="private",
-        )
-        declined_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-DEC4",
-            title="Declined Source",
-            publication_status="declined",
-        )
-        published_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-PUB3",
-            title="Published Source",
-            publication_status="published",
-        )
-        archived_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-ARCH3",
-            title="Archived Source",
-            publication_status="archived",
-        )
-
-        method.sources.add(
-            review_source,
-            collaborator_review,
-            private_source,
-            declined_source,
-            published_source,
-            archived_source,
-        )
-
-        request = self.factory.post("/")
-        request.user = self.owner
-
-        view = SubmitForReviewView()
-        view.request = request
-        view.object = method
-        view.action_attr_name = "approve"
-
-        view.post_action_hook(request, "review")
-
-        review_source.refresh_from_db()
-        collaborator_review.refresh_from_db()
-        private_source.refresh_from_db()
-        declined_source.refresh_from_db()
-        published_source.refresh_from_db()
-        archived_source.refresh_from_db()
-
-        self.assertEqual(review_source.publication_status, "published")
-        self.assertEqual(collaborator_review.publication_status, "published")
-        self.assertEqual(review_source.approved_by, self.owner)
-        self.assertEqual(collaborator_review.approved_by, self.owner)
-        self.assertEqual(private_source.publication_status, "private")
-        self.assertEqual(declined_source.publication_status, "declined")
-        self.assertEqual(published_source.publication_status, "published")
-        self.assertEqual(archived_source.publication_status, "archived")
+        sources = self._assert_non_review_sources_unchanged("approve", "published")
+        self.assertEqual(sources["review"].approved_by, self.owner)
+        self.assertEqual(sources["collaborator_review"].approved_by, self.owner)
 
     def test_reject_leaves_non_review_sources_unchanged(self):
         """Reject cascade only affects linked sources in review."""
-        method = AnalyticalMethod.objects.create(
-            owner=self.owner,
-            name="Method Reject",
-            publication_status="review",
-        )
-        review_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-REV6",
-            title="Review Source",
-            publication_status="review",
-        )
-        collaborator_review = Source.objects.create(
-            owner=self.other_owner,
-            abbreviation="S-REV7",
-            title="Collaborator Review",
-            publication_status="review",
-        )
-        private_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-PRIV4",
-            title="Private Source",
-            publication_status="private",
-        )
-        declined_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-DEC5",
-            title="Declined Source",
-            publication_status="declined",
-        )
-        published_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-PUB4",
-            title="Published Source",
-            publication_status="published",
-        )
-        archived_source = Source.objects.create(
-            owner=self.owner,
-            abbreviation="S-ARCH4",
-            title="Archived Source",
-            publication_status="archived",
-        )
-
-        method.sources.add(
-            review_source,
-            collaborator_review,
-            private_source,
-            declined_source,
-            published_source,
-            archived_source,
-        )
-
-        request = self.factory.post("/")
-        request.user = self.owner
-
-        view = SubmitForReviewView()
-        view.request = request
-        view.object = method
-        view.action_attr_name = "reject"
-
-        view.post_action_hook(request, "review")
-
-        review_source.refresh_from_db()
-        collaborator_review.refresh_from_db()
-        private_source.refresh_from_db()
-        declined_source.refresh_from_db()
-        published_source.refresh_from_db()
-        archived_source.refresh_from_db()
-
-        self.assertEqual(review_source.publication_status, "declined")
-        self.assertEqual(collaborator_review.publication_status, "declined")
-        self.assertEqual(private_source.publication_status, "private")
-        self.assertEqual(declined_source.publication_status, "declined")
-        self.assertEqual(published_source.publication_status, "published")
-        self.assertEqual(archived_source.publication_status, "archived")
+        self._assert_non_review_sources_unchanged("reject", "declined")
 
 
 # ----------- Material Category CRUD -----------------------------------------------------------------------------------
@@ -787,7 +577,7 @@ class MaterialCategoryCRUDViewsTestCase(
 
     model = MaterialCategory
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialcategory-create"
     view_modal_create_name = "materialcategory-create-modal"
     view_published_list_name = "materialcategory-list"
@@ -814,7 +604,7 @@ class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
 
     model = Material
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "material-create"
     view_modal_create_name = "material-create-modal"
     view_published_list_name = "material-list"
@@ -851,7 +641,7 @@ class MaterialComponentCRUDViewsTestCase(
 
     model = MaterialComponent
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialcomponent-create"
     view_modal_create_name = "materialcomponent-create-modal"
     view_published_list_name = "materialcomponent-list"
@@ -888,7 +678,7 @@ class MaterialComponentGroupCRUDViewsTestCase(
 
     model = MaterialComponentGroup
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialcomponentgroup-create"
     view_modal_create_name = "materialcomponentgroup-create-modal"
     view_published_list_name = "materialcomponentgroup-list"
@@ -925,7 +715,7 @@ class MaterialPropertyCRUDViewsTestCase(
 
     model = MaterialProperty
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "materialproperty-create"
     view_modal_create_name = "materialproperty-create-modal"
     view_published_list_name = "materialproperty-list"
@@ -1989,7 +1779,7 @@ class AnalyticalMethodCRUDViewsTestCase(
 
     model = AnalyticalMethod
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "analyticalmethod-create"
     view_published_list_name = "analyticalmethod-list"
     view_private_list_name = "analyticalmethod-list-owned"
@@ -2120,7 +1910,7 @@ class SampleSeriesCRUDViewsTestCase(
 
     model = SampleSeries
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "sampleseries-create"
     view_modal_create_name = "sampleseries-create-modal"
     view_published_list_name = "sampleseries-list"
@@ -3007,7 +2797,7 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
     model = Sample
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "sample-create"
     view_modal_create_name = "sample-create-modal"
     view_published_list_name = "sample-list"
@@ -3237,8 +3027,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="published"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3256,8 +3046,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="published"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3275,8 +3065,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="private"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3294,8 +3084,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             self.get_list_url(publication_status="private"), follow=True
         )
         self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
+        if self.explorer_view:
+            self.assertContains(response, self.get_explorer_url())
         if self.create_view:
             self.assertContains(
                 response, self.get_create_url()
@@ -3398,6 +3188,7 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertContains(response, 'data-workspace-section="sampling"')
         self.assertContains(response, 'data-workspace-section="analysis"')
         self.assertContains(response, 'data-workspace-section="sources"')
+        self.assertContains(response, 'data-workspace-section="contributors"')
         self.assertNotContains(response, "TOTAL_FORMS")
 
     def test_edit_workspace_not_offered_to_non_owner_of_private_sample(self):
@@ -3521,6 +3312,78 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertFalse(response.json()["saved"])
         self.assertIn("series", response.json()["html"])
 
+    def test_contributors_section_adds_ordered_authors(self):
+        author = Author.objects.create(
+            first_names="Ada",
+            last_names="Example",
+            owner=self.owner,
+            publication_status="published",
+        )
+        response = self.client.post(
+            self.section_url("contributors"),
+            {
+                "sample_authors-TOTAL_FORMS": "1",
+                "sample_authors-INITIAL_FORMS": "0",
+                "sample_authors-0-author": str(author.pk),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        link = self.sample.sample_authors.get()
+        self.assertEqual(link.author, author)
+        self.assertEqual(link.position, 1)
+
+    def test_contributors_summary_hides_authors_not_visible_to_editor(self):
+        secret = Author.objects.create(
+            last_names="Secretauthor",
+            contact_email="secret-summary-author@example.com",
+            owner=self.other,
+        )
+        SampleAuthor.objects.create(sample=self.sample, author=secret, position=1)
+        author = Author.objects.create(
+            last_names="Visibleauthor", owner=self.owner, publication_status="published"
+        )
+        response = self.client.post(
+            self.section_url("contributors"),
+            {
+                "sample_authors-TOTAL_FORMS": "1",
+                "sample_authors-INITIAL_FORMS": "0",
+                "sample_authors-0-author": str(author.pk),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        html = response.json()["html"]
+        self.assertIn("Visibleauthor", html)
+        self.assertNotIn("Secretauthor", html)
+        self.assertNotIn("secret-summary-author@example.com", html)
+
+        workspace = self.client.get(f"{self.sample.get_absolute_url()}?mode=edit")
+        self.assertNotContains(workspace, "Secretauthor")
+        self.assertNotContains(workspace, "secret-summary-author@example.com")
+        page = workspace.content.decode()
+        start = page.index('id="workspace-section-contributors"')
+        summary = page[start : page.index('id="workspace-editor-contributors"', start)]
+        self.assertIn("Visibleauthor", summary)
+        self.assertNotIn("No corresponding authors added yet", summary)
+
+    def test_contributors_reject_author_not_visible_to_editor(self):
+        locked = Author.objects.create(last_names="Locked", owner=self.other)
+        response = self.client.post(
+            self.section_url("contributors"),
+            {
+                "sample_authors-TOTAL_FORMS": "1",
+                "sample_authors-INITIAL_FORMS": "0",
+                "sample_authors-0-author": str(locked.pk),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(response.json()["saved"])
+        self.assertFalse(self.sample.sample_authors.exists())
+
     def test_unknown_section_returns_404(self):
         response = self.client.get(self.section_url("bogus"))
         self.assertEqual(response.status_code, 404)
@@ -3541,6 +3404,60 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.assertFalse(data["saved"])
         self.sample.refresh_from_db()
         self.assertEqual(self.sample.name, "Pilot sample")
+
+
+class SampleDetailAttributionTestCase(ViewWithPermissionsTestCase):
+    """Sample detail attribution: bibliography authors, not the owner."""
+
+    member_permissions = ["add_sample", "change_sample"]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.material = Material.objects.create(
+            owner=cls.owner,
+            name="Attribution material",
+            publication_status="published",
+        )
+        cls.sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Attributed sample",
+            material=cls.material,
+            standalone=True,
+            publication_status="published",
+        )
+        cls.author = Author.objects.create(
+            first_names="Saskia",
+            last_names="Hertel",
+            institution="HAW Hamburg",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        SampleAuthor.objects.create(sample=cls.sample, author=cls.author)
+        cls.url = reverse("sample-detail", kwargs={"pk": cls.sample.pk})
+
+    def test_detail_labels_contributors_as_corresponding_authors(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, "Corresponding authors")
+        self.assertContains(response, "Hertel, Saskia")
+        self.assertContains(response, "HAW Hamburg")
+
+    def test_detail_does_not_display_owner_prominently(self):
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "Editor</span>")
+        self.assertNotContains(response, "Contributed by")
+
+    def test_anonymous_does_not_see_private_author(self):
+        secret = Author.objects.create(
+            last_names="Secretauthor",
+            contact_email="secret-sample-author@example.com",
+            owner=self.outsider,
+        )
+        SampleAuthor.objects.create(sample=self.sample, author=secret)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secretauthor")
+        self.assertNotContains(response, "secret-sample-author@example.com")
 
 
 class SampleMeasurementWorkspaceTestCase(TestCase):
@@ -3915,6 +3832,162 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         self.assertEqual(value.property, self.property)
         self.assertEqual(value.owner, self.owner)
         self.assertEqual(value.average, Decimal("312.5"))
+
+    def test_properties_editor_offers_comment_field(self):
+        response = self.client.get(
+            self.section_url("properties"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("property_values-__prefix__-comment", response.json()["html"])
+
+    def test_measurements_editor_offers_limit_fields(self):
+        response = self.client.get(
+            self.section_url("measurements"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 200)
+        html = response.json()["html"]
+        for field in ("value_qualifier", "limit_type", "detection_limit"):
+            self.assertIn(f"component_measurements-__prefix__-{field}", html)
+
+    def test_measurements_post_saves_reporting_limit(self):
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        average="0.8",
+                        value_qualifier="less_than",
+                        limit_type="rl",
+                        detection_limit="0.8",
+                    )
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        measurement = self.sample.component_measurements.exclude(
+            pk=self.measurement.pk
+        ).get()
+        self.assertEqual(measurement.value_qualifier, "less_than")
+        self.assertEqual(measurement.limit_type, "rl")
+        self.assertEqual(measurement.detection_limit, Decimal("0.8"))
+        self.assertEqual(measurement.display_value, "<0.8")
+
+    def test_measurements_post_drops_stale_raw_limit_text(self):
+        measurement = ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=self.group,
+            component=self.component,
+            unit=self.unit,
+            average=Decimal("0.1"),
+            raw_value="(0,1)<LD=6,57",
+            value_qualifier=MeasurementValueQualifier.BELOW_DETECTION_LIMIT,
+            detection_limit=Decimal("6.57"),
+            raw_detection_limit="6,57",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(measurement.pk),
+                        average="0.8",
+                        value_qualifier="less_than",
+                        limit_type="rl",
+                        detection_limit="0.8",
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"], response.json())
+        measurement.refresh_from_db()
+        self.assertEqual(measurement.raw_value, "")
+        self.assertEqual(measurement.raw_detection_limit, "")
+        self.assertEqual(measurement.display_value, "<0.8")
+        self.assertEqual(measurement.display_detection_limit, "0.8")
+
+    def test_measurements_post_limit_type_change_drops_raw_limit_text(self):
+        measurement = ComponentMeasurement.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=self.group,
+            component=self.component,
+            unit=self.unit,
+            average=Decimal("0.1"),
+            value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            limit_type=MeasurementLimitType.LOD,
+            detection_limit=Decimal("6.57"),
+            raw_detection_limit="LD=6,57",
+        )
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(measurement.pk),
+                        average="0.1",
+                        value_qualifier="less_than",
+                        limit_type="rl",
+                        detection_limit="6.57",
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertTrue(response.json()["saved"], response.json())
+        measurement.refresh_from_db()
+        self.assertEqual(measurement.limit_type, "rl")
+        self.assertEqual(measurement.raw_detection_limit, "")
+        self.assertEqual(measurement.display_detection_limit, "6.57")
+
+    def test_properties_post_saves_limit_type(self):
+        response = self.client.post(
+            self.section_url("properties"),
+            self.property_formset(
+                [
+                    {
+                        "property": str(self.property.pk),
+                        "average": "0.5",
+                        "unit": str(self.unit.pk),
+                        "value_qualifier": "less_than",
+                        "limit_type": "loq",
+                        "detection_limit": "0.5",
+                    }
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        value = self.sample.property_values.get()
+        self.assertEqual(value.limit_type, "loq")
+        self.assertEqual(value.detection_limit, Decimal("0.5"))
+
+    def test_properties_post_saves_comment(self):
+        response = self.client.post(
+            self.section_url("properties"),
+            self.property_formset(
+                [
+                    {
+                        "property": str(self.property.pk),
+                        "average": "312.5",
+                        "unit": str(self.unit.pk),
+                        "comment": "calculated; C approximated as OM/1.8",
+                    }
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        value = self.sample.property_values.get()
+        self.assertEqual(value.comment, "calculated; C approximated as OM/1.8")
 
 
 # ----------- Sample utilities -----------------------------------------------------------------------------------------
@@ -4495,7 +4568,7 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
     model = Composition
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "composition-create"
     view_modal_create_name = "composition-create-modal"
     view_detail_name = "composition-detail"
@@ -5042,16 +5115,14 @@ class ComponentOrderDownViewTestCase(ViewWithPermissionsTestCase):
         cls.sample = Sample.objects.get(
             series=cls.series, timestep=Timestep.objects.default()
         )
-
-    def setUp(self):
-        self.composition = Composition.objects.create(
-            owner=self.member,
-            sample=self.sample,
-            group=self.component_group,
-            fractions_of=self.default_component,
+        cls.composition = Composition.objects.create(
+            owner=cls.member,
+            sample=cls.sample,
+            group=cls.component_group,
+            fractions_of=cls.default_component,
         )
-        self.component = MaterialComponent.objects.create(
-            owner=self.member, name="Test Component"
+        cls.component = MaterialComponent.objects.create(
+            owner=cls.member, name="Test Component"
         )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -5581,16 +5652,15 @@ class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
         )
 
 
-class EmptyStateViewsTestCase(TestCase):
-    """Test empty state messaging and CTAs across Materials views."""
+class SampleDetailPresentationMixin:
+    """Shared fixtures for the sample-detail and list-presentation tests."""
 
-    def setUp(self):
-        self.regular_user = User.objects.create_user(
-            username="regular", password="test123"
+    @classmethod
+    def setUpTestData(cls):
+        cls.regular_user = User.objects.create_user(
+            username="regular",
         )
-        self.staff_user = User.objects.create_user(
-            username="staff", password="test123", is_staff=True
-        )
+        cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
 
         content_types = {
             "material": ContentType.objects.get_for_model(Material),
@@ -5610,7 +5680,7 @@ class EmptyStateViewsTestCase(TestCase):
                 codename=f"add_{model_name}",
                 content_type=ct,
             )
-            self.staff_user.user_permissions.add(perm)
+            cls.staff_user.user_permissions.add(perm)
 
     def _create_unused_category(self):
         """Create a category guaranteed not to be assigned in this test."""
@@ -5619,6 +5689,10 @@ class EmptyStateViewsTestCase(TestCase):
             owner=self.staff_user,
             publication_status="published",
         )
+
+
+class EmptyStateViewsTestCase(SampleDetailPresentationMixin, TestCase):
+    """Test empty state messaging and CTAs across Materials views."""
 
     def test_material_list_empty_anonymous_shows_login_hint(self):
         category = self._create_unused_category()
@@ -5654,6 +5728,30 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "Reset filters")
         self.assertNotContains(response, "Create your first material")
         self.assertNotContains(response, "Log in to create")
+
+    def test_private_material_list_places_bulk_access_form_in_options_pane(self):
+        self.client.force_login(self.regular_user)
+        response = self.client.get(reverse("material-list-owned") + "?scope=private")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        pane_start = content.index('id="options-pane"')
+        self.assertIn('id="bulk-access-form"', content[pane_start:])
+        self.assertNotIn('id="bulk-access-form"', content[:pane_start])
+
+    def test_private_sample_list_hides_access_heading_with_toolbar(self):
+        self.client.force_login(self.regular_user)
+        response = self.client.get(reverse("sample-list-owned") + "?scope=private")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertNotIn('name="items"', content)
+        toolbar_start = content.index('id="bulk-access-toolbar"')
+        heading = content.index("Manage access for selected items")
+        form_start = content.index('id="bulk-access-form"')
+        self.assertLess(toolbar_start, heading)
+        self.assertLess(heading, form_start)
+        self.assertIn("getElementById('bulk-access-toolbar')", content)
 
     def test_material_review_list_renders_filter_context_for_staff(self):
         Material.objects.create(
@@ -5710,6 +5808,148 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No properties yet")
         self.assertContains(response, "Add the first property")
+
+    def test_sample_detail_empty_mass_measurements_anonymous(self):
+        sample = Sample.objects.create(
+            name="Massless Sample",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        sample.compositions.all().delete()
+
+        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No composition data yet")
+        self.assertContains(
+            response,
+            "Composition groups appear here once component measurements can be normalized",
+        )
+        self.assertNotContains(
+            response,
+            f"{reverse('componentmeasurement-create')}?sample={sample.pk}",
+        )
+
+    def test_sample_detail_empty_mass_measurements_owner_sees_cta_with_permission(self):
+        sample = Sample.objects.create(
+            name="Massless Sample",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.regular_user,
+            publication_status="private",
+        )
+        content_type = ContentType.objects.get_for_model(ComponentMeasurement)
+        permission, _ = Permission.objects.get_or_create(
+            codename="add_componentmeasurement",
+            content_type=content_type,
+            defaults={"name": "Can add component measurement"},
+        )
+        self.regular_user.user_permissions.add(permission)
+        sample.compositions.all().delete()
+
+        self.client.force_login(self.regular_user)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Add measurement")
+
+    def test_sample_detail_empty_compositions_owner_sees_manual_and_measurement_actions(
+        self,
+    ):
+        sample = Sample.objects.create(
+            name="Compositionless Sample",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.regular_user,
+            publication_status="private",
+        )
+        content_type = ContentType.objects.get_for_model(ComponentMeasurement)
+        permission, _ = Permission.objects.get_or_create(
+            codename="add_componentmeasurement",
+            content_type=content_type,
+            defaults={"name": "Can add component measurement"},
+        )
+        self.regular_user.user_permissions.add(permission)
+        composition_permission, _ = Permission.objects.get_or_create(
+            codename="add_composition",
+            content_type=ContentType.objects.get_for_model(Composition),
+            defaults={"name": "Can add composition"},
+        )
+        self.regular_user.user_permissions.add(composition_permission)
+        sample.compositions.all().delete()
+
+        self.client.force_login(self.regular_user)
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No composition data yet")
+        self.assertContains(
+            response,
+            "Composition groups appear here once component measurements can be normalized",
+        )
+        self.assertContains(response, "Add composition")
+        self.assertContains(response, "Add measurement")
+
+    def test_analytical_method_list_empty_anonymous(self):
+        response = self.client.get(
+            reverse("analyticalmethod-list") + "?scope=published&name=no-match-token"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No items match your current filters.")
+        self.assertContains(response, "Log in to create new analytical methods.")
+
+    def test_analytical_method_list_empty_staff_shows_create_cta(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.get(
+            reverse("analyticalmethod-list-owned")
+            + "?scope=private&name=no-match-token"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, "Create your first analytical method to get started."
+        )
+
+    def test_reset_filter_link_preserves_scope(self):
+        scopes = ["published", "private", "review"]
+        for scope in scopes:
+            with self.subTest(scope=scope):
+                self.client.force_login(self.staff_user)
+                url = reverse("material-list") + f"?scope={scope}"
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+
+                expected_reset_url = f"?scope={scope}"
+                self.assertContains(response, expected_reset_url)
+
+    def test_empty_state_with_existing_reset_behavior(self):
+        Material.objects.create(
+            name="Test Material",
+            type="material",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+
+        empty_category = self._create_unused_category()
+
+        self.client.force_login(self.staff_user)
+        response = self.client.get(
+            reverse("material-list") + f"?scope=published&category={empty_category.pk}"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No items match your current filters.")
+        self.assertContains(response, "Reset filters")
+
+        reset_url = reverse("material-list") + "?scope=published"
+        response = self.client.get(reset_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Test Material")
+
+
+class SampleDetailV2PresentationTestCase(SampleDetailPresentationMixin, TestCase):
+    """Sample detail v2 chrome: hero, rails, toolbar, anchor nav, actions, and metadata."""
 
     def test_sample_detail_shows_sample_identity_block_and_summary(self):
         sample = Sample.objects.create(
@@ -5852,7 +6092,9 @@ class EmptyStateViewsTestCase(TestCase):
                         self.assertNotContains(response, "2024-01-01")
 
     def _create_v2_owner_sample(self, name, status):
-        owner = User.objects.create_user(username=f"{name}-owner", password="test123")
+        owner = User.objects.create_user(
+            username=f"{name}-owner",
+        )
         return Sample.objects.create(
             name=name,
             material=Material.objects.create(name=f"{name} Material", type="material"),
@@ -6177,7 +6419,9 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "sdv2-properties")
 
     def test_v2_edit_mode_exposes_editorial_sections(self):
-        owner = User.objects.create_user(username="editorial-owner", password="test123")
+        owner = User.objects.create_user(
+            username="editorial-owner",
+        )
         change_perm, _ = Permission.objects.get_or_create(
             codename="change_sample",
             content_type=ContentType.objects.get_for_model(Sample),
@@ -6409,7 +6653,7 @@ class EmptyStateViewsTestCase(TestCase):
     def test_v2_superuser_can_add_data_to_published_sample(self):
         sample, _group = self._create_sample_with_composition_and_property()
         superuser = User.objects.create_superuser(
-            username="sample-superuser", password="test123"
+            username="sample-superuser",
         )
         self.client.force_login(superuser)
 
@@ -6439,6 +6683,7 @@ class EmptyStateViewsTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<td class="sdv2-num sdv2-edit-cell">')
         self.assertContains(
             response,
             reverse(
@@ -6601,7 +6846,9 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertNotContains(v2_response, "Classic view")
 
     def test_v2_rail_actions_dropdown_carries_secondary_editorial_actions(self):
-        owner = User.objects.create_user(username="dropdown-owner", password="test123")
+        owner = User.objects.create_user(
+            username="dropdown-owner",
+        )
         sample = Sample.objects.create(
             name="Dropdown Sample",
             material=Material.objects.create(name="Dropdown Material", type="material"),
@@ -6708,6 +6955,39 @@ class EmptyStateViewsTestCase(TestCase):
             publication_status="published",
         )
         return sample, group
+
+    def test_v2_properties_table_shows_property_value_comment(self):
+        sample, _group = self._create_sample_with_composition_and_property()
+        prop = sample.property_values.get()
+        prop.comment = "Calculated from dry-matter measurements"
+        prop.save()
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        properties_section = content[content.index('id="properties"') :]
+        properties_section = properties_section[: properties_section.index("</table>")]
+        self.assertIn('<th scope="col">Comments</th>', properties_section)
+        self.assertIn(
+            '<td class="sdv2-comment-cell">Calculated from dry-matter measurements</td>',
+            properties_section,
+        )
+
+    def test_v2_properties_table_shows_dash_for_empty_property_comment(self):
+        sample, _group = self._create_sample_with_composition_and_property()
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?experience=v2"
+        )
+
+        content = response.content.decode()
+        row = content[content.index('id="property-') :]
+        row = row[: row.index("</tr>")]
+        self.assertEqual(row.count("<td"), 6)
+        self.assertIn("<td>—</td>", row)
 
     def test_v2_anchor_nav_links_sections_for_all_users(self):
         sample, group = self._create_sample_with_composition_and_property()
@@ -6823,12 +7103,15 @@ class EmptyStateViewsTestCase(TestCase):
             publication_status="published",
         )
         default_group = MaterialComponentGroup.objects.default()
+        unit_percent, _ = Unit.objects.get_or_create(
+            owner=self.staff_user, name="%", defaults={"symbol": "percent"}
+        )
         ComponentMeasurement.objects.create(
             owner=self.staff_user,
             sample=sample,
             group=default_group,
             component=MaterialComponent.objects.default(),
-            unit=Unit.objects.filter(name="%").first(),
+            unit=unit_percent,
             average=Decimal("100.0"),
         )
 
@@ -6888,89 +7171,9 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "Manage access")
         self.assertContains(response, "Description present")
 
-    def test_sample_detail_empty_mass_measurements_anonymous(self):
-        sample = Sample.objects.create(
-            name="Massless Sample",
-            material=Material.objects.create(name="Test Material", type="material"),
-            owner=self.staff_user,
-            publication_status="published",
-        )
-        sample.compositions.all().delete()
 
-        response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No composition data yet")
-        self.assertContains(
-            response,
-            "Composition groups appear here once component measurements can be normalized",
-        )
-        self.assertNotContains(
-            response,
-            f"{reverse('componentmeasurement-create')}?sample={sample.pk}",
-        )
-
-    def test_sample_detail_empty_mass_measurements_owner_sees_cta_with_permission(self):
-        sample = Sample.objects.create(
-            name="Massless Sample",
-            material=Material.objects.create(name="Test Material", type="material"),
-            owner=self.regular_user,
-            publication_status="private",
-        )
-        content_type = ContentType.objects.get_for_model(ComponentMeasurement)
-        permission, _ = Permission.objects.get_or_create(
-            codename="add_componentmeasurement",
-            content_type=content_type,
-            defaults={"name": "Can add component measurement"},
-        )
-        self.regular_user.user_permissions.add(permission)
-        sample.compositions.all().delete()
-
-        self.client.force_login(self.regular_user)
-        response = self.client.get(
-            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Add measurement")
-
-    def test_sample_detail_empty_compositions_owner_sees_manual_and_measurement_actions(
-        self,
-    ):
-        sample = Sample.objects.create(
-            name="Compositionless Sample",
-            material=Material.objects.create(name="Test Material", type="material"),
-            owner=self.regular_user,
-            publication_status="private",
-        )
-        content_type = ContentType.objects.get_for_model(ComponentMeasurement)
-        permission, _ = Permission.objects.get_or_create(
-            codename="add_componentmeasurement",
-            content_type=content_type,
-            defaults={"name": "Can add component measurement"},
-        )
-        self.regular_user.user_permissions.add(permission)
-        composition_permission, _ = Permission.objects.get_or_create(
-            codename="add_composition",
-            content_type=ContentType.objects.get_for_model(Composition),
-            defaults={"name": "Can add composition"},
-        )
-        self.regular_user.user_permissions.add(composition_permission)
-        sample.compositions.all().delete()
-
-        self.client.force_login(self.regular_user)
-        response = self.client.get(
-            reverse("sample-detail", kwargs={"pk": sample.pk}) + "?mode=edit"
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No composition data yet")
-        self.assertContains(
-            response,
-            "Composition groups appear here once component measurements can be normalized",
-        )
-        self.assertContains(response, "Add composition")
-        self.assertContains(response, "Add measurement")
+class SampleDetailCompositionDisplayTestCase(SampleDetailPresentationMixin, TestCase):
+    """How the sample detail page derives and displays composition values."""
 
     def test_sample_detail_shows_default_composition(self):
         sample = Sample.objects.create(
@@ -7483,72 +7686,20 @@ class EmptyStateViewsTestCase(TestCase):
         self.assertContains(response, "Canonical: Organic matter")
         self.assertContains(response, "↔ Organic matter")
 
-    def test_analytical_method_list_empty_anonymous(self):
-        response = self.client.get(
-            reverse("analyticalmethod-list") + "?scope=published&name=no-match-token"
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No items match your current filters.")
-        self.assertContains(response, "Log in to create new analytical methods.")
-
-    def test_analytical_method_list_empty_staff_shows_create_cta(self):
-        self.client.force_login(self.staff_user)
-        response = self.client.get(
-            reverse("analyticalmethod-list-owned")
-            + "?scope=private&name=no-match-token"
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response, "Create your first analytical method to get started."
-        )
-
-    def test_reset_filter_link_preserves_scope(self):
-        scopes = ["published", "private", "review"]
-        for scope in scopes:
-            with self.subTest(scope=scope):
-                self.client.force_login(self.staff_user)
-                url = reverse("material-list") + f"?scope={scope}"
-                response = self.client.get(url)
-                self.assertEqual(response.status_code, 200)
-
-                expected_reset_url = f"?scope={scope}"
-                self.assertContains(response, expected_reset_url)
-
-    def test_empty_state_with_existing_reset_behavior(self):
-        Material.objects.create(
-            name="Test Material",
-            type="material",
-            owner=self.staff_user,
-            publication_status="published",
-        )
-
-        empty_category = self._create_unused_category()
-
-        self.client.force_login(self.staff_user)
-        response = self.client.get(
-            reverse("material-list") + f"?scope=published&category={empty_category.pk}"
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No items match your current filters.")
-        self.assertContains(response, "Reset filters")
-
-        reset_url = reverse("material-list") + "?scope=published"
-        response = self.client.get(reset_url)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Test Material")
-
 
 class MaterialsReviewWorkflowTests(TestCase):
     """Test the full review workflow (submit → approve/reject → withdraw) for Sample."""
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="test123")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
         cls.moderator = User.objects.create_user(
-            username="moderator", password="test123"
+            username="moderator",
         )
         cls.regular_user = User.objects.create_user(
-            username="regular", password="test123"
+            username="regular",
         )
 
         # Add moderator permission for Sample
@@ -7869,11 +8020,15 @@ class MaterialsReviewDetailAccessTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="test123")
-        cls.moderator = User.objects.create_user(
-            username="moderator", password="test123"
+        cls.owner = User.objects.create_user(
+            username="owner",
         )
-        cls.other_user = User.objects.create_user(username="other", password="test123")
+        cls.moderator = User.objects.create_user(
+            username="moderator",
+        )
+        cls.other_user = User.objects.create_user(
+            username="other",
+        )
 
         sample_ct = ContentType.objects.get_for_model(Sample)
         cls.sample_ct_id = sample_ct.id
@@ -7944,9 +8099,11 @@ class MaterialsReviewDetailAccessTests(TestCase):
         response = self.client.get(self._review_detail_url(self.review_sample))
         self.assertEqual(response.status_code, 403)
 
-    def test_anonymous_cannot_access_review_detail(self):
-        response = self.client.get(self._review_detail_url(self.review_sample))
-        self.assertEqual(response.status_code, 403)
+    def test_anonymous_is_redirected_to_login_for_review_detail(self):
+        url = self._review_detail_url(self.review_sample)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"{settings.LOGIN_URL}?next={url}")
 
 
 class SampleDetailTemplateReviewUITests(TestCase):
@@ -7954,8 +8111,12 @@ class SampleDetailTemplateReviewUITests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="test123")
-        cls.reviewer = User.objects.create_user(username="reviewer", password="test123")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
+        cls.reviewer = User.objects.create_user(
+            username="reviewer",
+        )
 
         with mute_signals(post_save, pre_save):
             cls.material = Material.objects.create(
@@ -8084,7 +8245,9 @@ class SampleSeriesDetailTemplateReviewUITests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="test123")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
 
         with mute_signals(post_save, pre_save):
             cls.material = Material.objects.create(
@@ -8133,12 +8296,12 @@ class MaterialsReviewDashboardTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="test123")
-        cls.staff = User.objects.create_user(
-            username="staff", password="test123", is_staff=True
+        cls.owner = User.objects.create_user(
+            username="owner",
         )
+        cls.staff = User.objects.create_user(username="staff", is_staff=True)
         cls.moderator = User.objects.create_user(
-            username="moderator", password="test123"
+            username="moderator",
         )
 
         sample_ct = ContentType.objects.get_for_model(Sample)
@@ -8210,9 +8373,11 @@ class ReviewActionLoggingTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="test123")
+        cls.owner = User.objects.create_user(
+            username="owner",
+        )
         cls.moderator = User.objects.create_user(
-            username="moderator", password="test123"
+            username="moderator",
         )
 
         sample_ct = ContentType.objects.get_for_model(Sample)
@@ -9394,7 +9559,7 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(
-            username="qualifier-view-owner", password="test123"
+            username="qualifier-view-owner",
         )
         cls.material = Material.objects.create(
             owner=cls.owner,
@@ -9448,6 +9613,16 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
                     "detection_limit": Decimal("6.57"),
                 },
             ),
+            (
+                "Below reporting limit",
+                {
+                    "average": Decimal("0.8"),
+                    "raw_value": "<0.8",
+                    "value_qualifier": MeasurementValueQualifier.LESS_THAN,
+                    "limit_type": MeasurementLimitType.RL,
+                    "detection_limit": Decimal("0.8"),
+                },
+            ),
             ("Exact zero", {"average": Decimal("0")}),
             (
                 "Hostile raw",
@@ -9495,7 +9670,21 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
                 self.assertContains(response, "<strong>&lt;0.1</strong>")
                 self.assertContains(response, "<strong>&gt;1450</strong>")
                 self.assertContains(response, "Below detection limit")
-                self.assertContains(response, "Detection limit: 6.57 %")
+                self.assertContains(response, "Limit of detection (LOD): 6.57 %")
+                self.assertContains(response, "Reporting limit (RL): 0.8 %")
+                self.assertContains(response, "Limit (type not specified): 6.57 %")
+                self.assertNotContains(response, "Detection limit: 6.57")
+                self.assertContains(
+                    response,
+                    '<details class="sdv2-limit">'
+                    '<summary title="Reporting limit (RL): 0.8 %">RL</summary>'
+                    '<span class="sdv2-limit-detail">Reporting limit (RL): 0.8 %</span>'
+                    "</details>",
+                    html=True,
+                )
+                self.assertNotContains(
+                    response, '<span class="sdv2-sd">Reporting limit (RL)'
+                )
                 self.assertContains(response, "<strong>0</strong>")
                 self.assertContains(response, "<strong>&lt;0.25</strong>")
                 self.assertNotContains(response, '<img src=x onerror="alert(31337)">')
@@ -9509,7 +9698,17 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
         self.assertIn("&lt;0.1", html)
         self.assertIn("&gt;1450", html)
         self.assertIn("Below detection limit", html)
-        self.assertIn("Detection limit: 6.57", html)
+        self.assertIn(
+            '<span class="visually-hidden">Limit of detection (LOD)</span>: 6.57',
+            html,
+        )
+        self.assertInHTML(
+            '<span class="text-muted small">'
+            '<span aria-hidden="true">RL</span>'
+            '<span class="visually-hidden">Reporting limit (RL)</span>'
+            ": 0.8 percent</span>",
+            html,
+        )
         self.assertIn(escape(self.hostile_raw), html)
         self.assertNotIn('<img src=x onerror="alert(31337)">', html)
 
@@ -9518,14 +9717,17 @@ class SampleMeasurementQualifierViewTestCase(TestCase):
             {"object": self.sample, "section": {"key": "properties"}},
         )
         self.assertIn("&lt;0.25", html)
-        self.assertIn("Detection limit: 6.57", html)
+        self.assertIn(
+            '<span class="visually-hidden">Limit (type not specified)</span>: 6.57',
+            html,
+        )
 
 
 class SampleCompositionSafetyViewTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(
-            username="composition-safety-owner", password="test123"
+            username="composition-safety-owner",
         )
         cls.material = Material.objects.create(
             owner=cls.owner,
@@ -9682,7 +9884,7 @@ class SampleGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
     model = SampleGroup
 
-    view_dashboard_name = "materials-explorer"
+    view_explorer_name = "materials-explorer"
     view_create_name = "samplegroup-create"
     view_modal_create_name = "samplegroup-create-modal"
     view_published_list_name = "samplegroup-list"

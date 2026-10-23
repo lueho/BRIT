@@ -46,7 +46,7 @@
               {{ process_policy.review_feedback_label }}
             </a>
           {% elif process_policy.is_in_review and not review_mode %}
-            {% if process_policy.is_owner or process_policy.is_staff or process_policy.is_moderator %}
+            {% if process_policy.can_view_review_activity %}
               <a class="sdv2-btn sdv2-btn-ghost"
                  href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
                 <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
@@ -116,6 +116,7 @@
         <h1 class="sdv2-hero-title">{{ object.name }}</h1>
         {% if process_authors %}
           <div class="small text-muted my-3">
+            <div class="sdv2-meta-label mb-1">Corresponding authors</div>
             {% for process_author in process_authors %}
               {% with author=process_author.author %}
                 <div class="mb-1">
@@ -135,9 +136,6 @@
           {% endif %}
         </div>
         <ul class="sdv2-hero-meta" aria-label="Process metadata">
-          {% if object.owner %}
-            <li><span class="sdv2-meta-label">Contributed by</span>{{ object.owner.username|default:object.owner }}</li>
-          {% endif %}
           {% if object.lastmodified_at %}
             <li>
               <span class="sdv2-meta-label">Last updated</span>

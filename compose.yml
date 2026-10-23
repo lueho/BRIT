@@ -1,6 +1,15 @@
 networks:
   full:
 
+x-web-build: &web-build
+  context: .
+  # The `dev` target carries no source layer; the checkout is bind-mounted
+  # below, so editing source never invalidates the image.
+  target: dev
+  args:
+    INSTALL_DEV: true
+    INSTALL_PDF_PARSING: true
+
 services:
   # Dev/CI-only static asset builder (SCSS -> CSS -> minified CSS/JS).
   # Not started by `docker compose up` (guarded by the `assets` profile).
@@ -35,15 +44,23 @@ services:
     networks:
       - full
 
+  init:
+    build: *web-build
+    command: python manage.py bootstrap_database
+    volumes:
+      - ./:/app
+    env_file:
+      - brit/settings/.env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - full
+
   web:
-    build:
-      context: .
-      # The `dev` target carries no source layer; the checkout is bind-mounted
-      # below, so editing source never invalidates the image.
-      target: dev
-      args:
-        INSTALL_DEV: true
-        INSTALL_PDF_PARSING: true
+    build: *web-build
     image: brit-web
     restart: unless-stopped
     command: python manage.py runserver 0.0.0.0:8000
@@ -54,6 +71,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      init:
+        condition: service_completed_successfully
       celery:
         condition: service_started
     ports:
@@ -80,6 +99,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      init:
+        condition: service_completed_successfully
     networks:
       - full
     healthcheck:

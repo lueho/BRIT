@@ -39,6 +39,7 @@ brit/static/scss/*.css.map
 node_modules/
 
 /test-results/
+/.task-evidence/
 /.venv/
 /.devcontainer/
 /.windsurf/

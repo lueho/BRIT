@@ -222,7 +222,7 @@ class WasteAtlasZoomControlMarkupTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
-            username="responsive-atlas-user", password="secret"
+            username="responsive-atlas-user",
         )
 
     def _render_generic(self, config_key="orga_level"):

@@ -1,12 +1,14 @@
 """Template tags for the Processes discovery navigation."""
 
 from django import template
+from django.urls import reverse
 
 from utils.object_management.permissions import user_is_moderator_for_model
 
 from ..models import Process
 from ..navigation import (
     PROCESS_SCOPES,
+    WORKSPACE_SCOPES,
     categories_url,
     category_detail_url,
     category_process_list_url,
@@ -67,6 +69,8 @@ def _nav_context(context, section):
         "nav_scope_urls": scope_urls,
         "nav_show_scopes": section != "processes",
         "nav_show_private": bool(user and user.is_authenticated),
+        "nav_workspace_active": scope in WORKSPACE_SCOPES,
+        "nav_workspace_base_url": reverse("processes:process-list-owned"),
         "nav_show_review": user_is_moderator_for_model(user, Process),
     }
 

@@ -186,8 +186,12 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
     scope = ChoiceFilter(
         choices=(
             ("published", "Published"),
-            ("private", "Private"),
+            ("private", "All workspace records"),
+            ("owned", "Owned by me"),
+            ("shared", "Shared with me"),
             ("review", "Review"),
+            ("declined", "Declined"),
+            ("archived", "Archived"),
         ),
         widget=HiddenInput(),
         method="filter_scope",
@@ -265,7 +269,7 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
     def _apply_shared_field_visibility(self):
         if "publication_status" not in self.filters:
             return
-        if self._get_scope_value() == "private":
+        if self._get_scope_value() in ("private", "owned", "shared"):
             return
         self.filters["publication_status"].field.widget = HiddenInput()
         self.filters["publication_status"].field.label = ""
@@ -278,5 +282,4 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
         across API, HTML list views, and exports.
         """
         user = getattr(self.request, "user", None)
-        scope = value if value in {"published", "private", "review"} else "published"
-        return apply_scope_filter(queryset, scope, user=user)
+        return apply_scope_filter(queryset, value, user=user)

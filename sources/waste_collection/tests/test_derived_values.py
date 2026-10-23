@@ -2,13 +2,19 @@
 
 from datetime import date, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
+from django.db import transaction
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from maps.models import Region, RegionAttributeValue, RegionProperty
 from maps.population.models import PopulationDataset, PopulationObservation
+from utils.object_management.models import ReviewAction
+from utils.object_management.policy import scope_queryset
 from utils.properties.models import Property, Unit
 
 from ..derived_values import (
@@ -21,6 +27,7 @@ from ..derived_values import (
     delete_derived_cpv,
     get_derived_property_config,
     get_population_for_collection,
+    preferred_measurement_queryset,
 )
 from ..models import (
     Collection,
@@ -103,8 +110,9 @@ class DerivedValuesTestCase(TestCase):
         CollectionPropertyValue.objects.bulk_create([cpv])
         return cpv
 
-    def test_create_or_update_removes_stale_derived_when_manual_exists(self):
-        collection, _catchment = self._create_collection("stale", population=2000)
+    def test_manual_counterpart_does_not_block_generated_artifact(self):
+        """Manual evidence coexists with — and never deletes — the artifact."""
+        collection, _ = self._create_collection("manual-coexist", population=2000)
 
         specific = self._bulk_create_cpv(
             name="specific source",
@@ -117,16 +125,10 @@ class DerivedValuesTestCase(TestCase):
             is_derived=False,
         )
 
-        _derived, action = create_or_update_derived_cpv(specific)
+        derived, action = create_or_update_derived_cpv(specific)
         self.assertEqual(action, "created")
-        self.assertTrue(
-            CollectionPropertyValue.objects.filter(
-                collection=collection,
-                property=self.property_total,
-                year=2024,
-                is_derived=True,
-            ).exists()
-        )
+        self.assertEqual(derived.average, 20.0)
+        self.assertEqual(derived.derived_from_id, specific.pk)
 
         self._bulk_create_cpv(
             name="manual total",
@@ -139,18 +141,26 @@ class DerivedValuesTestCase(TestCase):
             is_derived=False,
         )
 
-        _derived, action = create_or_update_derived_cpv(specific)
-        self.assertEqual(action, "skipped")
-        self.assertFalse(
+        derived, action = create_or_update_derived_cpv(specific)
+        self.assertEqual(action, "updated")
+        self.assertEqual(derived.average, 20.0)
+        self.assertEqual(derived.derived_from_id, specific.pk)
+        self.assertTrue(
             CollectionPropertyValue.objects.filter(
                 collection=collection,
                 property=self.property_total,
                 year=2024,
-                is_derived=True,
+                is_derived=False,
+                average=25,
             ).exists()
         )
 
     def test_backfill_counts_created_updated_and_skipped(self):
+        """Contract counts: created, updated, and skipped sources.
+
+        A manual counterpart at the same key never skips a valid source, and
+        a legacy unlinked derived row never counts as a source's output.
+        """
         collection_with_population, _ = self._create_collection(
             "has-pop", population=1000
         )
@@ -158,7 +168,7 @@ class DerivedValuesTestCase(TestCase):
             "no-pop", population=None
         )
 
-        self._bulk_create_cpv(
+        create_source = self._bulk_create_cpv(
             name="create-source",
             collection=collection_with_population,
             property=self.property_specific,
@@ -168,7 +178,7 @@ class DerivedValuesTestCase(TestCase):
             publication_status="published",
             is_derived=False,
         )
-        self._bulk_create_cpv(
+        update_source = self._bulk_create_cpv(
             name="update-source",
             collection=collection_with_population,
             property=self.property_specific,
@@ -178,32 +188,26 @@ class DerivedValuesTestCase(TestCase):
             publication_status="published",
             is_derived=False,
         )
-        self._bulk_create_cpv(
-            name="existing-derived-total",
+        # Legacy orphan at the same key is never adopted as linked output.
+        orphan = self._bulk_create_cpv(
+            name="legacy-orphan-total",
             collection=collection_with_population,
             property=self.property_total,
             unit=self.unit_total,
-            year=2025,
-            average=20,
+            year=2024,
+            average=99,
             publication_status="published",
             is_derived=True,
+            derived_from=None,
         )
-        self._bulk_create_cpv(
-            name="skip-manual-specific",
-            collection=collection_with_population,
-            property=self.property_specific,
-            unit=self.unit_specific,
-            year=2026,
-            average=30,
-            publication_status="published",
-            is_derived=False,
-        )
-        self._bulk_create_cpv(
+        # Manual counterpart at the source's output key neither blocks nor
+        # skips it; the manual row itself is a valid source too.
+        manual = self._bulk_create_cpv(
             name="manual-total",
             collection=collection_with_population,
             property=self.property_total,
             unit=self.unit_total,
-            year=2026,
+            year=2024,
             average=30,
             publication_status="published",
             is_derived=False,
@@ -227,11 +231,31 @@ class DerivedValuesTestCase(TestCase):
             value=1000,
         )
 
+        # update-source keeps an explicitly linked artifact; the orphan does
+        # not satisfy the "updated" category for create-source.
+        _linked, action = create_or_update_derived_cpv(update_source)
+        self.assertEqual(action, "created")
+
         dry_stats = backfill_derived_values(dry_run=True)
-        self.assertEqual(dry_stats, {"created": 1, "updated": 1, "skipped": 3})
+        # create-source and manual-total each gain a linked artifact;
+        # update-source refreshes its existing one; no-pop is skipped.
+        self.assertEqual(dry_stats, {"created": 2, "updated": 1, "skipped": 1})
 
         write_stats = backfill_derived_values(dry_run=False)
-        self.assertEqual(write_stats, {"created": 1, "updated": 1, "skipped": 3})
+        self.assertEqual(write_stats, {"created": 2, "updated": 1, "skipped": 1})
+
+        self.assertTrue(
+            CollectionPropertyValue.objects.filter(
+                is_derived=True, derived_from=create_source
+            ).exists()
+        )
+        self.assertTrue(
+            CollectionPropertyValue.objects.filter(
+                is_derived=True, derived_from=manual
+            ).exists()
+        )
+        orphan.refresh_from_db()
+        self.assertIsNone(orphan.derived_from_id)
 
     def test_backfill_derives_counterpart_for_zero_value(self):
         collection, _ = self._create_collection("zero-backfill", population=1000)
@@ -787,3 +811,418 @@ class DerivedValuesTestCase(TestCase):
     def test_get_population_for_collection_returns_none_without_data(self):
         collection, _ = self._create_collection("pop-none", population=None)
         self.assertIsNone(get_population_for_collection(collection, year=2024))
+
+    # --- Phase B1: explicit source-bound generation --------------------------
+
+    def _create_source(self, collection, **kwargs):
+        """Create a raw CPV through the manager so save signals run."""
+        kwargs.setdefault("name", "raw source")
+        kwargs.setdefault("property", self.property_specific)
+        kwargs.setdefault("unit", self.unit_specific)
+        kwargs.setdefault("year", 2024)
+        kwargs.setdefault("publication_status", "published")
+        kwargs["is_derived"] = False
+        return CollectionPropertyValue.objects.create(collection=collection, **kwargs)
+
+    def test_generated_artifact_links_its_source(self):
+        collection, _ = self._create_collection("link-s2t", population=2000)
+        source = self._create_source(collection, average=10)
+
+        artifact = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=source
+        )
+        self.assertEqual(artifact.average, Decimal("20.00"))
+        self.assertEqual(artifact.property_id, self.property_total.pk)
+        self.assertEqual(artifact.unit_id, self.unit_total.pk)
+        self.assertEqual(artifact.collection_id, collection.pk)
+        self.assertEqual(artifact.year, 2024)
+
+    def test_total_source_generates_linked_specific_artifact(self):
+        collection, _ = self._create_collection("link-t2s", population=2000)
+        source = self._create_source(
+            collection,
+            property=self.property_total,
+            unit=self.unit_total,
+            average=10,
+        )
+
+        artifact = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=source
+        )
+        self.assertEqual(artifact.average, Decimal("5.00"))
+        self.assertEqual(artifact.property_id, self.property_specific.pk)
+        self.assertEqual(artifact.unit_id, self.unit_specific.pk)
+
+    def test_two_sources_same_key_keep_separate_artifacts(self):
+        collection, _ = self._create_collection("two-src", population=2000)
+        source1 = self._create_source(collection, average=10)
+        artifact1 = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=source1
+        )
+        artifact1_pk, artifact1_average, artifact1_owner = (
+            artifact1.pk,
+            artifact1.average,
+            artifact1.owner_id,
+        )
+
+        source2 = self._create_source(collection, average=20)
+        artifact2 = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=source2
+        )
+
+        self.assertNotEqual(artifact1.pk, artifact2.pk)
+        self.assertEqual(artifact1.average, Decimal("20.00"))
+        self.assertEqual(artifact2.average, Decimal("40.00"))
+        # Creating source2 never touches source1's artifact.
+        artifact1.refresh_from_db()
+        self.assertEqual(
+            (artifact1.pk, artifact1.average, artifact1.owner_id),
+            (artifact1_pk, artifact1_average, artifact1_owner),
+        )
+
+    def test_source_lifecycle_governs_artifact_visibility(self):
+        collection, _ = self._create_collection("scope", population=2000)
+        published_source = self._create_source(collection, average=10)
+        private_source = self._create_source(
+            collection, year=2024, publication_status="private", average=10
+        )
+        artifact_published = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=published_source
+        )
+        artifact_private = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=private_source
+        )
+
+        public_qs = scope_queryset(
+            AnonymousUser(),
+            CollectionPropertyValue.objects.all(),
+            "published",
+        )
+        self.assertIn(artifact_published, public_qs)
+        self.assertNotIn(artifact_private, public_qs)
+
+    def test_source_edit_updates_only_its_own_artifact(self):
+        collection, _ = self._create_collection("edit-src", population=2000)
+        source1 = self._create_source(collection, average=10)
+        source2 = self._create_source(collection, average=20)
+        artifact1 = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=source1
+        )
+        artifact2 = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=source2
+        )
+
+        source1.average = 15
+        source1.save()
+
+        artifact1.refresh_from_db()
+        artifact2.refresh_from_db()
+        self.assertEqual(artifact1.average, Decimal("30.00"))
+        self.assertEqual(artifact2.average, Decimal("40.00"))
+
+    def test_source_becoming_non_convertible_removes_its_artifact(self):
+        collection, _ = self._create_collection("non-conv", population=2000)
+        other_property = Property.objects.create(name="other property [test]")
+        source = self._create_source(collection, average=10)
+        self.assertTrue(
+            CollectionPropertyValue.objects.filter(
+                is_derived=True, derived_from=source
+            ).exists()
+        )
+
+        source.property = other_property
+        source.save()
+
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(
+                is_derived=True, derived_from=source
+            ).exists()
+        )
+
+    def test_source_losing_population_removes_its_artifact(self):
+        collection, _ = self._create_collection("no-pop-edit", population=2000)
+        source = self._create_source(collection, average=10)
+        self.assertTrue(
+            CollectionPropertyValue.objects.filter(
+                is_derived=True, derived_from=source
+            ).exists()
+        )
+
+        # 2026 has no exact-year population for this region.
+        source.year = 2026
+        source.save()
+
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(
+                is_derived=True, derived_from=source
+            ).exists()
+        )
+
+    def test_source_delete_removes_only_its_own_artifact(self):
+        collection, _ = self._create_collection("del-own", population=2000)
+        source1 = self._create_source(collection, average=10)
+        source2 = self._create_source(collection, average=20)
+        manual = self._bulk_create_cpv(
+            name="manual total",
+            collection=collection,
+            property=self.property_total,
+            unit=self.unit_total,
+            year=2024,
+            average=25,
+            publication_status="published",
+            is_derived=False,
+        )
+        orphan = self._bulk_create_cpv(
+            name="legacy orphan",
+            collection=collection,
+            property=self.property_total,
+            unit=self.unit_total,
+            year=2025,
+            average=99,
+            publication_status="published",
+            is_derived=True,
+            derived_from=None,
+        )
+        artifact2 = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=source2
+        )
+        source1_pk = source1.pk
+
+        source1.delete()
+
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(
+                is_derived=True, derived_from_id=source1_pk
+            ).exists()
+        )
+        self.assertTrue(
+            CollectionPropertyValue.objects.filter(pk=artifact2.pk).exists()
+        )
+        self.assertTrue(CollectionPropertyValue.objects.filter(pk=manual.pk).exists())
+        self.assertTrue(CollectionPropertyValue.objects.filter(pk=orphan.pk).exists())
+
+    def test_source_delete_rolls_back_when_sync_fails(self):
+        collection, _ = self._create_collection("del-rb", population=2000)
+        source = self._create_source(collection, average=10)
+        artifact = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=source
+        )
+
+        with (
+            self.assertLogs("sources.waste_collection.signals", level="ERROR"),
+            self.assertRaises(RuntimeError),
+            transaction.atomic(),
+        ):
+            with patch(
+                "sources.waste_collection.derived_values.delete_derived_cpv",
+                side_effect=RuntimeError("boom"),
+            ):
+                source.delete()
+
+        self.assertTrue(CollectionPropertyValue.objects.filter(pk=source.pk).exists())
+        self.assertTrue(CollectionPropertyValue.objects.filter(pk=artifact.pk).exists())
+
+    def test_save_failure_rolls_back_source_and_artifact(self):
+        collection, _ = self._create_collection("save-rb", population=2000)
+        source = self._create_source(collection, average=10)
+        artifact = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=source
+        )
+
+        with (
+            self.assertLogs("sources.waste_collection.signals", level="ERROR"),
+            self.assertRaises(RuntimeError),
+            transaction.atomic(),
+        ):
+            with patch(
+                "sources.waste_collection.derived_values.create_or_update_derived_cpv",
+                side_effect=RuntimeError("boom"),
+            ):
+                source.average = 15
+                source.save()
+
+        source.refresh_from_db()
+        artifact.refresh_from_db()
+        self.assertEqual(source.average, 10)
+        self.assertEqual(artifact.average, Decimal("20.00"))
+
+    def test_missing_config_with_linked_output_denies_source_save(self):
+        collection, _ = self._create_collection("misconf", population=2000)
+        source = self._create_source(collection, average=10)
+        artifact = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=source
+        )
+
+        with override_settings(WASTE_COLLECTION_SPECIFIC_WASTE_PROPERTY_ID=999999):
+            clear_derived_value_config_cache()
+            with (
+                self.assertRaises(ImproperlyConfigured),
+                transaction.atomic(),
+            ):
+                source.average = 15
+                source.save()
+        clear_derived_value_config_cache()
+
+        source.refresh_from_db()
+        artifact.refresh_from_db()
+        self.assertEqual(source.average, 10)
+        self.assertEqual(artifact.average, Decimal("20.00"))
+
+    def test_recompute_creates_no_review_events(self):
+        collection, _ = self._create_collection("no-events", population=2000)
+        source = self._create_source(collection, average=10)
+        artifact = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=source
+        )
+        ct = ContentType.objects.get_for_model(CollectionPropertyValue)
+
+        source.average = 15
+        source.save()
+        create_or_update_derived_cpv(source)
+
+        self.assertFalse(
+            ReviewAction.objects.filter(
+                content_type=ct, object_id__in=(source.pk, artifact.pk)
+            ).exists()
+        )
+
+    def test_unsaved_or_generated_input_is_skipped(self):
+        collection, _ = self._create_collection("skip-input", population=2000)
+        unsaved = CollectionPropertyValue(
+            collection=collection,
+            property=self.property_specific,
+            unit=self.unit_specific,
+            year=2024,
+            average=10,
+            is_derived=False,
+        )
+        self.assertEqual(create_or_update_derived_cpv(unsaved), (None, "skipped"))
+
+        generated = self._bulk_create_cpv(
+            name="generated",
+            collection=collection,
+            property=self.property_total,
+            unit=self.unit_total,
+            year=2024,
+            average=5,
+            is_derived=True,
+        )
+        self.assertEqual(create_or_update_derived_cpv(generated), (None, "skipped"))
+
+    def test_delete_derived_cpv_removes_only_linked_output(self):
+        collection, _ = self._create_collection("del-linked", population=2000)
+        source = self._create_source(collection, average=10)
+        CollectionPropertyValue.objects.get(is_derived=True, derived_from=source)
+
+        self.assertEqual(delete_derived_cpv(source), 1)
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(
+                is_derived=True, derived_from=source
+            ).exists()
+        )
+
+    # --- Phase B1: purpose-scoped manual precedence -------------------------
+
+    def test_preferred_measurement_keeps_manual_over_generated(self):
+        collection, _ = self._create_collection("pref", population=2000)
+        source = self._create_source(collection, average=10)
+        generated = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=source
+        )
+        manual = self._bulk_create_cpv(
+            name="manual total 25",
+            collection=collection,
+            property=self.property_total,
+            unit=self.unit_total,
+            year=2024,
+            average=25,
+            is_derived=False,
+        )
+
+        preferred = preferred_measurement_queryset(
+            CollectionPropertyValue.objects.filter(collection=collection)
+        )
+        self.assertIn(source, preferred)
+        self.assertIn(manual, preferred)
+        self.assertNotIn(generated, preferred)
+
+    def test_preferred_measurement_requires_matching_year_and_unit(self):
+        collection, _ = self._create_collection("pref-key", population=2000)
+        source = self._create_source(collection, average=10)
+        generated = CollectionPropertyValue.objects.get(
+            is_derived=True, derived_from=source
+        )
+        other_year_manual = self._bulk_create_cpv(
+            name="manual other year",
+            collection=collection,
+            property=self.property_total,
+            unit=self.unit_total,
+            year=2025,
+            average=25,
+            is_derived=False,
+        )
+        other_unit_manual = self._bulk_create_cpv(
+            name="manual other unit",
+            collection=collection,
+            property=self.property_total,
+            unit=self.unit_specific,
+            year=2024,
+            average=25,
+            is_derived=False,
+        )
+
+        preferred = preferred_measurement_queryset(
+            CollectionPropertyValue.objects.filter(collection=collection)
+        )
+        self.assertIn(generated, preferred)
+        self.assertIn(other_year_manual, preferred)
+        self.assertIn(other_unit_manual, preferred)
+
+    def test_preferred_measurement_null_year_matches_null_only(self):
+        collection, _ = self._create_collection("pref-null", population=2000)
+        null_year_generated = self._bulk_create_cpv(
+            name="generated null year",
+            collection=collection,
+            property=self.property_total,
+            unit=self.unit_total,
+            year=None,
+            average=20,
+            is_derived=True,
+        )
+        null_year_manual = self._bulk_create_cpv(
+            name="manual null year",
+            collection=collection,
+            property=self.property_total,
+            unit=self.unit_total,
+            year=None,
+            average=25,
+            is_derived=False,
+        )
+        different_year_manual = self._bulk_create_cpv(
+            name="manual different year",
+            collection=collection,
+            property=self.property_total,
+            unit=self.unit_total,
+            year=2024,
+            average=30,
+            is_derived=False,
+        )
+
+        preferred = preferred_measurement_queryset(
+            CollectionPropertyValue.objects.filter(
+                collection=collection, property=self.property_total
+            )
+        )
+        # A null-year manual suppresses only a matching null-year generated row.
+        self.assertNotIn(null_year_generated, preferred)
+        self.assertIn(null_year_manual, preferred)
+        self.assertIn(different_year_manual, preferred)
+
+        different_year_manual.delete()
+        null_year_manual.delete()
+        preferred = preferred_measurement_queryset(
+            CollectionPropertyValue.objects.filter(
+                collection=collection, property=self.property_total
+            )
+        )
+        self.assertIn(null_year_generated, preferred)

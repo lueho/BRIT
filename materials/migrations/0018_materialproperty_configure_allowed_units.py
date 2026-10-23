@@ -42,8 +42,8 @@ def configure_allowed_units(apps, schema_editor):
     # id=1 Bulk density – Mg/m³
     unit_mg_m3 = _get_or_create_unit(Unit, User, "Mg/m³", symbol="Mg/m**3")
 
-    # id=3 Porosity – vol.-%
-    unit_vol_pct = _get_or_create_unit(Unit, User, "vol.-%", symbol="")
+    # id=3 Porosity – vol%
+    unit_vol_pct = _get_or_create_unit(Unit, User, "vol%", symbol="volume_percent")
 
     # id=6 Soluble Salts – mmhos/cm and dS/m (equivalent, both in use)
     unit_mmhos = _get_or_create_unit(Unit, User, "mmhos/cm", symbol="")

@@ -22,7 +22,9 @@ def ensure_initial_data(stdout=None):
         dict: Contains 'default_owner' User instance
     """
     admin_username = os.environ.get("ADMIN_USERNAME")
-    owner_username = getattr(settings, "DEFAULT_OBJECT_OWNER_USERNAME", admin_username)
+    owner_username = (
+        getattr(settings, "DEFAULT_OBJECT_OWNER_USERNAME", None) or admin_username
+    )
 
     if not owner_username:
         raise RuntimeError(

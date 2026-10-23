@@ -41,6 +41,16 @@ class RobotsTxtTests(SimpleTestCase):
                 self.assertIn(f"Disallow: {path}", content)
 
 
+class DebugSessionEndpointTests(SimpleTestCase):
+    """Session debug stubs were dev scaffolding and must not be routed."""
+
+    def test_session_debug_endpoints_are_not_routed(self):
+        for path in ("/set_session/", "/get_session/"):
+            with self.subTest(path=path):
+                with self.assertRaises(Resolver404):
+                    resolve(path)
+
+
 class RAnalysisPageTests(TestCase):
     def test_public_page_links_downloads_and_explains_access(self):
         response = self.client.get("/r-analysis/")
@@ -48,10 +58,17 @@ class RAnalysisPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "/r-analysis/BRIT_Datenanalyse.R")
         self.assertContains(
-            response, "https://flexibi-dst.s3.amazonaws.com/media/rscripts/brit_eu.zip"
+            response,
+            "https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-1.0.4.zip",
+        )
+        self.assertContains(
+            response,
+            "https://flexibi-dst.s3.amazonaws.com/media/rscripts/BRIT-EU-R-Code-1.0.4.zip",
         )
         self.assertContains(response, "analysis_api")
         self.assertContains(response, "historical input data")
+        self.assertContains(response, "BRIT.Rproj")
+        self.assertContains(response, "validated runtime is R 4.3.3")
 
     def test_standalone_r_client_is_available_as_static_file(self):
         self.assertIsNotNone(finders.find("rscripts/BRIT_Datenanalyse.R"))

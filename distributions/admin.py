@@ -1,27 +1,25 @@
 from django.contrib import admin
 
+from utils.object_management.admin import NamedUserCreatedObjectAdmin, PolicyAdminMixin
+
 from .models import Period, TemporalDistribution, Timestep
 
 
 @admin.register(TemporalDistribution)
-class TemporalDistributionAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class TemporalDistributionAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(Timestep)
-class TimestepAdmin(admin.ModelAdmin):
+class TimestepAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "distribution", "order", "owner", "publication_status")
-    search_fields = ("name",)
     list_filter = ("publication_status", "distribution")
     ordering = ("distribution", "order")
     autocomplete_fields = ("distribution",)
 
 
 @admin.register(Period)
-class PeriodAdmin(admin.ModelAdmin):
+class PeriodAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "distribution",
