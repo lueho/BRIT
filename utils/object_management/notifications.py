@@ -11,7 +11,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.text import capfirst
 
-from .models import ReviewAction
+from .models import ReviewAction, ReviewNotificationMute
 from .policy import decide
 
 logger = logging.getLogger(__name__)
@@ -75,6 +75,12 @@ def _can_open_review_link(user, obj):
 
 
 _CURRENT_OWNER = object()
+
+
+def _user_wants_review_emails(user):
+    """Return False when the user disabled review e-mails in their profile."""
+    profile = getattr(user, "profile", None)
+    return profile is None or profile.review_notifications
 
 
 def _review_participants(action, owner):
@@ -148,8 +154,9 @@ def send_review_action_notification(action, recipient):
     """Send a review notification e-mail for ``action`` to ``recipient``.
 
     Only actions performed by someone other than the recipient trigger an
-    e-mail. Recipients who can no longer open the review detail page (e.g.
-    a former owner after an ownership transfer) are skipped. Returns True
+    e-mail. Recipients who disabled review e-mails or muted this object,
+    and recipients who can no longer open the review detail page (e.g. a
+    former owner after an ownership transfer), are skipped. Returns True
     when an e-mail was sent.
     """
     obj = action.content_object
@@ -158,6 +165,7 @@ def send_review_action_notification(action, recipient):
         or recipient is None
         or recipient.pk == action.user_id
         or not recipient.email
+        or not _user_wants_review_emails(recipient)
     ):
         return False
     try:
@@ -165,6 +173,12 @@ def send_review_action_notification(action, recipient):
         # transfer (e.g. the synchronous broker fallback); use committed state.
         obj.refresh_from_db(fields=["owner"])
     except obj.__class__.DoesNotExist:
+        return False
+    if ReviewNotificationMute.objects.filter(
+        user_id=recipient.pk,
+        content_type_id=action.content_type_id,
+        object_id=action.object_id,
+    ).exists():
         return False
     if not _can_open_review_link(recipient, obj):
         logger.info(
@@ -195,6 +209,14 @@ def send_review_action_notification(action, recipient):
                 "object_id": action.object_id,
             },
         ),
+        "mute_url": reverse(
+            "object_management:review_notification_mute",
+            kwargs={
+                "content_type_id": action.content_type_id,
+                "object_id": action.object_id,
+            },
+        ),
+        "profile_url": reverse("user_profile"),
     }
     subject = render_to_string(SUBJECT_TEMPLATE, context).strip()
     body = render_to_string(BODY_TEMPLATE, context)

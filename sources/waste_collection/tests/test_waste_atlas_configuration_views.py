@@ -4,6 +4,7 @@ from copy import deepcopy
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 from django.contrib.auth.models import Permission, User
+from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
 
@@ -15,6 +16,15 @@ from sources.waste_collection.waste_atlas.models import (
     WasteAtlasMapConfiguration,
 )
 from sources.waste_collection.waste_atlas.pages import MAP_PAGES
+
+
+def _administer_objects_permission():
+    from utils.object_management.models import ReviewAction
+
+    return Permission.objects.get(
+        codename="administer_objects",
+        content_type=ContentType.objects.get_for_model(ReviewAction),
+    )
 
 
 class WasteAtlasMapConfigurationViewsTestCase(TestCase):
@@ -30,12 +40,12 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         )
         cls.staff = User.objects.create_user(
             username="atlas-config-staff",
-            password="secret",
             is_staff=True,
         )
+        cls.admin = User.objects.create_user(username="atlas-config-admin")
+        cls.admin.user_permissions.add(_administer_objects_permission())
         cls.regular_user = User.objects.create_user(
             username="atlas-config-user",
-            password="secret",
         )
 
     def _configuration(self):
@@ -593,7 +603,6 @@ class WasteAtlasExportFileNameTestCase(TestCase):
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
             username="atlas-export-user",
-            password="secret",
         )
 
     # (route name, expected fileBase) covering generic, country, sub-national,

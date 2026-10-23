@@ -47,7 +47,7 @@
                 {% endfor %}
                 {% object_policy object as greenhouse_policy %}
                 {% if greenhouse_policy.can_manage_samples %}
-                    {% if user.is_staff or 'greenhouses.add_greenhousegrowthcycle' in perms %}
+                    {% if 'greenhouses.add_greenhousegrowthcycle' in perms %}
                         <div class="card border-left-primary border">
                             <div class="card-header bg-body-tertiary border-bottom-0 py-3">
                                 <h5 class="mb-0">Add growth cycle</h5>

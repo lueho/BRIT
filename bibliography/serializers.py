@@ -154,6 +154,7 @@ class SourceCreateSerializer(ModelSerializer):
         read_only_fields = ["id", "publication_status"]
 
     def create(self, validated_data):
+
         authors_data = validated_data.pop("authors", [])
         actor = getattr(self.context.get("request"), "user", None)
         try:

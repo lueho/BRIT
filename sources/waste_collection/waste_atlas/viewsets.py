@@ -259,7 +259,7 @@ WEEKLY_BP_ACCESS_DAYS_PROPERTY_NAME = "weekly bring-point access days"
 BIOWASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME = "total biowaste in residual waste"
 FOOD_WASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME = "total food waste in residual waste"
 PERCENTAGE_UNIT_NAME = "%"
-SPECIFIC_AMOUNT_UNIT_NAME = "kg/(cap.*a)"
+SPECIFIC_AMOUNT_UNIT_NAME = "kg/(cap·a)"
 
 # Priority for picking the primary collection system per catchment.
 # Lower number = higher priority.
@@ -273,7 +273,7 @@ _COLLECTION_SYSTEM_PRIORITY = {
     "No separate collection": 7,
 }
 
-# Attribute IDs for population data (maps_attribute table)
+# RegionProperty IDs for population data
 POPULATION_ATTRIBUTE_ID = 3
 POPULATION_DENSITY_ATTRIBUTE_ID = 2
 
@@ -311,7 +311,7 @@ class GeoJSONAnonThrottleMixin:
 
 
 class IsMaintainer(permissions.BasePermission):
-    """Staff and collection moderators, who curate the data behind the maps."""
+    """Administrators and active collection moderators curating atlas data."""
 
     def has_permission(self, request, view):
         return is_maintainer(request.user)

@@ -5,6 +5,7 @@ from importlib import import_module
 
 from django.urls import reverse
 
+from utils.object_management.policy import decide
 from utils.object_management.review_context import (
     _serialize_m2m_sources,
     _serialize_value,
@@ -83,12 +84,25 @@ def serialize_collection_update_context(
     if not is_collection(obj):
         return None
 
-    is_owner = bool(user and user.is_authenticated and obj.owner_id == user.id)
-    if not is_owner:
+    decision = decide(user, "edit", obj)
+    if not decision.allowed:
+        details = {
+            "authentication_required": (
+                "Sign in to use the programmatic update endpoint."
+            ),
+            "missing_model_permission": (
+                "You do not have permission to change collections."
+            ),
+            "immutable_state": (
+                "This collection is frozen and can no longer be updated."
+            ),
+            "invalid_state": ("This collection is not in an editable state."),
+        }
         return {
             "available": False,
-            "detail": (
-                "Only the collection owner may use the programmatic update endpoint."
+            "detail": details.get(
+                decision.reason,
+                "You do not have access to update this collection.",
             ),
         }
 
@@ -199,7 +213,7 @@ def _serialize_collection_frequency(obj: object) -> dict[str, object] | None:
         if schedule_service is None:
             raise LookupError("Collection frequency schedule service is unavailable")
         rows = schedule_service.rows_from_frequency(frequency)
-        display_rows = schedule_service.display_rows(frequency)
+        display_rows = schedule_service.display_rows_from_rows(rows)
         is_year_round = (
             len(display_rows) == 1 and display_rows[0]["segment"] == "All year"
         )

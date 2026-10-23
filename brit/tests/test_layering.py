@@ -83,7 +83,6 @@ class LayeringContractTests(SimpleTestCase):
                 },
                 allowed_upward_imports={
                     ("brit/urls.py", "sources.registry"),
-                    ("brit/sitemap_items.py", "sources.registry"),
                     ("inventories/models.py", "sources"),
                 },
             ),

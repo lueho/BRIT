@@ -57,14 +57,14 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
     """
 
     search = CharFilter(
-        method="filter_search", label="Search", help_text="Search by object name"
+        method="form_only_filter", label="Search", help_text="Search by object name"
     )
 
     model_type = ModelMultipleChoiceFilter(
         queryset=ContentType.objects.none(),  # Set dynamically in __init__
         widget=CheckboxSelectMultiple,
         label="Model Type",
-        method="filter_model_type",
+        method="form_only_filter",
         help_text="Filter by content type",
     )
 
@@ -78,7 +78,7 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
             )
         ),
         label="Submitted by",
-        method="filter_owner",
+        method="form_only_filter",
         help_text="Filter by who submitted the item",
     )
 
@@ -87,7 +87,7 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
         lookup_expr="gte",
         label="Submitted after",
         help_text="Show items submitted after this date",
-        method="filter_submitted_after",
+        method="form_only_filter",
     )
 
     submitted_before = DateFilter(
@@ -95,7 +95,7 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
         lookup_expr="lte",
         label="Submitted before",
         help_text="Show items submitted before this date",
-        method="filter_submitted_before",
+        method="form_only_filter",
     )
 
     scope = ChoiceFilter(
@@ -117,7 +117,7 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
             ("name", "Name (A–Z)"),
             ("-name", "Name (Z–A)"),
         ),
-        method="filter_ordering",
+        method="form_only_filter",
     )
 
     class Meta:
@@ -158,49 +158,8 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
     def filter_search(self, queryset, name, value):
         """Filter by object name (case-insensitive contains).
 
-        This is a form-only filter; the view filters each real model queryset.
+        The view applies the real filtering and sorting to each model queryset
+        via ``ReviewItemCollector``; the ``queryset`` seen here is only the
+        FilterView plumbing dummy.
         """
-        # Return queryset unchanged; filtering happens in view
-        return queryset
-
-    def filter_model_type(self, queryset, name, value):
-        """Filter by ContentType.
-
-        This is a form-only filter; the view filters each real model queryset.
-        """
-        # Return queryset unchanged; filtering happens in view
-        return queryset
-
-    def filter_owner(self, queryset, name, value):
-        """Filter by owner/submitter.
-
-        This is a form-only filter; the view filters each real model queryset.
-        """
-        # Return queryset unchanged; filtering happens in view
-        return queryset
-
-    def filter_submitted_after(self, queryset, name, value):
-        """Filter by submission date lower bound.
-
-        This is a form-only filter; the view applies ``submitted_at__date__gte``
-        to each real model queryset.
-        """
-        # Return queryset unchanged; filtering happens in view
-        return queryset
-
-    def filter_submitted_before(self, queryset, name, value):
-        """Filter by submission date upper bound.
-
-        This is a form-only filter; the view applies ``submitted_at__date__lte``
-        to each real model queryset.
-        """
-        # Return queryset unchanged; filtering happens in view
-        return queryset
-
-    def filter_ordering(self, queryset, name, value):
-        """Apply sorting to the queryset.
-
-        This is a form-only filter; the view sorts lightweight references.
-        """
-        # Return queryset unchanged; sorting happens in view
         return queryset

@@ -8,11 +8,12 @@ from django.contrib.auth import get_user_model
 from django.db.models import F
 from django.utils import timezone
 
-from bibliography.utils import check_url, find_wayback_snapshot_for_year
+from bibliography.utils import check_url
 from brit.celery import app
 from maps.db_functions import SimplifyPreserveTopology
 from maps.signals import get_geojson_cache
 from maps.utils import (
+    AUTHZ_GEOJSON_CACHE_PREFIX,
     build_collection_cache_key,
     cache_rendered_geojson,
     rendered_geojson_cache_key,
@@ -25,6 +26,8 @@ from sources.waste_collection.geojson import (
     exclude_published_predecessors,
 )
 from sources.waste_collection.models import WasteFlyer
+from utils.object_management.permissions import filter_queryset_for_user
+from utils.object_management.policy import decide
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +61,9 @@ def warm_collection_geojson_cache(self):
         # never stale geometry under a current key.
         from sources.waste_collection.viewsets import CollectionViewSet
 
-        base_key = build_collection_cache_key(scope="published")
+        # Anonymous requests read the ``authz-v1:`` namespace exclusively, so
+        # warm the namespaced key that public-historical lookups resolve.
+        base_key = f"{AUTHZ_GEOJSON_CACHE_PREFIX}{build_collection_cache_key(scope='published')}"
         view = CollectionViewSet()
         aggregates = qs.aggregate(**view._version_aggregates())
         cache_key = rendered_geojson_cache_key(
@@ -95,34 +100,24 @@ def warm_collection_geojson_cache(self):
 
 
 @app.task(name="check_wasteflyer_url", trail=True)
-def check_wasteflyer_url(pk):
+def check_wasteflyer_url(pk, user_id=None):
+    """Refresh only ``url_valid``/``url_checked`` health metadata for a flyer.
+
+    When a ``user_id`` is supplied the acting identity's current
+    ``check_url`` decision is re-evaluated before any write.
+    """
     flyer = WasteFlyer.objects.filter(pk=pk).first()
     if flyer is None:
         return False
 
-    url_valid = check_url(flyer.url)
+    if user_id is not None:
+        actor = get_user_model().objects.filter(pk=user_id).first()
+        if actor is None or not decide(actor, "check_url", flyer).allowed:
+            return False
 
-    if flyer.url and "web.archive.org" in flyer.url:
-        flyer.url_valid = url_valid
-        flyer.url_checked = timezone.localdate()
-        flyer.save()
-        return True
-
-    collection_year = (
-        flyer.collections.exclude(valid_from__isnull=True)
-        .order_by("-valid_from")
-        .values_list("valid_from__year", flat=True)
-        .first()
-    )
-    if collection_year:
-        wayback_url = find_wayback_snapshot_for_year(flyer.url, collection_year)
-        if wayback_url:
-            flyer.url = wayback_url
-            url_valid = True
-
-    flyer.url_valid = url_valid
+    flyer.url_valid = check_url(flyer.url)
     flyer.url_checked = timezone.localdate()
-    flyer.save()
+    flyer.save(update_fields=["url_valid", "url_checked"])
     return True
 
 
@@ -140,9 +135,12 @@ def check_wasteflyer_urls(self, params, user_id=None):
     request = SimpleNamespace(user=user)
 
     qs = WasteFlyerFilter(params, queryset=WasteFlyer.objects.all(), request=request).qs
+    if user is not None:
+        qs = filter_queryset_for_user(qs, user)
     signatures = []
     for flyer in qs:
-        signatures.append(check_wasteflyer_url.s(flyer.pk))
+        if user is None or decide(user, "check_url", flyer).allowed:
+            signatures.append(check_wasteflyer_url.s(flyer.pk, user_id))
     callback = check_wasteflyer_urls_callback.s()
     task_chord = chord(signatures)(callback)
     return task_chord.task_id

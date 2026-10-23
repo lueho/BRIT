@@ -1,6 +1,10 @@
 from django.contrib import admin
 
-from utils.object_management.admin import PolicyAdminMixin, PolicyOwnedInlineMixin
+from utils.object_management.admin import (
+    NamedUserCreatedObjectAdmin,
+    PolicyAdminMixin,
+    PolicyOwnedInlineMixin,
+)
 
 from .models import Showcase, ShowcaseMaterial, ShowcaseProcess
 
@@ -18,7 +22,7 @@ class ShowcaseProcessInline(PolicyOwnedInlineMixin, admin.TabularInline):
 
 
 @admin.register(Showcase)
-class ShowcaseAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class ShowcaseAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "theme",
@@ -29,6 +33,5 @@ class ShowcaseAdmin(PolicyAdminMixin, admin.ModelAdmin):
     )
     search_fields = ("name", "description")
     list_filter = ("publication_status", "theme", "catchment")
-    ordering = ("name",)
     autocomplete_fields = ("catchment", "samples", "sample_series")
     inlines = (ShowcaseMaterialInline, ShowcaseProcessInline)

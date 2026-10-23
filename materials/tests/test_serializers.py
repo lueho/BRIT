@@ -76,7 +76,7 @@ class ComponentMeasurementWriteSerializerTestCase(TestCase):
 
     def test_rejects_volume_percent(self):
         unit, _ = Unit.objects.update_or_create(
-            name="vol.-%", defaults={"symbol": "volume_percent"}
+            name="vol%", defaults={"symbol": "volume_percent"}
         )
         serializer = ComponentMeasurementWriteSerializer(data=self._data(unit))
         self.assertFalse(serializer.is_valid())
@@ -558,7 +558,6 @@ class SampleSerializerTestCase(TestCase):
     def setUpTestData(cls):
         cls.owner = get_user_model().objects.create_user(
             username="sample-serializer-owner",
-            password="test123",
         )
         material = Material.objects.create(
             name="Test Material",
@@ -820,6 +819,7 @@ class MeasurementQualifierSerializerTestCase(TestCase):
         "display_value",
         "value_qualifier",
         "raw_value",
+        "limit_type",
         "detection_limit",
         "raw_detection_limit",
     )
@@ -827,7 +827,7 @@ class MeasurementQualifierSerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.owner = get_user_model().objects.create_user(
-            username="qualifier-serializer-owner", password="test123"
+            username="qualifier-serializer-owner",
         )
         cls.material = Material.objects.create(
             name="Qualifier material", owner=cls.owner
@@ -856,6 +856,7 @@ class MeasurementQualifierSerializerTestCase(TestCase):
             average=Decimal("0.1"),
             raw_value="0.1",
             value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            limit_type="loq",
             detection_limit=Decimal("6.57"),
             raw_detection_limit="6,57",
         )
@@ -867,6 +868,7 @@ class MeasurementQualifierSerializerTestCase(TestCase):
             average=Decimal("0.1"),
             raw_value="0.1",
             value_qualifier=MeasurementValueQualifier.LESS_THAN,
+            limit_type="loq",
             detection_limit=Decimal("6.57"),
             raw_detection_limit="6,57",
         )
@@ -878,6 +880,7 @@ class MeasurementQualifierSerializerTestCase(TestCase):
         self.assertEqual(Decimal(str(data["average"])), Decimal("0.1"))
         self.assertEqual(data["value_qualifier"], "less_than")
         self.assertEqual(data["raw_value"], "0.1")
+        self.assertEqual(data["limit_type"], "loq")
         self.assertEqual(Decimal(str(data["detection_limit"])), Decimal("6.57"))
         self.assertEqual(data["raw_detection_limit"], "6,57")
 

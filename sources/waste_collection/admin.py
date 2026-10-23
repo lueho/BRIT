@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from utils.object_management.admin import PolicyAdminMixin
+from utils.object_management.admin import NamedUserCreatedObjectAdmin, PolicyAdminMixin
 
 from .models import (
     AggregatedCollectionPropertyValue,
@@ -19,43 +19,29 @@ from .models import (
 
 
 @admin.register(Collector)
-class CollectorAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class CollectorAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "website", "catchment", "owner", "publication_status")
     search_fields = ("name", "description")
-    list_filter = ("publication_status",)
-    ordering = ("name",)
 
 
 @admin.register(CollectionSystem)
-class CollectionSystemAdmin(PolicyAdminMixin, admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class CollectionSystemAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(BinConfiguration)
-class BinConfigurationAdmin(PolicyAdminMixin, admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class BinConfigurationAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(WasteCategory)
-class WasteCategoryAdmin(PolicyAdminMixin, admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class WasteCategoryAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(WasteComponent)
-class WasteComponentAdmin(PolicyAdminMixin, admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class WasteComponentAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(WasteFlyer)
@@ -81,23 +67,18 @@ class CollectionSeasonAdmin(PolicyAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(CollectionFrequency)
-class CollectionFrequencyAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class CollectionFrequencyAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "type", "owner", "publication_status")
-    search_fields = ("name",)
     list_filter = ("publication_status", "type")
-    ordering = ("name",)
 
 
 @admin.register(FeeSystem)
-class FeeSystemAdmin(PolicyAdminMixin, admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class FeeSystemAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(Collection)
-class CollectionAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class CollectionAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "collector",
@@ -115,7 +96,6 @@ class CollectionAdmin(PolicyAdminMixin, admin.ModelAdmin):
         "collection_system",
         "bin_configuration",
     )
-    ordering = ("name",)
     autocomplete_fields = ("sources",)
     filter_horizontal = ("samples", "flyers", "predecessors")
 

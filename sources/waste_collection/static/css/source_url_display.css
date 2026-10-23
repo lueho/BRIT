@@ -18,3 +18,9 @@
   white-space: nowrap;
   vertical-align: bottom;
 }
+
+.source-url-archived {
+  color: var(--bs-secondary-color);
+  font-size: 0.8125em;
+  margin-inline-start: 0.35rem;
+}

@@ -21,7 +21,7 @@ from sources.waste_collection.models import (
     WasteCategory,
 )
 
-VOCABULARY_VERSION: Final[str] = "0.4.0"
+VOCABULARY_VERSION: Final[str] = "0.4.1"
 VOCABULARY_URI_BASE: Final[str] = "https://brit.bioresource-tools.net/vocab/soilcom"
 
 CONCEPT_SCHEME_URIS: Final[dict[str, str]] = {

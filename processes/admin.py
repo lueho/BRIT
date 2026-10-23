@@ -1,6 +1,10 @@
 from django.contrib import admin
 
-from utils.object_management.admin import PolicyAdminMixin, PolicyOwnedInlineMixin
+from utils.object_management.admin import (
+    NamedUserCreatedObjectAdmin,
+    PolicyAdminMixin,
+    PolicyOwnedInlineMixin,
+)
 
 from .models import (
     Process,
@@ -17,11 +21,13 @@ from .models import (
 class ProcessMaterialInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = ProcessMaterial
     extra = 1
+    autocomplete_fields = ("material", "quantity_unit")
 
 
 class ProcessOperatingParameterInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = ProcessOperatingParameter
     extra = 1
+    autocomplete_fields = ("unit",)
 
 
 class ProcessAuthorInline(PolicyOwnedInlineMixin, admin.TabularInline):
@@ -47,7 +53,7 @@ class ProcessInfoResourceInline(PolicyOwnedInlineMixin, admin.TabularInline):
 
 
 @admin.register(Process)
-class ProcessAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class ProcessAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "author_list", "owner", "publication_status")
     list_filter = ("categories", "publication_status")
     search_fields = (
@@ -61,14 +67,14 @@ class ProcessAdmin(PolicyAdminMixin, admin.ModelAdmin):
         "short_description",
         "mechanism",
     )
-    inlines = [
+    inlines = (
         ProcessMaterialInline,
         ProcessOperatingParameterInline,
         ProcessAuthorInline,
         ProcessSourceInline,
         ProcessLinkInline,
         ProcessInfoResourceInline,
-    ]
+    )
     filter_horizontal = ("categories",)
 
     @admin.display(description="Authors")
@@ -77,7 +83,7 @@ class ProcessAdmin(PolicyAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(ProcessCategory)
-class ProcessCategoryAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class ProcessCategoryAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "owner", "publication_status")
     search_fields = ("name",)
 
@@ -97,6 +103,7 @@ class ProcessMaterialAdmin(PolicyAdminMixin, admin.ModelAdmin):
     )
     list_filter = ("role", "optional")
     search_fields = ("process__name", "material__name")
+    autocomplete_fields = ("process", "material", "quantity_unit")
 
 
 @admin.register(ProcessOperatingParameter)
@@ -113,6 +120,7 @@ class ProcessOperatingParameterAdmin(PolicyAdminMixin, admin.ModelAdmin):
     )
     list_filter = ("parameter",)
     search_fields = ("process__name", "name")
+    autocomplete_fields = ("process", "unit")
 
 
 @admin.register(ProcessLink)

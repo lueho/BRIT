@@ -13,8 +13,15 @@
                Choose a region, then the information you need — collection systems and bins, schedules and collection counts, fees, or collected amounts.
             </p>
          </div>
-         {% if can_review_collections %}
-            <div class="atlas-context-actions">
+         <div class="atlas-context-actions">
+            <a class="btn btn-outline-primary btn-sm atlas-hero-btn"
+               href="{{ abfallatlas_url }}"
+               target="_blank"
+               rel="noopener noreferrer"
+               title="Visit abfall-atlas.de">
+               <i class="fas fa-globe" aria-hidden="true"></i> abfall-atlas.de <i class="fas fa-external-link-alt" aria-hidden="true"></i><span class="visually-hidden">(opens in a new tab)</span>
+            </a>
+            {% if can_review_collections %}
                <a class="btn btn-outline-primary btn-sm atlas-hero-btn"
                   href="{% url 'waste-atlas-change-map-overview' %}">
                   <i class="fas fa-exchange-alt"></i> Change maps
@@ -23,8 +30,8 @@
                   href="{% url 'waste-atlas-data-conflicts-overview' %}">
                   <i class="fas fa-exclamation-triangle"></i> Data conflicts
                </a>
-            </div>
-         {% endif %}
+            {% endif %}
+         </div>
       </header>
       <section class="atlas-panel atlas-directory" aria-labelledby="atlas-directory-title">
          <div class="atlas-directory-header">
@@ -73,24 +80,54 @@
                     role="tabpanel"
                     aria-labelledby="tab-{{ group.id }}">
                   {% if group.europe_maps %}
-                     <div class="atlas-directory-region">
-                        <p class="atlas-region-lead">Coverage and European comparison indicators.</p>
-                        <div class="atlas-map-list">
-                           {% for map in group.europe_maps %}
-                              <a class="atlas-map-link" href="{{ map.url }}" data-region="{{ group.id }}" data-category="{{ map.category }}" data-search="{{ map.title|lower }}">{{ map.title }}</a>
-                           {% endfor %}
+                     <div class="atlas-directory-region atlas-directory-region--europe">
+                        <div class="atlas-topic-grid">
+                           <div class="atlas-link-group atlas-topic-card">
+                              <div class="atlas-link-group-title">
+                                 <i class="fas fa-fw fa-globe-europe" aria-hidden="true"></i>
+                                 Europe-wide maps
+                              </div>
+                              <p class="atlas-region-lead">Coverage and European comparison indicators.</p>
+                              <div class="atlas-map-list">
+                                 {% for map in group.europe_maps %}
+                                    <a class="atlas-map-link" href="{{ map.url }}" data-region="{{ group.id }}" data-category="{{ map.category }}" data-search="{{ map.title|lower }}">{{ map.title }}</a>
+                                 {% endfor %}
+                              </div>
+                           </div>
                         </div>
                      </div>
                   {% endif %}
-                  <div class="row g-4">
-                     {% for region in group.regions %}
-                        <div class="col-lg-6 atlas-directory-region" data-region-value="{{ region.value }}">
-                           <div class="atlas-directory-region-head">
-                              <h3 class="atlas-directory-region-title">{{ region.label }}</h3>
-                           </div>
+                  {% if group.regions|length > 1 %}
+                     <div class="atlas-mapset-picker"
+                          role="group"
+                          aria-label="Map sets in {{ group.label }}">
+                        {% for region in group.regions %}
+                           <button type="button"
+                                   class="atlas-mapset-chip"
+                                   data-map-set="{{ region.value }}"
+                                   aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}">
+                              {{ region.label }}
+                              <span class="atlas-mapset-count">{{ region.map_count }}</span>
+                           </button>
+                        {% endfor %}
+                     </div>
+                  {% endif %}
+                  {% for region in group.regions %}
+                     <section class="atlas-directory-region atlas-mapset{% if forloop.first %} is-active{% endif %}"
+                              data-region-value="{{ region.value }}"
+                              aria-labelledby="atlas-mapset-{{ region.value }}">
+                        <div class="atlas-directory-region-head">
+                           <h3 class="atlas-directory-region-title"
+                               id="atlas-mapset-{{ region.value }}">{{ region.label }}</h3>
+                           <span class="atlas-mapset-meta">{{ region.map_count }} maps</span>
+                        </div>
+                        <div class="atlas-topic-grid">
                            {% for section in region.sections %}
-                              <div class="atlas-link-group" data-section="{{ section.key }}">
-                                 <div class="atlas-link-group-title">{{ section.label }}</div>
+                              <div class="atlas-link-group atlas-topic-card" data-section="{{ section.key }}">
+                                 <div class="atlas-link-group-title">
+                                    <i class="fas fa-fw {{ section.icon }}" aria-hidden="true"></i>
+                                    {{ section.label }}
+                                 </div>
                                  <div class="atlas-map-list">
                                     {% for map in section.maps %}
                                        <a class="atlas-map-link"
@@ -104,8 +141,8 @@
                               </div>
                            {% endfor %}
                         </div>
-                     {% endfor %}
-                  </div>
+                     </section>
+                  {% endfor %}
                   <p class="atlas-directory-empty" hidden>No maps match these filters.</p>
                </div>
             {% endfor %}

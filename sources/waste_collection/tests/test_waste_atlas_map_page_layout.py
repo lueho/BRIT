@@ -10,6 +10,7 @@ share the right-hand panel, using the same ``sidebar-tabs`` pattern as
 from pathlib import Path
 
 from django.contrib.auth.models import Permission, User
+from django.contrib.contenttypes.models import ContentType
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
@@ -33,6 +34,16 @@ class MapPageChromeTests(TestCase):
         cls.staff = User.objects.create_user(
             username="layout-staff", password="secret", is_staff=True
         )
+        from utils.object_management.models import ReviewAction
+
+        cls.admin = User.objects.create_user(username="layout-admin", is_staff=True)
+        cls.admin.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type=ContentType.objects.get_for_model(ReviewAction),
+            )
+        )
+        cls.staff = User.objects.create_user(username="layout-staff", is_staff=True)
 
     def setUp(self):
         self.client.force_login(self.user)
@@ -116,7 +127,7 @@ class MapPageChromeTests(TestCase):
 
     def test_options_pane_groups_actions_under_side_group_titles(self):
         """Export and administration actions each carry a group title."""
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
         content = self._content()
         pane = self._section(
             content, 'id="atlas-options-pane"', "</div>\n        </div>"

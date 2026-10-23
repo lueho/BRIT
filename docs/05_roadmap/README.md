@@ -50,7 +50,7 @@ Non-test code only; test-code coupling is tracked separately in WS6.
 | V6 | `layer_manager` imports `inventories`, `materials`, `distributions` | `layer_manager/models.py:6-8` | Merge `layer_manager` into `inventories` (it is its private result store) or genericize via contenttypes (WS8) |
 | V7 | `inventories` discovers algorithms via `pkgutil` over `sources` + DB dotted paths | `inventories/models.py:31-36,88-106,158-163` | Replace with the source-domain plugin registry; drop `flexibi_hamburg` aliases (WS8) |
 | V8 | Sideways: `roadside_trees` imports `urban_green_spaces` | `sources/roadside_trees/models.py:4`, `inventory/algorithms.py:6` | Remove dead import; move shared Hamburg data access behind explicit interface |
-| V9 | `brit.sitemap_items` imports `sources.registry` | `brit/sitemap_items.py` | Acceptable short-term (composition root); fold into the same registry pattern when WS1-D lands |
+| V9 | Resolved: `brit` no longer imports `sources.registry` for the sitemap | was `brit/sitemap_items.py` | Source plugins forward `sitemap_items` into `brit.sitemap_registry`; core apps register their own contributions from `AppConfig.ready()` |
 
 ---
 
@@ -104,17 +104,19 @@ The review/publication workflow is the heart of the platform; every domain model
 on it.
 
 1. **Atomic state transitions.** `submit_for_review/withdraw/approve/reject/archive`
-   (`utils/object_management/models.py:217-281`) are check-then-save without locking and
-   call `save()` without `update_fields`. Implement compare-and-swap transitions
-   (`filter(pk, publication_status=expected).update(...)` inside a transaction, or
-   `select_for_update`), saving only workflow fields. Add transition tests.
-   **Status:** completed in PR #273.
-2. **Single source of truth for permissions.** Permission logic is spread over
-   `permissions.py` (object permission, submit/approve checks, `get_object_policy`),
-   view mixins, and viewsets with double `check_object_permissions` calls. Consolidate
-   into one policy module consumed by views, API, and templates; document the matrix
-   (owner/moderator/staff × status × action). Verify the moderator edge case: changing
-   `publication_status` of published objects they do not own.
+   run through the atomic services in `utils/object_management/services.py`:
+   `content_mutation` locks the reviewable root (`select_for_update`), re-checks
+   policy against freshly persisted state, and audits a single
+   `content_revision` bump; `perform_transition` binds lifecycle decisions to
+   the inspected revision and enforces contributor exclusion.
+   **Status:** Historical reference: PR #273. Current revision-safe
+   authorization coverage is described in the canonical contract and
+   implementation map.
+2. **Single source of truth for permissions.**
+   **Status:** Unified authorization implementation: see the canonical contract
+   (`docs/02_developer_guide/security_permission_validation.md`) and the
+   implementation map (`docs/02_developer_guide/user_created_objects.md`) for
+   covered boundaries.
 3. **Status constants.** Replace scattered string literals (`"published"` appears in
    domain code, e.g. `sources/waste_collection/views.py:1352`) with the
    `UserCreatedObject.STATUS_*` constants / a `TextChoices` enum.

@@ -1,11 +1,10 @@
-import os
 import re
-import subprocess
-import sys
 from pathlib import Path
 
 from django.conf import settings
 from django.test import SimpleTestCase
+
+from brit.tests.probes import run_settings_probe
 
 
 class DeprecatedSecuritySettingsTests(SimpleTestCase):
@@ -18,15 +17,8 @@ class DeprecatedSecuritySettingsTests(SimpleTestCase):
 
 class ProductionContentSecurityPolicyTests(SimpleTestCase):
     def test_report_only_policy_is_added_to_responses(self):
-        environment = os.environ.copy()
-        environment["DJANGO_SETTINGS_MODULE"] = "brit.settings.heroku"
-        environment["SECRET_KEY"] = "test-secret-key"
-        environment["AWS_STORAGE_BUCKET_NAME"] = "brit-test-assets"
-        completed = subprocess.run(
-            [
-                sys.executable,
-                "-c",
-                """
+        completed = run_settings_probe(
+            """
 import django
 django.setup()
 import brit.settings.heroku as h
@@ -63,11 +55,11 @@ expected = (
 assert response.headers["Content-Security-Policy-Report-Only"] == expected
 assert "Content-Security-Policy" not in response.headers
 """,
-            ],
-            capture_output=True,
-            check=False,
-            env=environment,
-            text=True,
+            env={
+                "DJANGO_SETTINGS_MODULE": "brit.settings.heroku",
+                "SECRET_KEY": "test-secret-key",
+                "AWS_STORAGE_BUCKET_NAME": "brit-test-assets",
+            },
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)

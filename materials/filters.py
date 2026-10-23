@@ -264,7 +264,7 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
     q = CharFilter(
         method="filter_q",
         label="Search",
-        help_text="Search sample names, descriptions, substrate materials, or locations.",
+        help_text="Search sample names, descriptions, substrate materials, locations, or sample group names.",
     )
 
     name = ModelChoiceFilter(
@@ -396,6 +396,19 @@ class SampleFilter(FreeTextSearchFilterMixin, UserCreatedObjectScopedFilterSet):
             )
         ),
     )
+
+    def filter_q(self, queryset, name, value):
+        filtered = super().filter_q(queryset, name, value)
+        value = (value or "").strip()
+        if not value:
+            return filtered
+        user = getattr(getattr(self, "request", None), "user", None)
+        matching_groups = filter_queryset_for_user(
+            SampleGroup.objects.filter(name__icontains=value), user
+        )
+        return queryset.filter(
+            Q(pk__in=filtered.values("pk")) | Q(sample_groups__in=matching_groups)
+        ).distinct()
 
     def filter_parameter(self, queryset, name, value):
         canonical_property = value.canonical_property

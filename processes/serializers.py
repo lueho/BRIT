@@ -207,6 +207,12 @@ class ScopedRelatedObjectsMixin:
             link for link in obj.process_materials.all() if link.material_id in visible
         ]
 
+    def get_authors(self, obj):
+        """Get author ids in explicit process author order."""
+
+        visible = self._visible_pks(Author)
+        return [a.pk for a in obj.authors_ordered() if a.pk in visible]
+
 
 class ProcessListSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerializer):
     """Simplified serializer for Process list views."""
@@ -251,12 +257,6 @@ class ProcessListSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerializ
         return SourceModelSerializer(
             [s for s in obj.sources.all() if s.pk in visible], many=True
         ).data
-
-    def get_authors(self, obj):
-        """Get author ids in explicit process author order."""
-
-        visible = self._visible_pks(Author)
-        return [a.pk for a in obj.authors_ordered() if a.pk in visible]
 
 
 class ProcessDetailSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerializer):
@@ -324,12 +324,6 @@ class ProcessDetailSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerial
         return SourceModelSerializer(
             [s for s in obj.sources.all() if s.pk in visible], many=True
         ).data
-
-    def get_authors(self, obj):
-        """Get author ids in explicit process author order."""
-
-        visible = self._visible_pks(Author)
-        return [a.pk for a in obj.authors_ordered() if a.pk in visible]
 
     def get_process_materials(self, obj):
         return ProcessMaterialAPISerializer(

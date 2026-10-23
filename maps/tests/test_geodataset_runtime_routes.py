@@ -2,10 +2,13 @@ import json
 from unittest.mock import patch
 
 from django.contrib.admin.sites import AdminSite
+from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
 from django.test import TestCase
 from django.urls import reverse
+from rest_framework.authtoken.models import Token
 
 from bibliography.models import Source
 from maps.admin import GeoDatasetModelAdmin
@@ -226,6 +229,108 @@ class GeoDataSetLocalRelationRuntimeRouteTestCase(TestCase):
     def tearDown(self):
         with connection.cursor() as cursor:
             cursor.execute(f"DROP TABLE IF EXISTS public.{self.relation_name}")
+
+    def _get_features_with_geojson_rate(self, rate, *remote_addrs, **extra):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        url = reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk})
+        with patch(
+            "rest_framework.throttling.SimpleRateThrottle.THROTTLE_RATES",
+            {"geojson_anon": rate},
+        ):
+            return [
+                self.client.get(url, REMOTE_ADDR=addr, **extra) for addr in remote_addrs
+            ]
+
+    def test_feature_geojson_throttles_anonymous_subnet_together(self):
+        first, second = self._get_features_with_geojson_rate(
+            "1/minute", "202.46.62.65", "202.46.62.117"
+        )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)
+
+    def test_feature_geojson_throttle_skips_session_users(self):
+        user = User.objects.create_user(username="geodataset-map-user")
+        self.client.force_login(user)
+
+        responses = self._get_features_with_geojson_rate(
+            "1/minute", "202.46.62.65", "202.46.62.65"
+        )
+
+        self.assertEqual([r.status_code for r in responses], [200, 200])
+
+    def test_feature_geojson_throttle_skips_valid_token_clients(self):
+        token = Token.objects.create(
+            user=User.objects.create_user(username="geodataset-token-user")
+        )
+
+        responses = self._get_features_with_geojson_rate(
+            "1/minute",
+            "202.46.62.65",
+            "202.46.62.65",
+            HTTP_AUTHORIZATION=f"Token {token.key}",
+        )
+
+        self.assertEqual([r.status_code for r in responses], [200, 200])
+
+    def test_feature_geojson_invalid_token_is_throttled_not_rejected(self):
+        responses = self._get_features_with_geojson_rate(
+            "1/minute",
+            "202.46.62.65",
+            "202.46.62.65",
+            HTTP_AUTHORIZATION="Token invalid",
+        )
+
+        self.assertEqual([r.status_code for r in responses], [200, 429])
+
+    def _make_private_dataset_owned_by(self, owner):
+        self.dataset.publication_status = "private"
+        self.dataset.owner = owner
+        self.dataset.save(update_fields=["publication_status", "owner"])
+
+    def _get_private_features(self, **extra):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        return self.client.get(
+            reverse("geodataset-features-geojson", kwargs={"pk": self.dataset.pk}),
+            **extra,
+        )
+
+    def test_feature_geojson_serves_private_dataset_to_owner_token(self):
+        owner = User.objects.create_user(username="geodataset-private-owner")
+        token = Token.objects.create(user=owner)
+        self._make_private_dataset_owned_by(owner)
+
+        response = self._get_private_features(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        self.assertEqual(response.status_code, 200)
+        names = {
+            feature["properties"]["name"]
+            for feature in json.loads(b"".join(response.streaming_content))["features"]
+        }
+        self.assertEqual(names, {"Local feature A", "Local feature B"})
+
+    def test_feature_geojson_hides_private_dataset_from_other_token(self):
+        self._make_private_dataset_owned_by(
+            User.objects.create_user(username="geodataset-private-owner")
+        )
+        token = Token.objects.create(
+            user=User.objects.create_user(username="geodataset-other-user")
+        )
+
+        response = self._get_private_features(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_feature_geojson_hides_private_dataset_from_invalid_token(self):
+        self._make_private_dataset_owned_by(
+            User.objects.create_user(username="geodataset-private-owner")
+        )
+
+        response = self._get_private_features(HTTP_AUTHORIZATION="Token invalid")
+
+        self.assertNotEqual(response.status_code, 200)
 
     def test_runtime_adapter_resolves_local_relation_runtime(self):
         adapter = get_dataset_runtime_adapter(self.dataset)
