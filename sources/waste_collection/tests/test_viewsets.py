@@ -25,6 +25,7 @@ from maps.models import (
     CatchmentRevision,
     GeoPolygon,
     NutsRegion,
+    NutsVintage,
     Region,
     RegionAttributeValue,
     RegionProperty,
@@ -54,6 +55,7 @@ from sources.waste_collection.waste_atlas import params as atlas_params
 from sources.waste_collection.waste_atlas import viewsets as atlas_viewsets
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.properties.models import Property, Unit
+from utils.tests.testcases import ensure_test_default_owner
 
 
 class CollectionViewSetTestCase(APITestCase):
@@ -2291,6 +2293,7 @@ class GreenWasteCollectionSystemCountViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.region = Region.objects.create(name="Region DE", country="DE")
         cls.catchment_a = CollectionCatchment.objects.create(
             name="Catchment A",
@@ -2389,6 +2392,7 @@ class CollectionConflictViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.region = Region.objects.create(name="Region DE", country="DE")
         cls.catchment_conflict = CollectionCatchment.objects.create(
             name="Conflict",
@@ -2446,7 +2450,14 @@ class CollectionConflictViewSetTests(APITestCase):
         )
 
     def setUp(self):
-        self.client.force_login(User.objects.create_user("maintainer", is_staff=True))
+        maintainer = User.objects.create_user("maintainer")
+        maintainer.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
+        )
+        self.client.force_login(maintainer)
 
     @classmethod
     def _collection(cls, catchment, waste_category, collection_system, year):
@@ -2565,6 +2576,7 @@ class WasteAtlasThrottleTests(APITestCase):
 class CataloniaCollectionSystemViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.region_es = Region.objects.create(name="Catalonia", country="ES")
         cls.region_fr = Region.objects.create(name="France", country="FR")
         cls.catchment_same_bp = CollectionCatchment.objects.create(
@@ -2782,6 +2794,7 @@ class CollectionPointCountViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.region = Region.objects.create(name="Region IT", country="IT")
         cls.catchment = CollectionCatchment.objects.create(
             name="Catchment IT",
@@ -2847,6 +2860,7 @@ class ConnectionRateViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.region = Region.objects.create(name="Connection Rate Region", country="DE")
         cls.catchment = CollectionCatchment.objects.create(
             name="Connection Rate Catchment",
@@ -2970,6 +2984,7 @@ class ConnectionRateViewSetTests(APITestCase):
 class WasteAtlasPrimarySelectionTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.region = Region.objects.create(
             name="Primary Selection Region", country="DE"
         )
@@ -3112,6 +3127,7 @@ class TargetWasteCategoryViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.region = Region.objects.create(name="South Tyrol", country="IT")
         cls.door_to_door = CollectionSystem.objects.create(name="Door to door")
         cls.no_separate_collection = CollectionSystem.objects.create(
@@ -3174,6 +3190,7 @@ class BiowasteFeeSystemViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         region = Region.objects.create(name="Fee System Region", country="DE")
         cls.catchment = CollectionCatchment.objects.create(
             name="Bring Point Catchment",
@@ -3248,6 +3265,7 @@ class BinConfigurationViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.region_se = Region.objects.create(name="Region SE", country="SE")
         cls.region_de = Region.objects.create(name="Region DE", country="DE")
 
@@ -3359,12 +3377,15 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
+        cls.vintage = NutsVintage.objects.create(year=2021, is_current=True)
         cls.be1_region = NutsRegion.objects.create(
             name="Brussels",
             country="BE",
             cntr_code="BE",
             nuts_id="BE1",
             levl_code=1,
+            version=cls.vintage,
             borders=GeoPolygon.objects.create(
                 geom="MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))"
             ),
@@ -3375,6 +3396,7 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
             cntr_code="BE",
             nuts_id="BE2",
             levl_code=1,
+            version=cls.vintage,
             borders=GeoPolygon.objects.create(
                 geom="MULTIPOLYGON(((2 0, 2 1, 3 1, 3 0, 2 0)))"
             ),
@@ -3385,6 +3407,7 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
             cntr_code="BE",
             nuts_id="BE3",
             levl_code=1,
+            version=cls.vintage,
             borders=GeoPolygon.objects.create(
                 geom="MULTIPOLYGON(((4 0, 4 1, 5 1, 5 0, 4 0)))"
             ),
@@ -3499,6 +3522,7 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.specific_property = Property.objects.create(
             name="specific waste collected [green-atlas-test]"
         )
@@ -3733,6 +3757,7 @@ class BinSizeViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
         cls.residual_category, _ = WasteCategory.objects.get_or_create(
             name="Residual waste"
@@ -3892,6 +3917,7 @@ class AtlasRatioViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
         cls.food_category, _ = WasteCategory.objects.get_or_create(name="Food waste")
         cls.residual_category, _ = WasteCategory.objects.get_or_create(
@@ -4026,6 +4052,7 @@ class OrganicAmountViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         clear_derived_value_config_cache()
 
         cls.specific_property = Property.objects.create(
@@ -4317,6 +4344,7 @@ class WasteRatioMixedNumericTypesTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.specific_property = Property.objects.create(
             name="specific waste collected [ratio-type-test]"
         )
@@ -4419,6 +4447,7 @@ class SouthTyrolCollectionPointTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
         cls.food_category, _ = WasteCategory.objects.get_or_create(name="Food waste")
         cls.residual_category, _ = WasteCategory.objects.get_or_create(
@@ -4581,6 +4610,7 @@ class FalsyZeroRatioGuardTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
         cls.food_category, _ = WasteCategory.objects.get_or_create(name="Food waste")
         cls.residual_category, _ = WasteCategory.objects.get_or_create(
@@ -4702,6 +4732,7 @@ class CollectionPointCountNoDataAndDtDTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
         cls.residual_category, _ = WasteCategory.objects.get_or_create(
             name="Residual waste"
@@ -4839,6 +4870,7 @@ class BiowasteImpurityViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
         cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
         cls.no_collection, _ = CollectionSystem.objects.get_or_create(
@@ -4975,6 +5007,7 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.bio_category, _ = WasteCategory.objects.get_or_create(name="Biowaste")
         cls.d2d, _ = CollectionSystem.objects.get_or_create(name="Door to door")
         cls.bring_point, _ = CollectionSystem.objects.get_or_create(name="Bring point")
@@ -5124,6 +5157,7 @@ class WasteAtlasPublicationScopingTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.region = cls._region_with_borders("Pub Scope Region")
         cls.d2d = CollectionSystem.objects.create(name="Door to door")
         cls.bio_category = WasteCategory.objects.create(name="Biowaste")
@@ -5376,9 +5410,14 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         self.assertNotIn(self.review_catchment.id, ids)
 
     def test_conflicts_excludes_non_published(self):
-        self.client.force_login(
-            User.objects.create_user("pubscope-staff", is_staff=True)
+        moderator = User.objects.create_user("pubscope-moderator")
+        moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
         )
+        self.client.force_login(moderator)
         response = self._get("conflicts", theme="collection_system", scope="published")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = self._catchment_ids(response)
@@ -5387,38 +5426,38 @@ class WasteAtlasPublicationScopingTests(APITestCase):
 
     # --- Staff bypass tests ---
 
-    def test_staff_sees_private_and_review_in_collection_system(self):
+    def test_staff_only_sees_public_historical_in_collection_system(self):
         staff = User.objects.create_user("staffuser", is_staff=True)
         self.client.force_login(staff)
         response = self._get("collection_system")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = self._catchment_ids(response)
         self.assertIn(self.published_catchment.id, ids)
-        self.assertIn(self.private_catchment.id, ids)
-        self.assertIn(self.review_catchment.id, ids)
+        self.assertNotIn(self.private_catchment.id, ids)
+        self.assertNotIn(self.review_catchment.id, ids)
 
-    def test_staff_sees_private_and_review_in_catchment_geojson(self):
+    def test_staff_only_sees_public_historical_in_catchment_geojson(self):
         staff = User.objects.create_user("staffuser2", is_staff=True)
         self.client.force_login(staff)
         response = self._get("catchment_geojson")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = self._catchment_ids(response)
         self.assertIn(self.published_catchment.id, ids)
-        self.assertIn(self.private_catchment.id, ids)
-        self.assertIn(self.review_catchment.id, ids)
+        self.assertNotIn(self.private_catchment.id, ids)
+        self.assertNotIn(self.review_catchment.id, ids)
 
-    def test_staff_sees_private_and_review_in_collection_orga_level(self):
+    def test_staff_only_sees_public_historical_in_collection_orga_level(self):
         staff = User.objects.create_user("staffuser3", is_staff=True)
         self.client.force_login(staff)
         response = self._get("collection_orga_level")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = self._catchment_ids(response)
         self.assertIn(self.published_catchment.id, ids)
-        self.assertIn(self.private_catchment.id, ids)
-        self.assertIn(self.review_catchment.id, ids)
+        self.assertNotIn(self.private_catchment.id, ids)
+        self.assertNotIn(self.review_catchment.id, ids)
 
-    def test_anonymous_still_excluded_after_staff_bypass(self):
-        """Ensure anonymous users still only see published after staff bypass."""
+    def test_anonymous_still_gets_public_historical_only(self):
+        """Anonymous visitors keep the authorized public-historical set."""
         self.client.logout()
         response = self._get("collection_system")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -5463,8 +5502,15 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         ids = self._catchment_ids(self._get("collection_system", scope="mine"))
         self.assertNotIn(other_collection.catchment_id, ids)
 
-    def test_review_scope_requires_moderation_permission(self):
+    def test_review_scope_shows_own_review_and_moderated_rows(self):
+        # The owner can see their own in-review submission.
         self.client.force_login(self.user)
+        for key in ("collection_system", "catchment_geojson"):
+            ids = self._catchment_ids(self._get(key, scope="review"))
+            self.assertIn(self.review_catchment.id, ids, key)
+
+        # A non-owner without moderation rights sees none of it.
+        self.client.force_login(User.objects.create_user("scope_stranger"))
         for key in ("collection_system", "catchment_geojson"):
             ids = self._catchment_ids(self._get(key, scope="review"))
             self.assertNotIn(self.review_catchment.id, ids, key)
@@ -5505,8 +5551,19 @@ class WasteAtlasPublicationScopingTests(APITestCase):
             declined.catchment_id,
             self._catchment_ids(self._get("collection_system", scope="mine")),
         )
+        # A Django staff flag alone never opens the administrator scope.
         staff = User.objects.create_user("scope_all_staff", is_staff=True)
         self.client.force_login(staff)
+        ids = self._catchment_ids(self._get("collection_system", scope="all"))
+        self.assertNotIn(self.private_catchment.id, ids)
+        self.assertNotIn(self.review_catchment.id, ids)
+        self.assertNotIn(declined.catchment_id, ids)
+        # A non-staff administrator sees every status.
+        admin = User.objects.create_user("scope_all_admin")
+        admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
+        self.client.force_login(admin)
         ids = self._catchment_ids(self._get("collection_system", scope="all"))
         self.assertIn(self.private_catchment.id, ids)
         self.assertIn(self.review_catchment.id, ids)
@@ -5685,6 +5742,7 @@ class WasteAtlasTemporalCatchmentGeometryTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         borders = GeoPolygon.objects.create(geom=cls._polygon(2))
         region = Region.objects.create(
             name="Mutable current region", country="DE", borders=borders
@@ -6109,6 +6167,7 @@ class WasteAtlasChangeOverlayPrecisionTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         border = cls._shared_border()
         cls.west = cls._catchment("Western neighbour", [*border, (0, 1), (0, 0)])
         cls.east = cls._catchment(
@@ -6181,6 +6240,7 @@ class WasteAtlasChangeOverlayBorderNoiseTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         noise = 0.00002
         # Neighbours meeting at x = 1, where the eastern boundary reaches a hair
         # across the border and a spike touches the western one in a point.
@@ -6259,6 +6319,7 @@ class WasteAtlasChangeOverlappingCatchmentTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         # The county boundary reaches into the municipality, so both catchments
         # claim the same strip in both years.
         cls.county = cls._catchment(

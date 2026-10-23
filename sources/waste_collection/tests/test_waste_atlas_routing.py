@@ -3,6 +3,9 @@ import json
 from django.test import TestCase
 from django.urls import reverse
 
+from sources.waste_collection.tests.atlas_fixtures import (
+    seed_atlas_map_configurations,
+)
 from sources.waste_collection.waste_atlas.models import WasteAtlasMapConfiguration
 
 OLD_PREFIX = "/waste_collection/api/waste-atlas/"
@@ -63,6 +66,10 @@ class WasteAtlasLegacyRedirectTests(TestCase):
 
 
 class StoredMapConfigurationUrlTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_atlas_map_configurations()
+
     def test_stored_configurations_point_at_the_new_api_prefix(self):
         configurations = list(WasteAtlasMapConfiguration.objects.all())
         self.assertTrue(configurations)

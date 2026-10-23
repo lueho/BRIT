@@ -13,7 +13,7 @@
                Choose a region, then the information you need — collection systems and bins, schedules and collection counts, fees, or collected amounts.
             </p>
          </div>
-         {% if request.user.is_staff %}
+         {% if can_review_collections %}
             <div class="atlas-context-actions">
                <a class="btn btn-outline-primary btn-sm atlas-hero-btn"
                   href="{% url 'waste-atlas-change-map-overview' %}">

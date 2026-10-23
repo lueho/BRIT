@@ -9,7 +9,7 @@ share the right-hand panel, using the same ``sidebar-tabs`` pattern as
 
 from pathlib import Path
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
@@ -26,6 +26,10 @@ class MapPageChromeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(username="layout-user", password="secret")
+        cls.admin = User.objects.create_user(username="layout-admin", password="secret")
+        cls.admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.staff = User.objects.create_user(
             username="layout-staff", password="secret", is_staff=True
         )
@@ -186,8 +190,8 @@ class MapPageChromeTests(TestCase):
         self.assertIn('id="atlas-tree-toggle"', content)
         self.assertIn('aria-controls="atlas-tree"', content)
 
-    def test_edit_configuration_lives_in_the_options_pane_for_staff(self):
-        self.client.force_login(self.staff)
+    def test_edit_configuration_lives_in_the_options_pane_for_admin(self):
+        self.client.force_login(self.admin)
         content = self._content()
 
         header = self._section(content, '<header class="atlas-context"', "</header>")
@@ -197,6 +201,11 @@ class MapPageChromeTests(TestCase):
         )
         self.assertIn("Edit configuration", pane)
         self.assertIn("/configurations/", pane)
+
+    def test_staff_only_sees_no_configuration_entry(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse(MAP_ROUTE))
+        self.assertNotContains(response, "Edit configuration")
 
     def test_non_staff_see_no_configuration_entry(self):
         content = self._content()

@@ -317,11 +317,24 @@ test("selector scope uses the option ISO country and clears a missing NUTS level
   assert.match(selection.queryString(2024, null, region), /country=DE/);
   assert.doesNotMatch(selection.queryString(2024, null, region), /germany-schleswig/);
   assert.equal(new URLSearchParams(selection.queryString(2024, null, region, 'mine')).get('scope'), 'mine');
+  assert.equal(new URLSearchParams(selection.queryString(2024, null, region, 'historical')).get('scope'), 'historical');
   assert.equal(new URLSearchParams(selection.queryString(2024, 2023, region, 'review')).get('scope'), 'review');
   assert.equal(
     new URL(atlas.selectorNavigationTarget('/change/', 2024, 2023, region, 'all'), 'https://example.org').searchParams.get('scope'),
     'all',
   );
+});
+
+test("scope fallback applies only to an absent scope", () => {
+  const resolve = selection.resolvedScope;
+  assert.equal(resolve({}), 'historical');
+  assert.equal(resolve({ scope: null }), 'historical');
+  assert.equal(resolve({ scope: 'published' }), 'published');
+  assert.equal(resolve({ scope: 'archived' }), 'archived');
+  assert.equal(resolve({ scope: 'historical' }), 'historical');
+  // An explicit blank scope is preserved verbatim so it fails closed
+  // downstream instead of widening to the public historical default.
+  assert.equal(resolve({ scope: '' }), '');
 });
 
 test("collection activation opens the detail URL behind the displayed feature", () => {
@@ -332,4 +345,251 @@ test("collection activation opens the detail URL behind the displayed feature", 
   assert.deepEqual(assignedUrls, ["/collections/42/"]);
   assert.equal(collections.detailUrl({ properties: {} }), null);
   assert.equal(collections.detailUrl(null), null);
+});
+
+// ---- initSelectorControls DOM harness --------------------------------------
+
+function domOption(attrs, text) {
+  return {
+    _attrs: attrs,
+    getAttribute(name) {
+      return name in attrs ? attrs[name] : null;
+    },
+    textContent: text || "",
+    value: attrs.value || "",
+    index: 0,
+    hidden: false,
+    disabled: false,
+  };
+}
+
+function domSelect(id, options, value) {
+  const listeners = {};
+  const select = {
+    id,
+    options,
+    value:
+      value === undefined ? (options[0] ? options[0].value : "") : value,
+    selectedIndex: 0,
+    get selectedOptions() {
+      const option = this.options[this.selectedIndex];
+      return option ? [option] : [];
+    },
+    disabled: false,
+    addEventListener(event, fn) {
+      (listeners[event] ||= []).push(fn);
+    },
+    dispatch(event, payload) {
+      (listeners[event] || []).forEach((fn) =>
+        fn(payload || { preventDefault() {} })
+      );
+    },
+  };
+  options.forEach((option, i) => {
+    option.index = i;
+  });
+  return select;
+}
+
+function domElement(id) {
+  const listeners = {};
+  const classes = new Set();
+  return {
+    id,
+    href: undefined,
+    textContent: "",
+    disabled: false,
+    dataset: {},
+    classList: {
+      add: (name) => classes.add(name),
+      remove: (name) => classes.delete(name),
+      toggle: (name, force) => {
+        const on = force === undefined ? !classes.has(name) : force;
+        if (on) classes.add(name);
+        else classes.delete(name);
+      },
+      contains: (name) => classes.has(name),
+    },
+    removeAttribute(name) {
+      if (name === "href") this.href = undefined;
+    },
+    addEventListener(event, fn) {
+      (listeners[event] ||= []).push(fn);
+    },
+    dispatch(event, payload) {
+      (listeners[event] || []).forEach((fn) =>
+        fn(payload || { preventDefault() {} })
+      );
+    },
+  };
+}
+
+function selectorDom({ scopeValue } = {}) {
+  const elements = {
+    "sel-country": domSelect(
+      "sel-country",
+      [
+        domOption(
+          {
+            value: "DE",
+            "data-country": "DE",
+            "data-nuts-prefix": "",
+            "data-nuts-level": "",
+          },
+          "Germany",
+        ),
+      ],
+      "DE",
+    ),
+    "sel-theme": domSelect(
+      "sel-theme",
+      [
+        domOption(
+          {
+            value: "collection_system",
+            "data-url": "/map/",
+            "data-change-url": "/change/",
+            "data-map-set": "DE",
+            "data-theme-group": "collection",
+            "data-search": "collection system",
+          },
+          "Collection system",
+        ),
+      ],
+      "collection_system",
+    ),
+    "sel-year": domSelect(
+      "sel-year",
+      [domOption({ value: "2024" }, "2024"), domOption({ value: "2023" }, "2023")],
+      "2024",
+    ),
+    "btn-load": domElement("btn-load"),
+    "btn-toggle-change": domElement("btn-toggle-change"),
+    "atlas-selection-form": domElement("atlas-selection-form"),
+    "atlas-selector-status": domElement("atlas-selector-status"),
+  };
+  if (scopeValue !== undefined) {
+    elements["sel-scope"] = domSelect(
+      "sel-scope",
+      [
+        domOption({ value: "historical" }, "Historical"),
+        domOption({ value: "private" }, "Workspace"),
+        domOption({ value: scopeValue }, "Selected"),
+      ],
+      scopeValue,
+    );
+    elements["sel-scope"].selectedIndex = 2;
+  }
+  const previousDocument = sandbox.document;
+  sandbox.document = {
+    getElementById: (id) => elements[id] || null,
+  };
+  sandbox.window.location.href = "";
+  return {
+    elements,
+    restore() {
+      sandbox.document = previousDocument;
+    },
+  };
+}
+
+test("initSelectorControls initializes without a scope select", () => {
+  const dom = selectorDom();
+  try {
+    const controller = atlas.initSelectorControls(() => {}, {});
+    assert.ok(controller, "controller must initialize for anonymous maps");
+    assert.match(
+      dom.elements["btn-toggle-change"].href,
+      /scope=historical/,
+      "absent scope falls back to the historical request default",
+    );
+  } finally {
+    dom.restore();
+  }
+});
+
+test("explicit scopes survive the change-map toggle link without a selector", () => {
+  for (const scope of ["published", "archived", "bogus", ""]) {
+    const dom = selectorDom();
+    try {
+      atlas.initSelectorControls(() => {}, { scope });
+      const target = new URL(
+        dom.elements["btn-toggle-change"].href,
+        "https://example.org",
+      );
+      assert.ok(target.searchParams.has("scope"), `scope ${scope} missing`);
+      assert.equal(target.searchParams.get("scope"), scope);
+    } finally {
+      dom.restore();
+    }
+  }
+});
+
+test("navigateOrLoad navigates with the configured scope", () => {
+  const dom = selectorDom();
+  try {
+    atlas.initSelectorControls(() => {}, { scope: "archived" });
+    dom.elements["atlas-selection-form"].dispatch("submit");
+    const target = new URL(
+      sandbox.window.location.href,
+      "https://example.org",
+    );
+    assert.equal(target.pathname, "/map/");
+    assert.equal(target.searchParams.get("scope"), "archived");
+  } finally {
+    dom.restore();
+  }
+});
+
+test("navigateOrLoad keeps an explicit blank scope instead of widening", () => {
+  const dom = selectorDom();
+  try {
+    atlas.initSelectorControls(() => {}, { scope: "" });
+    dom.elements["atlas-selection-form"].dispatch("submit");
+    const target = new URL(
+      sandbox.window.location.href,
+      "https://example.org",
+    );
+    assert.ok(target.searchParams.has("scope"));
+    assert.equal(target.searchParams.get("scope"), "");
+  } finally {
+    dom.restore();
+  }
+});
+
+test("the scope select value takes precedence over the configured scope", () => {
+  const dom = selectorDom({ scopeValue: "review" });
+  try {
+    atlas.initSelectorControls(() => {}, { scope: "historical" });
+    assert.match(
+      dom.elements["btn-toggle-change"].href,
+      /scope=review/,
+      "selector value must win over the configured default",
+    );
+    dom.elements["atlas-selection-form"].dispatch("submit");
+    const target = new URL(
+      sandbox.window.location.href,
+      "https://example.org",
+    );
+    assert.equal(target.searchParams.get("scope"), "review");
+  } finally {
+    dom.restore();
+  }
+});
+
+test("selector query string preserves an explicit blank scope", () => {
+  const region = { country: "DE", nutsPrefix: "", nutsLevel: "" };
+  const blank = new URLSearchParams(
+    selection.queryString(2024, null, region, ""),
+  );
+  assert.ok(blank.has("scope"));
+  assert.equal(blank.get("scope"), "");
+  const absent = new URLSearchParams(selection.queryString(2024, null, region));
+  assert.ok(!absent.has("scope"));
+  const blankTarget = new URL(
+    atlas.selectorNavigationTarget("/change/", 2024, 2023, region, ""),
+    "https://example.org",
+  );
+  assert.ok(blankTarget.searchParams.has("scope"));
+  assert.equal(blankTarget.searchParams.get("scope"), "");
 });

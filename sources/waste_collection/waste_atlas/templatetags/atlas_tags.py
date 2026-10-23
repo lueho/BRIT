@@ -15,13 +15,13 @@ register = template.Library()
 
 # Layout keys are resolved centrally by ``resolve_export_legend`` and stripped
 # from the emitted config; the renderer reads only the resolved ``exportLegend``
-# object.  ``exportLegendTitle`` stays a flat key: it is staff-editable text, so
+# object.  ``exportLegendTitle`` stays a flat key: it is admin-editable text, so
 # a stored (theme) value wins over a page/region override.
 _EXPORT_LEGEND_LAYOUT_KEYS = frozenset(
     (*EXPORT_LEGEND_OVERRIDE_KEYS, *LEGACY_EXPORT_LEGEND_KEYS)
 )
-_STAFF_EDITABLE_TEXT_KEYS = frozenset({"exportLegendTitle"})
-# Keys only emitted for maintainers (staff and collection moderators).
+_ADMIN_EDITABLE_TEXT_KEYS = frozenset({"exportLegendTitle"})
+# Keys only emitted for maintainers (active admins and collection moderators).
 _MAINTAINER_ONLY_KEYS = frozenset({"conflictUrl"})
 # Legend entries may name an atlas-wide fill instead of a literal colour.
 _SHARED_COLOR_REFS = {
@@ -32,7 +32,7 @@ _CATEGORY_KEYS = ("categories", "quartileSpecialCases")
 # Stored keys whose emitted value is not the raw ``MAP_CONFIGS`` value because the
 # tag resolves or strips them at render time.
 RENDER_TIME_RESOLVED_KEYS = (
-    _EXPORT_LEGEND_LAYOUT_KEYS | _STAFF_EDITABLE_TEXT_KEYS | _MAINTAINER_ONLY_KEYS
+    _EXPORT_LEGEND_LAYOUT_KEYS | _ADMIN_EDITABLE_TEXT_KEYS | _MAINTAINER_ONLY_KEYS
 )
 
 
@@ -110,8 +110,8 @@ def atlas_js_config(context, config_key):
         # Export-legend layout is resolved below with explicit precedence.
         if key in _EXPORT_LEGEND_LAYOUT_KEYS:
             continue
-        # Staff-edited text wins over a page/region default.
-        if key in _STAFF_EDITABLE_TEXT_KEYS and key in stored:
+        # Admin-edited text wins over a page/region default.
+        if key in _ADMIN_EDITABLE_TEXT_KEYS and key in stored:
             continue
         config[key] = value
 
@@ -164,7 +164,7 @@ def atlas_js_config(context, config_key):
     # Runtime context from the view
     config["country"] = context.get("country", "DE")
     config["year"] = int(context.get("year", 2024))
-    config["scope"] = context.get("atlas_scope", "published")
+    config["scope"] = context.get("atlas_scope", "historical")
 
     config.pop("nutsPrefix", None)
     nuts_prefix = context.get("nuts_prefix")

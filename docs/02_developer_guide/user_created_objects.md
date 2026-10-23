@@ -113,6 +113,22 @@ generated-value activation, and broader version-graph lock ordering are
 outside this slice; the legacy cascade helpers are retained for a future
 migration.
 
+## Atlas scope and cache adapters
+
+*Part 9b draft runtime checkpoint - not a deployment claim.*
+
+Atlas collection, supporting-evidence and boundary-revision membership delegates to the shared authorization core. The Django staff flag alone grants neither private-data visibility nor maintainer access.
+
+The Atlas-specific `historical` purpose filter is the authorized union of published and archived collections. Every actor defaults to that public historical view, including administrators. Explicit `published` remains active-only; explicit `archived` selects historical archives. Workspace and lifecycle scopes refine authorized membership, `mine` remains a compatibility alias for the owned/shared `private` workspace, and `all` requires explicit administration. Unknown and blank scopes return no records instead of falling back to public data. Scope-free map permalinks retain the public historical default.
+
+CPVs, ACPVs and CatchmentRevisions retain their own ownership, grants, moderation and lifecycle rules. Collection rights alone do not expose another model's non-public evidence. Public historical evidence remains usable for selected collections and their readable version siblings; a public value attached to an unreadable collection does not enter CPV chain metrics. Generated-projection activation remains Part 10.
+
+Authenticated change-overlay requests bypass cache reads and writes so grant and membership changes take effect on the next request. Anonymous overlays use a separate authorization-prefixed cache namespace. The client preserves explicit scopes, including invalid or blank input, through requests and selector/change-map navigation.
+
+Map-configuration pages require explicit application administration; conflict aids and their overview require administration or collection moderation. These are coarse request/UI gates for ordinary configuration models, not completion of their specialized locked persistence and fresh-write authorization.
+
+Live-browser verification with representative snapshot data, legacy archive provenance, geography fallbacks and cross-reference visibility, wider version-graph locking, remaining domain/HTML/formset/importer writers, generated values and rollout hardening remain open. This checkpoint does not close those objectives or establish deployment readiness.
+
 ## Legacy moderator checks (pre-migration)
 
 - Per-model moderation rights use `can_moderate_<model>`.
