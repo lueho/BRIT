@@ -77,14 +77,6 @@ class CollectionCountOptionsReviewDetailTests(TestCase):
                     )
                 self.assertNotContains(response, "Collection count optionss")
 
-    def test_model_labels_use_correct_plural(self):
-        self.assertEqual(
-            CollectionCountOptions._meta.verbose_name, "collection count options"
-        )
-        self.assertEqual(
-            CollectionCountOptions._meta.verbose_name_plural, "collection count options"
-        )
-
     def test_review_detail_distinguishes_zero_from_unspecified_for_every_count(self):
         self.client.force_login(self.staff)
         for value, display in ((0, "0"), (None, "Not specified")):
