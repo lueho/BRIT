@@ -108,6 +108,68 @@ class UnitAutocompleteViewTestCase(ViewWithPermissionsTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class PropertyAutocompleteViewTestCase(ViewWithPermissionsTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.matching_property = Property.objects.create(
+            name="Calorific value",
+            publication_status="published",
+        )
+        Property.objects.create(
+            name="Ash content",
+            publication_status="published",
+        )
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse("property-autocomplete"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_search_by_name_returns_matching_property(self):
+        response = self.client.get(reverse("property-autocomplete"), {"q": "Calorific"})
+        self.assertEqual(response.status_code, 200)
+        result_ids = {item["id"] for item in response.json()["results"]}
+        self.assertIn(self.matching_property.pk, result_ids)
+        ash = Property.objects.get(name="Ash content")
+        self.assertNotIn(ash.pk, result_ids)
+
+    def test_search_returns_private_property_for_owner(self):
+        """An owner should find their private property via autocomplete search."""
+        private_property = Property.objects.create(
+            name="Owner Private Property",
+            owner=self.owner,
+            publication_status="private",
+        )
+        try:
+            self.client.force_login(self.owner)
+            response = self.client.get(
+                reverse("property-autocomplete"), {"q": "Owner Private"}
+            )
+            self.assertEqual(response.status_code, 200)
+            result_ids = {item["id"] for item in response.json()["results"]}
+            self.assertIn(private_property.pk, result_ids)
+        finally:
+            private_property.delete()
+
+    def test_search_excludes_private_property_for_outsider(self):
+        """An unrelated user's private property must not leak via autocomplete."""
+        private_property = Property.objects.create(
+            name="Outsider Private Property",
+            owner=self.owner,
+            publication_status="private",
+        )
+        try:
+            self.client.force_login(self.outsider)
+            response = self.client.get(
+                reverse("property-autocomplete"), {"q": "Outsider Private"}
+            )
+            self.assertEqual(response.status_code, 200)
+            result_ids = {item["id"] for item in response.json()["results"]}
+            self.assertNotIn(private_property.pk, result_ids)
+        finally:
+            private_property.delete()
+
+
 class PropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Property
 

@@ -3,6 +3,7 @@ from django.urls import include, path
 from .router import router
 from .views import (
     PropertiesExplorerView,
+    PropertyAutocompleteView,
     PropertyCreateView,
     PropertyDetailView,
     PropertyModalDeleteView,
@@ -39,6 +40,11 @@ urlpatterns = [
         "properties/<int:pk>/delete/modal/",
         PropertyModalDeleteView.as_view(),
         name="property-delete-modal",
+    ),
+    path(
+        "properties/autocomplete/",
+        PropertyAutocompleteView.as_view(),
+        name="property-autocomplete",
     ),
     path(
         "properties/<int:pk>/unit-options/",

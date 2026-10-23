@@ -481,6 +481,20 @@ class CollectionPropertyValueModelForm(
         ),
         label="Collection",
     )
+    property = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="property-autocomplete",
+            label_field="name",
+        ),
+        label="Property",
+    )
+    unit = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="unit-autocomplete",
+            label_field="name",
+        ),
+        label="Unit",
+    )
 
     class Meta:
         model = CollectionPropertyValue
@@ -524,6 +538,20 @@ class AggregatedCollectionPropertyValueModelForm(
             label_field="name",
         ),
         label="Collections",
+    )
+    property = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="property-autocomplete",
+            label_field="name",
+        ),
+        label="Property",
+    )
+    unit = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="unit-autocomplete",
+            label_field="name",
+        ),
+        label="Unit",
     )
 
     class Meta:
