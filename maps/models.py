@@ -964,6 +964,12 @@ class GeoDataset(NamedUserCreatedObject):
     Holds meta information about datasets from the core module or scenario extensions.
     """
 
+    @classmethod
+    def with_map_relations(cls):
+        return cls.objects.select_related(
+            "region", "map_configuration", "runtime_configuration"
+        ).prefetch_related("sources", "column_policies")
+
     preview = models.ImageField(upload_to="maps_geodataset/", default="generic_map.png")
     publish = models.BooleanField(default=False)
     region = models.ForeignKey(
@@ -1099,20 +1105,9 @@ class GeoDatasetColumnPolicy(models.Model):
         return f"{self.dataset}: {self.column_name}"
 
 
-class Attribute(PropertyBase):
-    """
-    Legacy maps quantitative definition kept during the ``RegionProperty`` rollout.
-    """
-
-    unit = models.CharField(max_length=127)
-
-    def __str__(self):
-        return f"{self.name} [{self.unit}]"
-
-
 class RegionProperty(PropertyBase):
     """
-    Maps-owned quantitative property definition that will replace ``Attribute``.
+    Maps-owned quantitative property definition for regional attributes.
     """
 
     allowed_units = models.ManyToManyField(
@@ -1141,10 +1136,6 @@ class CategoricalAttribute(NamedUserCreatedObject):
 class RegionAttributeValue(NumericMeasurementMixin, NamedUserCreatedObject):
     """
     Numeric regional measurement for the maps domain.
-
-    During the ``RegionProperty`` rollout this model now points at the
-    maps-owned ``RegionProperty`` table, while legacy ``Attribute`` rows are
-    retained temporarily for compatibility and data migration safety.
     """
 
     measurement_property_field = "property"
@@ -1153,6 +1144,11 @@ class RegionAttributeValue(NumericMeasurementMixin, NamedUserCreatedObject):
     region = models.ForeignKey(Region, on_delete=models.PROTECT)
     property = models.ForeignKey(RegionProperty, on_delete=models.PROTECT)
     unit = models.ForeignKey(Unit, on_delete=models.PROTECT, blank=True, null=True)
+    sources = models.ManyToManyField(
+        Source,
+        blank=True,
+        help_text="Sources or references for this property value.",
+    )
     date = models.DateField(blank=True, null=True)
     value = models.FloatField(default=0.0)
     standard_deviation = models.FloatField(default=0.0, blank=True, null=True)

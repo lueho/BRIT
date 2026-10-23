@@ -645,12 +645,6 @@ class SourcesModelAdapterTestCase(SimpleTestCase):
         self.assertEqual(WasteFlyer._meta.app_label, "waste_collection")
         self.assertTrue(WasteFlyer._meta.proxy)
 
-    def test_waste_collection_app_config_is_owned_by_sources(self):
-        self.assertEqual(
-            apps.get_app_config("waste_collection").name,
-            "sources.waste_collection",
-        )
-
     def test_greenhouse_selectors_import_greenhouse_from_sources_model_adapter(self):
         from sources.greenhouses import selectors
 

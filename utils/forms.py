@@ -754,8 +754,9 @@ class WorkspaceSectionFormSet(BaseInlineFormSet):
     reference_fields = {}
     position_fields = {}
 
-    def __init__(self, *args, role=None, **kwargs):
+    def __init__(self, *args, role=None, policy_user=None, **kwargs):
         self.role = role
+        self.policy_user = policy_user
         super().__init__(*args, **kwargs)
 
     def _construct_form(self, i, **kwargs):
@@ -800,6 +801,39 @@ class WorkspaceSectionFormSet(BaseInlineFormSet):
                 if reference in seen_references:
                     raise ValidationError("Each reference can only be added once.")
                 seen_references.add(reference)
+        self._enforce_row_policies()
+
+    def _enforce_row_policies(self):
+        """Authorize each changed/new/deleted row against the shared policy.
+
+        Rows of registered models are gated individually: the parent section
+        gate alone never grants write access to existing child records. New
+        rows are authorized as attached creates against the formset's parent
+        instance; changed rows as edits; deletions as deletes.
+        """
+        from utils.object_management.policy import decide
+        from utils.object_management.registry import model_policy
+
+        if self.policy_user is None or model_policy(self.model) is None:
+            return
+        for form in self.forms:
+            data = getattr(form, "cleaned_data", None)
+            if not data:
+                continue
+            row = data.get("id")
+            if data.get("DELETE"):
+                action, target, parent = "delete", row, None
+            elif row is None:
+                action, target, parent = "create", self.model, self.instance
+            elif form.has_changed():
+                action, target, parent = "edit", row, None
+            else:
+                continue
+            if target is None:
+                continue
+            decision = decide(self.policy_user, action, target, parent=parent)
+            if not decision.allowed:
+                form.add_error(None, "You are not allowed to change this row.")
 
     def save(self, commit=True):
         objects = super().save(commit=commit)
@@ -858,6 +892,7 @@ def workspace_section_formsets(parent, section, request, formset_class=None):
             instance=parent,
             queryset=queryset.select_related(*relations),
             role=role,
+            policy_user=request.user,
             data=request.POST if request.method == "POST" else None,
             files=request.FILES if request.method == "POST" else None,
             form_kwargs={"request": request},

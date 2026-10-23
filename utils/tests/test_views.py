@@ -3,9 +3,9 @@ from django.urls import reverse
 from utils.tests.testcases import ViewWithPermissionsTestCase
 
 
-class UtilsDashboardViewTestCase(ViewWithPermissionsTestCase):
+class UtilsExplorerViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "view_property"
-    url = reverse("utils-dashboard")
+    url = reverse("utils-explorer")
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(self.url)

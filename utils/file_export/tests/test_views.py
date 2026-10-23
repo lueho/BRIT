@@ -282,8 +282,11 @@ class GenericUserCreatedObjectExportViewTests(TestCase):
             self.assertEqual(call_args[1], "xlsx")
 
     def test_can_include_row_count_estimate_before_dispatch(self):
+        filter_requests = []
+
         class DummyFilterSet:
-            def __init__(self, data, queryset):
+            def __init__(self, data, queryset, request=None):
+                filter_requests.append(request)
                 self.qs = queryset
 
         class LabelView(GenericUserCreatedObjectExportView):
@@ -314,6 +317,7 @@ class GenericUserCreatedObjectExportViewTests(TestCase):
         self.assertEqual(data["task_id"], "generic-task-id")
         self.assertEqual(data["row_count"], User.objects.count())
         self.assertFalse(data["large_export"])
+        self.assertEqual([r.user for r in filter_requests], [self.user])
 
     def test_rejects_format_without_registered_renderer(self):
         class LabelView(GenericUserCreatedObjectExportView):

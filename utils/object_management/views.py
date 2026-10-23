@@ -36,7 +36,7 @@ from django.http import (
     HttpResponseNotAllowed,
     HttpResponseRedirect,
 )
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string, select_template
 from django.urls import NoReverseMatch, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -57,6 +57,7 @@ from utils.modal import (
 from utils.object_management.filters import ReviewDashboardFilterSet
 from utils.object_management.models import (
     ReviewAction,
+    ReviewNotificationMute,
     UserCreatedObject,
     populate_owner_review_feedback,
 )
@@ -134,12 +135,12 @@ class ReviewItemReference(NamedTuple):
 DEFAULT_BREADCRUMB_MODULES = {
     "bibliography": {"label": "Bibliography", "url_name": "bibliography-explorer"},
     "inventories": {"label": "Inventories", "url_name": "inventories-explorer"},
-    "maps": {"label": "Maps", "url_name": "maps-dashboard"},
+    "maps": {"label": "Maps", "url_name": "maps-explorer"},
     "materials": {"label": "Materials", "url_name": "materials-explorer"},
-    "processes": {"label": "Processes", "url_name": "processes:process-list"},
-    "properties": {"label": "Properties", "url_name": "properties-dashboard"},
+    "processes": {"label": "Processes", "url_name": "processes:explorer"},
+    "properties": {"label": "Properties", "url_name": "properties-explorer"},
     "sources": {"label": "Sources", "url_name": "sources-explorer"},
-    "utils": {"label": "Utilities", "url_name": "utils-dashboard"},
+    "utils": {"label": "Utilities", "url_name": "utils-explorer"},
     "greenhouses": {
         "label": "Greenhouses",
         "url_name": None,
@@ -1527,6 +1528,11 @@ class AddEditorView(BaseObjectAccessActionView):
             )
         return HttpResponseRedirect(self.get_success_url())
 
+    @staticmethod
+    def _model_change_permission(obj):
+        meta = type(obj)._meta
+        return f"{meta.app_label}.change_{meta.model_name}"
+
 
 class RemoveEditorView(BaseObjectAccessActionView):
     """Revoke a user's edit access to a UserCreatedObject."""
@@ -1840,7 +1846,7 @@ class UserCreatedObjectListMixin:
     paginate_by = 10
     header = None
     list_type = None
-    dashboard_url = None
+    explorer_url = None
     breadcrumb_parent_module_label = None
     breadcrumb_parent_module_url = None
     breadcrumb_module_label = None
@@ -1942,8 +1948,8 @@ class UserCreatedObjectListMixin:
         else:
             return None
 
-    def get_dashboard_url(self):
-        return self.dashboard_url
+    def get_explorer_url(self):
+        return self.explorer_url
 
     def get_create_url(self):
         return self.model.create_url
@@ -1966,9 +1972,8 @@ class UserCreatedObjectListMixin:
             return self.request.user
         return None
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        object_list = context.get("object_list")
+    def _populate_review_feedback(self, context):
+        """Annotate the current page's objects with owner-visible review feedback."""
         page_obj = context.get("page_obj")
         if (
             page_obj is not None
@@ -1977,164 +1982,143 @@ class UserCreatedObjectListMixin:
             populate_owner_review_feedback(
                 page_obj.object_list, getattr(self.request, "user", None)
             )
-        breadcrumb_model = getattr(object_list, "model", None) or getattr(
-            self, "model", None
-        )
-        default_module_label, _ = _get_default_breadcrumb_module(breadcrumb_model)
-        default_parent_label, _ = _get_default_breadcrumb_parent_module(
-            breadcrumb_model
-        )
-        breadcrumb_section_label = (
+
+    def _get_breadcrumb_model(self, context):
+        object_list = context.get("object_list")
+        return getattr(object_list, "model", None) or getattr(self, "model", None)
+
+    def _base_list_context(self):
+        return {
+            "header": self.get_header(),
+            "create_url": self.get_create_url(),
+            "create_url_text": self.get_create_url_text(),
+            "create_permission": self.get_create_permission(),
+            "list_type": self.get_list_type(),
+            "private_list_owner": self.get_private_list_owner(),
+            "explorer_url": self.get_explorer_url(),
+            "sortable_fields": self.get_sortable_fields(),
+            "current_sort": self.get_current_sort() or "",
+        }
+
+    def _breadcrumb_context(self, context):
+        model = self._get_breadcrumb_model(context)
+        default_module_label, _ = _get_default_breadcrumb_module(model)
+        default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
+        section_label = (
             self.breadcrumb_section_label
-            or _get_default_breadcrumb_section_label(breadcrumb_model)
+            or _get_default_breadcrumb_section_label(model)
         )
-        # Base context
-        context.update(
-            {
-                "header": self.get_header(),
-                "create_url": self.get_create_url(),
-                "create_url_text": self.get_create_url_text(),
-                "create_permission": self.get_create_permission(),
-                "list_type": self.get_list_type(),
-                "private_list_owner": self.get_private_list_owner(),
-                "dashboard_url": self.get_dashboard_url(),
-                "sortable_fields": self.get_sortable_fields(),
-                "current_sort": self.get_current_sort() or "",
-            }
-        )
-        context.update(
-            build_breadcrumb_context(
-                parent_module_label=(
-                    self.breadcrumb_parent_module_label or default_parent_label
-                ),
-                parent_module_url=(
-                    self.breadcrumb_parent_module_url
-                    or _get_default_breadcrumb_parent_module_url(breadcrumb_model)
-                ),
-                module_label=self.breadcrumb_module_label or default_module_label,
-                module_url=(
-                    self.breadcrumb_module_url
-                    or self.get_dashboard_url()
-                    or _get_default_breadcrumb_module_url(breadcrumb_model)
-                ),
-                section_label=breadcrumb_section_label,
-                page_title=(
-                    self.breadcrumb_page_title
-                    or self.get_header()
-                    or breadcrumb_section_label
-                ),
-            )
+        return build_breadcrumb_context(
+            parent_module_label=self.breadcrumb_parent_module_label
+            or default_parent_label,
+            parent_module_url=(
+                self.breadcrumb_parent_module_url
+                or _get_default_breadcrumb_parent_module_url(model)
+            ),
+            module_label=self.breadcrumb_module_label or default_module_label,
+            module_url=(
+                self.breadcrumb_module_url
+                or self.get_explorer_url()
+                or _get_default_breadcrumb_module_url(model)
+            ),
+            section_label=section_label,
+            page_title=(
+                self.breadcrumb_page_title or self.get_header() or section_label
+            ),
         )
 
-        # Scope switcher context (urls, active scope)
+    def _scope_model(self):
+        """Return the model used for scope-switcher URL resolution."""
         try:
-            queryset = self.get_queryset()
-            model = queryset.model
+            return self.get_queryset().model
         except Exception:
-            model = getattr(self, "model", None)
+            return getattr(self, "model", None)
 
-        # Determine URLs from model helpers if available
-        public_url = getattr(model, "public_list_url", None)
-        private_url = getattr(model, "private_list_url", None)
-        review_url = getattr(model, "review_list_url", None)
-        if callable(public_url):
-            public_url = public_url()
-        if callable(private_url):
-            private_url = private_url()
-        if callable(review_url):
-            review_url = review_url()
+    @staticmethod
+    def _call_or_value(value):
+        return value() if callable(value) else value
 
-        # Map URLs (if provided by model as classmethods)
-        public_map_url = None
-        private_map_url = None
-        review_map_url = None
+    @staticmethod
+    def _map_url(model, attr):
         try:
-            getter = getattr(model, "public_map_url", None)
+            getter = getattr(model, attr, None)
             if callable(getter):
-                public_map_url = getter()
+                return getter()
         except Exception:
-            public_map_url = None
-        try:
-            getter = getattr(model, "private_map_url", None)
-            if callable(getter):
-                private_map_url = getter()
-        except Exception:
-            private_map_url = None
-        try:
-            getter = getattr(model, "review_map_url", None)
-            if callable(getter):
-                review_map_url = getter()
-        except Exception:
-            review_map_url = None
+            pass
+        return None
 
-        # Try conventional URL names: <model>-list, <model>-list-owned, <model>-list-review
+    @staticmethod
+    def _conventional_scope_url(model, suffix):
+        """Try the conventional URL name ``<model_name>-<suffix>``."""
+        model_name = getattr(getattr(model, "_meta", None), "model_name", None)
+        if not model_name:
+            return None
         try:
-            model_name = model._meta.model_name if model is not None else None
-            if model_name:
-                if not public_url:
-                    try:
-                        public_url = reverse(f"{model_name}-list")
-                    except Exception:
-                        pass
-                if not private_url:
-                    try:
-                        private_url = reverse(f"{model_name}-list-owned")
-                    except Exception:
-                        pass
-                if not review_url:
-                    try:
-                        review_url = reverse(f"{model_name}-list-review")
-                    except Exception:
-                        pass
+            return reverse(f"{model_name}-{suffix}")
+        except Exception:
+            return None
+
+    def _scope_fallback_url(self, scope_value):
+        """Current URL with the scope overridden and pagination reset."""
+        params = self.request.GET.copy()
+        params.pop("page", None)
+        params["scope"] = scope_value
+        encoded = params.urlencode()
+        return f"{self.request.path}?{encoded}" if encoded else self.request.path
+
+    def _scope_context(self):
+        """Scope-switcher context: public/private/review, map, and gallery URLs."""
+        model = self._scope_model()
+        urls = {
+            "public_url": self._call_or_value(getattr(model, "public_list_url", None)),
+            "private_url": self._call_or_value(
+                getattr(model, "private_list_url", None)
+            ),
+            "review_url": self._call_or_value(getattr(model, "review_list_url", None)),
+        }
+        # Conventional URL names: <model>-list, <model>-list-owned, <model>-list-review
+        for key, suffix in (
+            ("public_url", "list"),
+            ("private_url", "list-owned"),
+            ("review_url", "list-review"),
+        ):
+            if not urls[key]:
+                urls[key] = self._conventional_scope_url(model, suffix)
+        # Last resort: rebuild the current URL with a scope override
+        try:
+            for key, scope in (
+                ("public_url", "published"),
+                ("private_url", "private"),
+                ("review_url", "review"),
+            ):
+                if not urls[key]:
+                    urls[key] = self._scope_fallback_url(scope)
         except Exception:
             pass
 
-        # Fallbacks: build URLs from current path and query params with scope override
-        try:
-            req = self.request
-            base_path = req.path
+        return {
+            "active_scope": self.get_list_type(),
+            "representation_mode": "list",
+            "public_representation_url": urls["public_url"],
+            "private_representation_url": urls["private_url"],
+            "review_representation_url": urls["review_url"],
+            "public_gallery_url": None,
+            "private_gallery_url": None,
+            "review_gallery_url": None,
+            # Map URLs for header view toggle (may be None if model has no map views)
+            "public_map_url": self._map_url(model, "public_map_url"),
+            "private_map_url": self._map_url(model, "private_map_url"),
+            "review_map_url": self._map_url(model, "review_map_url"),
+            **urls,
+        }
 
-            def build_fallback_url(scope_value: str) -> str:
-                params = req.GET.copy()
-                # Reset pagination when switching scope
-                if "page" in params:
-                    del params["page"]
-                params["scope"] = scope_value
-                encoded = params.urlencode()
-                return f"{base_path}?{encoded}" if encoded else base_path
-
-            if not public_url:
-                public_url = build_fallback_url("published")
-            if not private_url:
-                private_url = build_fallback_url("private")
-            if not review_url:
-                review_url = build_fallback_url("review")
-        except Exception:
-            # If anything goes wrong, keep URLs as-is (may be None)
-            pass
-
-        # Active scope from list_type (public/private/review)
-        active_scope = self.get_list_type()
-
-        context.update(
-            {
-                "active_scope": active_scope,
-                "public_url": public_url,
-                "private_url": private_url,
-                "review_url": review_url,
-                "public_representation_url": public_url,
-                "private_representation_url": private_url,
-                "review_representation_url": review_url,
-                "representation_mode": "list",
-                "public_gallery_url": None,
-                "private_gallery_url": None,
-                "review_gallery_url": None,
-                # Map URLs for header view toggle (may be None if model has no map views)
-                "public_map_url": public_map_url,
-                "private_map_url": private_map_url,
-                "review_map_url": review_map_url,
-            }
-        )
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        self._populate_review_feedback(context)
+        context.update(self._base_list_context())
+        context.update(self._breadcrumb_context(context))
+        context.update(self._scope_context())
         return context
 
 
@@ -2192,6 +2176,76 @@ class AddReviewCommentView(BaseReviewActionView):
 
         messages.success(request, "Comment added.")
         return HttpResponseRedirect(self.get_success_url())
+
+
+class ReviewNotificationMuteView(BaseReviewActionView):
+    """Toggle per-object review notification e-mails for the current user."""
+
+    permission_method = "has_comment_permission"
+    permission_denied_message = (
+        "You don't have permission to change notifications for this item."
+    )
+    template_name = "object_management/review_notification_mute.html"
+
+    def get_object(self, request=None, *args, **kwargs):
+        content_type = get_object_or_404(
+            ContentType, pk=self.kwargs.get("content_type_id")
+        )
+        model_class = content_type.model_class()
+        if model_class is None or not issubclass(model_class, UserCreatedObject):
+            raise Http404("Review notifications are not available for this item.")
+        return super().get_object(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        obj = self.get_object(request, *args, **kwargs)
+        self.ensure_permission(request, obj)
+        return render(
+            request,
+            self.template_name,
+            {
+                "object": obj,
+                "muted": self._is_muted(request.user, obj),
+                "review_url": reverse(
+                    "object_management:review_item_detail",
+                    kwargs={
+                        "content_type_id": self.kwargs["content_type_id"],
+                        "object_id": obj.pk,
+                    },
+                ),
+            },
+        )
+
+    def post(self, request, *args, **kwargs):
+        obj = self.get_object(request, *args, **kwargs)
+        self.ensure_permission(request, obj)
+        mute, created = ReviewNotificationMute.objects.get_or_create(
+            user=request.user,
+            content_type_id=self.kwargs["content_type_id"],
+            object_id=obj.pk,
+        )
+        if created:
+            messages.success(request, "E-mail notifications for this item disabled.")
+        else:
+            mute.delete()
+            messages.success(request, "E-mail notifications for this item enabled.")
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_success_url(self):
+        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={self.request.get_host()},
+            require_https=self.request.is_secure(),
+        ):
+            return next_url
+        return self.get_object().get_absolute_url()
+
+    def _is_muted(self, user, obj):
+        return ReviewNotificationMute.objects.filter(
+            user=user,
+            content_type_id=self.kwargs["content_type_id"],
+            object_id=obj.pk,
+        ).exists()
 
 
 class ReviewObjectListMixin(
@@ -2814,6 +2868,9 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
 
     template_name = "object_management/review_detail_wrapper.html"
     detail_view_class = None
+    permission_denied_message = (
+        "You do not have permission to access the review details page."
+    )
     _model_view_registry = {}
 
     @classmethod

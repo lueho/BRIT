@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("bibliography", "0009_rename_source_bibtex_fields"),
+        ("bibliography", "0001_squashed_0012"),
         ("distributions", "0004_alter_period_publication_status_and_more"),
         ("maps", "0011_alter_regionproperty_options"),
         ("materials", "0010_materialpropertyvalue_basis_component"),

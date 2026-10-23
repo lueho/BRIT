@@ -143,11 +143,11 @@ def material_to_legacy_feedstock(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("inventories", "0008_inventoryalgorithmparametervalue_is_custom"),
-        ("materials", "0029_merge_20260922_1559"),
+        ("inventories", "0001_squashed_0008"),
+        ("materials", "0001_squashed_0032"),
         # Layers must already carry Material feedstocks so their preserved
         # series can be preferred as the canonical temporal profile.
-        ("layer_manager", "0004_layer_feedstock_material"),
+        ("layer_manager", "0001_squashed_0004"),
     ]
 
     operations = [

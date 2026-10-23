@@ -16,9 +16,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from utils.forms import TomSelectFormsetHelper
-from utils.object_management.permissions import get_object_policy
 from utils.object_management.policy import decide, visible_queryset
-from utils.object_management.services import _fresh_actor, content_mutation
+from utils.object_management.services import (
+    _fresh_actor,
+    authorize_url_check_job,
+    content_mutation,
+    register_url_check_job,
+)
 from utils.object_management.templatetags.moderation_tags import safe_back_url
 from utils.object_management.views import (
     PolicyPermissionRequiredMixin,
@@ -37,7 +41,7 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateWithInlinesView,
 )
 from utils.permissions import HasModelPermission
-from utils.views import BreadcrumbContextMixin
+from utils.views import BreadcrumbContextMixin, LetterIndexMixin
 
 from .filters import AuthorFilterSet, LicenceListFilter, SourceFilter
 from .forms import (
@@ -66,7 +70,7 @@ from .tasks import check_source_url, check_source_urls
 
 
 class BibliographyExplorerView(BreadcrumbContextMixin, TemplateView):
-    template_name = "bibliography_dashboard.html"
+    template_name = "bibliography_explorer.html"
     breadcrumb_module_label = "Bibliography"
     breadcrumb_page_title = "Bibliography"
 
@@ -92,21 +96,21 @@ class BibliographyExplorerView(BreadcrumbContextMixin, TemplateView):
 class AuthorPublishedListView(PublishedObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
 class AuthorPrivateListView(PrivateObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
 class AuthorReviewListView(ReviewObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
@@ -194,19 +198,19 @@ class AuthorAutocompleteView(UserCreatedObjectAutocompleteView):
 class LicencePublishedListView(PublishedObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class LicencePrivateListView(PrivateObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class LicenceReviewListView(ReviewObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class LicenceCreateView(UserCreatedObjectCreateView):
@@ -250,31 +254,35 @@ class LicenceAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SourcePublishedFilterView(PublishedObjectFilterView):
+class SourceLetterIndexMixin(LetterIndexMixin):
+    letter_field = "citation_key"
+
+
+class SourcePublishedFilterView(SourceLetterIndexMixin, PublishedObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
         "citation_key"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
-class SourcePrivateFilterView(PrivateObjectFilterView):
+class SourcePrivateFilterView(SourceLetterIndexMixin, PrivateObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
         "citation_key"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
-class SourceReviewFilterView(ReviewObjectFilterView):
+class SourceReviewFilterView(SourceLetterIndexMixin, ReviewObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
         "citation_key"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class SourceCreateView(UserCreatedObjectCreateWithInlinesView):
@@ -561,15 +569,12 @@ class SourceCheckUrlView(LoginRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         self.object = get_object_or_404(self.model, pk=kwargs.get("pk"))
-        policy = get_object_policy(request.user, self.object, request=request)
-        if not (
-            policy.get("is_owner")
-            or policy.get("is_staff")
-            or policy.get("is_moderator")
-        ):
-            raise PermissionDenied
+        decision = decide(request.user, "check_url", self.object)
+        if not decision.allowed:
+            raise PermissionDenied(decision.reason)
 
-        task = check_source_url.delay(self.object.pk)
+        task = check_source_url.delay(self.object.pk, request.user.pk)
+        register_url_check_job(task.task_id, request.user, target=self.object)
         response_data = {"task_id": task.task_id}
         return HttpResponse(json.dumps(response_data), content_type="application/json")
 
@@ -577,6 +582,7 @@ class SourceCheckUrlView(LoginRequiredMixin, View):
 class SourceCheckUrlProgressView(LoginRequiredMixin, View):
     @staticmethod
     def get(request, task_id):
+        authorize_url_check_job(request.user, task_id)
         result = AsyncResult(task_id)
         response_data = {
             "state": result.state,
@@ -595,7 +601,8 @@ class SourceListCheckUrlsView(PermissionRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         params = request.GET.copy()
         params.pop("page", None)
-        task = self.check_task.delay(params)
+        task = self.check_task.delay(params, request.user.pk)
+        register_url_check_job(task.task_id, request.user)
         response_data = {"task_id": task.task_id}
         return HttpResponse(json.dumps(response_data), content_type="application/json")
 

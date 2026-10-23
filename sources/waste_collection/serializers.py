@@ -11,6 +11,7 @@ from distributions.models import TemporalDistribution, Timestep
 from maps.models import RegionAttributeValue
 from materials.models import Material
 from sources.waste_collection import models
+from sources.waste_collection.derived_values import preferred_measurement_queryset
 from sources.waste_collection.description_formatting import (
     flatten_collection_description,
     normalize_collection_description,
@@ -25,7 +26,7 @@ from utils.object_management.permissions import (
     get_object_policy,
 )
 from utils.properties.models import Property
-from utils.serializers import FieldLabelModelSerializer
+from utils.serializers import FieldLabelModelSerializer, SimplifiedGeometryMixin
 
 # Geometry simplification tolerance in degrees (approx 100m at equator)
 # Lower values = more detail, higher values = more simplification
@@ -83,12 +84,16 @@ GeoreferencedWasteCollection = models.Collection
 GeoreferencedCollector = models.Collector
 
 
-class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
+class WasteCollectionGeometrySerializer(
+    SimplifiedGeometryMixin, GeoFeatureModelSerializer
+):
     """GeoJSON serializer for waste collections with simplified geometry.
 
     Uses simplified geometry to reduce payload size and improve performance.
     The geometry is simplified using ST_SimplifyPreserveTopology to maintain
-    valid topology while reducing point count.
+    valid topology while reducing point count. The ``simplified_geom``
+    annotation is added by the viewset queryset; the serializer falls back
+    to the original geometry when the annotation is not present.
     """
 
     id = serializers.IntegerField(source="pk", read_only=True)
@@ -103,16 +108,6 @@ class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
         id_field = False
         fields = ["id", "catchment", "waste_category", "collection_system"]
 
-    def get_geom(self, instance):
-        """Return simplified geometry if available, otherwise original.
-
-        The simplified_geom annotation is added by the viewset queryset.
-        Falls back to original geometry if annotation is not present.
-        """
-        if hasattr(instance, "simplified_geom") and instance.simplified_geom:
-            return instance.simplified_geom
-        return getattr(instance, "geom", None)
-
     @staticmethod
     def get_waste_category(instance):
         category = getattr(instance, "effective_waste_category", None)
@@ -121,7 +116,7 @@ class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
         return category.name
 
 
-class CollectorGeometrySerializer(GeoFeatureModelSerializer):
+class CollectorGeometrySerializer(SimplifiedGeometryMixin, GeoFeatureModelSerializer):
     """
     GeoJSON serializer for Collectors with geometry and organizational level.
     Used by QGIS for map rendering.
@@ -131,6 +126,9 @@ class CollectorGeometrySerializer(GeoFeatureModelSerializer):
     collector = serializers.CharField(source="name", read_only=True)
     catchment = serializers.SerializerMethodField()
     orga_level = serializers.SerializerMethodField()
+    # ``Collector.geom`` is a property; without an explicit geometry field the
+    # geo field resolves to a ReadOnlyField that leaks the raw GEOS object.
+    geom = GeometrySerializerMethodField()
 
     class Meta:
         model = GeoreferencedCollector
@@ -744,8 +742,8 @@ class CollectionAnalysisListSerializer(serializers.ListSerializer):
         collection_values = defaultdict(list)
         aggregated_values = defaultdict(list)
         if chain_ids and child.include_collection_metrics:
-            for value in models.Collection.visible_collectionpropertyvalues(
-                chain_ids, user
+            for value in preferred_measurement_queryset(
+                models.Collection.visible_collectionpropertyvalues(chain_ids, user)
             ):
                 collection_values[anchor_of[value.collection_id]].append(value)
             for anchor, values in collection_values.items():
@@ -937,7 +935,9 @@ class CollectionPropertyValueSerializer(serializers.ModelSerializer):
     property_name = serializers.CharField(source="property.name", read_only=True)
     unit_name = serializers.CharField(source="unit.name", read_only=True)
     unit_symbol = serializers.CharField(source="unit.symbol", read_only=True)
-    publication_status = serializers.CharField(read_only=True)
+    is_derived = serializers.BooleanField(read_only=True)
+    derived_from = serializers.PrimaryKeyRelatedField(read_only=True)
+    publication_status = serializers.SerializerMethodField()
 
     class Meta:
         model = models.CollectionPropertyValue
@@ -952,8 +952,15 @@ class CollectionPropertyValueSerializer(serializers.ModelSerializer):
             "average",
             "standard_deviation",
             "is_derived",
+            "derived_from",
             "publication_status",
         )
+
+    def get_publication_status(self, obj):
+        """Lifecycle display follows the raw source for generated rows."""
+        if obj.is_derived and obj.derived_from_id is not None:
+            return obj.derived_from.publication_status
+        return obj.publication_status
 
 
 class CollectionImportRecordSerializer(serializers.Serializer):

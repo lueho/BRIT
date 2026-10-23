@@ -7,5 +7,12 @@ Comment: "{{ action.comment }}"
 You can view the details and the full review history here:
 {{ protocol }}://{{ site.domain }}{{ review_url }}
 
+You receive this e-mail because you own or commented on this
+{{ object_verbose_name|lower }}. Stop e-mails about it here:
+{{ protocol }}://{{ site.domain }}{{ mute_url }}
+
+To disable all review e-mails, change your profile settings:
+{{ protocol }}://{{ site.domain }}{{ profile_url }}
+
 Sincerely, your
 {{ site.name }} Team
