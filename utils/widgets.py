@@ -10,12 +10,12 @@ from django_tomselect.widgets import TomSelectModelMultipleWidget, TomSelectMode
 
 class CreateEnabledTomSelectModelWidget(TomSelectModelWidget):
     class Media:
-        js = ("js/tomselect_inline_create.min.js",)
+        js = ("js/ui_utils.min.js", "js/tomselect_inline_create.min.js")
 
 
 class CreateEnabledTomSelectModelMultipleWidget(TomSelectModelMultipleWidget):
     class Media:
-        js = ("js/tomselect_inline_create.min.js",)
+        js = ("js/ui_utils.min.js", "js/tomselect_inline_create.min.js")
 
 
 class RangeSliderWidget(SuffixedMultiWidget):
