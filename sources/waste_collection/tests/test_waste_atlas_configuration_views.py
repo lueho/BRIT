@@ -8,6 +8,9 @@ from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
 
+from sources.waste_collection.tests.atlas_fixtures import (
+    seed_atlas_map_configurations,
+)
 from sources.waste_collection.waste_atlas.legend import quartile_legend_entries
 from sources.waste_collection.waste_atlas.models import (
     WasteAtlasMapConfiguration,
@@ -27,6 +30,14 @@ def _administer_objects_permission():
 class WasteAtlasMapConfigurationViewsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
+        seed_atlas_map_configurations()
+        cls.admin = User.objects.create_user(
+            username="atlas-config-admin",
+            password="secret",
+        )
+        cls.admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.staff = User.objects.create_user(
             username="atlas-config-staff",
             is_staff=True,
@@ -84,7 +95,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         data.update(overrides)
         return data
 
-    def test_staff_can_hide_categories_that_are_absent_from_the_map(self):
+    def test_admin_can_hide_categories_that_are_absent_from_the_map(self):
         config = self._configuration()
         original = deepcopy(config.configuration)
         self.client.force_login(self.admin)
@@ -142,7 +153,15 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertEqual(staff_response.status_code, 200)
         self.assertContains(staff_response, "collection_system")
 
-    def test_non_admin_user_cannot_update_configuration(self):
+    def test_staff_only_user_cannot_update_configuration(self):
+        url = reverse(
+            "waste-atlas-map-configuration-update",
+            args=["collection_system"],
+        )
+        self.client.force_login(self.staff)
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_non_staff_user_cannot_update_configuration(self):
         config = self._configuration()
         original = deepcopy(config.configuration)
         self.client.force_login(self.regular_user)
@@ -159,7 +178,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         config.refresh_from_db()
         self.assertEqual(config.configuration, original)
 
-    def test_staff_update_is_per_configuration_and_reaches_preview_and_export(self):
+    def test_admin_update_is_per_configuration_and_reaches_preview_and_export(self):
         config = self._configuration()
         map_url = f"{reverse('waste-atlas-germany-collection-system-map')}?year=2023"
         untouched = WasteAtlasMapConfiguration.objects.create(
@@ -377,7 +396,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             "Shared category name",
         )
 
-    def test_staff_navigation_and_map_page_link_to_configuration_editor(self):
+    def test_admin_navigation_and_map_page_link_to_configuration_editor(self):
         config_list_url = reverse("waste-atlas-map-configuration-list")
         config_edit_url = reverse(
             "waste-atlas-map-configuration-update",

@@ -11,6 +11,9 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from sources.waste_collection.models import Collection
+from sources.waste_collection.tests.atlas_fixtures import (
+    seed_atlas_map_configurations,
+)
 from utils.object_management.models import ReviewAction
 
 API = "/waste_collection/waste-atlas/api/"
@@ -85,17 +88,22 @@ class WasteAtlasConflictAccessTests(APITestCase):
             self.client.get(self.endpoint).status_code, status.HTTP_403_FORBIDDEN
         )
 
-    def test_admins_and_moderators_may_read_conflicts(self):
-        for user in (self.admin, self.moderator):
+    def test_admin_and_moderators_may_read_conflicts(self):
+        admin = User.objects.create_user("conflict-admin")
+        admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
+        for user in (admin, self.moderator):
             self.client.force_login(user)
             self.assertEqual(
                 self.client.get(self.endpoint).status_code, status.HTTP_200_OK
             )
 
-    def test_plain_staff_may_not_read_conflicts(self):
+    def test_staff_only_is_refused_conflicts(self):
         self.client.force_login(self.staff)
         self.assertEqual(
-            self.client.get(self.endpoint).status_code, status.HTTP_403_FORBIDDEN
+            self.client.get(self.endpoint).status_code,
+            status.HTTP_403_FORBIDDEN,
         )
 
 
@@ -126,7 +134,11 @@ class WasteAtlasThrottleIdentityTests(APITestCase):
 
 
 class WasteAtlasPublicPagesTests(TestCase):
-    """The atlas is public; maintainer tools stay behind staff checks."""
+    """The atlas is public; maintainer tools stay behind role checks."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed_atlas_map_configurations()
 
     public_pages = (
         "waste-atlas-overview",
@@ -143,7 +155,7 @@ class WasteAtlasPublicPagesTests(TestCase):
         change_map = reverse("waste-atlas-change-map", args=["DE", "collection_system"])
         self.assertEqual(self.client.get(change_map).status_code, 200)
 
-    def test_maintainer_pages_still_require_admin_capability(self):
+    def test_maintainer_pages_require_admin_or_maintainer(self):
         pages = (
             reverse("waste-atlas-data-conflicts-overview"),
             reverse("waste-atlas-map-configuration-list"),
@@ -155,20 +167,17 @@ class WasteAtlasPublicPagesTests(TestCase):
         for url in pages:
             with self.subTest(url=url, user="plain"):
                 self.assertEqual(self.client.get(url).status_code, 403)
-        self.client.force_login(User.objects.create_user("plainstaff", is_staff=True))
+        # A Django staff flag alone must not open maintainer surfaces.
+        self.client.force_login(User.objects.create_user("staff-only", is_staff=True))
         for url in pages:
-            with self.subTest(url=url, user="plainstaff"):
+            with self.subTest(url=url, user="staff-only"):
                 self.assertEqual(self.client.get(url).status_code, 403)
 
-    def test_anonymous_visitors_only_get_public_historical_data(self):
+    def test_anonymous_visitors_get_the_historical_scope(self):
         url = reverse("waste-atlas-germany-collection-system-map")
-        response = self.client.get(url, {"scope": "all"})
-        # The requested scope is forwarded to the map config; the API resolves
-        # it to no records for unauthorized actors rather than falling back
-        # to public data silently widening.
-        self.assertEqual(_map_config(response)["scope"], "all")
+        response = self.client.get(url)
+        self.assertEqual(_map_config(response)["scope"], "historical")
         self.assertNotContains(response, 'value="mine"')
-        self.assertNotContains(response, 'value="all"')
         self.assertNotContains(response, "Edit configuration")
         self.assertEqual(
             self.client.get(
@@ -178,19 +187,42 @@ class WasteAtlasPublicPagesTests(TestCase):
             [],
         )
 
+    def test_anonymous_unknown_scope_is_preserved_but_closes(self):
+        # The raw unknown scope is preserved in the emitted JSON so the
+        # page does not silently widen to a public default, while the
+        # authorization layer returns no rows for it.  The authenticated
+        # selector is not rendered for anonymous visitors.
+        url = reverse("waste-atlas-germany-collection-system-map")
+        response = self.client.get(url, {"scope": "bogus"})
+        self.assertEqual(_map_config(response)["scope"], "bogus")
+        self.assertNotContains(response, "Unavailable scope")
+        api = self.client.get(
+            "/waste_collection/waste-atlas/api/collection-system/",
+            {"country": "DE", "year": 2024, "scope": "bogus"},
+        )
+        self.assertEqual(api.status_code, 200)
+        self.assertEqual(api.data, [])
+
+    def test_anonymous_public_scope_modes_stay_literal(self):
+        url = reverse("waste-atlas-germany-collection-system-map")
+        for scope in ("historical", "published", "archived"):
+            with self.subTest(scope=scope):
+                response = self.client.get(url, {"scope": scope})
+                self.assertEqual(_map_config(response)["scope"], scope)
+
     def test_conflict_overlay_is_only_offered_to_maintainers(self):
         url = reverse("waste-atlas-germany-collection-system-map")
         self.assertNotIn("conflictUrl", _map_config(self.client.get(url)))
         self.client.force_login(User.objects.create_user("plain-2"))
         self.assertNotIn("conflictUrl", _map_config(self.client.get(url)))
-        moderator = User.objects.create_user("overlay-moderator")
-        moderator.user_permissions.add(
-            Permission.objects.get(
-                content_type=ContentType.objects.get_for_model(Collection),
-                codename="can_moderate_collection",
-            )
+        # Django staff alone does not qualify as a maintainer.
+        self.client.force_login(User.objects.create_user("staff", is_staff=True))
+        self.assertNotIn("conflictUrl", _map_config(self.client.get(url)))
+        admin = User.objects.create_user("overlay-admin")
+        admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
         )
-        self.client.force_login(moderator)
+        self.client.force_login(admin)
         self.assertIn("conflictUrl", _map_config(self.client.get(url)))
 
 

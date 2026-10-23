@@ -13,6 +13,9 @@ from django.template import Context
 from django.test import SimpleTestCase, TestCase
 from django.urls import Resolver404, resolve, reverse
 
+from sources.waste_collection.tests.atlas_fixtures import (
+    seed_atlas_map_configurations,
+)
 from sources.waste_collection.waste_atlas.map_configs import (
     MAP_CONFIGS,
     no_collection_color,
@@ -57,6 +60,10 @@ URL_CONFIG_KEYS = (
 
 
 class WasteAtlasMapConfigStructureTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_atlas_map_configurations()
+
     DOOR_TO_DOOR_BIOWASTE_THEMES = {
         "biowaste_collection_count",
         "biowaste_fee_system",
@@ -684,6 +691,10 @@ class WasteAtlasMapConfigStructureTests(TestCase):
 
 
 class MapSelectionContextCachingTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_atlas_map_configurations()
+
     """The selection/directory contexts resolve ~1000 URLs per call over a
     static registry, so the resolved structure is cached per reverse
     function."""
@@ -773,6 +784,10 @@ class WasteAtlasOverviewDirectoryContextTests(SimpleTestCase):
 
 
 class WasteAtlasMapSelectionTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_atlas_map_configurations()
+
     @staticmethod
     def _context(**kwargs):
         return build_map_selection_context(
@@ -807,6 +822,10 @@ class WasteAtlasMapSelectionTests(TestCase):
 
 
 class MapConfigurationLookupCachingTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seed_atlas_map_configurations()
+
     """MAP_CONFIGS lookups are per-request hot paths, so they are cached, but
     the cache must stay in sync with runtime edits through the ORM."""
 
