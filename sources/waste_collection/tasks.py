@@ -13,6 +13,7 @@ from brit.celery import app
 from maps.db_functions import SimplifyPreserveTopology
 from maps.signals import get_geojson_cache
 from maps.utils import (
+    AUTHZ_GEOJSON_CACHE_PREFIX,
     build_collection_cache_key,
     cache_rendered_geojson,
     rendered_geojson_cache_key,
@@ -58,7 +59,11 @@ def warm_collection_geojson_cache(self):
         # never stale geometry under a current key.
         from sources.waste_collection.viewsets import CollectionViewSet
 
-        base_key = build_collection_cache_key(scope="published")
+        # Anonymous requests read a dedicated authorization-prefixed
+        # namespace; warm the key that audience actually uses.
+        base_key = AUTHZ_GEOJSON_CACHE_PREFIX + build_collection_cache_key(
+            scope="published"
+        )
         view = CollectionViewSet()
         aggregates = qs.aggregate(**view._version_aggregates())
         cache_key = rendered_geojson_cache_key(

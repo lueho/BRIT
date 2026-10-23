@@ -913,13 +913,22 @@ class CollectionViewSetTestCase(APITestCase):
 
 
 class CollectionReviewActionApiTestCase(APITestCase):
-    """Ensure review action API endpoints trigger collection cascade behavior."""
+    """Collection review actions keep independent evidence lifecycles intact.
+
+    CPV/ACPV records are independent reviewable objects: registering or
+    approving a collection must not transition them."""
 
     @classmethod
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(username="owner")
         cls.other_owner = User.objects.create_user(username="other-owner")
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
+        cls.staff.user_permissions.add(
+            Permission.objects.get(
+                codename="can_moderate_collection",
+                content_type=ContentType.objects.get_for_model(Collection),
+            )
+        )
 
         cls.catchment = CollectionCatchment.objects.create(name="Test Catchment")
         cls.collector = Collector.objects.create(name="Test Collector")
@@ -981,7 +990,7 @@ class CollectionReviewActionApiTestCase(APITestCase):
         acpv.collections.set(collections)
         return acpv
 
-    def test_register_for_review_cascades_property_values(self):
+    def test_register_for_review_does_not_cascade_property_values(self):
         collection = self._create_collection(
             "Collection Submit",
             owner=self.owner,
@@ -1006,12 +1015,12 @@ class CollectionReviewActionApiTestCase(APITestCase):
         acpv_private.refresh_from_db()
 
         self.assertEqual(collection.publication_status, "review")
-        self.assertEqual(cpv_private.publication_status, "review")
-        self.assertEqual(cpv_declined.publication_status, "review")
+        self.assertEqual(cpv_private.publication_status, "private")
+        self.assertEqual(cpv_declined.publication_status, "declined")
         self.assertEqual(cpv_published.publication_status, "published")
-        self.assertEqual(acpv_private.publication_status, "review")
+        self.assertEqual(acpv_private.publication_status, "private")
 
-    def test_approve_cascades_property_values(self):
+    def test_approve_does_not_cascade_property_values(self):
         collection = self._create_collection(
             "Collection Approve",
             owner=self.owner,
@@ -1023,7 +1032,9 @@ class CollectionReviewActionApiTestCase(APITestCase):
 
         self.client.force_login(self.staff)
         url = reverse("api-waste-collection-approve", kwargs={"pk": collection.pk})
-        response = self.client.post(url)
+        response = self.client.post(
+            url, {"expected_revision": collection.content_revision}, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         collection.refresh_from_db()
@@ -1032,12 +1043,12 @@ class CollectionReviewActionApiTestCase(APITestCase):
         acpv_review.refresh_from_db()
 
         self.assertEqual(collection.publication_status, "published")
-        self.assertEqual(cpv_owner.publication_status, "published")
-        self.assertEqual(cpv_other.publication_status, "published")
-        self.assertEqual(cpv_owner.approved_by, self.staff)
-        self.assertEqual(cpv_other.approved_by, self.staff)
-        self.assertEqual(acpv_review.publication_status, "published")
-        self.assertEqual(acpv_review.approved_by, self.staff)
+        self.assertEqual(cpv_owner.publication_status, "review")
+        self.assertIsNone(cpv_owner.approved_by)
+        self.assertEqual(cpv_other.publication_status, "review")
+        self.assertIsNone(cpv_other.approved_by)
+        self.assertEqual(acpv_review.publication_status, "review")
+        self.assertIsNone(acpv_review.approved_by)
 
 
 class CollectionImporterWorkflowTestCase(APITestCase):
@@ -1052,7 +1063,10 @@ class CollectionImporterWorkflowTestCase(APITestCase):
     def setUpTestData(cls):
         import datetime
 
+        call_command("sync_roles", "--apply", stdout=StringIO(), stderr=StringIO())
         cls.owner = User.objects.create_user(username="importer-owner")
+        # Baseline contributor role supplies the required create capabilities;
+        # the staff flag alone no longer passes the import gate.
         cls.staff_owner = User.objects.create_user(
             username="importer-staff", is_staff=True
         )
@@ -1299,13 +1313,27 @@ class CollectionMutationApiTestCase(APITestCase):
         cls.other_user = User.objects.create_user(username="agent-other")
         cls.staff = User.objects.create_user(username="agent-staff", is_staff=True)
 
-        cls.catchment = CollectionCatchment.objects.create(name="Agent Catchment")
-        cls.collection_system = CollectionSystem.objects.create(name="Agent System")
-        cls.waste_category = WasteCategory.objects.create(name="Agent Waste")
-        cls.collector = Collector.objects.create(name="Agent Collector")
-        cls.frequency = CollectionFrequency.objects.create(name="Agent Frequency")
-        cls.fee_system = FeeSystem.objects.create(name="Agent Fee")
-        cls.bin_configuration = BinConfiguration.objects.create(name="Agent Sorting")
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Agent Catchment", publication_status="published"
+        )
+        cls.collection_system = CollectionSystem.objects.create(
+            name="Agent System", publication_status="published"
+        )
+        cls.waste_category = WasteCategory.objects.create(
+            name="Agent Waste", publication_status="published"
+        )
+        cls.collector = Collector.objects.create(
+            name="Agent Collector", publication_status="published"
+        )
+        cls.frequency = CollectionFrequency.objects.create(
+            name="Agent Frequency", publication_status="published"
+        )
+        cls.fee_system = FeeSystem.objects.create(
+            name="Agent Fee", publication_status="published"
+        )
+        cls.bin_configuration = BinConfiguration.objects.create(
+            name="Agent Sorting", publication_status="published"
+        )
         cls.allowed_material = Material.objects.create(
             name="Agent Allowed Material", owner=cls.owner
         )
@@ -2173,9 +2201,7 @@ class CollectionMutationApiTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_new_version_does_not_copy_an_unreadable_source(self):
-        before_ids = set(Collection.objects.values_list("pk", flat=True))
-        predecessor_anchor = self.predecessor.version_anchor.pk
+    def test_new_version_drops_an_unreadable_inherited_source(self):
         self.client.force_login(self.other_user)
         response = self.client.post(
             reverse(
@@ -2185,13 +2211,11 @@ class CollectionMutationApiTestCase(APITestCase):
             {"valid_from": "2025-03-15", "submit_for_review": False},
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(
-            set(Collection.objects.values_list("pk", flat=True)), before_ids
-        )
-        predecessor = Collection.objects.get(pk=self.predecessor.pk)
-        self.assertEqual(predecessor.version_anchor.pk, predecessor_anchor)
-        self.assertFalse(predecessor.successors.exists())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        version = Collection.objects.get(pk=response.data["id"])
+        self.assertEqual(version.owner, self.other_user)
+        self.assertFalse(version.sources.filter(pk=self.source.pk).exists())
+        self.assertTrue(version.predecessors.filter(pk=self.predecessor.pk).exists())
 
     def test_new_version_rejects_private_predecessor_of_other_user(self):
         user = User.objects.create_user(username="agent-private-denied")
