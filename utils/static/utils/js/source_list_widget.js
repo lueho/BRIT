@@ -38,9 +38,7 @@ function addSourceToList(listElement, sourceId, sourceLabel, selectElement) {
     listElement.appendChild(li);
 
     // Wire modal links after insertion so the new link gets bound.
-    if (window.wireModalLinks) {
-        window.wireModalLinks();
-    }
+    document.dispatchEvent(new CustomEvent('brit:rewire-modal-links'));
 }
 
 /**
@@ -74,9 +72,7 @@ function openContentInModal(url) {
                 });
             }
             modalInstance.show();
-            if (window.wireModalLinks) {
-                window.wireModalLinks();
-            }
+            document.dispatchEvent(new CustomEvent('brit:rewire-modal-links'));
         })
         .catch(() => {
             window.location.href = url;

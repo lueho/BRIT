@@ -11,6 +11,15 @@ const sharedSource = readFileSync(
     join(HERE, "../../../../maps/static/js/maps.js"),
     "utf8"
 );
+// In production the base template loads the shared helpers before maps.js.
+const formatUtilsSource = readFileSync(
+    join(HERE, "../../../../utils/static/js/format_utils.js"),
+    "utf8"
+);
+const mapFeatureUtilsSource = readFileSync(
+    join(HERE, "../../../../maps/static/js/map_feature_utils.js"),
+    "utf8"
+);
 
 function makeElement(tagName) {
     const element = {
@@ -206,6 +215,8 @@ function setup({ loadShared = false } = {}) {
     };
     window.window = window;
     vm.createContext(sandbox);
+    vm.runInContext(formatUtilsSource, sandbox);
+    vm.runInContext(mapFeatureUtilsSource, sandbox);
     if (loadShared) {
         vm.runInContext(sharedSource, sandbox);
         (windowListeners["map:init"] || []).forEach(callback =>
