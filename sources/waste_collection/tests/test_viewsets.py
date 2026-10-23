@@ -4922,10 +4922,6 @@ class BiowasteImpurityViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         return {r["catchment_id"]: r for r in response.data}
 
-    def test_returns_200(self):
-        response = self.client.get(self.endpoint, {"country": "ES", "year": 2024})
-        self.assertEqual(response.status_code, 200)
-
     def test_impurity_rate_returned_from_collection_version_chain(self):
         by_catchment = self._by_catchment()
         row = by_catchment[self.catchment_with_data.id]
@@ -4959,13 +4955,6 @@ class BiowasteImpurityViewSetTests(APITestCase):
     def test_country_filter_excludes_other_countries(self):
         by_catchment = self._by_catchment(country="DE", year=2024)
         self.assertNotIn(self.catchment_with_data.id, by_catchment)
-
-    def test_response_keys(self):
-        by_catchment = self._by_catchment()
-        row = by_catchment[self.catchment_with_data.id]
-        self.assertIn("catchment_id", row)
-        self.assertIn("impurity_rate", row)
-        self.assertIn("no_collection", row)
 
 
 class WeeklyBpAccessDaysViewSetTests(APITestCase):
@@ -5063,10 +5052,6 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         return {r["catchment_id"]: r for r in response.data}
 
-    def test_returns_200(self):
-        response = self.client.get(self.endpoint, {"country": "ES", "year": 2024})
-        self.assertEqual(response.status_code, 200)
-
     def test_bring_point_catchment_has_bp_flag_and_value(self):
         by_catchment = self._by_catchment()
         row = by_catchment[self.catchment_bp_with_data.id]
@@ -5094,13 +5079,6 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
     def test_country_filter_excludes_other_countries(self):
         by_catchment = self._by_catchment(country="DE", year=2024)
         self.assertNotIn(self.catchment_bp_with_data.id, by_catchment)
-
-    def test_response_keys(self):
-        by_catchment = self._by_catchment()
-        row = by_catchment[self.catchment_bp_with_data.id]
-        self.assertIn("catchment_id", row)
-        self.assertIn("weekly_access_days", row)
-        self.assertIn("has_bring_point", row)
 
 
 class WasteAtlasPublicationScopingTests(APITestCase):
