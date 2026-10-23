@@ -53,6 +53,7 @@ test("change records key classification on overlay feature provenance", () => {
         from_catchment_id: null,
         to_catchment_id: 3,
         spatial_change: "added",
+        change_feature_id: 43,
       },
     },
     {
@@ -60,6 +61,7 @@ test("change records key classification on overlay feature provenance", () => {
         from_catchment_id: 9,
         to_catchment_id: null,
         spatial_change: "removed",
+        change_feature_id: 44,
       },
     },
   ];
@@ -71,7 +73,9 @@ test("change records key classification on overlay feature provenance", () => {
   assert.strictEqual(records[0].spatial_change, "transferred");
   assert.strictEqual(records[0].from_catchment_id, 1);
   assert.strictEqual(records[0].to_catchment_id, 2);
+  assert.strictEqual(records[1].catchment_id, 43);
   assert.strictEqual(records[1].change_type, "new");
+  assert.strictEqual(records[2].catchment_id, 44);
   assert.strictEqual(records[2].change_type, "removed");
 });
 
