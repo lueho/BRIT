@@ -279,7 +279,10 @@ class RegionModelForm(SimpleModelForm):
 
 
 class RegionAttributeValueModelForm(
-    NumericMeasurementFieldsFormMixin, SourcesFieldMixin, SimpleModelForm
+    NumericMeasurementFieldsFormMixin,
+    UserCreatedObjectFormMixin,
+    SourcesFieldMixin,
+    SimpleModelForm,
 ):
     measurement_field_names = ("value", "standard_deviation")
 
