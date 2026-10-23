@@ -168,6 +168,13 @@
     trigger.removeAttribute("aria-busy");
   }
 
+  function showExportError(trigger, message) {
+    // Anchor beside the actions menu, not the trigger: Bootstrap closes the
+    // dropdown on click, so an alert inside the menu would be invisible.
+    const anchor = trigger.closest(".sdv2-actions-menu") || trigger;
+    showInlineAlert(anchor, message);
+  }
+
   function startSampleExport(trigger) {
     const exportUrl = trigger && trigger.dataset.exportUrl;
     const progressTemplate = trigger && trigger.dataset.progressTemplate;
@@ -203,19 +210,19 @@
           onFailure: (data) => {
             resetExportTrigger(trigger);
             const msg = (data.details && data.details.error) || "Export failed";
-            showInlineAlert(trigger, msg);
+            showExportError(trigger, msg);
           },
           onError: (err) => {
             console.warn("sdv2 export progress failed", err);
             resetExportTrigger(trigger);
-            showInlineAlert(trigger, "Export polling failed. See console for details.");
+            showExportError(trigger, "Export polling failed. See console for details.");
           },
         });
       })
       .catch((err) => {
         console.warn("sdv2 export start failed", err);
         resetExportTrigger(trigger);
-        showInlineAlert(trigger, "Failed to start export. See console for details.");
+        showExportError(trigger, "Failed to start export. See console for details.");
       });
   }
 
