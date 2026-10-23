@@ -296,3 +296,57 @@ class SourceArticleCompatibilityTestCase(TestCase):
 
         source.article_number = "e42"
         self.assertEqual(source.eid, "e42")
+
+
+class SourceDoiNormalizationTestCase(TestCase):
+    """Regression tests for #393: DOI values must be stored as bare
+    ``10.xxxx/...`` strings, not resolver URLs, labels, or LaTeX markup."""
+
+    def test_resolver_url_is_normalized_on_save(self):
+        source = Source.objects.create(
+            title="Article", doi="https://doi.org/10.1007/s12649-010-9059-x"
+        )
+        self.assertEqual(source.doi, "10.1007/s12649-010-9059-x")
+
+    def test_doi_label_prefix_is_normalized_on_save(self):
+        source = Source.objects.create(title="Article", doi="DOI: 10.1021/jf9913458")
+        self.assertEqual(source.doi, "10.1021/jf9913458")
+
+    def test_latex_url_markup_is_normalized_on_save(self):
+        source = Source.objects.create(
+            title="Article", doi=r"\url10.37307/j.1863-9763.2017.03.07"
+        )
+        self.assertEqual(source.doi, "10.37307/j.1863-9763.2017.03.07")
+
+    def test_latex_url_braces_are_normalized_on_save(self):
+        source = Source.objects.create(
+            title="Article", doi=r"\url{10.1016/j.fshw.2015.10.001}"
+        )
+        self.assertEqual(source.doi, "10.1016/j.fshw.2015.10.001")
+
+    def test_bare_doi_is_unchanged_on_save(self):
+        source = Source.objects.create(
+            title="Article", doi="10.1016/j.scitotenv.2020.141699"
+        )
+        self.assertEqual(source.doi, "10.1016/j.scitotenv.2020.141699")
+
+    def test_clean_normalizes_before_validating(self):
+        source = Source(title="Article", doi="  https://doi.org/10.1021/jf9913458 ")
+        source.full_clean()
+        self.assertEqual(source.doi, "10.1021/jf9913458")
+
+    def test_clean_rejects_non_doi_value(self):
+        source = Source(title="Book", doi="ISBN 978-3-03736-016-3")
+        with self.assertRaises(ValidationError) as ctx:
+            source.full_clean()
+        self.assertIn("doi", ctx.exception.error_dict)
+
+    def test_clean_rejects_non_doi_url(self):
+        source = Source(title="Thesis", doi="https://theses.hal.science/tel-04453521v1")
+        with self.assertRaises(ValidationError) as ctx:
+            source.full_clean()
+        self.assertIn("doi", ctx.exception.error_dict)
+
+    def test_clean_accepts_empty_doi(self):
+        source = Source(title="Article")
+        source.full_clean()

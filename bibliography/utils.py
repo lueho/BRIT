@@ -1,3 +1,4 @@
+import re
 import string
 
 import requests
@@ -135,3 +136,25 @@ def generate_citation_key(source):
             return candidate
 
     return base
+
+
+DOI_PREFIXES = ("https://doi.org/", "http://doi.org/", "doi.org/", "doi:")
+DOI_PATTERN = re.compile(r"^10\.\d{4,9}/\S+$")
+
+
+def normalize_doi(value):
+    """Return the bare ``10.xxxx/...`` DOI for the given raw value.
+
+    Strips resolver URLs (``https://doi.org/``), ``doi:``/``DOI:`` labels and
+    LaTeX ``\\url``/``\\url{...}`` markup that sneak in via imports or
+    copy-paste. Values wrapped in no known prefix are returned stripped but
+    otherwise unchanged.
+    """
+    doi = str(value or "").strip()
+    for prefix in DOI_PREFIXES:
+        if doi.lower().startswith(prefix):
+            doi = doi[len(prefix) :]
+            break
+    if doi.startswith("\\url"):
+        doi = doi[4:]
+    return doi.strip("{}").strip()
