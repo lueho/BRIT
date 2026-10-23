@@ -26,7 +26,10 @@ const atlas = sandbox.WasteAtlasChoropleth;
 const single = { properties: { collection_detail_url: "/collections/7/" } };
 const composite = {
   properties: {
-    collection_options: [{ url: "/collections/1/" }, { url: "/collections/2/" }],
+    collection_details: [
+      { url: "/collections/1/", label: "Biowaste" },
+      { url: "/collections/2/", label: "Residual" },
+    ],
   },
 };
 
