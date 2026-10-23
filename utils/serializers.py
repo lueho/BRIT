@@ -3,7 +3,7 @@ from collections import OrderedDict
 from rest_framework import serializers
 from rest_framework.fields import SkipField
 from rest_framework.relations import PKOnlyObject
-from rest_framework.serializers import ModelSerializer, Serializer
+from rest_framework.serializers import ModelSerializer
 
 
 class UserCreatedObjectSerializer(serializers.ModelSerializer):
@@ -31,8 +31,8 @@ class UserCreatedObjectSerializer(serializers.ModelSerializer):
         ]
 
 
-class FieldLabelMixin(Serializer):
-    # TODO: EOL this class
+class FieldLabelModelSerializer(ModelSerializer):
+    """Renders output with defined labels instead of field names"""
 
     field_labels_as_keys = False
 
@@ -68,10 +68,6 @@ class FieldLabelMixin(Serializer):
                 ret[key] = field.to_representation(attribute)
 
         return ret
-
-
-class FieldLabelModelSerializer(FieldLabelMixin, ModelSerializer):
-    """Renders output with defined labels instead of field names"""
 
 
 class SimplifiedGeometryMixin:

@@ -1,9 +1,9 @@
 from django.db.models import Count, Max, Prefetch
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 from rest_framework.response import Response
-
-from utils.viewsets import AutoPermModelViewSet
+from rest_framework.viewsets import ModelViewSet
 
 from .filters import CatchmentFilterSet, RegionFilterSet
 from .mixins import CachedGeoJSONMixin, get_unbounded_geojson_rejection_response
@@ -34,16 +34,11 @@ from .utils import (
 )
 
 
-class LocationViewSet(AutoPermModelViewSet):
+class LocationViewSet(ModelViewSet):
     queryset = Location.objects.all()
     serializer_class = LocationModelSerializer
     filterset_fields = ("id",)
-    custom_permission_required = {
-        "list": None,
-        "retrieve": None,
-        "geojson": None,
-        "version": None,
-    }
+    permission_classes = [DjangoModelPermissionsOrAnonReadOnly]
 
     @action(detail=False, methods=["get"])
     def geojson(self, request, *args, **kwargs):
@@ -60,19 +55,13 @@ class LocationViewSet(AutoPermModelViewSet):
         return Response(serializer.data)
 
 
-class RegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
+class RegionViewSet(CachedGeoJSONMixin, ModelViewSet):
     geojson_geometry_field = "borders__geom"
     queryset = Region.objects.select_related("borders").all()
     serializer_class = RegionModelSerializer
     filterset_class = RegionFilterSet
     geojson_throttle_classes = (GeoJSONAnonThrottle,)
-    custom_permission_required = {
-        "list": None,
-        "retrieve": None,
-        "geojson": None,
-        "summaries": None,
-        "version": None,
-    }
+    permission_classes = [DjangoModelPermissionsOrAnonReadOnly]
 
     def get_cache_key(self, request):
         filters = request.query_params.dict()
@@ -93,18 +82,13 @@ class RegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         return Response(summary_data)
 
 
-class CatchmentViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
+class CatchmentViewSet(CachedGeoJSONMixin, ModelViewSet):
     geojson_geometry_field = "region__borders__geom"
     queryset = Catchment.objects.select_related("region", "region__borders").all()
     serializer_class = CatchmentModelSerializer
     filterset_class = CatchmentFilterSet
     geojson_throttle_classes = (GeoJSONAnonThrottle,)
-    custom_permission_required = {
-        "list": None,
-        "retrieve": None,
-        "geojson": None,
-        "version": None,
-    }
+    permission_classes = [DjangoModelPermissionsOrAnonReadOnly]
 
     def get_cache_key(self, request):
         filters = request.query_params.dict()
@@ -132,7 +116,7 @@ class CatchmentViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         return CatchmentModelSerializer
 
 
-class NutsRegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
+class NutsRegionViewSet(CachedGeoJSONMixin, ModelViewSet):
     geojson_geometry_field = "borders__geom"
     queryset = (
         NutsRegion.objects.select_related("borders", "parent")
@@ -157,12 +141,7 @@ class NutsRegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     serializer_class = NutsRegionSummarySerializer
     filterset_fields = ("id", "levl_code", "cntr_code", "parent_id")
     geojson_throttle_classes = (GeoJSONAnonThrottle,)
-    custom_permission_required = {
-        "list": None,
-        "retrieve": None,
-        "geojson": None,
-        "version": None,
-    }
+    permission_classes = [DjangoModelPermissionsOrAnonReadOnly]
 
     def get_vintage(self):
         """The vintage this request is scoped to; the current one by default."""

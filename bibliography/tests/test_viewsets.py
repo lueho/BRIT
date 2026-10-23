@@ -241,3 +241,74 @@ class SourceCreateAPIViewTestCase(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+class SourceViewSetTestCase(TestCase):
+    """SourceViewSet applies UserCreatedObject visibility scoping."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create(username="owner")
+        cls.outsider = User.objects.create(username="outsider")
+        cls.private_source = Source.objects.create(
+            owner=cls.owner,
+            title="Private Source",
+            publication_status=Source.STATUS_PRIVATE,
+        )
+        cls.published_source = Source.objects.create(
+            owner=cls.owner,
+            title="Published Source",
+            publication_status=Source.STATUS_PUBLISHED,
+        )
+        cls.outsider_private_source = Source.objects.create(
+            owner=cls.outsider,
+            title="Outsider Private Source",
+            publication_status=Source.STATUS_PRIVATE,
+        )
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def _listed_ids(self, response):
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return {item["id"] for item in response.json()}
+
+    def test_list_returns_only_published_sources_for_anonymous(self):
+        ids = self._listed_ids(self.client.get(reverse("api-source-list")))
+        self.assertIn(self.published_source.pk, ids)
+        self.assertNotIn(self.private_source.pk, ids)
+        self.assertNotIn(self.outsider_private_source.pk, ids)
+
+    def test_private_scope_returns_only_own_sources(self):
+        self.client.force_login(self.owner)
+        ids = self._listed_ids(
+            self.client.get(reverse("api-source-list"), {"scope": "private"})
+        )
+        self.assertIn(self.private_source.pk, ids)
+        self.assertNotIn(self.outsider_private_source.pk, ids)
+
+    def test_retrieve_private_source_401_for_anonymous(self):
+        response = self.client.get(
+            reverse("api-source-detail", args=[self.private_source.pk])
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_retrieve_private_source_403_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(
+            reverse("api-source-detail", args=[self.private_source.pk])
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_retrieve_private_source_200_for_owner(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("api-source-detail", args=[self.private_source.pk])
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_retrieve_published_source_200_for_anonymous(self):
+        response = self.client.get(
+            reverse("api-source-detail", args=[self.published_source.pk])
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
