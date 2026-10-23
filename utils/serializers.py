@@ -3,7 +3,7 @@ from collections import OrderedDict
 from rest_framework import serializers
 from rest_framework.fields import SkipField
 from rest_framework.relations import PKOnlyObject
-from rest_framework.serializers import ModelSerializer, Serializer
+from rest_framework.serializers import ModelSerializer
 
 
 class UserCreatedObjectSerializer(serializers.ModelSerializer):
@@ -31,8 +31,8 @@ class UserCreatedObjectSerializer(serializers.ModelSerializer):
         ]
 
 
-class FieldLabelMixin(Serializer):
-    # TODO: EOL this class
+class FieldLabelModelSerializer(ModelSerializer):
+    """Renders output with defined labels instead of field names"""
 
     field_labels_as_keys = False
 
@@ -70,5 +70,21 @@ class FieldLabelMixin(Serializer):
         return ret
 
 
-class FieldLabelModelSerializer(FieldLabelMixin, ModelSerializer):
-    """Renders output with defined labels instead of field names"""
+class SimplifiedGeometryMixin:
+    """Resolve ``geom`` from annotated or stored geometry attributes.
+
+    Pairs with ``GeometrySerializerMethodField`` on geo serializers whose
+    queryset annotates a simplified geometry. ``geom_fallback_attrs`` lists
+    candidate attribute names in order of preference; serializers with a
+    different fallback chain override it.
+    """
+
+    geom_fallback_attrs = ("simplified_geom", "geom")
+
+    def get_geom(self, instance):
+        """Return simplified geometry if available, otherwise original."""
+        for attr in self.geom_fallback_attrs:
+            geom = getattr(instance, attr, None)
+            if geom:
+                return geom
+        return None

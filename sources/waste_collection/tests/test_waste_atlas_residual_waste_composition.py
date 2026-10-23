@@ -36,7 +36,7 @@ class ResidualWasteCompositionViewSetTests(APITestCase):
             name="total food waste in residual waste"
         )
         cls.percentage_unit, _ = Unit.objects.get_or_create(name="%")
-        cls.kg_unit, _ = Unit.objects.get_or_create(name="kg/(cap.*a)")
+        cls.kg_unit, _ = Unit.objects.get_or_create(name="kg/(cap·a)")
         cls.biowaste_property.allowed_units.add(
             cls.percentage_unit,
             cls.kg_unit,

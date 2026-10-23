@@ -6,7 +6,6 @@ from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsp
 from django import template
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
-from django.test import RequestFactory
 from django.urls import reverse
 from django.utils.html import escape, mark_safe
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -66,6 +65,28 @@ def safe_back_url(context):
         return ""
 
     return back
+
+
+@register.simple_tag(takes_context=True)
+def safe_next_url(context):
+    """Return the request's ``next`` param if it is a same-host URL, else ``""``."""
+    request = context.get("request")
+    if request is None:
+        return ""
+
+    next_url = request.GET.get("next")
+    if not next_url:
+        return ""
+
+    try:
+        is_safe = url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        )
+    except ValueError:
+        return ""
+    return next_url if is_safe else ""
 
 
 @register.filter
@@ -502,15 +523,9 @@ def has_pending_review_items_for_user(user):
         return cached_result
 
     try:
-        from utils.object_management.views import ReviewDashboardView
+        from utils.object_management.review_queue import ReviewItemCollector
 
-        request = RequestFactory().get("/")
-        request.user = user
-
-        view = ReviewDashboardView()
-        view.setup(request)
-        view.request = request
-        has_items = view.has_review_items()
+        has_items = ReviewItemCollector(user).has_review_items()
 
         # Cache the result for 20 minutes. This badge appears in the shared
         # navigation, so cold checks otherwise affect unrelated pages.

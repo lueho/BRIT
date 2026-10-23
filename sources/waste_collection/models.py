@@ -22,6 +22,7 @@ from utils.object_management.models import (
     UserCreatedObject,
     UserCreatedObjectManager,
     UserCreatedObjectQuerySet,
+    get_default_owner,
 )
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import PropertyValue
@@ -100,7 +101,12 @@ class WasteCategory(NamedUserCreatedObject):
 
 class WasteComponentManager(MaterialManager):
     def get_queryset(self):
-        return super().get_queryset().filter(categories__name="Biowaste component")
+        return (
+            super()
+            .get_queryset()
+            .filter(categories__name="Biowaste component")
+            .distinct()
+        )
 
 
 class WasteComponent(Material):
@@ -113,7 +119,9 @@ class WasteComponent(Material):
 @receiver(post_save, sender=WasteComponent)
 def add_material_category(sender, instance, created, **kwargs):
     if created:
-        category = MaterialCategory.objects.get(name="Biowaste component")
+        category = MaterialCategory.objects.get(
+            name="Biowaste component", owner=get_default_owner()
+        )
         instance.categories.add(category)
         instance.save()
 
@@ -526,7 +534,17 @@ class Collection(NamedUserCreatedObject):
     objects = CollectionQuerySet.as_manager()
 
     class Meta(NamedUserCreatedObject.Meta):
-        indexes = [models.Index(fields=["name", "id"], name="collection_name_id_idx")]
+        indexes = [
+            models.Index(fields=["name", "id"], name="collection_name_id_idx"),
+            # Meta.indexes replaces the abstract base's list, so the shared
+            # publication_status index must be re-declared explicitly.
+            models.Index(
+                fields=["publication_status"], name="collection_pub_status_idx"
+            ),
+            # valid_until stays out: valid_on() ORs it with IS NULL, so it can
+            # never become an index condition.
+            models.Index(fields=["valid_from"], name="collection_valid_from_idx"),
+        ]
 
     VERSION_REVIEW_FIELD_NAMES = (
         "catchment",
@@ -958,6 +976,12 @@ class CollectionPropertyValue(PropertyValue):
         ),
     )
 
+    def get_breadcrumb_object_label(self):
+        label = f"{self.property}: {self.display_average}"
+        if self.standard_deviation:
+            label += f" ± {self.display_standard_deviation}"
+        return label
+
     @property
     def year_outside_collection_period(self):
         """True when ``year`` falls outside the collection's valid period.
@@ -988,6 +1012,12 @@ class CollectionPropertyValue(PropertyValue):
             models.CheckConstraint(
                 condition=Q(is_derived=True) | Q(derived_from__isnull=True),
                 name="soilcom_cpv_raw_without_source_pointer",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["collection", "property", "year", "is_derived"],
+                name="cpv_sync_lookup_idx",
             ),
         ]
 

@@ -143,8 +143,14 @@ class UserCreatedObjectPermission(permissions.BasePermission):
 
     def has_permission(self, request, view):
         """Evaluate action-level access before object-level checks run."""
-        action = getattr(view, "action", None)
-        if action in ("list", "retrieve"):
+        # OPTIONS only describes the endpoint; DRF's metadata class re-checks
+        # permissions before advertising any write action.
+        if request.method == "OPTIONS":
+            return True
+
+        # List/retrieve endpoints are publicly callable; queryset/object checks
+        # enforce which records are actually visible.
+        if getattr(view, "action", None) in ["list", "retrieve"]:
             return True
 
         model = self._get_view_model(view)

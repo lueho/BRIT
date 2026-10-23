@@ -2,24 +2,43 @@
 
 // Load 'lib/turf-inside/inside.min.js' script before this
 // Load 'js/maps.js' script before this
+// format_utils.js and map_feature_utils.js are loaded by the base template
 
-const fieldConfig = {
-    catchment: {
-        include: true,
-        format: (value) => value || ''
-    },
-    collector: {
-        include: true,
-        format: (value) => value || ''
-    },
-    collection_system: {
-        include: true,
-        format: (value) => value || ''
-    },
-    waste_category: {
-        include: true,
-        format: (value) => value || ''
-    },
+// Element ids rendered by the template. Centralised here so markup changes
+// only need to touch one place.
+const DOM_IDS = {
+    mapContext: 'map-context',
+    actionsHint: 'map-actions-hint',
+    summaryContainer: 'summary-container',
+    summaryTab: 'summary-tab',
+    clearSelection: 'btn-clear-selection',
+    collectionCreate: 'btn-collection-create',
+    collectionDetail: 'btn-collection-detail',
+    collectionUpdate: 'btn-collection-update',
+    collectionCopy: 'btn-collection-copy',
+    collectionDelete: 'btn-collection-delete',
+    privateMapLink: 'link-map-private',
+    publicMapLink: 'link-map-public',
+    collectionsAsListButton: 'btn-collections-as-list',
+    collectionsAsListLink: 'link-collections-as-list',
+};
+
+// Rebind .modal-link elements (e.g. after rewriting a button href). Handled by
+// modal_links.js, which is loaded by the base templates.
+function requestModalLinkRewire() {
+    document.dispatchEvent(new CustomEvent('brit:rewire-modal-links'));
+}
+
+// The features layer exposed by maps.js via a global lexical binding.
+function getFeaturesLayer() {
+    return (typeof featuresLayer !== 'undefined') ? featuresLayer : null;
+}
+
+const fieldConfig = createFieldConfig({
+    catchment: true,
+    collector: true,
+    collection_system: true,
+    waste_category: true,
     allowed_materials: {
         include: false,
         format: (value) => {
@@ -36,10 +55,7 @@ const fieldConfig = {
             return formatList(str, ', ');
         }
     },
-    fee_system: {
-        include: true,
-        format: (value) => value || ''
-    },
+    fee_system: true,
     population: {
         include: false,
         format: (value) => value ? value.toLocaleString() : ''
@@ -70,7 +86,7 @@ const fieldConfig = {
             return urlList ? `<ul class="list-disc pl-4">${urlList}</ul>` : '';
         }
     }
-};
+});
 
 function enableBtn(el) {
     if (!el) return;
@@ -98,7 +114,7 @@ function getScope() {
 function getContextFlag(flag) {
     // Read flags rendered as data-* attributes in the template (no JS in template)
     try {
-        const ctx = document.getElementById('map-context');
+        const ctx = document.getElementById(DOM_IDS.mapContext);
         if (!ctx) return null;
         const value = ctx.dataset[flag];
         if (value === undefined) return null;
@@ -111,7 +127,7 @@ function getContextFlag(flag) {
 
 function getCurrentUserId() {
     try {
-        const ctx = document.getElementById('map-context');
+        const ctx = document.getElementById(DOM_IDS.mapContext);
         if (!ctx) return null;
         const uid = ctx.dataset.userId;
         if (!uid) return null;
@@ -123,7 +139,7 @@ function getCurrentUserId() {
 }
 
 function hideSelectionHint() {
-    const hint = document.getElementById('map-actions-hint');
+    const hint = document.getElementById(DOM_IDS.actionsHint);
     if (hint) hint.classList.add('d-none');
 }
 
@@ -133,11 +149,9 @@ let __wc_lastSelectedLayer = null;
 function resetFeatureStyles(featureGroup) {
     try {
         if (!featureGroup) return;
-        featureGroup.eachLayer(layer => {
-            if (layer && typeof layer.setStyle === 'function' && typeof featuresLayerStyle === 'object') {
-                layer.setStyle(featuresLayerStyle);
-            }
-        });
+        if (typeof featuresLayerStyle === 'object') {
+            resetMapFeatureStyles(featureGroup, { style: featuresLayerStyle, demote: 'none' });
+        }
         __wc_lastSelectedLayer = null;
     } catch (_) { /* ignore styling errors */ }
 }
@@ -151,20 +165,18 @@ function selectFeature(layer) {
         }
         __wc_lastSelectedLayer = layer;
         // Apply a highlighted style to the current selection
-        if (typeof layer.setStyle === 'function') {
-            const highlight = Object.assign({}, featuresLayerStyle || {}, {
-                color: '#FF6600',
-                weight: (featuresLayerStyle && typeof featuresLayerStyle.weight === 'number')
-                    ? Math.max(2, featuresLayerStyle.weight + 3)
-                    : 5,
-                fillOpacity: (featuresLayerStyle && typeof featuresLayerStyle.fillOpacity === 'number')
-                    ? Math.min(1, featuresLayerStyle.fillOpacity + 0.15)
-                    : 0.65
-            });
-            layer.setStyle(highlight);
-        }
-        // Ensure the selected layer is drawn above overlapping polygons
-        try { if (typeof layer.bringToFront === 'function') { layer.bringToFront(); } } catch (_) { }
+        const base = (typeof featuresLayerStyle === 'object' && featuresLayerStyle) || {};
+        const highlight = Object.assign({}, base, {
+            color: '#FF6600',
+            weight: typeof base.weight === 'number'
+                ? Math.max(2, base.weight + 3)
+                : 5,
+            fillOpacity: typeof base.fillOpacity === 'number'
+                ? Math.min(1, base.fillOpacity + 0.15)
+                : 0.65
+        });
+        // Ensures the selected layer is drawn above overlapping polygons
+        selectMapFeature(layer, { style: highlight });
     } catch (_) { /* ignore styling errors */ }
 }
 
@@ -204,11 +216,10 @@ function featureClickHandler(e, featureGroup) {
         // Auto-select the single item
         const layer = [...intersectingFeatures][0];
         const fid = layer.feature && layer.feature.properties ? layer.feature.properties.id : null;
-        if (fid != null && typeof window.SelectionController !== 'undefined') {
-            window.SelectionController.select(fid, layer);
+        if (fid != null) {
+            SelectionController.select(fid, layer);
         } else {
             selectFeature(layer);
-            if (fid != null) { getFeatureDetails(fid); }
         }
         try {
             catchment = layer.feature.properties.catchment;
@@ -226,7 +237,7 @@ function featureClickHandler(e, featureGroup) {
                 const waste_category = f.feature.properties.waste_category;
                 const collection_system = f.feature.properties.collection_system;
                 const detailUrl = getDetailUrlForId(fid);
-                return `<a href="${detailUrl}" onclick="return window.__wc_selectFromPopup(${fid}, event)">${waste_category} - ${collection_system}</a>`;
+                return `<a href="${detailUrl}" data-wc-select="${fid}">${waste_category} - ${collection_system}</a>`;
             } catch (_) { return ''; }
         }).filter(Boolean).join('<br>');
     }
@@ -245,15 +256,13 @@ function createFeatureLayerBindings(featuresLayer) {
         return layer.feature.properties.catchment.toString();
     });
 
-    // Expose for cross-module helpers
-    try { window.featuresLayer = featuresLayer; } catch (_) { }
     featuresLayer.on('click', e => featureClickHandler(e, featuresLayer));
 }
 
 // --- Helpers for selection and navigation from popups ---
 function getDetailUrlForId(feature_id) {
     try {
-        const detailBtn = document.getElementById('btn-collection-detail');
+        const detailBtn = document.getElementById(DOM_IDS.collectionDetail);
         const tmpl = detailBtn && detailBtn.dataset && detailBtn.dataset.hrefTemplate;
         if (!tmpl) return '#';
         // Build ?next=<current path with filters>
@@ -272,7 +281,7 @@ function getDetailUrlForId(feature_id) {
 
 function highlightFeatureById(fid, featureGroup) {
     try {
-        const group = featureGroup || (typeof window.featuresLayer !== 'undefined' ? window.featuresLayer : null);
+        const group = featureGroup || getFeaturesLayer();
         if (!group || typeof group.eachLayer !== 'function') return;
         group.eachLayer(layer => {
             try {
@@ -285,7 +294,7 @@ function highlightFeatureById(fid, featureGroup) {
     } catch (_) { /* ignore */ }
 }
 
-window.__wc_selectFromPopup = function (fid, event) {
+function selectFromPopup(fid, event) {
     let allowDefault = false;
     try {
         if (event) {
@@ -293,12 +302,7 @@ window.__wc_selectFromPopup = function (fid, event) {
         }
     } catch (_) { /* ignore */ }
     try {
-        if (typeof window.SelectionController !== 'undefined') {
-            window.SelectionController.select(fid);
-        } else {
-            highlightFeatureById(fid, (typeof window.featuresLayer !== 'undefined') ? window.featuresLayer : null);
-            getFeatureDetails(fid);
-        }
+        SelectionController.select(fid);
     } catch (_) { }
     try {
         if (event && typeof event.preventDefault === 'function' && !allowDefault) {
@@ -310,7 +314,17 @@ window.__wc_selectFromPopup = function (fid, event) {
         return true;
     }
     return false;
-};
+}
+
+// Popup links carry data-wc-select instead of an inline onclick handler; the
+// delegated listener works regardless of when the popup enters the DOM.
+document.addEventListener('click', function (event) {
+    const link = event.target && typeof event.target.closest === 'function'
+        ? event.target.closest('a[data-wc-select]')
+        : null;
+    if (!link) return;
+    selectFromPopup(link.dataset.wcSelect, event);
+});
 
 // --- SelectionController: central state for current selection ---
 const SelectionController = (function () {
@@ -321,7 +335,7 @@ const SelectionController = (function () {
             if (layer) {
                 selectFeature(layer);
             } else {
-                highlightFeatureById(fid, (typeof window.featuresLayer !== 'undefined') ? window.featuresLayer : null);
+                highlightFeatureById(fid, getFeaturesLayer());
             }
         } catch (_) { }
         try { ButtonManager.reset(); } catch (_) { }
@@ -333,12 +347,11 @@ const SelectionController = (function () {
     function getSelectedId() { return currentId; }
     return { select, getSelectedId };
 })();
-try { window.SelectionController = SelectionController; } catch (_) { }
 
 // --- Show a loading indicator while details are fetched ---
 function showSummaryLoading() {
     try {
-        const c = document.getElementById('summary-container');
+        const c = document.getElementById(DOM_IDS.summaryContainer);
         if (c) {
             c.innerHTML = '<div class="text-center my-3"><div class="spinner-border text-secondary" role="status" aria-label="Loading"><span class="visually-hidden">Loading...</span></div></div>';
         }
@@ -347,7 +360,7 @@ function showSummaryLoading() {
 
 function clearSummary() {
     try {
-        const c = document.getElementById('summary-container');
+        const c = document.getElementById(DOM_IDS.summaryContainer);
         if (c) { c.innerHTML = '<p class="card-text">Select a collection on the map to view its details.</p>'; }
     } catch (_) { /* ignore */ }
 }
@@ -368,7 +381,7 @@ function clearSummary() {
     window.renderSummaries = function (featureInfos) {
         try { original(featureInfos); } catch (e) { console.warn('Original renderSummaries failed:', e); }
         try {
-            const container = document.getElementById('summary-container');
+            const container = document.getElementById(DOM_IDS.summaryContainer);
             if (container && (!container.textContent || container.textContent.trim() === '')) {
                 clearSummary();
             }
@@ -378,7 +391,7 @@ function clearSummary() {
 
 function scrollToSummaries() {
     try {
-        const summaryTab = document.getElementById("summary-tab");
+        const summaryTab = document.getElementById(DOM_IDS.summaryTab);
         if (summaryTab && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
             bootstrap.Tab.getOrCreateInstance(summaryTab).show();
         }
@@ -401,7 +414,7 @@ function updateUrls(feature_id) {
     params.set('next', nextTarget);
 
     try {
-        const create_button = document.getElementById('btn-collection-create');
+        const create_button = document.getElementById(DOM_IDS.collectionCreate);
         const create_url = create_button.dataset.hrefTemplate + '?' + params.toString();
         create_button.setAttribute('href', create_url);
     } catch (error) {
@@ -409,7 +422,7 @@ function updateUrls(feature_id) {
     }
 
     try {
-        const detail_button = document.getElementById('btn-collection-detail');
+        const detail_button = document.getElementById(DOM_IDS.collectionDetail);
         const detail_url = detail_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString());
         detail_button.setAttribute('href', detail_url);
         detail_button.classList.remove('d-none');
@@ -418,7 +431,7 @@ function updateUrls(feature_id) {
     }
 
     try {
-        const update_button = document.getElementById('btn-collection-update');
+        const update_button = document.getElementById(DOM_IDS.collectionUpdate);
         const update_url = update_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
         update_button.setAttribute('href', update_url);
     } catch (error) {
@@ -426,7 +439,7 @@ function updateUrls(feature_id) {
     }
 
     try {
-        const copy_button = document.getElementById('btn-collection-copy');
+        const copy_button = document.getElementById(DOM_IDS.collectionCopy);
         const copy_url = copy_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
         copy_button.setAttribute('href', copy_url);
     } catch (error) {
@@ -434,24 +447,13 @@ function updateUrls(feature_id) {
     }
 
     try {
-        const delete_button = document.getElementById('btn-collection-delete');
+        const delete_button = document.getElementById(DOM_IDS.collectionDelete);
         const delete_url = delete_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
         // Set the href so modal_links.js can read it; then rebind
         delete_button.setAttribute('href', delete_url);
         // Allow re-bind by removing the guard class
         try { delete_button.classList.remove('bmf-bound'); } catch (_) { }
-        // Prefer global rewire helper; fallback to direct binding
-        try {
-            if (typeof window.wireModalLinks === 'function') {
-                window.wireModalLinks();
-            } else if (typeof window.modalForm === 'function') {
-                window.modalForm(delete_button, {
-                    formURL: delete_url,
-                    modalID: '#modal',
-                    errorClass: '.is-invalid'
-                });
-            }
-        } catch (_) { /* ignore */ }
+        try { requestModalLinkRewire(); } catch (_) { /* ignore */ }
     } catch (error) {
         console.warn(`Delete button not updated: ${error}`);
     }
@@ -459,7 +461,7 @@ function updateUrls(feature_id) {
     // Selection hint off; button enablement handled by ButtonManager.apply()
     hideSelectionHint();
     try {
-        const clearBtn = document.getElementById('btn-clear-selection');
+        const clearBtn = document.getElementById(DOM_IDS.clearSelection);
         if (clearBtn) clearBtn.classList.remove('d-none');
     } catch (_) { /* ignore */ }
 }
@@ -469,23 +471,23 @@ function addDetailViewButton() {
 }
 
 function clickedPrivateMapButton() {
-    const privateMapLink = document.getElementById('link-map-private');
+    const privateMapLink = document.getElementById(DOM_IDS.privateMapLink);
     window.location.href = privateMapLink.dataset.hrefTemplate + '?' + parseFilterParameters().toString();
 }
 
 function clickedPublicMapButton() {
-    const publicMapLink = document.getElementById('link-map-public');
+    const publicMapLink = document.getElementById(DOM_IDS.publicMapLink);
     console.log(publicMapLink.dataset.hrefTemplate);
     window.location.href = publicMapLink.dataset.hrefTemplate + '?' + parseFilterParameters().toString();
 }
 
 function clickedListButton() {
-    const listButton = document.getElementById('btn-collections-as-list');
+    const listButton = document.getElementById(DOM_IDS.collectionsAsListButton);
     window.location.href = listButton.dataset.hrefTemplate + '?' + parseFilterParameters().toString();
 }
 
 function clickedListLink() {
-    const listLink = document.getElementById('link-collections-as-list');
+    const listLink = document.getElementById(DOM_IDS.collectionsAsListLink);
     window.location.href = listLink.dataset.hrefTemplate + '?' + parseFilterParameters().toString();
 }
 
@@ -497,7 +499,7 @@ function adaptMapConfig() {
 (function hookFeaturesLayerFilterParams() {
     function getDatasetVersion() {
         try {
-            const ctx = document.getElementById('map-context');
+            const ctx = document.getElementById(DOM_IDS.mapContext);
             if (!ctx) return null;
             const dv = ctx.dataset.dv;
             return dv || null;
@@ -549,9 +551,7 @@ function adaptMapConfig() {
             }
             let url = base + featureId + '/';
             try {
-                const scope = (typeof window.getScope === 'function')
-                    ? window.getScope()
-                    : (new URLSearchParams(window.location.search).get('scope') || 'published');
+                const scope = getScope();
                 const sep = url.indexOf('?') === -1 ? '?' : '&';
                 url = url + sep + 'scope=' + encodeURIComponent(scope);
             } catch (_) { /* ignore */ }
@@ -594,7 +594,7 @@ const ButtonManager = (function () {
             const nextParams = buildNextParams();
 
             try {
-                const detailBtn = document.getElementById('btn-collection-detail');
+                const detailBtn = document.getElementById(DOM_IDS.collectionDetail);
                 if (detailBtn) {
                     const tmpl = detailBtn.dataset.hrefTemplate;
                     if (tmpl) {
@@ -609,7 +609,7 @@ const ButtonManager = (function () {
             } catch (_) { }
 
             try {
-                const updateBtn = document.getElementById('btn-collection-update');
+                const updateBtn = document.getElementById(DOM_IDS.collectionUpdate);
                 if (updateBtn) {
                     const tmpl = updateBtn.dataset.hrefTemplate;
                     if (tmpl) {
@@ -619,7 +619,7 @@ const ButtonManager = (function () {
             } catch (_) { }
 
             try {
-                const copyBtn = document.getElementById('btn-collection-copy');
+                const copyBtn = document.getElementById(DOM_IDS.collectionCopy);
                 if (copyBtn) {
                     const tmpl = copyBtn.dataset.hrefTemplate;
                     if (tmpl) {
@@ -629,20 +629,14 @@ const ButtonManager = (function () {
             } catch (_) { }
 
             try {
-                const delBtn = document.getElementById('btn-collection-delete');
+                const delBtn = document.getElementById(DOM_IDS.collectionDelete);
                 if (delBtn) {
                     const tmpl = delBtn.dataset.hrefTemplate;
                     if (tmpl) {
                         const delUrl = tmpl.replace('__pk__', data.id) + '?' + nextParams.toString();
                         delBtn.setAttribute('href', delUrl);
                         try { delBtn.classList.remove('bmf-bound'); } catch (_) { }
-                        try {
-                            if (typeof window.wireModalLinks === 'function') {
-                                window.wireModalLinks();
-                            } else if (typeof window.modalForm === 'function') {
-                                window.modalForm(delBtn, { formURL: delUrl, modalID: '#modal', errorClass: '.is-invalid' });
-                            }
-                        } catch (_) { }
+                        try { requestModalLinkRewire(); } catch (_) { }
                     }
                 }
             } catch (_) { }
@@ -661,9 +655,9 @@ const ButtonManager = (function () {
             }
 
             try { console.debug('[WC] computed button perms:', { canUpdate, canDelete, canCopy }); } catch (_) { }
-            const updateBtn = document.getElementById('btn-collection-update');
-            const delBtn = document.getElementById('btn-collection-delete');
-            const copyBtn = document.getElementById('btn-collection-copy');
+            const updateBtn = document.getElementById(DOM_IDS.collectionUpdate);
+            const delBtn = document.getElementById(DOM_IDS.collectionDelete);
+            const copyBtn = document.getElementById(DOM_IDS.collectionCopy);
 
             if (updateBtn) { canUpdate ? enableBtn(updateBtn) : disableBtn(updateBtn, 'You do not have permission to edit this item.'); }
             if (delBtn) { canDelete ? enableBtn(delBtn) : disableBtn(delBtn, 'You do not have permission to delete this item.'); }
@@ -674,12 +668,12 @@ const ButtonManager = (function () {
     }
 
     function reset() {
-        try { disableBtn(document.getElementById('btn-collection-copy'), 'Select a collection on the map first'); } catch (_) { }
-        try { disableBtn(document.getElementById('btn-collection-update'), 'Select a collection on the map first'); } catch (_) { }
-        try { disableBtn(document.getElementById('btn-collection-delete'), 'Select a collection on the map first'); } catch (_) { }
-        try { const d = document.getElementById('btn-collection-detail'); if (d) d.classList.add('d-none'); } catch (_) { }
-        try { const hint = document.getElementById('map-actions-hint'); if (hint) hint.classList.remove('d-none'); } catch (_) { }
-        try { const cs = document.getElementById('btn-clear-selection'); if (cs) cs.classList.add('d-none'); } catch (_) { }
+        try { disableBtn(document.getElementById(DOM_IDS.collectionCopy), 'Select a collection on the map first'); } catch (_) { }
+        try { disableBtn(document.getElementById(DOM_IDS.collectionUpdate), 'Select a collection on the map first'); } catch (_) { }
+        try { disableBtn(document.getElementById(DOM_IDS.collectionDelete), 'Select a collection on the map first'); } catch (_) { }
+        try { const d = document.getElementById(DOM_IDS.collectionDetail); if (d) d.classList.add('d-none'); } catch (_) { }
+        try { const hint = document.getElementById(DOM_IDS.actionsHint); if (hint) hint.classList.remove('d-none'); } catch (_) { }
+        try { const cs = document.getElementById(DOM_IDS.clearSelection); if (cs) cs.classList.add('d-none'); } catch (_) { }
     }
 
     return { apply, reset };
@@ -692,7 +686,7 @@ const ButtonManager = (function () {
     window.renderFeatureDetails = function (data) {
         try { if (original) original(data); } catch (e) { console.warn('Original renderFeatureDetails failed:', e); }
         try {
-            const container = document.getElementById('summary-container');
+            const container = document.getElementById(DOM_IDS.summaryContainer);
             if (container && (!container.textContent || container.textContent.trim() === '')) {
                 clearSummary();
             }

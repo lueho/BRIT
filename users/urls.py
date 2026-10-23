@@ -4,6 +4,7 @@ from .views import (
     ModalLoginRequiredMessage,
     RegistrationView,
     ResendActivationView,
+    ReviewNotificationPreferenceView,
     UserAutocompleteView,
     UserDeleteView,
     UserProfileView,
@@ -20,6 +21,11 @@ urlpatterns = [
     ),
     path("", include("registration.backends.default.urls")),
     path("profile/", UserProfileView.as_view(), name="user_profile"),
+    path(
+        "profile/review-notifications/",
+        ReviewNotificationPreferenceView.as_view(),
+        name="review_notification_preference",
+    ),
     path(
         "loginrequired/",
         ModalLoginRequiredMessage.as_view(),

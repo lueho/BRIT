@@ -3,6 +3,8 @@
     width: 10em;
 }
 
+/* !important is required here: export links appear in Bootstrap contexts
+   (dropdown items, modal footers) whose a:hover/disabled rules otherwise win. */
 a.disabled {
     pointer-events: none !important;
     text-decoration: none !important;
@@ -10,12 +12,12 @@ a.disabled {
 }
 
 .export-format-item {
-    cursor: pointer !important;
+    cursor: pointer;
 }
 
 .export-format-item.disabled {
-    pointer-events: none !important;
-    cursor: not-allowed !important;
+    pointer-events: none;
+    cursor: not-allowed;
     opacity: 0.65;
     background-color: #f8f9fa;
 }
@@ -33,7 +35,7 @@ a.disabled {
 .export-text,
 .export-status a,
 .export-status button {
-    cursor: pointer !important;
+    cursor: pointer;
 }
 
 /* Add download button styling */

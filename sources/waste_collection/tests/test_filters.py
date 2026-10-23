@@ -9,6 +9,7 @@ from factory.django import mute_signals
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import Region
 from materials.models import MaterialCategory
+from utils.object_management.models import get_default_owner
 from utils.properties.models import Property
 from utils.tests.testcases import ScopedSelectionFilterTestMixin
 
@@ -332,7 +333,9 @@ class CollectionFilterMetadataTestCase(TestCase):
                 )
             ]
         )
-        MaterialCategory.objects.get_or_create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.material = WasteComponent.objects.create(
             name="Choice alpha", owner=cls.owner
         )
@@ -581,7 +584,9 @@ class CollectionFilterTestCase(TestCase):
         )
         cls.collection1.add_predecessor(cls.predecessor_collection)
 
-        MaterialCategory.objects.get_or_create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
 
         cls.allowed_material_a = WasteComponent.objects.create(name="Filter Allowed A")
         cls.allowed_material_b = WasteComponent.objects.create(name="Filter Allowed B")
@@ -963,6 +968,21 @@ class CollectionFilterTestCase(TestCase):
         self.assertNotIn(self.child_collection, qs)
         self.assertIn(self.predecessor_collection, qs)
 
+    def test_filter_valid_on_delegates_to_queryset_method(self):
+        """The filter must reuse CollectionQuerySet.valid_on instead of
+        reimplementing the validity-window logic (#246)."""
+        from unittest.mock import patch
+
+        qs = Collection.objects.all()
+        target_date = timezone.now().date()
+        with patch.object(
+            type(qs), "valid_on", return_value=Collection.objects.none()
+        ) as mock_valid_on:
+            result = CollectionFilterSet.filter_valid_on(qs, None, target_date)
+
+        mock_valid_on.assert_called_once_with(target_date)
+        self.assertFalse(result.exists())
+
     def test_required_bin_capacity_filter(self):
         # Filter by required_bin_capacity in range 200-400 (inclusive)
         data = {"required_bin_capacity_min": 200, "required_bin_capacity_max": 400}
@@ -1037,7 +1057,9 @@ class WasteComponentListFilterScopedSelectionTestCase(
 
     @classmethod
     def setUpTestData(cls):
-        MaterialCategory.objects.get_or_create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         super().setUpTestData()
 
 

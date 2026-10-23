@@ -4,6 +4,7 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 
 from ..models import NutsRegion, NutsVintage
+from ..utils import ensure_initial_data
 
 
 class NutsVintageTestCase(TestCase):
@@ -19,6 +20,23 @@ class NutsVintageTestCase(TestCase):
         self.assertEqual(NutsVintage.resolve("NUTS2021").year, 2021)
         self.assertEqual(NutsVintage.resolve("NUTS 2021").year, 2021)
         self.assertEqual(NutsVintage.resolve(2021).year, 2021)
+
+    def test_initial_data_keeps_a_newer_current_vintage(self):
+        NutsVintage.objects.filter(year=2021).delete()
+        vintage_2024 = NutsVintage.objects.create(year=2024, is_current=True)
+
+        ensure_initial_data()
+
+        self.assertEqual(NutsVintage.current(), vintage_2024)
+        self.assertFalse(NutsVintage.objects.get(year=2021).is_current)
+
+    def test_initial_data_marks_2021_current_when_none_is(self):
+        NutsVintage.objects.filter(year=2021).delete()
+        NutsVintage.objects.create(year=2024)
+
+        ensure_initial_data()
+
+        self.assertEqual(NutsVintage.current().year, 2021)
 
     def test_resolve_returns_none_for_unknown_or_empty_labels(self):
         self.assertIsNone(NutsVintage.resolve(""))

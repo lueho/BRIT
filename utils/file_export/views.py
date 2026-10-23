@@ -243,7 +243,7 @@ class GenericUserCreatedObjectExportView(FilteredListFileExportView):
         else:
             base_qs = spec.model.objects.all()
 
-        return spec.filterset(qdict, queryset=base_qs).qs.count()
+        return spec.filterset(qdict, queryset=base_qs, request=self.request).qs.count()
 
     def get(self, request, *args, **kwargs):
         params = dict(request.GET)

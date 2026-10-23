@@ -15,10 +15,14 @@ from .models import (
     LETTERLESS_ORGANIZATION_NAME_MESSAGE,
     LETTERLESS_SURNAME_MESSAGE,
     Author,
+    AuthorCreationDenied,
     Licence,
     Source,
     author_name_has_letter,
+    find_or_create_author,
+    normalize_author_name_part,
 )
+from .utils import DOI_FORMAT_MESSAGE, DOI_PATTERN, normalize_doi
 
 
 class AuthorModelSerializer(ModelSerializer):
@@ -149,6 +153,64 @@ class SourceCreateSerializer(ModelSerializer):
             "publication_status",
         ]
         read_only_fields = ["id", "publication_status"]
+
+    def validate_doi(self, value):
+        doi = normalize_doi(value) or None
+        if doi and not DOI_PATTERN.match(doi):
+            raise ValidationError(DOI_FORMAT_MESSAGE)
+        return doi
+
+    def _resolve_authors(self, owner, authors_data):
+        authors = []
+        author_ids = set()
+
+        for author_data in authors_data:
+            raw_author_id = author_data.get("id")
+            author = None
+            if raw_author_id not in (None, ""):
+                try:
+                    author = Author.objects.get(pk=int(raw_author_id))
+                except (Author.DoesNotExist, TypeError, ValueError) as exc:
+                    raise ValidationError(
+                        {"authors": [f"Author id {raw_author_id} does not exist."]}
+                    ) from exc
+            else:
+                first_names = normalize_author_name_part(author_data.get("first_names"))
+                last_names = normalize_author_name_part(author_data.get("last_names"))
+                author_type = author_data.get("author_type", "person")
+                organization_name = normalize_author_name_part(
+                    author_data.get("organization_name")
+                )
+                organization_abbreviation = normalize_author_name_part(
+                    author_data.get("organization_abbreviation")
+                )
+                try:
+                    author, _ = find_or_create_author(
+                        owner,
+                        filters={
+                            "author_type": author_type,
+                            "first_names__iexact": first_names,
+                            "last_names__iexact": last_names,
+                            "organization_name__iexact": organization_name,
+                        },
+                        create_kwargs={
+                            "first_names": first_names,
+                            "last_names": last_names,
+                            "author_type": author_type,
+                            "organization_name": organization_name,
+                            "organization_abbreviation": organization_abbreviation,
+                        },
+                    )
+                except AuthorCreationDenied as exc:
+                    raise PermissionDenied(
+                        "You need permission to create authors for source creation."
+                    ) from exc
+
+            if author.pk not in author_ids:
+                authors.append(author)
+                author_ids.add(author.pk)
+
+        return authors
 
     def create(self, validated_data):
         from .services import create_source_with_authors

@@ -71,8 +71,8 @@
               {% endif %}
               {% if dashboard_url %}
                 <a class="btn btn-sm btn-outline-secondary"
-                   href="{{ dashboard_url }}"
-                   title="Open Explorer (dashboard)">
+                   href="{{ explorer_url }}"
+                   title="Open Explorer">
                   <i class="fas fa-table-cells-large"></i> Explorer
                 </a>
               {% endif %}
@@ -105,10 +105,10 @@
                 </div>
               {% endif %}
             {% endblock active_filters %}
+            {% block list_letter_index %}
+              {% include "partials/letter_index.html" %}
+            {% endblock list_letter_index %}
             {% block list_table %}
-              {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
-                {% include "object_management/bulk_access_toolbar.html" %}
-              {% endif %}
               <div class="table-responsive">
                 <table class="table modern-table">
                   {% block list_table_head %}
@@ -252,6 +252,7 @@
                   {% block filter_body %}
                     <form method="get">
                       {% crispy filter.form %}
+                      {% include "partials/letter_index_input.html" %}
                       <div class="d-flex justify-content-end gap-2 mt-2">
                         <button id="btn-filter"
                                 class="btn btn-sm btn-primary submit-filter"
@@ -286,6 +287,9 @@
                     {% endblock list_card_export_actions %}
                     {% block list_card_options_dropdown_additional_links %}
                     {% endblock list_card_options_dropdown_additional_links %}
+                    {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
+                      {% include "object_management/bulk_access_toolbar.html" with heading="Manage access for selected items" heading_class="mt-3 mb-1" %}
+                    {% endif %}
                     {% if not user.is_authenticated %}
                       <p class="text-muted small mt-3 mb-0">Log in to enable export and additional options.</p>
                     {% endif %}

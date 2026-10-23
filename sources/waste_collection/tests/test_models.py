@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from unittest.mock import patch
 
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db.models import signals
 from django.test import TestCase
@@ -59,7 +60,9 @@ class InitialDataTestCase(TestCase):
 class WasteComponentManagerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        category = MaterialCategory.objects.create(name="Biowaste component")
+        category, _ = MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.waste_component = WasteComponent.objects.create(name="Kitchen waste")
         cls.material_component = MaterialComponent.objects.create(name="Carbon")
         cls.material_component.categories.add(category)
@@ -70,6 +73,52 @@ class WasteComponentManagerTestCase(TestCase):
             self.material_component.pk,
             WasteComponent.objects.values_list("pk", flat=True),
         )
+
+    def test_component_with_same_named_categories_is_listed_once(self):
+        other_owner = User.objects.create(username="other-owner")
+        other_category = MaterialCategory.objects.create(
+            owner=other_owner, name="Biowaste component"
+        )
+        self.waste_component.categories.add(other_category)
+        self.assertEqual(
+            self.waste_component.categories.filter(name="Biowaste component").count(),
+            2,
+        )
+        self.assertEqual(
+            list(
+                WasteComponent.objects.filter(pk=self.waste_component.pk).values_list(
+                    "pk", flat=True
+                )
+            ),
+            [self.waste_component.pk],
+        )
+        self.assertEqual(
+            WasteComponent.objects.filter(pk=self.waste_component.pk).count(), 1
+        )
+        self.assertEqual(
+            WasteComponent.objects.get(pk=self.waste_component.pk),
+            self.waste_component,
+        )
+
+    def test_component_classified_only_by_other_owner_is_listed_once(self):
+        other_owner = User.objects.create(username="other-owner")
+        other_category = MaterialCategory.objects.create(
+            owner=other_owner, name="Biowaste component"
+        )
+        material = Material.objects.create(
+            name="Legacy classified material", type="material"
+        )
+        material.categories.add(other_category)
+        self.assertEqual(
+            list(
+                WasteComponent.objects.filter(pk=material.pk).values_list(
+                    "pk", flat=True
+                )
+            ),
+            [material.pk],
+        )
+        self.assertEqual(material.categories.count(), 1)
+        self.assertFalse(material.categories.filter(owner=get_default_owner()).exists())
 
 
 class CollectionCatchmentTestCase(TestCase):
@@ -110,6 +159,18 @@ class CollectionCatchmentTestCase(TestCase):
         collections = self.catchment.downstream_collections
         self.assertNotIn(self.unrelated_collection, collections)
 
+    def test_downstream_collections_reflects_collections_added_after_access(self):
+        list(self.catchment.downstream_collections)
+        new_collection = Collection.objects.create(catchment=self.child_catchment)
+        self.assertIn(new_collection, list(self.catchment.downstream_collections))
+
+    def test_upstream_collections_reflects_collections_added_after_access(self):
+        list(self.grandchild_catchment.upstream_collections)
+        new_collection = Collection.objects.create(catchment=self.catchment)
+        self.assertIn(
+            new_collection, list(self.grandchild_catchment.upstream_collections)
+        )
+
     def test_upstream_collections_includes_collections_from_all_ancestor_catchments(
         self,
     ):
@@ -127,24 +188,25 @@ class WasteFlyerTestCase(TestCase):
 
 
 class WasteFlyerUrlCheckSignalTestCase(TestCase):
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.catchment = CollectionCatchment.objects.create(name="Signal Catchment")
-        self.collection_system = CollectionSystem.objects.create(name="Signal System")
-        self.category = WasteCategory.objects.create(name="Signal Category")
-        self.collection = Collection.objects.create(
-            owner=self.owner,
-            catchment=self.catchment,
-            collection_system=self.collection_system,
-            waste_category=self.category,
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_default_owner()
+        cls.catchment = CollectionCatchment.objects.create(name="Signal Catchment")
+        cls.collection_system = CollectionSystem.objects.create(name="Signal System")
+        cls.category = WasteCategory.objects.create(name="Signal Category")
+        cls.collection = Collection.objects.create(
+            owner=cls.owner,
+            catchment=cls.catchment,
+            collection_system=cls.collection_system,
+            waste_category=cls.category,
             valid_from=date(2024, 1, 1),
         )
-        self.property = Property.objects.create(
-            owner=self.owner,
+        cls.property = Property.objects.create(
+            owner=cls.owner,
             name="Signal Property",
         )
-        self.unit = Unit.objects.create(owner=self.owner, name="kg", symbol="kg")
-        self.property.allowed_units.add(self.unit)
+        cls.unit = Unit.objects.create(owner=cls.owner, name="kg", symbol="kg")
+        cls.property.allowed_units.add(cls.unit)
 
     @patch("sources.waste_collection.models.celery.current_app.send_task")
     def test_collection_flyer_add_schedules_wasteflyer_url_check(self, mock_send_task):
@@ -231,6 +293,30 @@ class CollectionTestCase(TestCase):
 
     def test_collection_is_named_automatically_on_creation(self):
         self.assertEqual("Catchment Category System 2024", self.collection.name)
+
+    def test_effective_allowed_materials_reflects_relation_updates_after_access(
+        self,
+    ):
+        list(self.collection.effective_allowed_materials)
+        material = WasteComponent.objects.create(name="Allowed after access")
+        self.collection.allowed_materials.add(material)
+        self.assertIn(material, list(self.collection.effective_allowed_materials))
+
+    def test_effective_forbidden_materials_reflects_relation_updates_after_access(
+        self,
+    ):
+        list(self.collection.effective_forbidden_materials)
+        material = WasteComponent.objects.create(name="Forbidden after access")
+        self.collection.forbidden_materials.add(material)
+        self.assertIn(material, list(self.collection.effective_forbidden_materials))
+
+    def test_effective_materials_use_prefetched_relations(self):
+        collection = Collection.objects.prefetch_related(
+            "allowed_materials", "forbidden_materials"
+        ).get(pk=self.collection.pk)
+        with self.assertNumQueries(0):
+            list(collection.effective_allowed_materials)
+            list(collection.effective_forbidden_materials)
 
     def test_collection_name_is_updated_on_model_update(self):
         self.collection.collection_system = CollectionSystem.objects.create(
@@ -886,11 +972,16 @@ class CollectionReviewCascadeTransitionTestCase(TestCase):
             publication_status="published"
         )
 
+        approver = User.objects.create_user(username="cascade-approver")
         with self.assertLogs("sources.waste_collection.models", "WARNING") as logs:
-            Collection._apply_review_action_transition([stale, other], "approve")
+            Collection._apply_review_action_transition(
+                [stale, other], "approve", actor=approver
+            )
 
         other.refresh_from_db()
         self.assertEqual(other.publication_status, "published")
+        self.assertIsNotNone(other.approved_at)
+        self.assertEqual(other.approved_by_id, approver.pk)
         self.assertEqual(len(logs.records), 1)
         self.assertIn(str(stale.pk), logs.output[0])
 
@@ -902,3 +993,33 @@ class CollectionReviewCascadeTransitionTestCase(TestCase):
         ):
             with self.assertRaises(RuntimeError):
                 Collection._apply_review_action_transition([value], "approve")
+
+
+class CollectionIndexTestCase(TestCase):
+    """Regression tests for #168: a subclass ``Meta.indexes`` replaces the
+    abstract base's index list, so hot-path indexes must be declared
+    explicitly on the concrete models."""
+
+    def test_collection_has_publication_status_index(self):
+        index_fields = {tuple(i.fields) for i in Collection._meta.indexes}
+        self.assertIn(("publication_status",), index_fields)
+
+    def test_collection_has_valid_from_index(self):
+        index_fields = {tuple(i.fields) for i in Collection._meta.indexes}
+        self.assertIn(("valid_from",), index_fields)
+
+    def test_collectionpropertyvalue_has_derived_sync_index(self):
+        index_fields = {tuple(i.fields) for i in CollectionPropertyValue._meta.indexes}
+        self.assertIn(("collection", "property", "year", "is_derived"), index_fields)
+
+    def test_index_migration_builds_concurrently(self):
+        from django.contrib.postgres.operations import AddIndexConcurrently
+        from django.db.migrations.loader import MigrationLoader
+
+        migration = MigrationLoader(None).disk_migrations[
+            ("waste_collection", "0009_collection_collection_pub_status_idx_and_more")
+        ]
+        self.assertFalse(migration.atomic)
+        self.assertTrue(migration.operations)
+        for operation in migration.operations:
+            self.assertIsInstance(operation, AddIndexConcurrently)

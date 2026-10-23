@@ -1,17 +1,11 @@
 import hashlib
 
-from django.db.models import (
-    BigIntegerField,
-    CharField,
-    OuterRef,
-    StringAgg,
-    Subquery,
-    Value,
-)
-from django.db.models.expressions import RawSQL
+from django.db.models import CharField, StringAgg, Value
 from django.db.models.functions import Cast, Concat
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny, DjangoModelPermissionsOrAnonReadOnly
 from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
 
 from maps.mixins import (
     CachedGeoJSONMixin,
@@ -20,8 +14,9 @@ from maps.mixins import (
 )
 from maps.models import Catchment, GeoPolygon, Region
 from maps.throttling import GeoJSONAnonThrottle
-from utils.object_management.permissions import filter_queryset_for_user
-from utils.viewsets import AutoPermModelViewSet
+from maps.utils import row_xmin_subquery
+from utils.object_management.permissions import UserCreatedObjectPermission
+from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 from .filters import ShowcaseAPIFilterSet
 from .models import BiogasPlantsSweden, Showcase
@@ -35,24 +30,19 @@ from .serializers import (
 )
 
 
-class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
+class ShowcaseViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     queryset = Showcase.objects.all()
     serializer_class = ShowcaseModelSerializer
     filterset_fields = ("id", "region__country")
     filterset_class = ShowcaseAPIFilterSet
     geojson_throttle_classes = (GeoJSONAnonThrottle,)
-    custom_permission_required = {
-        "list": None,
-        "retrieve": None,
-        "geojson": None,
-        "summaries": None,
-        "version": None,
-    }
+    permission_classes = [
+        UserCreatedObjectPermission,
+        DjangoModelPermissionsOrAnonReadOnly,
+    ]
 
     def get_queryset(self):
-        queryset = filter_queryset_for_user(
-            super().get_queryset(), self.request.user
-        ).select_related("region__borders")
+        queryset = super().get_queryset().select_related("region__borders")
         if self.action in ("geojson", "version"):
             return queryset
         connections = (
@@ -67,18 +57,7 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     @staticmethod
     def _row_xmin(model, pk_ref):
         """Transaction id of the ``model`` row at ``pk_ref`` as text."""
-        return Cast(
-            Subquery(
-                model.objects.filter(pk=OuterRef(pk_ref))
-                .annotate(
-                    row_xmin=RawSQL(
-                        "xmin::text::bigint", [], output_field=BigIntegerField()
-                    )
-                )
-                .values("row_xmin")[:1]
-            ),
-            CharField(),
-        )
+        return Cast(row_xmin_subquery(model, pk_ref), CharField())
 
     def _version_aggregates(self):
         """Showcase GeoJSON also serializes the linked catchments, regions and
@@ -119,7 +98,16 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
             )
         )
 
-    @action(detail=False, methods=["get"])
+    @action(
+        detail=False,
+        methods=["get", "head"],
+        permission_classes=[AllowAny],
+    )
+    def version(self, request, *args, **kwargs):
+        """Public dataset version for client-side cache revalidation."""
+        return super().version(request, *args, **kwargs)
+
+    @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def geojson(self, request, *args, **kwargs):
         """
         Custom action to retrieve the geographical details of a Showcase instance.
@@ -158,7 +146,7 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         response["Access-Control-Expose-Headers"] = "X-Data-Version"
         return response
 
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def summaries(self, request, *args, **kwargs):
         """
         Custom action to retrieve the summary of a Showcase instance.
@@ -177,13 +165,8 @@ class ShowcaseViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         return Response({"summaries": serializer.data})
 
 
-class SwedenBiogasPlantsViewSet(AutoPermModelViewSet):
+class SwedenBiogasPlantsViewSet(ModelViewSet):
     queryset = BiogasPlantsSweden.objects.all()
     serializer_class = BiogasPlantsSwedenSimpleModelSerializer
     # filterset_class = BiogasPlantsSwedenFilterSet
-    custom_permission_required = {
-        "list": None,
-        "retrieve": None,
-        "geojson": None,
-        "summaries": None,
-    }
+    permission_classes = [DjangoModelPermissionsOrAnonReadOnly]

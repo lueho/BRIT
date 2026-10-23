@@ -228,9 +228,14 @@ class ChangeLegendCategoriesAreDistinguishableTests(TestCase):
     def test_renderer_paints_reassigned_territory_with_its_own_color(self):
         source = CHOROPLETH_JS.read_text()
 
-        for line in source.splitlines():
-            if "boundary_changed" in line and "label:" in line:
-                self.assertIn("colors.boundaryChanged", line)
+        legend_lines = [
+            line
+            for line in source.splitlines()
+            if "boundary_changed" in line and "label:" in line
+        ]
+        self.assertTrue(legend_lines, "renderer has no boundary_changed legend entry")
+        for line in legend_lines:
+            self.assertIn("colors.boundaryChanged", line)
 
 
 class SeededMapConfigurationsDeferToGlobalNoDataColorTests(TestCase):

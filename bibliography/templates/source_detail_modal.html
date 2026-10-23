@@ -1,12 +1,7 @@
+{% extends "modal_base.html" %}
 {% load moderation_tags %}
-<div class="modal-header">
-    <h5 class="modal-title">{{ object.citation_key }}</h5>
-    <button type="button"
-            class="btn-close"
-            data-bs-dismiss="modal"
-            aria-label="Close"></button>
-</div>
-<div class="modal-body">
+{% block modal_title %}{{ object.citation_key }}{% endblock %}
+{% block modal_body %}
     {% if 'citation_key' in object_data and object_data.citation_key %}
         <p>
             <strong>Citation key:</strong>
@@ -139,13 +134,12 @@
             {{ object_data.abstract|markdown_to_html }}
         </p>
     {% endif %}
-</div>
-
-<div class="modal-footer">
+{% endblock %}
+{% block modal_footer %}
     <a href="{% url 'source-detail' object.pk %}"
        class="btn btn-outline-secondary"
        target="_blank">
         <i class="fas fa-external-link-alt"></i> Full Details
     </a>
     <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
-</div>
+{% endblock %}

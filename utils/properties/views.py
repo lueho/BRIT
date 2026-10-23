@@ -17,20 +17,20 @@ from .forms import PropertyModelForm, UnitModelForm
 from .models import Property, Unit
 
 
-class PropertiesDashboardView(TemplateView):
-    template_name = "properties_dashboard.html"
+class PropertiesExplorerView(TemplateView):
+    template_name = "properties_explorer.html"
 
 
 # ----------- Unit CRUD ------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 class UnitPublishedListView(PublishedObjectListView):
     model = Unit
-    dashboard_url = reverse_lazy("properties-dashboard")
+    explorer_url = reverse_lazy("properties-explorer")
 
 
 class UnitPrivateListView(PrivateObjectListView):
     model = Unit
-    dashboard_url = reverse_lazy("properties-dashboard")
+    explorer_url = reverse_lazy("properties-explorer")
 
 
 class UnitCreateView(UserCreatedObjectCreateView):
@@ -73,12 +73,20 @@ class WeightFractionUnitAutocompleteView(UnitAutocompleteView):
 
 class PropertyPublishedListView(PublishedObjectListView):
     model = Property
-    dashboard_url = reverse_lazy("properties-dashboard")
+    explorer_url = reverse_lazy("properties-explorer")
 
 
 class PropertyPrivateListView(PrivateObjectListView):
     model = Property
-    dashboard_url = reverse_lazy("properties-dashboard")
+    explorer_url = reverse_lazy("properties-explorer")
+
+
+class PropertyAutocompleteView(UserCreatedObjectAutocompleteView):
+    """Autocomplete view for generic Property selection."""
+
+    model = Property
+    search_lookups = ["name__icontains"]
+    value_fields = ["name"]
 
 
 class PropertyCreateView(UserCreatedObjectCreateView):

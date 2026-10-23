@@ -1,6 +1,8 @@
+import string
 from urllib.parse import urlencode
 
 from crispy_forms.helper import FormHelper
+from django.db.models.functions import Substr, Upper
 from django.http import HttpResponseRedirect, JsonResponse, QueryDict
 from django.template.loader import render_to_string
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -209,6 +211,85 @@ class FilterDefaultsMixin:
         return super().get(request, *args, **kwargs)
 
 
+class LetterIndexMixin:
+    """Opt-in A–Z 'starts with' navigation for filtered list views.
+
+    Add to a FilterView subclass to expose a ``letter`` query parameter that
+    filters ``letter_field`` by its first letter and to provide ``letter_index``
+    context for the A–Z bar rendered by ``partials/letter_index.html``. The
+    special letter ``#`` selects objects whose initial is not an ASCII letter.
+    """
+
+    letter_param = "letter"
+    letter_field = "name"
+    letters = string.ascii_uppercase
+    other_letter = "#"
+
+    def get_letter(self):
+        raw = (self.request.GET.get(self.letter_param) or "").strip().upper()
+        if raw == self.other_letter:
+            return raw
+        if len(raw) == 1 and raw.isascii() and raw.isalpha():
+            return raw
+        return None
+
+    def apply_letter_filter(self, queryset):
+        letter = self.get_letter()
+        if letter is None:
+            return queryset
+        if letter == self.other_letter:
+            return queryset.exclude(**{f"{self.letter_field}__iregex": r"^[A-Za-z]"})
+        return queryset.filter(**{f"{self.letter_field}__istartswith": letter})
+
+    def get_letter_index_queryset(self):
+        """Queryset the index is computed on: filtered, but before the letter."""
+        filterset = getattr(self, "filterset", None)
+        if filterset is not None:
+            return filterset.qs
+        return self.get_queryset()
+
+    def get_available_letters(self):
+        queryset = self.get_letter_index_queryset()
+        initials = (
+            queryset.order_by()
+            .annotate(initial=Upper(Substr(self.letter_field, 1, 1)))
+            .values_list("initial", flat=True)
+            .distinct()
+        )
+        return set(initials)
+
+    def get_letter_index(self):
+        available = self.get_available_letters()
+        active = self.get_letter()
+        letters = frozenset(self.letters)
+        index = [
+            {
+                "letter": letter,
+                "enabled": letter in available,
+                "active": letter == active,
+            }
+            for letter in self.letters
+        ]
+        index.append(
+            {
+                "letter": self.other_letter,
+                "enabled": any(initial not in letters for initial in available),
+                "active": active == self.other_letter,
+            }
+        )
+        return index
+
+    def get_context_data(self, **kwargs):
+        object_list = kwargs.get("object_list", getattr(self, "object_list", None))
+        if hasattr(object_list, "filter"):
+            object_list = self.apply_letter_filter(object_list)
+            kwargs["object_list"] = object_list
+            self.object_list = object_list
+        kwargs["letter_index"] = self.get_letter_index()
+        kwargs["letter_active"] = self.get_letter()
+        return super().get_context_data(**kwargs)
+
+
 class ModelSelectOptionsView(ListView):
     """
     Returns a pre-rendered list of options for a select DOM element as json response. This is useful for updating
@@ -267,7 +348,7 @@ class ModelSelectOptionsView(ListView):
         )
 
 
-class UtilsDashboardView(BreadcrumbContextMixin, TemplateView):
-    template_name = "utils_dashboard.html"
+class UtilsExplorerView(BreadcrumbContextMixin, TemplateView):
+    template_name = "utils_explorer.html"
     breadcrumb_module_label = "Utilities"
     breadcrumb_page_title = "Utilities"

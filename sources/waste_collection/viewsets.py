@@ -5,7 +5,8 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import connection, transaction
-from django.db.models import F, Max, Model, Prefetch, Q
+from django.db.models import BigIntegerField, F, Max, Model, Prefetch, Q
+from django.db.models.functions import Cast
 from django.urls import reverse
 from django.utils import timezone
 from django_filters import rest_framework as rf_filters
@@ -22,7 +23,8 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from maps.db_functions import SimplifyPreserveTopology
 from maps.mixins import CachedGeoJSONMixin
-from maps.utils import build_collection_cache_key
+from maps.models import GeoPolygon
+from maps.utils import build_collection_cache_key, row_xmin_subquery
 from sources.waste_collection.filters import (
     CollectionExtendedFilterSet,
     CollectionFilterSet,
@@ -116,7 +118,7 @@ class CollectionListPagination(PageNumberPagination):
 
 
 class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
-    """Collection viewset that integrates with GeoJSONMixin and UserCreatedObjectViewSet.
+    """Collection viewset that integrates with CachedGeoJSONMixin and UserCreatedObjectViewSet.
 
     Provides the standard CRUD operations for collections, plus:
     - GeoJSON endpoint with scope-based filtering
@@ -1446,6 +1448,9 @@ class CollectorViewSet(CachedGeoJSONMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = CollectorGeometrySerializer
     permission_classes = [permissions.AllowAny]
     filterset_fields = ["id", "catchment__region__country"]
+    # ``Collector.geom`` is a property over the catchment's region borders;
+    # the rendered path needs the underlying database field path.
+    geojson_geometry_field = "catchment__region__borders__geom"
 
     def get_queryset(self):
         """
@@ -1457,7 +1462,9 @@ class CollectorViewSet(CachedGeoJSONMixin, viewsets.ReadOnlyModelViewSet):
             "catchment",
             "catchment__region",
             "catchment__region__borders",
-        ).prefetch_related(
+            # Reverse one-to-one subtype links read by the serializer on every
+            # feature: select_related keeps them joined even though the
+            # rendered streaming path clears prefetches.
             "catchment__region__nutsregion",
             "catchment__region__lauregion",
         )
@@ -1476,20 +1483,60 @@ class CollectorViewSet(CachedGeoJSONMixin, viewsets.ReadOnlyModelViewSet):
 
         return qs
 
+    def _version_aggregates(self):
+        """Collector responses depend on the linked catchment, its region and
+        the region's border polygon.
+
+        GeoPolygon carries no modification timestamp, so the newest borders
+        transaction id (xmin) stands in for it — inserts, in-place edits and
+        reimports all advance xmin.
+        """
+        return {
+            **super()._version_aggregates(),
+            "max_catchment_mod": Max("catchment__lastmodified_at"),
+            "max_region_mod": Max("catchment__region__lastmodified_at"),
+            "max_borders_xmin": Max(
+                Cast(
+                    row_xmin_subquery(GeoPolygon, "catchment__region__borders_id"),
+                    output_field=BigIntegerField(),
+                )
+            ),
+        }
+
+    def _version_timestamp(self, aggregates):
+        """Fingerprint combining every version input as its own segment.
+
+        The inputs are incomparable units (epoch seconds vs. transaction
+        ids), so taking a max would let whichever unit is numerically
+        largest dominate and silently drop changes in the others.
+        """
+        parts = [str(super()._version_timestamp(aggregates))]
+        for key in ("max_catchment_mod", "max_region_mod"):
+            modified = aggregates.get(key)
+            parts.append(modified.isoformat() if modified else "")
+        parts.append(str(aggregates.get("max_borders_xmin") or 0))
+        return ":".join(parts)
+
     def get_cache_key(self, request):
-        """Build cache key including country filter."""
+        """Build cache key including country filter and dataset version."""
         params = request.query_params
         country = params.get("country", "all")
         id_list = params.getlist("id") if hasattr(params, "getlist") else []
+        # Embedding the dataset version orphans stale payloads when collector,
+        # catchment, region or border data changes, instead of serving them.
+        dataset_version = self.get_dataset_stats(request)["version"]
 
         if id_list:
             try:
                 ids_sorted = sorted([str(int(x)) for x in id_list])
             except Exception:
                 ids_sorted = sorted([str(x) for x in id_list])
-            return f"collector_geojson:country:{country}:id:{','.join(ids_sorted)}"
+            return (
+                f"collector_geojson:country:{country}:id:{','.join(ids_sorted)}"
+                f":dv:{dataset_version}"
+            )
 
-        return f"collector_geojson:country:{country}"
+        return f"collector_geojson:country:{country}:dv:{dataset_version}"
 
     def get_geojson_serializer_class(self):
         """Use CollectorGeometrySerializer for GeoJSON endpoint."""

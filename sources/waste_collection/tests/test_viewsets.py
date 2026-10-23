@@ -1,7 +1,7 @@
 import json
 import math
 from collections import Counter
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -11,9 +11,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache, caches
 from django.db import connection
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, APITestCase
@@ -26,9 +27,9 @@ from maps.models import (
     GeoPolygon,
     NutsRegion,
     Region,
-    RegionAttributeValue,
     RegionProperty,
 )
+from maps.population.models import PopulationDataset, PopulationObservation
 from maps.throttling import GeoJSONAnonThrottle
 from materials.models import Material
 from sources.waste_collection.derived_values import clear_derived_value_config_cache
@@ -58,7 +59,7 @@ from utils.properties.models import Property, Unit
 
 class CollectionViewSetTestCase(APITestCase):
     """
-    Integration tests for CollectionViewSet with GeoJSONMixin and UserCreatedObjectViewSet.
+    Integration tests for CollectionViewSet with CachedGeoJSONMixin and UserCreatedObjectViewSet.
     Covers GeoJSON endpoint filtering and model permission enforcement for creation.
     """
 
@@ -905,6 +906,157 @@ class CollectionViewSetTestCase(APITestCase):
                     else:
                         self.assertNotIn("X-Data-Version", head)
         self.client.force_authenticate(user=None)
+
+
+class CollectorGeoJSONRenderedPathTests(APITestCase):
+    """Collector GeoJSON streams database-rendered geometry like the other
+    ``CachedGeoJSONMixin`` viewsets."""
+
+    @classmethod
+    def setUpTestData(cls):
+        borders = GeoPolygon.objects.create(
+            geom="MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))"
+        )
+        cls.region = Region.objects.create(
+            name="Collector Region", country="DE", borders=borders
+        )
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Collector Catchment", region=cls.region
+        )
+        cls.collector = Collector.objects.create(
+            name="Geo Collector", catchment=cls.catchment
+        )
+        cls.url = reverse("api-collector-geojson")
+
+    def setUp(self):
+        self.geojson_cache = caches[settings.GEOJSON_CACHE]
+        self.geojson_cache.clear()
+
+    def test_geojson_streams_database_rendered_geometry(self):
+        with (
+            patch("maps.mixins.STREAMING_THRESHOLD", 0),
+            CaptureQueriesContext(connection) as queries,
+        ):
+            response = self.client.get(
+                self.url, {"id": self.collector.pk}, REMOTE_ADDR="10.9.10.1"
+            )
+            self.assertTrue(response.streaming)
+            data = json.loads(b"".join(response.streaming_content))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["X-Cache-Status"], "STREAM")
+        self.assertTrue(any("ST_AsGeoJSON" in q["sql"] for q in queries))
+        feature = data["features"][0]
+        self.assertEqual(feature["geometry"]["type"], "MultiPolygon")
+        self.assertEqual(feature["properties"]["collector"], "Geo Collector")
+        self.assertEqual(feature["properties"]["catchment"], "Collector Catchment")
+
+    def test_geojson_bbox_limits_features(self):
+        """bbox must filter through the catchment's region borders.
+
+        ``Collector.geom`` is a model property, not a field, so the bbox
+        filter has to resolve the underlying relation path instead.
+        """
+        inside = self.client.get(
+            self.url, {"bbox": "-1,-1,2,2"}, REMOTE_ADDR="10.9.10.2"
+        )
+        outside = self.client.get(
+            self.url, {"bbox": "10,10,20,20"}, REMOTE_ADDR="10.9.10.3"
+        )
+
+        self.assertEqual(inside.status_code, status.HTTP_200_OK)
+        self.assertEqual(inside["X-Total-Count"], "1")
+        self.assertEqual(outside.status_code, status.HTTP_200_OK)
+        self.assertEqual(outside["X-Total-Count"], "0")
+
+    def test_geojson_streaming_does_not_query_relations_per_feature(self):
+        """Streamed collectors must not issue per-row NUTS/LAU lookups.
+
+        The rendered streaming path clears prefetches; the organizational
+        relations the serializer reads must come from select_related joins.
+        """
+        for i in range(5):
+            catchment = CollectionCatchment.objects.create(
+                name=f"Stream Catchment {i}", region=self.region
+            )
+            Collector.objects.create(name=f"Stream Collector {i}", catchment=catchment)
+
+        with (
+            patch("maps.mixins.STREAMING_THRESHOLD", 0),
+            CaptureQueriesContext(connection) as queries,
+        ):
+            response = self.client.get(
+                self.url, {"stream": "true"}, REMOTE_ADDR="10.9.10.6"
+            )
+            data = b"".join(response.streaming_content)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(json.loads(data)["features"]), 6)
+        # Without select_related on the subtype links, each collector would
+        # issue one NUTS and one LAU query per feature (>= 10 extra here).
+        self.assertLessEqual(len(queries), 6)
+
+    def test_geojson_response_rotates_after_collector_edit(self):
+        first = self.client.get(self.url, REMOTE_ADDR="10.9.10.8")
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(first["X-Cache-Status"], "MISS")
+
+        # lastmodified_at only rotates on a fresh write, and the version
+        # token truncates it to whole seconds — bump it explicitly like the
+        # region cache-rotation tests do.
+        self.collector.name = "Renamed Collector"
+        self.collector.save()
+        Collector.objects.filter(pk=self.collector.pk).update(
+            lastmodified_at=timezone.now() + timedelta(days=1)
+        )
+
+        second = self.client.get(self.url, REMOTE_ADDR="10.9.10.8")
+        self.assertEqual(second["X-Cache-Status"], "MISS")
+        self.assertNotEqual(second["X-Data-Version"], first["X-Data-Version"])
+        self.assertEqual(
+            second.data["features"][0]["properties"]["collector"],
+            "Renamed Collector",
+        )
+
+
+class CollectorGeoJSONVersionRotationTests(TransactionTestCase):
+    """Border edits must rotate the collector dataset version.
+
+    GeoPolygon has no modification timestamp, so the version fingerprint
+    tracks each borders row's ``xmin``. Transaction ids only advance across
+    real commits, so this test needs TransactionTestCase autocommit.
+    """
+
+    def setUp(self):
+        # TransactionTestCase truncates the initial-data admin user that the
+        # owner field defaults to.
+        User.objects.get_or_create(username="admin")
+        borders = GeoPolygon.objects.create(
+            geom="MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))"
+        )
+        self.region = Region.objects.create(
+            name="Collector Region", country="DE", borders=borders
+        )
+        self.catchment = CollectionCatchment.objects.create(
+            name="Collector Catchment", region=self.region
+        )
+        self.collector = Collector.objects.create(
+            name="Geo Collector", catchment=self.catchment
+        )
+        self.url = reverse("api-collector-geojson")
+        caches[settings.GEOJSON_CACHE].clear()
+
+    def test_geojson_response_rotates_after_border_edit(self):
+        first = self.client.get(self.url, REMOTE_ADDR="10.9.10.7")
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(first["X-Cache-Status"], "MISS")
+
+        self.region.borders.geom = "MULTIPOLYGON(((0 0, 0 2, 2 2, 2 0, 0 0)))"
+        self.region.borders.save()
+
+        second = self.client.get(self.url, REMOTE_ADDR="10.9.10.7")
+        self.assertEqual(second["X-Cache-Status"], "MISS")
+        self.assertNotEqual(second["X-Data-Version"], first["X-Data-Version"])
 
 
 class CollectionReviewActionApiTestCase(APITestCase):
@@ -3856,11 +4008,20 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
             average=30.0,
         )
 
-        RegionAttributeValue.objects.create(
-            name="Population GW Amount",
+        cls.pop_dataset = PopulationDataset.objects.create(
+            slug="gw-avg-population",
+            name="GW average annual population",
+            provider="Eurostat",
+            source_code="nama_10r_3popgdp",
+            geographic_scope="nuts",
+            temporal_basis="calendar_year_average",
+            classification_version="NUTS2021",
+            is_canonical=True,
+        )
+        cls.pop_observation = PopulationObservation.objects.create(
+            dataset=cls.pop_dataset,
             region=cls.region,
-            property=cls.population_attribute,
-            date=date(2024, 1, 1),
+            year=2024,
             value=1000,
         )
 
@@ -3953,6 +4114,45 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
 
         self.assertTrue(data_by_catchment[self.catchment_ignored.id]["no_collection"])
         self.assertIsNone(data_by_catchment[self.catchment_ignored.id]["amount"])
+
+    def test_fallback_unavailable_without_average_population(self):
+        """Deleting the annual observation removes total/population fallback."""
+        self.pop_observation.delete()
+
+        response = self.client.get(self.endpoint, {"country": "DE", "year": 2024})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_catchment = {row["catchment_id"]: row for row in response.data}
+        self.assertIsNone(data_by_catchment[self.catchment_total.id]["amount"])
+        self.assertIsNone(data_by_catchment[self.catchment_agg_total.id]["amount"])
+        # directly reported specific amounts are unaffected
+        self.assertEqual(data_by_catchment[self.catchment_agg.id]["amount"], 120.0)
+        self.assertEqual(data_by_catchment[self.catchment_specific.id]["amount"], 90.0)
+
+    def test_point_in_time_population_is_not_used_for_fallback(self):
+        """A stock observation does not substitute for the annual average."""
+        self.pop_observation.delete()
+        stock = PopulationDataset.objects.create(
+            slug="gw-stock-population",
+            name="GW stock population",
+            provider="Eurostat",
+            source_code="demo_r_pjanaggr3",
+            geographic_scope="nuts",
+            temporal_basis="point_in_time",
+            classification_version="NUTS2021",
+            is_canonical=True,
+        )
+        PopulationObservation.objects.create(
+            dataset=stock, region=self.region, year=2024, value=1000
+        )
+
+        response = self.client.get(self.endpoint, {"country": "DE", "year": 2024})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_catchment = {row["catchment_id"]: row for row in response.data}
+        self.assertIsNone(data_by_catchment[self.catchment_total.id]["amount"])
+        self.assertIsNone(data_by_catchment[self.catchment_agg_total.id]["amount"])
+        self.assertEqual(data_by_catchment[self.catchment_specific.id]["amount"], 90.0)
 
 
 class BinSizeViewSetTests(APITestCase):
@@ -4585,11 +4785,20 @@ class WasteRatioMixedNumericTypesTests(APITestCase):
             publication_status="published",
         )
 
-        RegionAttributeValue.objects.create(
-            name="Ratio Type Population",
+        cls.pop_dataset = PopulationDataset.objects.create(
+            slug="ratio-avg-population",
+            name="Ratio average annual population",
+            provider="Eurostat",
+            source_code="nama_10r_3popgdp",
+            geographic_scope="nuts",
+            temporal_basis="calendar_year_average",
+            classification_version="NUTS2021",
+            is_canonical=True,
+        )
+        cls.pop_observation = PopulationObservation.objects.create(
+            dataset=cls.pop_dataset,
             region=region,
-            property=cls.population_attribute,
-            date=date(2024, 1, 1),
+            year=2024,
             value=1000,
         )
         CollectionPropertyValue.objects.bulk_create(
@@ -4634,6 +4843,53 @@ class WasteRatioMixedNumericTypesTests(APITestCase):
         self.assertEqual(row["bio_amount"], 100.0)
         self.assertEqual(row["residual_amount"], 50.0)
         self.assertAlmostEqual(row["ratio"], 2 / 3)
+
+    def test_waste_ratio_unavailable_without_average_population(self):
+        """No annual average observation -> fallback amount and ratio vanish."""
+        self.pop_observation.delete()
+
+        response = self.client.get(
+            "/waste_collection/waste-atlas/api/waste-ratio/",
+            {"country": "DE", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = next(
+            item for item in response.data if item["catchment_id"] == self.catchment.id
+        )
+        self.assertIsNone(row["bio_amount"])
+        self.assertEqual(row["residual_amount"], 50.0)
+        self.assertIsNone(row["ratio"])
+
+    def test_waste_ratio_ignores_point_in_time_population(self):
+        """A stock observation does not substitute for the annual average."""
+        self.pop_observation.delete()
+        stock = PopulationDataset.objects.create(
+            slug="ratio-stock-population",
+            name="Ratio stock population",
+            provider="Eurostat",
+            source_code="demo_r_pjanaggr3",
+            geographic_scope="nuts",
+            temporal_basis="point_in_time",
+            classification_version="NUTS2021",
+            is_canonical=True,
+        )
+        PopulationObservation.objects.create(
+            dataset=stock, region=self.catchment.region, year=2024, value=1000
+        )
+
+        response = self.client.get(
+            "/waste_collection/waste-atlas/api/waste-ratio/",
+            {"country": "DE", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = next(
+            item for item in response.data if item["catchment_id"] == self.catchment.id
+        )
+        self.assertIsNone(row["bio_amount"])
+        self.assertEqual(row["residual_amount"], 50.0)
+        self.assertIsNone(row["ratio"])
 
 
 class SouthTyrolCollectionPointTests(APITestCase):
@@ -5149,10 +5405,6 @@ class BiowasteImpurityViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         return {r["catchment_id"]: r for r in response.data}
 
-    def test_returns_200(self):
-        response = self.client.get(self.endpoint, {"country": "ES", "year": 2024})
-        self.assertEqual(response.status_code, 200)
-
     def test_impurity_rate_returned_from_collection_version_chain(self):
         by_catchment = self._by_catchment()
         row = by_catchment[self.catchment_with_data.id]
@@ -5186,13 +5438,6 @@ class BiowasteImpurityViewSetTests(APITestCase):
     def test_country_filter_excludes_other_countries(self):
         by_catchment = self._by_catchment(country="DE", year=2024)
         self.assertNotIn(self.catchment_with_data.id, by_catchment)
-
-    def test_response_keys(self):
-        by_catchment = self._by_catchment()
-        row = by_catchment[self.catchment_with_data.id]
-        self.assertIn("catchment_id", row)
-        self.assertIn("impurity_rate", row)
-        self.assertIn("no_collection", row)
 
 
 class WeeklyBpAccessDaysViewSetTests(APITestCase):
@@ -5290,10 +5535,6 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         return {r["catchment_id"]: r for r in response.data}
 
-    def test_returns_200(self):
-        response = self.client.get(self.endpoint, {"country": "ES", "year": 2024})
-        self.assertEqual(response.status_code, 200)
-
     def test_bring_point_catchment_has_bp_flag_and_value(self):
         by_catchment = self._by_catchment()
         row = by_catchment[self.catchment_bp_with_data.id]
@@ -5321,13 +5562,6 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
     def test_country_filter_excludes_other_countries(self):
         by_catchment = self._by_catchment(country="DE", year=2024)
         self.assertNotIn(self.catchment_bp_with_data.id, by_catchment)
-
-    def test_response_keys(self):
-        by_catchment = self._by_catchment()
-        row = by_catchment[self.catchment_bp_with_data.id]
-        self.assertIn("catchment_id", row)
-        self.assertIn("weekly_access_days", row)
-        self.assertIn("has_bring_point", row)
 
 
 class WasteAtlasPublicationScopingTests(APITestCase):

@@ -424,7 +424,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
     )
     collections_per_year = CollectionsPerYearFilter(label="Collections per year")
     spec_waste_collected = SpecWasteCollectedFilter(
-        label="Specific waste collected [kg/(cap.*a)]",
+        label="Specific waste collected [kg/(cap·a)]",
     )
     fee_system = ModelChoiceFilter(
         queryset=FeeSystem.objects.all(),
@@ -621,9 +621,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
 
     @staticmethod
     def filter_valid_on(qs, _, value):
-        return qs.filter(
-            Q(valid_from__lte=value), Q(valid_until__gte=value) | Q(valid_until=None)
-        )
+        return qs.valid_on(value)
 
     @staticmethod
     def filter_waste_category(qs, _, values):

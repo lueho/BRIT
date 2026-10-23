@@ -1,5 +1,6 @@
 """Tests for sources.waste_collection.derived_values."""
 
+import json
 from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
@@ -30,6 +31,7 @@ from ..derived_values import (
     preferred_measurement_queryset,
 )
 from ..models import (
+    AggregatedCollectionPropertyValue,
     Collection,
     CollectionCatchment,
     CollectionPropertyValue,
@@ -39,6 +41,7 @@ from ..models import (
 from ..signals import sync_derived_cpv_on_delete, sync_derived_cpv_on_save
 from ..waste_atlas.viewsets import (
     _amounts_for_2024,
+    _get_green_waste_collection_amount,
     _resolved_population_attribute_id,
 )
 
@@ -69,11 +72,23 @@ class DerivedValuesTestCase(TestCase):
         cls.population_attribute = RegionProperty.objects.create(
             name="Population [test]",
         )
+        cls.avg_dataset = PopulationDataset.objects.create(
+            slug="test-annual-average",
+            name="Test annual average population",
+            provider="Eurostat",
+            source_code="nama_10r_3popgdp",
+            geographic_scope="nuts",
+            temporal_basis="calendar_year_average",
+            source_unit="NR",
+            classification_version="NUTS2021",
+            is_canonical=True,
+        )
 
         cls.collection_system = CollectionSystem.objects.create(
             name="Collection system"
         )
         cls.waste_category = WasteCategory.objects.create(name="Waste category")
+        cls.green_category = WasteCategory.objects.create(name="Green waste")
 
     def setUp(self):
         clear_derived_value_config_cache()
@@ -81,7 +96,7 @@ class DerivedValuesTestCase(TestCase):
     def tearDown(self):
         clear_derived_value_config_cache()
 
-    def _create_collection(self, suffix, *, population=None):
+    def _create_collection(self, suffix, *, population=None, legacy_population=None):
         region = Region.objects.create(name=f"Region {suffix}", country="DE")
         catchment = CollectionCatchment.objects.create(
             name=f"Catchment {suffix}",
@@ -95,14 +110,29 @@ class DerivedValuesTestCase(TestCase):
             publication_status="published",
         )
         if population is not None:
+            PopulationObservation.objects.create(
+                dataset=self.avg_dataset,
+                region=region,
+                year=2024,
+                value=Decimal(str(population)),
+            )
+        if legacy_population is not None:
             RegionAttributeValue.objects.create(
                 name=f"Population {suffix}",
                 region=region,
                 property=self.population_attribute,
                 date=date(2024, 1, 1),
-                value=population,
+                value=legacy_population,
             )
         return collection, catchment
+
+    def _avg_population(self, region, year, value):
+        return PopulationObservation.objects.create(
+            dataset=self.avg_dataset,
+            region=region,
+            year=year,
+            value=Decimal(str(value)),
+        )
 
     @staticmethod
     def _bulk_create_cpv(**kwargs):
@@ -121,7 +151,7 @@ class DerivedValuesTestCase(TestCase):
             unit=self.unit_specific,
             year=2024,
             average=10,
-            publication_status="published",
+            publication_status="private",
             is_derived=False,
         )
 
@@ -223,13 +253,7 @@ class DerivedValuesTestCase(TestCase):
             is_derived=False,
         )
 
-        RegionAttributeValue.objects.create(
-            name="Population has-pop 2025",
-            region=collection_with_population.catchment.region,
-            property=self.population_attribute,
-            date=date(2025, 1, 1),
-            value=1000,
-        )
+        self._avg_population(collection_with_population.catchment.region, 2025, 1000)
 
         # update-source keeps an explicitly linked artifact; the orphan does
         # not satisfy the "updated" category for create-source.
@@ -333,13 +357,7 @@ class DerivedValuesTestCase(TestCase):
         collection, catchment = self._create_collection(
             "atlas-wrong-year", population=None
         )
-        RegionAttributeValue.objects.create(
-            name="Population atlas-wrong-year 2023",
-            region=collection.catchment.region,
-            property=self.population_attribute,
-            date=date(2023, 1, 1),
-            value=2500,
-        )
+        self._avg_population(collection.catchment.region, 2023, 2500)
 
         self._bulk_create_cpv(
             name="total-only-wrong-year",
@@ -585,7 +603,7 @@ class DerivedValuesTestCase(TestCase):
             unit=self.unit_specific,
             year=2024,
             average=10.0,
-            publication_status="published",
+            publication_status="review",
             is_derived=False,
         )
         derived1, action1 = create_or_update_derived_cpv(cpv)
@@ -608,7 +626,7 @@ class DerivedValuesTestCase(TestCase):
             unit=self.unit_specific,
             year=2024,
             average=10.0,
-            publication_status="published",
+            publication_status="private",
             is_derived=False,
         )
         create_or_update_derived_cpv(source)
@@ -699,13 +717,7 @@ class DerivedValuesTestCase(TestCase):
 
     def test_backfill_writes_correct_values(self):
         collection, _ = self._create_collection("bf-val", population=2000)
-        RegionAttributeValue.objects.create(
-            name="Population bf-val 2025",
-            region=collection.catchment.region,
-            property=self.population_attribute,
-            date=date(2025, 1, 1),
-            value=2000,
-        )
+        self._avg_population(collection.catchment.region, 2025, 2000)
         self._bulk_create_cpv(
             name="bf-specific",
             collection=collection,
@@ -748,45 +760,23 @@ class DerivedValuesTestCase(TestCase):
     def test_get_population_for_collection_returns_exact_year(self):
         collection, _ = self._create_collection("pop-year", population=None)
         region = collection.catchment.region
-        RegionAttributeValue.objects.create(
-            name="Pop 2023",
-            region=region,
-            property=self.population_attribute,
-            date=date(2023, 1, 1),
-            value=3000,
-        )
-        RegionAttributeValue.objects.create(
-            name="Pop 2024",
-            region=region,
-            property=self.population_attribute,
-            date=date(2024, 6, 15),
-            value=3500,
-        )
+        self._avg_population(region, 2023, 3000)
+        self._avg_population(region, 2024, 3500)
         self.assertEqual(get_population_for_collection(collection, year=2024), 3500)
         self.assertEqual(get_population_for_collection(collection, year=2023), 3000)
 
     def test_get_population_for_collection_never_falls_back_to_another_year(self):
         collection, _ = self._create_collection("pop-fallback", population=None)
         region = collection.catchment.region
-        RegionAttributeValue.objects.create(
-            name="Pop old",
-            region=region,
-            property=self.population_attribute,
-            date=date(2020, 1, 1),
-            value=1000,
-        )
-        RegionAttributeValue.objects.create(
-            name="Pop newer",
-            region=region,
-            property=self.population_attribute,
-            date=date(2022, 1, 1),
-            value=2000,
-        )
+        self._avg_population(region, 2020, 1000)
+        self._avg_population(region, 2022, 2000)
         self.assertIsNone(get_population_for_collection(collection, year=2024))
         self.assertIsNone(get_population_for_collection(collection))
 
     def test_get_population_for_collection_prefers_population_observation(self):
-        collection, _ = self._create_collection("pop-observation", population=2000)
+        collection, _ = self._create_collection(
+            "pop-observation", legacy_population=2000
+        )
         region = collection.catchment.region
         dataset = PopulationDataset.objects.create(
             slug="eurostat-test",

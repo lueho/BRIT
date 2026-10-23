@@ -1,3 +1,52 @@
-.map-container {
-  height: 240px;
+/* Collection detail (detail_v2 / "sdv2" layout) — page-specific styles. */
+
+/* The catchment map sits in the hero media slot. */
+.sdv2-hero-map {
+  /* Anchor the absolutely-positioned .map-error alert inside the map. */
+  position: relative;
+}
+
+.sdv2-hero-map .map-container {
+  height: 16rem;
+  width: 100%;
+}
+
+@media (max-width: 960px) {
+  .sdv2-hero-map .map-container {
+    height: 12rem;
+  }
+}
+
+/* Property-value groups (direct + aggregated) inside section panels. */
+.cdv2-prop-group + .cdv2-prop-group {
+  margin-top: 1.1rem;
+}
+
+.cdv2-prop-title {
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--sdv2-text, #25302a);
+  margin: 0 0 0.35rem;
+}
+
+.cdv2-material-group + .cdv2-material-group {
+  margin-top: 1.1rem;
+}
+
+.cdv2-prop-values {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 13.5px;
+}
+
+.cdv2-prop-value {
+  padding: 0.15rem 0;
+}
+
+.cdv2-prop-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-left: 0.5rem;
+  vertical-align: middle;
 }

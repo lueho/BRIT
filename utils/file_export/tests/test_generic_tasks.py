@@ -14,7 +14,7 @@ from ..generic_tasks import BATCH_SIZE, export_user_created_object_to_file
 class DummyFilterSet:
     """Minimal filterset stand-in that passes through the queryset unchanged."""
 
-    def __init__(self, data, queryset):
+    def __init__(self, data, queryset, request=None):
         self.qs = queryset
 
 
@@ -148,7 +148,7 @@ class ExportTaskTestCase(TestCase):
 
         spec = TaskExportSpec(
             model=mock_model,
-            filterset=lambda data, queryset: mock_filtered,
+            filterset=lambda data, queryset, request=None: mock_filtered,
             serializer=DummySerializer,
             renderers={"csv": MagicMock()},
         )
@@ -193,7 +193,7 @@ class ExportTaskTestCase(TestCase):
 
         spec = TaskExportSpec(
             model=mock_model,
-            filterset=lambda data, queryset: mock_filtered,
+            filterset=lambda data, queryset, request=None: mock_filtered,
             serializer=DummySerializer,
             renderers={"csv": MagicMock()},
         )

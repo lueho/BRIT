@@ -1,11 +1,18 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.test import TestCase
 from django.utils import timezone
 
-from maps.models import GeoPolygon, LauRegion, NutsRegion, Region
+from maps.models import (
+    GeoPolygon,
+    LauRegion,
+    NutsRegion,
+    Region,
+    RegionAttributeValue,
+    RegionProperty,
+)
 from maps.population.models import (
     GeographicScope,
     PopulationDataset,
@@ -19,6 +26,8 @@ from maps.population.services import (
     METHOD_SUMMED,
     TEMPORAL_BASIS_MIXED,
     materialize_estimate,
+    population_values_by_region,
+    resolve_composed_population,
     resolve_population,
 )
 from maps.validation import RegionCompositionError
@@ -378,3 +387,140 @@ class RegionDeletionCascadeTestCase(PopulationServiceTestCaseBase):
         self.assertFalse(
             PopulationEstimate.objects.filter(region_id=region_pk).exists()
         )
+
+
+class PopulationPolicyTestCase(PopulationServiceTestCaseBase):
+    """Temporal-basis selection policy.
+
+    An explicit ``temporal_basis`` filters observation candidates *before*
+    the canonical-dataset preference and never falls back to unverified
+    legacy ``RegionAttributeValue`` rows. Passing ``None`` keeps the
+    general-purpose current behaviour (stocks and explicit legacy allowed).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.stock_dataset = PopulationDataset.objects.create(
+            slug="eurostat-demo-pjanaggr3",
+            name="Population on 1 January",
+            provider="Eurostat",
+            source_code="demo_r_pjanaggr3",
+            geographic_scope=GeographicScope.NUTS,
+            temporal_basis=TemporalBasis.POINT_IN_TIME,
+            is_canonical=True,
+        )
+        cls.population_property = RegionProperty.objects.create(name="Population")
+
+    def _legacy_population(self, region, year, value):
+        return RegionAttributeValue.objects.create(
+            name="legacy population",
+            region=region,
+            property=self.population_property,
+            date=date(year, 12, 31),
+            value=value,
+        )
+
+    def test_explicit_average_basis_selects_average_over_canonical_stock(self):
+        average = PopulationDataset.objects.create(
+            slug="avg-noncanonical",
+            name="Average (non-canonical)",
+            provider="Eurostat",
+            source_code="nama_10r_3popgdp",
+            geographic_scope=GeographicScope.NUTS,
+            temporal_basis=TemporalBasis.CALENDAR_YEAR_AVERAGE,
+            is_canonical=False,
+        )
+        self.observe(self.stock_dataset, self.nuts3, 2021, "999")
+        self.observe(average, self.nuts3, 2021, "330000")
+        result = resolve_population(
+            self.nuts3,
+            2021,
+            temporal_basis=TemporalBasis.CALENDAR_YEAR_AVERAGE,
+        )
+        self.assertEqual(result.value, Decimal("330000"))
+        self.assertEqual(result.datasets, (average,))
+        self.assertEqual(result.temporal_basis, TemporalBasis.CALENDAR_YEAR_AVERAGE)
+        unfiltered = resolve_population(self.nuts3, 2021)
+        self.assertEqual(unfiltered.datasets, (self.stock_dataset,))
+
+    def test_average_basis_never_uses_stock_or_legacy(self):
+        self.observe(self.stock_dataset, self.nuts3, 2021, "999")
+        self._legacy_population(self.nuts3, 2021, 1000)
+        self.assertIsNone(
+            resolve_population(
+                self.nuts3,
+                2021,
+                legacy_attribute_id=self.population_property.pk,
+                temporal_basis=TemporalBasis.CALENDAR_YEAR_AVERAGE,
+            )
+        )
+        unfiltered = resolve_population(
+            self.nuts3, 2021, legacy_attribute_id=self.population_property.pk
+        )
+        self.assertEqual(unfiltered.value, Decimal("999"))
+        self.assertEqual(unfiltered.temporal_basis, TemporalBasis.POINT_IN_TIME)
+
+    def test_composed_average_requires_complete_average_components(self):
+        region = self.custom_region("Policy", [self.nuts3, self.nuts3_sibling])
+        self.observe(self.stock_dataset, self.nuts3, 2021, "999")
+        self.observe(self.nuts_dataset, self.nuts3_sibling, 2021, "140000")
+        self.assertIsNone(
+            resolve_composed_population(
+                region, 2021, temporal_basis=TemporalBasis.CALENDAR_YEAR_AVERAGE
+            )
+        )
+        self.assertIsNone(
+            resolve_population(
+                region, 2021, temporal_basis=TemporalBasis.CALENDAR_YEAR_AVERAGE
+            )
+        )
+        self.observe(
+            self.nuts_dataset,
+            self.nuts3,
+            2021,
+            "330000",
+            status=SourceStatus.PROVISIONAL,
+        )
+        result = resolve_composed_population(
+            region, 2021, temporal_basis=TemporalBasis.CALENDAR_YEAR_AVERAGE
+        )
+        self.assertEqual(result.value, Decimal("470000"))
+        self.assertTrue(result.is_provisional)
+
+    def test_point_basis_selects_point_observation_not_average(self):
+        self.observe(self.nuts_dataset, self.nuts3, 2021, "330000")
+        self.observe(self.stock_dataset, self.nuts3, 2021, "999")
+        result = resolve_population(
+            self.nuts3, 2021, temporal_basis=TemporalBasis.POINT_IN_TIME
+        )
+        self.assertEqual(result.value, Decimal("999"))
+        self.assertEqual(result.temporal_basis, TemporalBasis.POINT_IN_TIME)
+
+    def test_bulk_average_basis_selects_only_average_observations(self):
+        self.observe(self.nuts_dataset, self.nuts3, 2021, "330000")
+        self.observe(self.stock_dataset, self.nuts1, 2021, "8003421")
+        self._legacy_population(self.nuts1, 2021, 8000000)
+        values = population_values_by_region(
+            [self.nuts3.pk, self.nuts1.pk],
+            2021,
+            legacy_attribute_id=self.population_property.pk,
+            temporal_basis=TemporalBasis.CALENDAR_YEAR_AVERAGE,
+        )
+        self.assertEqual(values, {self.nuts3.pk: Decimal("330000")})
+
+    def test_explicit_basis_still_requires_exact_year_and_keeps_zero(self):
+        self.observe(self.nuts_dataset, self.nuts3, 2020, "329000")
+        self.assertIsNone(
+            resolve_population(
+                self.nuts3,
+                2021,
+                temporal_basis=TemporalBasis.CALENDAR_YEAR_AVERAGE,
+            )
+        )
+        self.observe(self.nuts_dataset, self.nuts3, 2021, "0")
+        result = resolve_population(
+            self.nuts3, 2021, temporal_basis=TemporalBasis.CALENDAR_YEAR_AVERAGE
+        )
+        self.assertIsNotNone(result)
+        self.assertEqual(result.value, Decimal("0"))

@@ -38,6 +38,7 @@ from maps.models import (
     RegionAttributeValue,
     RegionProperty,
 )
+from maps.population.models import TemporalBasis
 from maps.population.services import population_values_by_region
 from maps.throttling import GeoJSONAnonThrottle, TrustedClientIPMixin
 from maps.utils import get_or_set_cache
@@ -45,6 +46,7 @@ from sources.waste_collection.derived_values import (
     convert_total_to_specific,
     get_derived_property_config,
     preferred_measurement_queryset,
+    get_derived_value_config,
 )
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
@@ -252,7 +254,7 @@ WEEKLY_BP_ACCESS_DAYS_PROPERTY_NAME = "weekly bring-point access days"
 BIOWASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME = "total biowaste in residual waste"
 FOOD_WASTE_IN_RESIDUAL_WASTE_PROPERTY_NAME = "total food waste in residual waste"
 PERCENTAGE_UNIT_NAME = "%"
-SPECIFIC_AMOUNT_UNIT_NAME = "kg/(cap.*a)"
+SPECIFIC_AMOUNT_UNIT_NAME = "kg/(cap·a)"
 
 # Priority for picking the primary collection system per catchment.
 # Lower number = higher priority.
@@ -266,7 +268,7 @@ _COLLECTION_SYSTEM_PRIORITY = {
     "No separate collection": 7,
 }
 
-# Attribute IDs for population data (maps_attribute table)
+# RegionProperty IDs for population data
 POPULATION_ATTRIBUTE_ID = 3
 POPULATION_DENSITY_ATTRIBUTE_ID = 2
 
@@ -2471,6 +2473,7 @@ def _amounts_for_year(
         _map_property_value_q(user),
         collection_id__in=missing_cols,
         property_id=cfg.total_property_id,
+        unit_id=get_derived_value_config().total_unit_id,
         year=year,
     ).values_list("collection_id", "average")
     total_by_catchment: dict[int, float] = {}
@@ -2492,7 +2495,7 @@ def _amounts_for_year(
     region_pop = population_values_by_region(
         {region_id for region_id in catchment_regions.values() if region_id},
         year,
-        legacy_attribute_id=_resolved_population_attribute_id(),
+        temporal_basis=TemporalBasis.CALENDAR_YEAR_AVERAGE,
     )
     for cid, total_mg in total_by_catchment.items():
         region_id = catchment_regions.get(cid)
@@ -2684,6 +2687,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
             _map_property_value_q(user),
             collection_id__in=missing_cols,
             property_id=cfg.total_property_id,
+            unit_id=get_derived_value_config().total_unit_id,
             year=year,
         ).values_list("collection_id", "average")
         for col_id, avg in total_qs:
@@ -2706,6 +2710,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
                 _map_aggregated_property_value_q(user),
                 collections__id__in=still_missing_cols,
                 property_id=cfg.total_property_id,
+                unit_id=get_derived_value_config().total_unit_id,
                 year=year,
             ).values_list("collections__id", "average")
             for col_id, avg in agg_total_qs:
@@ -2725,7 +2730,7 @@ def _get_green_waste_collection_amount(country, year, nuts_prefixes=(), user=Non
             region_pop = population_values_by_region(
                 {region_id for region_id in catchment_regions.values() if region_id},
                 year,
-                legacy_attribute_id=_resolved_population_attribute_id(),
+                temporal_basis=TemporalBasis.CALENDAR_YEAR_AVERAGE,
             )
             for cid, total_mg in total_by_catchment.items():
                 region_id = catchment_regions.get(cid)

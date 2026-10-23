@@ -8,9 +8,8 @@ renderer and the selector rely on.
 
 from importlib import import_module
 
-from django.apps import apps
 from django.template import Context
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import Resolver404, resolve, reverse
 
 from sources.waste_collection.waste_atlas.map_configs import (
@@ -19,6 +18,7 @@ from sources.waste_collection.waste_atlas.map_configs import (
     no_data_color,
 )
 from sources.waste_collection.waste_atlas.map_selection import (
+    DIRECTORY_SECTION_ORDER,
     MAP_SELECTION_THEME_ORDER,
     MAP_SELECTION_WASTE_CATEGORY_OVERRIDES,
     THEME_LABELS,
@@ -287,24 +287,6 @@ class WasteAtlasMapConfigStructureTests(TestCase):
         self.assertEqual(special_case["color"], no_collection_color())
 
     def test_organic_ratio_distinguishes_no_collection_from_no_data(self):
-        stored = WasteAtlasMapConfiguration.objects.get(key="organic_waste_ratio")
-        configuration = dict(stored.configuration)
-        configuration["legendCategoryOrder"] = [
-            *[entry["value"] for entry in configuration["categories"]],
-            "no_collection",
-            "q1",
-            "q2",
-            "q3",
-            "q4",
-        ]
-        stored.configuration = configuration
-        stored.save(update_fields=["configuration"])
-
-        migration = import_module(
-            "sources.waste_collection.waste_atlas.migrations."
-            "0026_add_organic_ratio_no_collection"
-        )
-        migration.add_organic_ratio_no_collection(apps, None)
         config = MAP_CONFIGS["organic_waste_ratio"]
 
         category = next(
@@ -321,7 +303,6 @@ class WasteAtlasMapConfigStructureTests(TestCase):
         self.assertEqual(special_case["classValue"], "no_collection")
         self.assertEqual(special_case["label"], "No separate collection")
         self.assertEqual(special_case["color"], no_collection_color())
-        self.assertEqual(config["legendCategoryOrder"][-1], "no_collection")
 
     @staticmethod
     def _all_entries(config):
@@ -733,6 +714,33 @@ class MapSelectionContextCachingTests(TestCase):
         self.assertTrue(se_entry["selected"])
         self.assertEqual(selected["selected_map_set"], "DE")
         self.assertEqual(other["selected_map_set"], "SE")
+
+
+class WasteAtlasOverviewDirectoryContextTests(SimpleTestCase):
+    def test_directory_sections_have_icons(self):
+        map_selection = import_module(
+            "sources.waste_collection.waste_atlas.map_selection"
+        )
+        section_icons = getattr(map_selection, "DIRECTORY_SECTION_ICONS", {})
+
+        self.assertEqual(set(DIRECTORY_SECTION_ORDER), set(section_icons))
+        context = build_overview_directory_context(reverse)
+        for group in context["directory_region_groups"]:
+            for region in group["regions"]:
+                for section in region["sections"]:
+                    with self.subTest(section=section["key"]):
+                        self.assertEqual(section["icon"], section_icons[section["key"]])
+
+    def test_region_map_count_is_the_sum_of_section_maps(self):
+        context = build_overview_directory_context(reverse)
+
+        for group in context["directory_region_groups"]:
+            for region in group["regions"]:
+                with self.subTest(map_set=region["value"]):
+                    expected_map_count = sum(
+                        len(section["maps"]) for section in region["sections"]
+                    )
+                    self.assertEqual(region.get("map_count"), expected_map_count)
 
     def test_cached_results_are_isolated_between_calls(self):
         """Mutating a returned context must not poison the shared cache."""

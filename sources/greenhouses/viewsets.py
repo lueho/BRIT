@@ -1,7 +1,9 @@
 from django.db.models import Sum
 from django.http import JsonResponse
 from rest_framework.decorators import action
+from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
 
 from maps.mixins import (
     get_unbounded_geojson_rejection_response,
@@ -13,21 +15,15 @@ from sources.greenhouses.serializers import (
     NantesGreenhousesGeometrySerializer,
     NantesGreenhousesModelSerializer,
 )
-from utils.viewsets import AutoPermModelViewSet
 
 
-class NantesGreenhousesViewSet(AutoPermModelViewSet):
+class NantesGreenhousesViewSet(ModelViewSet):
     """Greenhouse map/API viewset."""
 
     queryset = NantesGreenhouses.objects.order_by("pk")
     serializer_class = NantesGreenhousesModelSerializer
     filterset_class = NantesGreenhousesFilterSet
-    custom_permission_required = {
-        "list": None,
-        "retrieve": None,
-        "geojson": None,
-        "summaries": None,
-    }
+    permission_classes = [DjangoModelPermissionsOrAnonReadOnly]
 
     @action(detail=False, methods=["get"])
     def geojson(self, request, *args, **kwargs):

@@ -14,6 +14,7 @@ manually entered counterpart evidence always coexists with generated
 projections and is preferred only in purpose-specific read queries.
 """
 
+import json
 import logging
 from dataclasses import dataclass
 from decimal import Decimal
@@ -26,12 +27,13 @@ from django.db.models import Exists, IntegerField, OuterRef, Q, Value
 from django.db.models.functions import Coalesce
 
 from maps.models import RegionProperty
+from maps.population.models import TemporalBasis
 from maps.population.services import resolve_population
 from maps.validation import RegionCompositionError
 from utils.object_management.models import get_default_owner
 from utils.properties.models import Property, Unit
 
-from .models import CollectionPropertyValue
+from .models import Collection, CollectionPropertyValue
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +50,7 @@ _SETTING_NOT_SET = object()
 
 _DEFAULT_SPECIFIC_WASTE_PROPERTY_NAME = "specific waste collected"
 _DEFAULT_TOTAL_WASTE_PROPERTY_NAME = "total waste collected"
-_DEFAULT_SPECIFIC_WASTE_UNIT_NAME = "kg/(cap.*a)"
+_DEFAULT_SPECIFIC_WASTE_UNIT_NAME = "kg/(cap·a)"
 _DEFAULT_TOTAL_WASTE_UNIT_NAME = "Mg/a"
 _DEFAULT_POPULATION_ATTRIBUTE_NAME = "Population"
 
@@ -62,6 +64,10 @@ _DEFAULT_POPULATION_ATTRIBUTE_NAME = "Population"
 
 # Conversion factor: 1 Mg = 1000 kg
 _MG_TO_KG = 1000
+_FROZEN_STATUSES = (
+    CollectionPropertyValue.STATUS_PUBLISHED,
+    CollectionPropertyValue.STATUS_ARCHIVED,
+)
 
 
 def convert_specific_to_total_mg(value, population, ndigits=2):
@@ -283,25 +289,21 @@ def is_convertible_property(property_id):
     return property_id in get_convertible_property_ids()
 
 
-def get_population_for_collection(collection, year=None):
-    """Return the exact-year population for a collection's catchment region.
+def _population_for_collection(collection, year=None):
+    """Resolve an exact-year annual average, retaining its input provenance.
 
-    Resolution goes through :func:`population.services.resolve_population`,
-    which requires an observation for exactly *year* (with a legacy
-    exact-year ``RegionAttributeValue`` compatibility adapter). Returns
-    ``None`` when *year* is not given or no exact-year value exists.
+    Stocks and legacy attributes of unknown basis cannot silently substitute.
     """
     if not year:
         return None
 
-    cfg = get_derived_property_config()
     region = getattr(collection.catchment, "region", None)
     if region is None:
         return None
 
     try:
         result = resolve_population(
-            region, year, legacy_attribute_id=cfg.population_attribute_id
+            region, year, temporal_basis=TemporalBasis.CALENDAR_YEAR_AVERAGE
         )
     except RegionCompositionError:
         logger.warning(
@@ -309,24 +311,33 @@ def get_population_for_collection(collection, year=None):
             region.pk,
         )
         return None
-    if result is None:
-        return None
-    return result.value
+    return result
 
 
-def compute_counterpart_value(cpv):
-    """Compute the counterpart amount for a single CPV record.
+def get_population_for_collection(collection, year=None):
+    """Return the exact-year annual-average population, or ``None``."""
+    result = _population_for_collection(collection, year)
+    return result.value if result is not None else None
 
-    Returns ``(target_property_id, target_unit_id, computed_average)``
-    or ``None`` if the conversion is not applicable.
-    """
+
+def _compute_counterpart_value(cpv):
     cfg = get_derived_value_config()
     mapping = _counterpart_mapping().get(cpv.property_id)
     if mapping is None:
         return None
 
     target_property_id, target_unit_id = mapping
-    population = get_population_for_collection(cpv.collection, year=cpv.year)
+    expected_unit = (
+        cfg.specific_unit_id
+        if cpv.property_id == cfg.specific_property_id
+        else cfg.total_unit_id
+    )
+    if cpv.unit_id != expected_unit:
+        return None
+    population_result = _population_for_collection(cpv.collection, year=cpv.year)
+    if population_result is None:
+        return None
+    population = population_result.value
     if not population or population <= 0:
         return None
 
@@ -337,7 +348,62 @@ def compute_counterpart_value(cpv):
         # total → specific: specific_kg = total_Mg * 1000 / population
         computed = convert_total_to_specific(cpv.average, population, ndigits=2)
 
-    return target_property_id, target_unit_id, computed
+    return target_property_id, target_unit_id, computed, population_result
+
+
+def compute_counterpart_value(cpv):
+    """Return ``(property_id, unit_id, average)`` or ``None`` if unsuitable."""
+    result = _compute_counterpart_value(cpv)
+    return result[:3] if result is not None else None
+
+
+def _calculation_description(cpv, population, *, from_specific):
+    """Snapshot the inputs rather than relying on revisable observation rows."""
+    observations = []
+    for observation in population.observations:
+        dataset = observation.dataset
+        run = observation.import_run
+        observations.append(
+            {
+                "id": observation.pk,
+                "region_id": observation.region_id,
+                "year": observation.year,
+                "value": str(observation.value),
+                "dataset": dataset.slug,
+                "provider": dataset.provider,
+                "source_code": dataset.source_code,
+                "classification_version": dataset.classification_version,
+                "import_run_id": observation.import_run_id,
+                "release": run.structure_version if run is not None else None,
+                "checksum": run.checksum if run is not None else None,
+                "source_status": observation.source_status,
+                "flags": observation.flags,
+            }
+        )
+    return json.dumps(
+        {
+            "formula": (
+                "specific_kg * population / 1000"
+                if from_specific
+                else "total_Mg * 1000 / population"
+            ),
+            "source_cpv": {
+                "id": cpv.pk,
+                "average": str(cpv.average),
+                "unit_id": cpv.unit_id,
+            },
+            "population": {
+                "value": str(population.value),
+                "year": population.year,
+                "temporal_basis": population.temporal_basis,
+                "method": population.method,
+                "is_provisional": population.is_provisional,
+                "is_mixed_provenance": population.is_mixed_provenance,
+                "observations": observations,
+            },
+        },
+        sort_keys=True,
+    )
 
 
 def _linked_generated_qs(cpv):
@@ -365,7 +431,20 @@ def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
     if cpv.is_derived or cpv.pk is None:
         return None, "skipped"
 
-    result = compute_counterpart_value(cpv)
+    mapping = _counterpart_mapping().get(cpv.property_id)
+    if mapping is None:
+        return None, "skipped"
+    # Serialize generators even before a counterpart exists, and lock existing
+    # counterparts so a concurrent publication cannot be overwritten.
+    Collection.objects.select_for_update().only("pk").get(pk=cpv.collection_id)
+    counterparts = list(
+        _derived_counterpart_qs(cpv, mapping[0]).select_for_update().order_by("pk")
+    )
+    for counterpart in counterparts:
+        if counterpart.publication_status in _FROZEN_STATUSES:
+            return counterpart, "skipped"
+
+    result = _compute_counterpart_value(cpv)
     if result is None:
         # A source that is no longer convertible invalidates only its own
         # linked artifact — stale generated output is not valid evidence.
@@ -411,6 +490,12 @@ def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
             "year": cpv.year,
             "name": f"derived from {cpv.property.name}",
             "average": computed_avg,
+            "description": _calculation_description(
+                cpv,
+                population,
+                from_specific=cpv.property_id
+                == get_derived_value_config().specific_property_id,
+            ),
             "unit_id": target_unit_id,
             "owner": owner if owner is not None else cpv.owner,
             "publication_status": effective_publication_status,

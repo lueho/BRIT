@@ -244,10 +244,12 @@ class WasteAtlasVendorScriptTests(TestCase):
 
 class WasteAtlasDiscoverabilityTests(TestCase):
     def test_overview_is_listed_in_the_sitemap(self):
-        from brit.sitemap_items import SITEMAP_ITEMS
+        from brit.sitemap_registry import get_sitemap_items
 
-        self.assertIn(reverse("waste-atlas-overview"), SITEMAP_ITEMS)
-        self.assertNotIn(reverse("waste-atlas-data-conflicts-overview"), SITEMAP_ITEMS)
+        self.assertIn(reverse("waste-atlas-overview"), get_sitemap_items())
+        self.assertNotIn(
+            reverse("waste-atlas-data-conflicts-overview"), get_sitemap_items()
+        )
 
     def test_sitemap_entry_is_publicly_reachable(self):
         self.assertEqual(

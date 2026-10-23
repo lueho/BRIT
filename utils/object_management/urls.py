@@ -32,6 +32,11 @@ urlpatterns = [
         name="add_review_comment",
     ),
     path(
+        "mute-notifications/<int:content_type_id>/<int:object_id>/",
+        views.ReviewNotificationMuteView.as_view(),
+        name="review_notification_mute",
+    ),
+    path(
         "approve/<int:content_type_id>/<int:object_id>/",
         views.ApproveItemView.as_view(),
         name="approve_item",

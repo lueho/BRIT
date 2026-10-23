@@ -258,15 +258,17 @@ class CollectionSeasonForm(SimpleForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["distribution"].queryset = TemporalDistribution.objects.filter(
-            name="Months of the year"
+            name="Months of the year", owner=get_default_owner()
         )
         try:
             self.fields["distribution"].initial = TemporalDistribution.objects.get(
-                name="Months of the year"
+                name="Months of the year", owner=get_default_owner()
             )
         except TemporalDistribution.DoesNotExist:
             pass
-        distribution_qs = TemporalDistribution.objects.filter(name="Months of the year")
+        distribution_qs = TemporalDistribution.objects.filter(
+            name="Months of the year", owner=get_default_owner()
+        )
         if distribution_qs.exists():
             distribution = distribution_qs.first()
             self.fields["first_timestep"].queryset = Timestep.objects.filter(
@@ -355,10 +357,17 @@ class CollectionSeasonFormSet(M2MInlineFormSet):
             options.option_3 = form.cleaned_data["option_3"]
             options.save()
 
+        default_distribution = TemporalDistribution.objects.get(
+            name="Months of the year", owner=get_default_owner()
+        )
         CollectionSeason.objects.exclude(
-            distribution=TemporalDistribution.objects.get(name="Months of the year"),
-            first_timestep=Timestep.objects.get(name="January"),
-            last_timestep=Timestep.objects.get(name="December"),
+            distribution=default_distribution,
+            first_timestep=Timestep.objects.get(
+                distribution=default_distribution, name="January"
+            ),
+            last_timestep=Timestep.objects.get(
+                distribution=default_distribution, name="December"
+            ),
         ).filter(collectionfrequency=None).delete()
         return child_objects
 
@@ -427,6 +436,22 @@ class WasteFlyerFormSet(M2MInlineFormSet):
         return child_objects
 
 
+def preserve_bibliographic_sources_through_formset(obj, formset):
+    """Save *formset* against *obj* without wiping non-flyer sources.
+
+    ``M2MInlineFormSet.save()`` replaces the whole ``sources`` relation with
+    only the submitted WasteFlyer objects, so bibliographic sources must be
+    captured beforehand and re-added afterwards.
+    """
+    bibliographic_sources = list(
+        obj.sources.exclude(type="waste_flyer").values_list("pk", flat=True)
+    )
+    formset.parent_object = obj
+    formset.save()
+    if bibliographic_sources:
+        obj.sources.add(*bibliographic_sources)
+
+
 class CollectionPropertyValueModelFormHelper(FormHelper):
     form_tag = False
     layout = Layout(
@@ -443,7 +468,27 @@ class CollectionPropertyValueModelFormHelper(FormHelper):
     )
 
 
+class AllowedUnitFormMixin:
+    """Reject units that are not allowed for the selected property."""
+
+    def clean(self):
+        cleaned_data = super().clean()
+        prop = cleaned_data.get("property")
+        unit = cleaned_data.get("unit")
+        if (
+            prop
+            and unit
+            and {"property", "unit"} & set(self.changed_data)
+            and not prop.allowed_units.filter(pk=unit.pk).exists()
+        ):
+            self.add_error(
+                "unit", _("This unit is not allowed for the selected property.")
+            )
+        return cleaned_data
+
+
 class CollectionPropertyValueModelForm(
+    AllowedUnitFormMixin,
     NumericMeasurementFieldsFormMixin,
     UserCreatedObjectFormMixin,
     SourcesFieldMixin,
@@ -455,6 +500,21 @@ class CollectionPropertyValueModelForm(
             label_field="name",
         ),
         label="Collection",
+    )
+    property = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="property-autocomplete",
+            label_field="name",
+        ),
+        label="Property",
+    )
+    unit = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="unit-autocomplete",
+            label_field="name",
+            filter_by=("property", "id"),
+        ),
+        label="Unit",
     )
 
     class Meta:
@@ -488,6 +548,7 @@ class AggregatedCollectionPropertyValueModelFormHelper(FormHelper):
 
 
 class AggregatedCollectionPropertyValueModelForm(
+    AllowedUnitFormMixin,
     NumericMeasurementFieldsFormMixin,
     UserCreatedObjectFormMixin,
     SourcesFieldMixin,
@@ -499,6 +560,21 @@ class AggregatedCollectionPropertyValueModelForm(
             label_field="name",
         ),
         label="Collections",
+    )
+    property = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="property-autocomplete",
+            label_field="name",
+        ),
+        label="Property",
+    )
+    unit = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="unit-autocomplete",
+            label_field="name",
+            filter_by=("property", "id"),
+        ),
+        label="Unit",
     )
 
     class Meta:

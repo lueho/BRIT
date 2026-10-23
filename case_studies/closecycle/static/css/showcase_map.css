@@ -5,6 +5,27 @@
   overflow-x: visible;
 }
 
+.btn.csm-theme-chip {
+  color: var(--bs-body-color);
+  background: #fff;
+  border-color: #c7d2ca;
+  border-radius: 999px;
+}
+
+.btn.csm-theme-chip:hover,
+.btn.csm-theme-chip:focus-visible {
+  color: var(--bs-body-color);
+  background: #f0f3f1;
+  border-color: #9fb3a5;
+}
+
+.btn.csm-theme-chip.active {
+  color: var(--bs-body-color);
+  background: #eaf1ec;
+  border-color: var(--bs-primary);
+  font-weight: 600;
+}
+
 .csm-intro {
   color: var(--bs-secondary-color);
   font-size: .9rem;

@@ -191,6 +191,13 @@ deployment), the domain falls back to `CANONICAL_HOST` or the first
 `ALLOWED_HOSTS` entry. The link scheme is `https` when
 `SECURE_SSL_REDIRECT` is enabled.
 
+Users can opt out of review e-mails at two levels, both linked from every
+notification's footer: `ReviewNotificationMute` silences e-mails for a
+single object (`review_notification_mute` view, reachable by owner,
+staff, and moderators), and the `review_notifications` flag on
+`users.UserProfile` disables all review e-mails for the account
+(`review_notification_preference` view, toggled from the profile page).
+
 ## Views and ViewSets
 
 ### Class-Based Views (CBVs)

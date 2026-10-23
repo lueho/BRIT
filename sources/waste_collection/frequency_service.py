@@ -124,13 +124,14 @@ class CollectionFrequencyScheduleService:
         return max(int(derived_count), 1)
 
     @classmethod
-    def infer_cadence(cls, count, first_timestep, last_timestep):
+    def infer_cadence(cls, count, first_timestep, last_timestep, month_span=None):
         if count in (None, ""):
             return ""
         count = int(count)
         # month_span only depends on the timesteps, not the cadence, so compute it
         # once instead of issuing an identical COUNT query for every candidate.
-        month_span = cls.month_span(first_timestep, last_timestep)
+        if month_span is None:
+            month_span = cls.month_span(first_timestep, last_timestep)
         matches = [
             cadence
             for cadence in CADENCE_TO_ANNUAL_COUNT
@@ -192,7 +193,9 @@ class CollectionFrequencyScheduleService:
         options_qs = frequency.collectioncountoptions_set.select_related(
             "season__distribution",
             "season__first_timestep",
+            "season__first_timestep__distribution",
             "season__last_timestep",
+            "season__last_timestep__distribution",
         ).order_by("season__first_timestep__order")
         for options in options_qs:
             cadence_hint = cadence_hints.get(
@@ -206,17 +209,24 @@ class CollectionFrequencyScheduleService:
                 "first_timestep": options.season.first_timestep,
                 "last_timestep": options.season.last_timestep,
             }
+            month_span = None
             for field_name in COUNT_FIELDS:
                 value = getattr(options, field_name)
                 row[field_name] = value
                 if field_name == "standard" and cadence_hint and value is not None:
                     row[f"{field_name}_cadence"] = cadence_hint
-                else:
-                    row[f"{field_name}_cadence"] = cls.infer_cadence(
-                        value,
+                    continue
+                if value not in (None, "") and month_span is None:
+                    month_span = cls.month_span(
                         options.season.first_timestep,
                         options.season.last_timestep,
                     )
+                row[f"{field_name}_cadence"] = cls.infer_cadence(
+                    value,
+                    options.season.first_timestep,
+                    options.season.last_timestep,
+                    month_span=month_span,
+                )
             rows.append(row)
         return rows
 
@@ -301,7 +311,10 @@ class CollectionFrequencyScheduleService:
 
     @classmethod
     def display_rows(cls, frequency):
-        rows = cls.rows_from_frequency(frequency)
+        return cls.display_rows_from_rows(cls.rows_from_frequency(frequency))
+
+    @classmethod
+    def display_rows_from_rows(cls, rows):
         display_rows = []
         for row in rows:
             first_timestep = row.get("first_timestep")

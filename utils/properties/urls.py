@@ -2,7 +2,8 @@ from django.urls import include, path
 
 from .router import router
 from .views import (
-    PropertiesDashboardView,
+    PropertiesExplorerView,
+    PropertyAutocompleteView,
     PropertyCreateView,
     PropertyDetailView,
     PropertyModalDeleteView,
@@ -21,7 +22,7 @@ from .views import (
 )
 
 urlpatterns = [
-    path("explorer/", PropertiesDashboardView.as_view(), name="properties-dashboard"),
+    path("explorer/", PropertiesExplorerView.as_view(), name="properties-explorer"),
     path("properties/", PropertyPublishedListView.as_view(), name="property-list"),
     path(
         "properties/user/",
@@ -39,6 +40,11 @@ urlpatterns = [
         "properties/<int:pk>/delete/modal/",
         PropertyModalDeleteView.as_view(),
         name="property-delete-modal",
+    ),
+    path(
+        "properties/autocomplete/",
+        PropertyAutocompleteView.as_view(),
+        name="property-autocomplete",
     ),
     path(
         "properties/<int:pk>/unit-options/",

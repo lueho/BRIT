@@ -183,6 +183,25 @@ class SourceCreateSerializerPersistenceTestCase(TestCase):
         with self.assertRaises(PermissionDenied):
             serializer.save()
         self.assertFalse(Source.objects.exists())
+class SourceCreateSerializerDoiValidationTestCase(TestCase):
+    def test_non_doi_value_is_invalid(self):
+        serializer = SourceCreateSerializer(
+            data={"title": "Book", "doi": "ISBN 978-3-03736-016-3"}
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("doi", serializer.errors)
+        self.assertFalse(Source.objects.filter(title="Book").exists())
+
+    def test_resolver_url_is_normalized(self):
+        serializer = SourceCreateSerializer(
+            data={"title": "Article", "doi": "https://doi.org/10.1000/example"}
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertEqual(serializer.validated_data["doi"], "10.1000/example")
+
+    def test_blank_doi_is_valid(self):
+        serializer = SourceCreateSerializer(data={"title": "Article", "doi": ""})
+        self.assertTrue(serializer.is_valid(), serializer.errors)
 
 
 class AuthorModelSerializerTestCase(TestCase):

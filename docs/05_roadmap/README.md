@@ -50,7 +50,7 @@ Non-test code only; test-code coupling is tracked separately in WS6.
 | V6 | `layer_manager` imports `inventories`, `materials`, `distributions` | `layer_manager/models.py:6-8` | Merge `layer_manager` into `inventories` (it is its private result store) or genericize via contenttypes (WS8) |
 | V7 | `inventories` discovers algorithms via `pkgutil` over `sources` + DB dotted paths | `inventories/models.py:31-36,88-106,158-163` | Replace with the source-domain plugin registry; drop `flexibi_hamburg` aliases (WS8) |
 | V8 | Sideways: `roadside_trees` imports `urban_green_spaces` | `sources/roadside_trees/models.py:4`, `inventory/algorithms.py:6` | Remove dead import; move shared Hamburg data access behind explicit interface |
-| V9 | `brit.sitemap_items` imports `sources.registry` | `brit/sitemap_items.py` | Acceptable short-term (composition root); fold into the same registry pattern when WS1-D lands |
+| V9 | Resolved: `brit` no longer imports `sources.registry` for the sitemap | was `brit/sitemap_items.py` | Source plugins forward `sitemap_items` into `brit.sitemap_registry`; core apps register their own contributions from `AppConfig.ready()` |
 
 ---
 

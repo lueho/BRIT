@@ -3,9 +3,10 @@ import json
 from celery.result import AsyncResult
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import ProtectedError, Q, RestrictedError
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
@@ -22,6 +23,10 @@ from utils.object_management.services import (
     content_mutation,
     record_creation,
     register_url_check_job,
+)
+from utils.object_management.permissions import (
+    UserCreatedObjectPermission,
+    get_object_policy,
 )
 from utils.object_management.templatetags.moderation_tags import safe_back_url
 from utils.object_management.views import (
@@ -40,8 +45,7 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateView,
     UserCreatedObjectUpdateWithInlinesView,
 )
-from utils.permissions import HasModelPermission
-from utils.views import BreadcrumbContextMixin
+from utils.views import BreadcrumbContextMixin, LetterIndexMixin
 
 from .filters import AuthorFilterSet, LicenceListFilter, SourceFilter
 from .forms import (
@@ -57,6 +61,7 @@ from .inlines import SourceAuthorInline
 from .models import (
     SOURCE_TYPES,
     Author,
+    AuthorCreationDenied,
     Licence,
     Source,
 )
@@ -70,7 +75,7 @@ from .tasks import check_source_url, check_source_urls
 
 
 class BibliographyExplorerView(BreadcrumbContextMixin, TemplateView):
-    template_name = "bibliography_dashboard.html"
+    template_name = "bibliography_explorer.html"
     breadcrumb_module_label = "Bibliography"
     breadcrumb_page_title = "Bibliography"
 
@@ -96,21 +101,21 @@ class BibliographyExplorerView(BreadcrumbContextMixin, TemplateView):
 class AuthorPublishedListView(PublishedObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
 class AuthorPrivateListView(PrivateObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
 class AuthorReviewListView(ReviewObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
@@ -198,19 +203,19 @@ class AuthorAutocompleteView(UserCreatedObjectAutocompleteView):
 class LicencePublishedListView(PublishedObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class LicencePrivateListView(PrivateObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class LicenceReviewListView(ReviewObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class LicenceCreateView(UserCreatedObjectCreateView):
@@ -254,31 +259,35 @@ class LicenceAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SourcePublishedFilterView(PublishedObjectFilterView):
+class SourceLetterIndexMixin(LetterIndexMixin):
+    letter_field = "citation_key"
+
+
+class SourcePublishedFilterView(SourceLetterIndexMixin, PublishedObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
         "citation_key"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
-class SourcePrivateFilterView(PrivateObjectFilterView):
+class SourcePrivateFilterView(SourceLetterIndexMixin, PrivateObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
         "citation_key"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
-class SourceReviewFilterView(ReviewObjectFilterView):
+class SourceReviewFilterView(SourceLetterIndexMixin, ReviewObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
         "citation_key"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-explorer")
+    explorer_url = reverse_lazy("bibliography-explorer")
 
 
 class SourceCreateView(UserCreatedObjectCreateWithInlinesView):
@@ -484,6 +493,14 @@ class SourceQuickCreateView(LoginRequiredMixin, View):
                 "title": source.title,
                 "text": formatted_label,
                 "label": formatted_label,
+                "author_cleanup_token": signing.dumps(
+                    {
+                        "source": source.pk,
+                        "user": request.user.pk,
+                        "authors": created_author_ids,
+                    },
+                    salt=self.author_cleanup_salt,
+                ),
             },
             status=201,
         )
@@ -526,12 +543,28 @@ class SourceQuickCreateView(LoginRequiredMixin, View):
             source.delete()
         return JsonResponse({"deleted": True}, status=200)
 
+    def _created_author_ids_from_token(self, token, source, user):
+        """Return the author IDs a valid cleanup token issued for ``source`` lists."""
+        if not isinstance(token, str) or not token:
+            return []
+        try:
+            data = signing.loads(token, salt=self.author_cleanup_salt)
+        except signing.BadSignature:
+            return []
+        if not isinstance(data, dict):
+            return []
+        if data.get("source") != source.pk or data.get("user") != user.pk:
+            return []
+        author_ids = data.get("authors")
+        if not isinstance(author_ids, list):
+            return []
+        return [author_id for author_id in author_ids if isinstance(author_id, int)]
+
 
 class SourceCreateAPIView(APIView):
     queryset = Source.objects.all()
-    permission_classes = [HasModelPermission]
+    permission_classes = [UserCreatedObjectPermission]
     action = "create"
-    permission_required = {"create": "bibliography.add_source"}
 
     def post(self, request, *args, **kwargs):
         serializer = SourceCreateSerializer(

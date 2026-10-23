@@ -4,6 +4,10 @@ migrations (inventories 0009 / layer_manager 0004).
 The functions are exercised directly with the real app registry: the state
 they expect (feedstock already repointed to the material, the old series
 preserved in ``sample_series``) is built straight in the test database.
+
+These are one-off data-migration helpers. Once the migrations have been
+applied in all environments (or folded into a squashed baseline), this file
+should be removed — the helpers can never run again.
 """
 
 import importlib
@@ -21,12 +25,7 @@ from inventories.models import (
     ScenarioInventoryConfiguration,
 )
 from layer_manager.models import (
-    DistributionSet,
-    DistributionShare,
     Layer,
-    LayerAggregatedDistribution,
-    LayerAggregatedValue,
-    LayerField,
 )
 from maps.models import Region
 from materials.models import Material, SampleSeries
@@ -36,11 +35,6 @@ config_migration = importlib.import_module(
 )
 config_dedup = config_migration.deduplicate_collapsed_configurations
 config_restore = config_migration.restore_collapsed_configurations
-layer_migration = importlib.import_module(
-    "layer_manager.migrations.0004_layer_feedstock_material"
-)
-layer_dedup = layer_migration.deduplicate_collapsed_layers
-layer_restore = layer_migration.restore_collapsed_layers
 
 
 class _SchemaEditorShim:
@@ -210,102 +204,3 @@ class MigrationDedupTestCase(TestCase):
                 scenario=self.scenario
             ).count(),
         )
-
-
-class LayerMigrationDedupTestCase(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.region = Region.objects.create(name="Layer Region")
-        cls.scenario = Scenario.objects.create(name="Layer Scenario", region=cls.region)
-        cls.geodataset = GeoDataset.objects.create(
-            name="Layer Dataset", region=cls.region
-        )
-        cls.algorithm = InventoryAlgorithm.objects.create(
-            name="Layer Algorithm", geodataset=cls.geodataset
-        )
-        cls.material = Material.objects.create(name="Layer Material")
-        cls.series = SampleSeries.objects.create(material=cls.material, name="S")
-
-    def _layer(self, table_name, sample_series=None):
-        return Layer._base_manager.create(
-            name="Result",
-            geom_type="Polygon",
-            table_name=table_name,
-            scenario=self.scenario,
-            feedstock=self.material,
-            sample_series=sample_series,
-            algorithm=self.algorithm,
-        )
-
-    def test_collapsed_layers_keep_temporal_profile_and_drop_table(self):
-        self._layer("dedup_loser_table")
-        keeper = self._layer("dedup_keeper_table", sample_series=self.series)
-        with connection.cursor() as cursor:
-            cursor.execute('CREATE TABLE "dedup_loser_table" (id integer)')
-
-        layer_dedup(apps, _SchemaEditorShim())
-
-        self.assertQuerySetEqual(
-            Layer._base_manager.filter(scenario=self.scenario), [keeper]
-        )
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT to_regclass('dedup_loser_table')")
-            self.assertIsNone(cursor.fetchone()[0])
-
-    def test_reverse_restores_collapsed_layer_with_its_data(self):
-        loser = self._layer("dedup_restore_loser_table")
-        self._layer("dedup_restore_keeper_table", sample_series=self.series)
-        field = LayerField.objects.create(field_name="production", data_type="float")
-        loser.layer_fields.add(field)
-        aggregate = LayerAggregatedValue.objects.create(
-            name="Total production", value=4.2, unit="Mg/a", layer=loser
-        )
-        aggregated_distribution = LayerAggregatedDistribution.objects.create(
-            name="seasonal", type="seasonal", layer=loser
-        )
-        distribution_set = DistributionSet.objects.create(
-            aggregated_distribution=aggregated_distribution
-        )
-        share = DistributionShare.objects.create(
-            distribution_set=distribution_set, average=1.5, standard_deviation=0
-        )
-        with connection.cursor() as cursor:
-            cursor.execute(
-                'CREATE TABLE "dedup_restore_loser_table" (id integer, production float)'
-            )
-            cursor.execute(
-                'INSERT INTO "dedup_restore_loser_table" VALUES (1, 4.2), (2, 0.5)'
-            )
-
-        layer_dedup(apps, _SchemaEditorShim())
-        self.assertFalse(Layer._base_manager.filter(id=loser.id).exists())
-        self.assertFalse(_relation_exists("public.dedup_restore_loser_table"))
-        layer_restore(apps, _SchemaEditorShim())
-
-        restored = Layer._base_manager.get(id=loser.id)
-        self.assertEqual(restored.table_name, "dedup_restore_loser_table")
-        self.assertEqual(restored.sample_series_id, None)
-        self.assertEqual([field], list(restored.layer_fields.all()))
-        self.assertEqual(
-            [(aggregate.id, 4.2)],
-            list(restored.layeraggregatedvalue_set.values_list("id", "value")),
-        )
-        self.assertTrue(
-            DistributionShare.objects.filter(
-                id=share.id,
-                distribution_set__aggregated_distribution__layer=restored,
-            ).exists()
-        )
-        with connection.cursor() as cursor:
-            cursor.execute(
-                'SELECT id, production FROM "dedup_restore_loser_table" ORDER BY id'
-            )
-            self.assertEqual([(1, 4.2), (2, 0.5)], cursor.fetchall())
-        self.assertFalse(_relation_exists(layer_migration.BACKUP_TABLE))
-
-    def test_single_layer_is_untouched(self):
-        layer = self._layer("dedup_single_table")
-
-        layer_dedup(apps, _SchemaEditorShim())
-
-        self.assertTrue(Layer._base_manager.filter(id=layer.id).exists())

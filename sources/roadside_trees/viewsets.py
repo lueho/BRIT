@@ -4,7 +4,9 @@ import json
 from django.http import JsonResponse
 from django_filters import rest_framework as rf_filters
 from rest_framework.decorators import action
+from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+from rest_framework.viewsets import ModelViewSet
 
 from maps.mixins import CachedGeoJSONMixin
 from sources.roadside_trees.filters import HamburgRoadsideTreesFilterSet
@@ -13,7 +15,6 @@ from sources.roadside_trees.serializers import (
     HamburgRoadsideTreeGeometrySerializer,
     HamburgRoadsideTreeSimpleModelSerializer,
 )
-from utils.viewsets import AutoPermModelViewSet
 
 
 class GeoJSONAnonThrottle(AnonRateThrottle):
@@ -24,19 +25,13 @@ class GeoJSONUserThrottle(UserRateThrottle):
     rate = "60/minute"
 
 
-class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
+class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, ModelViewSet):
     queryset = HamburgRoadsideTrees.objects.all()
     serializer_class = HamburgRoadsideTreeSimpleModelSerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
     filterset_class = HamburgRoadsideTreesFilterSet
-
-    custom_permission_required = {
-        "list": None,
-        "retrieve": None,
-        "geojson": None,
-        "summaries": None,
-        "version": None,
-    }
+    geojson_geometry_field = "geom"
+    permission_classes = [DjangoModelPermissionsOrAnonReadOnly]
 
     def get_queryset(self):
         return HamburgRoadsideTrees.objects.all()

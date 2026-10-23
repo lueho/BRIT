@@ -10,7 +10,12 @@ from utils.object_management.models import (
     UserCreatedObjectManager,
 )
 
-from .utils import generate_citation_key
+from .utils import (
+    DOI_FORMAT_MESSAGE,
+    DOI_PATTERN,
+    generate_citation_key,
+    normalize_doi,
+)
 
 AUTHOR_TYPES = (("person", "Person"), ("organization", "Organization"))
 
@@ -23,6 +28,29 @@ LETTERLESS_SURNAME_MESSAGE = "Surnames must contain at least one letter."
 def author_name_has_letter(value):
     """Return whether an author name contains at least one letter."""
     return any(char.isalpha() for char in str(value or ""))
+
+
+def normalize_author_name_part(value):
+    """Collapse whitespace in an author name part from a payload."""
+    return " ".join(str(value or "").split())
+
+
+class AuthorCreationDenied(Exception):
+    """Raised when author creation is needed but the owner lacks permission."""
+
+
+def find_or_create_author(owner, *, filters, create_kwargs):
+    """Find an author by ``filters`` or create it (needs add_author permission).
+
+    Returns ``(author, created)``. Raises :class:`AuthorCreationDenied` when
+    the author is missing and ``owner`` may not create authors.
+    """
+    author = Author.objects.filter(**filters).first()
+    if author is not None:
+        return author, False
+    if not owner.has_perm("bibliography.add_author"):
+        raise AuthorCreationDenied("permission")
+    return Author.objects.create(owner=owner, **create_kwargs), True
 
 
 class Author(UserCreatedObject):
@@ -405,7 +433,34 @@ class Source(UserCreatedObject):
             return f"{title_words[0]}{year_part}".strip()
         return f"Source{year_part}".strip()
 
+    def clean(self):
+        super().clean()
+        self.doi = normalize_doi(self.doi) or None
+        if (
+            self.doi
+            and not DOI_PATTERN.match(self.doi)
+            and self.doi != self._stored_normalized_doi()
+        ):
+            raise ValidationError({"doi": DOI_FORMAT_MESSAGE})
+
+    def _stored_normalized_doi(self):
+        if self._state.adding or self.pk is None:
+            return None
+        stored = (
+            type(self)
+            ._base_manager.filter(pk=self.pk)
+            .values_list("doi", flat=True)
+            .first()
+        )
+        return normalize_doi(stored) or None
+
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = list(update_fields)
+            kwargs["update_fields"] = update_fields
+        if update_fields is None or "doi" in update_fields:
+            self.doi = normalize_doi(self.doi) or None
         if not self.citation_key:
             self.citation_key = generate_citation_key(self)
         super().save(*args, **kwargs)

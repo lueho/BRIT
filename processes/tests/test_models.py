@@ -73,8 +73,9 @@ class URLValidationTestCase(TestCase):
 class ProcessCategoryModelTestCase(TestCase):
     """Test the ProcessCategory model."""
 
-    def setUp(self):
-        self.owner = get_user_model().objects.create(username="category_owner")
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create(username="category_owner")
 
     def test_create_category(self):
         """ProcessCategory can be created with name and owner."""
@@ -100,16 +101,17 @@ class ProcessCategoryModelTestCase(TestCase):
 class ProcessModelTestCase(TestCase):
     """Test the Process model and its relationships."""
 
-    def setUp(self):
-        self.owner = get_user_model().objects.create(username="process_owner")
-        self.category = ProcessCategory.objects.create(
-            name="Thermochemical", owner=self.owner
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = get_user_model().objects.create(username="process_owner")
+        cls.category = ProcessCategory.objects.create(
+            name="Thermochemical", owner=cls.owner
         )
-        self.material_in = Material.objects.create(name="Wood Chips", owner=self.owner)
-        self.material_out = Material.objects.create(name="Syngas", owner=self.owner)
-        self.unit_celsius = Unit.objects.create(name="°C", owner=self.owner)
-        self.unit_percent = Unit.objects.create(name="%", owner=self.owner)
-        self.unit_tonne = Unit.objects.create(name="t", owner=self.owner)
+        cls.material_in = Material.objects.create(name="Wood Chips", owner=cls.owner)
+        cls.material_out = Material.objects.create(name="Syngas", owner=cls.owner)
+        cls.unit_celsius = Unit.objects.create(name="°C", owner=cls.owner)
+        cls.unit_percent = Unit.objects.create(name="%", owner=cls.owner)
+        cls.unit_tonne = Unit.objects.create(name="t", owner=cls.owner)
 
     def test_operating_parameter_range_validation(self):
         process = Process.objects.create(name="Invalid Temperature", owner=self.owner)

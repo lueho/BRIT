@@ -21,11 +21,11 @@ from ..permissions import (
 class ReviewWorkflowPermissionTests(TestCase):
     """Test the permissions for the review workflow."""
 
-    def setUp(self):
-        # Create users
-        self.owner = User.objects.create_user(username="owner")
-        self.moderator = User.objects.create_user(username="moderator")
-        self.regular_user = User.objects.create_user(username="regular")
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner")
+        cls.moderator = User.objects.create_user(username="moderator")
+        cls.regular_user = User.objects.create_user(username="regular")
 
         # Add moderator permissions
         content_type = ContentType.objects.get_for_model(Collection)
@@ -34,33 +34,33 @@ class ReviewWorkflowPermissionTests(TestCase):
             content_type=content_type,
             defaults={"name": "Can moderate collections"},
         )
-        self.moderator.user_permissions.add(permission)
+        cls.moderator.user_permissions.add(permission)
 
         with mute_signals(post_save):
             # Create test collections in different states
-            self.private_collection = Collection.objects.create(
+            cls.private_collection = Collection.objects.create(
                 name="Private Collection",
-                owner=self.owner,
+                owner=cls.owner,
                 publication_status=UserCreatedObject.STATUS_PRIVATE,
             )
 
         with mute_signals(post_save):
-            self.review_collection = Collection.objects.create(
+            cls.review_collection = Collection.objects.create(
                 name="Review Collection",
-                owner=self.owner,
+                owner=cls.owner,
                 publication_status=UserCreatedObject.STATUS_REVIEW,
             )
 
         with mute_signals(post_save):
-            self.published_collection = Collection.objects.create(
+            cls.published_collection = Collection.objects.create(
                 name="Published Collection",
-                owner=self.owner,
+                owner=cls.owner,
                 publication_status=UserCreatedObject.STATUS_PUBLISHED,
             )
 
         # Create permission checker
-        self.permission_checker = UserCreatedObjectPermission()
-        self.factory = RequestFactory()
+        cls.permission_checker = UserCreatedObjectPermission()
+        cls.factory = RequestFactory()
 
     def test_submit_permission(self):
         """Test permission to submit an object for review."""
@@ -228,12 +228,13 @@ class ReviewWorkflowPermissionTests(TestCase):
 
 
 class GlobalObjectPermissionTestCase(TestCase):
-    def setUp(self):
-        self.permission = GlobalObjectPermission()
-        self.factory = APIRequestFactory()
+    @classmethod
+    def setUpTestData(cls):
+        cls.permission = GlobalObjectPermission()
+        cls.factory = APIRequestFactory()
 
-        self.staff_user = User.objects.create_user(username="staffuser", is_staff=True)
-        self.regular_user = User.objects.create_user(
+        cls.staff_user = User.objects.create_user(username="staffuser", is_staff=True)
+        cls.regular_user = User.objects.create_user(
             username="regularuser", is_staff=False
         )
 

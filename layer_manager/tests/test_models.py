@@ -1,5 +1,3 @@
-from importlib import import_module
-
 from django.apps import apps
 from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Point, Polygon
 from django.db import IntegrityError, connection, transaction
@@ -54,22 +52,20 @@ class LayerTestCase(TestCase):
                 ]
             )
         )
+        cls.scenario = Scenario.objects.get(name="Test Scenario")
+        cls.feedstock_sample_series = Material.objects.get(name="Test Feedstock")
 
-    def setUp(self):
-        self.scenario = Scenario.objects.get(name="Test Scenario")
-        self.feedstock_sample_series = Material.objects.get(name="Test Feedstock")
-
-        self.testkwargs = {
+        cls.testkwargs = {
             "name": "test name",
-            "scenario": self.scenario,
+            "scenario": cls.scenario,
             "algorithm": InventoryAlgorithm.objects.get(
                 function_name="avg_point_yield"
             ),
             "geom_type": "Point",
             "table_name": "test_table_name",
-            "feedstock": self.feedstock_sample_series,
+            "feedstock": cls.feedstock_sample_series,
         }
-        self.fields = {"field1": "float", "field2": "int"}
+        cls.fields = {"field1": "float", "field2": "int"}
 
     def test_update_or_create_feature_collection(self):
         kwargs = self.testkwargs
@@ -309,78 +305,22 @@ class LayerFieldUniquenessTestCase(TestCase):
         self.assertEqual(LayerField.objects.filter(field_name="value").count(), 2)
 
 
-class MergeDuplicateLayerFieldsMigrationTestCase(TestCase):
+class LayerAggregatedDistributionTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        region = Region.objects.create(name="Test Region")
-        catchment = Catchment.objects.create(name="Test Catchment", region=region)
-        scenario = Scenario.objects.create(
-            name="Test Scenario", region=region, catchment=catchment
+        cls.component = MaterialComponent.objects.default()
+        cls.timestep = Timestep.objects.default()
+        cls.distribution = TemporalDistribution.objects.default()
+        cls.aggregated_distribution = LayerAggregatedDistribution.objects.create(
+            name="Test distribution", distribution=cls.distribution
         )
-        geodataset = GeoDataset.objects.create(name="Test Geodataset", region=region)
-        algorithm = InventoryAlgorithm.objects.create(
-            name="Average Point Yield",
-            function_name="avg_point_yield",
-            geodataset=geodataset,
+        cls.distribution_set = DistributionSet.objects.create(
+            aggregated_distribution=cls.aggregated_distribution,
+            timestep=cls.timestep,
         )
-        feedstock = Material.objects.create(name="Test Feedstock")
-        cls.layer_kwargs = {
-            "geom_type": "Point",
-            "scenario": scenario,
-            "algorithm": algorithm,
-            "feedstock": feedstock,
-        }
-
-    def setUp(self):
-        constraint = next(
-            c
-            for c in LayerField._meta.constraints
-            if c.name == "unique_layer_field_name_data_type"
-        )
-        with connection.schema_editor() as schema_editor:
-            schema_editor.remove_constraint(LayerField, constraint)
-
-    def test_duplicates_are_merged_into_the_oldest_field(self):
-        keeper = LayerField.objects.create(field_name="value", data_type="float")
-        duplicate = LayerField.objects.create(field_name="value", data_type="float")
-        other = LayerField.objects.create(field_name="value", data_type="int")
-        first = Layer.objects.create(name="first", table_name="t1", **self.layer_kwargs)
-        second = Layer.objects.create(
-            name="second", table_name="t2", **self.layer_kwargs
-        )
-        both = Layer.objects.create(name="both", table_name="t3", **self.layer_kwargs)
-        first.layer_fields.add(keeper, other)
-        second.layer_fields.add(duplicate)
-        both.layer_fields.add(keeper, duplicate)
-
-        migration = import_module(
-            "layer_manager.migrations.0002_unique_layer_field_name_data_type"
-        )
-        migration.merge_duplicate_layer_fields(apps, "default")
-
-        self.assertQuerySetEqual(
-            LayerField.objects.order_by("id"), [keeper, other], ordered=True
-        )
-        self.assertSetEqual(set(first.layer_fields.all()), {keeper, other})
-        self.assertSetEqual(set(second.layer_fields.all()), {keeper})
-        self.assertSetEqual(set(both.layer_fields.all()), {keeper})
-
-
-class LayerAggregatedDistributionTestCase(TestCase):
-    def setUp(self):
-        self.component = MaterialComponent.objects.default()
-        self.timestep = Timestep.objects.default()
-        self.distribution = TemporalDistribution.objects.default()
-        self.aggregated_distribution = LayerAggregatedDistribution.objects.create(
-            name="Test distribution", distribution=self.distribution
-        )
-        self.distribution_set = DistributionSet.objects.create(
-            aggregated_distribution=self.aggregated_distribution,
-            timestep=self.timestep,
-        )
-        self.share = DistributionShare.objects.create(
-            distribution_set=self.distribution_set,
-            component=self.component,
+        cls.share = DistributionShare.objects.create(
+            distribution_set=cls.distribution_set,
+            component=cls.component,
             average=1.23,
             standard_deviation=0.02,
         )

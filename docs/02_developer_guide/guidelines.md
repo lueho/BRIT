@@ -44,8 +44,35 @@ required/optional variable reference is in
 ### Start the stack
 
 ```sh
-docker compose up
+docker compose up --build
 ```
+
+A one-shot `init` service runs `python manage.py bootstrap_database` before
+`web` and `celery` start. The command applies migrations and seeds the initial
+data in the order a completely fresh database requires, so no database
+snapshot or manual migration step is needed after cloning. It is idempotent
+and can also be run by hand on an existing database:
+
+```sh
+docker compose run --rm init
+```
+
+The bootstrap creates the superuser named by `ADMIN_USERNAME` (`admin` in the
+example file). Set `ADMIN_PASSWORD` before the first start to give it a usable
+password, or assign one afterwards:
+
+```sh
+docker compose exec web python manage.py changepassword admin
+```
+
+Use `createsuperuser` only when you want a different admin username — it
+cannot change the password of an account that already exists. Without a
+password the account exists but cannot log in.
+
+Maps backed by optional datasets (for example NUTS regions, Nantes
+greenhouses, Hamburg roadside trees, and waste collections) render an
+"unavailable" notice instead of an error until the corresponding dataset has
+been imported or configured.
 
 ### How the local image is built
 
@@ -150,6 +177,10 @@ docker compose exec web python manage.py test utils.tests.test_example.ExampleTe
   not as something a simple pattern check can prove. When adding scripts, data
   files, operations material, or automation config, verify the intended home in
   [Repository Boundaries](repository_boundaries.md).
+
+- **Population statistics**
+  Changes to population imports, selection or derived waste rates must follow
+  the [Population Statistics Policy](population_policy.md) and its targeted tests.
 
 ## Deployment Handoff
 

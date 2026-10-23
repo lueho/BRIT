@@ -213,7 +213,7 @@ def _serialize_collection_frequency(obj: object) -> dict[str, object] | None:
         if schedule_service is None:
             raise LookupError("Collection frequency schedule service is unavailable")
         rows = schedule_service.rows_from_frequency(frequency)
-        display_rows = schedule_service.display_rows(frequency)
+        display_rows = schedule_service.display_rows_from_rows(rows)
         is_year_round = (
             len(display_rows) == 1 and display_rows[0]["segment"] == "All year"
         )

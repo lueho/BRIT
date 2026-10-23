@@ -41,18 +41,19 @@ class BaseAPITestCase(TestCase):
     #: mapping of http‑method → Factory function (populated in setUp).
     _VERB_MAP: dict[str, callable]
 
-    def setUp(self):  # noqa: D401 (simple docstring ok in tests)
-        self.factory = APIRequestFactory()
-        self._VERB_MAP = {
-            "get": self.factory.get,
-            "post": self.factory.post,
-            "put": self.factory.put,
-            "patch": self.factory.patch,
-            "delete": self.factory.delete,
+    @classmethod
+    def setUpTestData(cls):
+        cls.factory = APIRequestFactory()
+        cls._VERB_MAP = {
+            "get": cls.factory.get,
+            "post": cls.factory.post,
+            "put": cls.factory.put,
+            "patch": cls.factory.patch,
+            "delete": cls.factory.delete,
         }
-        self.staff_user = User.objects.create_user(username="staff", is_staff=True)
-        self.regular_user = User.objects.create_user(username="regular", is_staff=False)
-        self.anonymous_user = AnonymousUser()
+        cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
+        cls.regular_user = User.objects.create_user(username="regular", is_staff=False)
+        cls.anonymous_user = AnonymousUser()
 
     def _build_request(self, verb: str, path: str = "/", *, data: dict | None = None):
         """Return a raw *Django* `HttpRequest` for the given verb/path/data."""
@@ -133,9 +134,10 @@ class MockUserCreatedObjectViewSet(UserCreatedObjectViewSet):
 class GlobalObjectViewSetTests(BaseAPITestCase):
     """Read/write rules for *global* objects."""
 
-    def setUp(self):
-        super().setUp()
-        self.example = TestGlobalObject.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.example = TestGlobalObject.objects.create(
             name="Example", description="desc"
         )
 
@@ -497,7 +499,6 @@ class UserCreatedObjectWorkflowTests(BaseAPITestCase):
 
 class UserCreatedObjectPermissionTests(BaseAPITestCase):
     def setUp(self):
-        super().setUp()
         self.permission = UserCreatedObjectPermission()
         self.view = Mock(
             action=None,

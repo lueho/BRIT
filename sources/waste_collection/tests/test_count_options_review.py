@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
@@ -76,14 +77,6 @@ class CollectionCountOptionsReviewDetailTests(TestCase):
                     )
                 self.assertNotContains(response, "Collection count optionss")
 
-    def test_model_labels_use_correct_plural(self):
-        self.assertEqual(
-            CollectionCountOptions._meta.verbose_name, "collection count options"
-        )
-        self.assertEqual(
-            CollectionCountOptions._meta.verbose_name_plural, "collection count options"
-        )
-
     def test_review_detail_distinguishes_zero_from_unspecified_for_every_count(self):
         self.client.force_login(self.staff)
         for value, display in ((0, "0"), (None, "Not specified")):
@@ -102,7 +95,8 @@ class CollectionCountOptionsReviewDetailTests(TestCase):
 
     def test_review_detail_remains_restricted(self):
         response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"{settings.LOGIN_URL}?next={self.url}")
         self.client.force_login(self.outsider)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 403)
