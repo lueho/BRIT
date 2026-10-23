@@ -10,7 +10,7 @@
 <https://brit.bioresource-tools.net/vocab/soilcom>
     a owl:Ontology ;
     dcterms:title "BRIT Soilcom controlled vocabulary"@en ;
-    owl:versionInfo "0.4.0" ;
+    owl:versionInfo "0.4.1" ;
     dcterms:created "2026-03-05"^^xsd:date .
 
 britvoc:scheme/waste-category a skos:ConceptScheme ;

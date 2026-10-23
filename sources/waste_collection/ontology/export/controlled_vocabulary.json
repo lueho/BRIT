@@ -753,6 +753,6 @@
   "units": [],
   "unmapped_countries": [],
   "uri_base": "https://brit.bioresource-tools.net/vocab/soilcom",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "waste_categories": []
 }
