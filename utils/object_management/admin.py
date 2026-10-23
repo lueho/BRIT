@@ -32,12 +32,14 @@ from contextlib import ExitStack
 from functools import reduce
 from operator import or_
 
+from django.apps import apps
 from django.contrib import admin, messages
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import FieldDoesNotExist, PermissionDenied
 from django.db import transaction
-from django.db.models import Model, Q
+from django.db.models import Model, ProtectedError, Q, RestrictedError
 from django.forms.models import construct_instance
+from django.template.response import TemplateResponse
 
 from .models import ReviewAction, UserCreatedObject
 from .policy import (
@@ -51,12 +53,21 @@ from .policy import (
 )
 from .registry import (
     KIND_OWNED,
+    KIND_REVIEWABLE,
     REVIEWABLE_MODELS,
+    administrator_managed,
     model_policy,
     resolve_create_parent,
     root_model,
 )
-from .services import content_mutation, record_creation
+from .services import (
+    _fresh_actor,
+    authorize_create,
+    content_mutation,
+    record_creation,
+    validate_created_parent,
+    validate_references,
+)
 
 _METADATA_READONLY_FIELDS = (
     "owner",
@@ -80,12 +91,13 @@ _ADMIN_ACTION_MAP = {"view": "read", "change": "edit", "delete": "delete"}
 _POLICY_BOUNDARIES_ATTR = "_policy_boundaries"
 
 _OWNED_SAVE_BOUNDARIES_ATTR = "_policy_owned_save_boundaries"
+_PENDING_PARENT_CHECKS_ATTR = "_policy_pending_parent_checks"
 
 
 def _model_has_field(model, name):
     try:
         model._meta.get_field(name)
-    except Exception:
+    except FieldDoesNotExist:
         return False
     return True
 
@@ -95,18 +107,13 @@ def _policy_boundary_key(obj):
 
 
 def _scope_relation_formfield(formfield, db_field, user):
-    """Narrow a registered related-model formfield to visible rows.
-
-    Shared by ``PolicyAdminMixin`` and ``PolicyOwnedInlineMixin`` so FK/M2M
-    pickers — including inline reference choices — can never offer or accept
-    records the acting user may not read.
-    """
+    """Narrow a registered related-model formfield to visible rows; an
+    unregistered UCO relation offers nothing (fail closed)."""
     related = getattr(db_field.remote_field, "model", None)
-    if (
-        formfield is not None
-        and related is not None
-        and model_policy(related) is not None
-        and getattr(formfield, "queryset", None) is not None
+    if formfield is None or getattr(formfield, "queryset", None) is None:
+        return formfield
+    if related is not None and (
+        model_policy(related) is not None or issubclass(related, UserCreatedObject)
     ):
         formfield.queryset = visible_queryset(user, formfield.queryset)
     return formfield
@@ -137,6 +144,18 @@ def _formset_touched(formset):
     )
 
 
+def _active_admin_actor(request, admin_site):
+    """Re-read the request actor and re-check site eligibility at the
+    persistence hook — a revoked staff flag or deactivated account must
+    deny, and ``request.user`` is refreshed so downstream decisions see
+    the live record."""
+    actor = _fresh_actor(request.user)
+    request.user = actor
+    if not admin_site.has_permission(request):
+        raise PermissionDenied("staff_required")
+    return actor
+
+
 class PolicyAdminMixin:
     """Django admin adapter delegating object verbs to the policy core."""
 
@@ -164,6 +183,31 @@ class PolicyAdminMixin:
 
     def _admin_write_denied(self, request):
         return self.policy_administrator_only and not is_admin(request.user)
+
+    def _authorize_write(self, request, action, obj=None, *, parent=None):
+        """Fresh actor + administrator narrowing + core decision at the
+        persistence hook. ``create`` runs through ``authorize_create`` so the
+        fresh actor and live parent are used, never cached form data."""
+        actor = _active_admin_actor(request, self.admin_site)
+        if self._admin_write_denied(request):
+            raise PermissionDenied("administrator_required")
+        if action == "create":
+            actor = authorize_create(
+                actor,
+                self.get_policy_model(),
+                parent=parent,
+            )
+            request.user = actor
+            if not self.admin_site.has_permission(request):
+                raise PermissionDenied("staff_required")
+            if self._admin_write_denied(request):
+                raise PermissionDenied("administrator_required")
+            return actor
+        persisted = type(obj)._base_manager.get(pk=obj.pk)
+        decision = decide(actor, _ADMIN_ACTION_MAP[action], persisted, parent=parent)
+        if not decision.allowed:
+            raise PermissionDenied(decision.reason)
+        return actor
 
     def _policy_metadata_readonly(self, model, readonly):
         return _metadata_readonly(model, self.policy_metadata_readonly, readonly)
@@ -244,19 +288,104 @@ class PolicyAdminMixin:
     def get_actions(self, request):
         actions = super().get_actions(request)
         _, policy = self._model_policy()
-        if policy is not None:
-            # The stock action raises PermissionDenied for the whole batch on
-            # the first denied row; the policy-aware replacement deletes each
-            # record inside its own boundary and reports skips.
-            actions.pop("delete_selected", None)
-            actions["policy_delete_selected"] = (
+        if policy is not None and "delete_selected" in actions:
+            # The stock template hard-codes ``action=delete_selected`` — keep
+            # the standard identifier so no template fork is needed.
+            actions["delete_selected"] = (
                 PolicyAdminMixin.policy_delete_selected,
-                "policy_delete_selected",
+                "delete_selected",
                 "Delete selected records",
             )
         return actions
 
+    def get_deleted_objects(self, objs, request):
+        """Core cascade/permission precheck before Django formats related
+        names — a blocked delete raises PermissionDenied so no hidden leaf
+        reaches the preview."""
+        model, policy = self._model_policy()
+        if policy is not None:
+            for obj in objs:
+                try:
+                    with content_mutation(request.user, obj, action="delete") as locked:
+                        self._authorize_write(request, "delete", locked)
+                except (ProtectedError, RestrictedError, model.DoesNotExist):
+                    raise PermissionDenied("deletion_not_permitted") from None
+        return super().get_deleted_objects(objs, request)
+
+    def _policy_delete_one(self, request, obj, *, log_deletion=True):
+        """Delete one governed root inside its own boundary; the audit log
+        entry is written while the row still carries its primary key."""
+        with content_mutation(request.user, obj, action="delete") as locked:
+            self._authorize_write(request, "delete", locked)
+            if log_deletion:
+                self.log_deletions(request, [locked])
+            locked.delete()
+
     def policy_delete_selected(self, request, queryset):
+        """Confirmation-gated bulk delete under the standard action id.
+
+        The first pass only previews via ``get_deleted_objects`` (which ran
+        the core cascade precheck). The confirmed ``post=yes`` pass re-checks
+        and deletes each allowed root inside its own boundary, logging real
+        deletions only — never the stock all-N success count."""
+        if request.method != "POST":
+            raise PermissionDenied("post_required")
+        _active_admin_actor(request, self.admin_site)
+        if self._admin_write_denied(request):
+            raise PermissionDenied("administrator_required")
+        queryset = visible_queryset(request.user, queryset)
+
+        def _deletable(obj):
+            try:
+                with content_mutation(request.user, obj, action="delete"):
+                    return True
+            except (PermissionDenied, ProtectedError, RestrictedError):
+                return False
+            except queryset.model.DoesNotExist:
+                return False
+
+        if request.POST.get("post") != "yes":
+            eligible = [obj for obj in queryset if _deletable(obj)]
+            blocked = queryset.count() - len(eligible)
+            if not eligible:
+                self.message_user(
+                    request, "No permitted records selected.", level=messages.WARNING
+                )
+                return None
+            (
+                deletable_objects,
+                model_count,
+                perms_lacking,
+                protected,
+            ) = self.get_deleted_objects(eligible, request)
+            opts = self.model._meta
+            context = dict(
+                self.admin_site.each_context(request),
+                opts=opts,
+                title="Delete multiple objects",
+                objects_name=str(opts.verbose_name_plural),
+                queryset=eligible,
+                deletable_objects=[deletable_objects],
+                model_count=dict(model_count).items(),
+                perms_lacking=perms_lacking,
+                protected=protected,
+                blocked_count=blocked,
+                action_checkbox_name=admin.helpers.ACTION_CHECKBOX_NAME,
+                media=self.media,
+            )
+            if blocked:
+                self.message_user(
+                    request,
+                    f"{blocked} record(s) skipped: deletion not permitted.",
+                    level=messages.WARNING,
+                )
+            request.current_app = self.admin_site.name
+            return TemplateResponse(
+                request,
+                "admin/delete_selected_confirmation.html",
+                context,
+            )
+
         self.delete_queryset(request, queryset)
 
     def get_readonly_fields(self, request, obj=None):
@@ -334,9 +463,11 @@ class PolicyAdminMixin:
         _, policy = self._model_policy()
         if request.method == "POST" and policy is not None:
             with transaction.atomic():
+                request.user = _fresh_actor(request.user)
                 try:
                     return super().add_view(request, form_url, extra_context)
                 finally:
+                    setattr(request, _PENDING_PARENT_CHECKS_ATTR, None)
                     self._close_owned_save_boundaries(request, *sys.exc_info())
         return super().add_view(request, form_url, extra_context)
 
@@ -349,12 +480,19 @@ class PolicyAdminMixin:
                     request, object_id, form_url, extra_context
                 )
             with content_mutation(request.user, obj, action="edit") as locked:
+                # The request actor is re-read only after the root lock is
+                # held; staff admission is site eligibility, not authority —
+                # a revoked flag must not complete a waiting POST.
+                request.user = _fresh_actor(request.user)
+                if not self.admin_site.has_permission(request):
+                    raise PermissionDenied("staff_required")
                 self._open_policy_boundary(request, locked)
                 try:
                     return super().changeform_view(
                         request, str(locked.pk), form_url, extra_context
                     )
                 finally:
+                    setattr(request, _PENDING_PARENT_CHECKS_ATTR, None)
                     self._close_policy_boundary(request, locked)
                     self._close_owned_save_boundaries(request, *sys.exc_info())
         return super().changeform_view(request, object_id, form_url, extra_context)
@@ -400,7 +538,10 @@ class PolicyAdminMixin:
         return _normalized_parents(parent)
 
     def _assign_server_metadata(self, request, obj):
-        if not isinstance(obj, UserCreatedObject):
+        policy = model_policy(type(obj))
+        if not isinstance(obj, UserCreatedObject) and (
+            policy is None or policy.kind != KIND_OWNED
+        ):
             return
         if _model_has_field(type(obj), "owner"):
             obj.owner = request.user
@@ -416,9 +557,13 @@ class PolicyAdminMixin:
         """
         if change:
             if self._policy_boundary_open(request, obj):
+                actor = self._authorize_write(request, "change", obj)
+                validate_references(actor, getattr(form, "cleaned_data", {}))
                 construct_instance(form, obj)
                 return super().save_model(request, obj, form, change)
             with content_mutation(request.user, obj, action="edit") as locked:
+                actor = self._authorize_write(request, "change", locked)
+                validate_references(actor, getattr(form, "cleaned_data", {}))
                 construct_instance(form, locked)
                 form.instance = locked
                 super().save_model(request, locked, form, change)
@@ -431,15 +576,13 @@ class PolicyAdminMixin:
             or getattr(parent, "pk", None) is None
         ):
             raise PermissionDenied("invalid_parent")
-        decision = decide(request.user, "create", type(obj), parent=parent)
-        if not decision.allowed:
-            raise PermissionDenied(decision.reason)
-        # Owned children get the same server-owned metadata as any other
-        # governed create; plain-model rows simply have no such fields.
-        self._assign_server_metadata(request, obj)
-        self._open_owned_save_boundary(request, parent)
+        locked_parent = self._open_owned_save_boundary(request, parent)
         try:
+            actor = self._authorize_write(request, "create", obj, parent=locked_parent)
+            validate_references(actor, getattr(form, "cleaned_data", {}))
+            self._assign_server_metadata(request, obj)
             super().save_model(request, obj, form, change)
+            validate_created_parent(obj, parent=locked_parent)
         except BaseException:
             self._close_owned_save_boundaries(request, *sys.exc_info())
             raise
@@ -447,9 +590,9 @@ class PolicyAdminMixin:
     def save_model(self, request, obj, form, change):
         model, policy = self._model_policy()
         if policy is None:
+            if self._is_unregistered_uco():
+                raise PermissionDenied("unsupported_model")
             return super().save_model(request, obj, form, change)
-        if self._admin_write_denied(request):
-            raise PermissionDenied("administrator_required")
         if change:
             self._reject_forged_parent_change(request, obj, policy)
         if policy.kind == KIND_OWNED:
@@ -457,25 +600,37 @@ class PolicyAdminMixin:
             return
         if not change:
             # Independent evidence and standalone roots validate their
-            # declared parent(s) from cleaned data before persistence; the
-            # audit is the row's own creation event only.
+            # declared parent(s) from cleaned data; create authorization
+            # uses the fresh actor and live parent via authorize_create.
             parent = self._validated_create_parent(policy, obj, form)
             if policy.parent_path and (
                 parent is None or (isinstance(parent, list) and not parent)
             ):
                 raise PermissionDenied("invalid_parent")
-            decision = decide(request.user, "create", model, parent=parent)
-            if not decision.allowed:
-                raise PermissionDenied(decision.reason)
+            actor = self._authorize_write(request, "create", parent=parent)
+            validate_references(actor, getattr(form, "cleaned_data", {}))
             self._assign_server_metadata(request, obj)
             with transaction.atomic():
                 super().save_model(request, obj, form, change)
-                record_creation(request.user, obj)
+                if parent is not None:
+                    # Many-valued parents (e.g. M2M ``collections``) are only
+                    # written in ``save_related`` — defer the persisted-parent
+                    # check so the whole compound write stays atomic.
+                    pending = getattr(request, _PENDING_PARENT_CHECKS_ATTR, None)
+                    if pending is None:
+                        pending = []
+                        setattr(request, _PENDING_PARENT_CHECKS_ATTR, pending)
+                    pending.append((obj, parent))
+                record_creation(actor, obj)
             return
         if self._policy_boundary_open(request, obj):
+            actor = self._authorize_write(request, "change", obj)
+            validate_references(actor, getattr(form, "cleaned_data", {}))
             construct_instance(form, obj)
             return super().save_model(request, obj, form, change)
         with content_mutation(request.user, obj, action="edit") as locked:
+            actor = self._authorize_write(request, "change", locked)
+            validate_references(actor, getattr(form, "cleaned_data", {}))
             construct_instance(form, locked)
             form.instance = locked
             super().save_model(request, locked, form, change)
@@ -499,14 +654,36 @@ class PolicyAdminMixin:
             authorize = getattr(inline, "authorize_formset", None)
             if authorize is not None:
                 authorize(request, formset, change)
+                for child_form in formset.forms:
+                    if (
+                        child_form.instance.pk is None
+                        and child_form.has_changed()
+                        and not child_form.cleaned_data.get("DELETE", False)
+                    ):
+                        self._assign_server_metadata(request, child_form.instance)
             elif _formset_touched(formset):
                 raise PermissionDenied("unsupported_model")
         return super().save_formset(request, form, formset, change)
 
     def save_related(self, request, form, formsets, change):
+        model, policy = self._model_policy()
         try:
+            if policy is not None:
+                if change:
+                    actor = self._authorize_write(request, "change", form.instance)
+                else:
+                    parent = self._validated_create_parent(policy, form.instance, form)
+                    actor = self._authorize_write(
+                        request, "create", form.instance, parent=parent
+                    )
+                validate_references(actor, getattr(form, "cleaned_data", {}))
             super().save_related(request, form, formsets, change)
+            pending = getattr(request, _PENDING_PARENT_CHECKS_ATTR, None)
+            setattr(request, _PENDING_PARENT_CHECKS_ATTR, None)
+            for saved_obj, expected in pending or ():
+                validate_created_parent(saved_obj, parent=expected)
         except BaseException:
+            setattr(request, _PENDING_PARENT_CHECKS_ATTR, None)
             self._close_owned_save_boundaries(request, *sys.exc_info())
             raise
         self._close_owned_save_boundaries(request)
@@ -514,26 +691,33 @@ class PolicyAdminMixin:
     def delete_model(self, request, obj):
         model, policy = self._model_policy()
         if policy is not None:
+            _active_admin_actor(request, self.admin_site)
             if self._admin_write_denied(request):
                 raise PermissionDenied("administrator_required")
-            with content_mutation(request.user, obj, action="delete") as locked:
-                locked.delete()
+            # Django's delete view already logged this row in its transaction.
+            self._policy_delete_one(request, obj, log_deletion=False)
             return
+        if self._is_unregistered_uco():
+            raise PermissionDenied("unsupported_model")
         super().delete_model(request, obj)
 
     def delete_queryset(self, request, queryset):
         model, policy = self._model_policy()
         if policy is None:
+            if self._is_unregistered_uco():
+                raise PermissionDenied("unsupported_model")
             return super().delete_queryset(request, queryset)
+        _active_admin_actor(request, self.admin_site)
         if self._admin_write_denied(request):
             raise PermissionDenied("administrator_required")
         denied = 0
         deleted = 0
         for obj in queryset:
             try:
-                with content_mutation(request.user, obj, action="delete") as locked:
-                    locked.delete()
-            except PermissionDenied:
+                self._policy_delete_one(request, obj)
+            except (PermissionDenied, ProtectedError, RestrictedError):
+                denied += 1
+            except queryset.model.DoesNotExist:
                 denied += 1
             else:
                 deleted += 1
@@ -566,20 +750,75 @@ class PolicyOwnedInlineMixin:
         return model, model_policy(model) if model is not None else None
 
     def _inline_write_denied(self, request):
-        return self.policy_administrator_only and not is_admin(request.user)
+        return (
+            self.policy_administrator_only or administrator_managed(self.model)
+        ) and not is_admin(request.user)
+
+    def _declared_parent_field(self):
+        model, policy = self._inline_model_policy()
+        if policy is None or policy.kind != KIND_OWNED or not policy.parent_path:
+            return None
+        first_hop = policy.parent_path.split("__")[0]
+        try:
+            field = model._meta.get_field(first_hop)
+        except FieldDoesNotExist:
+            return None
+        related = getattr(field, "related_model", None)
+        if (
+            related is None
+            or field.many_to_many
+            or not issubclass(self.parent_model, related)
+            or (self.fk_name is not None and self.fk_name != first_hop)
+        ):
+            return None
+        return field
+
+    def _parent_context(self, obj):
+        field = self._declared_parent_field()
+        if field is None or not isinstance(obj, field.related_model):
+            return None
+        return resolve_create_parent(
+            model_policy(self.model), validated_data={field.name: obj}
+        )
 
     def _parent_gate(self, request, obj, action):
         if self._inline_write_denied(request):
             return False
+        if self._declared_parent_field() is None:
+            return False
         if obj is None or getattr(obj, "pk", None) is None:
-            # Compound parent creation: governed by the parent's own create.
-            parent_model = getattr(self, "parent_model", None)
-            if parent_model is None:
-                return False
-            return decide(request.user, "create", parent_model).allowed
-        if action == "add":
-            return decide(request.user, "create", self.model, parent=obj).allowed
-        return decide(request.user, "edit", obj).allowed
+            if action == "add":
+                return decide(request.user, "create", self.parent_model).allowed
+            return editable_queryset(
+                request.user, self.parent_model._base_manager.all()
+            ).exists()
+        parent = self._parent_context(obj)
+        return (
+            parent is not None
+            and decide(request.user, "create", self.model, parent=parent).allowed
+        )
+
+    def has_view_permission(self, request, obj=None):
+        # Read follows the parent: parent-readable rows show their owned
+        # children even to actors without child-model permissions.
+        field = self._declared_parent_field()
+        if field is None:
+            return False
+        if obj is not None and not isinstance(obj, field.related_model):
+            return False
+        if obj is None or getattr(obj, "pk", None) is None:
+            return visible_queryset(
+                request.user, self.parent_model._base_manager.all()
+            ).exists()
+        return decide(request.user, "read", obj).allowed
+
+    def get_queryset(self, request):
+        # Owned children surface only where their declared parent is
+        # readable by the acting user.
+        queryset = super().get_queryset(request)
+        if self._declared_parent_field() is None:
+            return queryset.none()
+        return visible_queryset(request.user, queryset)
 
     def has_add_permission(self, request, obj=None):
         model, policy = self._inline_model_policy()
@@ -630,22 +869,56 @@ class PolicyOwnedInlineMixin:
             if _formset_touched(formset):
                 raise PermissionDenied("unsupported_model")
             return
+        # Declared binding: the formset's actual FK is the first hop of the
+        # owned parent_path, and that hop resolves to this inline's declared
+        # parent model — a misbound inline (SourceAuthor via ``author``)
+        # fails closed at persistence.
+        field = self._declared_parent_field()
+        fk = getattr(formset, "fk", None)
+        if field is None or fk is None or fk.name != field.name:
+            raise PermissionDenied("invalid_parent")
+        # Every supplied existing-child id — including delete-marked rows —
+        # must belong to this parent; compare the persisted FK, never the
+        # POST-mutated ``form.instance``.
+        posted_pks = set()
+        for bound_form in formset.forms:
+            pk_value = bound_form.data.get(
+                bound_form.add_prefix(formset.model._meta.pk.name)
+            ) or bound_form.data.get(bound_form.add_prefix("id"))
+            if pk_value:
+                posted_pks.add(pk_value)
+        if posted_pks:
+            persisted_rows = {
+                str(row.pk): getattr(row, fk.attname)
+                for row in formset.model._base_manager.filter(pk__in=posted_pks)
+            }
+            for pk_value in posted_pks:
+                if persisted_rows.get(pk_value) != formset.instance.pk:
+                    raise PermissionDenied("invalid_parent")
         if not _formset_touched(formset):
             return
+        actor = _active_admin_actor(request, self.admin_site)
         if change:
-            allowed = self._parent_gate(request, formset.instance, "change")
+            parent = self._parent_context(formset.instance)
+            actor = authorize_create(actor, self.model, parent=parent)
         else:
-            # Compound parent creation (e.g. Source + author rows): the
-            # just-saved parent is governed by its own create decision,
-            # not by an edit capability the creator may not hold.
-            parent_model = getattr(self, "parent_model", None)
-            allowed = (
-                not self._inline_write_denied(request)
-                and parent_model is not None
-                and decide(request.user, "create", parent_model).allowed
-            )
-        if not allowed:
-            raise PermissionDenied("insufficient_parent_access")
+            parent_policy = model_policy(self.parent_model)
+            parent = resolve_create_parent(parent_policy, instance=formset.instance)
+            actor = authorize_create(actor, self.parent_model, parent=parent)
+        request.user = actor
+        if not self.admin_site.has_permission(request):
+            raise PermissionDenied("staff_required")
+        if self._inline_write_denied(request):
+            raise PermissionDenied("administrator_required")
+        # References are re-validated only on touched, non-deleted rows —
+        # deleting must not require reading a now-inaccessible reference.
+        for bound_form in formset.forms:
+            if (
+                bound_form not in getattr(formset, "deleted_forms", ())
+                and getattr(bound_form, "cleaned_data", None)
+                and getattr(bound_form, "has_changed", lambda: False)()
+            ):
+                validate_references(actor, bound_form.cleaned_data)
 
 
 class NamedUserCreatedObjectAdmin(admin.ModelAdmin):
@@ -677,7 +950,7 @@ class ReviewActionAdmin(admin.ModelAdmin):
     search_fields = ("comment", "user__username")
     list_filter = ("action", "content_type", "created_at")
     ordering = ("-created_at",)
-    actions = []
+    actions = ()
 
     def has_add_permission(self, request):
         return False
@@ -701,9 +974,11 @@ class ReviewActionAdmin(admin.ModelAdmin):
             # Class/list admission for active actors; the scoped queryset
             # and per-event decision decide which rows are visible.
             return True
+        if is_admin(request.user):
+            return True
         target = obj.content_object
         if target is None or model_policy(type(target)) is None:
-            return is_admin(request.user)
+            return False
         return decide(request.user, "view_review_activity", target).allowed
 
     def get_queryset(self, request):
@@ -714,12 +989,13 @@ class ReviewActionAdmin(admin.ModelAdmin):
         if is_admin(user):
             return queryset
 
-        from django.apps import apps
-
         filters = []
         for label in REVIEWABLE_MODELS:
             model = apps.get_model(label)
             if model is None:
+                continue
+            policy = model_policy(model)
+            if policy is None or policy.kind != KIND_REVIEWABLE:
                 continue
             ct = ContentType.objects.get_for_model(model)
             # Own and directly/group-shared root history; model moderators

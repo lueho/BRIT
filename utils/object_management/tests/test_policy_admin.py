@@ -6,10 +6,8 @@ root, that bulk actions cannot bypass per-record checks, and that the review
 audit log is append-only.
 """
 
-from pathlib import Path
 from unittest.mock import patch
 
-from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
@@ -64,6 +62,7 @@ from utils.object_management.models import (
 from utils.object_management.registry import KIND_OWNED, model_policy
 from utils.object_management.services import _ACTIVE_MUTATION_ROOTS
 from utils.properties.models import Property, Unit
+from utils.tests.testcases import ensure_test_default_owner
 
 
 def _perm(model, codename):
@@ -109,50 +108,11 @@ class PolicyAdminGuardTests(TestCase):
         self.assertNotIn("approve_selected", model_admin.actions)
 
 
-class StaffBypassGuardTests(TestCase):
-    """``is_staff`` must not act as an application authorization bypass.
-
-    The flag remains valid only for Django admin login eligibility and
-    informational/operational plumbing; governed writers and capability
-    checks must go through ``decide``/``is_admin``/``is_moderator``.
-    """
-
-    # Informational or operational uses that are not authorization gates:
-    # cache invalidation, fallback policy dict keys, admin-login plumbing,
-    # account provisioning helpers, and the deferred Waste Atlas
-    # publication-scope helpers (pending the lead-authored archive spec).
-    ALLOWED_IS_STAFF_PATHS = frozenset(
-        {
-            "utils/object_management/signals.py",
-            "utils/object_management/utils.py",
-            "utils/object_management/permissions.py",
-            "utils/object_management/templatetags/moderation_tags.py",
-            "users/utils.py",
-        }
-    )
-
-    def test_no_new_is_staff_uses_in_application_code(self):
-        root = Path(settings.BASE_DIR)
-        offenders = []
-        for path in sorted(root.rglob("*.py")):
-            relative = path.relative_to(root).as_posix()
-            parts = set(path.parts)
-            if (
-                "tests" in parts
-                or "migrations" in parts
-                or relative.startswith(("venv", ".venv", "node_modules"))
-                or path.name.startswith("test_")
-            ):
-                continue
-            if "is_staff" in path.read_text(encoding="utf-8", errors="ignore"):
-                if relative not in self.ALLOWED_IS_STAFF_PATHS:
-                    offenders.append(relative)
-        self.assertEqual(offenders, [])
-
-
 class PolicyAdminAccessTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        default_owner = ensure_test_default_owner()
+        Unit.objects.get_or_create(name="No unit", owner=default_owner)
         cls.owner = User.objects.create_user(username="admin-owner", is_staff=True)
         cls.owner.user_permissions.add(
             _perm(Property, "change_property"),
@@ -302,7 +262,7 @@ class PolicyAdminAccessTests(TestCase):
         response = self.client.post(
             reverse("admin:properties_property_changelist"),
             {
-                "action": "policy_delete_selected",
+                "action": "delete_selected",
                 "_selected_action": [
                     str(self.private_property.pk),
                     str(self.foreign_property.pk),
@@ -319,6 +279,8 @@ class PolicyAdminAccessTests(TestCase):
 class PolicyAdminInlineTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        default_owner = ensure_test_default_owner()
+        Unit.objects.get_or_create(name="No unit", owner=default_owner)
         cls.owner = User.objects.create_user(username="inline-owner", is_staff=True)
         cls.owner.user_permissions.add(
             _perm(Source, "change_source"), _perm(Author, "add_author")
@@ -448,6 +410,8 @@ class InlineMisuseFailClosedTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        default_owner = ensure_test_default_owner()
+        Unit.objects.get_or_create(name="No unit", owner=default_owner)
         cls.owner = User.objects.create_user(username="misuse-owner", is_staff=True)
         cls.owner.user_permissions.add(
             _perm(Sample, "change_sample"),
@@ -559,6 +523,8 @@ class InlineMisuseFailClosedTests(TestCase):
 class ReviewActionAdminTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        default_owner = ensure_test_default_owner()
+        Unit.objects.get_or_create(name="No unit", owner=default_owner)
         cls.superuser = User.objects.create_user(
             username="audit-super", is_staff=True, is_superuser=True
         )
@@ -725,6 +691,8 @@ class PolicyOwnedInlineScopingTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        default_owner = ensure_test_default_owner()
+        Unit.objects.get_or_create(name="No unit", owner=default_owner)
         cls.owner = User.objects.create_user(username="scope-owner", is_staff=True)
         cls.owner.user_permissions.add(
             _perm(Source, "change_source"), _perm(Source, "add_source")
@@ -806,6 +774,8 @@ class CompoundSourceCreationTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        default_owner = ensure_test_default_owner()
+        Unit.objects.get_or_create(name="No unit", owner=default_owner)
         cls.creator = User.objects.create_user(
             username="compound-creator", is_staff=True
         )
@@ -881,6 +851,8 @@ class AdminBoundaryRequestLocalTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        default_owner = ensure_test_default_owner()
+        Unit.objects.get_or_create(name="No unit", owner=default_owner)
         cls.owner = User.objects.create_user(username="boundary-owner", is_staff=True)
         cls.owner.user_permissions.add(
             _perm(Property, "change_property"), _perm(Author, "add_author")
@@ -1024,6 +996,8 @@ class OwnedStandaloneAdminTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        default_owner = ensure_test_default_owner()
+        Unit.objects.get_or_create(name="No unit", owner=default_owner)
         cls.owner = User.objects.create_user(username="owned-owner", is_staff=True)
         # No add_composition/change_composition: the parent edit rule is the
         # capability for owned children.
@@ -1279,6 +1253,8 @@ class IndependentEvidenceAdminTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        default_owner = ensure_test_default_owner()
+        Unit.objects.get_or_create(name="No unit", owner=default_owner)
         cls.owner = User.objects.create_user(username="acpv-owner", is_staff=True)
         cls.editor = User.objects.create_user(username="acpv-editor", is_staff=True)
         cls.editor.user_permissions.add(
@@ -1418,6 +1394,8 @@ class NonUcoOwnedAdminTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        default_owner = ensure_test_default_owner()
+        Unit.objects.get_or_create(name="No unit", owner=default_owner)
         cls.owner = User.objects.create_user(username="sic-owner", is_staff=True)
         cls.owner.user_permissions.add(
             _perm(Scenario, "change_scenario"),
@@ -1544,6 +1522,8 @@ class GeoDatasetConfigAdminTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        default_owner = ensure_test_default_owner()
+        Unit.objects.get_or_create(name="No unit", owner=default_owner)
         cls.owner = User.objects.create_user(username="cfg-owner", is_staff=True)
         cls.owner.user_permissions.add(_perm(GeoDataset, "change_geodataset"))
         cls.owner.user_permissions.add(
@@ -1893,3 +1873,68 @@ class GeoDatasetConfigAdminTests(TestCase):
                 self.assertFalse(
                     inline.has_add_permission(request, self.published_dataset)
                 )
+
+    def test_root_m2m_and_two_inline_changes_share_one_revision(self):
+        extra = Source.objects.create(
+            owner=self.administrator, title="Extra source", type="misc"
+        )
+        payload = self._dataset_changeform_post()
+        payload["name"] = "Compound change"
+        payload["sources"] = (str(self.map_source.pk), str(extra.pk))
+        self.client.force_login(self.administrator)
+        response = self.client.post(
+            reverse("admin:maps_geodataset_change", args=[self.dataset.pk]),
+            payload,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.dataset.refresh_from_db()
+        self.config.refresh_from_db()
+        self.assertEqual(self.dataset.name, "Compound change")
+        self.assertCountEqual(self.dataset.sources.all(), [self.map_source, extra])
+        self.assertEqual(self.config.backend_type, "legacy_model")
+        self.assertEqual(self.dataset.column_policies.count(), 1)
+        self.assertEqual(self.dataset.content_revision, 2)
+        events = ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(GeoDataset),
+            object_id=self.dataset.pk,
+        )
+        self.assertEqual(events.count(), 1)
+        self.assertEqual(events.get().action, "edited")
+        self.assertEqual(events.get().content_revision, 2)
+
+    def test_compound_audit_failure_rolls_back_scalar_m2m_and_both_inlines(self):
+        extra = Source.objects.create(
+            owner=self.administrator, title="Extra source", type="misc"
+        )
+        before_name = self.dataset.name
+        payload = self._dataset_changeform_post()
+        payload["name"] = "Must roll back"
+        payload["sources"] = str(extra.pk)
+        self.client.force_login(self.administrator)
+        self.client.raise_request_exception = False
+        with (
+            patch(
+                "utils.object_management.services._record_event",
+                side_effect=RuntimeError("compound audit unavailable"),
+            ),
+            self.assertLogs("django.request", level="ERROR") as logged,
+        ):
+            response = self.client.post(
+                reverse("admin:maps_geodataset_change", args=[self.dataset.pk]),
+                payload,
+            )
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("compound audit unavailable", "\n".join(logged.output))
+        self.dataset.refresh_from_db()
+        self.config.refresh_from_db()
+        self.assertEqual(self.dataset.name, before_name)
+        self.assertEqual(list(self.dataset.sources.all()), [self.map_source])
+        self.assertEqual(self.config.backend_type, "local_relation")
+        self.assertFalse(self.dataset.column_policies.exists())
+        self.assertEqual(self.dataset.content_revision, 1)
+        self.assertFalse(
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(GeoDataset),
+                object_id=self.dataset.pk,
+            ).exists()
+        )

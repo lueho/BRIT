@@ -84,7 +84,8 @@ class ProcessAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
 
 @admin.register(ProcessCategory)
 class ProcessCategoryAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
-    pass
+    list_display = ("name", "owner", "publication_status")
+    search_fields = ("name",)
 
 
 @admin.register(ProcessMaterial)

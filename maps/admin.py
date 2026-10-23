@@ -55,7 +55,11 @@ class CategoricalAttributeModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
 
 @admin.register(Catchment)
 class CatchmentModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
-    autocomplete_fields = ("region", "parent_region", "parent")
+    autocomplete_fields = (
+        "region",
+        "parent_region",
+        "parent",
+    )
     search_fields = ("name",)
 
 
@@ -70,9 +74,20 @@ class CatchmentRevisionModelAdmin(PolicyAdminMixin, GISModelAdmin):
         "change_reason",
         "publication_status",
     )
-    list_filter = ("publication_status", "change_reason")
-    search_fields = ("name", "catchment__name", "description")
-    autocomplete_fields = ("catchment", "members", "sources")
+    list_filter = (
+        "publication_status",
+        "change_reason",
+    )
+    search_fields = (
+        "name",
+        "catchment__name",
+        "description",
+    )
+    autocomplete_fields = (
+        "catchment",
+        "members",
+        "sources",
+    )
     filter_horizontal = ("predecessors",)
     readonly_fields = (
         "geom_hash",
@@ -104,10 +119,16 @@ class CatchmentRevisionModelAdmin(PolicyAdminMixin, GISModelAdmin):
         for revision in queryset.order_by("effective_from", "pk"):
             try:
                 perform_transition(request.user, revision, "submit")
-            except (PermissionDenied, ValidationError) as error:
+            except PermissionDenied as error:
                 self.message_user(
                     request,
                     f"{revision}: {error}",
+                    level=messages.ERROR,
+                )
+            except ValidationError as error:
+                self.message_user(
+                    request,
+                    f"{revision}: {'; '.join(error.messages)}",
                     level=messages.ERROR,
                 )
             else:
@@ -115,7 +136,7 @@ class CatchmentRevisionModelAdmin(PolicyAdminMixin, GISModelAdmin):
         if completed:
             self.message_user(
                 request,
-                f"Submitted {completed} catchment revision(s) for review.",
+                f"Updated {completed} catchment revision(s).",
                 level=messages.SUCCESS,
             )
 
@@ -123,10 +144,21 @@ class CatchmentRevisionModelAdmin(PolicyAdminMixin, GISModelAdmin):
 @admin.register(GeoDataset)
 class GeoDatasetModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
     autocomplete_fields = ("region",)
-    list_display = ("name", "model_name", "region")
+    list_display = (
+        "name",
+        "model_name",
+        "region",
+    )
     readonly_fields = ("relation_column_review",)
-    search_fields = ("name", "model_name", "region__name")
-    inlines = (GeoDatasetRuntimeConfigurationInline, GeoDatasetColumnPolicyInline)
+    search_fields = (
+        "name",
+        "model_name",
+        "region__name",
+    )
+    inlines = (
+        GeoDatasetRuntimeConfigurationInline,
+        GeoDatasetColumnPolicyInline,
+    )
 
     @admin.display(description="Local relation column review")
     def relation_column_review(self, obj):
@@ -207,7 +239,11 @@ class GeoDatasetColumnPolicyAdmin(PolicyAdminMixin, admin.ModelAdmin):
         "is_searchable",
         "is_exportable",
     )
-    search_fields = ("dataset__name", "column_name", "display_label")
+    search_fields = (
+        "dataset__name",
+        "column_name",
+        "display_label",
+    )
 
 
 @admin.register(Location)
@@ -246,9 +282,16 @@ class RegionModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
 
 @admin.register(RegionAttributeValue)
 class RegionAttributeValueModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
-    autocomplete_fields = ("region", "property", "unit", "sources")
+    autocomplete_fields = (
+        "region",
+        "property",
+        "unit",
+    )
 
 
 @admin.register(RegionAttributeTextValue)
 class RegionAttributeTextValueModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
-    autocomplete_fields = ("region", "categorical_attribute")
+    autocomplete_fields = (
+        "region",
+        "categorical_attribute",
+    )
