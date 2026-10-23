@@ -940,6 +940,7 @@ class NamedUserCreatedObjectAdmin(admin.ModelAdmin):
     ordering = ("name",)
 
 
+@admin.register(ReviewAction)
 class ReviewActionAdmin(admin.ModelAdmin):
     """Read-only audit log: review events are append-only, even for superusers.
 
