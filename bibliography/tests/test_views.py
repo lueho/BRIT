@@ -1048,7 +1048,7 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(source_author.position, 1)
         self.assertEqual(payload["label"], "Lovelace, A.. Inline source")
 
-    def test_post_skips_letterless_inline_authors(self):
+    def test_post_rejects_letterless_inline_authors(self):
         add_author_permission = Permission.objects.get(codename="add_author")
         self.member.user_permissions.add(add_author_permission)
         self.client.force_login(self.member)
@@ -1071,13 +1071,13 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 201)
-        source = Source.objects.get(pk=response.json()["id"])
-        self.assertEqual(
-            list(source.authors.values_list("last_names", flat=True)), ["Lovelace"]
-        )
+        # Letterless author entries are invalid input: the whole request
+        # rejects with 400 and persists nothing (no partial rows).
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Source.objects.exists())
         self.assertFalse(Author.objects.filter(last_names="70").exists())
         self.assertFalse(Author.objects.filter(organization_name="30.379").exists())
+        self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
 
     def test_post_http_201_creates_source_and_new_author_when_permitted(self):
         add_author_permission = Permission.objects.get(codename="add_author")
@@ -1185,6 +1185,9 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 302)
 
     def test_delete_http_200_owner_can_delete_own_unpublished_source(self):
+        self.member.user_permissions.add(
+            Permission.objects.get(codename="delete_source")
+        )
         self.client.force_login(self.member)
         source = Source.objects.create(owner=self.member, title="To delete")
 

@@ -158,14 +158,22 @@ class SourceAuthorReviewCascadeTest(TestCase):
 class SourceAuthorCitationTest(TestCase):
     """Citation links stay ordered and independently readable."""
 
+    def setUp(self):
+        self.owner = User.objects.create_user(username="citation-owner")
+
     def _make_source(self, title="Test Source"):
         with mute_signals(post_save):
-            return Source.objects.create(title=title, publication_status="private")
+            return Source.objects.create(
+                title=title, owner=self.owner, publication_status="private"
+            )
 
     def _make_author(self, first="John", last="Doe"):
         with mute_signals(post_save):
             return Author.objects.create(
-                first_names=first, last_names=last, publication_status="private"
+                first_names=first,
+                last_names=last,
+                owner=self.owner,
+                publication_status="private",
             )
 
     def _link(self, source, author, position=1):

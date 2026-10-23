@@ -16,11 +16,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from utils.forms import TomSelectFormsetHelper
-from utils.object_management.policy import decide
+from utils.object_management.policy import decide, visible_queryset
 from utils.object_management.services import (
+    _fresh_actor,
     authorize_url_check_job,
     content_mutation,
-    record_creation,
     register_url_check_job,
 )
 from utils.object_management.templatetags.moderation_tags import safe_back_url
@@ -388,7 +388,7 @@ def _parse_json_object(request):
 
 
 class AuthorQuickCreateView(LoginRequiredMixin, View):
-    """Create a minimal Author object for inline source creation workflows."""
+    """Create or reuse an Author for inline source creation workflows."""
 
     def post(self, request, *args, **kwargs):
         """Create or return an Author from a JSON payload."""
@@ -398,12 +398,9 @@ class AuthorQuickCreateView(LoginRequiredMixin, View):
 
         allow_create = decide(request.user, "create", Author).allowed
         try:
-            with transaction.atomic():
-                author, created = resolve_author_for_source(
-                    request.user, payload, allow_create=allow_create
-                )
-                if created:
-                    record_creation(request.user, author)
+            author, created = resolve_author_for_source(
+                request.user, payload, allow_create=allow_create
+            )
         except PermissionDenied as exc:
             return JsonResponse({"error": str(exc)}, status=403)
         except ValidationError as exc:
@@ -454,11 +451,6 @@ class SourceQuickCreateView(LoginRequiredMixin, View):
                     status=400,
                 )
 
-        source_data = {
-            "title": payload.get("title", ""),
-            "type": "misc",
-            "year": year,
-        }
         authors_data = payload.get("authors", [])
         if not isinstance(authors_data, list):
             return JsonResponse(
@@ -466,6 +458,11 @@ class SourceQuickCreateView(LoginRequiredMixin, View):
                 status=400,
             )
 
+        source_data = {
+            "title": payload.get("title", ""),
+            "type": "misc",
+            "year": year,
+        }
         try:
             source = create_source_with_authors(request.user, source_data, authors_data)
         except PermissionDenied as exc:
@@ -493,13 +490,14 @@ class SourceQuickCreateView(LoginRequiredMixin, View):
         )
 
     def delete(self, request, *args, **kwargs):
-        """Delete a quick-created Source if the delete policy allows it.
+        """Delete a quick-created Source when the delete policy allows it.
 
-        Only sources the policy lets the requesting user delete (i.e. owned
-        private records) and that are not referenced by other objects may be
-        removed via this endpoint.  This prevents orphaned records when the
-        user removes a just-created source from the widget before saving the
-        parent form.
+        The initial lookup is read-scoped so invisible foreign sources resolve
+        to 404. The row is then locked for update and the delete decision is
+        evaluated before any reference inspection, so unauthorized actors
+        cannot probe citation state; cited sources report 400 inside the lock.
+        Authors are independent reviewable records and are never
+        cascade-deleted.
         """
         payload = _parse_json_object(request)
         if payload is None:
@@ -510,24 +508,39 @@ class SourceQuickCreateView(LoginRequiredMixin, View):
             return JsonResponse({"error": "Source id is required."}, status=400)
 
         try:
-            source = Source.objects.get(pk=int(source_id))
-        except (Source.DoesNotExist, TypeError, ValueError):
+            pk = int(source_id)
+        except (TypeError, ValueError):
             return JsonResponse({"error": "Source not found."}, status=404)
 
-        if not decide(request.user, "delete", source).allowed:
-            return JsonResponse(
-                {"error": "You don't have permission to delete this source."},
-                status=403,
-            )
+        source = (
+            visible_queryset(request.user, Source.objects.all()).filter(pk=pk).first()
+        )
+        if source is None:
+            return JsonResponse({"error": "Source not found."}, status=404)
 
-        if source_is_referenced(source):
-            return JsonResponse(
-                {"error": "This source is referenced by other objects."},
-                status=400,
-            )
-
-        with content_mutation(request.user, source, action="delete"):
-            source.delete()
+        try:
+            # Lock the row and re-read the actor before any reference
+            # inspection: denied actors never learn whether the source is
+            # cited, and the full row lock blocks new citing FKs until the
+            # boundary commits.
+            with transaction.atomic():
+                locked = Source._base_manager.select_for_update().get(pk=source.pk)
+                actor = _fresh_actor(request.user)
+                if not decide(actor, "delete", locked).allowed:
+                    raise PermissionDenied(
+                        "You don't have permission to delete this source."
+                    )
+                if source_is_referenced(locked):
+                    return JsonResponse(
+                        {"error": "This source is referenced by other objects."},
+                        status=400,
+                    )
+                with content_mutation(actor, locked, action="delete") as inner:
+                    inner.delete()
+        except Source.DoesNotExist:
+            return JsonResponse({"error": "Source not found."}, status=404)
+        except PermissionDenied as exc:
+            return JsonResponse({"error": str(exc)}, status=403)
         return JsonResponse({"deleted": True}, status=200)
 
 
