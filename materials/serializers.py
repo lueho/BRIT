@@ -148,6 +148,7 @@ MEASUREMENT_METADATA_FIELDS = (
     "display_value",
     "value_qualifier",
     "raw_value",
+    "limit_type",
     "detection_limit",
     "raw_detection_limit",
 )
@@ -157,6 +158,7 @@ class MeasurementMetadataSerializerMixin(Serializer):
     display_value = ReadOnlyField()
     value_qualifier = ReadOnlyField()
     raw_value = ReadOnlyField()
+    limit_type = ReadOnlyField(source="effective_limit_type")
     detection_limit = ReadOnlyField()
     raw_detection_limit = ReadOnlyField()
 
@@ -503,11 +505,9 @@ def _request_user(context):
 
 
 def _editable_by(queryset, user):
-    if getattr(user, "is_staff", False):
-        return queryset.all()
-    if getattr(user, "is_authenticated", False):
-        return queryset.editable_by_user(user)
-    return queryset.none()
+    from utils.object_management.policy import editable_queryset
+
+    return editable_queryset(user, queryset)
 
 
 def _validate_related_pks(value, queryset, message):

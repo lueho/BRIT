@@ -1,4 +1,4 @@
-from django.db.models import Count, Max
+from django.db.models import Count, Max, Prefetch
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -7,7 +7,15 @@ from utils.viewsets import AutoPermModelViewSet
 
 from .filters import CatchmentFilterSet, RegionFilterSet
 from .mixins import CachedGeoJSONMixin, get_unbounded_geojson_rejection_response
-from .models import Catchment, Location, NutsRegion, NutsVintage, Region
+from .models import (
+    Catchment,
+    Location,
+    NutsRegion,
+    NutsVintage,
+    Region,
+    RegionAttributeTextValue,
+    RegionAttributeValue,
+)
 from .serializers import (
     CatchmentGeoFeatureModelSerializer,
     CatchmentModelSerializer,
@@ -129,8 +137,20 @@ class NutsRegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     queryset = (
         NutsRegion.objects.select_related("borders", "parent")
         .prefetch_related(
-            "regionattributevalue_set__property",
-            "regionattributetextvalue_set__categorical_attribute",
+            Prefetch(
+                "regionattributevalue_set",
+                queryset=RegionAttributeValue.objects.select_related(
+                    "property", "unit"
+                ).order_by("-date"),
+                to_attr="ordered_attribute_values",
+            ),
+            Prefetch(
+                "regionattributetextvalue_set",
+                queryset=RegionAttributeTextValue.objects.select_related(
+                    "categorical_attribute"
+                ),
+                to_attr="region_text_values",
+            ),
         )
         .all()
     )

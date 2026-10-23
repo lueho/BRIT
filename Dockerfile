@@ -60,14 +60,20 @@ ARG INSTALL_PDF_PARSING=false
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Minimum runtime OS libraries and non-root user setup
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Minimum runtime OS libraries and non-root user setup. Apt timeouts/retries
+# guard CI image builds against stalling mirror downloads.
+RUN apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 \
+    -o Acquire::https::Timeout=30 update \
+    && apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 \
+    -o Acquire::https::Timeout=30 install -y --no-install-recommends \
     libpq5 \
     libproj25 \
     libgdal32 \
     curl \
     && if [ "$INSTALL_PDF_PARSING" = "true" ]; then \
-        apt-get install -y --no-install-recommends poppler-utils; \
+        apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 \
+        -o Acquire::https::Timeout=30 \
+        install -y --no-install-recommends poppler-utils; \
     fi \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 1000 --create-home --shell /bin/bash standard_user \

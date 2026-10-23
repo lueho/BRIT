@@ -9,6 +9,7 @@ from factory.django import mute_signals
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import LauRegion, NutsRegion, RegionAttributeValue, RegionProperty
 from materials.models import MaterialCategory
+from utils.object_management.models import get_default_owner
 from utils.properties.models import Unit
 
 from ..models import (
@@ -77,7 +78,9 @@ class SetMeasurementColumnsTestCase(TestCase):
 class CollectionModelSerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        MaterialCategory.objects.create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed Material 1"
         )
@@ -259,7 +262,9 @@ class CollectionModelSerializerTestCase(TestCase):
 class CollectionFlatSerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        MaterialCategory.objects.create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(), name="Biowaste component"
+        )
         cls.allowed_material_1 = WasteComponent.objects.create(
             name="Allowed Material 1"
         )

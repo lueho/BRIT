@@ -47,7 +47,7 @@ def copy_process_authors_and_sources(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("bibliography", "0010_author_contact_details"),
+        ("bibliography", "0001_squashed_0012"),
         ("processes", "0013_process_sources"),
     ]
 

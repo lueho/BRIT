@@ -11,13 +11,15 @@ from django.contrib.gis.db.models.functions import AsGeoJSON, NumPoints
 from django.core.cache import caches
 from django.core.cache.backends.base import DEFAULT_TIMEOUT
 from django.db import connections
-from django.db.models import Count, Max, Min, Sum
+from django.db.models import BigIntegerField, Count, Max, Min, OuterRef, Subquery, Sum
+from django.db.models.expressions import RawSQL
+from django.utils import timezone
 from rest_framework.serializers import ReadOnlyField
 from rest_framework.utils.encoders import JSONEncoder
 
 from utils.object_management.policy import scope_queryset
 
-INITIALIZATION_DEPENDENCIES = ["users", "utils.properties"]
+INITIALIZATION_DEPENDENCIES = ["object_management", "properties"]
 
 
 def ensure_initial_data(stdout=None):
@@ -26,13 +28,36 @@ def ensure_initial_data(stdout=None):
     Idempotent and safe to run multiple times. Logs to stdout if provided.
     Returns a dict summarizing created objects.
     """
-    from .models import MapConfiguration, MapLayerConfiguration, MapLayerStyle
+    from utils.object_management.models import get_default_owner
+
+    from .models import (
+        MapConfiguration,
+        MapLayerConfiguration,
+        MapLayerStyle,
+        NutsVintage,
+    )
+
+    owner = get_default_owner()
 
     def log(msg):
         if stdout:
             print(msg, file=stdout)
 
     created = {}
+
+    vintage, vintage_created = NutsVintage.objects.get_or_create(
+        year=2021,
+        defaults={
+            "is_current": not NutsVintage.objects.filter(is_current=True).exists(),
+            "source_release": "GISCO NUTS 2021",
+        },
+    )
+    if not NutsVintage.objects.filter(is_current=True).exists():
+        vintage.is_current = True
+        vintage.save(update_fields=["is_current"])
+    created["initial_nuts_vintage"] = vintage_created
+    if vintage_created:
+        log("Created initial NUTS 2021 vintage")
 
     # Default Region Layer Style
     default_region_style, region_style_created = MapLayerStyle.objects.get_or_create(
@@ -44,6 +69,8 @@ def ensure_initial_data(stdout=None):
             "opacity": 1.0,
             "weight": 3,
             "publication_status": "published",
+            "approved_at": timezone.now(),
+            "approved_by": owner,
         },
     )
     created["default_region_layer_style"] = region_style_created
@@ -61,6 +88,8 @@ def ensure_initial_data(stdout=None):
                 "opacity": 1.0,
                 "weight": 3,
                 "publication_status": "published",
+                "approved_at": timezone.now(),
+                "approved_by": owner,
             },
         )
     )
@@ -79,6 +108,8 @@ def ensure_initial_data(stdout=None):
             "weight": 3,
             "radius": 3,
             "publication_status": "published",
+            "approved_at": timezone.now(),
+            "approved_by": owner,
         },
     )
     created["default_features_layer_style"] = feature_style_created
@@ -95,6 +126,8 @@ def ensure_initial_data(stdout=None):
                 "load_layer": True,
                 "api_basename": "api-region",
                 "publication_status": "published",
+                "approved_at": timezone.now(),
+                "approved_by": owner,
             },
         )
     )
@@ -112,6 +145,8 @@ def ensure_initial_data(stdout=None):
                 "load_layer": True,
                 "api_basename": "api-catchment",
                 "publication_status": "published",
+                "approved_at": timezone.now(),
+                "approved_by": owner,
             },
         )
     )
@@ -128,6 +163,8 @@ def ensure_initial_data(stdout=None):
                 "layer_type": "features",
                 "load_layer": True,
                 "publication_status": "published",
+                "approved_at": timezone.now(),
+                "approved_by": owner,
             },
         )
     )
@@ -140,21 +177,22 @@ def ensure_initial_data(stdout=None):
         name="Default Map Configuration",
         defaults={
             "publication_status": "published",
+            "approved_at": timezone.now(),
+            "approved_by": owner,
         },
     )
     if map_config_created:
         log("Created Default Map Configuration")
+        # Ensure layers are set
+        default_map_config.layers.set(
+            [
+                default_region_layer,
+                default_catchment_layer,
+                default_feature_layer,
+            ]
+        )
+        log("Set layers for Default Map Configuration")
     created["default_map_configuration"] = map_config_created
-
-    # Ensure layers are set
-    default_map_config.layers.set(
-        [
-            default_region_layer,
-            default_catchment_layer,
-            default_feature_layer,
-        ]
-    )
-    log("Set layers for Default Map Configuration")
 
 
 def _generate_filter_key_part(filters=None):
@@ -355,6 +393,22 @@ GEOJSON_MAX_RENDERED_CACHE_BYTES = 8 * 1024 * 1024
 GEOJSON_RENDERED_SCHEMA_VERSION = 2
 GEOJSON_RENDER_SLOTS = BoundedSemaphore(2)
 GEOJSON_MAX_DB_RESULT_BYTES = 1024 * 1024
+
+
+def row_xmin_subquery(model, pk_ref):
+    """Subquery resolving the transaction id of the ``model`` row at ``pk_ref``.
+
+    ``xmin`` only exists on the row's own base table, so version inputs for
+    models without ``lastmodified_at`` (e.g. GeoPolygon borders) resolve it
+    through a per-row subquery that re-selects the row by primary key.
+    """
+    return Subquery(
+        model.objects.filter(pk=OuterRef(pk_ref))
+        .annotate(
+            row_xmin=RawSQL("xmin::text::bigint", [], output_field=BigIntegerField())
+        )
+        .values("row_xmin")[:1]
+    )
 
 
 def geojson_version_aggregates(geometry_field=None):

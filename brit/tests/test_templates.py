@@ -1,12 +1,13 @@
 from pathlib import Path
+from urllib.parse import urlparse
 
 from cookie_consent.models import Cookie, CookieGroup
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
-from django.urls import reverse
+from django.urls import Resolver404, resolve, reverse
 
-from brit.sitemap_items import SITEMAP_ITEMS
+from brit.sitemap_registry import get_sitemap_items
 
 
 class ListEmptyStateTemplateTests(SimpleTestCase):
@@ -70,33 +71,92 @@ class DeleteConfirmationTemplateTests(SimpleTestCase):
         self.assertNotIn("<2>", html)
 
 
+class SharedUiUtilsScriptTests(SimpleTestCase):
+    """``js/ui_utils.min.js`` provides fetchJson/pollTaskProgress/showInlineAlert
+    to export polling, TomSelect inline-create and map error handling, so both
+    base layouts must load it before any page-specific script uses it."""
+
+    def test_base_template_includes_ui_utils(self):
+        html = render_to_string("base.html")
+        self.assertIn("js/ui_utils.min.js", html)
+
+    def test_base_iframe_template_includes_ui_utils(self):
+        html = render_to_string("base_iframe.html")
+        self.assertIn("js/ui_utils.min.js", html)
+
+
 class SitemapItemsTestCase(SimpleTestCase):
     def test_sources_explorer_is_canonical_sitemap_entry(self):
-        self.assertIn("/sources/explorer/", SITEMAP_ITEMS)
-        self.assertNotIn("/sources/list/", SITEMAP_ITEMS)
+        self.assertIn("/sources/explorer/", get_sitemap_items())
+        self.assertNotIn("/sources/list/", get_sitemap_items())
 
     def test_source_plugin_sitemap_entries_are_composed_dynamically(self):
-        self.assertIn("/maps/nantes/greenhouses/export/", SITEMAP_ITEMS)
-        self.assertIn("/waste_collection/collections/", SITEMAP_ITEMS)
+        self.assertIn("/maps/nantes/greenhouses/map/", get_sitemap_items())
+        self.assertIn("/waste_collection/collections/", get_sitemap_items())
 
     def test_stale_nantes_roadside_tree_sitemap_entries_are_absent(self):
-        self.assertNotIn("/maps/nantes/roadside_trees/export/", SITEMAP_ITEMS)
-        self.assertNotIn("/case_studies/nantes/roadside_trees/export/", SITEMAP_ITEMS)
+        self.assertNotIn("/maps/nantes/roadside_trees/export/", get_sitemap_items())
+        self.assertNotIn(
+            "/case_studies/nantes/roadside_trees/export/", get_sitemap_items()
+        )
+
+
+class SitemapIntegrityTests(TestCase):
+    """Every sitemap entry must stay a live, publicly indexable page (#144)."""
+
+    def test_all_sitemap_entries_resolve(self):
+        unresolved = []
+        for item in get_sitemap_items():
+            try:
+                resolve(item)
+            except Resolver404:
+                unresolved.append(item)
+        self.assertEqual(
+            unresolved,
+            [],
+            f"Sitemap entries pointing at removed routes: {unresolved}",
+        )
+
+    def test_sitemap_entries_are_unique(self):
+        items = get_sitemap_items()
+        self.assertEqual(len(items), len(set(items)))
+
+    def test_all_sitemap_entries_serve_public_pages(self):
+        failures = {}
+        for item in get_sitemap_items():
+            response = self.client.get(item, follow=True)
+            if response.status_code != 200:
+                failures[item] = f"status {response.status_code}"
+                continue
+            if response.redirect_chain:
+                final_url = response.redirect_chain[-1][0]
+                if urlparse(final_url).path != urlparse(item).path:
+                    failures[item] = f"redirects to {final_url}"
+                    continue
+            if "text/html" not in response.headers.get("Content-Type", ""):
+                failures[item] = "non-HTML response"
+        self.assertEqual(
+            failures,
+            {},
+            "Sitemap entries not serving a public page to anonymous "
+            f"requests: {failures}",
+        )
 
 
 class CookieConsentTemplateHardeningTests(TestCase):
     """Regression tests for cookie-consent template compatibility and behavior."""
 
-    def setUp(self):
-        self.factory = RequestFactory()
-        self.cookie_group = CookieGroup.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.factory = RequestFactory()
+        cls.cookie_group = CookieGroup.objects.create(
             varname="analytics",
             name="Analytics",
             description="Analytics cookies",
             is_required=False,
         )
         Cookie.objects.create(
-            cookiegroup=self.cookie_group,
+            cookiegroup=cls.cookie_group,
             name="_ga",
             description="Google Analytics",
             domain="example.org",
@@ -145,7 +205,8 @@ class CookieConsentTemplateHardeningTests(TestCase):
         html = render_to_string("partials/_cookie_bar.html", {"request": request})
 
         self.assertIn("cookiebar.module.js", html)
-        self.assertIn("showCookieBar({", html)
+        self.assertIn("startCookieBar(showCookieBar, {", html)
+        self.assertIn("js/cookie_bar.min.js", html)
         self.assertNotIn("legacyShowCookieBar", html)
         self.assertNotIn("cookiebar.js", html)
 
@@ -188,8 +249,8 @@ class BreadcrumbModuleLandingTests(TestCase):
             html=True,
         )
 
-    def test_utils_dashboard_uses_utilities_label(self):
-        response = self.client.get(reverse("utils-dashboard"))
+    def test_utils_explorer_uses_utilities_label(self):
+        response = self.client.get(reverse("utils-explorer"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "BRIT | Utilities")
@@ -222,7 +283,7 @@ class BreadcrumbStaticPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            '<h5 class="mb-0">Bioresource Information Tool</h5>',
+            '<h1 class="sdv2-hero-title">Bioresource Information Tool</h1>',
             html=True,
         )
         self.assertNotContains(
@@ -727,6 +788,27 @@ class StickyFilterOffsetAssetTests(SimpleTestCase):
         self.assertNotIn("top: calc(56px + 1rem);", css)
 
 
+class LetterIndexThemeAssetTests(SimpleTestCase):
+    """The A-Z letter bar must not fall back to stock-Bootstrap blue states.
+
+    Bootstrap's ``.page-link:focus`` reads ``--bs-pagination-focus-color`` and
+    ``--bs-pagination-focus-box-shadow``, separate from the hover/active
+    properties, so those must be recolored to the BRIT primary too.
+    """
+
+    def test_letter_index_overrides_pagination_focus_state(self):
+        css = (Path(settings.BASE_DIR) / "brit/static/css/filtered-list.css").read_text(
+            encoding="utf-8"
+        )
+        block = css.split(".letter-index .pagination {", 1)[1].split("}", 1)[0]
+
+        self.assertIn("--bs-pagination-focus-color: var(--bs-primary);", block)
+        self.assertIn(
+            "--bs-pagination-focus-box-shadow: 0 0 0 .15rem rgba(var(--bs-primary-rgb), .25);",
+            block,
+        )
+
+
 class BreadcrumbRailGlobalStylingAssetTests(SimpleTestCase):
     """Asset-level regression tests for the global .page-breadcrumb-rail styling.
 
@@ -908,3 +990,157 @@ class NarrativeSpacingAssetTests(SimpleTestCase):
         match = re.search(r"\.sdv2-about-body\s*>\s*p:last-child\s*\{([^}]*)\}", css)
         self.assertIsNotNone(match)
         self.assertIn("margin-bottom: 0;", match.group(1))
+
+
+class PropertiesTableAssetTests(SimpleTestCase):
+    def test_only_edit_cell_disables_wrapping(self):
+        import re
+
+        css = (
+            Path(settings.BASE_DIR) / "brit/static/css/sample_detail_v2.css"
+        ).read_text(encoding="utf-8")
+        self.assertNotRegex(css, r"\.sdv2-properties-table td:last-child\s*\{")
+        edit = re.search(
+            r"\.sdv2-properties-table td\.sdv2-edit-cell\s*\{([^}]*)\}", css
+        )
+        self.assertIsNotNone(edit)
+        self.assertIn("white-space: nowrap;", edit.group(1))
+        comment = re.search(
+            r"\.sdv2-properties-table td\.sdv2-comment-cell\s*\{([^}]*)\}", css
+        )
+        self.assertIsNotNone(comment)
+        self.assertIn("overflow-wrap: anywhere;", comment.group(1))
+
+    def test_scenario_parameters_source_cell_keeps_nowrap(self):
+        import re
+
+        css = (
+            Path(settings.BASE_DIR) / "inventories/static/css/scenario_detail.css"
+        ).read_text(encoding="utf-8")
+        match = re.search(r"\.sri-parameters td:last-child\s*\{([^}]*)\}", css)
+        self.assertIsNotNone(match)
+        self.assertIn("white-space: nowrap;", match.group(1))
+
+
+class ExplorerUrlNameTests(TestCase):
+    """Explorer pages use canonical ``*-explorer`` URL names (issue #89)."""
+
+    def test_explorer_url_names_resolve(self):
+        self.assertEqual(reverse("maps-explorer"), "/maps/explorer/")
+        self.assertEqual(reverse("utils-explorer"), "/utils/explorer/")
+        self.assertEqual(reverse("properties-explorer"), "/utils/properties/explorer/")
+        self.assertEqual(reverse("processes:explorer"), "/processes/explorer/")
+
+    def test_legacy_dashboard_url_names_are_removed(self):
+        from django.urls import NoReverseMatch
+
+        for name in (
+            "maps-dashboard",
+            "utils-dashboard",
+            "properties-dashboard",
+            "processes:dashboard",
+            "processes:processes-explorer",
+        ):
+            with self.subTest(url_name=name):
+                with self.assertRaises(NoReverseMatch):
+                    reverse(name)
+
+
+class MapsExplorerTests(TestCase):
+    """The Maps explorer uses the shared explorer-card pattern and links to all
+    entity lists (issue #89)."""
+
+    def test_explorer_links_to_all_entity_lists(self):
+        response = self.client.get(reverse("maps-explorer"))
+
+        self.assertEqual(response.status_code, 200)
+        for url_name in (
+            "maps_list",
+            "region-list",
+            "catchment-list",
+            "location-list",
+        ):
+            with self.subTest(url_name=url_name):
+                self.assertContains(response, reverse(url_name))
+
+    def test_explorer_uses_shared_card_pattern(self):
+        response = self.client.get(reverse("maps-explorer"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "explorer-card")
+
+    def test_nuts_count_covers_only_the_current_vintage(self):
+        from maps.models import NutsRegion, NutsVintage
+
+        other_vintage = NutsVintage.objects.create(year=2024)
+        for vintage in (NutsVintage.default(), other_vintage):
+            NutsRegion.objects.create(
+                name="Deutschland",
+                nuts_id="DE",
+                levl_code=0,
+                cntr_code="DE",
+                version=vintage,
+                publication_status=NutsRegion.STATUS_PUBLISHED,
+            )
+
+        response = self.client.get(reverse("maps-explorer"))
+
+        self.assertEqual(response.context["nuts_count"], 1)
+
+
+class SidebarNavigationTests(TestCase):
+    """Sidebar module entries point at primary lists and mark the active
+    section from the resolved route, not the raw path (issue #89)."""
+
+    @staticmethod
+    def _active_link(url):
+        return f'<a class="nav-link active" href="{url}"'
+
+    def test_bibliography_sidebar_links_to_source_list(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertContains(
+            response,
+            f'<a class="nav-link" href="{reverse("source-list")}">',
+            html=False,
+        )
+
+    def test_maps_page_marks_maps_nav_active(self):
+        response = self.client.get(reverse("maps_list"), follow=True)
+
+        self.assertContains(
+            response, self._active_link(reverse("maps_list")), html=False
+        )
+
+    def test_materials_page_marks_only_materials_nav_active(self):
+        response = self.client.get(reverse("sample-list"), follow=True)
+
+        self.assertContains(
+            response, self._active_link(reverse("sample-list")), html=False
+        )
+        self.assertNotContains(
+            response, self._active_link(reverse("maps_list")), html=False
+        )
+
+    def test_collection_list_marks_sources_nav_active(self):
+        """Waste Collection stays under Sources, so its pages highlight Sources."""
+        response = self.client.get(reverse("collection-list"), follow=True)
+
+        self.assertContains(
+            response, self._active_link(reverse("sources-explorer")), html=False
+        )
+
+    def test_waste_atlas_marks_waste_atlas_nav_active(self):
+        response = self.client.get(reverse("waste-atlas-overview"), follow=True)
+
+        self.assertContains(
+            response, self._active_link(reverse("waste-atlas-overview")), html=False
+        )
+        self.assertNotContains(
+            response, self._active_link(reverse("sources-explorer")), html=False
+        )
+
+    def test_about_page_marks_about_nav_active(self):
+        response = self.client.get(reverse("about"))
+
+        self.assertContains(response, self._active_link(reverse("about")), html=False)

@@ -1,10 +1,65 @@
 # Static Assets (SCSS → CSS → minified)
 
 BRIT serves **pre-built, committed** static assets. Templates reference the
-minified files directly via `{% static %}` (Django uses plain
-`StaticFilesStorage`, so `collectstatic` just copies them — there is no
-runtime asset processing). Keeping the compiled output in git means the
-production image and Heroku never need a Node toolchain.
+minified files directly via `{% static %}`. Keeping the compiled output in git
+means the production image and Heroku never need a Node toolchain.
+
+In production the release-phase `collectstatic` is handled by
+[Collectfasta](https://github.com/jasongi/collectfasta) on top of the S3
+manifest storage (`brit.storages.StaticStorage`): it post-processes files —
+hashing plus `url()` reference rewriting — in a local in-memory two-pass run,
+then uploads only changed files to S3, skipping unchanged ones via cached
+checksums. Development and tests use plain `StaticFilesStorage`, where
+`collectstatic` just copies files.
+
+**Ops settings** (defined in `brit/settings/heroku.py` only): checksum
+metadata lives in a dedicated Redis cache alias (`COLLECTFASTA_CACHE =
+"collectfasta"`, 30-day `TIMEOUT`, `MAX_ENTRIES=10000`, keys namespaced
+`collectfasta:<bucket>:<location>`). Uploads run synchronously
+(`COLLECTFASTA_THREADS = 0`) on purpose: upstream 3.3.5 never consumes the
+`pool.map` iterators, so exceptions in worker threads would not propagate and
+a failed upload could pass the release silently. `collectstatic
+--disable-collectfasta` remains as an escape hatch to the stock command.
+
+## Release deployment (guarded)
+
+Heroku's release phase does not run plain `collectstatic`. The chain is
+
+```
+python manage.py collectstatic_safe --noinput --manifest-output /tmp/brit-staticfiles.json && \
+  python manage.py verify_staticfiles --manifest /tmp/brit-staticfiles.json
+```
+
+`collectstatic_safe` (in `brit/management/commands/`) wraps Collectfasta with
+deployment safeguards:
+
+- **Manifest-last atomic publication.** `staticfiles.json` is deferred and
+  PUT only after every asset upload, the fresh manifest has been validated,
+  and the local receipt file has been written. An asset-upload error
+  prevents publication entirely; S3 replaces the manifest atomically and
+  only once every referenced object is present.
+- **No deletions.** The atomic S3 wrapper turns every `delete()` into a
+  no-op and overwrites under exact names (`file_overwrite=True`), so
+  publication never removes existing keys — the previous manifest is never
+  deleted and old hashed files are retained.
+- **Fresh checks, not caches.** The manifest is re-compared against live
+  remote bytes, and referenced objects are confirmed via a fresh
+  `list_objects_v2` listing over the storage location — objects that are
+  missing remotely but hidden by a stale checksum cache fail the release
+  closed.
+- **Guard rails.** `--clear`, `--no-post-process`, a disabled Collectfasta,
+  and `COLLECTFASTA_THREADS != 0` are rejected before any write.
+
+`verify_staticfiles` then re-reads the live `staticfiles.json`, validates
+its schema/hash, requires its contents — paths, version and hash — to match
+the receipt produced by the same build exactly, and re-lists the bucket to
+confirm every referenced object exists. It exits non-zero on any mismatch and is the release gate — the
+`/health` endpoint only reports liveness, not asset correctness.
+
+Plain `collectstatic` (or `--disable-collectfasta`) is **not** release-safe:
+it publishes the manifest during a normal multi-file upload with no
+manifest-last guarantee and no remote verification. It must not replace the
+guarded chain in `heroku.yml`.
 
 Because the output is committed, it must always be **reproducible** and **in
 sync** with its sources. That is what this pipeline guarantees.

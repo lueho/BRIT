@@ -204,7 +204,7 @@ class CompositeMapPageTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
-            username="composite-page-user", password="secret"
+            username="composite-page-user",
         )
 
     def _render(self, theme, config_key):

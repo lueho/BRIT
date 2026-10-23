@@ -119,6 +119,21 @@ DATABASES["default"]["ENGINE"] = "django.contrib.gis.db.backends.postgis"
 STATICFILES_LOCATION = "static"
 STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{STATICFILES_LOCATION}/"
 
+INSTALLED_APPS = ["collectfasta", *INSTALLED_APPS]
+COLLECTFASTA_STRATEGY = "collectfasta.strategies.boto3.Boto3ManifestMemoryStrategy"
+COLLECTFASTA_CACHE = "collectfasta"
+COLLECTFASTA_THREADS = 0
+
+CACHES = {
+    **CACHES,
+    "collectfasta": {
+        **CACHES["default"],
+        "TIMEOUT": 2592000,
+        "KEY_PREFIX": f"collectfasta:{AWS_STORAGE_BUCKET_NAME}:{STATICFILES_LOCATION}",
+        "OPTIONS": {**CACHES["default"].get("OPTIONS", {}), "MAX_ENTRIES": 10000},
+    },
+}
+
 # The base STORAGES already points uploads at S3; only the staticfiles
 # backend differs (manifest storage on the CDN bucket). Copy the outer dict
 # so other settings modules importing base STORAGES are unaffected.

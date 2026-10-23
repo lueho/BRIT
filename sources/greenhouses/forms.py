@@ -54,7 +54,7 @@ class GrowthCycleModelForm(SimpleModelForm):
 
 class GrowthTimestepInline(InlineFormSetFactory):
     model = GrowthTimeStepSet
-    fields = ["owner", "timestep", "growth_cycle"]
+    fields = ["timestep"]
 
 
 class GrowthCycleCreateForm(ModalModelForm):

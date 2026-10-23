@@ -13,7 +13,7 @@ import utils.properties.models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("bibliography", "0003_alter_author_publication_status_and_more"),
+        ("bibliography", "0001_squashed_0012"),
         ("materials", "0003_alter_analyticalmethod_publication_status_and_more"),
         ("properties", "0004_alter_property_options"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

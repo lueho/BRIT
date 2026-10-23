@@ -1,0 +1,29 @@
+<div class="modal-header">
+  <h5 class="modal-title">{{ modal_title }}</h5>
+  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<div class="modal-body">
+  <p>
+    <strong>{{ object }}</strong><br>
+    {% if owner %}Owned by {{ owner.username }}.{% endif %}
+  </p>
+  <p>Your access is provided through:</p>
+  <ul>
+    {% for route in access_routes %}
+      <li>{{ route }}</li>
+    {% endfor %}
+  </ul>
+  <p>
+    {% if can_edit %}
+      You can edit this record while it remains in an editable state.
+    {% else %}
+      You have read-only access to this record.
+      {% if edit_explanation %}
+        <br><span class="text-muted">{{ edit_explanation }}</span>
+      {% endif %}
+    {% endif %}
+  </p>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+</div>

@@ -19,6 +19,16 @@ class ObjectManagementInitialDataTests(TestCase):
                 with self.assertRaises(RuntimeError):
                     obj_utils.ensure_initial_data()
 
+    def test_none_default_owner_setting_falls_back_to_admin_username(self):
+        """An explicit DEFAULT_OBJECT_OWNER_USERNAME=None must not shadow ADMIN_USERNAME."""
+        with override_settings(DEFAULT_OBJECT_OWNER_USERNAME=None):
+            with mock.patch.dict(
+                os.environ, {"ADMIN_USERNAME": "fallback-admin"}, clear=True
+            ):
+                result = obj_utils.ensure_initial_data()
+
+        self.assertEqual(result["default_owner"].username, "fallback-admin")
+
 
 class ModerationPermissionSignalTests(TestCase):
     """The post-migrate signal only ensures can_moderate_* permission rows for

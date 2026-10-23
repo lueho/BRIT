@@ -8,7 +8,6 @@ from utils.filters import BaseCrispyFilterSet, UserCreatedObjectScopedFilterSet
 
 from .models import (
     GIS_SOURCE_MODELS,
-    Attribute,
     Catchment,
     GeoDataset,
     Location,
@@ -225,28 +224,4 @@ class LocationListFilter(UserCreatedObjectScopedFilterSet):
 
     class Meta:
         model = Location
-        fields = ("scope", "name")
-
-
-class AttributeListFilter(UserCreatedObjectScopedFilterSet):
-    name = ModelChoiceFilter(
-        queryset=Attribute.objects.none(),
-        method="filter_selected_object",
-        label="Attribute Name",
-        widget=TomSelectModelWidget(
-            config=TomSelectConfig(
-                url="attribute-autocomplete",
-                filter_by=("scope", "name"),
-            ),
-        ),
-    )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.filters["name"].queryset = self.scoped_choice_queryset(
-            Attribute.objects.all(), selected_field="name"
-        )
-
-    class Meta:
-        model = Attribute
         fields = ("scope", "name")

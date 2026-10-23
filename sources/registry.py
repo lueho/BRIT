@@ -4,6 +4,7 @@ from django.apps import apps
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 
+from brit.sitemap_registry import register_sitemap_items
 from maps.registry import register_source_domain_map_contracts
 from sources.contracts import (
     SourceDomainDatasetRuntimeCompatibility,
@@ -252,6 +253,7 @@ def initialize_source_domain_registry() -> None:
             geojson_cache_warmer=plugin.get_geojson_cache_warmer(),
             dataset_runtime_compatibilities=plugin.dataset_runtime_compatibilities,
         )
+        register_sitemap_items(plugin.sitemap_items)
 
     _SOURCE_DOMAIN_PLUGINS = plugins
     _SOURCE_DOMAIN_REGISTRY_INITIALIZED = True

@@ -19,20 +19,8 @@ class NantesGreenhousesModelSerializer(ModelSerializer):
         )
 
 
-class NantesGreenhousesFlatSerializer(ModelSerializer):
-    class Meta:
-        model = NantesGreenhouses
-        fields = (
-            "nb_cycles",
-            "culture_1",
-            "culture_2",
-            "culture_3",
-            "heated",
-            "lighted",
-            "high_wire",
-            "above_ground",
-            "surface_ha",
-        )
+class NantesGreenhousesFlatSerializer(NantesGreenhousesModelSerializer):
+    pass
 
 
 class NantesGreenhousesGeometrySerializer(GeoFeatureModelSerializer):

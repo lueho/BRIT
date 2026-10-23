@@ -9,10 +9,11 @@ from unittest.mock import Mock, patch
 from urllib.parse import urlencode, urlparse, urlunparse
 
 from django.conf import settings
-from django.contrib.auth.models import AnonymousUser, Group, Permission, User
+from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.core.cache import caches
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.db import connection
 from django.middleware.common import CommonMiddleware
@@ -20,14 +21,14 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
-from rest_framework import serializers
 from rest_framework.renderers import JSONRenderer
 from rest_framework.request import Request
-from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework.test import APIRequestFactory
 from rest_framework.viewsets import ModelViewSet
 
 from bibliography.models import Source
-from maps.mixins import GeoJSONMixin
+from maps.mixins import CachedGeoJSONMixin
+from maps.serializers import RegionGeoFeatureModelSerializer
 from maps.views import CatchmentCreateMergeLauView
 from utils.object_management.models import ReviewAction
 from utils.properties.models import Unit
@@ -39,7 +40,6 @@ from utils.tests.testcases import (
 from utils.tests.testrunner import serial_test
 
 from ..models import (
-    Attribute,
     Catchment,
     GeoDataset,
     GeoDatasetRuntimeConfiguration,
@@ -69,7 +69,8 @@ class DummyMapView(MapMixin, DummyBaseView):
 
 
 class MapMixinTestCase(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         default_layer_style = MapLayerStyle.objects.create(
             color="#000000",
             weight=1,
@@ -92,14 +93,14 @@ class MapMixinTestCase(TestCase):
                     style=default_layer_style,
                 )
             )
-        self.map_config = MapConfiguration.objects.create(
+        cls.map_config = MapConfiguration.objects.create(
             name="Test Map Configuration",
             adjust_bounds_to_layer="features",
             load_features_layer_summary=True,
         )
-        self.map_config.layers.set(layers)
-        self.factory = RequestFactory()
-        self.view = DummyMapView()
+        cls.map_config.layers.set(layers)
+        cls.factory = RequestFactory()
+        cls.view = DummyMapView()
 
     def mock_reverse_side_effect(name, *args, **kwargs):
         if "-detail" in name:
@@ -492,7 +493,7 @@ class LocationCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
     model = Location
     add_scope_query_param_to_list_urls = True
 
-    view_dashboard_name = "maps-dashboard"
+    view_explorer_name = "maps-explorer"
     view_create_name = "location-create"
     view_published_list_name = "location-list"
     view_private_list_name = "location-list-owned"
@@ -520,7 +521,7 @@ class RegionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     model = Region
     add_scope_query_param_to_list_urls = True
 
-    view_dashboard_name = "maps-dashboard"
+    view_explorer_name = "maps-explorer"
     view_create_name = "region-create"
     view_published_list_name = "region-list"
     view_private_list_name = "region-list-owned"
@@ -605,7 +606,7 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     model = Catchment
     model_add_permission = "add_catchment"
 
-    view_dashboard_name = "maps-dashboard"
+    view_explorer_name = "maps-explorer"
     view_create_name = "catchment-create"
     view_published_list_name = "catchment-list"
     view_private_list_name = "catchment-list-owned"
@@ -615,6 +616,7 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 
     allow_create_for_any_authenticated_user = True
     add_scope_query_param_to_list_urls = True
+    create_view_post = False
 
     create_object_data = {"name": "Test Catchment"}
     update_object_data = {"name": "Updated Test Catchment"}
@@ -680,19 +682,6 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         self.assertContains(response, "Population density")
         self.assertContains(response, "2024: 123.321 people/km²")
         self.assertNotContains(response, "[1/km²]")
-
-    # -----------------------
-    # CreateView Test Cases
-    # -----------------------
-
-    def test_create_view_post_as_authenticated_without_permission(self):
-        self.skipTest("Post method is not implemented for this view.")
-
-    def test_create_view_post_as_authenticated_with_permission(self):
-        self.skipTest("Post method is not implemented for this view.")
-
-    def test_create_view_post_as_staff_user(self):
-        self.skipTest("Post method is not implemented for this view.")
 
     # -----------------------
     # CatchmentCreateSelectRegionView
@@ -1477,40 +1466,6 @@ class NutsAndLauCatchmentPedigreeAPITestCase(ViewSetWithPermissionsTestCase):
         self.assertIn("id_level_4", response.data)
 
 
-# ----------- Attribute CRUD -------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class AttributeCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
-    modal_detail_view = True
-    modal_update_view = True
-    modal_create_view = True
-    add_scope_query_param_to_list_urls = True
-
-    model = Attribute
-
-    view_dashboard_name = "maps-dashboard"
-    view_create_name = "attribute-create"
-    view_modal_create_name = "attribute-create-modal"
-    view_published_list_name = "attribute-list"
-    view_private_list_name = "attribute-list-owned"
-    view_detail_name = "attribute-detail"
-    view_modal_detail_name = "attribute-detail-modal"
-    view_update_name = "attribute-update"
-    view_modal_update_name = "attribute-update-modal"
-    view_delete_name = "attribute-delete-modal"
-
-    create_object_data = {
-        "name": "Test Attribute",
-        "unit": "Test Unit",
-    }
-    update_object_data = {
-        "name": "Updated Test Attribute",
-        "unit": "Updated Test Unit",
-        "description": "Updated description",
-    }
-
-
 # ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -1526,7 +1481,7 @@ class RegionAttributeValueCRUDViewsTestCase(
 
     model = RegionAttributeValue
 
-    view_dashboard_name = "maps-dashboard"
+    view_explorer_name = "maps-explorer"
     view_create_name = "regionattributevalue-create"
     view_modal_create_name = "regionattributevalue-create-modal"
     view_detail_name = "regionattributevalue-detail"
@@ -1815,6 +1770,18 @@ class ClearGeojsonCacheViewTest(TestCase):
 
         self.non_staff_user = User.objects.create_user(username="nonstaff")
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
+        cls.admin_user = User.objects.create_user(username="cache-admin")
+        cls.admin_user.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type=ContentType.objects.get_for_model(ReviewAction),
+            )
+        )
+        cls.non_staff_user = User.objects.create_user(username="nonstaff")
+
     @patch("maps.views.clear_geojson_cache_pattern")
     def test_clear_geojson_cache_as_admin(self, mock_clear):
         self.client.force_login(self.admin_user)
@@ -1846,184 +1813,12 @@ class ClearGeojsonCacheViewTest(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_clear_geojson_cache_as_plain_staff_denied(self):
+        self.client.force_login(self.staff_user)
+        url = reverse("clear-geojson-cache")
+        response = self.client.get(url)
 
-class DummyGeoJSONSerializer(serializers.Serializer):
-    """Dummy serializer for testing GeoJSONMixin."""
-
-    def to_representation(self, instance):
-        return {"type": "Feature", "properties": {}, "geometry": None}
-
-    @property
-    def data(self):
-        return {"type": "FeatureCollection", "features": []}
-
-
-class MockGeoJSONViewSet(GeoJSONMixin, ModelViewSet):
-    """Minimal viewset used only for unit tests."""
-
-    queryset = Mock()
-    geojson_serializer_class = DummyGeoJSONSerializer
-
-    def filter_queryset(self, queryset):
-        return queryset
-
-
-class GeoJSONMixinTestCase(TestCase):
-    """Unit tests for GeoJSONMixin behaviour."""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.user = User.objects.create_user(username="testuser")
-
-    def setUp(self):
-        self.factory = APIRequestFactory()
-        self.viewset = MockGeoJSONViewSet()
-        self.viewset.format_kwarg = None
-
-        request = self.factory.get("/")
-        force_authenticate(request, self.user)
-        self.viewset.request = Request(request)
-
-    def _make_request(self, url="/api/test/geojson/", user=None, **query_params):
-        request = self.factory.get(url, query_params)
-        user = user or self.user
-        force_authenticate(request, user=user)
-        return Request(request)
-
-    def test_geojson_requires_serializer_class(self):
-        class IncompleteViewSet(GeoJSONMixin, ModelViewSet):
-            pass
-
-        viewset = IncompleteViewSet()
-        with self.assertRaises(AssertionError):
-            viewset.get_geojson_serializer_class()
-
-    def test_get_geojson_serializer_class(self):
-        self.assertIs(
-            self.viewset.get_geojson_serializer_class(),
-            self.viewset.geojson_serializer_class,
-        )
-
-    def test_get_geojson_serializer(self):
-        mock_serializer_class = Mock()
-        self.viewset.get_geojson_serializer_class = Mock(
-            return_value=mock_serializer_class
-        )
-        self.viewset.get_serializer_context = Mock(return_value={"request": None})
-
-        data = [{"foo": "bar"}]
-        self.viewset.get_geojson_serializer(data, many=True)
-
-        self.viewset.get_geojson_serializer_class.assert_called_once()
-        mock_serializer_class.assert_called_once_with(
-            data, many=True, context={"request": None}
-        )
-
-    def test_geojson_uses_parent_get_queryset(self):
-        request = self._make_request()
-        filtered_qs = Mock()
-
-        self.viewset.get_queryset = Mock(return_value=filtered_qs)
-        self.viewset.filter_queryset = Mock(return_value=filtered_qs)
-
-        serializer_mock = Mock()
-        serializer_mock.data = {"hello": "world"}
-        self.viewset.get_geojson_serializer = Mock(return_value=serializer_mock)
-
-        response = self.viewset.geojson(request)
-
-        self.viewset.get_queryset.assert_called_once()
-        self.viewset.filter_queryset.assert_called_once_with(filtered_qs)
-        self.viewset.get_geojson_serializer.assert_called_once_with(
-            filtered_qs, many=True
-        )
-        self.assertDictEqual(response.data, {"hello": "world"})
-
-    def test_scope_parameter_handling(self):
-        test_scopes = ["published", "private", "invalid"]
-
-        for scope in test_scopes:
-            with self.subTest(scope=scope):
-                request = self._make_request(scope=scope)
-                filtered_qs = Mock()
-
-                self.viewset.get_queryset = Mock(return_value=filtered_qs)
-                self.viewset.filter_queryset = Mock(return_value=filtered_qs)
-
-                mock_serializer = Mock()
-                mock_serializer.data = {"type": "FeatureCollection", "features": []}
-                self.viewset.get_geojson_serializer = Mock(return_value=mock_serializer)
-
-                response = self.viewset.geojson(request)
-
-                self.viewset.get_queryset.assert_called_once()
-                self.viewset.filter_queryset.assert_called_once_with(filtered_qs)
-                self.viewset.get_geojson_serializer.assert_called_once_with(
-                    filtered_qs, many=True
-                )
-                self.assertIsInstance(response.data, dict)
-
-    def test_authentication_handling(self):
-        test_users = [
-            (self.user, "authenticated"),
-            (AnonymousUser(), "unauthenticated"),
-        ]
-
-        for user, auth_status in test_users:
-            with self.subTest(auth_status=auth_status):
-                request = self._make_request(user=user)
-                filtered_qs = Mock()
-
-                self.viewset.get_queryset = Mock(return_value=filtered_qs)
-                self.viewset.filter_queryset = Mock(return_value=filtered_qs)
-
-                mock_serializer = Mock()
-                mock_serializer.data = {"type": "FeatureCollection", "features": []}
-                self.viewset.get_geojson_serializer = Mock(return_value=mock_serializer)
-
-                response = self.viewset.geojson(request)
-
-                self.viewset.get_queryset.assert_called_once()
-                self.viewset.filter_queryset.assert_called_once_with(filtered_qs)
-                self.viewset.get_geojson_serializer.assert_called_once_with(
-                    filtered_qs, many=True
-                )
-                self.assertIsInstance(response.data, dict)
-
-    def test_empty_queryset_handling(self):
-        request = self._make_request()
-
-        empty_qs = Mock()
-        self.viewset.get_queryset = Mock(return_value=empty_qs)
-        self.viewset.filter_queryset = Mock(return_value=empty_qs)
-
-        mock_serializer = Mock()
-        mock_serializer.data = {"type": "FeatureCollection", "features": []}
-        self.viewset.get_geojson_serializer = Mock(return_value=mock_serializer)
-
-        response = self.viewset.geojson(request)
-
-        self.assertIsInstance(response.data, dict)
-
-    def test_serializer_error_handling(self):
-        request = self._make_request()
-
-        qs = Mock()
-        qs.filter = Mock(return_value=qs)
-        self.viewset.get_queryset = Mock(return_value=qs)
-        self.viewset.filter_queryset = Mock(return_value=qs)
-
-        error_serializer = Mock(spec=DummyGeoJSONSerializer)
-
-        def data_property_raiser(self):
-            raise serializers.ValidationError("Test error")
-
-        type(error_serializer).data = property(data_property_raiser)
-
-        self.viewset.get_geojson_serializer = Mock(return_value=error_serializer)
-
-        with self.assertRaises(serializers.ValidationError):
-            self.viewset.geojson(request)
+        self.assertEqual(response.status_code, 403)
 
 
 def _redis_geojson_test_caches():
@@ -2213,16 +2008,19 @@ class GeoJSONCachingTests(TestCase):
 
 @serial_test
 class LargeGeometryMemoryTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.region = Region(name="Large geometry")
+        cls.region.geom = MultiPolygon(
+            Polygon(((0, 0), (1, 0), (1, 1), (0, 1), (0, 0)))
+        )
+        cls.region.save()
+        cls.url = reverse("api-region-geojson")
+
     def setUp(self):
         self.cache = caches[settings.GEOJSON_CACHE]
         self.cache.clear()
         self.addCleanup(self.cache.clear)
-        self.region = Region(name="Large geometry")
-        self.region.geom = MultiPolygon(
-            Polygon(((0, 0), (1, 0), (1, 1), (0, 1), (0, 0)))
-        )
-        self.region.save()
-        self.url = reverse("api-region-geojson")
 
     def test_single_complex_geometry_streams_without_loading_geos_objects(self):
         with (
@@ -2435,6 +2233,18 @@ class StreamingGeoJSONTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotEqual(response["X-Cache-Status"], "REJECT")
+
+    def test_streaming_requires_geojson_geometry_field(self):
+        """The serializer-per-feature fallback is gone: streaming without a
+        declared database geometry field must fail loudly."""
+
+        class BareViewSet(CachedGeoJSONMixin, ModelViewSet):
+            queryset = Region.objects.none()
+            serializer_class = RegionGeoFeatureModelSerializer
+
+        view = BareViewSet()
+        with self.assertRaises(ImproperlyConfigured):
+            list(view._stream_geojson(Region.objects.none()))
 
     def test_unknown_query_parameter_does_not_bound_large_request(self):
         with patch(
@@ -2721,3 +2531,51 @@ class GeoJSONHeadTests(TestCase):
         self.assertFalse(hasattr(head, "data"))
         get = self.client.get(url, params)
         self.assertEqual(head["X-Data-Version"], get["X-Data-Version"])
+
+
+class MissingNamedDatasetMapViewTestCase(ViewWithPermissionsTestCase):
+    """Named filtered maps render an empty-state page instead of an error
+    when the optional GeoDataset has not been imported or configured."""
+
+    def assertDatasetUnavailable(self, url_name):
+        dataset_count = GeoDataset.objects.count()
+        response = self.client.get(reverse(url_name), follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dataset not configured")
+        self.assertContains(response, "import or configure this dataset")
+        self.assertEqual(GeoDataset.objects.count(), dataset_count)
+
+    def test_waste_collection_map_renders_unavailable_state(self):
+        self.assertDatasetUnavailable("WasteCollection")
+
+    def test_nantes_greenhouses_map_renders_unavailable_state(self):
+        self.assertDatasetUnavailable("NantesGreenhouses")
+
+    def test_hamburg_roadside_trees_map_renders_unavailable_state(self):
+        self.assertDatasetUnavailable("HamburgRoadsideTrees")
+
+    def test_nuts_region_map_renders_unavailable_state(self):
+        self.assertDatasetUnavailable("NutsRegion")
+
+    def test_private_named_map_still_requires_login(self):
+        response = self.client.get(reverse("WasteCollection-owned"))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith(settings.LOGIN_URL))
+
+    def test_missing_explicit_dataset_pk_returns_404(self):
+        response = self.client.get(reverse("geodataset-map", kwargs={"pk": 999999}))
+        self.assertEqual(response.status_code, 404)
+
+    def test_dataset_scoped_catchment_autocomplete_returns_empty(self):
+        Catchment.objects.create(
+            name="Unrelated Catchment", owner=self.owner, publication_status="published"
+        )
+
+        for url_name in (
+            "nantesgreenhouses-catchment-autocomplete",
+            "hamburgroadsidetrees-catchment-autocomplete",
+        ):
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name), data={"q": ""})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(json.loads(response.content)["results"], [])

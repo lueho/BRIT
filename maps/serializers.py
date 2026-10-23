@@ -284,6 +284,39 @@ class NutsRegionCatchmentOptionSerializer(ModelSerializer):
         fields = ["id", "name"]
 
 
+def _region_attribute_values(obj):
+    """Numeric attribute values of a region, newest first.
+
+    Consumes the ``ordered_attribute_values`` list prefetched by
+    ``NutsRegionViewSet``; falls back to a single query when absent.
+    """
+    values = getattr(obj, "ordered_attribute_values", None)
+    if values is not None:
+        return values
+    return obj.regionattributevalue_set.select_related("property", "unit").order_by(
+        "-date"
+    )
+
+
+def _latest_region_attribute_value(obj, property_name):
+    for value in _region_attribute_values(obj):
+        if value.property.name == property_name:
+            return value
+    return None
+
+
+def _region_text_value(obj, attribute_name):
+    values = getattr(obj, "region_text_values", None)
+    if values is None:
+        values = obj.regionattributetextvalue_set.select_related(
+            "categorical_attribute"
+        )
+    for value in values:
+        if value.categorical_attribute.name == attribute_name:
+            return value
+    return None
+
+
 class NutsRegionSummarySerializer(FieldLabelModelSerializer):
     name = CharField(source="display_name")
     population = SerializerMethodField()
@@ -303,37 +336,26 @@ class NutsRegionSummarySerializer(FieldLabelModelSerializer):
 
     @staticmethod
     def get_population(obj):
-        qs = obj.regionattributevalue_set.filter(property__name="Population").order_by(
-            "-date"
-        )
-        if qs.exists():
-            pop = qs[0]
-            return f"{int(pop.value)} ({pop.date.year})"
-        else:
+        pop = _latest_region_attribute_value(obj, "Population")
+        if pop is None:
             return None
+        return f"{int(pop.value)} ({pop.date.year})"
 
     @staticmethod
     def get_population_density(obj):
-        qs = obj.regionattributevalue_set.filter(
-            property__name="Population density"
-        ).order_by("-date")
-        if qs.exists():
-            pd = qs[0]
-            unit = pd.measurement_unit_label
-            unit_suffix = f" {unit}" if unit else ""
-            return f"{pd.value}{unit_suffix} ({pd.date.year})"
-        else:
+        pd = _latest_region_attribute_value(obj, "Population density")
+        if pd is None:
             return None
+        unit = pd.measurement_unit_label
+        unit_suffix = f" {unit}" if unit else ""
+        return f"{pd.value}{unit_suffix} ({pd.date.year})"
 
     @staticmethod
     def get_urban_rural_remoteness(obj):
-        qs = obj.regionattributetextvalue_set.filter(
-            categorical_attribute__name="Urban rural remoteness"
-        )
-        if qs.exists():
-            return qs[0].value
-        else:
+        text_value = _region_text_value(obj, "Urban rural remoteness")
+        if text_value is None:
             return None
+        return text_value.value
 
 
 class LauRegionSummarySerializer(FieldLabelModelSerializer):

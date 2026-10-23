@@ -5,12 +5,11 @@ from bibliography.models import Source
 from utils.tests.testcases import ScopedSelectionFilterTestMixin
 
 from ..filters import (
-    AttributeListFilter,
     CatchmentFilterSet,
     GeoDataSetFilterSet,
     LocationListFilter,
 )
-from ..models import Attribute, Catchment, GeoDataset, Location, Region
+from ..models import Catchment, GeoDataset, Location, Region
 
 
 class CatchmentFilterTestCase(TestCase):
@@ -105,19 +104,6 @@ class LocationListFilterScopedSelectionTestCase(
 ):
     filterset_class = LocationListFilter
     model = Location
-
-
-class AttributeListFilterScopedSelectionTestCase(
-    ScopedSelectionFilterTestMixin, TestCase
-):
-    filterset_class = AttributeListFilter
-    model = Attribute
-
-    @classmethod
-    def create_choice(cls, name, owner, publication_status):
-        return Attribute.objects.create(
-            name=name, unit="t", owner=owner, publication_status=publication_status
-        )
 
 
 class GeoDataSetFilterSetScopedSelectionTestCase(TestCase):

@@ -1,13 +1,8 @@
+{% extends "modal_base.html" %}
 {% load custom_tags %}
 {% load moderation_tags %}
-<div class="modal-header">
-  <h5 class="modal-title">Collection Detail</h5>
-  <button type="button"
-          class="btn-close"
-          data-bs-dismiss="modal"
-          aria-label="Close"></button>
-</div>
-<div class="modal-body">
+{% block modal_title %}Collection Detail{% endblock %}
+{% block modal_body %}
   <p class="card-text">
     <strong>Name:</strong>
     <br>
@@ -104,9 +99,9 @@
       {{ object.description|collection_description_to_html }}
     </p>
   {% endif %}
-</div>
-<div class="modal-footer">
+{% endblock %}
+{% block modal_footer %}
   <a href="{% detail_or_review_url object %}"
      class="btn btn-primary">More</a>
   <button type="button" class="btn btn-default" data-bs-dismiss="modal">Close</button>
-</div>
+{% endblock %}
