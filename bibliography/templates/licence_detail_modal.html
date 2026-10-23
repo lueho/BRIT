@@ -1,12 +1,7 @@
+{% extends "modal_base.html" %}
 {% load moderation_tags %}
-<div class="modal-header">
-    <h5 class="modal-title">Licence Details</h5>
-    <button type="button"
-            class="btn-close"
-            data-bs-dismiss="modal"
-            aria-label="Close"></button>
-</div>
-<div class="modal-body">
+{% block modal_title %}Licence Details{% endblock %}
+{% block modal_body %}
     <p>
         <strong>Name:</strong>
         <br>
@@ -26,8 +21,4 @@
             {{ object.description|markdown_to_html }}
         </p>
     {% endif %}
-</div>
-
-<div class="modal-footer">
-    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
-</div>
+{% endblock %}

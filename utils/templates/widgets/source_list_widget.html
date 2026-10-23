@@ -62,7 +62,9 @@
                        {% if widget.can_create_author %}data-author-quick-create-url="{% url 'author-quick-create' %}"{% endif %}>
                 {% if widget.can_create_author %}
                 <p class="text-muted small mt-1 mb-0">
-                    For organisations or single names, type the full name and press Enter. For persons, use "Last, First" format.
+                    Type a name, then choose <em>Create person</em> or <em>Create organization</em> in the list.
+                    For persons you can type "First Last" or "Last, First".
+                    New authors are only saved once you click "Add source".
                 </p>
                 {% endif %}
             </div>

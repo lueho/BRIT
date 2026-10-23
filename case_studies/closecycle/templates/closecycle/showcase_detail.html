@@ -74,7 +74,7 @@
                 <i class="fas fa-clipboard-check" aria-hidden="true"></i> {{ policy.review_feedback_label }}
               </a>
             {% elif policy.is_in_review %}
-              {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+              {% if policy.can_view_review_activity %}
                 <a class="sdv2-btn sdv2-btn-ghost"
                    href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
                   <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view

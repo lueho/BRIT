@@ -76,6 +76,28 @@ def safe_back_url(context):
     return back
 
 
+@register.simple_tag(takes_context=True)
+def safe_next_url(context):
+    """Return the request's ``next`` param if it is a same-host URL, else ``""``."""
+    request = context.get("request")
+    if request is None:
+        return ""
+
+    next_url = request.GET.get("next")
+    if not next_url:
+        return ""
+
+    try:
+        is_safe = url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        )
+    except ValueError:
+        return ""
+    return next_url if is_safe else ""
+
+
 @register.filter
 def markdown_to_html(value):
     """Render a deliberately limited markdown subset.
@@ -374,6 +396,27 @@ def detail_or_review_url(context, obj, use_back=False):
             is_declined = getattr(obj, "publication_status", None) == "declined"
     except Exception:
         is_declined = False
+
+    if is_declined and user and getattr(user, "is_authenticated", False):
+        owner_id = getattr(obj, "owner_id", None)
+        if owner_id == getattr(user, "id", None):
+            try:
+                ct = ContentType.objects.get_for_model(obj.__class__)
+                review_url = reverse(
+                    "object_management:review_item_detail",
+                    kwargs={"content_type_id": ct.id, "object_id": obj.pk},
+                )
+                next_param = ""
+                try:
+                    if request is not None:
+                        next_param = f"?next={quote(path_without_return_params(request), safe='')}"
+                except Exception:  # pragma: no cover - defensive
+                    next_param = ""
+                return f"{review_url}{next_param}"
+            except Exception as e:  # pragma: no cover - defensive
+                logger.warning(
+                    "detail_or_review_url: failed building owner review URL: %s", e
+                )
 
     try:
         if (

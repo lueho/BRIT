@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from utils.object_management.admin import PolicyAdminMixin
+from utils.object_management.admin import NamedUserCreatedObjectAdmin, PolicyAdminMixin
 
 from .models import (
     AnalyticalMethod,
@@ -13,9 +13,16 @@ from .models import (
     MaterialPropertyGroup,
     MaterialPropertyValue,
     Sample,
+    SampleAuthor,
     SampleGroup,
     SampleSeries,
 )
+
+
+class SampleAuthorInline(admin.TabularInline):
+    model = SampleAuthor
+    extra = 1
+    autocomplete_fields = ("author",)
 
 
 @admin.register(AnalyticalMethod)
@@ -61,15 +68,13 @@ class AnalyticalMethodAdmin(PolicyAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(Material)
-class MaterialAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class MaterialAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "abbreviation", "owner", "publication_status")
     search_fields = ("name", "abbreviation", "description")
-    list_filter = ("publication_status",)
-    ordering = ("name",)
 
 
 @admin.register(MaterialComponent)
-class MaterialComponentAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class MaterialComponentAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "abbreviation",
@@ -80,19 +85,15 @@ class MaterialComponentAdmin(PolicyAdminMixin, admin.ModelAdmin):
     )
     search_fields = ("name", "abbreviation", "description")
     list_filter = ("publication_status", "is_aggregate")
-    ordering = ("name",)
 
 
 @admin.register(MaterialComponentGroup)
-class MaterialComponentGroupAdmin(PolicyAdminMixin, admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class MaterialComponentGroupAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(MaterialProperty)
-class MaterialPropertyAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class MaterialPropertyAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "abbreviation",
@@ -104,16 +105,12 @@ class MaterialPropertyAdmin(PolicyAdminMixin, admin.ModelAdmin):
     )
     search_fields = ("name", "abbreviation")
     list_filter = ("publication_status", "aggregation_kind", "group")
-    ordering = ("name",)
     filter_horizontal = ("allowed_units",)
 
 
 @admin.register(MaterialPropertyGroup)
-class MaterialPropertyGroupAdmin(PolicyAdminMixin, admin.ModelAdmin):
-    list_display = ("name", "owner", "publication_status")
-    search_fields = ("name",)
-    list_filter = ("publication_status",)
-    ordering = ("name",)
+class MaterialPropertyGroupAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
+    pass
 
 
 @admin.register(MaterialPropertyValue)
@@ -134,7 +131,7 @@ class MaterialPropertyValueAdmin(PolicyAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(SampleSeries)
-class SampleSeriesAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class SampleSeriesAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "material",
@@ -145,20 +142,18 @@ class SampleSeriesAdmin(PolicyAdminMixin, admin.ModelAdmin):
     )
     search_fields = ("name", "material__name")
     list_filter = ("publication_status", "publish", "standard")
-    ordering = ("name",)
 
 
 @admin.register(SampleGroup)
-class SampleGroupAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class SampleGroupAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "kind", "owner", "publication_status")
     search_fields = ("name", "description", "sources__title")
     list_filter = ("kind", "publication_status")
-    ordering = ("name",)
     autocomplete_fields = ("sources",)
 
 
 @admin.register(Sample)
-class SampleAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class SampleAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "material",
@@ -170,9 +165,9 @@ class SampleAdmin(PolicyAdminMixin, admin.ModelAdmin):
     )
     search_fields = ("name", "material__name", "location")
     list_filter = ("publication_status", "standalone", "sample_groups")
-    ordering = ("name",)
     autocomplete_fields = ("sources",)
     filter_horizontal = ("sample_groups",)
+    inlines = (SampleAuthorInline,)
 
 
 @admin.register(Composition)

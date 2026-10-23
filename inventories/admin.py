@@ -1,8 +1,10 @@
+import math
+
 from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
 
-from utils.object_management.admin import PolicyAdminMixin
+from utils.object_management.admin import NamedUserCreatedObjectAdmin, PolicyAdminMixin
 
 from .models import (
     InventoryAlgorithm,
@@ -58,6 +60,19 @@ class InventoryAlgorithmParameterValueAdmin(admin.ModelAdmin):
     list_filter = ("default", "is_custom")
     ordering = ("parameter", "name")
 
+    def get_search_results(self, request, queryset, search_term):
+        """Also match the numeric value, which custom values display instead of a name."""
+        results, may_have_duplicates = super().get_search_results(
+            request, queryset, search_term
+        )
+        try:
+            number = float(search_term.strip())
+        except ValueError:
+            return results, may_have_duplicates
+        if not math.isfinite(number):
+            return results, may_have_duplicates
+        return results | queryset.filter(value=number), may_have_duplicates
+
 
 @admin.register(ScenarioInventoryConfiguration)
 class ScenarioInventoryConfigurationAdmin(PolicyAdminMixin, admin.ModelAdmin):
@@ -70,6 +85,15 @@ class ScenarioInventoryConfigurationAdmin(PolicyAdminMixin, admin.ModelAdmin):
         "value",
     )
     ordering = ("scenario",)
+    autocomplete_fields = (
+        "scenario",
+        "feedstock",
+        "sample_series",
+        "geodataset",
+        "inventory_algorithm",
+        "inventory_parameter",
+        "inventory_value",
+    )
 
     @staticmethod
     def feedstock_link(obj):
@@ -115,7 +139,7 @@ class ScenarioInventoryConfigurationAdmin(PolicyAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(Scenario)
-class ScenarioAdmin(PolicyAdminMixin, admin.ModelAdmin):
+class ScenarioAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "region_link",
@@ -127,8 +151,6 @@ class ScenarioAdmin(PolicyAdminMixin, admin.ModelAdmin):
         "publication_status",
     )
     search_fields = ("name", "description")
-    list_filter = ("publication_status",)
-    ordering = ("name",)
     autocomplete_fields = ("showcase",)
 
     @staticmethod

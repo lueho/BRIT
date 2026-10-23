@@ -11,12 +11,8 @@ from ..models import UserCreatedObject
 class BulkManageAccessViewTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.owner = User.objects.create_user(username="owner", password="pw")
-        cls.editor = User.objects.create_user(username="editor", password="pw")
-        cls.new_owner = User.objects.create_user(username="new_owner", password="pw")
-        cls.other = User.objects.create_user(username="other", password="pw")
-        cls.staff = User.objects.create_user(
-            username="staff", password="pw", is_staff=True
+        cls.owner = User.objects.create_user(
+            username="owner",
         )
         cls.admin = User.objects.create_user(
             username="sharing-admin", password="pw", is_staff=True

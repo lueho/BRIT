@@ -19,7 +19,7 @@
     <h6>Seven themes for closing regional material cycles</h6>
     <div class="d-flex flex-wrap gap-2 mb-3">
       {% for theme in closecycle_themes %}
-        <a class="btn btn-sm btn-outline-secondary{% if request.GET.theme == theme.key %} active{% endif %}"
+        <a class="btn btn-sm btn-outline-secondary csm-theme-chip{% if request.GET.theme == theme.key %} active{% endif %}"
            href="{{ theme.url }}"
            title="{{ theme.description }}">
           <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
@@ -28,7 +28,7 @@
           {{ theme.label }}
         </a>
       {% endfor %}
-      <a class="btn btn-sm btn-outline-secondary" href="{% url 'Showcase' %}">All themes</a>
+      <a class="btn btn-sm btn-outline-secondary csm-theme-chip" href="{% url 'Showcase' %}">All themes</a>
     </div>
     <p class="small mb-2">
       <strong>Markers:</strong> showcase installations or demonstrations.

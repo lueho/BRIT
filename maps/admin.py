@@ -10,7 +10,6 @@ from utils.object_management.admin import (
 from utils.object_management.services import perform_transition
 
 from .models import (
-    Attribute,
     Catchment,
     CatchmentRevision,
     CategoricalAttribute,
@@ -41,11 +40,6 @@ class GeoDatasetColumnPolicyInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = GeoDatasetColumnPolicy
     extra = 0
     policy_administrator_only = True
-
-
-@admin.register(Attribute)
-class AttributeModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
-    search_fields = ["name"]
 
 
 @admin.register(RegionProperty)

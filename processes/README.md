@@ -9,8 +9,7 @@ For planned future work, see `PRODUCTION_ROADMAP.md`.
 
 ### Main entry points
 
-- Dashboard: `processes:dashboard`
-- Explorer alias: `processes:processes-explorer`
+- Explorer: `processes:explorer` (`/processes/explorer/`); the unnamed legacy `/processes/dashboard/` permanently redirects to it
 - Category list: `processes:processcategory-list`
 - Process list: `processes:process-list`
 - Process type alias: `processes:processtype-list`
@@ -97,7 +96,8 @@ The main forms live in `processes/forms.py` and follow the shared BRIT `SimpleMo
 
 The canonical current templates are:
 
-- `processes/dashboard.html`
+- `processes/explorer.html`
+- `processes/processcategory_catalogue.html`
 - `processes/processcategory_list.html`
 - `processes/processcategory_detail.html`
 - `processes/processcategory_form.html`
