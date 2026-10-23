@@ -843,7 +843,7 @@ class CollectionImporter:
     ) -> None:
         """Import a single property value from a workbook record.
 
-        Both specific (kg/(cap.*a)) and total (Mg/a) values provided by the
+        Both specific (kg/(cap·a)) and total (Mg/a) values provided by the
         workbook are stored as raw (``is_derived=False``) observations.  If an
         auto-derived counterpart with the same collection/property/unit/year
         already exists it is deleted before the raw value is created, so that

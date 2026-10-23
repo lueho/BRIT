@@ -1,10 +1,13 @@
 "use strict";
 
 (function () {
-    if (window.__britTomSelectInlineCreateInitialized) {
+    // Symbol-keyed guard: idempotent across double-includes without adding a
+    // string-named global to window.
+    const initialized = Symbol.for('brit.tomSelectInlineCreateInitialized');
+    if (globalThis[initialized]) {
         return;
     }
-    window.__britTomSelectInlineCreateInitialized = true;
+    globalThis[initialized] = true;
 
     const selector = 'select[data-tomselect-create-url]';
 
@@ -44,26 +47,24 @@
 
     async function createOption(select, userInput) {
         const quickCreateUrl = select.dataset.tomselectCreateUrl;
-        const response = await fetch(quickCreateUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify(buildPayload(select, userInput))
-        });
-
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
+        try {
+            return await fetchJson(quickCreateUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(buildPayload(select, userInput))
+            });
+        } catch (error) {
+            const serverMessage = error.payload && error.payload.error;
             throw new Error(
-                payload.error
+                serverMessage
                 || select.dataset.tomselectCreateErrorMessage
                 || 'Could not create option.'
             );
         }
-
-        return payload;
     }
 
     function reportCreateError(instance, message) {
@@ -75,7 +76,12 @@
             return;
         }
 
-        window.alert(message);
+        const anchor = (instance && instance.wrapper) || input;
+        if (typeof showInlineAlert === 'function' && anchor) {
+            showInlineAlert(anchor, message);
+        } else {
+            console.error('Could not create option:', message);
+        }
     }
 
     function enhanceInstance(select) {

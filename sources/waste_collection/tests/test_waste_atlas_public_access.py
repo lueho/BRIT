@@ -14,6 +14,7 @@ from sources.waste_collection.models import Collection
 from sources.waste_collection.tests.atlas_fixtures import (
     seed_atlas_map_configurations,
 )
+from utils.object_management.models import ReviewAction
 
 API = "/waste_collection/waste-atlas/api/"
 BAD_YEARS = ["0", "-5", "20000", "99999999999999999999", "abc", "2024.5", ""]
@@ -61,6 +62,13 @@ class WasteAtlasConflictAccessTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user("conflict-user")
+        cls.admin = User.objects.create_user("conflict-admin", is_staff=True)
+        cls.admin.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(ReviewAction),
+                codename="administer_objects",
+            )
+        )
         cls.staff = User.objects.create_user("conflict-staff", is_staff=True)
         cls.moderator = User.objects.create_user("conflict-moderator")
         cls.moderator.user_permissions.add(
@@ -171,6 +179,13 @@ class WasteAtlasPublicPagesTests(TestCase):
         self.assertEqual(_map_config(response)["scope"], "historical")
         self.assertNotContains(response, 'value="mine"')
         self.assertNotContains(response, "Edit configuration")
+        self.assertEqual(
+            self.client.get(
+                reverse("api-waste-atlas-collection-system-list"),
+                {"country": "DE", "year": 2024, "scope": "all"},
+            ).json(),
+            [],
+        )
 
     def test_anonymous_unknown_scope_is_preserved_but_closes(self):
         # The raw unknown scope is preserved in the emitted JSON so the
@@ -261,10 +276,12 @@ class WasteAtlasVendorScriptTests(TestCase):
 
 class WasteAtlasDiscoverabilityTests(TestCase):
     def test_overview_is_listed_in_the_sitemap(self):
-        from brit.sitemap_items import SITEMAP_ITEMS
+        from brit.sitemap_registry import get_sitemap_items
 
-        self.assertIn(reverse("waste-atlas-overview"), SITEMAP_ITEMS)
-        self.assertNotIn(reverse("waste-atlas-data-conflicts-overview"), SITEMAP_ITEMS)
+        self.assertIn(reverse("waste-atlas-overview"), get_sitemap_items())
+        self.assertNotIn(
+            reverse("waste-atlas-data-conflicts-overview"), get_sitemap_items()
+        )
 
     def test_sitemap_entry_is_publicly_reachable(self):
         self.assertEqual(

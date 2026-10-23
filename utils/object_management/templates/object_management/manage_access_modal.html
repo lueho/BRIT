@@ -1,11 +1,5 @@
-<div class="modal-header">
-  <h5 class="modal-title">{{ modal_title }}</h5>
-  <button type="button"
-          class="btn-close"
-          data-bs-dismiss="modal"
-          aria-label="Close"></button>
-</div>
-<div class="modal-body">
+{% extends "modal_base.html" %}
+{% block modal_body %}
   <h6>Current owner</h6>
   <p class="mb-3">{{ object.owner.username }}</p>
   <h6>Transfer ownership</h6>
@@ -64,6 +58,7 @@
         <i class="fas fa-user-plus"></i> Add user
       </button>
     </div>
+    <div class="form-text">The user can only edit if they also hold this record type's change permission.</div>
   </form>
   <h6>Group grants</h6>
   <p class="text-muted small mb-2">
@@ -109,13 +104,13 @@
         <i class="fas fa-user-group"></i> Add group
       </button>
     </div>
-    <div class="form-text">Current and future group members inherit this grant. Group membership and permissions are not changed.</div>
+    <div class="form-text">This grant applies to the group — current and future members inherit it. A member can only edit if they also hold this record type's change permission, so group membership alone does not guarantee effective edit access.</div>
   </form>
   <p class="text-muted small mt-3 mb-0">
-    Recipients can read this item. Editing also requires the relevant change permission and an unpublished, non-archived item.
+    Recipients can read this item. Editing also requires the relevant change permission and an editable lifecycle state (private, review, or declined); published and archived items are frozen.
     Removing one grant does not remove access provided by other grants or roles.
   </p>
-</div>
-<div class="modal-footer">
+{% endblock %}
+{% block modal_footer %}
   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-</div>
+{% endblock %}

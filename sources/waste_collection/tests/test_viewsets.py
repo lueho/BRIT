@@ -1,7 +1,7 @@
 import json
 import math
 from collections import Counter
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -11,9 +11,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache, caches
 from django.db import connection
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, APITestCase
@@ -60,7 +61,7 @@ from utils.tests.testcases import ensure_test_default_owner
 
 class CollectionViewSetTestCase(APITestCase):
     """
-    Integration tests for CollectionViewSet with GeoJSONMixin and UserCreatedObjectViewSet.
+    Integration tests for CollectionViewSet with CachedGeoJSONMixin and UserCreatedObjectViewSet.
     Covers GeoJSON endpoint filtering and model permission enforcement for creation.
     """
 
@@ -909,14 +910,172 @@ class CollectionViewSetTestCase(APITestCase):
         self.client.force_authenticate(user=None)
 
 
+class CollectorGeoJSONRenderedPathTests(APITestCase):
+    """Collector GeoJSON streams database-rendered geometry like the other
+    ``CachedGeoJSONMixin`` viewsets."""
+
+    @classmethod
+    def setUpTestData(cls):
+        borders = GeoPolygon.objects.create(
+            geom="MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))"
+        )
+        cls.region = Region.objects.create(
+            name="Collector Region", country="DE", borders=borders
+        )
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Collector Catchment", region=cls.region
+        )
+        cls.collector = Collector.objects.create(
+            name="Geo Collector", catchment=cls.catchment
+        )
+        cls.url = reverse("api-collector-geojson")
+
+    def setUp(self):
+        self.geojson_cache = caches[settings.GEOJSON_CACHE]
+        self.geojson_cache.clear()
+
+    def test_geojson_streams_database_rendered_geometry(self):
+        with (
+            patch("maps.mixins.STREAMING_THRESHOLD", 0),
+            CaptureQueriesContext(connection) as queries,
+        ):
+            response = self.client.get(
+                self.url, {"id": self.collector.pk}, REMOTE_ADDR="10.9.10.1"
+            )
+            self.assertTrue(response.streaming)
+            data = json.loads(b"".join(response.streaming_content))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["X-Cache-Status"], "STREAM")
+        self.assertTrue(any("ST_AsGeoJSON" in q["sql"] for q in queries))
+        feature = data["features"][0]
+        self.assertEqual(feature["geometry"]["type"], "MultiPolygon")
+        self.assertEqual(feature["properties"]["collector"], "Geo Collector")
+        self.assertEqual(feature["properties"]["catchment"], "Collector Catchment")
+
+    def test_geojson_bbox_limits_features(self):
+        """bbox must filter through the catchment's region borders.
+
+        ``Collector.geom`` is a model property, not a field, so the bbox
+        filter has to resolve the underlying relation path instead.
+        """
+        inside = self.client.get(
+            self.url, {"bbox": "-1,-1,2,2"}, REMOTE_ADDR="10.9.10.2"
+        )
+        outside = self.client.get(
+            self.url, {"bbox": "10,10,20,20"}, REMOTE_ADDR="10.9.10.3"
+        )
+
+        self.assertEqual(inside.status_code, status.HTTP_200_OK)
+        self.assertEqual(inside["X-Total-Count"], "1")
+        self.assertEqual(outside.status_code, status.HTTP_200_OK)
+        self.assertEqual(outside["X-Total-Count"], "0")
+
+    def test_geojson_streaming_does_not_query_relations_per_feature(self):
+        """Streamed collectors must not issue per-row NUTS/LAU lookups.
+
+        The rendered streaming path clears prefetches; the organizational
+        relations the serializer reads must come from select_related joins.
+        """
+        for i in range(5):
+            catchment = CollectionCatchment.objects.create(
+                name=f"Stream Catchment {i}", region=self.region
+            )
+            Collector.objects.create(name=f"Stream Collector {i}", catchment=catchment)
+
+        with (
+            patch("maps.mixins.STREAMING_THRESHOLD", 0),
+            CaptureQueriesContext(connection) as queries,
+        ):
+            response = self.client.get(
+                self.url, {"stream": "true"}, REMOTE_ADDR="10.9.10.6"
+            )
+            data = b"".join(response.streaming_content)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(json.loads(data)["features"]), 6)
+        # Without select_related on the subtype links, each collector would
+        # issue one NUTS and one LAU query per feature (>= 10 extra here).
+        self.assertLessEqual(len(queries), 6)
+
+    def test_geojson_response_rotates_after_collector_edit(self):
+        first = self.client.get(self.url, REMOTE_ADDR="10.9.10.8")
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(first["X-Cache-Status"], "MISS")
+
+        # lastmodified_at only rotates on a fresh write, and the version
+        # token truncates it to whole seconds — bump it explicitly like the
+        # region cache-rotation tests do.
+        self.collector.name = "Renamed Collector"
+        self.collector.save()
+        Collector.objects.filter(pk=self.collector.pk).update(
+            lastmodified_at=timezone.now() + timedelta(days=1)
+        )
+
+        second = self.client.get(self.url, REMOTE_ADDR="10.9.10.8")
+        self.assertEqual(second["X-Cache-Status"], "MISS")
+        self.assertNotEqual(second["X-Data-Version"], first["X-Data-Version"])
+        self.assertEqual(
+            second.data["features"][0]["properties"]["collector"],
+            "Renamed Collector",
+        )
+
+
+class CollectorGeoJSONVersionRotationTests(TransactionTestCase):
+    """Border edits must rotate the collector dataset version.
+
+    GeoPolygon has no modification timestamp, so the version fingerprint
+    tracks each borders row's ``xmin``. Transaction ids only advance across
+    real commits, so this test needs TransactionTestCase autocommit.
+    """
+
+    def setUp(self):
+        # TransactionTestCase truncates the initial-data admin user that the
+        # owner field defaults to.
+        User.objects.get_or_create(username="admin")
+        borders = GeoPolygon.objects.create(
+            geom="MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))"
+        )
+        self.region = Region.objects.create(
+            name="Collector Region", country="DE", borders=borders
+        )
+        self.catchment = CollectionCatchment.objects.create(
+            name="Collector Catchment", region=self.region
+        )
+        self.collector = Collector.objects.create(
+            name="Geo Collector", catchment=self.catchment
+        )
+        self.url = reverse("api-collector-geojson")
+        caches[settings.GEOJSON_CACHE].clear()
+
+    def test_geojson_response_rotates_after_border_edit(self):
+        first = self.client.get(self.url, REMOTE_ADDR="10.9.10.7")
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(first["X-Cache-Status"], "MISS")
+
+        self.region.borders.geom = "MULTIPOLYGON(((0 0, 0 2, 2 2, 2 0, 0 0)))"
+        self.region.borders.save()
+
+        second = self.client.get(self.url, REMOTE_ADDR="10.9.10.7")
+        self.assertEqual(second["X-Cache-Status"], "MISS")
+        self.assertNotEqual(second["X-Data-Version"], first["X-Data-Version"])
+
+
 class CollectionReviewActionApiTestCase(APITestCase):
-    """Ensure review action API endpoints trigger collection cascade behavior."""
+    """Ensure review action API endpoints honour independent record lifecycles."""
 
     @classmethod
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(username="owner")
         cls.other_owner = User.objects.create_user(username="other-owner")
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
+        cls.moderator = User.objects.create_user(username="moderator")
+        cls.moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
+        )
 
         cls.catchment = CollectionCatchment.objects.create(name="Test Catchment")
         cls.collector = Collector.objects.create(name="Test Collector")
@@ -978,7 +1137,9 @@ class CollectionReviewActionApiTestCase(APITestCase):
         acpv.collections.set(collections)
         return acpv
 
-    def test_register_for_review_cascades_property_values(self):
+    def test_register_for_review_leaves_property_values_unchanged(self):
+        """Independent lifecycle: submitting a Collection does not cascade to
+        CPVs/ACPVs — each record transitions individually."""
         collection = self._create_collection(
             "Collection Submit",
             owner=self.owner,
@@ -1003,12 +1164,14 @@ class CollectionReviewActionApiTestCase(APITestCase):
         acpv_private.refresh_from_db()
 
         self.assertEqual(collection.publication_status, "review")
-        self.assertEqual(cpv_private.publication_status, "review")
-        self.assertEqual(cpv_declined.publication_status, "review")
+        self.assertEqual(cpv_private.publication_status, "private")
+        self.assertEqual(cpv_declined.publication_status, "declined")
         self.assertEqual(cpv_published.publication_status, "published")
-        self.assertEqual(acpv_private.publication_status, "review")
+        self.assertEqual(acpv_private.publication_status, "private")
 
-    def test_approve_cascades_property_values(self):
+    def test_approve_leaves_property_values_unchanged(self):
+        """Independent lifecycle: approving a Collection does not cascade to
+        CPVs/ACPVs — each record requires its own review action."""
         collection = self._create_collection(
             "Collection Approve",
             owner=self.owner,
@@ -1018,9 +1181,13 @@ class CollectionReviewActionApiTestCase(APITestCase):
         cpv_other = self._create_cpv(collection, self.other_owner, "review", year=2021)
         acpv_review = self._create_acpv([collection], self.owner, "review")
 
-        self.client.force_login(self.staff)
+        self.client.force_login(self.moderator)
         url = reverse("api-waste-collection-approve", kwargs={"pk": collection.pk})
-        response = self.client.post(url)
+        response = self.client.post(
+            url,
+            {"expected_revision": collection.content_revision},
+            format="json",
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         collection.refresh_from_db()
@@ -1029,12 +1196,12 @@ class CollectionReviewActionApiTestCase(APITestCase):
         acpv_review.refresh_from_db()
 
         self.assertEqual(collection.publication_status, "published")
-        self.assertEqual(cpv_owner.publication_status, "published")
-        self.assertEqual(cpv_other.publication_status, "published")
-        self.assertEqual(cpv_owner.approved_by, self.staff)
-        self.assertEqual(cpv_other.approved_by, self.staff)
-        self.assertEqual(acpv_review.publication_status, "published")
-        self.assertEqual(acpv_review.approved_by, self.staff)
+        self.assertEqual(cpv_owner.publication_status, "review")
+        self.assertEqual(cpv_other.publication_status, "review")
+        self.assertIsNone(cpv_owner.approved_by)
+        self.assertIsNone(cpv_other.approved_by)
+        self.assertEqual(acpv_review.publication_status, "review")
+        self.assertIsNone(acpv_review.approved_by)
 
 
 class CollectionImporterWorkflowTestCase(APITestCase):
@@ -1053,6 +1220,18 @@ class CollectionImporterWorkflowTestCase(APITestCase):
         cls.staff_owner = User.objects.create_user(
             username="importer-staff", is_staff=True
         )
+        collection_ct = ContentType.objects.get_for_model(Collection)
+        collector_ct = ContentType.objects.get_for_model(Collector)
+        for codename, ct in (
+            ("add_collection", collection_ct),
+            ("add_collector", collector_ct),
+        ):
+            permission, _ = Permission.objects.get_or_create(
+                codename=codename,
+                content_type=ct,
+                defaults={"name": f"Can {codename.replace('_', ' ')}"},
+            )
+            cls.staff_owner.user_permissions.add(permission)
         cls.catchment = CollectionCatchment.objects.create(
             name="Importer Test Catchment"
         )
@@ -1282,6 +1461,29 @@ class CollectionImporterWorkflowTestCase(APITestCase):
         )
         self.assertEqual(collection.collector.name, "Ajuntament de Cardona")
         self.assertEqual(response.data["stats"]["collectors_created"], 1)
+
+    def test_bulk_import_endpoint_denies_staff_without_add_capability(self):
+        plain_staff = User.objects.create_user(
+            username="importer-plain-staff", is_staff=True
+        )
+        self.client.force_login(plain_staff)
+
+        response = self.client.post(
+            reverse("api-waste-collection-bulk-import"),
+            {
+                "records": [self._make_record()],
+                "publication_status": "private",
+                "dry_run": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(
+            Collection.objects.filter(
+                owner=plain_staff, valid_from=self.valid_from
+            ).exists()
+        )
 
 
 class CollectionMutationApiTestCase(APITestCase):
@@ -1683,7 +1885,7 @@ class CollectionMutationApiTestCase(APITestCase):
             (
                 index
                 for index, sql in enumerate(sqls)
-                if f'FROM "{user_table}"' in sql and "FOR UPDATE" in sql
+                if f'FROM "{user_table}"' in sql and "FOR NO KEY UPDATE" in sql
             ),
             None,
         )
@@ -2283,6 +2485,176 @@ class CollectionMutationApiTestCase(APITestCase):
         )
         self.assertTrue(
             successor.flyers.filter(url="https://example.com/version-flyer-b").exists()
+        )
+
+
+class CollectionPropertyValueAnchorApiTestCase(APITestCase):
+    """The CPV endpoint authorizes the actual stored parent — the collection's
+    version anchor, which may be an archived predecessor."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="cpv-anchor-owner")
+        cls.reader = User.objects.create_user(username="cpv-anchor-reader")
+        cls.no_capability = User.objects.create_user(
+            username="cpv-anchor-no-capability"
+        )
+        cls.inactive = User.objects.create_user(
+            username="cpv-anchor-inactive", is_active=False
+        )
+
+        cpv_ct = ContentType.objects.get_for_model(CollectionPropertyValue)
+        add_cpv = Permission.objects.get(
+            codename="add_collectionpropertyvalue", content_type=cpv_ct
+        )
+        cls.reader.user_permissions.add(add_cpv)
+        cls.inactive.user_permissions.add(add_cpv)
+
+        cls.catchment = CollectionCatchment.objects.create(
+            name="CPV Anchor Catchment", publication_status="published"
+        )
+        cls.system = CollectionSystem.objects.create(
+            name="CPV Anchor System", publication_status="published"
+        )
+        cls.category = WasteCategory.objects.create(
+            name="CPV Anchor Category", publication_status="published"
+        )
+        # Isolated non-convertible property keeps this test clear of the
+        # derived-value pipeline.
+        cls.property = Property.objects.create(
+            name="CPV Anchor Property", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="CPV Anchor Unit", publication_status="published"
+        )
+        cls.property.allowed_units.add(cls.unit)
+
+        cls.archived_anchor = cls._collection("Archived anchor", "archived")
+        cls.published_successor = cls._collection("Published successor", "published")
+        cls.published_successor.predecessors.add(cls.archived_anchor)
+        cls.private_anchor = cls._collection("Private anchor", "private")
+        cls.successor_with_private_anchor = cls._collection(
+            "Successor on private anchor", "published"
+        )
+        cls.successor_with_private_anchor.predecessors.add(cls.private_anchor)
+
+    @classmethod
+    def _collection(cls, name, publication_status):
+        return Collection.objects.create(
+            name=name,
+            owner=cls.owner,
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_category=cls.category,
+            valid_from=date(2020, 1, 1),
+            publication_status=publication_status,
+        )
+
+    def _payload(self, collection):
+        return {
+            "collection": collection.pk,
+            "property_id": self.property.pk,
+            "unit_name": self.unit.name,
+            "year": 2021,
+            "average": 42.0,
+            "submit_for_review": False,
+        }
+
+    def _post(self, collection):
+        return self.client.post(
+            reverse("api-waste-collection-property-value-create"),
+            self._payload(collection),
+            format="json",
+        )
+
+    def _review_events(self, obj, action=None):
+        qs = ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(obj), object_id=obj.pk
+        )
+        if action is not None:
+            qs = qs.filter(action=action)
+        return qs
+
+    def test_reader_creates_private_cpv_on_archived_anchor(self):
+        """A published successor's anchor is its archived predecessor; the
+        declared read attachment rule lets an add-capable reader store
+        independent evidence there."""
+        anchor_revision = self.archived_anchor.content_revision
+        self.client.force_login(self.reader)
+
+        response = self._post(self.published_successor)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["anchor_collection_id"], self.archived_anchor.pk)
+        cpv = CollectionPropertyValue.objects.get(pk=response.data["id"])
+        self.assertEqual(cpv.collection, self.archived_anchor)
+        self.assertEqual(cpv.owner, self.reader)
+        self.assertEqual(cpv.publication_status, "private")
+        self.assertFalse(cpv.is_derived)
+
+        # The archived anchor is untouched: no status, owner, or revision
+        # change, and no review activity is recorded on it.
+        self.archived_anchor.refresh_from_db()
+        self.assertEqual(self.archived_anchor.publication_status, "archived")
+        self.assertEqual(self.archived_anchor.owner, self.owner)
+        self.assertEqual(self.archived_anchor.content_revision, anchor_revision)
+        self.assertFalse(self._review_events(self.archived_anchor).exists())
+
+        # The new evidence carries its own creation event bound to its own
+        # revision.
+        event = self._review_events(cpv, ReviewAction.ACTION_CREATED).get()
+        self.assertEqual(event.user, self.reader)
+        self.assertEqual(event.content_revision, cpv.content_revision)
+
+    def test_direct_archived_target_is_the_stored_parent(self):
+        self.client.force_login(self.reader)
+
+        response = self._post(self.archived_anchor)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        cpv = CollectionPropertyValue.objects.get(pk=response.data["id"])
+        self.assertEqual(cpv.collection, self.archived_anchor)
+        self.assertEqual(cpv.owner, self.reader)
+
+    def test_create_requires_add_capability(self):
+        self.client.force_login(self.no_capability)
+
+        response = self._post(self.archived_anchor)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(
+                collection=self.archived_anchor
+            ).exists()
+        )
+
+    def test_inactive_actor_is_denied(self):
+        self.client.force_login(self.inactive)
+
+        response = self._post(self.archived_anchor)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(
+                collection=self.archived_anchor
+            ).exists()
+        )
+
+    def test_private_foreign_anchor_denied_despite_readable_target(self):
+        """The target successor is public, but its stored anchor is a foreign
+        private collection — creation must fail atomically."""
+        self.client.force_login(self.reader)
+
+        response = self._post(self.successor_with_private_anchor)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(
+                collection__in=[
+                    self.private_anchor,
+                    self.successor_with_private_anchor,
+                ]
+            ).exists()
         )
 
 
@@ -4954,10 +5326,6 @@ class BiowasteImpurityViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         return {r["catchment_id"]: r for r in response.data}
 
-    def test_returns_200(self):
-        response = self.client.get(self.endpoint, {"country": "ES", "year": 2024})
-        self.assertEqual(response.status_code, 200)
-
     def test_impurity_rate_returned_from_collection_version_chain(self):
         by_catchment = self._by_catchment()
         row = by_catchment[self.catchment_with_data.id]
@@ -4991,13 +5359,6 @@ class BiowasteImpurityViewSetTests(APITestCase):
     def test_country_filter_excludes_other_countries(self):
         by_catchment = self._by_catchment(country="DE", year=2024)
         self.assertNotIn(self.catchment_with_data.id, by_catchment)
-
-    def test_response_keys(self):
-        by_catchment = self._by_catchment()
-        row = by_catchment[self.catchment_with_data.id]
-        self.assertIn("catchment_id", row)
-        self.assertIn("impurity_rate", row)
-        self.assertIn("no_collection", row)
 
 
 class WeeklyBpAccessDaysViewSetTests(APITestCase):
@@ -5096,10 +5457,6 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         return {r["catchment_id"]: r for r in response.data}
 
-    def test_returns_200(self):
-        response = self.client.get(self.endpoint, {"country": "ES", "year": 2024})
-        self.assertEqual(response.status_code, 200)
-
     def test_bring_point_catchment_has_bp_flag_and_value(self):
         by_catchment = self._by_catchment()
         row = by_catchment[self.catchment_bp_with_data.id]
@@ -5127,13 +5484,6 @@ class WeeklyBpAccessDaysViewSetTests(APITestCase):
     def test_country_filter_excludes_other_countries(self):
         by_catchment = self._by_catchment(country="DE", year=2024)
         self.assertNotIn(self.catchment_bp_with_data.id, by_catchment)
-
-    def test_response_keys(self):
-        by_catchment = self._by_catchment()
-        row = by_catchment[self.catchment_bp_with_data.id]
-        self.assertIn("catchment_id", row)
-        self.assertIn("weekly_access_days", row)
-        self.assertIn("has_bring_point", row)
 
 
 class WasteAtlasPublicationScopingTests(APITestCase):
@@ -5424,7 +5774,7 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         self.assertNotIn(self.private_catchment.id, ids)
         self.assertNotIn(self.review_catchment.id, ids)
 
-    # --- Staff bypass tests ---
+    # --- Plain staff has no bypass: public historical scope only ---
 
     def test_staff_only_sees_public_historical_in_collection_system(self):
         staff = User.objects.create_user("staffuser", is_staff=True)
@@ -5529,7 +5879,7 @@ class WasteAtlasPublicationScopingTests(APITestCase):
             self.assertNotIn(self.private_catchment.id, ids, key)
             self.assertNotIn(self.published_catchment.id, ids, key)
 
-    def test_all_scope_is_staff_only(self):
+    def test_all_scope_is_administrator_only(self):
         declined = Collection.objects.create(
             name="Declined collection",
             owner=self.user,

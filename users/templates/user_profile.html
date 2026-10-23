@@ -13,6 +13,22 @@
     </div>
 
     <div class="pt-3">
+        <p><b>E-mail notifications:</b>
+            Review e-mails are {% if not review_notifications_enabled %}currently disabled{% else %}enabled{% endif %}.
+        </p>
+        <form method="post" action="{% url 'review_notification_preference' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-primary w-100">
+                {% if review_notifications_enabled %}
+                    Disable review e-mails
+                {% else %}
+                    Enable review e-mails
+                {% endif %}
+            </button>
+        </form>
+    </div>
+
+    <div class="pt-3">
         <a href="{% url 'user-export-list' %}" class="btn btn-outline-primary w-100">
             My exports
         </a>

@@ -1880,7 +1880,7 @@ class GeoDatasetConfigAdminTests(TestCase):
         )
         payload = self._dataset_changeform_post()
         payload["name"] = "Compound change"
-        payload["sources"] = [str(self.map_source.pk), str(extra.pk)]
+        payload["sources"] = (str(self.map_source.pk), str(extra.pk))
         self.client.force_login(self.administrator)
         response = self.client.post(
             reverse("admin:maps_geodataset_change", args=[self.dataset.pk]),
@@ -1909,7 +1909,7 @@ class GeoDatasetConfigAdminTests(TestCase):
         before_name = self.dataset.name
         payload = self._dataset_changeform_post()
         payload["name"] = "Must roll back"
-        payload["sources"] = [str(extra.pk)]
+        payload["sources"] = str(extra.pk)
         self.client.force_login(self.administrator)
         self.client.raise_request_exception = False
         with (

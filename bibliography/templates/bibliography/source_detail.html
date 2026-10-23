@@ -153,7 +153,7 @@
     {% block url_check_action %}
         {% object_policy object as policy %}
         {% if object.url %}
-            {% if policy.is_owner or policy.is_moderator or policy.is_staff %}
+            {% if policy.is_owner or policy.is_moderator or policy.is_admin %}
                 <button type="button"
                         class="check-url-btn btn btn-outline-success w-100 mb-2"
                         data-pk="{{ object.pk }}"

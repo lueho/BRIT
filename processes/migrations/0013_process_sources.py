@@ -21,7 +21,7 @@ def copy_reference_sources_to_process_sources(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("bibliography", "0010_author_contact_details"),
+        ("bibliography", "0001_squashed_0012"),
         ("processes", "0012_move_process_contact_details_to_authors"),
     ]
 

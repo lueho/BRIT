@@ -60,6 +60,20 @@ class CollectionAnalysisApiTests(APITestCase):
             self.client.get(self.endpoint(), {"page_size": 1}).status_code, 200
         )
         self.client.force_authenticate(self.staff_user)
+        self.assertEqual(self.get_extended().status_code, 403)
+
+    def test_extended_view_requires_active_membership(self):
+        # Active group member.
+        self.assertEqual(self.get_extended().status_code, 200)
+        # An inactive member is denied before the group check.
+        self.analyst.is_active = False
+        self.analyst.save(update_fields=["is_active"])
+        self.assertEqual(self.get_extended().status_code, 403)
+        # An explicit administrator is allowed without group membership.
+        administrator = User.objects.create_user(
+            username="administrator", is_superuser=True
+        )
+        self.client.force_authenticate(administrator)
         self.assertEqual(self.get_extended().status_code, 200)
 
     def test_default_list_remains_lean(self):

@@ -1,161 +1,119 @@
-{% extends "detail_with_options.html" %}
+{% extends "detail_v2.html" %}
 {% load static %}
+{% load i18n %}
 {% load moderation_tags %}
 {% block style_sheets %}
-    {{ block.super }}
-    <link rel="stylesheet" href="{% static 'css/source_url_display.min.css' %}">
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/source_url_display.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/collection_detail.min.css' %}">
 {% endblock style_sheets %}
-{% block detail_header_badge %}
-    {% include "object_management/review_status_badge.html" with object=object %}
-{% endblock detail_header_badge %}
-{% block detail_header_actions %}
-    <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
-        <div class="btn-group me-2" role="group">
-            {% safe_back_url as back_url %}
-            {% if back_url %}
-                <a class="btn btn-sm btn-outline-secondary"
-                   href="{{ back_url }}"
-                   rel="nofollow"
-                   title="Back to results">
-                    <i class="fas fa-arrow-left"></i>
-                    <span class="d-none d-md-inline">Back to results</span>
-                </a>
-            {% endif %}
-            {% if back_collection %}
-                <a class="btn btn-sm btn-outline-secondary"
-                   href="{{ back_collection.get_absolute_url }}"
-                   title="Collection">
-                    <i class="fas fa-arrow-left"></i>
-                    <span class="d-none d-md-inline">Collection</span>
-                </a>
-            {% endif %}
-            {% if object.list_url %}
-                <a class="btn btn-sm btn-outline-secondary"
-                   href="{{ object.list_url }}"
-                   title="List">
-                    <i class="fas fa-list-ul"></i>
-                    <span class="d-none d-md-inline">List</span>
-                </a>
-            {% endif %}
-            <a class="btn btn-sm btn-outline-secondary"
-               href="{% url 'wastecollection-explorer' %}"
-               title="Open Explorer (dashboard)">
-                <i class="fas fa-table-cells-large"></i>
-                <span class="d-none d-md-inline">Explorer</span>
-            </a>
-        </div>
-        {{ block.super }}
+{% block detail_page_title %}{{ object.property }}: {{ object.display_average }} {{ object.unit }}{% endblock detail_page_title %}
+{% block detail_title %}{{ object.property }}: {{ object.display_average }} {{ object.unit }}{% endblock detail_title %}
+{% block rail_aria_label %}Collection property toolbar{% endblock rail_aria_label %}
+{% block rail_nav %}
+  {% include "waste_collection/includes/collectionpropertyvalue_context_nav.html" %}
+{% endblock rail_nav %}
+{% block anon_nav %}
+  {% include "waste_collection/includes/collectionpropertyvalue_context_nav.html" %}
+{% endblock anon_nav %}
+{% block hero_lede %}
+  <div class="sdv2-hero-material">
+    {{ object.display_average }}{% if object.standard_deviation %}
+      ± {{ object.display_standard_deviation }}{% endif %} {{ object.unit }}
+  </div>
+{% endblock hero_lede %}
+{% block hero_meta_items %}
+  {% if object.collection %}
+    <li>
+      <span class="sdv2-meta-label">Collection</span>
+      {% if back_collection %}
+        <a href="{{ back_collection.get_absolute_url }}">{{ back_collection }}</a>
+      {% else %}
+        {{ object.collection }}
+      {% endif %}
+    </li>
+  {% endif %}
+  <li>
+    <span class="sdv2-meta-label">Year</span>
+    {{ object.year }}
+    {% if object.year_outside_collection_period %}
+      <i class="fas fa-circle-info text-muted ms-1"
+         title="Reference year {{ object.year }} is outside the collection validity period ({{ object.collection.valid_from|date:'Y' }}-{% if object.collection.valid_until %}{{ object.collection.valid_until|date:'Y' }}{% else %}present{% endif %})"
+         aria-label="Reference year outside collection validity period"></i>
+    {% endif %}
+  </li>
+  <li>
+    <span class="sdv2-meta-label">Unit</span>
+    {{ object.unit }}
+  </li>
+{% endblock hero_meta_items %}
+{% block layout_class %}{% if visible_related_collections %}sdv2-layout{% else %}sdv2-layout sdv2-layout-full{% endif %}{% endblock layout_class %}
+{% block detail_sections %}
+  <section class="sdv2-section-panel" aria-label="Value details">
+    <div class="sdv2-section-header">
+      <div class="sdv2-section-heading">
+        <h2 class="sdv2-section-title">Details</h2>
+      </div>
     </div>
-{% endblock detail_header_actions %}
-{% block detail_body %}
-    {% if visible_related_collections %}
-        <p class="card-text">
-            <strong>Related collections:</strong>
-        </p>
-        <ul>
-            {% for related_collection in visible_related_collections %}
-                <li>
-                    <a href="{{ related_collection.get_absolute_url }}">{{ related_collection }}</a>
-                </li>
-            {% endfor %}
+    <dl class="sdv2-context-details">
+      <div>
+        <dt>{% trans "Property" %}</dt>
+        <dd>{{ object.property }}</dd>
+      </div>
+      <div>
+        <dt>{% trans "Year" %}</dt>
+        <dd>{{ object.year }}</dd>
+      </div>
+      <div>
+        <dt>{% trans "Value" %}</dt>
+        <dd>{{ object.display_average }} {{ object.unit }}</dd>
+      </div>
+      {% if object.standard_deviation %}
+        <div>
+          <dt>{% trans "Standard deviation" %}</dt>
+          <dd>{{ object.display_standard_deviation }} {{ object.unit }}</dd>
+        </div>
+      {% endif %}
+      <div>
+        <dt>{% trans "Owner" %}</dt>
+        <dd>{{ object.owner }}</dd>
+      </div>
+    </dl>
+  </section>
+  {% if object.sources.exists %}
+    <section class="sdv2-section-panel" id="sources" aria-label="Sources">
+      <div class="sdv2-section-header">
+        <div class="sdv2-section-heading">
+          <h2 class="sdv2-section-title">Sources</h2>
+        </div>
+      </div>
+      <ul class="mb-0">
+        {% include "waste_collection/includes/source_list_items.html" with sources=object.sources.all %}
+      </ul>
+    </section>
+  {% endif %}
+{% endblock detail_sections %}
+{% block detail_aside %}
+  {% if visible_related_collections %}
+    <aside class="sdv2-related" aria-label="Related collections">
+      <section class="sdv2-related-section sdv2-surface"
+               aria-label="Related collections">
+        <h3 class="sdv2-related-title">Related collections</h3>
+        <ul class="sdv2-related-list">
+          {% for related_collection in visible_related_collections %}
+            <li>
+              <a class="sdv2-related-link" href="{{ related_collection.get_absolute_url }}">
+                <span class="sdv2-related-name">{{ related_collection }}</span>
+              </a>
+            </li>
+          {% endfor %}
         </ul>
-    {% else %}
-        <p class="card-text">
-            <strong>Collection:</strong>
-            <br>
-            {{ object.collection }}
-        </p>
-    {% endif %}
-    <p class="card-text">
-        <strong>Property:</strong>
-        <br>
-        {{ object.property }}
-    </p>
-    <p class="card-text">
-        <strong>Year:</strong>
-        <br>
-        {{ object.year }}
-        {% if object.year_outside_collection_period %}
-            <i class="fas fa-triangle-exclamation text-warning ms-1"
-               title="Reference year {{ object.year }} is outside the collection validity period ({{ object.collection.valid_from|date:'Y' }}-{% if object.collection.valid_until %}{{ object.collection.valid_until|date:'Y' }}{% else %}present{% endif %})"
-               aria-label="Reference year outside collection validity period"></i>
-        {% endif %}
-    </p>
-    {% if object.standard_deviation %}
-        <p class="card-text">
-            <strong>Value:</strong>
-            <br>
-            {{ object.average }}
-            ± {{ object.standard_deviation }} {{ object.unit }}
-        </p>
-    {% else %}
-        <p class="card-text">
-            <strong>Value:</strong>
-            <br>
-            {{ object.average }} {{ object.unit }}
-        </p>
-    {% endif %}
-    {% if object.sources.exists %}
-        <p class="card-text">
-            <strong>Sources:</strong>
-        </p>
-        <ul>
-            {% for source in object.sources.all %}
-                <li>
-                    {% if source.type == "waste_flyer" %}
-                        {# Waste flyer: Keep full href, but compact visible label for better UX #}
-                        <i class="fas fa-file-alt text-muted"></i>
-                        <span class="badge bg-secondary text-white me-2">Waste Flyer</span>
-                        <a href="{{ source.url }}"
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           class="source-url-line js-compact-url">
-                            <span class="source-url-label">{{ source.url }}</span>
-                            <i class="fas fa-external-link-alt ms-1 small"></i>
-                        </a>
-                        {% if "web.archive.org" in source.url %}<span class="badge text-bg-light border ms-2">Archived</span>{% endif %}
-                    {% else %}
-                        {# Regular bibliographic source #}
-                        <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
-                        {% if source.title %}- {{ source.title }}{% endif %}
-                        {% if source.year %}({{ source.year }}){% endif %}
-                        {% if source.url %}
-                            <br>
-                            <span class="text-muted small source-url-meta">
-                                <a href="{{ source.url }}"
-                                   target="_blank"
-                                   rel="noopener noreferrer"
-                                   class="source-url-line js-compact-url">
-                                    <i class="fas fa-external-link-alt"></i>
-                                    <span class="source-url-label">{{ source.url }}</span>
-                                </a>
-                            </span>
-                        {% endif %}
-                    {% endif %}
-                </li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-    <p class="card-text">
-        <strong>Owner:</strong>
-        <br>
-        {{ object.owner }}
-    </p>
-    {% if object.publication_status != 'published' %}
-        <p class="card-text text-muted small">
-            {% if object.publication_status == 'private' %}
-                Visible only to you (owner) and moderators until submitted.
-            {% elif object.publication_status == 'review' %}
-                Awaiting moderator review.
-            {% elif object.publication_status == 'declined' %}
-                Changes were declined; update and resubmit after addressing feedback.
-            {% endif %}
-        </p>
-    {% endif %}
-{% endblock detail_body %}
-{% block detail_card_footer %}
-{% endblock detail_card_footer %}
-{% block detail_with_options_scripts %}
-    <script src="{% static 'js/source_url_display.min.js' %}"
-            type="text/javascript"></script>
-{% endblock detail_with_options_scripts %}
+      </section>
+    </aside>
+  {% endif %}
+{% endblock detail_aside %}
+{% block javascript %}
+  {{ block.super }}
+  <script src="{% static 'js/source_url_display.min.js' %}"
+          type="text/javascript"></script>
+{% endblock javascript %}

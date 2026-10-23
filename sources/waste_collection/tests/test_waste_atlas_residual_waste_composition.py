@@ -36,7 +36,7 @@ class ResidualWasteCompositionViewSetTests(APITestCase):
             name="total food waste in residual waste"
         )
         cls.percentage_unit, _ = Unit.objects.get_or_create(name="%")
-        cls.kg_unit, _ = Unit.objects.get_or_create(name="kg/(cap.*a)")
+        cls.kg_unit, _ = Unit.objects.get_or_create(name="kg/(cap·a)")
         cls.biowaste_property.allowed_units.add(
             cls.percentage_unit,
             cls.kg_unit,
@@ -107,9 +107,20 @@ class ResidualWasteCompositionViewSetTests(APITestCase):
             88,
             publication_status="review",
         )
-        cls.staff_user = get_user_model().objects.create_user(
-            username="composition-map-staff",
+        cls.admin_user = get_user_model().objects.create_user(
+            username="composition-map-admin",
             is_staff=True,
+        )
+        from django.contrib.auth.models import Permission
+        from django.contrib.contenttypes.models import ContentType
+
+        from utils.object_management.models import ReviewAction
+
+        cls.admin_user.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type=ContentType.objects.get_for_model(ReviewAction),
+            )
         )
 
         cls.catchment_without_data = CollectionCatchment.objects.create(
@@ -167,10 +178,10 @@ class ResidualWasteCompositionViewSetTests(APITestCase):
             publication_status=publication_status,
         )
 
-    def _by_catchment(self):
+    def _by_catchment(self, **params):
         response = self.client.get(
             self.endpoint,
-            {"country": "DE", "year": 2024},
+            {"country": "DE", "year": 2024, **params},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         return {row["catchment_id"]: row for row in response.data}
@@ -208,10 +219,12 @@ class ResidualWasteCompositionViewSetTests(APITestCase):
     def test_excludes_catchments_without_a_residual_waste_collection(self):
         self.assertNotIn(self.biowaste_only_catchment.id, self._by_catchment())
 
-    def test_staff_preview_includes_the_latest_review_value(self):
-        self.client.force_authenticate(self.staff_user)
+    def test_admin_preview_includes_the_latest_review_value(self):
+        self.client.force_authenticate(self.admin_user)
 
-        row = self._by_catchment()[self.catchment_with_data.id]
+        # Non-public rows require the explicit administrator-only scope;
+        # the default scope stays public-historical for every actor.
+        row = self._by_catchment(scope="all")[self.catchment_with_data.id]
 
         self.assertEqual(row["bw_rw_percentage"], 88)
         self.assertEqual(row["analysis_year"], 2025)

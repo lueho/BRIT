@@ -106,7 +106,16 @@ atlas.setRenderDefaults({
   quartileColors: ["#1", "#2", "#3", "#4"],
 });
 
-const { changes, collections, layout, legend, quartiles, selection } = atlas;
+const { changes, collections, directory, layout, legend, quartiles, selection } = atlas;
+
+test("directory search matches query terms at word starts", () => {
+  assert.equal(directory.matchesSearch("residual waste bin size", "bin"), true);
+  assert.equal(directory.matchesSearch("combined schedule", "bin"), false);
+  assert.equal(directory.matchesSearch("biowaste bin capacity", "bio bin"), true);
+  assert.equal(directory.matchesSearch("residual waste bin size", ""), true);
+  assert.equal(directory.matchesSearch("combined schedule", "sched"), true);
+  assert.equal(directory.matchesSearch("baden-württemberg", "würt"), true);
+});
 
 test("quartile categories use rounded whole-number labels", () => {
   const categories = quartiles.categories([10, 20, 30, 40], ["a", "b", "c", "d"]);

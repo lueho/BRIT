@@ -24,13 +24,25 @@ API URLs; migration `0027` rewrites them to the new prefix.
 ## Public access
 
 Map pages, the overview and the data API are public and only ever return
-published (and archived) collections to anonymous visitors. Restricted:
+public historical collections — published records plus retained,
+previously published archives — to every actor by default. In the Atlas
+the `published` scope intentionally includes archived predecessors so
+historical years remain available; it is a narrower purpose filter over
+the core public read states, while the generic `published` scope is
+active-only. The authorization rules themselves live in
+[`security_permission_validation.md`](security_permission_validation.md);
+this page only names where they apply. Restricted:
 
-- map configuration pages and the data-conflicts overview: staff only;
+- map configuration pages and the data-conflicts overview: explicit
+  application administrators only;
 - `collection-conflicts/` API and the conflict overlay in the map config:
-  staff and collection moderators (`can_moderate_collection`);
-- `scope=mine|review|all`: only for the users those scopes are meant for;
-  anonymous requests fall back to `published`.
+  administrators and active collection moderators
+  (`can_moderate_collection`);
+- data scopes: `mine` is a compatibility alias for the owned/shared
+  workspace, `owned` and `shared` address that workspace explicitly, and
+  `review`/`declined` follow current core visibility; `all` is
+  administrator-only. Unknown or unauthorized scopes return no data —
+  never an unfiltered queryset or a public fallback.
 
 The data API is limited by its own scoped throttle (`waste_atlas`, keyed on the
 proxy-vouched client IP) and is exempt from the site-wide anonymous limit in

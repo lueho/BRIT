@@ -22,7 +22,7 @@ from .map_selection import (
     resolve_map_set,
 )
 from .models import WasteAtlasMapConfiguration
-from .pages import MAP_PAGES, MAP_SET_LABELS
+from .pages import ABFALLATLAS_URL, MAP_PAGES, MAP_SET_LABELS
 from .params import (
     parse_atlas_year,
     parse_country,
@@ -469,6 +469,7 @@ class WasteAtlasOverviewView(TemplateView):
         ctx.update(
             _atlas_access_context(self.request.user, self.request.GET.get("scope"))
         )
+        ctx["abfallatlas_url"] = ABFALLATLAS_URL
         ctx["selected_required_bin_capacity_reference"] = self.request.GET.get(
             "required_bin_capacity_reference",
             "person",
@@ -481,6 +482,8 @@ class WasteAtlasOverviewView(TemplateView):
         )
         ctx["directory_selected_category"] = self.request.GET.get("category", "")
         ctx["directory_query"] = self.request.GET.get("q", "")
+        ctx["atlas_administrator"] = is_admin(self.request.user)
+        ctx["atlas_active_actor"] = is_active_actor(self.request.user)
         ctx["atlas_tree_overview_active"] = True
         return ctx
 

@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from utils.properties.units import UnitConversionError, convert_weight_fraction_value
 
-from .models import MaterialComponent, MeasurementValueQualifier
+from .models import MaterialComponent, MeasurementLimitType, MeasurementValueQualifier
 
 WARNING_MULTIPLE_BASIS_COMPONENTS = "multiple_basis_components"
 WARNING_AGGREGATE_COMPONENTS_EXCLUDED = "aggregate_components_excluded"
@@ -197,7 +197,7 @@ def _build_raw_derived_group_composition(
         MeasurementValueQualifier.LESS_THAN,
         MeasurementValueQualifier.BELOW_DETECTION_LIMIT,
     }
-    censored_count = 0
+    censored_counts = defaultdict(int)
     for measurement in observations:
         if measurement.value_qualifier not in {
             MeasurementValueQualifier.EXACT,
@@ -219,7 +219,7 @@ def _build_raw_derived_group_composition(
         ):
             return unavailable(
                 "invalid_measurement_value",
-                "This group contains a negative or non-finite concentration, uncertainty, or detection limit. Review the raw measurements before normalization.",
+                "This group contains a negative or non-finite concentration, uncertainty, or limit value. Review the raw measurements before normalization.",
             )
         try:
             percentage = to_weight_percent(
@@ -235,7 +235,8 @@ def _build_raw_derived_group_composition(
                 "invalid_mass_fraction",
                 "This group contains an individual mass fraction above 100%. Review the raw measurements before normalization.",
             )
-        censored_count += measurement.value_qualifier in zero_qualifiers
+        if measurement.value_qualifier in zero_qualifiers:
+            censored_counts[measurement.effective_limit_type] += 1
 
     positive_measurements = []
     basis_components = []
@@ -266,10 +267,10 @@ def _build_raw_derived_group_composition(
         grouped_components[measurement.component].append(measurement)
 
     if not positive_measurements:
-        if censored_count:
+        if censored_counts:
             return unavailable(
                 "censored_values_approximated_as_zero",
-                "Detection-limit observations are approximated as zero for aggregation; no positive exact measurements remain. Raw values are unchanged.",
+                "Below-limit observations are approximated as zero for aggregation; no positive exact measurements remain. Raw values are unchanged.",
             )
         return None
 
@@ -283,10 +284,8 @@ def _build_raw_derived_group_composition(
 
     warnings = []
     warning_codes = []
-    if censored_count:
-        warnings.append(
-            f"{censored_count} detection-limit observation(s) were approximated as zero for aggregation; their stored values are unchanged."
-        )
+    if censored_counts:
+        warnings.append(_censored_values_warning(censored_counts))
         warning_codes.append("censored_values_approximated_as_zero")
     if excluded_aggregate_names:
         warnings.append(
@@ -388,6 +387,31 @@ def _build_raw_derived_group_composition(
         if composition_setting is not None
         else None,
     }
+
+
+def _censored_values_warning(censored_counts):
+    order = [*MeasurementLimitType.values, ""]
+    parts = []
+    for limit_type in sorted(censored_counts, key=order.index):
+        limit = (
+            f"the {MeasurementLimitType(limit_type).label[0].lower()}"
+            f"{MeasurementLimitType(limit_type).label[1:]}"
+            if limit_type
+            else "an unspecified limit"
+        )
+        count = censored_counts[limit_type]
+        parts.append(
+            f"{count} observation(s) below {limit}"
+            if not parts
+            else f"{count} below {limit}"
+        )
+    summary = (
+        parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
+    )
+    return (
+        f"{summary} were approximated as zero for aggregation; their stored "
+        "values are unchanged."
+    )
 
 
 def _normalize_component_name(component):
