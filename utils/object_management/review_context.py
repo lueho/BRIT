@@ -103,7 +103,7 @@ def _serialize_review_feedback(obj: Any, *, history_limit: int) -> dict[str, Any
             ReviewAction.for_object(obj)
             .select_related("user")
             .exclude(user_id=obj.owner_id)
-            .exclude(action=ReviewAction.ACTION_SUBMITTED)
+            .filter(action__in=ReviewAction.REVIEW_FEEDBACK_ACTIONS)
             .filter(
                 Q(created_at__gt=latest_submission.created_at)
                 | Q(
