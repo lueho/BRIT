@@ -91,6 +91,17 @@ CURATED_MODELS = frozenset(
     }
 )
 
+# Owned children whose runtime relation/column configuration additionally
+# requires explicit application administration on every mutation — including
+# create, edit, delete, reassignment, and editable-scope listing. Ordinary
+# owned children not listed here remain governed solely by parent authority.
+ADMINISTRATOR_MANAGED_CHILDREN = frozenset(
+    {
+        "maps.geodatasetcolumnpolicy",
+        "maps.geodatasetruntimeconfiguration",
+    }
+)
+
 OWNED_CHILDREN = {
     "bibliography.sourceauthor": "source",
     "closecycle.showcasematerial": "showcase",
@@ -176,6 +187,17 @@ def model_policy(model):
     if not isinstance(label, str):
         return None
     return MODEL_POLICIES.get(label)
+
+
+def administrator_managed(model):
+    """Whether writes to ``model`` additionally require ``actor.admin``.
+
+    Parent authority, lifecycle state, and capability checks still apply; the
+    administrator requirement is strictly additive.
+    """
+    meta = getattr(model, "_meta", None)
+    label = getattr(meta, "label_lower", None) if meta is not None else None
+    return label in ADMINISTRATOR_MANAGED_CHILDREN
 
 
 def generated_profile(model):

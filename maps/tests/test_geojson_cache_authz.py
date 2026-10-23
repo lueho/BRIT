@@ -19,7 +19,11 @@ from django.urls import reverse
 from rest_framework.test import APIRequestFactory
 
 from maps.models import GeoPolygon, Region
-from maps.utils import AUTHZ_GEOJSON_CACHE_PREFIX, get_region_cache_key
+from maps.utils import (
+    AUTHZ_GEOJSON_CACHE_PREFIX,
+    get_catchment_cache_key,
+    get_region_cache_key,
+)
 from maps.viewsets import RegionViewSet
 
 User = get_user_model()
@@ -188,3 +192,105 @@ class GeoJsonCacheAudienceTests(TestCase):
         request.user = AnonymousUser()
 
         self.assertIsNone(view._audience_cache_key(request, legacy_key))
+
+
+class GeoJsonCacheKeyScopeCollisionTests(TestCase):
+    """Id-scoped requests must not collide across differing filters.
+
+    ``?id=PUBLIC`` warms the anonymous ``authz-v1:`` entry; the identical id
+    combined with a scope or any other filter must compute a different key
+    and therefore an independently resolved, scoped payload.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="ck-owner")
+        cls.public_region = Region.objects.create(
+            name="CK Public",
+            country="DE",
+            owner=cls.owner,
+            publication_status="published",
+            borders=GeoPolygon.objects.create(
+                geom=MultiPolygon(Polygon(((0, 0), (0, 1), (1, 1), (1, 0), (0, 0))))
+            ),
+        )
+        cls.archived_region = Region.objects.create(
+            name="CK Archived",
+            country="DE",
+            owner=cls.owner,
+            publication_status="archived",
+            borders=GeoPolygon.objects.create(
+                geom=MultiPolygon(Polygon(((2, 2), (2, 3), (3, 3), (3, 2), (2, 2))))
+            ),
+        )
+
+    @override_settings(CACHES=_GEOJSON_CACHE_SETTINGS)
+    def setUp(self):
+        self.geojson_cache = caches["geojson"]
+        self.geojson_cache.clear()
+        self.url = reverse("api-region-geojson")
+
+    def tearDown(self):
+        self.geojson_cache.clear()
+
+    def test_scoped_id_request_does_not_hit_unscoped_public_payload(self):
+        warm = self.client.get(f"{self.url}?id={self.public_region.pk}")
+        self.assertEqual(warm.status_code, 200)
+        self.assertEqual(len(warm.json()["features"]), 1)
+
+        for params in ("scope=private", "scope=owned", "scope=shared"):
+            with self.subTest(params=params):
+                response = self.client.get(
+                    f"{self.url}?id={self.public_region.pk}&{params}"
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["features"], [])
+        # an invalid scope is rejected outright — never a cache hit
+        response = self.client.get(f"{self.url}?id={self.public_region.pk}&scope=bogus")
+        self.assertEqual(response.status_code, 400)
+
+    def test_scoped_id_head_reports_scoped_count(self):
+        self.client.get(f"{self.url}?id={self.public_region.pk}")
+        response = self.client.head(
+            f"{self.url}?id={self.public_region.pk}&scope=private"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("X-Total-Count"), "0")
+
+    def test_archived_id_with_published_scope_is_empty(self):
+        warm = self.client.get(f"{self.url}?id={self.archived_region.pk}")
+        self.assertEqual(warm.status_code, 200)
+        self.assertEqual(len(warm.json()["features"]), 1)
+        response = self.client.get(
+            f"{self.url}?id={self.archived_region.pk}&scope=published"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["features"], [])
+
+
+class GeoJsonCacheKeyFactoryTests(TestCase):
+    """Direct factory parity: id-only keys stay stable, extra filters split."""
+
+    def test_id_only_key_retained_when_filters_are_empty_or_id_only(self):
+        base = get_region_cache_key(7)
+        self.assertEqual(base, "region_geojson:id:7")
+        self.assertEqual(get_region_cache_key(7, {}), base)
+        self.assertEqual(get_region_cache_key(7, {"id": "7"}), base)
+        self.assertEqual(get_catchment_cache_key(9), "catchment_geojson:id:9")
+        self.assertEqual(
+            get_catchment_cache_key(9, {"id": "9"}), "catchment_geojson:id:9"
+        )
+
+    def test_extra_filters_produce_distinct_deterministic_keys(self):
+        scoped = get_region_cache_key(7, {"id": "7", "scope": "private"})
+        self.assertNotEqual(scoped, "region_geojson:id:7")
+        self.assertTrue(scoped.startswith("region_geojson:id:7"))
+        self.assertEqual(
+            scoped,
+            get_region_cache_key(7, {"scope": "private", "id": "7"}),
+        )
+        other = get_region_cache_key(7, {"id": "7", "scope": "published"})
+        self.assertNotEqual(scoped, other)
+        catch = get_catchment_cache_key(9, {"id": "9", "scope": "private"})
+        self.assertTrue(catch.startswith("catchment_geojson:id:9"))
+        self.assertNotEqual(catch, "catchment_geojson:id:9")

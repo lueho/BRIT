@@ -61,7 +61,8 @@
                                href="{{ object.get_map_url }}">Map</a>
                             <a class="btn btn-sm btn-outline-secondary"
                                href="{% url 'geodataset-table' pk=object.pk %}">Table</a>
-                            {% if object.update_url and list_type == 'private' %}
+                            {% object_policy object as card_policy %}
+                            {% if object.update_url and list_type == 'private' and card_policy.can_edit %}
                                 <a class="btn btn-sm btn-outline-secondary"
                                    href="{{ object.update_url }}">Edit metadata</a>
                             {% endif %}

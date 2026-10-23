@@ -3,7 +3,7 @@ from rest_framework.viewsets import ModelViewSet
 from .object_management.models import UserCreatedObject
 from .object_management.policy import visible_queryset
 from .object_management.registry import model_policy
-from .object_management.viewsets import perform_policy_create
+from .object_management.viewsets import perform_policy_update
 from .permissions import (
     HasModelPermission,
 )
@@ -136,57 +136,26 @@ class AutoPermModelViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         """Server owns owner/lifecycle initialization; payload cannot forge them."""
-        from django.db import transaction
+        from .object_management.viewsets import (
+            finalize_policy_create,
+            perform_policy_create,
+        )
 
-        from .object_management.registry import KIND_OWNED
-        from .object_management.services import content_mutation, record_creation
-
-        validated = getattr(serializer, "validated_data", None)
-        if isinstance(validated, dict):
-            validated.pop("owner", None)
-            validated.pop("publication_status", None)
-        model = getattr(getattr(serializer, "Meta", None), "model", None)
-        policy = model_policy(model) if model is not None else None
-        if policy is not None:
-            _, parent = perform_policy_create(self, serializer)
-            if isinstance(model, type) and issubclass(model, UserCreatedObject):
-                if policy.kind == KIND_OWNED and parent is not None:
-                    with content_mutation(self.request.user, parent, action="edit"):
-                        serializer.save(
-                            owner=self.request.user,
-                            publication_status=UserCreatedObject.STATUS_PRIVATE,
-                        )
-                    return
-                with transaction.atomic():
-                    obj = serializer.save(
-                        owner=self.request.user,
-                        publication_status=UserCreatedObject.STATUS_PRIVATE,
-                    )
-                    record_creation(self.request.user, obj)
-            else:
-                serializer.save()
-            return
-        if model is not None and issubclass(model, UserCreatedObject):
-            from django.core.exceptions import PermissionDenied
-
-            raise PermissionDenied("Unregistered model cannot be created.")
-        serializer.save()
+        policy, parent = perform_policy_create(self, serializer)
+        finalize_policy_create(self, serializer, policy, parent)
 
     def perform_update(self, serializer):
-        from .object_management.services import content_mutation
-
-        instance = getattr(serializer, "instance", None)
-        if isinstance(instance, UserCreatedObject):
-            with content_mutation(self.request.user, instance, action="edit"):
-                serializer.save()
-            return
-        serializer.save()
+        perform_policy_update(self, serializer)
 
     def perform_destroy(self, instance):
         from .object_management.services import content_mutation
 
-        if isinstance(instance, UserCreatedObject):
-            with content_mutation(self.request.user, instance, action="delete"):
-                instance.delete()
+        if isinstance(instance, UserCreatedObject) or (
+            model_policy(type(instance)) is not None
+        ):
+            with content_mutation(
+                self.request.user, instance, action="delete"
+            ) as locked:
+                locked.delete()
             return
         instance.delete()

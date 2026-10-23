@@ -1,5 +1,6 @@
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.models import Model
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -9,6 +10,7 @@ from .models import UserCreatedObject
 from .permissions import (
     GlobalObjectPermission,
     UserCreatedObjectPermission,
+    _forbidden_write_fields,
     apply_scope_filter,
     filter_queryset_for_user,
 )
@@ -16,7 +18,6 @@ from .policy import decide
 from .registry import (
     KIND_OWNED,
     KIND_REVIEWABLE,
-    generated_profile,
     model_policy,
     resolve_create_parent,
     resolve_parent,
@@ -24,9 +25,13 @@ from .registry import (
 )
 from .services import (
     StaleRevisionError,
+    _fresh_actor,
+    authorize_create,
     content_mutation,
     perform_transition,
     record_creation,
+    validate_created_parent,
+    validate_references,
 )
 
 
@@ -49,26 +54,132 @@ def _create_parent(view, serializer, policy):
 
 
 def perform_policy_create(view, serializer):
-    """Final authorization boundary for bound creates.
+    """Advisory create-context resolution for bound creates.
 
-    For owned children and independent evidence models the validated parent
-    context is resolved from the declared ``parent_path`` and the create
-    decision is re-evaluated with it; missing or unauthorized context raises
-    ``PermissionDenied`` before any row is written.
+    Resolves the registered policy and declared ``parent_path`` parent context
+    and performs a preliminary ``create`` decision for early denial. The
+    authoritative check runs inside the write boundary via
+    ``services.authorize_create`` with a freshly reloaded actor and parent
+    rows; this advisory step never substitutes for it.
 
     Returns ``(policy, parent)`` so callers can scope the write boundary.
     """
     model = _serializer_model(view, serializer)
     policy = model_policy(model)
-    if policy is None or policy.parent_path is None:
+    if policy is None:
         return policy, None
-    parent = _create_parent(view, serializer, policy)
-    if parent is None:
-        raise PermissionDenied("Creation requires a valid parent context.")
+    parent = None
+    if policy.parent_path is not None:
+        parent = _create_parent(view, serializer, policy)
+        if parent is None:
+            raise PermissionDenied("Creation requires a valid parent context.")
     decision = decide(view.request.user, "create", model, parent=parent)
     if not decision.allowed:
         raise PermissionDenied(decision.reason)
     return policy, parent
+
+
+def finalize_policy_create(view, serializer, policy, parent):
+    """Persist a governed create inside the shared write boundary.
+
+    Owned children are written inside a ``content_mutation`` on the resolved
+    parent so the parent's audit captures the new row; only real
+    ``UserCreatedObject`` rows get owner/lifecycle injection and creation
+    audit events. Unregistered non-UCO models keep plain serializer
+    persistence with reference validation.
+    """
+    model = _serializer_model(view, serializer)
+    is_uco = isinstance(model, type) and issubclass(model, UserCreatedObject)
+    if is_uco and policy is None:
+        raise PermissionDenied("Unregistered model cannot be created.")
+    validated = getattr(serializer, "validated_data", None)
+    if policy is not None and isinstance(validated, dict):
+        for forbidden in _forbidden_write_fields(model):
+            validated.pop(forbidden, None)
+    if policy is not None and policy.kind == KIND_OWNED and parent is not None:
+        with content_mutation(
+            view.request.user, parent, action="edit"
+        ) as locked_parent:
+            actor = authorize_create(view.request.user, model, parent=locked_parent)
+            validate_references(actor, validated)
+            if is_uco:
+                obj = serializer.save(
+                    owner=actor,
+                    publication_status=UserCreatedObject.STATUS_PRIVATE,
+                )
+            else:
+                obj = serializer.save()
+            validate_created_parent(obj, parent=locked_parent)
+            return obj
+    with transaction.atomic():
+        if policy is not None:
+            actor = authorize_create(view.request.user, model, parent=parent)
+        else:
+            actor = _fresh_actor(view.request.user)
+        validate_references(actor, validated)
+        if is_uco:
+            obj = serializer.save(
+                owner=actor,
+                publication_status=UserCreatedObject.STATUS_PRIVATE,
+            )
+            validate_created_parent(obj, parent=parent)
+            record_creation(actor, obj)
+            return obj
+        created = serializer.save()
+        validate_created_parent(created, parent=parent)
+        return created
+
+
+def perform_policy_update(view, serializer):
+    """Shared governed-update boundary for bound serializers.
+
+    Resolves a changed declared evidence parent through
+    ``resolve_create_parent``/``resolve_parents``, hands the reparent to
+    ``content_mutation`` via ``proposed_parent``, rebinds
+    ``serializer.instance`` to the yielded fresh row, validates reference read
+    access inside the locked write boundary, and saves once. Non-governed
+    instances keep ordinary serializer behavior.
+    """
+    instance = getattr(serializer, "instance", None)
+    policy = model_policy(type(instance)) if isinstance(instance, Model) else None
+    if policy is None and not isinstance(instance, UserCreatedObject):
+        serializer.save()
+        return
+    proposed_parent = None
+    if (
+        policy is not None
+        and policy.kind == KIND_REVIEWABLE
+        and policy.parent_path is not None
+    ):
+        parent_field = policy.parent_path.split("__")[0]
+        validated = getattr(serializer, "validated_data", None) or {}
+        if parent_field in validated:
+            new_parent = resolve_create_parent(policy, validated_data=validated)
+            if new_parent is None:
+                raise ValidationError("invalid_parent")
+            if isinstance(new_parent, (list, tuple)):
+                new_keys = sorted(getattr(p, "pk", None) for p in new_parent)
+                old_keys = sorted(
+                    p.pk for p in resolve_parents(instance, policy.parent_path)
+                )
+                if new_keys != old_keys:
+                    proposed_parent = new_parent
+            else:
+                old_parent = resolve_parent(instance, policy.parent_path)
+                if getattr(new_parent, "pk", None) != getattr(old_parent, "pk", None):
+                    proposed_parent = new_parent
+    with content_mutation(
+        view.request.user,
+        instance,
+        action="edit",
+        proposed_parent=proposed_parent,
+    ) as fresh:
+        serializer.instance = fresh
+        validate_references(
+            _fresh_actor(view.request.user),
+            getattr(serializer, "validated_data", None),
+        )
+        serializer.save()
 
 
 class GlobalObjectViewSet(ModelViewSet):
@@ -76,7 +187,7 @@ class GlobalObjectViewSet(ModelViewSet):
     Base viewset for Global Objects.
     Implements read and write permissions.
     Read: Any user (authenticated or not)
-    Write: Only staff users
+    Write: users with the explicit administer_objects capability
     """
 
     permission_classes = [GlobalObjectPermission]
@@ -110,8 +221,8 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         """Retrieve a single object from the read-scoped queryset, then enforce
         object-level permissions.
 
-        Objects the user may not read resolve to 404; readable objects still go
-        through ``check_object_permissions`` for the requested action.
+        Objects the user may not read resolve to 404 instead of leaking existence; the
+        object-level permission check still gates the requested action.
         """
         from django.shortcuts import get_object_or_404
 
@@ -123,77 +234,13 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         self.check_object_permissions(self.request, obj)
         return obj
 
-    def _save_uco_create(self, serializer):
-        return serializer.save(
-            owner=self.request.user,
-            publication_status=UserCreatedObject.STATUS_PRIVATE,
-        )
-
     def perform_create(self, serializer):
         """Server owns owner/lifecycle initialization; payload cannot forge them."""
-        validated = getattr(serializer, "validated_data", None)
-        if isinstance(validated, dict):
-            validated.pop("owner", None)
-            validated.pop("publication_status", None)
         policy, parent = perform_policy_create(self, serializer)
-        serializer_model = _serializer_model(self, serializer)
-        if isinstance(validated, dict):
-            # Generated-projection marker and source pointer are
-            # server-controlled; a public create can only produce raw rows.
-            profile = generated_profile(serializer_model)
-            if profile is not None:
-                for profile_field in profile:
-                    validated.pop(profile_field, None)
-        if not (
-            isinstance(serializer_model, type)
-            and issubclass(serializer_model, UserCreatedObject)
-        ):
-            serializer.save()
-            return
-        if policy is not None and policy.kind == KIND_OWNED and parent is not None:
-            with content_mutation(self.request.user, parent, action="edit"):
-                self._save_uco_create(serializer)
-            return
-        with transaction.atomic():
-            obj = self._save_uco_create(serializer)
-            record_creation(self.request.user, obj)
+        finalize_policy_create(self, serializer, policy, parent)
 
     def perform_update(self, serializer):
-        instance = serializer.instance
-        policy = model_policy(type(instance))
-        proposed_parent = None
-        if (
-            policy is not None
-            and policy.kind == KIND_REVIEWABLE
-            and policy.parent_path is not None
-        ):
-            parent_field = policy.parent_path.split("__")[0]
-            validated = getattr(serializer, "validated_data", None) or {}
-            if parent_field in validated:
-                new_parent = resolve_create_parent(policy, validated_data=validated)
-                if new_parent is None:
-                    raise ValidationError("invalid_parent")
-                if isinstance(new_parent, (list, tuple)):
-                    new_keys = sorted(getattr(p, "pk", None) for p in new_parent)
-                    old_keys = sorted(
-                        p.pk for p in resolve_parents(instance, policy.parent_path)
-                    )
-                    if new_keys != old_keys:
-                        proposed_parent = new_parent
-                else:
-                    old_parent = resolve_parent(instance, policy.parent_path)
-                    if getattr(new_parent, "pk", None) != getattr(
-                        old_parent, "pk", None
-                    ):
-                        proposed_parent = new_parent
-        with content_mutation(
-            self.request.user,
-            instance,
-            action="edit",
-            proposed_parent=proposed_parent,
-        ) as fresh:
-            serializer.instance = fresh
-            serializer.save()
+        perform_policy_update(self, serializer)
 
     def perform_destroy(self, instance):
         with content_mutation(self.request.user, instance, action="delete") as locked:

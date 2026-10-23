@@ -140,6 +140,10 @@ class GlobalObjectViewSetTests(BaseAPITestCase):
         cls.example = TestGlobalObject.objects.create(
             name="Example", description="desc"
         )
+        cls.admin_user = User.objects.create_user(username="gobj-admin")
+        cls.admin_user.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
 
     # helper – centralised patch/dispatch logic
     def _response(
@@ -196,10 +200,22 @@ class GlobalObjectViewSetTests(BaseAPITestCase):
                 )
                 self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_staff_user_can_write(self):
+    def test_staff_user_cannot_write(self):
+        # Staff status alone is not an administrative capability.
+        for verb in ("post", "put", "patch", "delete"):
+            with self.subTest(verb=verb):
+                resp = self._response(
+                    verb,
+                    user=self.staff_user,
+                    data={"name": "n"},
+                    pk=self.example.id,
+                )
+                self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_user_can_write(self):
         # create
         create = self._response(
-            "post", user=self.staff_user, data={"name": "New", "description": "d"}
+            "post", user=self.admin_user, data={"name": "New", "description": "d"}
         )
         self.assertEqual(create.status_code, status.HTTP_201_CREATED)
         # update / partial-update / delete
@@ -210,7 +226,7 @@ class GlobalObjectViewSetTests(BaseAPITestCase):
         ]
         for verb, payload in verbs:
             resp = self._response(
-                verb, user=self.staff_user, data=payload, pk=self.example.id
+                verb, user=self.admin_user, data=payload, pk=self.example.id
             )
             expected = (
                 status.HTTP_204_NO_CONTENT if verb == "delete" else status.HTTP_200_OK
@@ -219,16 +235,16 @@ class GlobalObjectViewSetTests(BaseAPITestCase):
 
     def test_duplicate_name_returns_400(self):
         self._response(
-            "post", user=self.staff_user, data={"name": "Unique", "description": "d"}
+            "post", user=self.admin_user, data={"name": "Unique", "description": "d"}
         )
         dup = self._response(
-            "post", user=self.staff_user, data={"name": "Unique", "description": "dup"}
+            "post", user=self.admin_user, data={"name": "Unique", "description": "dup"}
         )
         self.assertEqual(dup.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("name", dup.data)
 
     def test_delete_unknown_pk_returns_404(self):
-        resp = self._response("delete", user=self.staff_user, pk=9999)
+        resp = self._response("delete", user=self.admin_user, pk=9999)
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
 
 
@@ -359,6 +375,9 @@ class UserCreatedObjectQueryTests(BaseAPITestCase):
 
 class UserCreatedObjectCreationTests(BaseAPITestCase):
     def test_perform_create_sets_owner(self):
+        self.regular_user.user_permissions.add(
+            Permission.objects.get(codename="add_property")
+        )
         serializer = Mock(save=Mock(return_value=MockUserCreatedObject()))
         serializer.Meta = SimpleNamespace(model=Property)
         viewset = MockUserCreatedObjectViewSet()
@@ -616,10 +635,11 @@ class UserCreatedObjectPermissionTests(BaseAPITestCase):
         req = self._detail_request("get", self.admin)
         self.assertTrue(self.permission.has_object_permission(req, self.view, obj))
 
-    def test_anonymous_cannot_read_archived(self):
+    def test_anonymous_can_read_archived(self):
+        # Archived records are public frozen historical data.
         obj = self._obj("archived")
         req = self._detail_request("get", self.anonymous_user)
-        self.assertFalse(self.permission.has_object_permission(req, self.view, obj))
+        self.assertTrue(self.permission.has_object_permission(req, self.view, obj))
 
     def test_admin_can_read_private(self):
         obj = self._obj("private")

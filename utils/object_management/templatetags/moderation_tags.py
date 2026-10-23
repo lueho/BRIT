@@ -351,10 +351,10 @@ def detail_or_review_url(context, obj, use_back=False):
     """
     Return the URL that should be used to view the object in list/filter UIs.
 
-    If the object's publication status is 'review' (or obj.is_in_review is True)
-    and the current user is allowed to access the review UI for this object
-    (staff or per‑model moderator and NOT the owner), return the review view URL
-    with a ?next=<current_path> parameter so that actions can navigate back.
+    If the object's publication status is 'review' or 'declined' and the
+    shared policy grants the current user ``view_review_activity`` on it,
+    return the review view URL with a ?next=<current_path> parameter so that
+    actions can navigate back.
 
     Otherwise, return the object's regular absolute URL.
     """
@@ -382,7 +382,6 @@ def detail_or_review_url(context, obj, use_back=False):
     except Exception:
         in_review = False
 
-    # Owners of declined items should be redirected to the review feedback view
     try:
         is_declined = getattr(obj, "is_declined", None)
         if is_declined is None:
@@ -457,6 +456,8 @@ def is_moderator_for_any_model(user):
     20 minutes to reduce database load.
     """
     if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if not getattr(user, "is_active", True):
         return False
 
     # Use cache to avoid repeated permission checks
