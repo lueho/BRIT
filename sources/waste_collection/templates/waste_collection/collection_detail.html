@@ -32,20 +32,11 @@
        href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
       <i class="fas fa-clipboard-check" aria-hidden="true"></i> {{ policy.review_feedback_label }}
     </a>
-  {% elif policy.is_in_review and not review_mode %}
-    {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
-      <a class="sdv2-btn sdv2-btn-ghost"
-         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-        <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
-      </a>
-    {% endif %}
-  {% elif policy.is_declined and not review_mode %}
-    {% if policy.is_staff or policy.is_moderator %}
-      <a class="sdv2-btn sdv2-btn-ghost"
-         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-        <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
-      </a>
-    {% endif %}
+  {% elif policy.can_view_review_activity and not review_mode %}
+    <a class="sdv2-btn sdv2-btn-ghost"
+       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+      <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
+    </a>
   {% endif %}
 {% endblock detail_header_review_actions %}
 {% block rail_dropdown_extra %}

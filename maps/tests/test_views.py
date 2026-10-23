@@ -9,7 +9,8 @@ from unittest.mock import Mock, patch
 from urllib.parse import urlencode, urlparse, urlunparse
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.core.cache import caches
 from django.core.exceptions import ImproperlyConfigured
@@ -29,6 +30,7 @@ from bibliography.models import Source
 from maps.mixins import CachedGeoJSONMixin
 from maps.serializers import RegionGeoFeatureModelSerializer
 from maps.views import CatchmentCreateMergeLauView
+from utils.object_management.models import ReviewAction
 from utils.properties.models import Unit
 from utils.tests.testcases import (
     AbstractTestCases,
@@ -1731,11 +1733,18 @@ class ClearGeojsonCacheViewTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
+        cls.admin_user = User.objects.create_user(username="cache-admin")
+        cls.admin_user.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type=ContentType.objects.get_for_model(ReviewAction),
+            )
+        )
         cls.non_staff_user = User.objects.create_user(username="nonstaff")
 
     @patch("maps.views.clear_geojson_cache_pattern")
-    def test_clear_geojson_cache_as_staff(self, mock_clear):
-        self.client.force_login(self.staff_user)
+    def test_clear_geojson_cache_as_admin(self, mock_clear):
+        self.client.force_login(self.admin_user)
         url = reverse("clear-geojson-cache") + "?pattern=testpattern"
         response = self.client.get(url)
 
@@ -1749,6 +1758,13 @@ class ClearGeojsonCacheViewTest(TestCase):
 
     def test_clear_geojson_cache_as_non_staff(self):
         self.client.force_login(self.non_staff_user)
+        url = reverse("clear-geojson-cache")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_clear_geojson_cache_as_plain_staff_denied(self):
+        self.client.force_login(self.staff_user)
         url = reverse("clear-geojson-cache")
         response = self.client.get(url)
 

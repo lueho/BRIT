@@ -1060,13 +1060,20 @@ class CollectorGeoJSONVersionRotationTests(TransactionTestCase):
 
 
 class CollectionReviewActionApiTestCase(APITestCase):
-    """Ensure review action API endpoints trigger collection cascade behavior."""
+    """Ensure review action API endpoints honour independent record lifecycles."""
 
     @classmethod
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(username="owner")
         cls.other_owner = User.objects.create_user(username="other-owner")
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
+        cls.moderator = User.objects.create_user(username="moderator")
+        cls.moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
+        )
 
         cls.catchment = CollectionCatchment.objects.create(name="Test Catchment")
         cls.collector = Collector.objects.create(name="Test Collector")
@@ -1128,7 +1135,9 @@ class CollectionReviewActionApiTestCase(APITestCase):
         acpv.collections.set(collections)
         return acpv
 
-    def test_register_for_review_cascades_property_values(self):
+    def test_register_for_review_leaves_property_values_unchanged(self):
+        """Independent lifecycle: submitting a Collection does not cascade to
+        CPVs/ACPVs — each record transitions individually."""
         collection = self._create_collection(
             "Collection Submit",
             owner=self.owner,
@@ -1153,12 +1162,14 @@ class CollectionReviewActionApiTestCase(APITestCase):
         acpv_private.refresh_from_db()
 
         self.assertEqual(collection.publication_status, "review")
-        self.assertEqual(cpv_private.publication_status, "review")
-        self.assertEqual(cpv_declined.publication_status, "review")
+        self.assertEqual(cpv_private.publication_status, "private")
+        self.assertEqual(cpv_declined.publication_status, "declined")
         self.assertEqual(cpv_published.publication_status, "published")
-        self.assertEqual(acpv_private.publication_status, "review")
+        self.assertEqual(acpv_private.publication_status, "private")
 
-    def test_approve_cascades_property_values(self):
+    def test_approve_leaves_property_values_unchanged(self):
+        """Independent lifecycle: approving a Collection does not cascade to
+        CPVs/ACPVs — each record requires its own review action."""
         collection = self._create_collection(
             "Collection Approve",
             owner=self.owner,
@@ -1168,9 +1179,13 @@ class CollectionReviewActionApiTestCase(APITestCase):
         cpv_other = self._create_cpv(collection, self.other_owner, "review", year=2021)
         acpv_review = self._create_acpv([collection], self.owner, "review")
 
-        self.client.force_login(self.staff)
+        self.client.force_login(self.moderator)
         url = reverse("api-waste-collection-approve", kwargs={"pk": collection.pk})
-        response = self.client.post(url)
+        response = self.client.post(
+            url,
+            {"expected_revision": collection.content_revision},
+            format="json",
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         collection.refresh_from_db()
@@ -1179,12 +1194,12 @@ class CollectionReviewActionApiTestCase(APITestCase):
         acpv_review.refresh_from_db()
 
         self.assertEqual(collection.publication_status, "published")
-        self.assertEqual(cpv_owner.publication_status, "published")
-        self.assertEqual(cpv_other.publication_status, "published")
-        self.assertEqual(cpv_owner.approved_by, self.staff)
-        self.assertEqual(cpv_other.approved_by, self.staff)
-        self.assertEqual(acpv_review.publication_status, "published")
-        self.assertEqual(acpv_review.approved_by, self.staff)
+        self.assertEqual(cpv_owner.publication_status, "review")
+        self.assertEqual(cpv_other.publication_status, "review")
+        self.assertIsNone(cpv_owner.approved_by)
+        self.assertIsNone(cpv_other.approved_by)
+        self.assertEqual(acpv_review.publication_status, "review")
+        self.assertIsNone(acpv_review.approved_by)
 
 
 class CollectionImporterWorkflowTestCase(APITestCase):
@@ -1203,6 +1218,18 @@ class CollectionImporterWorkflowTestCase(APITestCase):
         cls.staff_owner = User.objects.create_user(
             username="importer-staff", is_staff=True
         )
+        collection_ct = ContentType.objects.get_for_model(Collection)
+        collector_ct = ContentType.objects.get_for_model(Collector)
+        for codename, ct in (
+            ("add_collection", collection_ct),
+            ("add_collector", collector_ct),
+        ):
+            permission, _ = Permission.objects.get_or_create(
+                codename=codename,
+                content_type=ct,
+                defaults={"name": f"Can {codename.replace('_', ' ')}"},
+            )
+            cls.staff_owner.user_permissions.add(permission)
         cls.catchment = CollectionCatchment.objects.create(
             name="Importer Test Catchment"
         )
@@ -1432,6 +1459,29 @@ class CollectionImporterWorkflowTestCase(APITestCase):
         )
         self.assertEqual(collection.collector.name, "Ajuntament de Cardona")
         self.assertEqual(response.data["stats"]["collectors_created"], 1)
+
+    def test_bulk_import_endpoint_denies_staff_without_add_capability(self):
+        plain_staff = User.objects.create_user(
+            username="importer-plain-staff", is_staff=True
+        )
+        self.client.force_login(plain_staff)
+
+        response = self.client.post(
+            reverse("api-waste-collection-bulk-import"),
+            {
+                "records": [self._make_record()],
+                "publication_status": "private",
+                "dry_run": False,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(
+            Collection.objects.filter(
+                owner=plain_staff, valid_from=self.valid_from
+            ).exists()
+        )
 
 
 class CollectionMutationApiTestCase(APITestCase):
@@ -1833,7 +1883,7 @@ class CollectionMutationApiTestCase(APITestCase):
             (
                 index
                 for index, sql in enumerate(sqls)
-                if f'FROM "{user_table}"' in sql and "FOR UPDATE" in sql
+                if f'FROM "{user_table}"' in sql and "FOR NO KEY UPDATE" in sql
             ),
             None,
         )
@@ -2436,6 +2486,176 @@ class CollectionMutationApiTestCase(APITestCase):
         )
 
 
+class CollectionPropertyValueAnchorApiTestCase(APITestCase):
+    """The CPV endpoint authorizes the actual stored parent — the collection's
+    version anchor, which may be an archived predecessor."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="cpv-anchor-owner")
+        cls.reader = User.objects.create_user(username="cpv-anchor-reader")
+        cls.no_capability = User.objects.create_user(
+            username="cpv-anchor-no-capability"
+        )
+        cls.inactive = User.objects.create_user(
+            username="cpv-anchor-inactive", is_active=False
+        )
+
+        cpv_ct = ContentType.objects.get_for_model(CollectionPropertyValue)
+        add_cpv = Permission.objects.get(
+            codename="add_collectionpropertyvalue", content_type=cpv_ct
+        )
+        cls.reader.user_permissions.add(add_cpv)
+        cls.inactive.user_permissions.add(add_cpv)
+
+        cls.catchment = CollectionCatchment.objects.create(
+            name="CPV Anchor Catchment", publication_status="published"
+        )
+        cls.system = CollectionSystem.objects.create(
+            name="CPV Anchor System", publication_status="published"
+        )
+        cls.category = WasteCategory.objects.create(
+            name="CPV Anchor Category", publication_status="published"
+        )
+        # Isolated non-convertible property keeps this test clear of the
+        # derived-value pipeline.
+        cls.property = Property.objects.create(
+            name="CPV Anchor Property", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="CPV Anchor Unit", publication_status="published"
+        )
+        cls.property.allowed_units.add(cls.unit)
+
+        cls.archived_anchor = cls._collection("Archived anchor", "archived")
+        cls.published_successor = cls._collection("Published successor", "published")
+        cls.published_successor.predecessors.add(cls.archived_anchor)
+        cls.private_anchor = cls._collection("Private anchor", "private")
+        cls.successor_with_private_anchor = cls._collection(
+            "Successor on private anchor", "published"
+        )
+        cls.successor_with_private_anchor.predecessors.add(cls.private_anchor)
+
+    @classmethod
+    def _collection(cls, name, publication_status):
+        return Collection.objects.create(
+            name=name,
+            owner=cls.owner,
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_category=cls.category,
+            valid_from=date(2020, 1, 1),
+            publication_status=publication_status,
+        )
+
+    def _payload(self, collection):
+        return {
+            "collection": collection.pk,
+            "property_id": self.property.pk,
+            "unit_name": self.unit.name,
+            "year": 2021,
+            "average": 42.0,
+            "submit_for_review": False,
+        }
+
+    def _post(self, collection):
+        return self.client.post(
+            reverse("api-waste-collection-property-value-create"),
+            self._payload(collection),
+            format="json",
+        )
+
+    def _review_events(self, obj, action=None):
+        qs = ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(obj), object_id=obj.pk
+        )
+        if action is not None:
+            qs = qs.filter(action=action)
+        return qs
+
+    def test_reader_creates_private_cpv_on_archived_anchor(self):
+        """A published successor's anchor is its archived predecessor; the
+        declared read attachment rule lets an add-capable reader store
+        independent evidence there."""
+        anchor_revision = self.archived_anchor.content_revision
+        self.client.force_login(self.reader)
+
+        response = self._post(self.published_successor)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["anchor_collection_id"], self.archived_anchor.pk)
+        cpv = CollectionPropertyValue.objects.get(pk=response.data["id"])
+        self.assertEqual(cpv.collection, self.archived_anchor)
+        self.assertEqual(cpv.owner, self.reader)
+        self.assertEqual(cpv.publication_status, "private")
+        self.assertFalse(cpv.is_derived)
+
+        # The archived anchor is untouched: no status, owner, or revision
+        # change, and no review activity is recorded on it.
+        self.archived_anchor.refresh_from_db()
+        self.assertEqual(self.archived_anchor.publication_status, "archived")
+        self.assertEqual(self.archived_anchor.owner, self.owner)
+        self.assertEqual(self.archived_anchor.content_revision, anchor_revision)
+        self.assertFalse(self._review_events(self.archived_anchor).exists())
+
+        # The new evidence carries its own creation event bound to its own
+        # revision.
+        event = self._review_events(cpv, ReviewAction.ACTION_CREATED).get()
+        self.assertEqual(event.user, self.reader)
+        self.assertEqual(event.content_revision, cpv.content_revision)
+
+    def test_direct_archived_target_is_the_stored_parent(self):
+        self.client.force_login(self.reader)
+
+        response = self._post(self.archived_anchor)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        cpv = CollectionPropertyValue.objects.get(pk=response.data["id"])
+        self.assertEqual(cpv.collection, self.archived_anchor)
+        self.assertEqual(cpv.owner, self.reader)
+
+    def test_create_requires_add_capability(self):
+        self.client.force_login(self.no_capability)
+
+        response = self._post(self.archived_anchor)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(
+                collection=self.archived_anchor
+            ).exists()
+        )
+
+    def test_inactive_actor_is_denied(self):
+        self.client.force_login(self.inactive)
+
+        response = self._post(self.archived_anchor)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(
+                collection=self.archived_anchor
+            ).exists()
+        )
+
+    def test_private_foreign_anchor_denied_despite_readable_target(self):
+        """The target successor is public, but its stored anchor is a foreign
+        private collection — creation must fail atomically."""
+        self.client.force_login(self.reader)
+
+        response = self._post(self.successor_with_private_anchor)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(
+                collection__in=[
+                    self.private_anchor,
+                    self.successor_with_private_anchor,
+                ]
+            ).exists()
+        )
+
+
 class GreenWasteCollectionSystemCountViewSetTests(APITestCase):
     """Tests for Green Waste collection-system count atlas endpoint."""
 
@@ -2598,7 +2818,14 @@ class CollectionConflictViewSetTests(APITestCase):
         )
 
     def setUp(self):
-        self.client.force_login(User.objects.create_user("maintainer", is_staff=True))
+        maintainer = User.objects.create_user("maintainer")
+        maintainer.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
+        )
+        self.client.force_login(maintainer)
 
     @classmethod
     def _collection(cls, catchment, waste_category, collection_system, year):
@@ -5506,49 +5733,55 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         self.assertNotIn(self.review_catchment.id, ids)
 
     def test_conflicts_excludes_non_published(self):
-        self.client.force_login(
-            User.objects.create_user("pubscope-staff", is_staff=True)
+        moderator = User.objects.create_user("pubscope-moderator")
+        moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
         )
+        self.client.force_login(moderator)
         response = self._get("conflicts", theme="collection_system", scope="published")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = self._catchment_ids(response)
         self.assertNotIn(self.private_catchment.id, ids)
         self.assertNotIn(self.review_catchment.id, ids)
 
-    # --- Staff bypass tests ---
+    # --- Plain staff has no bypass: public historical scope only ---
 
-    def test_staff_sees_private_and_review_in_collection_system(self):
+    def test_plain_staff_sees_only_public_historical_in_collection_system(self):
         staff = User.objects.create_user("staffuser", is_staff=True)
         self.client.force_login(staff)
         response = self._get("collection_system")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = self._catchment_ids(response)
         self.assertIn(self.published_catchment.id, ids)
-        self.assertIn(self.private_catchment.id, ids)
-        self.assertIn(self.review_catchment.id, ids)
+        self.assertNotIn(self.private_catchment.id, ids)
+        self.assertNotIn(self.review_catchment.id, ids)
 
-    def test_staff_sees_private_and_review_in_catchment_geojson(self):
+    def test_plain_staff_sees_only_public_historical_in_catchment_geojson(self):
         staff = User.objects.create_user("staffuser2", is_staff=True)
         self.client.force_login(staff)
         response = self._get("catchment_geojson")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = self._catchment_ids(response)
         self.assertIn(self.published_catchment.id, ids)
-        self.assertIn(self.private_catchment.id, ids)
-        self.assertIn(self.review_catchment.id, ids)
+        self.assertNotIn(self.private_catchment.id, ids)
+        self.assertNotIn(self.review_catchment.id, ids)
 
-    def test_staff_sees_private_and_review_in_collection_orga_level(self):
+    def test_plain_staff_sees_only_public_historical_in_collection_orga_level(
+        self,
+    ):
         staff = User.objects.create_user("staffuser3", is_staff=True)
         self.client.force_login(staff)
         response = self._get("collection_orga_level")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ids = self._catchment_ids(response)
         self.assertIn(self.published_catchment.id, ids)
-        self.assertIn(self.private_catchment.id, ids)
-        self.assertIn(self.review_catchment.id, ids)
+        self.assertNotIn(self.private_catchment.id, ids)
+        self.assertNotIn(self.review_catchment.id, ids)
 
-    def test_anonymous_still_excluded_after_staff_bypass(self):
-        """Ensure anonymous users still only see published after staff bypass."""
+    def test_anonymous_sees_only_public_historical(self):
         self.client.logout()
         response = self._get("collection_system")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -5593,11 +5826,28 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         ids = self._catchment_ids(self._get("collection_system", scope="mine"))
         self.assertNotIn(other_collection.catchment_id, ids)
 
-    def test_review_scope_requires_moderation_permission(self):
+    def test_review_scope_limits_to_authorized_rows(self):
+        """scope=review filters by lifecycle state within authorized visibility:
+        an owner sees their own review rows but no foreign review rows; a
+        Collection moderator sees all review rows."""
+        foreign_review_catchment = CollectionCatchment.objects.create(
+            name="Foreign Review Catchment",
+            region=self._region_with_borders("Foreign Review Region"),
+        )
+        Collection.objects.create(
+            name="Foreign Review Collection",
+            owner=User.objects.create_user("foreign-review-owner"),
+            catchment=foreign_review_catchment,
+            waste_category=self.bio_category,
+            collection_system=self.d2d,
+            valid_from=date(2024, 1, 1),
+            publication_status="review",
+        )
         self.client.force_login(self.user)
         for key in ("collection_system", "catchment_geojson"):
             ids = self._catchment_ids(self._get(key, scope="review"))
-            self.assertNotIn(self.review_catchment.id, ids, key)
+            self.assertIn(self.review_catchment.id, ids, key)
+            self.assertNotIn(foreign_review_catchment.id, ids, key)
 
         moderator = User.objects.create_user("scope_moderator")
         moderator.user_permissions.add(
@@ -5610,10 +5860,11 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         for key in ("collection_system", "catchment_geojson"):
             ids = self._catchment_ids(self._get(key, scope="review"))
             self.assertIn(self.review_catchment.id, ids, key)
+            self.assertIn(foreign_review_catchment.id, ids, key)
             self.assertNotIn(self.private_catchment.id, ids, key)
             self.assertNotIn(self.published_catchment.id, ids, key)
 
-    def test_all_scope_is_staff_only(self):
+    def test_all_scope_is_administrator_only(self):
         declined = Collection.objects.create(
             name="Declined collection",
             owner=self.user,
@@ -5637,6 +5888,19 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         )
         staff = User.objects.create_user("scope_all_staff", is_staff=True)
         self.client.force_login(staff)
+        ids = self._catchment_ids(self._get("collection_system", scope="all"))
+        self.assertNotIn(self.private_catchment.id, ids)
+        self.assertNotIn(self.review_catchment.id, ids)
+        self.assertNotIn(declined.catchment_id, ids)
+
+        administrator = User.objects.create_user("scope_all_admin")
+        administrator.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(ReviewAction),
+                codename="administer_objects",
+            )
+        )
+        self.client.force_login(administrator)
         ids = self._catchment_ids(self._get("collection_system", scope="all"))
         self.assertIn(self.private_catchment.id, ids)
         self.assertIn(self.review_catchment.id, ids)

@@ -191,6 +191,27 @@ class GenericUserCreatedObjectExportView(FilteredListFileExportView):
             raise NotImplementedError("Subclasses must set model_label")
         return tuple(get_export_spec(self.model_label).renderers)
 
+    def get_filter_params(self, request, params):
+        """Drop seeded lifecycle params for generated-projection models.
+
+        For a profiled model the export task resolves lifecycle through the
+        source-aware core scope; a raw ``publication_status`` field filter
+        would match stale copied projection metadata instead. An explicit
+        ``publication_status`` requested by the user is preserved — the task
+        interprets it as source-lifecycle filtering, not a raw field match.
+        """
+        from utils.object_management.registry import generated_profile
+
+        from .export_registry import get_export_spec
+
+        explicit_status = params.get("publication_status")
+        params = super().get_filter_params(request, params)
+        if generated_profile(get_export_spec(self.model_label).model) is not None:
+            params.pop("publication_status", None)
+            if explicit_status is not None:
+                params["publication_status"] = explicit_status
+        return params
+
     def get_export_row_count_estimate(self, filter_params, export_context):
         from .export_registry import get_export_spec
 
@@ -210,10 +231,15 @@ class GenericUserCreatedObjectExportView(FilteredListFileExportView):
         ]
 
         if has_publication_status:
+            from .generic_tasks import apply_explicit_state_filter
+
             visible_qs = filter_queryset_for_user(
                 spec.model.objects.all(), self.request.user
             )
             base_qs = apply_scope_filter(visible_qs, list_type, user=self.request.user)
+            base_qs = apply_explicit_state_filter(
+                self.request.user, spec, qdict, base_qs
+            )
         else:
             base_qs = spec.model.objects.all()
 

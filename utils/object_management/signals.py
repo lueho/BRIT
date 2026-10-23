@@ -1,15 +1,19 @@
 """
 Automatic Permission Creation for UserCreatedObject Models
 
-This module provides signal handlers that automatically create and manage
-moderation permissions for all UserCreatedObject subclasses in the project.
+This module provides signal handlers that automatically create moderation
+permission rows for the explicitly registered reviewable models.
 
 ## Overview
 
 When Django runs migrations, this signal handler:
-1. Discovers all concrete (non-abstract) UserCreatedObject subclasses
-2. Creates a `can_moderate_<model>` permission for each model
-3. Assigns these permissions to the moderators group
+1. Resolves the explicitly registered reviewable models from
+   utils/object_management/registry.py
+2. Creates a `can_moderate_<model>` permission row for each model
+
+Group membership and permission grants are managed separately through
+`users.roles` and the `sync_roles` management command; this signal never
+assigns permissions to groups or users.
 
 ## Permission Naming
 
@@ -44,8 +48,6 @@ The permission creation is centralized here (single source of truth) and used by
 - Views and mixins (access control)
 - Templates (button visibility via templatetags)
 
-Staff users always have moderation rights and don't need explicit permissions.
-
 See Also:
 - docs/02_developer_guide/user_created_objects.md
 - utils/object_management/README.md
@@ -54,9 +56,8 @@ See Also:
 
 import logging
 
-from django.apps import apps
 from django.conf import settings
-from django.contrib.auth.models import Group, Permission
+from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.db import transaction
@@ -65,76 +66,39 @@ from django.dispatch import receiver
 
 logger = logging.getLogger(__name__)
 
-_moderation_permissions_loaded = set()
-
-
-def _iter_user_created_models():
-    """Yield all concrete, non-proxy models that inherit from UserCreatedObject."""
-    try:
-        from utils.object_management.models import UserCreatedObject
-    except Exception:
-        return
-
-    for app_config in apps.get_app_configs():
-        for model in app_config.get_models():
-            try:
-                if (
-                    isinstance(model, type)
-                    and issubclass(model, UserCreatedObject)
-                    and not model._meta.abstract
-                ):
-                    yield model
-            except Exception:
-                # Be defensive; skip any model that causes problems during import/meta access
-                continue
-
 
 @receiver(post_migrate)
 def ensure_moderation_permissions(sender, **kwargs):
     """
-    After migrations, ensure custom per-model moderation permissions exist and
-    are assigned to the moderators group.
+    After migrations, ensure custom per-model moderation permission rows exist
+    for every explicitly registered reviewable model.
 
     Runs in all environments (including tests) to ensure permissions exist
-    consistently. Uses get_or_create for idempotency.
+    consistently. Uses get_or_create for idempotency. Group assignment is
+    handled by the sync_roles command, never here.
     """
+    if (
+        sender is not None
+        and getattr(sender, "name", None) != "utils.object_management"
+    ):
+        return
     using = kwargs.get("using") or "default"
-    if using in _moderation_permissions_loaded:
-        return
 
-    group_name = getattr(settings, "REVIEW_MODERATORS_GROUP_NAME", "moderators")
+    from .registry import KIND_REVIEWABLE, registered_models
 
-    try:
-        moderators_group, _ = Group.objects.get_or_create(name=group_name)
-    except Exception:
-        # If group creation fails, don't break migrations
-        return
+    permissions = Permission.objects.using(using)
+    content_types = ContentType.objects.db_manager(using)
+    for model in registered_models(KIND_REVIEWABLE):
+        model_name = model._meta.model_name
+        content_type = content_types.get_for_model(model, for_concrete_model=False)
+        codename = f"can_moderate_{model_name}"
+        perm_name = f"Can moderate {model._meta.verbose_name_plural}"
 
-    completed = True
-    for model in _iter_user_created_models():
-        try:
-            model_name = model._meta.model_name
-            content_type = ContentType.objects.get_for_model(
-                model, for_concrete_model=False
-            )
-            codename = f"can_moderate_{model_name}"
-            perm_name = f"Can moderate {model._meta.verbose_name_plural}"
-
-            permission, _ = Permission.objects.get_or_create(
-                content_type=content_type,
-                codename=codename,
-                defaults={"name": perm_name},
-            )
-
-            # Ensure the group holds the permission
-            moderators_group.permissions.add(permission)
-        except Exception:
-            completed = False
-            # Be robust; a single failure should not break overall signal execution
-            continue
-
-    if completed:
-        _moderation_permissions_loaded.add(using)
+        permissions.get_or_create(
+            content_type=content_type,
+            codename=codename,
+            defaults={"name": perm_name},
+        )
 
 
 @receiver(post_save)
@@ -283,9 +247,15 @@ def _clear_moderator_caches():
         from django.contrib.auth.models import User
         from django.db.models import Q
 
-        # Clear cache for staff users and users with moderation permissions
+        # Clear cache for users holding explicit moderation or administration
+        # capabilities and members of the configured moderators group.
         moderator_users = User.objects.filter(
-            Q(is_staff=True)
+            Q(user_permissions__codename__startswith="can_moderate_")
+            | Q(groups__permissions__codename__startswith="can_moderate_")
+            | Q(user_permissions__codename="administer_objects")
+            | Q(groups__permissions__codename="administer_objects")
+            | Q(is_superuser=True)
+            | Q(is_staff=True)
             | Q(
                 groups__name=getattr(
                     settings, "REVIEW_MODERATORS_GROUP_NAME", "moderators"

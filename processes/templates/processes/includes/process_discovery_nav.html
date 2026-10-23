@@ -45,6 +45,9 @@
           </li>
         {% endif %}
       </ul>
+      {% if nav_show_private and nav_workspace_active %}
+        {% include "object_management/workspace_nav.html" with workspace_base_url=nav_workspace_base_url %}
+      {% endif %}
     {% endif %}
   {% endif %}
 </nav>
