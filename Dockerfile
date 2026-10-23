@@ -71,7 +71,9 @@ RUN apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 \
     libgdal32 \
     curl \
     && if [ "$INSTALL_PDF_PARSING" = "true" ]; then \
-        apt-get install -y --no-install-recommends poppler-utils; \
+        apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 \
+        -o Acquire::https::Timeout=30 \
+        install -y --no-install-recommends poppler-utils; \
     fi \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 1000 --create-home --shell /bin/bash standard_user \
