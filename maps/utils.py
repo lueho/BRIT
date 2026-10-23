@@ -44,7 +44,10 @@ def ensure_initial_data(stdout=None):
 
     vintage, vintage_created = NutsVintage.objects.get_or_create(
         year=2021,
-        defaults={"is_current": True, "source_release": "GISCO NUTS 2021"},
+        defaults={
+            "is_current": not NutsVintage.objects.filter(is_current=True).exists(),
+            "source_release": "GISCO NUTS 2021",
+        },
     )
     if not NutsVintage.objects.filter(is_current=True).exists():
         vintage.is_current = True

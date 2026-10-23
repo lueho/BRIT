@@ -598,16 +598,14 @@ class ControlledDatabaseBootstrapBase(SimpleTestCase):
         with fresh.cursor() as cursor:
             cursor.execute(
                 "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = 'public' AND ("
-                "table_name LIKE 'materials!_%' ESCAPE '!' OR "
-                "table_name LIKE 'properties!_%' ESCAPE '!' OR "
-                "table_name = 'auth_user')"
+                "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' "
+                "AND table_name NOT IN ('django_migrations', 'spatial_ref_sys')"
             )
             names = [row[0] for row in cursor.fetchall()]
         for name in names:
             with fresh.cursor() as cursor:
-                cursor.execute(f'SELECT * FROM "{name}" ORDER BY 1')
-                tables[name] = sorted(cursor.fetchall())
+                cursor.execute(f'SELECT to_jsonb(t)::text FROM "{name}" t')
+                tables[name] = sorted(row[0] for row in cursor.fetchall())
         return tables
 
     def _applied(self, fresh):
@@ -862,6 +860,14 @@ class AdoptedHistoryBootstrapTests(ControlledDatabaseBootstrapBase):
                 recorder.record_unapplied(app, baseline)
 
             before = self._snapshot(fresh)
+            for table in (
+                "auth_user",
+                "materials_basematerial",
+                "maps_nutsvintage",
+                "maps_maplayerstyle",
+                "object_management_reviewaction",
+            ):
+                self.assertIn(table, before)
             applied_before = self._applied(fresh)
             history_before = list(
                 recorder.migration_qs.order_by("id").values(
