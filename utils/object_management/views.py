@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
-from collections.abc import Iterable
-from datetime import date, datetime
-from typing import Any, NamedTuple
+from typing import Any
 from urllib.parse import unquote, urlparse
 
 from django.conf import settings
@@ -25,11 +22,11 @@ from django.core.exceptions import (
     PermissionDenied,
     ValidationError,
 )
+from django.core.paginator import Paginator
 from django.db import DatabaseError
-from django.db.models import CharField, Q, QuerySet, Value
+from django.db.models import QuerySet
 from django.http import (
     Http404,
-    HttpRequest,
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseNotAllowed,
@@ -73,11 +70,7 @@ from utils.object_management.permissions import (
     get_object_policy,
     user_is_moderator_for_model,
 )
-from utils.object_management.review_filtering import ReviewItemFilter
-from utils.object_management.review_hooks import (
-    get_breadcrumb_module,
-    get_review_search_fields,
-)
+from utils.object_management.review_hooks import get_breadcrumb_module
 from utils.views import get_safe_next_url
 
 from ..forms import (
@@ -92,22 +85,15 @@ from ..views import (
     NoFormTagMixin,
     build_breadcrumb_context,
 )
+from .access import (
+    CreateUserObjectMixin,
+    UserCreatedObjectReadAccessMixin,
+    UserCreatedObjectWriteAccessMixin,
+)
 from .redirects import ReviewActionRedirectResolver
+from .review_queue import ReviewItemCollector
 
 logger = logging.getLogger(__name__)
-
-
-class ReviewItemReference(NamedTuple):
-    """Lightweight stand-in for a reviewable object before hydration.
-
-    The dashboard collects these per model from a single ``values_list``
-    query and hydrates only the paginated page's worth of objects.
-    """
-
-    model: type[UserCreatedObject]
-    pk: int
-    name: str | None
-    submitted_at: datetime | None
 
 
 DEFAULT_BREADCRUMB_MODULES = {
@@ -338,520 +324,71 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
     Supports filtering by model type, owner, submission date, and search.
     Dynamically discovers all UserCreatedObject subclasses and shows items
     the current user has permission to moderate.
+
+    The review-queue pipeline lives in ``ReviewItemCollector``; this view only
+    wires up the filter form, pagination, and template context.
     """
 
     template_name = "object_management/review_dashboard.html"
     filterset_class = ReviewDashboardFilterSet
     context_object_name = "review_items"
     paginate_by = getattr(settings, "REVIEW_DASHBOARD_PAGE_SIZE", 20)
-    _available_models_cache: list[type[UserCreatedObject]] | None = None
     breadcrumb_module_label = "Review"
     breadcrumb_page_title = "Content Review"
 
-    def setup(self, request: HttpRequest, *args: Any, **kwargs: Any) -> None:
-        """Reset per-request cache."""
-        super().setup(request, *args, **kwargs)
-        self._available_models_cache = None
-
-    @staticmethod
-    def _in_review_queryset_for_model(
-        model: type[UserCreatedObject],
-    ) -> QuerySet[UserCreatedObject]:
-        """Return a queryset containing review items for the provided model.
-
-        Supports models whose manager either:
-        - exposes ``in_review()`` directly,
-        - exposes a queryset with ``in_review()``, or
-        - only supports standard queryset filtering.
-        """
-        manager = model.objects
-        if hasattr(manager, "in_review"):
-            return manager.in_review()
-
-        queryset = manager.get_queryset()
-        if hasattr(queryset, "in_review"):
-            return queryset.in_review()
-
-        try:
-            model._meta.get_field("publication_status")
-        except FieldDoesNotExist as exc:
-            raise AttributeError(
-                f"{model.__name__} has no publication_status field for review filtering"
-            ) from exc
-
-        return queryset.filter(publication_status=UserCreatedObject.STATUS_REVIEW)
-
-    @staticmethod
-    def _is_primary_model_module(model: type[UserCreatedObject]) -> bool:
-        """Return whether a model is defined in the app's models module tree."""
-        module_name = getattr(model, "__module__", "")
-        app_config = getattr(model._meta, "app_config", None)
-        app_name = getattr(app_config, "name", None) or model._meta.app_label
-        expected_prefix = f"{app_name}.models"
-        return module_name == expected_prefix or module_name.startswith(
-            f"{expected_prefix}."
-        )
+    @property
+    def collector(self) -> ReviewItemCollector:
+        """Return the per-request review-queue collector (created lazily)."""
+        collector = getattr(self, "_collector", None)
+        if collector is None:
+            collector = ReviewItemCollector(
+                self.request.user, self.request.GET, page_size=self.paginate_by
+            )
+            self._collector = collector
+        return collector
 
     def get_available_models(self) -> list[type[UserCreatedObject]]:
-        """Discover all concrete UserCreatedObject subclasses that have items in review.
-
-        Returns models that either:
-        1. Have items currently in review, OR
-        2. Are in the priority list and user has moderation permissions
-
-        Optimized to avoid N+1 queries by pre-fetching all user permissions.
-        Results are cached per-request to avoid repeated expensive queries.
-        """
-        # Return cached result if available
-        if self._available_models_cache is not None:
-            return self._available_models_cache
-
-        from django.apps import apps
-        from django.contrib.auth.models import Permission
-
-        # Get priority models from settings (models always shown in filters if user has permissions)
-        # Format: ['app_label.ModelName', ...]
-        priority_model_paths = getattr(settings, "REVIEW_DASHBOARD_PRIORITY_MODELS", [])
-        priority_models = []
-        for model_path in priority_model_paths:
-            try:
-                app_label, model_name = model_path.split(".")
-                model = apps.get_model(app_label, model_name)
-                priority_models.append(model)
-            except (ValueError, LookupError) as e:
-                logger.warning(f"Could not load priority model '{model_path}': {e}")
-
-        available_models = []
-        priority_positions = {
-            model: index for index, model in enumerate(priority_models)
-        }
-
-        # Optimize: Pre-fetch all user permissions in a single query
-        # This avoids N+1 queries when checking permissions for each model
-        if self.request.user.is_staff:
-            # Staff users can moderate all models
-            user_can_moderate_all = True
-            user_permission_codenames = set()
-        else:
-            user_can_moderate_all = False
-            # Get user permissions (both direct and via groups) in a single query
-            user_permission_codenames = set(
-                Permission.objects.filter(user=self.request.user).values_list(
-                    "codename", flat=True
-                )
-            )
-            group_permission_codenames = set(
-                Permission.objects.filter(group__user=self.request.user).values_list(
-                    "codename", flat=True
-                )
-            )
-            user_permission_codenames |= group_permission_codenames
-
-        # Helper to check if user can moderate a specific model (using cached permissions)
-        def can_moderate(model):
-            if user_can_moderate_all:
-                return True
-            codename = f"can_moderate_{model._meta.model_name}"
-            return codename in user_permission_codenames
-
-        def has_visible_review_items(model):
-            queryset = self._in_review_queryset_for_model(model)
-            return queryset.exclude(owner=self.request.user).exists()
-
-        for model in apps.get_models():
-            # Check if model inherits from UserCreatedObject and is not abstract
-            if (
-                issubclass(model, UserCreatedObject)
-                and not model._meta.abstract
-                and self._is_primary_model_module(model)
-                and hasattr(model, "objects")
-                and model not in available_models
-            ):
-                # Check if user can moderate this model type
-                if can_moderate(model):
-                    # Check if there are any items in review for this model
-                    try:
-                        if has_visible_review_items(model):
-                            available_models.append(model)
-                    except (
-                        AttributeError,
-                        FieldDoesNotExist,
-                        FieldError,
-                        TypeError,
-                        ValueError,
-                    ) as e:
-                        # Model may not have in_review() manager method or other issues
-                        logger.debug(
-                            f"Could not check review items for {model.__name__}: {e}"
-                        )
-
-        available_models.sort(
-            key=lambda model: (
-                priority_positions.get(model, len(priority_positions)),
-                model._meta.verbose_name,
-            )
-        )
-
-        # Cache for subsequent calls within the same request
-        self._available_models_cache = available_models
-        return available_models
-
-    def _get_fallback_queryset(self) -> QuerySet:
-        from django.apps import apps
-
-        fallback_models = sorted(
-            (
-                model
-                for model in apps.get_models()
-                if (
-                    issubclass(model, UserCreatedObject)
-                    and not model._meta.abstract
-                    and self._is_primary_model_module(model)
-                    and hasattr(model, "objects")
-                )
-            ),
-            key=lambda model: (model._meta.app_label, model._meta.model_name),
-        )
-        if fallback_models:
-            return fallback_models[0].objects.none()
-        return ReviewAction.objects.none()
-
-    def get_filterset_kwargs(self, filterset_class: type[FilterSet]) -> dict[str, Any]:
-        """Override to pass available_models and provide a dummy queryset.
-
-        Since we're working with a heterogeneous list of objects rather than
-        a single QuerySet, we need to provide a dummy queryset to satisfy
-        django_filters' initialization, but we won't actually use it for filtering.
-        """
-        kwargs = super().get_filterset_kwargs(filterset_class)
-
-        # Remove the queryset from kwargs since we're using a list
-        # Replace it with a dummy queryset (we just need something with a .model attribute)
-
-        # Get first available model or use a default
-        available_models = self.get_available_models()
-        if available_models:
-            # Use the first available model's queryset as a dummy
-            kwargs["queryset"] = available_models[0].objects.none()
-        else:
-            kwargs["queryset"] = self._get_fallback_queryset()
-
-        kwargs["available_models"] = available_models
-        return kwargs
-
-    def _has_active_query_filters(self) -> bool:
-        """Return whether any non-ordering filters are active."""
-        return bool(
-            self.request.GET.get("search", "").strip()
-            or self.request.GET.getlist("model_type")
-            or self.request.GET.get("owner")
-            or self.request.GET.get("submitted_after")
-            or self.request.GET.get("submitted_before")
-        )
-
-    def _get_selected_model_type_ids(self) -> set[int]:
-        """Return valid selected content type IDs from the request."""
-        return {
-            int(model_type)
-            for model_type in self.request.GET.getlist("model_type")
-            if model_type.isdigit()
-        }
-
-    @staticmethod
-    def _get_select_related_fields(model_class: type[UserCreatedObject]) -> list[str]:
-        """Return common foreign keys that are safe to select_related."""
-        select_fields = ["owner", "approved_by"]
-        for field_name in (
-            "property",
-            "unit",
-            "material",
-            "sample",
-            "catchment",
-            "waste_category",
-            "collection_system",
-        ):
-            try:
-                field = model_class._meta.get_field(field_name)
-            except FieldDoesNotExist:
-                continue
-            if field.is_relation and field.many_to_one:
-                select_fields.append(field_name)
-        return select_fields
-
-    def _parse_submitted_date(self, parameter_name: str) -> date | None:
-        """Parse a submitted date filter, returning None for invalid values."""
-        raw_value = (self.request.GET.get(parameter_name) or "").strip()
-        if not raw_value:
-            return None
-        try:
-            return datetime.strptime(raw_value, "%Y-%m-%d").date()
-        except ValueError as exc:
-            logger.warning("Invalid date filter value '%s': %s", raw_value, exc)
-            return None
-
-    @staticmethod
-    def _matches_selected_model_types(
-        model_class: type[UserCreatedObject], selected_model_type_ids: set[int]
-    ) -> bool:
-        """Return whether a model is included by the selected model_type filter."""
-        if not selected_model_type_ids:
-            return True
-        return (
-            ContentType.objects.get_for_model(model_class).id in selected_model_type_ids
-        )
-
-    def _apply_search_filter(
-        self,
-        queryset: QuerySet[UserCreatedObject],
-        model_class: type[UserCreatedObject],
-        search: str,
-    ) -> QuerySet[UserCreatedObject]:
-        """Apply model-specific search filters at the database level."""
-        search_filters = []
-
-        try:
-            model_class._meta.get_field("name")
-            search_filters.append(Q(name__icontains=search))
-        except FieldDoesNotExist:
-            pass
-
-        for field_name in get_review_search_fields(model_class):
-            search_filters.append(Q(**{f"{field_name}__icontains": search}))
-
-        if not search_filters:
-            return queryset.none()
-
-        combined_filter = search_filters[0]
-        for search_filter in search_filters[1:]:
-            combined_filter |= search_filter
-        return queryset.filter(combined_filter)
-
-    def _apply_database_review_filters(
-        self,
-        queryset: QuerySet[UserCreatedObject],
-        model_class: type[UserCreatedObject],
-    ) -> QuerySet[UserCreatedObject]:
-        """Apply active dashboard filters directly to a model queryset."""
-        queryset = queryset.exclude(owner=self.request.user)
-
-        owner_id = (self.request.GET.get("owner") or "").strip()
-        if owner_id:
-            if owner_id.isdigit():
-                queryset = queryset.filter(owner_id=int(owner_id))
-            else:
-                logger.warning("Invalid owner_id filter value: %s", owner_id)
-
-        submitted_after = self._parse_submitted_date("submitted_after")
-        if submitted_after is not None:
-            queryset = queryset.filter(submitted_at__date__gte=submitted_after)
-
-        submitted_before = self._parse_submitted_date("submitted_before")
-        if submitted_before is not None:
-            queryset = queryset.filter(submitted_at__date__lte=submitted_before)
-
-        search = self.request.GET.get("search", "").strip()
-        if search:
-            queryset = self._apply_search_filter(queryset, model_class, search)
-
-        return queryset
-
-    def _apply_requested_ordering(
-        self, items: Iterable[ReviewItemReference]
-    ) -> list[ReviewItemReference]:
-        """Sort heterogeneous review items using the dashboard ordering option."""
-        ordering = self.request.GET.get("ordering", "-submitted_at")
-        filter_obj = ReviewItemFilter([], self.request.GET)
-        return filter_obj._apply_ordering(list(items), ordering)
-
-    def _get_review_references(
-        self,
-        available_models: list[type[UserCreatedObject]],
-        limit_per_model: int | None = None,
-    ) -> tuple[
-        list[ReviewItemReference],
-        dict[type[UserCreatedObject], QuerySet[UserCreatedObject]],
-    ]:
-        """Filter in SQL and sort lightweight references without loading full objects."""
-        references = []
-        querysets = {}
-        selected_model_type_ids = self._get_selected_model_type_ids()
-        active_filters = self._has_active_query_filters()
-
-        for model_class in available_models:
-            if not self._matches_selected_model_types(
-                model_class, selected_model_type_ids
-            ):
-                continue
-            try:
-                queryset = self._in_review_queryset_for_model(model_class)
-            except (
-                AttributeError,
-                FieldDoesNotExist,
-                FieldError,
-                TypeError,
-                ValueError,
-            ) as exc:
-                logger.warning(
-                    "Could not build in-review queryset for %s: %s",
-                    model_class.__name__,
-                    exc,
-                )
-                continue
-
-            queryset = self._apply_database_review_filters(queryset, model_class)
-            querysets[model_class] = queryset
-            if not active_filters:
-                queryset = queryset.order_by("-submitted_at", "pk")
-            try:
-                model_class._meta.get_field("name")
-                name = "name"
-            except FieldDoesNotExist:
-                name = Value("", output_field=CharField())
-            metadata = queryset.values_list("pk", name, "submitted_at")
-            if limit_per_model is not None:
-                metadata = metadata[:limit_per_model]
-            references.extend(
-                ReviewItemReference(model_class, *row) for row in metadata.iterator()
-            )
-
-        return self._apply_requested_ordering(references), querysets
-
-    def _hydrate_review_references(
-        self,
-        references: Iterable[ReviewItemReference],
-        querysets: dict[type[UserCreatedObject], QuerySet[UserCreatedObject]],
-    ) -> list[UserCreatedObject]:
-        """Load only selected objects, retaining the original visibility filters."""
-        ids_by_model = defaultdict(list)
-        for reference in references:
-            ids_by_model[reference.model].append(reference.pk)
-        objects = {}
-        for model_class, ids in ids_by_model.items():
-            queryset = (
-                querysets[model_class]
-                .filter(pk__in=ids)
-                .select_related(*self._get_select_related_fields(model_class))
-                .order_by()
-            )
-            objects.update(((model_class, obj.pk), obj) for obj in queryset)
-        return [
-            objects[(reference.model, reference.pk)]
-            for reference in references
-            if (reference.model, reference.pk) in objects
-        ]
+        """Return models with review items the current user can moderate."""
+        return self.collector.available_models()
 
     def collect_review_items(self) -> list[UserCreatedObject]:
-        """Keep the unpaginated JSON queue's existing result shape and fetch limits."""
-        available_models = self.get_available_models()
-        limit = (
-            None
-            if self._has_active_query_filters()
-            else self.paginate_by * max(10, len(available_models))
-        )
-        references, querysets = self._get_review_references(available_models, limit)
-        return self._hydrate_review_references(references, querysets)
-
-    def has_review_items(self) -> bool:
-        """Return whether the user can moderate any pending review item."""
-        from django.apps import apps
-        from django.contrib.auth.models import Permission
-
-        user = self.request.user
-        if not user or not getattr(user, "is_authenticated", False):
-            return False
-
-        if user.is_staff:
-            user_can_moderate_all = True
-            user_permission_codenames = set()
-        else:
-            user_can_moderate_all = False
-            user_permission_codenames = set(
-                Permission.objects.filter(user=user).values_list("codename", flat=True)
-            )
-            user_permission_codenames |= set(
-                Permission.objects.filter(group__user=user).values_list(
-                    "codename", flat=True
-                )
-            )
-
-        def can_moderate(model):
-            if user_can_moderate_all:
-                return True
-            codename = f"can_moderate_{model._meta.model_name}"
-            return codename in user_permission_codenames
-
-        for model_class in apps.get_models():
-            if (
-                not issubclass(model_class, UserCreatedObject)
-                or model_class._meta.abstract
-                or not self._is_primary_model_module(model_class)
-                or not hasattr(model_class, "objects")
-                or not can_moderate(model_class)
-            ):
-                continue
-
-            try:
-                has_items = (
-                    self._in_review_queryset_for_model(model_class)
-                    .exclude(owner=user)
-                    .exists()
-                )
-            except (
-                AttributeError,
-                FieldDoesNotExist,
-                FieldError,
-                TypeError,
-                ValueError,
-            ) as exc:
-                logger.debug(
-                    "Could not check review items for %s: %s",
-                    model_class.__name__,
-                    exc,
-                )
-                continue
-
-            if has_items:
-                return True
-
-        return False
+        """Return the unpaginated review queue (used by the JSON endpoint)."""
+        return self.collector.collect(self.get_available_models())
 
     def get_queryset(self) -> QuerySet[UserCreatedObject]:
-        """Override to return dummy queryset for FilterView compatibility.
+        """Return a dummy queryset for FilterView compatibility.
 
         The actual items are collected in get_context_data().
         """
-        # Return empty queryset from first available model or a default
         available_models = self.get_available_models()
         if available_models:
             return available_models[0].objects.none()
-        return self._get_fallback_queryset()
+        return self.collector.fallback_queryset()
+
+    def get_filterset_kwargs(self, filterset_class: type[FilterSet]) -> dict[str, Any]:
+        """Pass the dummy queryset and available models into the filterset."""
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        kwargs["available_models"] = self.get_available_models()
+        return kwargs
 
     def paginate_queryset(
         self, queryset: QuerySet[UserCreatedObject], page_size: int
     ) -> tuple[None, None, None, None]:
-        """Override to prevent parent FilterView from paginating the dummy queryset.
+        """Disable FilterView pagination of the dummy queryset.
 
-        The parent MultipleObjectMixin tries to paginate get_queryset() which returns
-        an empty queryset. This causes Http404 on page 2+. We handle pagination
-        manually in get_context_data() for the actual heterogeneous review items.
-
-        Returns None to indicate "no pagination at this level".
+        The parent FilterView paginates get_queryset() (an empty queryset) and
+        would 404 on page 2+. The review references are paginated in
+        get_context_data() instead.
         """
         return (None, None, None, None)
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
 
-        references, querysets = self._get_review_references(self.get_available_models())
-
-        from django.core.paginator import Paginator
-
+        references, querysets = self.collector.references(self.get_available_models())
         paginator = Paginator(references, self.paginate_by)
-        page_number = self.request.GET.get("page")
-        page_obj = paginator.get_page(page_number)
-        page_obj.object_list = self._hydrate_review_references(
-            page_obj.object_list, querysets
-        )
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+        page_obj.object_list = self.collector.hydrate(page_obj.object_list, querysets)
 
         context.update(
             {
@@ -1690,27 +1227,6 @@ class BulkManageAccessView(LoginRequiredMixin, View):
         return "/"
 
 
-class UserOwnsObjectMixin(UserPassesTestMixin):
-    """
-    All models that have access restrictions specific to a user contain a field named 'owner'. This mixin prevents
-    access to objects owned by other users.
-    """
-
-    def test_func(self):
-        try:
-            obj = self.get_object()
-        except Http404:
-            # Propagate 404 so DetailView handles nonexistent objects correctly
-            raise
-        except ObjectDoesNotExist as err:
-            # Normalize model DoesNotExist to Http404
-            raise Http404 from err
-        except Exception:
-            return False
-        policy = get_object_policy(self.request.user, obj, request=self.request)
-        return policy["is_owner"]
-
-
 class UserCreatedObjectListMixin:
     paginate_by = 10
     header = None
@@ -1831,9 +1347,8 @@ class UserCreatedObjectListMixin:
             return self.request.user
         return None
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        object_list = context.get("object_list")
+    def _populate_review_feedback(self, context):
+        """Annotate the current page's objects with owner-visible review feedback."""
         page_obj = context.get("page_obj")
         if (
             page_obj is not None
@@ -1842,164 +1357,143 @@ class UserCreatedObjectListMixin:
             populate_owner_review_feedback(
                 page_obj.object_list, getattr(self.request, "user", None)
             )
-        breadcrumb_model = getattr(object_list, "model", None) or getattr(
-            self, "model", None
-        )
-        default_module_label, _ = _get_default_breadcrumb_module(breadcrumb_model)
-        default_parent_label, _ = _get_default_breadcrumb_parent_module(
-            breadcrumb_model
-        )
-        breadcrumb_section_label = (
+
+    def _get_breadcrumb_model(self, context):
+        object_list = context.get("object_list")
+        return getattr(object_list, "model", None) or getattr(self, "model", None)
+
+    def _base_list_context(self):
+        return {
+            "header": self.get_header(),
+            "create_url": self.get_create_url(),
+            "create_url_text": self.get_create_url_text(),
+            "create_permission": self.get_create_permission(),
+            "list_type": self.get_list_type(),
+            "private_list_owner": self.get_private_list_owner(),
+            "explorer_url": self.get_explorer_url(),
+            "sortable_fields": self.get_sortable_fields(),
+            "current_sort": self.get_current_sort() or "",
+        }
+
+    def _breadcrumb_context(self, context):
+        model = self._get_breadcrumb_model(context)
+        default_module_label, _ = _get_default_breadcrumb_module(model)
+        default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
+        section_label = (
             self.breadcrumb_section_label
-            or _get_default_breadcrumb_section_label(breadcrumb_model)
+            or _get_default_breadcrumb_section_label(model)
         )
-        # Base context
-        context.update(
-            {
-                "header": self.get_header(),
-                "create_url": self.get_create_url(),
-                "create_url_text": self.get_create_url_text(),
-                "create_permission": self.get_create_permission(),
-                "list_type": self.get_list_type(),
-                "private_list_owner": self.get_private_list_owner(),
-                "explorer_url": self.get_explorer_url(),
-                "sortable_fields": self.get_sortable_fields(),
-                "current_sort": self.get_current_sort() or "",
-            }
-        )
-        context.update(
-            build_breadcrumb_context(
-                parent_module_label=(
-                    self.breadcrumb_parent_module_label or default_parent_label
-                ),
-                parent_module_url=(
-                    self.breadcrumb_parent_module_url
-                    or _get_default_breadcrumb_parent_module_url(breadcrumb_model)
-                ),
-                module_label=self.breadcrumb_module_label or default_module_label,
-                module_url=(
-                    self.breadcrumb_module_url
-                    or self.get_explorer_url()
-                    or _get_default_breadcrumb_module_url(breadcrumb_model)
-                ),
-                section_label=breadcrumb_section_label,
-                page_title=(
-                    self.breadcrumb_page_title
-                    or self.get_header()
-                    or breadcrumb_section_label
-                ),
-            )
+        return build_breadcrumb_context(
+            parent_module_label=self.breadcrumb_parent_module_label
+            or default_parent_label,
+            parent_module_url=(
+                self.breadcrumb_parent_module_url
+                or _get_default_breadcrumb_parent_module_url(model)
+            ),
+            module_label=self.breadcrumb_module_label or default_module_label,
+            module_url=(
+                self.breadcrumb_module_url
+                or self.get_explorer_url()
+                or _get_default_breadcrumb_module_url(model)
+            ),
+            section_label=section_label,
+            page_title=(
+                self.breadcrumb_page_title or self.get_header() or section_label
+            ),
         )
 
-        # Scope switcher context (urls, active scope)
+    def _scope_model(self):
+        """Return the model used for scope-switcher URL resolution."""
         try:
-            queryset = self.get_queryset()
-            model = queryset.model
+            return self.get_queryset().model
         except Exception:
-            model = getattr(self, "model", None)
+            return getattr(self, "model", None)
 
-        # Determine URLs from model helpers if available
-        public_url = getattr(model, "public_list_url", None)
-        private_url = getattr(model, "private_list_url", None)
-        review_url = getattr(model, "review_list_url", None)
-        if callable(public_url):
-            public_url = public_url()
-        if callable(private_url):
-            private_url = private_url()
-        if callable(review_url):
-            review_url = review_url()
+    @staticmethod
+    def _call_or_value(value):
+        return value() if callable(value) else value
 
-        # Map URLs (if provided by model as classmethods)
-        public_map_url = None
-        private_map_url = None
-        review_map_url = None
+    @staticmethod
+    def _map_url(model, attr):
         try:
-            getter = getattr(model, "public_map_url", None)
+            getter = getattr(model, attr, None)
             if callable(getter):
-                public_map_url = getter()
+                return getter()
         except Exception:
-            public_map_url = None
-        try:
-            getter = getattr(model, "private_map_url", None)
-            if callable(getter):
-                private_map_url = getter()
-        except Exception:
-            private_map_url = None
-        try:
-            getter = getattr(model, "review_map_url", None)
-            if callable(getter):
-                review_map_url = getter()
-        except Exception:
-            review_map_url = None
+            pass
+        return None
 
-        # Try conventional URL names: <model>-list, <model>-list-owned, <model>-list-review
+    @staticmethod
+    def _conventional_scope_url(model, suffix):
+        """Try the conventional URL name ``<model_name>-<suffix>``."""
+        model_name = getattr(getattr(model, "_meta", None), "model_name", None)
+        if not model_name:
+            return None
         try:
-            model_name = model._meta.model_name if model is not None else None
-            if model_name:
-                if not public_url:
-                    try:
-                        public_url = reverse(f"{model_name}-list")
-                    except Exception:
-                        pass
-                if not private_url:
-                    try:
-                        private_url = reverse(f"{model_name}-list-owned")
-                    except Exception:
-                        pass
-                if not review_url:
-                    try:
-                        review_url = reverse(f"{model_name}-list-review")
-                    except Exception:
-                        pass
+            return reverse(f"{model_name}-{suffix}")
+        except Exception:
+            return None
+
+    def _scope_fallback_url(self, scope_value):
+        """Current URL with the scope overridden and pagination reset."""
+        params = self.request.GET.copy()
+        params.pop("page", None)
+        params["scope"] = scope_value
+        encoded = params.urlencode()
+        return f"{self.request.path}?{encoded}" if encoded else self.request.path
+
+    def _scope_context(self):
+        """Scope-switcher context: public/private/review, map, and gallery URLs."""
+        model = self._scope_model()
+        urls = {
+            "public_url": self._call_or_value(getattr(model, "public_list_url", None)),
+            "private_url": self._call_or_value(
+                getattr(model, "private_list_url", None)
+            ),
+            "review_url": self._call_or_value(getattr(model, "review_list_url", None)),
+        }
+        # Conventional URL names: <model>-list, <model>-list-owned, <model>-list-review
+        for key, suffix in (
+            ("public_url", "list"),
+            ("private_url", "list-owned"),
+            ("review_url", "list-review"),
+        ):
+            if not urls[key]:
+                urls[key] = self._conventional_scope_url(model, suffix)
+        # Last resort: rebuild the current URL with a scope override
+        try:
+            for key, scope in (
+                ("public_url", "published"),
+                ("private_url", "private"),
+                ("review_url", "review"),
+            ):
+                if not urls[key]:
+                    urls[key] = self._scope_fallback_url(scope)
         except Exception:
             pass
 
-        # Fallbacks: build URLs from current path and query params with scope override
-        try:
-            req = self.request
-            base_path = req.path
+        return {
+            "active_scope": self.get_list_type(),
+            "representation_mode": "list",
+            "public_representation_url": urls["public_url"],
+            "private_representation_url": urls["private_url"],
+            "review_representation_url": urls["review_url"],
+            "public_gallery_url": None,
+            "private_gallery_url": None,
+            "review_gallery_url": None,
+            # Map URLs for header view toggle (may be None if model has no map views)
+            "public_map_url": self._map_url(model, "public_map_url"),
+            "private_map_url": self._map_url(model, "private_map_url"),
+            "review_map_url": self._map_url(model, "review_map_url"),
+            **urls,
+        }
 
-            def build_fallback_url(scope_value: str) -> str:
-                params = req.GET.copy()
-                # Reset pagination when switching scope
-                if "page" in params:
-                    del params["page"]
-                params["scope"] = scope_value
-                encoded = params.urlencode()
-                return f"{base_path}?{encoded}" if encoded else base_path
-
-            if not public_url:
-                public_url = build_fallback_url("published")
-            if not private_url:
-                private_url = build_fallback_url("private")
-            if not review_url:
-                review_url = build_fallback_url("review")
-        except Exception:
-            # If anything goes wrong, keep URLs as-is (may be None)
-            pass
-
-        # Active scope from list_type (public/private/review)
-        active_scope = self.get_list_type()
-
-        context.update(
-            {
-                "active_scope": active_scope,
-                "public_url": public_url,
-                "private_url": private_url,
-                "review_url": review_url,
-                "public_representation_url": public_url,
-                "private_representation_url": private_url,
-                "review_representation_url": review_url,
-                "representation_mode": "list",
-                "public_gallery_url": None,
-                "private_gallery_url": None,
-                "review_gallery_url": None,
-                # Map URLs for header view toggle (may be None if model has no map views)
-                "public_map_url": public_map_url,
-                "private_map_url": private_map_url,
-                "review_map_url": review_map_url,
-            }
-        )
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        self._populate_review_feedback(context)
+        context.update(self._base_list_context())
+        context.update(self._breadcrumb_context(context))
+        context.update(self._scope_context())
         return context
 
 
@@ -2221,140 +1715,6 @@ class ReviewObjectListView(ReviewObjectListMixin, ListView):
         template_names = super().get_template_names()
         template_names.append("simple_list_card.html")
         return template_names
-
-
-class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
-    """
-    A Mixin to control access to objects based on 'publication_status' and 'owner'.
-
-    - Published objects ('publication_status' == 'published') are accessible to all users.
-    - Unpublished objects are accessible to their owners, staff, or moderators
-      (users with the per‑model permission `can_moderate_<model>`).
-    """
-
-    publication_status_field = "publication_status"
-    owner_field = "owner"
-    published_status = "published"
-    permission_denied_message = "You do not have permission to access this object."
-
-    def test_func(self):
-        try:
-            obj = self.get_object()
-        except Http404:
-            # Ensure missing objects yield 404 rather than permission redirect
-            raise
-        except ObjectDoesNotExist as err:
-            # Normalize model-specific DoesNotExist to Http404
-            raise Http404 from err
-        except Exception:
-            return False
-
-        if not hasattr(obj, self.publication_status_field) or not hasattr(
-            obj, self.owner_field
-        ):
-            raise ImproperlyConfigured(
-                f"The model {obj.__class__.__name__} must have '{self.publication_status_field}' and '{self.owner_field}' fields."
-            )
-
-        # Directly honor model publication_status for public read access
-        try:
-            status = getattr(obj, self.publication_status_field, None)
-            if status is not None:
-                published_value = _resolve_status_value(obj.__class__, "published")
-                if status == published_value:
-                    return True
-        except Exception:
-            pass
-
-        # Policy-based evaluation (covers private/review/declined/archived and role checks)
-        policy = get_object_policy(self.request.user, obj, request=self.request)
-        if policy["is_published"]:
-            return True
-        # Archived, private, review, and declined objects require authentication
-        return (
-            policy["is_owner"]
-            or policy["is_editor"]
-            or policy["is_staff"]
-            or policy["is_moderator"]
-        )
-
-
-class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
-    """
-    A Mixin to control write access to objects based on 'publication_status' and 'owner'.
-
-    - Published objects ('publication_status' == 'published') are accessible to all users.
-    - Unpublished objects are only accessible to their owners.
-    """
-
-    publication_status_field = "publication_status"
-    owner_field = "owner"
-    published_status = "published"
-    permission_denied_message = "You do not have permission to access this object."
-    object_policy_action = "edit"
-
-    def test_func(self):
-        user = self.request.user
-
-        # Authentication is required for all write operations
-        if not user.is_authenticated:
-            return False
-
-        try:
-            obj = self.get_object()
-        except Http404:
-            # For write operations on nonexistent objects, propagate 404
-            raise
-        except ObjectDoesNotExist as err:
-            raise Http404 from err
-        except Exception:
-            return False
-
-        if not hasattr(obj, self.publication_status_field) or not hasattr(
-            obj, self.owner_field
-        ):
-            raise ImproperlyConfigured(
-                f"The model {obj.__class__.__name__} must have '{self.publication_status_field}' and '{self.owner_field}' fields."
-            )
-
-        policy = get_object_policy(user, obj, request=self.request)
-        if self.object_policy_action == "delete":
-            if policy["can_delete"]:
-                return True
-            # Fallback for models without delete URLs in the policy
-            return not policy["is_archived"] and (
-                policy["is_staff"]
-                or (policy["is_owner"] and not policy["is_published"])
-            )
-
-        if self.object_policy_action == "duplicate" and policy["can_new_version"]:
-            return True
-
-        if policy["can_edit"]:
-            return True
-
-        # Fallback for models without update URLs in the policy
-        return not policy["is_archived"] and (
-            policy["is_staff"]
-            or (
-                policy["is_owner"]
-                and not policy["is_published"]
-                and policy["has_change_permission"]
-            )
-        )
-
-
-class CreateUserObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
-    def has_permission(self):
-        # Staff users can always create objects
-        if self.request.user.is_staff:
-            return True
-        # For non-staff users, use the default permission check
-        return super().has_permission()
-
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        return super().form_valid(form)
 
 
 class UserCreatedObjectCreateView(
