@@ -950,7 +950,7 @@ class ReviewActionAdmin(admin.ModelAdmin):
     search_fields = ("comment", "user__username")
     list_filter = ("action", "content_type", "created_at")
     ordering = ("-created_at",)
-    actions = []
+    actions = ()
 
     def has_add_permission(self, request):
         return False

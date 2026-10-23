@@ -38,6 +38,9 @@ ATLAS_CONFIG_MIGRATIONS = (
 
 
 def seed_atlas_map_configurations():
+    model = apps.get_model("waste_atlas", "WasteAtlasMapConfiguration")
+    if model.objects.exists():
+        return
     for name in ATLAS_CONFIG_MIGRATIONS:
         module = import_module(
             f"sources.waste_collection.waste_atlas.migrations.{name}"
