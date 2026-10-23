@@ -27,9 +27,9 @@ from maps.models import (
     GeoPolygon,
     NutsRegion,
     Region,
-    RegionAttributeValue,
     RegionProperty,
 )
+from maps.population.models import PopulationDataset, PopulationObservation
 from maps.throttling import GeoJSONAnonThrottle
 from materials.models import Material
 from sources.waste_collection.derived_values import clear_derived_value_config_cache
@@ -3781,11 +3781,20 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
             average=30.0,
         )
 
-        RegionAttributeValue.objects.create(
-            name="Population GW Amount",
+        cls.pop_dataset = PopulationDataset.objects.create(
+            slug="gw-avg-population",
+            name="GW average annual population",
+            provider="Eurostat",
+            source_code="nama_10r_3popgdp",
+            geographic_scope="nuts",
+            temporal_basis="calendar_year_average",
+            classification_version="NUTS2021",
+            is_canonical=True,
+        )
+        cls.pop_observation = PopulationObservation.objects.create(
+            dataset=cls.pop_dataset,
             region=cls.region,
-            property=cls.population_attribute,
-            date=date(2024, 1, 1),
+            year=2024,
             value=1000,
         )
 
@@ -3878,6 +3887,45 @@ class GreenWasteCollectionAmountViewSetTests(APITestCase):
 
         self.assertTrue(data_by_catchment[self.catchment_ignored.id]["no_collection"])
         self.assertIsNone(data_by_catchment[self.catchment_ignored.id]["amount"])
+
+    def test_fallback_unavailable_without_average_population(self):
+        """Deleting the annual observation removes total/population fallback."""
+        self.pop_observation.delete()
+
+        response = self.client.get(self.endpoint, {"country": "DE", "year": 2024})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_catchment = {row["catchment_id"]: row for row in response.data}
+        self.assertIsNone(data_by_catchment[self.catchment_total.id]["amount"])
+        self.assertIsNone(data_by_catchment[self.catchment_agg_total.id]["amount"])
+        # directly reported specific amounts are unaffected
+        self.assertEqual(data_by_catchment[self.catchment_agg.id]["amount"], 120.0)
+        self.assertEqual(data_by_catchment[self.catchment_specific.id]["amount"], 90.0)
+
+    def test_point_in_time_population_is_not_used_for_fallback(self):
+        """A stock observation does not substitute for the annual average."""
+        self.pop_observation.delete()
+        stock = PopulationDataset.objects.create(
+            slug="gw-stock-population",
+            name="GW stock population",
+            provider="Eurostat",
+            source_code="demo_r_pjanaggr3",
+            geographic_scope="nuts",
+            temporal_basis="point_in_time",
+            classification_version="NUTS2021",
+            is_canonical=True,
+        )
+        PopulationObservation.objects.create(
+            dataset=stock, region=self.region, year=2024, value=1000
+        )
+
+        response = self.client.get(self.endpoint, {"country": "DE", "year": 2024})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data_by_catchment = {row["catchment_id"]: row for row in response.data}
+        self.assertIsNone(data_by_catchment[self.catchment_total.id]["amount"])
+        self.assertIsNone(data_by_catchment[self.catchment_agg_total.id]["amount"])
+        self.assertEqual(data_by_catchment[self.catchment_specific.id]["amount"], 90.0)
 
 
 class BinSizeViewSetTests(APITestCase):
@@ -4510,11 +4558,20 @@ class WasteRatioMixedNumericTypesTests(APITestCase):
             publication_status="published",
         )
 
-        RegionAttributeValue.objects.create(
-            name="Ratio Type Population",
+        cls.pop_dataset = PopulationDataset.objects.create(
+            slug="ratio-avg-population",
+            name="Ratio average annual population",
+            provider="Eurostat",
+            source_code="nama_10r_3popgdp",
+            geographic_scope="nuts",
+            temporal_basis="calendar_year_average",
+            classification_version="NUTS2021",
+            is_canonical=True,
+        )
+        cls.pop_observation = PopulationObservation.objects.create(
+            dataset=cls.pop_dataset,
             region=region,
-            property=cls.population_attribute,
-            date=date(2024, 1, 1),
+            year=2024,
             value=1000,
         )
         CollectionPropertyValue.objects.bulk_create(
@@ -4559,6 +4616,53 @@ class WasteRatioMixedNumericTypesTests(APITestCase):
         self.assertEqual(row["bio_amount"], 100.0)
         self.assertEqual(row["residual_amount"], 50.0)
         self.assertAlmostEqual(row["ratio"], 2 / 3)
+
+    def test_waste_ratio_unavailable_without_average_population(self):
+        """No annual average observation -> fallback amount and ratio vanish."""
+        self.pop_observation.delete()
+
+        response = self.client.get(
+            "/waste_collection/waste-atlas/api/waste-ratio/",
+            {"country": "DE", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = next(
+            item for item in response.data if item["catchment_id"] == self.catchment.id
+        )
+        self.assertIsNone(row["bio_amount"])
+        self.assertEqual(row["residual_amount"], 50.0)
+        self.assertIsNone(row["ratio"])
+
+    def test_waste_ratio_ignores_point_in_time_population(self):
+        """A stock observation does not substitute for the annual average."""
+        self.pop_observation.delete()
+        stock = PopulationDataset.objects.create(
+            slug="ratio-stock-population",
+            name="Ratio stock population",
+            provider="Eurostat",
+            source_code="demo_r_pjanaggr3",
+            geographic_scope="nuts",
+            temporal_basis="point_in_time",
+            classification_version="NUTS2021",
+            is_canonical=True,
+        )
+        PopulationObservation.objects.create(
+            dataset=stock, region=self.catchment.region, year=2024, value=1000
+        )
+
+        response = self.client.get(
+            "/waste_collection/waste-atlas/api/waste-ratio/",
+            {"country": "DE", "year": 2024},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = next(
+            item for item in response.data if item["catchment_id"] == self.catchment.id
+        )
+        self.assertIsNone(row["bio_amount"])
+        self.assertEqual(row["residual_amount"], 50.0)
+        self.assertIsNone(row["ratio"])
 
 
 class SouthTyrolCollectionPointTests(APITestCase):

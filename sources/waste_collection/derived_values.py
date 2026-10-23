@@ -8,9 +8,11 @@ the missing value can be derived via population data:
     total_Mg = specific x population / 1000
 
 Derived records are stored with ``is_derived=True`` so they can be
-distinguished from manually entered data and regenerated at will.
+distinguished from manually entered data. Only editable derived records
+are regenerated automatically.
 """
 
+import json
 import logging
 from dataclasses import dataclass
 from decimal import Decimal
@@ -21,12 +23,13 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 
 from maps.models import RegionProperty
+from maps.population.models import TemporalBasis
 from maps.population.services import resolve_population
 from maps.validation import RegionCompositionError
 from utils.object_management.models import get_default_owner
 from utils.properties.models import Property, Unit
 
-from .models import CollectionPropertyValue
+from .models import Collection, CollectionPropertyValue
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +60,10 @@ _DEFAULT_POPULATION_ATTRIBUTE_NAME = "Population"
 
 # Conversion factor: 1 Mg = 1000 kg
 _MG_TO_KG = 1000
+_FROZEN_STATUSES = (
+    CollectionPropertyValue.STATUS_PUBLISHED,
+    CollectionPropertyValue.STATUS_ARCHIVED,
+)
 
 
 def convert_specific_to_total_mg(value, population, ndigits=2):
@@ -278,25 +285,21 @@ def is_convertible_property(property_id):
     return property_id in get_convertible_property_ids()
 
 
-def get_population_for_collection(collection, year=None):
-    """Return the exact-year population for a collection's catchment region.
+def _population_for_collection(collection, year=None):
+    """Resolve an exact-year annual average, retaining its input provenance.
 
-    Resolution goes through :func:`population.services.resolve_population`,
-    which requires an observation for exactly *year* (with a legacy
-    exact-year ``RegionAttributeValue`` compatibility adapter). Returns
-    ``None`` when *year* is not given or no exact-year value exists.
+    Stocks and legacy attributes of unknown basis cannot silently substitute.
     """
     if not year:
         return None
 
-    cfg = get_derived_property_config()
     region = getattr(collection.catchment, "region", None)
     if region is None:
         return None
 
     try:
         result = resolve_population(
-            region, year, legacy_attribute_id=cfg.population_attribute_id
+            region, year, temporal_basis=TemporalBasis.CALENDAR_YEAR_AVERAGE
         )
     except RegionCompositionError:
         logger.warning(
@@ -304,24 +307,33 @@ def get_population_for_collection(collection, year=None):
             region.pk,
         )
         return None
-    if result is None:
-        return None
-    return result.value
+    return result
 
 
-def compute_counterpart_value(cpv):
-    """Compute the counterpart amount for a single CPV record.
+def get_population_for_collection(collection, year=None):
+    """Return the exact-year annual-average population, or ``None``."""
+    result = _population_for_collection(collection, year)
+    return result.value if result is not None else None
 
-    Returns ``(target_property_id, target_unit_id, computed_average)``
-    or ``None`` if the conversion is not applicable.
-    """
+
+def _compute_counterpart_value(cpv):
     cfg = get_derived_value_config()
     mapping = _counterpart_mapping().get(cpv.property_id)
     if mapping is None:
         return None
 
     target_property_id, target_unit_id = mapping
-    population = get_population_for_collection(cpv.collection, year=cpv.year)
+    expected_unit = (
+        cfg.specific_unit_id
+        if cpv.property_id == cfg.specific_property_id
+        else cfg.total_unit_id
+    )
+    if cpv.unit_id != expected_unit:
+        return None
+    population_result = _population_for_collection(cpv.collection, year=cpv.year)
+    if population_result is None:
+        return None
+    population = population_result.value
     if not population or population <= 0:
         return None
 
@@ -332,7 +344,62 @@ def compute_counterpart_value(cpv):
         # total → specific: specific_kg = total_Mg * 1000 / population
         computed = convert_total_to_specific(cpv.average, population, ndigits=2)
 
-    return target_property_id, target_unit_id, computed
+    return target_property_id, target_unit_id, computed, population_result
+
+
+def compute_counterpart_value(cpv):
+    """Return ``(property_id, unit_id, average)`` or ``None`` if unsuitable."""
+    result = _compute_counterpart_value(cpv)
+    return result[:3] if result is not None else None
+
+
+def _calculation_description(cpv, population, *, from_specific):
+    """Snapshot the inputs rather than relying on revisable observation rows."""
+    observations = []
+    for observation in population.observations:
+        dataset = observation.dataset
+        run = observation.import_run
+        observations.append(
+            {
+                "id": observation.pk,
+                "region_id": observation.region_id,
+                "year": observation.year,
+                "value": str(observation.value),
+                "dataset": dataset.slug,
+                "provider": dataset.provider,
+                "source_code": dataset.source_code,
+                "classification_version": dataset.classification_version,
+                "import_run_id": observation.import_run_id,
+                "release": run.structure_version if run is not None else None,
+                "checksum": run.checksum if run is not None else None,
+                "source_status": observation.source_status,
+                "flags": observation.flags,
+            }
+        )
+    return json.dumps(
+        {
+            "formula": (
+                "specific_kg * population / 1000"
+                if from_specific
+                else "total_Mg * 1000 / population"
+            ),
+            "source_cpv": {
+                "id": cpv.pk,
+                "average": str(cpv.average),
+                "unit_id": cpv.unit_id,
+            },
+            "population": {
+                "value": str(population.value),
+                "year": population.year,
+                "temporal_basis": population.temporal_basis,
+                "method": population.method,
+                "is_provisional": population.is_provisional,
+                "is_mixed_provenance": population.is_mixed_provenance,
+                "observations": observations,
+            },
+        },
+        sort_keys=True,
+    )
 
 
 def _derived_counterpart_qs(cpv, target_property_id):
@@ -346,8 +413,10 @@ def _derived_counterpart_qs(cpv, target_property_id):
 
 def _prune_duplicate_derived_rows(cpv, target_property_id):
     """Keep a single derived counterpart row and delete older duplicates."""
-    derived_qs = _derived_counterpart_qs(cpv, target_property_id).order_by(
-        "-lastmodified_at", "-pk"
+    derived_qs = (
+        _derived_counterpart_qs(cpv, target_property_id)
+        .exclude(publication_status__in=_FROZEN_STATUSES)
+        .order_by("-lastmodified_at", "-pk")
     )
     keep_id = derived_qs.values_list("pk", flat=True).first()
     if keep_id is None:
@@ -364,11 +433,13 @@ def _prune_duplicate_derived_rows(cpv, target_property_id):
     return deleted_count
 
 
+@transaction.atomic
 def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
     """Create or update the derived counterpart for a single CPV.
 
     Skips if the CPV is itself derived (prevents infinite loops) or if
-    a non-derived (manually entered) counterpart already exists.
+    a non-derived (manually entered) counterpart already exists. Published
+    and archived derived counterparts require explicit review to replace.
 
     *owner* and *publication_status* override the values copied from the
     source CPV when provided (useful for batch backfills).
@@ -379,11 +450,24 @@ def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
     if cpv.is_derived:
         return None, "skipped"
 
-    result = compute_counterpart_value(cpv)
+    mapping = _counterpart_mapping().get(cpv.property_id)
+    if mapping is None:
+        return None, "skipped"
+    # Serialize generators even before a counterpart exists, and lock existing
+    # counterparts so a concurrent publication cannot be overwritten.
+    Collection.objects.select_for_update().only("pk").get(pk=cpv.collection_id)
+    counterparts = list(
+        _derived_counterpart_qs(cpv, mapping[0]).select_for_update().order_by("pk")
+    )
+    for counterpart in counterparts:
+        if counterpart.publication_status in _FROZEN_STATUSES:
+            return counterpart, "skipped"
+
+    result = _compute_counterpart_value(cpv)
     if result is None:
         return None, "skipped"
 
-    target_property_id, target_unit_id, computed_avg = result
+    target_property_id, target_unit_id, computed_avg, population = result
 
     # Check if a manually entered value already exists
     existing = CollectionPropertyValue.objects.filter(
@@ -439,6 +523,12 @@ def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
         defaults={
             "name": f"derived from {cpv.property.name}",
             "average": computed_avg,
+            "description": _calculation_description(
+                cpv,
+                population,
+                from_specific=cpv.property_id
+                == get_derived_value_config().specific_property_id,
+            ),
             "unit_id": target_unit_id,
             "owner": owner if owner is not None else cpv.owner,
             "publication_status": effective_publication_status,
@@ -462,8 +552,8 @@ def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
 def delete_derived_cpv(cpv):
     """Delete derived counterparts when a source CPV is deleted.
 
-    Only deletes derived records for the counterpart property, not
-    manually entered ones.
+    Only deletes editable derived records for the counterpart property,
+    not manually entered, published or archived ones.
     """
     if cpv.is_derived:
         return 0
@@ -473,12 +563,16 @@ def delete_derived_cpv(cpv):
         return 0
 
     target_property_id, _ = mapping
-    count, _ = CollectionPropertyValue.objects.filter(
-        collection=cpv.collection,
-        property_id=target_property_id,
-        year=cpv.year,
-        is_derived=True,
-    ).delete()
+    count, _ = (
+        CollectionPropertyValue.objects.filter(
+            collection=cpv.collection,
+            property_id=target_property_id,
+            year=cpv.year,
+            is_derived=True,
+        )
+        .exclude(publication_status__in=_FROZEN_STATUSES)
+        .delete()
+    )
     if count:
         logger.debug(
             "Deleted %d derived CPV(s) (property=%s, year=%s) for collection id=%s",
@@ -532,8 +626,11 @@ def backfill_derived_values(dry_run=False, owner=None, publication_status=None):
                 stats["skipped"] += 1
                 continue
 
-            derived_exists = _derived_counterpart_qs(cpv, target_property_id).exists()
-            if derived_exists:
+            derived_qs = _derived_counterpart_qs(cpv, target_property_id)
+            if derived_qs.filter(publication_status__in=_FROZEN_STATUSES).exists():
+                stats["skipped"] += 1
+                continue
+            if derived_qs.exists():
                 stats["updated"] += 1
             else:
                 stats["created"] += 1
