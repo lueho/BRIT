@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser, Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.test import TestCase
 
 from utils.properties.models import Property
@@ -11,6 +12,8 @@ from ..policy import (
     Decision,
     capabilities,
     decide,
+    object_access_routes,
+    reviewable_queryset,
     scope_queryset,
     visible_queryset,
 )
@@ -782,3 +785,133 @@ class PolicyQuerysetTests(TestCase):
             None,
         )
         self.assertEqual(list(scoped), [])
+
+
+class PolicyReviewFindingRegressionTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username="finding-owner")
+        self.moderator = User.objects.create_user(username="finding-moderator")
+        self.editor = User.objects.create_user(username="finding-editor")
+        property_ct = ContentType.objects.get_for_model(Property)
+        self.moderate_permission = Permission.objects.get(
+            codename="can_moderate_property", content_type=property_ct
+        )
+        self.moderator.user_permissions.add(self.moderate_permission)
+        self.private_property = Property.objects.create(
+            name="Finding private",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        self.review_property = Property.objects.create(
+            name="Finding review",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+        )
+
+    def test_review_queue_excludes_moderators_own_submissions(self):
+        own = Property.objects.create(
+            name="Finding own review",
+            owner=self.moderator,
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+        )
+        moderator = User.objects.get(pk=self.moderator.pk)
+        queue = reviewable_queryset(
+            moderator, Property.objects.filter(pk__in=[own.pk, self.review_property.pk])
+        )
+        self.assertEqual(list(queue), [self.review_property])
+        self.assertFalse(decide(moderator, "reject", own).allowed)
+
+    def test_access_routes_report_public_reads_for_anonymous_and_inactive(self):
+        published = Property.objects.create(
+            name="Finding published",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+        archived = Property.objects.create(
+            name="Finding archived",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_ARCHIVED,
+        )
+        inactive = User.objects.create_user(
+            username="finding-inactive", is_active=False
+        )
+        for user in (AnonymousUser(), inactive):
+            with self.subTest(user=user):
+                self.assertEqual(
+                    object_access_routes(user, published), ["published (public read)"]
+                )
+                self.assertEqual(
+                    object_access_routes(user, archived),
+                    ["archived (public historical read)"],
+                )
+                self.assertEqual(object_access_routes(user, self.private_property), [])
+
+    def test_revoked_direct_grant_applies_to_cached_user_instance(self):
+        self.private_property.add_editor(self.editor)
+        editor = User.objects.get(pk=self.editor.pk)
+        self.assertTrue(decide(editor, "read", self.private_property).allowed)
+
+        self.private_property.remove_editor(self.editor)
+        self.assertFalse(decide(editor, "read", self.private_property).allowed)
+
+    def test_revoked_group_grant_and_membership_apply_to_cached_user_instance(self):
+        group = Group.objects.create(name="finding-editors")
+        self.private_property.add_editor_group(group)
+        self.editor.groups.add(group)
+        editor = User.objects.get(pk=self.editor.pk)
+        self.assertTrue(decide(editor, "read", self.private_property).allowed)
+
+        self.private_property.remove_editor_group(group)
+        self.assertFalse(decide(editor, "read", self.private_property).allowed)
+
+        self.private_property.add_editor_group(group)
+        self.assertTrue(decide(editor, "read", self.private_property).allowed)
+        User.objects.get(pk=self.editor.pk).groups.remove(group)
+        self.assertFalse(decide(editor, "read", self.private_property).allowed)
+
+    def test_unaudited_creator_or_last_modifier_cannot_approve(self):
+        for field in ("created_by", "lastmodified_by"):
+            with self.subTest(field=field):
+                candidate = Property.objects.create(
+                    name=f"Finding unaudited {field}",
+                    owner=self.owner,
+                    publication_status=UserCreatedObject.STATUS_REVIEW,
+                )
+                Property.objects.filter(pk=candidate.pk).update(
+                    **{field: self.moderator}
+                )
+                candidate.refresh_from_db()
+                self.assertFalse(
+                    ReviewAction.objects.filter(object_id=candidate.pk).exists()
+                )
+                decision = decide(self.moderator, "approve", candidate)
+                self.assertFalse(decision.allowed)
+                self.assertEqual(decision.reason, "four_eyes_required")
+        self.assertTrue(decide(self.moderator, "approve", self.review_property).allowed)
+
+    def test_rolled_back_grant_does_not_survive_in_cached_user_instance(self):
+        editor = User.objects.get(pk=self.editor.pk)
+        with self.assertRaises(RuntimeError):
+            with transaction.atomic():
+                self.private_property.add_editor(self.editor)
+                self.assertTrue(decide(editor, "read", self.private_property).allowed)
+                raise RuntimeError("rollback")
+        self.assertFalse(decide(editor, "read", self.private_property).allowed)
+
+    def test_editor_grants_are_not_cached_while_version_store_is_unavailable(self):
+        class UnavailableCache:
+            def get(self, *args, **kwargs):
+                return None
+
+            def add(self, *args, **kwargs):
+                return False
+
+            def set(self, *args, **kwargs):
+                return None
+
+        self.private_property.add_editor(self.editor)
+        editor = User.objects.get(pk=self.editor.pk)
+        with patch("django.core.cache.cache", UnavailableCache()):
+            self.assertTrue(decide(editor, "read", self.private_property).allowed)
+            self.private_property.remove_editor(self.editor)
+            self.assertFalse(decide(editor, "read", self.private_property).allowed)
