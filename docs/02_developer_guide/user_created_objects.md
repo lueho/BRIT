@@ -149,6 +149,35 @@ UI/API request
 
 ## Known pending boundaries
 
+## Version-chain approval and predecessor archival
+
+*Part 9a draft runtime checkpoint — not a deployment claim.*
+
+A governed ``approve`` on a versioned record acquires any declared
+transition dependencies through the ``_lock_review_dependencies(action)``
+hook — inside the governing transaction and **before** the fresh-actor and
+authorization checks — so dependent rows are locked while authority is
+still established, never read from a stale decision afterwards.
+``Collection`` locks its predecessors through that hook for approval.
+
+Archival on approval is restricted to predecessors whose freshly locked
+status is ``published``: unpublished predecessors are never forced into the
+public historical archive. Governed approval archives them through
+``perform_transition(..., "archive")``, producing an actor- and
+revision-bound audit event in the same transaction; raw ORM
+``approve()`` with no actor archives only published predecessors without
+fabricating audit entries.
+
+A pre-existing ``archived`` status alone does NOT prove prior publication —
+legacy rows may carry that state without a matching ``archived`` audit event.
+Ambiguous legacy archives require an approved audit before any public-archive
+rollout can rely on them.
+
+Remaining gaps: Atlas read scopes, domain-specific writer surfaces,
+generated-value activation, and broader version-graph lock ordering are
+outside this slice; the legacy cascade helpers are retained for a future
+migration.
+
 ## Legacy moderator checks (pre-migration)
 
 - Per-model moderation rights use `can_moderate_<model>`.
