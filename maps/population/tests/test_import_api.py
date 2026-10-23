@@ -196,6 +196,7 @@ class PopulationImportAPITestCase(APITestCase):
         payload = _payload()
         payload["dataset"]["slug"] = "destatis-lau"
         payload["dataset"]["geographic_scope"] = "lau"
+        payload["dataset"].pop("classification_version")
         payload["observations"][0] = {
             "region_scheme": "LAU",
             "region_code": "03454026",
@@ -237,3 +238,97 @@ class PopulationImportAPITestCase(APITestCase):
         schema = response.json()
         self.assertEqual(schema.get("$schema", "").startswith("http"), True)
         self.assertIn("schema_version", schema.get("properties", {}))
+
+    # --- dataset definition immutability -----------------------------------
+
+    def _post_and_expect_no_commit(self, payload):
+        """A reimport must not commit: committed=False report or a 400."""
+        response = self.post(payload)
+        if response.status_code in (status.HTTP_200_OK, status.HTTP_201_CREATED):
+            self.assertFalse(response.data["committed"], response.data)
+        else:
+            self.assertEqual(
+                response.status_code, status.HTTP_400_BAD_REQUEST, response.data
+            )
+
+    def test_dataset_definition_fields_immutable_once_observations_exist(self):
+        response = self.post(_payload())
+        self.assertTrue(response.data["committed"])
+        original = PopulationDataset.objects.get()
+        for field, new_value in (
+            ("provider", "other-provider"),
+            ("external_id", "demo_r_pjanaggr3"),
+            ("geographic_scope", "lau"),
+            ("temporal_basis", "point_in_time"),
+            ("source_unit", "NR"),
+            ("classification_version", "NUTS2024"),
+        ):
+            with self.subTest(field=field):
+                payload = _payload()
+                payload["dataset"][field] = new_value
+                if field == "geographic_scope":
+                    # keep observation scheme consistent so any refusal is an
+                    # explicit non-commit, not a form mismatch
+                    payload["observations"][0]["region_scheme"] = "LAU"
+                    payload["observations"][0]["region_code"] = "03454026"
+                self._post_and_expect_no_commit(payload)
+                dataset = PopulationDataset.objects.get()
+                self.assertEqual(dataset.provider, original.provider)
+                self.assertEqual(dataset.source_code, original.source_code)
+                self.assertEqual(dataset.geographic_scope, original.geographic_scope)
+                self.assertEqual(dataset.temporal_basis, original.temporal_basis)
+                self.assertEqual(dataset.source_unit, original.source_unit)
+                self.assertEqual(
+                    dataset.classification_version,
+                    original.classification_version,
+                )
+                self.assertEqual(PopulationObservation.objects.count(), 1)
+                self.assertEqual(PopulationImportRun.objects.count(), 1)
+
+    def test_dataset_name_and_canonical_flag_may_change_with_observations(self):
+        self.post(_payload())
+        payload = _payload()
+        payload["dataset"]["name"] = "Renamed average dataset"
+        payload["dataset"]["is_canonical"] = False
+        response = self.post(payload)
+        self.assertTrue(response.data["committed"], response.data)
+        dataset = PopulationDataset.objects.get()
+        self.assertEqual(dataset.name, "Renamed average dataset")
+        self.assertFalse(dataset.is_canonical)
+
+    def test_dataset_definition_change_allowed_on_empty_dataset(self):
+        PopulationDataset.objects.create(
+            slug="eurostat-nama-10r-3popgdp",
+            name="Empty dataset",
+            provider="old-provider",
+            source_code="old_code",
+            geographic_scope="nuts",
+            temporal_basis="point_in_time",
+            source_unit="NR",
+            classification_version="NUTS2024",
+        )
+        response = self.post(_payload())
+        self.assertTrue(response.data["committed"], response.data)
+        dataset = PopulationDataset.objects.get()
+        self.assertEqual(dataset.provider, "eurostat")
+        self.assertEqual(dataset.temporal_basis, "calendar_year_average")
+        self.assertEqual(dataset.classification_version, "NUTS2021")
+
+    def test_scope_region_scheme_mismatch_rejected(self):
+        payload = _payload()
+        payload["observations"][0]["region_scheme"] = "LAU"
+        response = self.post(payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_negative_values_rejected(self):
+        payload = _payload()
+        payload["observations"][0]["value"] = "-5"
+        response = self.post(payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_zero_value_is_stored(self):
+        payload = _payload()
+        payload["observations"][0]["value"] = "0"
+        response = self.post(payload)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(PopulationObservation.objects.get().value, Decimal("0.000"))
