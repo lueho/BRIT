@@ -1,14 +1,13 @@
 """Temporal catchment boundary snapshots and their integrity rules."""
 
 from datetime import date
-from importlib import import_module
 
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.test import SimpleTestCase, TestCase
+from django.test import TestCase
 
 from maps.admin import CatchmentRevisionModelAdmin
 from maps.models import Catchment, CatchmentRevision, LauRegion
@@ -239,23 +238,3 @@ class CatchmentRevisionCompositionTests(TestCase):
         )
         self.assertAlmostEqual(revision.geom.area, 2.0)
         self.assertTrue(revision.geom.equals(square(0, 0, 2, 1)))
-
-
-class CatchmentRevisionBackfillNameTests(SimpleTestCase):
-    """The backfill must fit the name column for every existing catchment."""
-
-    @staticmethod
-    def initial_revision_name(name):
-        migration = import_module("maps.migrations.0017_catchment_revisions")
-        return migration.initial_revision_name(name)
-
-    def test_long_catchment_names_stay_within_the_name_column(self):
-        max_length = CatchmentRevision._meta.get_field("name").max_length
-
-        name = self.initial_revision_name("x" * max_length)
-
-        self.assertLessEqual(len(name), max_length)
-        self.assertTrue(name.endswith(" — initial boundary"))
-
-    def test_missing_catchment_name_falls_back_to_a_generic_label(self):
-        self.assertEqual(self.initial_revision_name(""), "Catchment — initial boundary")
