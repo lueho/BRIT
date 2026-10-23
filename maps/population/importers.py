@@ -114,22 +114,33 @@ def _match_region(
     return _unique_or_error(regions, resolution, matched_version=str(vintage.year))
 
 
+_OPTIONAL_DEFINITION_FIELDS = {
+    "external_id": "source_code",
+    "source_unit": "source_unit",
+    "classification_version": "classification_version",
+}
+
+
 def _upsert_dataset(data):
     slug = data["slug"]
     defaults = {
         "name": data["name"],
         "provider": data["provider"],
-        "source_code": data.get("external_id", ""),
         "geographic_scope": data["geographic_scope"],
         "temporal_basis": data["temporal_basis"],
-        "source_unit": data.get("source_unit", ""),
-        "classification_version": data.get("classification_version", ""),
         "is_canonical": data.get("is_canonical", False),
     }
+    for payload_name, field_name in _OPTIONAL_DEFINITION_FIELDS.items():
+        defaults[field_name] = data.get(payload_name, "")
     dataset, created = PopulationDataset.objects.select_for_update().get_or_create(
         slug=slug, defaults=defaults
     )
     if not created:
+        # Omitted optional metadata keeps the stored value; only an explicit
+        # value (including blank) counts as a definition change.
+        for payload_name, field_name in _OPTIONAL_DEFINITION_FIELDS.items():
+            if payload_name not in data:
+                defaults[field_name] = getattr(dataset, field_name)
         definition_fields = (
             "provider",
             "source_code",
@@ -182,7 +193,7 @@ def import_population_payload(payload, *, user=None, dry_run=False):
             structure_version=payload["dataset"].get("release", ""),
         )
 
-        classification_version = payload["dataset"].get("classification_version", "")
+        classification_version = dataset.classification_version
         resolver = VintageResolver()
 
         for index, observation in enumerate(payload["observations"]):

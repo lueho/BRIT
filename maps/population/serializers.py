@@ -13,18 +13,16 @@ class ImportDatasetSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
     provider = serializers.CharField(max_length=255)
     external_id = serializers.CharField(
-        max_length=255, required=False, allow_blank=True, default=""
+        max_length=255, required=False, allow_blank=True
     )
     release = serializers.CharField(
         max_length=100, required=False, allow_blank=True, default=""
     )
     geographic_scope = serializers.ChoiceField(choices=GeographicScope.choices)
     temporal_basis = serializers.ChoiceField(choices=TemporalBasis.choices)
-    source_unit = serializers.CharField(
-        max_length=30, required=False, allow_blank=True, default=""
-    )
+    source_unit = serializers.CharField(max_length=30, required=False, allow_blank=True)
     classification_version = serializers.CharField(
-        max_length=30, required=False, allow_blank=True, default=""
+        max_length=30, required=False, allow_blank=True
     )
     is_canonical = serializers.BooleanField(required=False, default=False)
 

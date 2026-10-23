@@ -5,6 +5,7 @@ ETL (e.g. BRIT-data) writes population observations into BRIT without BRIT
 depending on any provider-specific code.
 """
 
+import re
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -14,6 +15,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from maps.models import LauRegion, NutsRegion
+from maps.population.contracts import POPULATION_IMPORT_SCHEMA
 from maps.population.models import (
     PopulationDataset,
     PopulationImportRun,
@@ -284,6 +286,58 @@ class PopulationImportAPITestCase(APITestCase):
                 )
                 self.assertEqual(PopulationObservation.objects.count(), 1)
                 self.assertEqual(PopulationImportRun.objects.count(), 1)
+
+    def test_reimport_omitting_optional_metadata_preserves_definition(self):
+        response = self.post(_payload())
+        self.assertTrue(response.data["committed"], response.data)
+        payload = _payload()
+        for field in ("external_id", "source_unit", "classification_version"):
+            del payload["dataset"][field]
+        payload["observations"][0]["reference_period"] = "2024"
+        response = self.post(payload)
+        self.assertTrue(response.data["committed"], response.data)
+        dataset = PopulationDataset.objects.get()
+        self.assertEqual(dataset.source_code, "nama_10r_3popgdp")
+        self.assertEqual(dataset.source_unit, "THS")
+        self.assertEqual(dataset.classification_version, "NUTS2021")
+        self.assertEqual(
+            sorted(PopulationObservation.objects.values_list("year", flat=True)),
+            [2023, 2024],
+        )
+
+    def test_reimport_explicitly_blanking_definition_field_rejected(self):
+        self.post(_payload())
+        for field in ("external_id", "source_unit", "classification_version"):
+            with self.subTest(field=field):
+                payload = _payload()
+                payload["dataset"][field] = ""
+                payload["observations"][0]["reference_period"] = "2024"
+                self._post_and_expect_no_commit(payload)
+                dataset = PopulationDataset.objects.get()
+                self.assertEqual(dataset.source_code, "nama_10r_3popgdp")
+                self.assertEqual(dataset.source_unit, "THS")
+                self.assertEqual(dataset.classification_version, "NUTS2021")
+                self.assertEqual(PopulationObservation.objects.count(), 1)
+
+    def test_schema_value_rejects_negative_strings(self):
+        value_schema = POPULATION_IMPORT_SCHEMA["properties"]["observations"]["items"][
+            "properties"
+        ]["value"]
+        string_branches = [
+            branch for branch in value_schema["anyOf"] if branch.get("type") == "string"
+        ]
+        self.assertEqual(len(string_branches), 1)
+        pattern = re.compile(string_branches[0]["pattern"])
+        for accepted in ("0", "330.5", "1000", ".5", "5.", "+5", "1e3", "3.3E-1"):
+            with self.subTest(accepted=accepted):
+                self.assertIsNotNone(pattern.search(accepted))
+        for rejected in ("-5", "-0.1", "-1e3", "abc", "", " -5", "1e"):
+            with self.subTest(rejected=rejected):
+                self.assertIsNone(pattern.search(rejected))
+        number_branches = [
+            branch for branch in value_schema["anyOf"] if branch.get("type") == "number"
+        ]
+        self.assertEqual(number_branches, [{"type": "number", "minimum": 0}])
 
     def test_dataset_name_and_canonical_flag_may_change_with_observations(self):
         self.post(_payload())

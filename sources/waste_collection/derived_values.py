@@ -626,8 +626,11 @@ def backfill_derived_values(dry_run=False, owner=None, publication_status=None):
                 stats["skipped"] += 1
                 continue
 
-            derived_exists = _derived_counterpart_qs(cpv, target_property_id).exists()
-            if derived_exists:
+            derived_qs = _derived_counterpart_qs(cpv, target_property_id)
+            if derived_qs.filter(publication_status__in=_FROZEN_STATUSES).exists():
+                stats["skipped"] += 1
+                continue
+            if derived_qs.exists():
                 stats["updated"] += 1
             else:
                 stats["created"] += 1

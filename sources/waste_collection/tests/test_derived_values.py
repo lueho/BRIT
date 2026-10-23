@@ -1081,6 +1081,38 @@ class DerivedValuesTestCase(TestCase):
                 derived.refresh_from_db()
                 self.assertEqual(derived.average, 30.0)
 
+    def test_backfill_dry_run_skips_frozen_derived_like_real_run(self):
+        for frozen in ("published", "archived"):
+            with self.subTest(status=frozen):
+                collection, _ = self._create_collection(
+                    f"frozen-dry-{frozen}", population=None
+                )
+                self._avg_observation(
+                    collection.catchment.region,
+                    2024,
+                    "2000",
+                    slug=f"frozen-dry-ds-{frozen}",
+                )
+                specific = self._bulk_create_cpv(
+                    name="specific",
+                    collection=collection,
+                    property=self.property_specific,
+                    unit=self.unit_specific,
+                    year=2024,
+                    average=10,
+                    publication_status="private",
+                    is_derived=False,
+                )
+                derived, action = create_or_update_derived_cpv(specific)
+                self.assertEqual(action, "created")
+                CollectionPropertyValue.objects.filter(pk=derived.pk).update(
+                    publication_status=frozen, approved_at=timezone.now()
+                )
+                dry_stats = backfill_derived_values(dry_run=True)
+                self.assertEqual(dry_stats["updated"], 0, dry_stats)
+                write_stats = backfill_derived_values(dry_run=False)
+                self.assertEqual(dry_stats, write_stats)
+
     def test_policy_published_derived_survives_source_delete(self):
         collection, _ = self._create_collection("pub-del", population=None)
         self._avg_observation(collection.catchment.region, 2024, "2000")
