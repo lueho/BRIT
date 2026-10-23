@@ -15,7 +15,12 @@ backfill_module = importlib.import_module(
 
 
 class BackfillApprovalMetadataTests(TestCase):
-    """Retroactive backfill for pre-workflow published rows (issue #93)."""
+    """Retroactive backfill for pre-workflow published rows (issue #93).
+
+    This exercises a one-off data-migration helper directly. Once migration
+    0034 has been applied in all environments (or folded into a squashed
+    baseline), this test class should be removed together with the helper's
+    relevance — the migration can never run again."""
 
     def setUp(self):
         self.owner = User.objects.create_user(username="backfill-owner")

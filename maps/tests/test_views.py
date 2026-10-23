@@ -588,6 +588,7 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 
     allow_create_for_any_authenticated_user = True
     add_scope_query_param_to_list_urls = True
+    create_view_post = False
 
     create_object_data = {"name": "Test Catchment"}
     update_object_data = {"name": "Updated Test Catchment"}
@@ -653,19 +654,6 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         self.assertContains(response, "Population density")
         self.assertContains(response, "2024: 123.321 people/km²")
         self.assertNotContains(response, "[1/km²]")
-
-    # -----------------------
-    # CreateView Test Cases
-    # -----------------------
-
-    def test_create_view_post_as_authenticated_without_permission(self):
-        self.skipTest("Post method is not implemented for this view.")
-
-    def test_create_view_post_as_authenticated_with_permission(self):
-        self.skipTest("Post method is not implemented for this view.")
-
-    def test_create_view_post_as_staff_user(self):
-        self.skipTest("Post method is not implemented for this view.")
 
     # -----------------------
     # CatchmentCreateSelectRegionView

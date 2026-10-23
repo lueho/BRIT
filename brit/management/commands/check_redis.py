@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
-    help = "Test Redis connection"
+    help = "Check Redis connection"
 
     def handle(self, *args, **options):
         redis_url = os.environ.get("REDIS_URL")
