@@ -10,7 +10,11 @@ from django.utils.html import escape
 from factory.django import mute_signals
 
 from utils.object_management.models import User
-from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
+from utils.tests.testcases import (
+    AbstractTestCases,
+    CheckUrlButtonVisibilityTestMixin,
+    ViewWithPermissionsTestCase,
+)
 
 from ..models import Author, Licence, Source, SourceAuthor, check_url_valid
 
@@ -311,7 +315,10 @@ class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+class SourceCRUDViewsTestCase(
+    CheckUrlButtonVisibilityTestMixin,
+    AbstractTestCases.UserCreatedObjectCRUDViewTestCase,
+):
     model = Source
     add_scope_query_param_to_list_urls = True
 
@@ -485,20 +492,6 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             "sourceauthors-1-author": self.source_author_2.author.pk,
         }
 
-    def test_detail_view_unpublished_contains_check_url_button_for_owner(self):
-        self.client.force_login(self.owner_user)
-        response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
-        self.assertContains(response, "check url")
-
-    def test_detail_view_published_contains_check_url_button_for_owner(self):
-        self.client.force_login(self.owner_user)
-        response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertContains(response, "check url")
-
-    def test_detail_view_published_doesnt_contain_check_url_button_for_anonymous(self):
-        response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertNotContains(response, "check url")
-
     def test_detail_view_published_contains_check_url_button_for_staff(self):
         self.client.force_login(self.staff_user)
         response = self.client.get(self.get_detail_url(self.published_object.pk))
@@ -508,13 +501,6 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         self.client.force_login(self.util_objects["moderator"])
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertContains(response, "check url")
-
-    def test_detail_view_published_doesnt_contain_check_url_button_for_unprivileged_non_owner(
-        self,
-    ):
-        self.client.force_login(self.non_owner_user)
-        response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertNotContains(response, "check url")
 
     def test_create_source_without_author_succeeds(self):
         """

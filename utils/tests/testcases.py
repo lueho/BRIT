@@ -1419,3 +1419,33 @@ class ScopedSelectionFilterTestMixin:
 
         self.assertFalse(filtr.form.is_valid())
         self.assertIn(self.field, filtr.form.errors)
+
+
+class CheckUrlButtonVisibilityTestMixin:
+    """Detail-view check-URL button visibility tests.
+
+    Mix into ``AbstractTestCases.UserCreatedObjectCRUDViewTestCase`` subclasses
+    whose detail template renders a check-URL button gated to the owner and
+    privileged users. ``check_url_button_text`` is the rendered button label.
+    """
+
+    check_url_button_text = "check url"
+
+    def test_detail_view_unpublished_contains_check_url_button_for_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
+        self.assertContains(response, self.check_url_button_text)
+
+    def test_detail_view_published_contains_check_url_button_for_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertContains(response, self.check_url_button_text)
+
+    def test_detail_view_published_doesnt_contain_check_url_button_for_anonymous(self):
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertNotContains(response, self.check_url_button_text)
+
+    def test_detail_view_published_doesnt_contain_check_url_button_for_non_owner(self):
+        self.client.force_login(self.non_owner_user)
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertNotContains(response, self.check_url_button_text)

@@ -226,44 +226,52 @@ class MaterialPropertyCanonicalTestCase(CanonicalRelationTestMixin, TestCase):
         self._test_canonical_follows_comparable(MaterialProperty)
 
 
-class MaterialTestCase(TestCase):
+class StandardSampleSeriesTestCase(TestCase):
+    """Shared fixture for test cases needing a standard sample series.
+
+    Provides ``user``, ``material1``, ``sample_series`` and ``sample0`` plus the
+    ``custom_*`` distribution, timesteps, group and component, and the
+    ``default_*`` counterparts.
+    """
+
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username="standard_user")
-        custom_distribution = TemporalDistribution.objects.create(
-            name="Custom Distribution",
+        cls.user = User.objects.create(username="standard_user")
+        cls.custom_distribution = TemporalDistribution.objects.create(
+            name="Custom Distribution"
         )
-        main_step1 = Timestep.objects.create(
-            name="Timestep 1", distribution=custom_distribution
+        cls.timestep1 = Timestep.objects.create(
+            name="Timestep 1", distribution=cls.custom_distribution
         )
-        main_step2 = Timestep.objects.create(
-            name="Timestep 2", distribution=custom_distribution
+        cls.timestep2 = Timestep.objects.create(
+            name="Timestep 2", distribution=cls.custom_distribution
         )
-        MaterialComponentGroup.objects.create(name="Custom Group")
-        MaterialComponent.objects.default()
-        MaterialComponent.objects.create(name="Custom Component")
+        cls.custom_group = MaterialComponentGroup.objects.create(name="Custom Group")
+        cls.custom_component = MaterialComponent.objects.create(name="Custom Component")
+        cls.default_distribution = TemporalDistribution.objects.default()
+        cls.default_group = MaterialComponentGroup.objects.default()
+        cls.default_component = MaterialComponent.objects.default()
 
         with mute_signals(signals.post_save):
-            material1 = Material.objects.create(name="Test Material 1")
-            sample_series = SampleSeries.objects.create(
-                material=material1, standard=True
+            cls.material1 = Material.objects.create(name="Test Material 1")
+            cls.sample_series = SampleSeries.objects.create(
+                material=cls.material1, standard=True
             )
-            Sample.objects.create(
-                material=material1,
-                series=sample_series,
+            cls.sample0 = Sample.objects.create(
+                material=cls.material1,
+                series=cls.sample_series,
                 timestep=Timestep.objects.default(),
             )
             Sample.objects.create(
-                material=material1, series=sample_series, timestep=main_step1
+                material=cls.material1,
+                series=cls.sample_series,
+                timestep=cls.timestep1,
             )
             Sample.objects.create(
-                material=material1, series=sample_series, timestep=main_step2
+                material=cls.material1,
+                series=cls.sample_series,
+                timestep=cls.timestep2,
             )
-
-    def setUp(self):
-        self.user = User.objects.get(username="standard_user")
-        self.default_group = MaterialComponentGroup.objects.default()
-        self.default_component = MaterialComponent.objects.default()
 
 
 class BaseMaterialUniquenessTestCase(TestCase):
@@ -393,50 +401,7 @@ class SampleSubstrateCategoryTestCase(TestCase):
         self.assertEqual(category, first)
 
 
-class SampleSeriesTestCase(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        User.objects.create(username="standard_user")
-        custom_distribution = TemporalDistribution.objects.create(
-            name="Custom Distribution",
-        )
-        timestep1 = Timestep.objects.create(
-            name="Timestep 1", distribution=custom_distribution
-        )
-        timestep2 = Timestep.objects.create(
-            name="Timestep 2", distribution=custom_distribution
-        )
-        MaterialComponentGroup.objects.create(name="Custom Group")
-        MaterialComponent.objects.default()
-        MaterialComponent.objects.create(name="Custom Component")
-
-        with mute_signals(signals.post_save):
-            material1 = Material.objects.create(name="Test Material 1")
-            sample_series = SampleSeries.objects.create(
-                material=material1, standard=True
-            )
-            Sample.objects.create(
-                material=material1,
-                series=sample_series,
-                timestep=Timestep.objects.default(),
-            )
-            Sample.objects.create(
-                material=material1, series=sample_series, timestep=timestep1
-            )
-            Sample.objects.create(
-                material=material1, series=sample_series, timestep=timestep2
-            )
-        cls.user = User.objects.get(username="standard_user")
-        cls.material1 = Material.objects.get(name="Test Material 1")
-        cls.sample0 = Sample.objects.get(timestep=Timestep.objects.default())
-        cls.default_distribution = TemporalDistribution.objects.default()
-        cls.custom_distribution = TemporalDistribution.objects.get(
-            name="Custom Distribution"
-        )
-        cls.default_group = MaterialComponentGroup.objects.default()
-        cls.custom_group = MaterialComponentGroup.objects.get(name="Custom Group")
-        cls.default_component = MaterialComponent.objects.default()
-
+class SampleSeriesTestCase(StandardSampleSeriesTestCase):
     def setUp(self):
         # test_save_with_changed_material_updates_linked_samples saves the
         # series, so it is created per test instead of shared via setUpTestData.
@@ -1541,53 +1506,10 @@ class SampleGeoReferenceTestCase(TestCase):
         self.assertEqual(duplicate.site, sample.site)
 
 
-class CompositionTestCase(TestCase):
+class CompositionTestCase(StandardSampleSeriesTestCase):
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username="standard_user")
-        custom_distribution = TemporalDistribution.objects.create(
-            name="Custom Distribution"
-        )
-        main_step1 = Timestep.objects.create(
-            name="Timestep 1", distribution=custom_distribution
-        )
-        main_step2 = Timestep.objects.create(
-            name="Timestep 2", distribution=custom_distribution
-        )
-        MaterialComponentGroup.objects.create(
-            name="Custom Group",
-        )
-
-        MaterialComponent.objects.create(
-            name="Custom Component",
-        )
-
-        with mute_signals(signals.post_save):
-            material1 = Material.objects.create(name="Test Material 1")
-            sample_series = SampleSeries.objects.create(
-                material=material1, standard=True
-            )
-            Sample.objects.create(
-                material=material1,
-                series=sample_series,
-                timestep=Timestep.objects.default(),
-            )
-            Sample.objects.create(
-                material=material1, series=sample_series, timestep=main_step1
-            )
-            Sample.objects.create(
-                material=material1, series=sample_series, timestep=main_step2
-            )
-        cls.user = User.objects.get(username="standard_user")
-        cls.material1 = Material.objects.get(name="Test Material 1")
-        cls.sample0 = Sample.objects.get(timestep=Timestep.objects.default())
-        cls.default_distribution = TemporalDistribution.objects.default()
-        cls.custom_distribution = TemporalDistribution.objects.get(
-            name="Custom Distribution"
-        )
-        cls.default_group = MaterialComponentGroup.objects.default()
-        cls.custom_group = MaterialComponentGroup.objects.get(name="Custom Group")
-        cls.default_component = MaterialComponent.objects.default()
+        super().setUpTestData()
         cls.composition = Composition.objects.create(
             owner=cls.user,
             group=cls.default_group,
