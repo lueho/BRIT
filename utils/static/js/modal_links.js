@@ -9,30 +9,32 @@
  * The plugin itself attaches the click listener and prevents the default
  * navigation, so we only need to wire it once.
  */
-function wireModalLinks() {
-    document.querySelectorAll('.modal-link:not(.bmf-bound)').forEach(link => {
-        link.classList.add('bmf-bound');
-        // Prefer data-link attribute, fall back to href for compatibility
-        const formURL = link.getAttribute('data-link') || link.getAttribute('href');
-        modalForm(link, {
-            formURL: formURL,
-            modalID: '#modal',
-            errorClass: '.is-invalid'
+(function () {
+    function wireModalLinks() {
+        document.querySelectorAll('.modal-link:not(.bmf-bound)').forEach(link => {
+            link.classList.add('bmf-bound');
+            // Prefer data-link attribute, fall back to href for compatibility
+            const formURL = link.getAttribute('data-link') || link.getAttribute('href');
+            modalForm(link, {
+                formURL: formURL,
+                modalID: '#modal',
+                errorClass: '.is-invalid'
+            });
+            // Prevent the browser from following the href after the modal opens
+            link.addEventListener('click', function (e) {
+                e.preventDefault();
+            });
         });
-        // Prevent the browser from following the href after the modal opens
-        link.addEventListener('click', function (e) {
-            e.preventDefault();
-        });
-    });
-}
+    }
 
-// Run once DOM is ready and also after each AJAX success that might inject new links.
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", wireModalLinks);
-} else {
-    wireModalLinks();
-}
+    // Run once DOM is ready and also after each AJAX success that might inject new links.
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", wireModalLinks);
+    } else {
+        wireModalLinks();
+    }
 
-// Dynamic pages that inject fragments later request a rewire via this event
-// instead of a global function.
-document.addEventListener('brit:rewire-modal-links', wireModalLinks);
+    // Dynamic pages that inject fragments later request a rewire via this
+    // event; the function itself stays private to this module.
+    document.addEventListener('brit:rewire-modal-links', wireModalLinks);
+})();
