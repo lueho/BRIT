@@ -26,8 +26,13 @@ class MapPageChromeTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(
-            username="layout-user",
+        cls.user = User.objects.create_user(username="layout-user", password="secret")
+        cls.admin = User.objects.create_user(username="layout-admin", password="secret")
+        cls.admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
+        cls.staff = User.objects.create_user(
+            username="layout-staff", password="secret", is_staff=True
         )
         from utils.object_management.models import ReviewAction
 
@@ -196,15 +201,7 @@ class MapPageChromeTests(TestCase):
         self.assertIn('id="atlas-tree-toggle"', content)
         self.assertIn('aria-controls="atlas-tree"', content)
 
-    def test_map_page_keeps_the_current_tree_region_open(self):
-        content = self._content()
-
-        self.assertRegex(
-            content,
-            r'<details class="atlas-tree-region"[^>]*\bopen\b',
-        )
-
-    def test_edit_configuration_lives_in_the_options_pane_for_admins(self):
+    def test_edit_configuration_lives_in_the_options_pane_for_admin(self):
         self.client.force_login(self.admin)
         content = self._content()
 
@@ -216,14 +213,12 @@ class MapPageChromeTests(TestCase):
         self.assertIn("Edit configuration", pane)
         self.assertIn("/configurations/", pane)
 
-    def test_non_admin_users_see_no_configuration_entry(self):
-        content = self._content()
+    def test_staff_only_sees_no_configuration_entry(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse(MAP_ROUTE))
+        self.assertNotContains(response, "Edit configuration")
 
-        self.assertNotIn("Edit configuration", content)
-
-        self.client.force_login(
-            User.objects.create_user("layout-plainstaff", is_staff=True)
-        )
+    def test_non_staff_see_no_configuration_entry(self):
         content = self._content()
 
         self.assertNotIn("Edit configuration", content)

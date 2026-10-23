@@ -70,14 +70,58 @@ def _previous_selection_year(year):
         return year
 
 
-class WasteAtlasStaffMixin(LoginRequiredMixin, UserPassesTestMixin):
-    """Restrict configuration tools to explicit site administrators.
+class WasteAtlasAdminMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """Restrict map configuration tools to administrators.
 
-    The Django staff flag alone is not an application capability here.
+    The Django staff flag alone never qualifies: administration requires
+    the shared-policy administrator check.
     """
 
     def test_func(self):
         return is_admin(self.request.user)
+
+
+class WasteAtlasMaintainerMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """Restrict maintainer aids to administrators and Collection
+    moderators through the shared policy."""
+
+    def test_func(self):
+        return is_maintainer(self.request.user)
+
+
+def _atlas_access_context(user, scope=None):
+    """Common atlas access context for map, change-map and overview views.
+
+    Supplies the normalized scope, actor flags and the scope options the
+    selector may offer.  An unknown or unauthorized raw scope is preserved
+    so the template can render it as a disabled ``Unavailable`` option
+    instead of silently widening to the default.
+    """
+    normalized, _ = _effective_scope(user, scope)
+    options = [
+        ("historical", "Historical"),
+        ("published", "Published (active only)"),
+        ("archived", "Archived"),
+    ]
+    if is_active_actor(user):
+        options += [
+            ("private", "My workspace"),
+            ("owned", "Owned by me"),
+            ("shared", "Shared with me"),
+            ("review", "In review"),
+            ("declined", "Declined"),
+        ]
+    if is_admin(user):
+        options.append(("all", "All"))
+    known = {value for value, _ in options}
+    return {
+        "atlas_scope": normalized,
+        "atlas_scope_available": normalized in known,
+        "atlas_scope_options": options,
+        "atlas_is_active_actor": is_active_actor(user),
+        "atlas_is_admin": is_admin(user),
+        "can_review_collections": is_maintainer(user),
+    }
 
 
 def _configuration_map_pages(config_key):
@@ -115,7 +159,7 @@ def _configuration_return_paths(config_key):
 
 
 class WasteAtlasMapConfigurationListView(
-    WasteAtlasStaffMixin,
+    WasteAtlasAdminMixin,
     AtlasShellTreeMixin,
     ListView,
 ):
@@ -134,7 +178,7 @@ class WasteAtlasMapConfigurationListView(
 
 
 class WasteAtlasMapConfigurationUpdateView(
-    WasteAtlasStaffMixin,
+    WasteAtlasAdminMixin,
     AtlasShellTreeMixin,
     FormView,
 ):
@@ -250,12 +294,9 @@ class AtlasMapView(TemplateView):
         selected_map_set = self.get_selected_map_set()
         ctx["country"] = self.get_country()
         ctx["year"] = str(parse_year(self.request.GET.get("year"), page["year"]))
-        ctx["atlas_scope"] = _effective_scope(
-            self.request.user, self.request.GET.get("scope", "published")
-        )[0]
-        ctx["can_review_collections"] = is_maintainer(self.request.user)
-        ctx["atlas_administrator"] = is_admin(self.request.user)
-        ctx["atlas_active_actor"] = is_active_actor(self.request.user)
+        ctx.update(
+            _atlas_access_context(self.request.user, self.request.GET.get("scope"))
+        )
         ctx["nuts_prefix"] = self.get_nuts_prefix()
         ctx["nuts_level"] = self.get_nuts_level()
         ctx["map_title"] = page["title"]
@@ -405,8 +446,8 @@ class AtlasPermalinkView(RedirectView):
 
     Permalinks name a map by region set, theme and year instead of by page
     path, so they keep working when page paths or the mount point change. They
-    always resolve to the published scope and show the data as published when
-    opened.
+    always resolve to the historical scope and show public historical data
+    when opened.
     """
 
     permanent = False
@@ -425,6 +466,9 @@ class WasteAtlasOverviewView(TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        ctx.update(
+            _atlas_access_context(self.request.user, self.request.GET.get("scope"))
+        )
         ctx["abfallatlas_url"] = ABFALLATLAS_URL
         ctx["selected_required_bin_capacity_reference"] = self.request.GET.get(
             "required_bin_capacity_reference",
@@ -451,12 +495,9 @@ class WasteAtlasChangeMapOverviewView(AtlasShellTreeMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["atlas_scope"] = _effective_scope(
-            self.request.user, self.request.GET.get("scope", "published")
-        )[0]
-        ctx["can_review_collections"] = is_maintainer(self.request.user)
-        ctx["atlas_administrator"] = is_admin(self.request.user)
-        ctx["atlas_active_actor"] = is_active_actor(self.request.user)
+        ctx.update(
+            _atlas_access_context(self.request.user, self.request.GET.get("scope"))
+        )
         selection_ctx = build_map_selection_context(reverse)
         years = list(selection_ctx["map_selection_years"])
         ctx.update(selection_ctx)
@@ -471,7 +512,7 @@ class WasteAtlasChangeMapOverviewView(AtlasShellTreeMixin, TemplateView):
 
 
 class WasteAtlasDataConflictsOverviewView(
-    WasteAtlasStaffMixin, AtlasShellTreeMixin, TemplateView
+    WasteAtlasMaintainerMixin, AtlasShellTreeMixin, TemplateView
 ):
     """Overview page listing maps with the maintainer conflict-overlay aid.
 

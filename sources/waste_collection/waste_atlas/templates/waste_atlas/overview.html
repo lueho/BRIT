@@ -21,7 +21,7 @@
                title="Visit abfall-atlas.de">
                <i class="fas fa-globe" aria-hidden="true"></i> abfall-atlas.de <i class="fas fa-external-link-alt" aria-hidden="true"></i><span class="visually-hidden">(opens in a new tab)</span>
             </a>
-            {% if atlas_administrator %}
+            {% if can_review_collections %}
                <a class="btn btn-outline-primary btn-sm atlas-hero-btn"
                   href="{% url 'waste-atlas-change-map-overview' %}">
                   <i class="fas fa-exchange-alt"></i> Change maps

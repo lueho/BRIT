@@ -41,7 +41,7 @@ from maps.models import (
 from maps.population.models import TemporalBasis
 from maps.population.services import population_values_by_region
 from maps.throttling import GeoJSONAnonThrottle, TrustedClientIPMixin
-from maps.utils import get_or_set_cache
+from maps.utils import AUTHZ_GEOJSON_CACHE_PREFIX, get_or_set_cache
 from sources.waste_collection.derived_values import (
     convert_total_to_specific,
     get_derived_property_config,
@@ -121,6 +121,16 @@ def is_maintainer(user):
 
 
 def _effective_scope(user=None, scope=None):
+    """Normalize the requested atlas scope for ``user``.
+
+    ``None`` resolves to the atlas-specific ``historical`` scope (the
+    authorized public union of published and archived), for every actor -
+    including administrators and staff.  The legacy ``mine`` alias is
+    normalized to ``private`` (the shared-workspace scope), which covers
+    owned *and* shared rows rather than ownership alone.  Unknown values
+    are preserved so callers can render or reject them; nothing falls
+    back to a public scope silently.
+    """
     if isinstance(user, Request):
         if scope is None:
             scope = user.query_params.get("scope")
@@ -590,14 +600,16 @@ def _change_overlay_cache_key(from_ids, from_year, to_ids, to_year, user=None):
     it entirely because an identity key cannot protect against grant
     revocation — so the ``authz-v1`` namespace marks public-historical data.
 
-    Geometry taken from the legacy Region fallback cannot be versioned this way,
-    which is why cached overlays also expire after
+    Geometry taken from the legacy Region fallback cannot be versioned this
+    way, which is why cached overlays also expire after
     ``_CHANGE_OVERLAY_CACHE_TIMEOUT``.
     """
     catchment_ids = sorted(set(from_ids) | set(to_ids))
-    versions = CatchmentRevision.objects.filter(
-        catchment_id__in=catchment_ids
-    ).aggregate(count=Count("pk"), latest=Max("lastmodified_at"))
+    versions = (
+        _supporting_queryset(CatchmentRevision, user)
+        .filter(catchment_id__in=catchment_ids)
+        .aggregate(count=Count("pk"), latest=Max("lastmodified_at"))
+    )
     latest = versions["latest"]
     fingerprint = ":".join(
         (
@@ -1182,7 +1194,7 @@ class CatchmentViewSet(WasteAtlasGenericViewSet):
             generate_overlay,
             timeout=_CHANGE_OVERLAY_CACHE_TIMEOUT,
         )
-        return Response(payload)
+        return Response(payload_data)
 
     def _geojson_response(self, request, queryset):
         _country, year = _parse_country_year(request)

@@ -1,17 +1,16 @@
-{% if request.user.is_authenticated %}
+{% if atlas_is_active_actor %}
   <div class="atlas-selector-field">
     <label for="sel-scope">Collection scope</label>
     <select id="sel-scope">
-      <option value="published" {% if atlas_scope == "published" %}selected{% endif %}>Published</option>
-      <option value="mine" {% if atlas_scope == "mine" %}selected{% endif %}>My workspace</option>
-      <option value="owned" {% if atlas_scope == "owned" %}selected{% endif %}>Owned</option>
-      <option value="shared" {% if atlas_scope == "shared" %}selected{% endif %}>Shared</option>
-      {% if atlas_active_actor %}
-        <option value="review" {% if atlas_scope == "review" %}selected{% endif %}>Review</option>
-      {% endif %}
-      {% if atlas_administrator %}
-        <option value="all" {% if atlas_scope == "all" %}selected{% endif %}>All</option>
+      {% for value, label in atlas_scope_options %}
+        <option value="{{ value }}" {% if atlas_scope == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+      {% if not atlas_scope_available %}
+        <option value="{{ atlas_scope }}" selected disabled>Unavailable scope</option>
       {% endif %}
     </select>
+    <small class="atlas-selector-help">Historical shows everything published,
+      including archived records. Published shows only currently active
+      records.</small>
   </div>
 {% endif %}
