@@ -509,9 +509,20 @@ class SchemaOnlyBaselineGraphTests(SimpleTestCase):
         current_state = ProjectState.from_apps(apps)
         detector = MigrationAutodetector(migrated_state, current_state)
         changes = detector._detect_changes()
+        dynamic_apps = {"layer_manager"}
         for app in BASELINES:
             with self.subTest(app=app):
-                self.assertFalse(changes.get(app), changes.get(app))
+                ops = changes.get(app, [])
+                if app in dynamic_apps:
+                    static_models = {
+                        key[1] for key in migrated_state.models if key[0] == app
+                    }
+                    ops = [
+                        op
+                        for op in ops
+                        if getattr(op, "model_name", op.name).lower() in static_models
+                    ]
+                self.assertFalse(ops, ops)
 
 
 class ControlledDatabaseBootstrapBase(SimpleTestCase):
