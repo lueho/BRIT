@@ -15,6 +15,7 @@ from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from utils.object_management.models import get_default_owner
 
 from ..forms import (
+    AggregatedCollectionPropertyValueModelForm,
     CollectionAddPredecessorForm,
     CollectionAddWasteSampleForm,
     CollectionFrequencyModelForm,
@@ -289,6 +290,28 @@ class CollectionPropertyValueModelFormTestCase(TestCase):
         self.assertEqual(
             form.fields["standard_deviation"].widget.attrs.get("step"), "any"
         )
+
+    def test_unit_and_property_use_visibility_filtered_autocomplete(self):
+        """Regression test for #666: plain <select> widgets enumerated all
+        units and properties, including private objects of other users."""
+        from django_tomselect.widgets import TomSelectModelWidget
+
+        form = CollectionPropertyValueModelForm()
+
+        self.assertIsInstance(form.fields["unit"].widget, TomSelectModelWidget)
+        self.assertIsInstance(form.fields["property"].widget, TomSelectModelWidget)
+
+
+class AggregatedCollectionPropertyValueModelFormTestCase(TestCase):
+    def test_unit_and_property_use_visibility_filtered_autocomplete(self):
+        """Regression test for #666: plain <select> widgets enumerated all
+        units and properties, including private objects of other users."""
+        from django_tomselect.widgets import TomSelectModelWidget
+
+        form = AggregatedCollectionPropertyValueModelForm()
+
+        self.assertIsInstance(form.fields["unit"].widget, TomSelectModelWidget)
+        self.assertIsInstance(form.fields["property"].widget, TomSelectModelWidget)
 
 
 class CollectionModelFormTestCase(TestCase):

@@ -81,6 +81,14 @@ class PropertyPrivateListView(PrivateObjectListView):
     explorer_url = reverse_lazy("properties-explorer")
 
 
+class PropertyAutocompleteView(UserCreatedObjectAutocompleteView):
+    """Autocomplete view for generic Property selection."""
+
+    model = Property
+    search_lookups = ["name__icontains"]
+    value_fields = ["name"]
+
+
 class PropertyCreateView(UserCreatedObjectCreateView):
     model = Property
     form_class = PropertyModelForm
