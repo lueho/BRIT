@@ -1,6 +1,7 @@
 import logging
 import smtplib
 
+from django.contrib import messages
 from django.contrib.auth.mixins import AccessMixin, LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.contrib.sites.shortcuts import get_current_site
@@ -9,7 +10,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
-from django.views.generic import DeleteView, TemplateView
+from django.views.generic import DeleteView, TemplateView, View
 from django_tomselect.autocompletes import AutocompleteModelView
 from registration.backends.default.views import (
     RegistrationView as BaseRegistrationView,
@@ -21,6 +22,7 @@ from registration.backends.default.views import (
 from utils.modal import BSModalLoginView
 
 from .forms import CustomAuthenticationForm
+from .models import UserProfile
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +113,28 @@ class UserDeleteView(LoginRequiredMixin, DeleteView):
 class UserProfileView(LoginRequiredMixin, TemplateView):
     model = User
     template_name = "user_profile.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        profile = getattr(self.request.user, "profile", None)
+        context["review_notifications_enabled"] = (
+            profile.review_notifications if profile is not None else True
+        )
+        return context
+
+
+class ReviewNotificationPreferenceView(LoginRequiredMixin, View):
+    """Toggle all review-workflow notification e-mails for the current user."""
+
+    def post(self, request):
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        profile.review_notifications = not profile.review_notifications
+        profile.save(update_fields=["review_notifications"])
+        if profile.review_notifications:
+            messages.success(request, "Review e-mail notifications enabled.")
+        else:
+            messages.success(request, "Review e-mail notifications disabled.")
+        return redirect("user_profile")
 
 
 class ModalLoginView(BSModalLoginView):

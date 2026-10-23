@@ -248,7 +248,10 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
   min-width: 16rem;
 }
 .atlas-directory-region-head {
+  align-items: baseline;
   border-bottom: 1px solid var(--atlas-border);
+  display: flex;
+  gap: .75rem;
   margin-bottom: .75rem;
   padding-bottom: .35rem;
 }
@@ -256,6 +259,87 @@ body.iframe-embed .coverage-page.coverage-page--iframe {
   font-size: 1.05rem;
   font-weight: 800;
   margin: 0;
+}
+.atlas-mapset-meta {
+  color: var(--atlas-ink-muted);
+  font-size: .8rem;
+}
+.atlas-mapset-picker {
+  display: none;
+}
+.atlas-directory--enhanced .atlas-mapset-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin: 0 0 1.1rem;
+}
+.atlas-directory--enhanced .atlas-mapset:not(.is-active) {
+  display: none;
+}
+.atlas-mapset-chip {
+  align-items: center;
+  background: var(--atlas-surface);
+  border: 1px solid var(--atlas-border);
+  border-radius: 999px;
+  color: var(--atlas-ink);
+  display: inline-flex;
+  font-size: .875rem;
+  font-weight: 600;
+  gap: .45rem;
+  padding: .35rem .5rem .35rem .85rem;
+}
+.atlas-mapset-chip:hover {
+  border-color: var(--brit-accent);
+}
+.atlas-mapset-chip:focus-visible {
+  outline: 2px solid var(--brit-accent);
+  outline-offset: 2px;
+}
+.atlas-mapset-chip[aria-pressed="true"] {
+  background: var(--brit-accent);
+  border-color: var(--brit-accent);
+  color: #fff;
+}
+.atlas-mapset-chip[data-empty] {
+  opacity: .5;
+}
+.atlas-mapset-count {
+  background: var(--atlas-surface-muted, rgba(0, 0, 0, .06));
+  border-radius: 999px;
+  font-size: .75rem;
+  min-width: 1.6rem;
+  padding: .05rem .45rem;
+  text-align: center;
+}
+.atlas-mapset-chip[aria-pressed="true"] .atlas-mapset-count {
+  background: rgba(255, 255, 255, .22);
+}
+[data-bs-theme="dark"] .atlas-mapset-chip[aria-pressed="true"] {
+  color: #17231b;
+}
+.atlas-directory-region--europe {
+  margin-bottom: 1.1rem;
+}
+.atlas-topic-grid {
+  display: grid;
+  gap: .85rem;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+}
+.atlas-topic-card {
+  background: var(--atlas-surface);
+  border: 1px solid var(--atlas-border);
+  border-radius: var(--atlas-radius);
+  box-shadow: var(--atlas-shadow-sm);
+  margin: 0;
+  padding: .85rem 1rem;
+}
+.atlas-directory .atlas-topic-card .atlas-link-group-title {
+  align-items: flex-start;
+  display: flex;
+  gap: .45rem;
+}
+.atlas-directory .atlas-topic-card .atlas-link-group-title i {
+  color: var(--brit-accent);
 }
 
 /* Region tab navigation — quiet underline tabs, no colored pills */

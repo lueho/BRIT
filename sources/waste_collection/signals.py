@@ -149,21 +149,36 @@ def invalidate_collection_geojson_cache(sender, instance, **kwargs):
 # ---------------------------------------------------------------------------
 
 
-def sync_derived_cpv_on_save(sender, instance, **kwargs):
-    """Create or update the derived counterpart when a source CPV is saved."""
-    try:
-        from .derived_values import (
-            create_or_update_derived_cpv,
-            is_convertible_property,
-        )
+def _linked_generated_output_exists(instance):
+    """Whether a generated row is explicitly linked to ``instance``."""
+    from .models import CollectionPropertyValue
 
-        if instance.is_derived:
-            return
-        if not is_convertible_property(instance.property_id):
+    return CollectionPropertyValue.objects.filter(
+        is_derived=True, derived_from_id=instance.pk
+    ).exists()
+
+
+def sync_derived_cpv_on_save(sender, instance, **kwargs):
+    """Sync the generated projection when a source CPV is saved.
+
+    Every persisted raw source saves its linked artifact, including when it
+    becomes non-convertible so a stale linked output is cleaned up. Missing
+    configuration may stay a debug-level skip while the source has no
+    linked output; once a linked output exists, the error propagates so a
+    changed source cannot commit with stale calculated data. Unexpected
+    failures are logged and propagated so source and projection writes roll
+    back together inside the caller's atomic boundary.
+    """
+    try:
+        from .derived_values import create_or_update_derived_cpv
+
+        if instance.is_derived or instance.pk is None:
             return
 
         create_or_update_derived_cpv(instance)
     except ImproperlyConfigured as exc:
+        if _linked_generated_output_exists(instance):
+            raise
         logger.debug(
             "Skipping derived CPV sync for CollectionPropertyValue id=%s: %s",
             instance.pk,
@@ -174,27 +189,21 @@ def sync_derived_cpv_on_save(sender, instance, **kwargs):
             "Failed to sync derived CPV for CollectionPropertyValue id=%s",
             instance.pk,
         )
+        raise
 
 
 def sync_derived_cpv_on_delete(sender, instance, **kwargs):
-    """Delete derived counterparts when a source CPV is deleted."""
+    """Remove the generated output linked to a deleted source CPV."""
     try:
-        from .derived_values import delete_derived_cpv, is_convertible_property
+        from .derived_values import delete_derived_cpv
 
-        if instance.is_derived:
-            return
-        if not is_convertible_property(instance.property_id):
+        if instance.is_derived or instance.pk is None:
             return
 
         delete_derived_cpv(instance)
-    except ImproperlyConfigured as exc:
-        logger.debug(
-            "Skipping derived CPV delete sync for CollectionPropertyValue id=%s: %s",
-            instance.pk,
-            exc,
-        )
     except Exception:
         logger.exception(
             "Failed to delete derived CPV for CollectionPropertyValue id=%s",
             instance.pk,
         )
+        raise

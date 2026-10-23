@@ -1,8 +1,6 @@
-import os
-import subprocess
-import sys
-
 from django.test import SimpleTestCase
+
+from brit.tests.probes import run_settings_probe
 
 FAKE_SENTRY_SETUP = """
 import sys
@@ -34,19 +32,13 @@ sys.modules["sentry_sdk.integrations.celery"] = celery_integration
 
 class ProductionMonitoringSettingsTests(SimpleTestCase):
     def run_production_script(self, script, sentry_dsn=None):
-        environment = os.environ.copy()
-        environment["DJANGO_SETTINGS_MODULE"] = "brit.settings.heroku"
-        environment["SECRET_KEY"] = "test-secret-key"
-        if sentry_dsn is None:
-            environment.pop("SENTRY_DSN", None)
-        else:
-            environment["SENTRY_DSN"] = sentry_dsn
-        return subprocess.run(
-            [sys.executable, "-c", FAKE_SENTRY_SETUP + script],
-            capture_output=True,
-            check=False,
-            env=environment,
-            text=True,
+        return run_settings_probe(
+            FAKE_SENTRY_SETUP + script,
+            env={
+                "DJANGO_SETTINGS_MODULE": "brit.settings.heroku",
+                "SECRET_KEY": "test-secret-key",
+                "SENTRY_DSN": sentry_dsn,
+            },
         )
 
     def test_sentry_initializes_django_and_celery_integrations(self):

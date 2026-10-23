@@ -32,6 +32,11 @@ urlpatterns = [
         name="add_review_comment",
     ),
     path(
+        "mute-notifications/<int:content_type_id>/<int:object_id>/",
+        views.ReviewNotificationMuteView.as_view(),
+        name="review_notification_mute",
+    ),
+    path(
         "approve/<int:content_type_id>/<int:object_id>/",
         views.ApproveItemView.as_view(),
         name="approve_item",
@@ -106,5 +111,10 @@ urlpatterns = [
         "modal/manage-access/<int:content_type_id>/<int:object_id>/",
         views.ManageAccessModalView.as_view(),
         name="manage_access_modal",
+    ),
+    path(
+        "modal/your-access/<int:content_type_id>/<int:object_id>/",
+        views.YourAccessModalView.as_view(),
+        name="your_access_modal",
     ),
 ]

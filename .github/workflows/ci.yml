@@ -28,61 +28,16 @@ jobs:
       - name: Check Ruff formatting
         run: uv run ruff format --check .
 
-  migrations:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgis/postgis:15-3.4
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_brit_db
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgdal-dev gdal-bin
-
-      - uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --locked --dev
-
-      - name: Check for missing migrations
-        env:
-          DJANGO_SETTINGS_MODULE: brit.settings.testrunner
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_HOST: localhost
-          POSTGRES_PORT: 5432
-          REDIS_URL: redis://localhost:6379/0
-          SECRET_KEY: ci-test-key-not-secret
-        run: uv run python manage.py makemigrations --check --dry-run
-
   test:
     runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: brit.settings.testrunner
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://localhost:6379/0
+      SECRET_KEY: ci-test-key-not-secret
     services:
       postgres:
         image: postgis/postgis:15-3.4
@@ -111,25 +66,49 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgdal-dev gdal-bin
+      - uses: docker/setup-buildx-action@v3
 
-      - uses: astral-sh/setup-uv@v7
+      # Tests and the missing-migration check run inside the same image as
+      # dev/prod, so GDAL/GEOS versions match and no apt/uv setup on the
+      # runner is needed. Layer cache makes rebuilds fast as long as
+      # dependency inputs are unchanged.
+      - name: Build dev image
+        uses: docker/build-push-action@v6
         with:
-          enable-cache: true
+          context: .
+          target: dev
+          build-args: |
+            INSTALL_DEV=true
+            INSTALL_PDF_PARSING=true
+          load: true
+          tags: brit-web-ci
+          cache-from: type=gha,scope=brit-web-ci
+          cache-to: type=gha,mode=max,scope=brit-web-ci
 
-      - name: Install dependencies
-        run: uv sync --locked --dev
+      - name: Check for missing migrations
+        run: |
+          docker run --rm --network host \
+            --volume "$GITHUB_WORKSPACE:/app" \
+            --env DJANGO_SETTINGS_MODULE \
+            --env POSTGRES_USER \
+            --env POSTGRES_PASSWORD \
+            --env POSTGRES_HOST \
+            --env POSTGRES_PORT \
+            --env REDIS_URL \
+            --env SECRET_KEY \
+            brit-web-ci \
+            python manage.py makemigrations --check --dry-run
 
       - name: Run tests
-        env:
-          DJANGO_SETTINGS_MODULE: brit.settings.testrunner
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_HOST: localhost
-          POSTGRES_PORT: 5432
-          REDIS_URL: redis://localhost:6379/0
-          SECRET_KEY: ci-test-key-not-secret
-        run: uv run python manage.py test --settings=brit.settings.testrunner --parallel 2 --noinput
+        run: |
+          docker run --rm --network host \
+            --volume "$GITHUB_WORKSPACE:/app" \
+            --env DJANGO_SETTINGS_MODULE \
+            --env POSTGRES_USER \
+            --env POSTGRES_PASSWORD \
+            --env POSTGRES_HOST \
+            --env POSTGRES_PORT \
+            --env REDIS_URL \
+            --env SECRET_KEY \
+            brit-web-ci \
+            python manage.py test --settings=brit.settings.testrunner --parallel 4 --noinput

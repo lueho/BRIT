@@ -59,7 +59,8 @@ def send_review_action_notification_to_user(review_action_id, recipient_id):
     """Deliver one review notification e-mail; transient failures are retried.
 
     Missing actions or recipients are terminal skips. Eligibility (actor,
-    e-mail address, review-page access) is re-checked at delivery time.
+    e-mail address, opt-out preferences, review-page access) is re-checked
+    at delivery time.
     """
     from .models import ReviewAction
     from .notifications import send_review_action_notification

@@ -173,6 +173,17 @@ DIRECTORY_SECTION_LABELS = {
     ),
 }
 
+DIRECTORY_SECTION_ICONS = {
+    "organisation": "fa-sitemap",
+    "systems": "fa-recycle",
+    "bins": "fa-trash-alt",
+    "points": "fa-map-pin",
+    "schedule": "fa-calendar-alt",
+    "counts": "fa-redo",
+    "fees": "fa-euro-sign",
+    "amounts": "fa-chart-bar",
+}
+
 DIRECTORY_THEME_GROUP_SECTIONS = {
     "orga_level": "organisation",
     "collection_orga_level": "organisation",
@@ -637,6 +648,7 @@ def _directory_region_context(map_set, themes, reverse_func):
         {
             "key": key,
             "label": DIRECTORY_SECTION_LABELS[key],
+            "icon": DIRECTORY_SECTION_ICONS[key],
             "maps": sections_by_key[key],
         }
         for key in DIRECTORY_SECTION_ORDER
@@ -650,6 +662,7 @@ def _directory_region_context(map_set, themes, reverse_func):
         "nuts_prefix": scope.get("nuts_prefix", ""),
         "nuts_level": scope.get("nuts_level", ""),
         "sections": sections,
+        "map_count": sum(len(section["maps"]) for section in sections),
     }
 
 

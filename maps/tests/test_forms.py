@@ -1,8 +1,10 @@
+from django.contrib.auth.models import User
 from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.forms import formset_factory
 from django.http import QueryDict
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 
+from bibliography.models import Source
 from utils.properties.models import Unit
 
 from ..forms import (
@@ -290,3 +292,58 @@ class RegionAttributeValueModelFormTestCase(TestCase):
         cleaned_data = form.clean()
 
         self.assertIsNone(cleaned_data["unit"])
+
+    def test_form_saves_selected_sources(self):
+        region = Region.objects.create(
+            name="Published Region", publication_status="published"
+        )
+        region_property = RegionProperty.objects.create(
+            name="Population density", publication_status="published"
+        )
+        source = Source.objects.create(title="Regional statistics yearbook")
+        data = QueryDict("", mutable=True)
+        data.update(
+            {
+                "region": str(region.pk),
+                "property": str(region_property.pk),
+                "date": "2024-01-01",
+                "value": "123.321",
+            }
+        )
+        data.setlist("sources", [str(source.pk)])
+
+        form = RegionAttributeValueModelForm(data=data)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        value = form.save()
+        self.assertQuerySetEqual(value.sources.all(), [source])
+
+    def test_form_rejects_private_source_from_other_user(self):
+        owner = User.objects.create_user(username="source-owner")
+        other = User.objects.create_user(username="other-user")
+        private_source = Source.objects.create(
+            owner=owner, title="Private source", publication_status="private"
+        )
+        region = Region.objects.create(
+            name="Published Region", publication_status="published"
+        )
+        region_property = RegionProperty.objects.create(
+            name="Population density", publication_status="published"
+        )
+        request = RequestFactory().post("/")
+        request.user = other
+        data = QueryDict("", mutable=True)
+        data.update(
+            {
+                "region": str(region.pk),
+                "property": str(region_property.pk),
+                "date": "2024-01-01",
+                "value": "123.321",
+            }
+        )
+        data.setlist("sources", [str(private_source.pk)])
+
+        form = RegionAttributeValueModelForm(data=data, request=request)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("sources", form.errors)

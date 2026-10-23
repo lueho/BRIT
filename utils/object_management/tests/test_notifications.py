@@ -4,16 +4,23 @@ import smtplib
 from unittest import mock
 
 from celery.exceptions import Retry
+from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core import mail
 from django.db.models.signals import post_save
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from factory.django import mute_signals
 
 from sources.waste_collection.models import Collection
-from utils.object_management.models import ReviewAction, UserCreatedObject
+from users.models import UserProfile
+from utils.file_export.models import UserExport
+from utils.object_management.models import (
+    ReviewAction,
+    ReviewNotificationMute,
+    UserCreatedObject,
+)
 from utils.object_management.tasks import (
     send_review_action_notification_to_user,
     send_review_action_notifications,
@@ -59,9 +66,16 @@ class ReviewOwnerNotificationTests(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             return self.client.post(*args, **kwargs)
 
+    def _post_approve(self, obj=None):
+        target = obj or self.collection
+        return self._post(
+            self._action_url("approve_item", obj),
+            data={"expected_revision": target.content_revision},
+        )
+
     def test_approve_notifies_owner(self):
         self.client.force_login(self.moderator)
-        response = self._post(self._action_url("approve_item"))
+        response = self._post_approve()
         self.assertEqual(response.status_code, 302)
 
         self.assertEqual(len(mail.outbox), 1)
@@ -92,7 +106,7 @@ class ReviewOwnerNotificationTests(TestCase):
 
     def test_notification_contains_link_to_review_detail(self):
         self.client.force_login(self.moderator)
-        self._post(self._action_url("approve_item"))
+        self._post_approve()
 
         self.assertEqual(len(mail.outbox), 1)
         review_url = reverse(
@@ -123,7 +137,7 @@ class ReviewOwnerNotificationTests(TestCase):
             publication_status=UserCreatedObject.STATUS_REVIEW,
         )
         self.client.force_login(self.moderator)
-        response = self._post(self._action_url("approve_item", collection))
+        response = self._post_approve(collection)
         self.assertEqual(response.status_code, 302)
         self.assertEqual(len(mail.outbox), 0)
 
@@ -162,8 +176,9 @@ class ReviewOwnerNotificationTests(TestCase):
         new_owner = User.objects.create_user(
             username="newowner", email="newowner@example.com"
         )
-        self.owner.is_staff = True
-        self.owner.save(update_fields=["is_staff"])
+        self.owner.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         self.client.force_login(self.moderator)
         with self.captureOnCommitCallbacks() as callbacks:
             response = self.client.post(self._action_url("reject_item"))
@@ -213,7 +228,7 @@ class ReviewOwnerNotificationTests(TestCase):
     @override_settings(SECURE_SSL_REDIRECT=True)
     def test_notification_links_use_https_when_ssl_redirect_enabled(self):
         self.client.force_login(self.moderator)
-        self._post(self._action_url("approve_item"))
+        self._post_approve()
 
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("https://", mail.outbox[0].body)
@@ -225,15 +240,15 @@ class ReviewOwnerNotificationTests(TestCase):
         with self.assertLogs(
             "utils.object_management.notifications", level="WARNING"
         ) as logs:
-            self._post(self._action_url("approve_item"))
+            self._post_approve()
 
         self.assertTrue(any("No Site row" in line for line in logs.output))
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("http://brit.example.org", mail.outbox[0].body)
 
 
-class ReviewParticipantNotificationTests(TestCase):
-    """Users who commented on an object are notified about later actions."""
+class ReviewNotificationTestBase(TestCase):
+    """Shared fixtures for review notification tests."""
 
     @classmethod
     def setUpTestData(cls):
@@ -247,15 +262,15 @@ class ReviewParticipantNotificationTests(TestCase):
             username="commenter", email="commenter@example.com"
         )
         content_type = ContentType.objects.get_for_model(Collection)
-        permission, _ = Permission.objects.get_or_create(
+        cls.moderation_permission, _ = Permission.objects.get_or_create(
             codename="can_moderate_collection",
             content_type=content_type,
             defaults={"name": "Can moderate collections"},
         )
-        cls.moderator.user_permissions.add(permission)
-        cls.commenter.user_permissions.add(permission)
+        cls.moderator.user_permissions.add(cls.moderation_permission)
+        cls.commenter.user_permissions.add(cls.moderation_permission)
         cls.collection = Collection.objects.create(
-            name="Participated Collection",
+            name="Notified Collection",
             owner=cls.owner,
             publication_status=UserCreatedObject.STATUS_REVIEW,
         )
@@ -270,10 +285,20 @@ class ReviewParticipantNotificationTests(TestCase):
             },
         )
 
+    def _mute_url(self, obj=None):
+        return self._action_url("review_notification_mute", obj)
+
     def _post(self, *args, **kwargs):
         """POST and execute on_commit callbacks (notification enqueue)."""
         with self.captureOnCommitCallbacks(execute=True):
             return self.client.post(*args, **kwargs)
+
+    def _post_approve(self, obj=None):
+        target = obj or self.collection
+        return self._post(
+            self._action_url("approve_item", obj),
+            data={"expected_revision": target.content_revision},
+        )
 
     def _add_comment(self, user, text, obj=None):
         """Record a past comment without triggering a notification."""
@@ -289,6 +314,10 @@ class ReviewParticipantNotificationTests(TestCase):
     @staticmethod
     def _recipients():
         return {message.to[0] for message in mail.outbox}
+
+
+class ReviewParticipantNotificationTests(ReviewNotificationTestBase):
+    """Users who commented on an object are notified about later actions."""
 
     def test_new_comment_notifies_owner_and_past_commenter(self):
         self._add_comment(self.commenter, "Earlier feedback.")
@@ -306,7 +335,7 @@ class ReviewParticipantNotificationTests(TestCase):
     def test_status_change_notifies_past_commenter(self):
         self._add_comment(self.commenter, "Earlier feedback.")
         self.client.force_login(self.moderator)
-        response = self._post(self._action_url("approve_item"))
+        response = self._post_approve()
         self.assertEqual(response.status_code, 302)
 
         self.assertEqual(self._recipients(), {self.owner.email, self.commenter.email})
@@ -441,3 +470,348 @@ class ReviewParticipantNotificationTests(TestCase):
             sorted(message.to[0] for message in mail.outbox),
             sorted([self.owner.email, self.commenter.email]),
         )
+
+
+class ReviewNotificationOptOutTests(ReviewNotificationTestBase):
+    """Muted objects and disabled preferences suppress review e-mails."""
+
+    def _mute(self, user, obj=None):
+        obj = obj or self.collection
+        return ReviewNotificationMute.objects.create(
+            user=user,
+            content_type_id=self.content_type_id,
+            object_id=obj.id,
+        )
+
+    def _review_detail_url(self, obj=None):
+        return self._action_url("review_item_detail", obj)
+
+    def test_muted_commenter_is_skipped(self):
+        self._add_comment(self.commenter, "Earlier feedback.")
+        self._mute(self.commenter)
+        self.client.force_login(self.moderator)
+        self._post(self._action_url("add_review_comment"), data={"message": "Ping."})
+
+        self.assertEqual(self._recipients(), {self.owner.email})
+
+    def test_muted_owner_is_skipped(self):
+        self._add_comment(self.commenter, "Earlier feedback.")
+        self._mute(self.owner)
+        self.client.force_login(self.moderator)
+        self._post(self._action_url("add_review_comment"), data={"message": "Ping."})
+
+        self.assertEqual(self._recipients(), {self.commenter.email})
+
+    def test_global_optout_suppresses_commenter(self):
+        UserProfile.objects.create(user=self.commenter, review_notifications=False)
+        self._add_comment(self.commenter, "Earlier feedback.")
+        self.client.force_login(self.moderator)
+        self._post(self._action_url("add_review_comment"), data={"message": "Ping."})
+
+        self.assertEqual(self._recipients(), {self.owner.email})
+
+    def test_global_optout_suppresses_owner(self):
+        UserProfile.objects.create(user=self.owner, review_notifications=False)
+        self._add_comment(self.commenter, "Earlier feedback.")
+        self.client.force_login(self.moderator)
+        self._post(self._action_url("add_review_comment"), data={"message": "Ping."})
+
+        self.assertEqual(self._recipients(), {self.commenter.email})
+
+    def test_mute_view_toggles_notifications_for_item(self):
+        self.client.force_login(self.commenter)
+        response = self.client.post(self._mute_url())
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            ReviewNotificationMute.objects.filter(user=self.commenter).exists()
+        )
+
+        self._add_comment(self.commenter, "Earlier feedback.")
+        self.client.force_login(self.moderator)
+        self._post(self._action_url("add_review_comment"), data={"message": "Ping."})
+        self.assertEqual(self._recipients(), {self.owner.email})
+
+        self.client.force_login(self.commenter)
+        self.client.post(self._mute_url())
+        self.assertFalse(
+            ReviewNotificationMute.objects.filter(user=self.commenter).exists()
+        )
+
+    def test_mute_view_get_shows_current_state(self):
+        self.client.force_login(self.commenter)
+        response = self.client.get(self._mute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Disable")
+
+        self._mute(self.commenter)
+        response = self.client.get(self._mute_url())
+        self.assertContains(response, "Enable")
+
+    def test_mute_view_get_is_read_only(self):
+        self.client.force_login(self.commenter)
+        actions_before = ReviewAction.objects.count()
+
+        response = self.client.get(self._mute_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ReviewAction.objects.count(), actions_before)
+        self.assertFalse(ReviewNotificationMute.objects.exists())
+
+    def test_mute_view_post_ignores_external_next(self):
+        self.client.force_login(self.commenter)
+        response = self.client.post(
+            self._mute_url(), data={"next": "https://attacker.example/"}
+        )
+        self.assertRedirects(
+            response,
+            self.collection.get_absolute_url(),
+            fetch_redirect_response=False,
+        )
+
+    def test_mute_view_post_ignores_scheme_relative_next(self):
+        self.client.force_login(self.commenter)
+        response = self.client.post(
+            self._mute_url(), data={"next": "//attacker.example/"}
+        )
+        self.assertRedirects(
+            response,
+            self.collection.get_absolute_url(),
+            fetch_redirect_response=False,
+        )
+
+    def test_mute_view_post_honors_review_detail_next(self):
+        self.client.force_login(self.commenter)
+        response = self.client.post(
+            self._mute_url(), data={"next": self._review_detail_url()}
+        )
+        self.assertRedirects(
+            response, self._review_detail_url(), fetch_redirect_response=False
+        )
+
+    def test_mute_view_secure_request_rejects_http_next(self):
+        self.client.force_login(self.commenter)
+        response = self.client.post(
+            self._mute_url(), data={"next": "http://testserver/home/"}, secure=True
+        )
+        self.assertRedirects(
+            response,
+            self.collection.get_absolute_url(),
+            fetch_redirect_response=False,
+        )
+
+    def test_mute_view_secure_request_accepts_https_same_host(self):
+        self.client.force_login(self.commenter)
+        response = self.client.post(
+            self._mute_url(), data={"next": "https://testserver/home/"}, secure=True
+        )
+        self.assertEqual(response["Location"], "https://testserver/home/")
+
+    def test_owner_without_change_permission_can_mute_own_subscription(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(self._mute_url())
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(ReviewNotificationMute.objects.filter(user=self.owner).exists())
+
+    def test_staff_can_mute_own_subscription(self):
+        staff = User.objects.create_user(
+            username="staffer", email="staffer@example.com", is_staff=True
+        )
+        self.client.force_login(staff)
+        response = self.client.post(self._mute_url())
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(ReviewNotificationMute.objects.filter(user=staff).exists())
+
+    def test_moderator_can_mute_own_subscription(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(self._mute_url())
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            ReviewNotificationMute.objects.filter(user=self.moderator).exists()
+        )
+
+    def test_posted_user_id_cannot_mute_another_user(self):
+        outsider = User.objects.create_user(
+            username="victim", email="victim@example.com"
+        )
+        self.client.force_login(self.commenter)
+        response = self.client.post(self._mute_url(), data={"user": outsider.pk})
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            ReviewNotificationMute.objects.filter(user=self.commenter).exists()
+        )
+        self.assertFalse(ReviewNotificationMute.objects.filter(user=outsider).exists())
+
+    def test_mute_view_denies_user_without_review_access(self):
+        outsider = User.objects.create_user(
+            username="outsider", email="outsider@example.com"
+        )
+        self.client.force_login(outsider)
+        with self.assertLogs("django.request", level="WARNING") as logs:
+            get_response = self.client.get(self._mute_url())
+            post_response = self.client.post(self._mute_url())
+        self.assertEqual(get_response.status_code, 403)
+        self.assertEqual(post_response.status_code, 403)
+        output = "\n".join(logs.output)
+        self.assertIn("Forbidden", output)
+        self.assertIn(self._mute_url(), output)
+        self.assertGreaterEqual(len(logs.output), 2)
+        self.assertFalse(ReviewNotificationMute.objects.filter(user=outsider).exists())
+
+    def test_mute_view_rejects_non_review_object_owned_by_user(self):
+        export = UserExport.objects.create(
+            owner=self.commenter,
+            model_label="waste_collection.Collection",
+            file_format="xlsx",
+            file_name="secret-export.xlsx",
+        )
+        export_ct = ContentType.objects.get_for_model(UserExport)
+        url = reverse(
+            "object_management:review_notification_mute",
+            kwargs={"content_type_id": export_ct.id, "object_id": export.id},
+        )
+        self.client.force_login(self.commenter)
+        with self.assertLogs("django.request", level="WARNING"):
+            get_response = self.client.get(url)
+            post_response = self.client.post(url)
+        self.assertEqual(get_response.status_code, 403)
+        self.assertNotContains(get_response, "secret-export", status_code=403)
+        self.assertEqual(post_response.status_code, 403)
+        self.assertFalse(ReviewNotificationMute.objects.exists())
+
+    def test_mute_view_rejects_non_review_object_for_staff(self):
+        staff = User.objects.create_user(
+            username="staffer", email="staffer@example.com", is_staff=True
+        )
+        url = reverse(
+            "object_management:review_notification_mute",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(User).id,
+                "object_id": self.owner.id,
+            },
+        )
+        self.client.force_login(staff)
+        with self.assertLogs("django.request", level="WARNING"):
+            response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+        self.assertNotContains(response, self.owner.username, status_code=403)
+
+    def test_mutes_are_deleted_with_object(self):
+        self._mute(self.commenter)
+        object_id = self.collection.id
+        self.collection.delete()
+        self.assertFalse(
+            ReviewNotificationMute.objects.filter(
+                content_type_id=self.content_type_id, object_id=object_id
+            ).exists()
+        )
+
+    def test_mute_view_post_requires_csrf_token(self):
+        middleware = list(settings.MIDDLEWARE)
+        csrf = "django.middleware.csrf.CsrfViewMiddleware"
+        if csrf not in middleware:
+            middleware.append(csrf)
+        actions_before = ReviewAction.objects.count()
+        with override_settings(MIDDLEWARE=middleware):
+            client = Client(enforce_csrf_checks=True)
+            client.force_login(self.owner)
+            with self.assertLogs("django.security.csrf", level="WARNING") as logs:
+                response = client.post(self._mute_url())
+
+        self.assertEqual(response.status_code, 403)
+        output = "\n".join(logs.output)
+        self.assertIn("CSRF", output)
+        self.assertIn(self._mute_url(), output)
+        self.assertFalse(ReviewNotificationMute.objects.exists())
+        self.assertEqual(ReviewAction.objects.count(), actions_before)
+
+    def test_mute_view_requires_login(self):
+        response = self.client.post(self._mute_url())
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ReviewNotificationMute.objects.exists())
+
+    def test_profile_preference_view_toggles(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(reverse("review_notification_preference"))
+        self.assertEqual(response.status_code, 302)
+        profile = UserProfile.objects.get(user=self.owner)
+        self.assertFalse(profile.review_notifications)
+
+        self.client.post(reverse("review_notification_preference"))
+        profile.refresh_from_db()
+        self.assertTrue(profile.review_notifications)
+
+    def test_email_contains_mute_and_profile_links(self):
+        self.client.force_login(self.moderator)
+        self._post(self._action_url("add_review_comment"), data={"message": "Ping."})
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(self._mute_url(), mail.outbox[0].body)
+        self.assertIn(reverse("user_profile"), mail.outbox[0].body)
+
+    def _create_action(self, user, action=ReviewAction.ACTION_COMMENT, text=""):
+        with mute_signals(post_save):
+            return ReviewAction.objects.create(
+                content_type_id=self.content_type_id,
+                object_id=self.collection.id,
+                user=user,
+                action=action,
+                comment=text,
+            )
+
+    def _queued_deliveries(self, action):
+        with mock.patch.object(
+            send_review_action_notification_to_user, "delay"
+        ) as deliver:
+            send_review_action_notifications.delay(action.pk, self.owner.pk).get()
+        return {call.args[1]: call.args for call in deliver.call_args_list}
+
+    def test_queued_delivery_skips_globally_disabled_recipient(self):
+        self._add_comment(self.commenter, "Earlier feedback.")
+        action = self._create_action(self.moderator, text="Ping.")
+        deliveries = self._queued_deliveries(action)
+        self.assertEqual(set(deliveries), {self.owner.pk, self.commenter.pk})
+
+        UserProfile.objects.create(user=self.commenter, review_notifications=False)
+        results = {
+            recipient_id: send_review_action_notification_to_user.apply(args=args).get()
+            for recipient_id, args in deliveries.items()
+        }
+        self.assertFalse(results[self.commenter.pk])
+        self.assertTrue(results[self.owner.pk])
+        self.assertEqual(self._recipients(), {self.owner.email})
+
+    def test_queued_delivery_skips_per_object_muted_recipient(self):
+        self._add_comment(self.commenter, "Earlier feedback.")
+        action = self._create_action(self.moderator, text="Ping.")
+        deliveries = self._queued_deliveries(action)
+        self.assertEqual(set(deliveries), {self.owner.pk, self.commenter.pk})
+
+        self._mute(self.owner)
+        self.assertFalse(
+            send_review_action_notification_to_user.apply(
+                args=deliveries[self.owner.pk]
+            ).get()
+        )
+        self.assertTrue(
+            send_review_action_notification_to_user.apply(
+                args=deliveries[self.commenter.pk]
+            ).get()
+        )
+        self.assertEqual(self._recipients(), {self.commenter.email})
+
+    def test_muted_other_object_does_not_suppress_delivery(self):
+        other = Collection.objects.create(
+            name="Other Collection",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+        )
+        self._mute(self.commenter, obj=other)
+        self._add_comment(self.commenter, "Earlier feedback.")
+        action = self._create_action(self.moderator, text="Ping.")
+
+        result = send_review_action_notification_to_user.apply(
+            args=(action.pk, self.commenter.pk)
+        ).get()
+
+        self.assertTrue(result)
+        self.assertIn(self.commenter.email, self._recipients())

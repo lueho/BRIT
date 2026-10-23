@@ -16,10 +16,11 @@ from ..models import ReviewAction, UserCreatedObject
 class ReviewWorkflowModelTests(TestCase):
     """Test the model methods for the review workflow."""
 
-    def setUp(self):
-        self.owner = User.objects.create_user(username="owner")
-        self.moderator = User.objects.create_user(username="moderator")
-        self.regular_user = User.objects.create_user(username="regular")
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner")
+        cls.moderator = User.objects.create_user(username="moderator")
+        cls.regular_user = User.objects.create_user(username="regular")
 
         # Add moderator permissions
         content_type = ContentType.objects.get_for_model(Collection)
@@ -28,23 +29,27 @@ class ReviewWorkflowModelTests(TestCase):
             content_type=content_type,
             defaults={"name": "Can moderate collections"},
         )
-        self.moderator.user_permissions.add(permission)
+        cls.moderator.user_permissions.add(permission)
 
         # Create a test collection
-        self.category = WasteCategory.objects.create(
+        cls.category = WasteCategory.objects.create(
             name="Test Category",
-            owner=self.owner,
+            owner=cls.owner,
             publication_status=UserCreatedObject.STATUS_PRIVATE,
         )
 
+        cls.source = Source.objects.create(
+            owner=cls.owner,
+            title="Review Workflow Model Source",
+        )
+
+    def setUp(self):
+        # The collection's review state is the mutation under test, so it is
+        # created per test instead of shared via setUpTestData.
         self.collection = Collection.objects.create(
             name="Test Collection",
             owner=self.owner,
             publication_status=UserCreatedObject.STATUS_PRIVATE,
-        )
-        self.source = Source.objects.create(
-            owner=self.owner,
-            title="Review Workflow Model Source",
         )
         self.collection.sources.add(self.source)
 
@@ -82,6 +87,129 @@ class ReviewWorkflowModelTests(TestCase):
         )
         self.assertIsNotNone(self.collection.approved_at)
         self.assertEqual(self.collection.approved_by, self.moderator)
+
+    def test_approve_requires_the_approving_user(self):
+        """approve() must always record who published the object."""
+        self.collection.submit_for_review()
+
+        with self.assertRaisesMessage(
+            ValidationError, "approve() requires the approving user"
+        ):
+            self.collection.approve()
+
+        self.collection.refresh_from_db()
+        self.assertEqual(
+            self.collection.publication_status, UserCreatedObject.STATUS_REVIEW
+        )
+        self.assertIsNone(self.collection.approved_at)
+        self.assertIsNone(self.collection.approved_by)
+
+    def test_clean_rejects_transition_to_published_without_approval(self):
+        self.collection.publication_status = UserCreatedObject.STATUS_PUBLISHED
+
+        with self.assertRaises(ValidationError) as context:
+            self.collection.clean()
+
+        self.assertIn("approved_at", str(context.exception))
+        self.assertIn("approved_by", str(context.exception))
+
+    def test_clean_rejects_transition_to_published_with_partial_approval(self):
+        self.collection.publication_status = UserCreatedObject.STATUS_PUBLISHED
+        self.collection.approved_at = timezone.now()
+
+        with self.assertRaises(ValidationError) as context:
+            self.collection.clean()
+
+        self.assertIn("approved_by", str(context.exception))
+
+    def test_clean_allows_publishing_transition_with_approval_metadata(self):
+        self.collection.publication_status = UserCreatedObject.STATUS_PUBLISHED
+        self.collection.approved_at = timezone.now()
+        self.collection.approved_by = self.moderator
+
+        self.collection.clean()
+
+    def test_clean_allows_updates_to_already_published_objects(self):
+        """Rows already stored as published (e.g. pre-workflow data) stay editable."""
+        Collection.objects.filter(pk=self.collection.pk).update(
+            publication_status=UserCreatedObject.STATUS_PUBLISHED
+        )
+        published = Collection.objects.get(pk=self.collection.pk)
+        self.assertIsNone(published.approved_at)
+        self.assertIsNone(published.approved_by)
+
+        published.name = "Renamed collection"
+        published.clean()
+
+    def test_direct_create_as_published_stamps_approval_metadata(self):
+        """ORM saves bypass clean(), so save() must still record approval."""
+        category = WasteCategory.objects.create(
+            name="Directly published",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+
+        category.refresh_from_db()
+        self.assertIsNotNone(category.approved_at)
+        self.assertEqual(category.approved_by, self.owner)
+
+    def test_direct_save_publishing_with_update_fields_stamps_approval(self):
+        self.collection.publication_status = UserCreatedObject.STATUS_PUBLISHED
+        self.collection.save(update_fields=("publication_status",))
+
+        self.collection.refresh_from_db()
+        self.assertEqual(
+            self.collection.publication_status, UserCreatedObject.STATUS_PUBLISHED
+        )
+        self.assertIsNotNone(self.collection.approved_at)
+        self.assertEqual(self.collection.approved_by, self.owner)
+
+    def test_partial_publish_save_writes_explicit_approval_metadata(self):
+        approved_at = timezone.now() - datetime.timedelta(days=1)
+        self.collection.publication_status = UserCreatedObject.STATUS_PUBLISHED
+        self.collection.approved_at = approved_at
+        self.collection.approved_by = self.moderator
+        self.collection.save(update_fields=["publication_status"])
+
+        self.collection.refresh_from_db()
+        self.assertEqual(self.collection.approved_at, approved_at)
+        self.assertEqual(self.collection.approved_by, self.moderator)
+
+    def test_direct_publish_keeps_existing_approval_metadata(self):
+        approved_at = timezone.now() - datetime.timedelta(days=1)
+        category = WasteCategory.objects.create(
+            name="Explicitly approved",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+            approved_at=approved_at,
+            approved_by=self.moderator,
+        )
+
+        category.refresh_from_db()
+        self.assertEqual(category.approved_at, approved_at)
+        self.assertEqual(category.approved_by, self.moderator)
+
+    def test_save_of_non_published_object_leaves_approval_empty(self):
+        self.collection.name = "Renamed private collection"
+        self.collection.save()
+
+        self.collection.refresh_from_db()
+        self.assertIsNone(self.collection.approved_at)
+        self.assertIsNone(self.collection.approved_by)
+
+    def test_save_of_already_published_object_does_not_stamp(self):
+        """Pre-workflow rows are backfilled by migration, not by unrelated edits."""
+        Collection.objects.filter(pk=self.collection.pk).update(
+            publication_status=UserCreatedObject.STATUS_PUBLISHED
+        )
+        published = Collection.objects.get(pk=self.collection.pk)
+
+        published.name = "Renamed collection"
+        published.save()
+
+        published.refresh_from_db()
+        self.assertIsNone(published.approved_at)
+        self.assertIsNone(published.approved_by)
 
     def test_reject(self):
         """Test rejecting an object."""
@@ -239,8 +367,9 @@ class ReviewWorkflowModelTests(TestCase):
 
 
 class BreadcrumbLabelModelTests(TestCase):
-    def setUp(self):
-        self.owner = User.objects.create_user(username="breadcrumb-model-owner")
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="breadcrumb-model-owner")
 
     def test_plural_breadcrumb_label_uses_model_metadata(self):
         self.assertEqual(Property.get_breadcrumb_plural_label(), "properties")

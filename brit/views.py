@@ -8,12 +8,40 @@ from django.views import View
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
+from brit.featured import (
+    BRIT_EU_ECN_FACTSHEETS,
+    BRIT_EU_MAP_LINKS,
+    ECN_BRIT_EU_URL,
+    ECN_FACTSHEETS_URL,
+    FEATURED_DESTINATIONS,
+)
 from utils.views import BreadcrumbContextMixin
 
 
 @method_decorator(xframe_options_exempt, name="dispatch")
 class HomeView(TemplateView):
     template_name = "home.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["featured_destinations"] = FEATURED_DESTINATIONS
+        return context
+
+
+class BritEUResultsView(BreadcrumbContextMixin, TemplateView):
+    template_name = "brit_eu_results.html"
+    breadcrumb_page_title = "BRIT-EU results"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["brit_eu_map_links"] = BRIT_EU_MAP_LINKS
+        context["brit_eu_ecn_factsheets"] = BRIT_EU_ECN_FACTSHEETS
+        context["ecn_brit_eu_url"] = ECN_BRIT_EU_URL
+        context["ecn_factsheets_url"] = ECN_FACTSHEETS_URL
+        context["brit_eu_feature"] = next(
+            feature for feature in FEATURED_DESTINATIONS if feature["slug"] == "brit-eu"
+        )
+        return context
 
 
 class AboutView(BreadcrumbContextMixin, TemplateView):
@@ -65,16 +93,6 @@ class CacheTestView(View):
             return HttpResponse(f"Calculated value: {cached_value}")
         else:
             return HttpResponse(f"Cached value: {cached_value}")
-
-
-def set_session(request):
-    request.session["test_key"] = "test_value"
-    return HttpResponse("Session value set")
-
-
-def get_session(request):
-    value = request.session.get("test_key", "Not found")
-    return HttpResponse(f"Session value: {value}")
 
 
 def health_check(request):

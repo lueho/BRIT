@@ -17,7 +17,9 @@ from utils.object_management.permissions import user_is_moderator_for_model
 
 from .models import Process
 
-PROCESS_SCOPES = ("published", "private", "review")
+PROCESS_SCOPES = ("published", "private", "owned", "shared", "review")
+
+WORKSPACE_SCOPES = ("private", "owned", "shared")
 
 PRESERVED_FILTER_PARAMS = (
     "name",
@@ -33,6 +35,8 @@ PRESERVED_FILTER_PARAMS = (
 _SCOPE_LIST_ROUTES = {
     "published": "processes:process-list",
     "private": "processes:process-list-owned",
+    "owned": "processes:process-list-owned",
+    "shared": "processes:process-list-owned",
     "review": "processes:process-list-review",
 }
 
@@ -152,7 +156,7 @@ def _normalized_scope(scope, user):
     published context and only process moderators keep ``review``."""
     if scope == "review" and not user_is_moderator_for_model(user, Process):
         return "published"
-    if scope == "private" and not (user and user.is_authenticated):
+    if scope in WORKSPACE_SCOPES and not (user and user.is_authenticated):
         return "published"
     return scope
 

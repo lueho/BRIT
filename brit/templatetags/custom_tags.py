@@ -1,6 +1,7 @@
 from decimal import Decimal, InvalidOperation
 
 from django import template
+from django.apps import apps
 
 register = template.Library()
 
@@ -10,6 +11,73 @@ def user_in_group(user, group_name):
     if not user or not getattr(user, "is_authenticated", False):
         return False
     return user.groups.filter(name=group_name).exists()
+
+
+# Sidebar sections are matched against the resolved route, not raw path
+# substrings. App-label sets cover every view of a module (including source
+# domain plugins mounted under their own path prefixes); stand-alone pages
+# are matched by URL name instead.
+NAV_SECTION_APP_LABELS = {
+    "maps": {"maps", "population", "nuts_import"},
+    "materials": {"materials"},
+    "sources": {
+        "sources",
+        "waste_collection",
+        "greenhouses",
+        "roadside_trees",
+        "urban_green_spaces",
+        "sotasen",
+    },
+    "processes": {"processes"},
+    "inventories": {"inventories"},
+    "bibliography": {"bibliography"},
+    "waste-atlas": {"waste_atlas"},
+    "object_management": {"object_management"},
+}
+
+NAV_SECTION_URL_NAMES = {
+    "learning": {"learning"},
+    "r-analysis": {"r-analysis"},
+    "about": {"about"},
+    "privacy": {"privacypolicy"},
+}
+
+
+def _resolved_app_label(resolver_match):
+    """Return the app label owning the resolved view, or None."""
+    app_name = getattr(resolver_match, "app_name", None)
+    if app_name:
+        return app_name
+    namespaces = getattr(resolver_match, "namespaces", None) or []
+    if namespaces:
+        return namespaces[-1]
+    func = getattr(resolver_match, "func", None)
+    module = getattr(getattr(func, "view_class", None) or func, "__module__", "")
+    best = None
+    for config in apps.get_app_configs():
+        if module == config.name or module.startswith(f"{config.name}."):
+            if best is None or len(config.name) > len(best.name):
+                best = config
+    return best.label if best else None
+
+
+@register.simple_tag(takes_context=True)
+def nav_active(context, section):
+    """Return ``' active'`` when the resolved route belongs to *section*.
+
+    Usage: ``<a class="nav-link{% nav_active 'maps' %}" ...>``. The leading
+    space keeps the emitted class list tidy for both outcomes.
+    """
+    request = context.get("request")
+    match = getattr(request, "resolver_match", None) if request else None
+    if match is None:
+        return ""
+    url_names = NAV_SECTION_URL_NAMES.get(section)
+    if url_names is not None:
+        return " active" if match.url_name in url_names else ""
+    if _resolved_app_label(match) in NAV_SECTION_APP_LABELS.get(section, set()):
+        return " active"
+    return ""
 
 
 @register.filter

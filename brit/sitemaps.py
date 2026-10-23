@@ -1,6 +1,6 @@
 from django.contrib.sitemaps import Sitemap
 
-from .sitemap_items import SITEMAP_ITEMS
+from .sitemap_registry import get_sitemap_items
 
 
 class DynamicViewSitemap(Sitemap):
@@ -8,7 +8,7 @@ class DynamicViewSitemap(Sitemap):
     changefreq = "daily"
 
     def items(self):
-        return [item for item in SITEMAP_ITEMS if item != "/"]  # Exclude root URL
+        return [item for item in get_sitemap_items() if item != "/"]  # Exclude root URL
 
     def location(self, item):
         return item
