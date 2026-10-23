@@ -4251,7 +4251,9 @@ var WasteAtlasChoropleth = (function () {
     },
     collections: {
       detailUrl: _collectionDetailUrl,
-      openChoice: _openCollectionChoice
+      openChoice: _openCollectionChoice,
+      openInNewTab: _openCollectionInNewTab,
+      suppressAutoscroll: _suppressAutoscroll
     },
     quartiles: {
       apply: _applyQuartiles,
