@@ -155,6 +155,14 @@ class ReviewDashboardFilterSet(BaseCrispyFilterSet):
         """Form-only filter; the dashboard resolves the scope itself."""
         return queryset
 
+    def form_only_filter(self, queryset, name, value):
+        """No-op so this FilterSet can validate input and render its form.
+
+        These widgets exist to drive the dashboard's own request handling;
+        the queryset returned here is unused.
+        """
+        return queryset
+
     def filter_search(self, queryset, name, value):
         """Filter by object name (case-insensitive contains).
 
