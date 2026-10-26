@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("bibliography", "0001_squashed_0012"),
         ("properties", "0001_squashed_0010"),
-        ("waste_collection", "0001_squashed_0008"),
+        ("waste_collection", "0009_collection_collection_pub_status_idx_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
