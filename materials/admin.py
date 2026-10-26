@@ -1,6 +1,10 @@
 from django.contrib import admin
 
-from utils.object_management.admin import NamedUserCreatedObjectAdmin, PolicyAdminMixin
+from utils.object_management.admin import (
+    NamedUserCreatedObjectAdmin,
+    PolicyAdminMixin,
+    PolicyOwnedInlineMixin,
+)
 
 from .models import (
     AnalyticalMethod,
@@ -19,7 +23,7 @@ from .models import (
 )
 
 
-class SampleAuthorInline(admin.TabularInline):
+class SampleAuthorInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = SampleAuthor
     extra = 1
     autocomplete_fields = ("author",)

@@ -870,6 +870,20 @@ class Collection(NamedUserCreatedObject):
         """
         return list(self.predecessors.order_by("pk").select_for_update())
 
+    def _has_published_descendant(self):
+        """Return whether any later version in the chain is published."""
+        visited = {self.pk}
+        frontier = [self.pk]
+        while frontier:
+            successors = Collection.objects.filter(predecessors__in=frontier).exclude(
+                pk__in=visited
+            )
+            if successors.filter(publication_status=self.STATUS_PUBLISHED).exists():
+                return True
+            frontier = list(successors.values_list("pk", flat=True).distinct())
+            visited.update(frontier)
+        return False
+
     def _lock_review_dependencies(self, action):
         if action == "approve":
             self._lock_predecessors()
@@ -886,7 +900,9 @@ class Collection(NamedUserCreatedObject):
         """
 
         with transaction.atomic():
-            # Acquire row-level locks on predecessors deterministically to avoid races
+            # Lock self, then predecessors, in the same order as governed
+            # approval so the successor checks below see committed versions.
+            list(Collection.objects.select_for_update().filter(pk=self.pk))
             predecessors = self._lock_predecessors()
 
             # Re-check after acquiring locks: ensure no other published successor exists
@@ -899,6 +915,11 @@ class Collection(NamedUserCreatedObject):
                         "Another version based on this predecessor has already been published."
                     )
 
+            if self._has_published_descendant():
+                raise ValidationError(
+                    "A newer version of this collection has already been published."
+                )
+
             super().approve(user=user)
 
             # Archive only published predecessors — archived records are
@@ -906,17 +927,12 @@ class Collection(NamedUserCreatedObject):
             # never be forced public here.
             for predecessor in predecessors:
                 if predecessor.publication_status == self.STATUS_PUBLISHED:
-                    if user is not None:
-                        perform_transition(
-                            user,
-                            predecessor,
-                            "archive",
-                            expected_revision=predecessor.content_revision,
-                        )
-                    else:
-                        # Raw trusted ORM calls carry no actor and produce
-                        # no fabricated audit event.
-                        predecessor.archive()
+                    perform_transition(
+                        user,
+                        predecessor,
+                        "archive",
+                        expected_revision=predecessor.content_revision,
+                    )
 
     @classmethod
     def public_map_url(cls):
