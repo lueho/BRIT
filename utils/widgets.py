@@ -284,15 +284,28 @@ class SourceListWidget(SelectMultiple):
 
     template_name = "widgets/source_list_widget.html"
 
-    def __init__(self, attrs=None, autocomplete_url=None, label_field="label"):
+    def __init__(
+        self,
+        attrs=None,
+        autocomplete_url=None,
+        label_field="label",
+        can_create_source=False,
+        can_create_author=False,
+    ):
         self.autocomplete_url = autocomplete_url or "source-autocomplete"
         self.label_field = label_field
+        self.can_create_source = can_create_source
+        self.can_create_author = can_create_author
         super().__init__(attrs)
 
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
         context["widget"]["autocomplete_url"] = self.autocomplete_url
         context["widget"]["label_field"] = self.label_field
+        context["widget"]["can_create_source"] = self.can_create_source
+        context["widget"]["can_create_author"] = (
+            self.can_create_source and self.can_create_author
+        )
         return context
 
     def value_from_datadict(self, data, files, name):

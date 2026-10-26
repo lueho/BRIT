@@ -1,12 +1,15 @@
+from io import StringIO
+
+from django.core.management import call_command
 from django.db.models.signals import post_save
 from django.test import TestCase
 from django.urls import reverse
 
-from utils.object_management.models import User
+from utils.object_management.models import ReviewAction, User
 from utils.tests.testcases import ViewWithPermissionsTestCase
 
 from ..forms import SourceBibtexArticleImportForm
-from ..models import Author, Source, check_url_valid
+from ..models import Author, Source, SourceAuthor, check_url_valid
 
 
 def setUpModule():
@@ -18,6 +21,11 @@ def tearDownModule():
 
 
 class SourceBibtexBulkImportFormTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls._role_output = StringIO()
+        call_command("sync_roles", "--apply", stdout=cls._role_output)
+
     def test_form_creates_multiple_sources_from_multiple_entries(self):
         owner = User.objects.create(username="owner")
         ada = Author.objects.create(
@@ -94,11 +102,56 @@ class SourceBibtexBulkImportFormTestCase(TestCase):
 
         self.assertTrue(form.is_valid(), form.errors)
 
+        author_count = Author.objects.count()
         with self.assertRaisesMessage(
             ValueError,
             "The BibTeX import form contains multiple entries.",
         ):
             form.create_source(owner=owner)
+
+        # The rejection must happen before any persistence: no sources,
+        # no association rows, no audit events, no author mutations.
+        self.assertEqual(Source.objects.count(), 0)
+        self.assertEqual(SourceAuthor.objects.count(), 0)
+        self.assertEqual(Author.objects.count(), author_count)
+        self.assertEqual(ReviewAction.objects.count(), 0)
+
+    def test_single_source_helper_rejects_multi_entry_with_new_authors(self):
+        owner = User.objects.create(username="owner")
+        form = SourceBibtexArticleImportForm(
+            data={
+                "bibtex_entry": """
+                @article{Lovelace1843,
+                    author = {Lovelace, Ada},
+                    title = {Notes on the Analytical Engine},
+                    journal = {Scientific Memoirs},
+                    year = {1843}
+                }
+
+                @article{Hopper1952,
+                    author = {Hopper, Grace},
+                    title = {The Education of a Computer},
+                    journal = {Proceedings of the ACM},
+                    year = {1952}
+                }
+                """,
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+        with self.assertRaisesMessage(
+            ValueError,
+            "The BibTeX import form contains multiple entries.",
+        ):
+            form.create_source(owner=owner)
+
+        # Even though every entry would be individually creatable, the
+        # multi-entry rejection leaves no rows or audits behind.
+        self.assertEqual(Source.objects.count(), 0)
+        self.assertEqual(SourceAuthor.objects.count(), 0)
+        self.assertFalse(Author.objects.exists())
+        self.assertEqual(ReviewAction.objects.count(), 0)
 
 
 class SourceBibtexBulkImportViewTestCase(ViewWithPermissionsTestCase):
