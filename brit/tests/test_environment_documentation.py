@@ -29,10 +29,10 @@ class EnvironmentExampleTests(SimpleTestCase):
 
         self.assertSetEqual(expected_variables - set(variables), set())
 
-    def test_redis_example_url_matches_bundled_tls_configuration(self):
+    def test_redis_example_url_matches_compose_service(self):
         variables = self._example_variables()
-        redis_conf = (settings.BASE_DIR / "docker" / "redis" / "redis.conf").read_text()
+        compose = (settings.BASE_DIR / "compose.yml").read_text()
 
-        self.assertEqual(variables["REDIS_URL"], "rediss://redis:6379/0")
-        self.assertIn("port 0", redis_conf)
-        self.assertIn("tls-port 6379", redis_conf)
+        self.assertEqual(variables["REDIS_URL"], "redis://redis:6379/0")
+        self.assertIn("image: redis:7-alpine", compose)
+        self.assertNotIn("docker/redis", compose)

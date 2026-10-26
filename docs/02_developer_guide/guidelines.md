@@ -178,6 +178,10 @@ docker compose exec web python manage.py test utils.tests.test_example.ExampleTe
   files, operations material, or automation config, verify the intended home in
   [Repository Boundaries](repository_boundaries.md).
 
+- **Population statistics**
+  Changes to population imports, selection or derived waste rates must follow
+  the [Population Statistics Policy](population_policy.md) and its targeted tests.
+
 ## Deployment Handoff
 
 - **Deployment path**

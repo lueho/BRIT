@@ -1,54 +1,44 @@
 from django.test import TestCase
-from rest_framework.fields import CharField, IntegerField
-from rest_framework.serializers import ModelSerializer, Serializer
+from rest_framework import serializers
 
 from sources.waste_collection.models import Collector
-from utils.serializers import FieldLabelMixin
+from utils.serializers import FieldLabelModelSerializer
 
 
-class FieldLabelMixinTestCase(TestCase):
+class FieldLabelModelSerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        class TestSerializer(FieldLabelMixin, Serializer):
-            char = CharField(label="Text")
-            integer = IntegerField(label="Number")
+        class TestSerializer(FieldLabelModelSerializer):
+            name = serializers.CharField(label="Collector name")
+            website = serializers.CharField(label="Website URL")
 
-        cls.data = {"char": "abc", "integer": 123}
-        cls.serializer = TestSerializer
-
-        class TestModelSerializer(ModelSerializer):
             class Meta:
                 model = Collector
                 fields = ("name", "website")
 
-        cls.model_serializer = TestModelSerializer
-        cls.tdata = {"name": "Test collector", "website": "https://www.flyer.org"}
-        cls.object = Collector.objects.create(**cls.tdata)
+        cls.serializer = TestSerializer
+        cls.object = Collector.objects.create(
+            name="Test collector", website="https://www.flyer.org"
+        )
 
-    def test_serializer_init_sets_label_names_as_keys_attribute(self):
-        serializer = self.serializer(field_labels_as_keys=True)
-        self.assertTrue(serializer.field_labels_as_keys)
-
-    def test_field_labels_as_keys_default_to_false(self):
-        serializer = self.serializer()
+    def test_field_labels_as_keys_defaults_to_false(self):
+        serializer = self.serializer(self.object)
         self.assertFalse(serializer.field_labels_as_keys)
 
-    def test_serializer_to_representation_uses_field_names_by_default(self):
-        serializer = self.serializer(data=self.data)
-        self.assertTrue(serializer.is_valid())
-        self.assertDictEqual(serializer.validated_data, self.data)
-        self.assertDictEqual(serializer.data, self.data)
+    def test_to_representation_uses_field_names_by_default(self):
+        serializer = self.serializer(self.object)
+        self.assertDictEqual(
+            serializer.data,
+            {"name": "Test collector", "website": "https://www.flyer.org"},
+        )
 
-    def test_serializer_to_representation_uses_field_labels_on_keyword_argument(self):
-        serializer = self.serializer(data=self.data, field_labels_as_keys=True)
+    def test_to_representation_uses_field_labels_on_keyword_argument(self):
+        serializer = self.serializer(self.object, field_labels_as_keys=True)
         self.assertTrue(serializer.field_labels_as_keys)
-
-        expected = {"Text": "abc", "Number": 123}
-        self.assertTrue(serializer.is_valid())
-        self.assertTrue(serializer.field_labels_as_keys)
-        self.assertDictEqual(serializer.validated_data, self.data)
-        self.assertDictEqual(serializer.data, expected)
-
-    def test_model_serializer_to_representation_uses_field_names_by_default(self):
-        serializer = self.model_serializer(self.object)
-        self.assertDictEqual(serializer.data, self.tdata)
+        self.assertDictEqual(
+            serializer.data,
+            {
+                "Collector name": "Test collector",
+                "Website URL": "https://www.flyer.org",
+            },
+        )

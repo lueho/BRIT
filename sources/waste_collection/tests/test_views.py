@@ -791,18 +791,19 @@ class CollectionPropertyValueCRUDViewsTestCase(
 
     @classmethod
     def create_related_objects(cls):
+        unit = Unit.objects.create(name="Test Unit", publication_status="published")
+        prop = Property.objects.create(
+            name="Test Property", publication_status="published"
+        )
+        prop.allowed_units.add(unit)
         return {
             "collection": Collection.objects.create(
                 owner=cls.owner_user,
                 name="Test Collection",
                 publication_status="published",
             ),
-            "property": Property.objects.create(
-                name="Test Property", publication_status="published"
-            ),
-            "unit": Unit.objects.create(
-                name="Test Unit", publication_status="published"
-            ),
+            "property": prop,
+            "unit": unit,
         }
 
     def related_objects_post_data(self):
@@ -1037,13 +1038,14 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
 
     @classmethod
     def create_related_objects(cls):
+        unit = Unit.objects.create(name="Test Unit", publication_status="published")
+        prop = Property.objects.create(
+            name="Test Property", publication_status="published"
+        )
+        prop.allowed_units.add(unit)
         return {
-            "property": Property.objects.create(
-                name="Test Property", publication_status="published"
-            ),
-            "unit": Unit.objects.create(
-                name="Test Unit", publication_status="published"
-            ),
+            "property": prop,
+            "unit": unit,
         }
 
     def related_objects_post_data(self):
@@ -4998,27 +5000,36 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
         self.assertNotContains(response, 'value="all"')
 
     def test_repeated_page_render_skips_cached_selector_fragments(self):
-        """The ~600-entry selector/tree loops are fragment-cached: a second
+        """The ~600-entry selector/tree fragments are fragment-cached: a second
         render of the same page must not evaluate them again."""
         from django.core.cache import cache
-        from django.template.defaulttags import ForNode
+
+        from sources.waste_collection.waste_atlas.templatetags import (
+            atlas_navigation,
+        )
 
         cache.clear()
         url = reverse("waste-atlas-germany-collection-system-map")
-        renders = []
 
-        original_render = ForNode.render
-
-        def counting_render(node, context):
-            renders.append(node)
-            return original_render(node, context)
-
-        with patch.object(ForNode, "render", counting_render):
+        with (
+            patch.object(
+                atlas_navigation,
+                "_theme_option",
+                wraps=atlas_navigation._theme_option,
+            ) as option_calls,
+            patch.object(
+                atlas_navigation,
+                "_region_group",
+                wraps=atlas_navigation._region_group,
+            ) as group_calls,
+        ):
             self.client.get(url)
-            first_pass = len(renders)
-            renders.clear()
+            first_pass = option_calls.call_count + group_calls.call_count
+            option_calls.reset_mock()
+            group_calls.reset_mock()
             self.client.get(url)
-        self.assertLess(len(renders), first_pass)
+        self.assertGreater(first_pass, 0)
+        self.assertEqual(option_calls.call_count + group_calls.call_count, 0)
 
     def test_region_property_map_does_not_link_to_an_unrelated_collection(self):
         response = self.client.get(

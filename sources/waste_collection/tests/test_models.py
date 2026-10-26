@@ -160,6 +160,18 @@ class CollectionCatchmentTestCase(TestCase):
         collections = self.catchment.downstream_collections
         self.assertNotIn(self.unrelated_collection, collections)
 
+    def test_downstream_collections_reflects_collections_added_after_access(self):
+        list(self.catchment.downstream_collections)
+        new_collection = Collection.objects.create(catchment=self.child_catchment)
+        self.assertIn(new_collection, list(self.catchment.downstream_collections))
+
+    def test_upstream_collections_reflects_collections_added_after_access(self):
+        list(self.grandchild_catchment.upstream_collections)
+        new_collection = Collection.objects.create(catchment=self.catchment)
+        self.assertIn(
+            new_collection, list(self.grandchild_catchment.upstream_collections)
+        )
+
     def test_upstream_collections_includes_collections_from_all_ancestor_catchments(
         self,
     ):
@@ -282,6 +294,30 @@ class CollectionTestCase(TestCase):
 
     def test_collection_is_named_automatically_on_creation(self):
         self.assertEqual("Catchment Category System 2024", self.collection.name)
+
+    def test_effective_allowed_materials_reflects_relation_updates_after_access(
+        self,
+    ):
+        list(self.collection.effective_allowed_materials)
+        material = WasteComponent.objects.create(name="Allowed after access")
+        self.collection.allowed_materials.add(material)
+        self.assertIn(material, list(self.collection.effective_allowed_materials))
+
+    def test_effective_forbidden_materials_reflects_relation_updates_after_access(
+        self,
+    ):
+        list(self.collection.effective_forbidden_materials)
+        material = WasteComponent.objects.create(name="Forbidden after access")
+        self.collection.forbidden_materials.add(material)
+        self.assertIn(material, list(self.collection.effective_forbidden_materials))
+
+    def test_effective_materials_use_prefetched_relations(self):
+        collection = Collection.objects.prefetch_related(
+            "allowed_materials", "forbidden_materials"
+        ).get(pk=self.collection.pk)
+        with self.assertNumQueries(0):
+            list(collection.effective_allowed_materials)
+            list(collection.effective_forbidden_materials)
 
     def test_collection_name_is_updated_on_model_update(self):
         self.collection.collection_system = CollectionSystem.objects.create(
@@ -1026,3 +1062,33 @@ class ManualCollectionPropertyValueUniquenessTestCase(TestCase):
     def test_published_manual_cpv_null_year_different_unit_allowed(self):
         self._create(year=None)
         self._create(year=None, unit=self.other_unit)
+
+
+class CollectionIndexTestCase(TestCase):
+    """Regression tests for #168: a subclass ``Meta.indexes`` replaces the
+    abstract base's index list, so hot-path indexes must be declared
+    explicitly on the concrete models."""
+
+    def test_collection_has_publication_status_index(self):
+        index_fields = {tuple(i.fields) for i in Collection._meta.indexes}
+        self.assertIn(("publication_status",), index_fields)
+
+    def test_collection_has_valid_from_index(self):
+        index_fields = {tuple(i.fields) for i in Collection._meta.indexes}
+        self.assertIn(("valid_from",), index_fields)
+
+    def test_collectionpropertyvalue_has_derived_sync_index(self):
+        index_fields = {tuple(i.fields) for i in CollectionPropertyValue._meta.indexes}
+        self.assertIn(("collection", "property", "year", "is_derived"), index_fields)
+
+    def test_index_migration_builds_concurrently(self):
+        from django.contrib.postgres.operations import AddIndexConcurrently
+        from django.db.migrations.loader import MigrationLoader
+
+        migration = MigrationLoader(None).disk_migrations[
+            ("waste_collection", "0009_collection_collection_pub_status_idx_and_more")
+        ]
+        self.assertFalse(migration.atomic)
+        self.assertTrue(migration.operations)
+        for operation in migration.operations:
+            self.assertIsInstance(operation, AddIndexConcurrently)

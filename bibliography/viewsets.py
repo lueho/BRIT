@@ -1,4 +1,7 @@
-from utils.viewsets import AutoPermModelViewSet
+from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
+from rest_framework.viewsets import ModelViewSet
+
+from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 from .filters import SourceModelFilterSet
 from .models import Author, Licence, Source
@@ -9,30 +12,20 @@ from .serializers import (
 )
 
 
-class AuthorViewSet(AutoPermModelViewSet):
+class AuthorViewSet(ModelViewSet):
     queryset = Author.objects.all()
     serializer_class = AuthorModelSerializer
-    custom_permission_required = {
-        "list": None,
-        "retrieve": None,
-    }
+    permission_classes = [DjangoModelPermissionsOrAnonReadOnly]
 
 
-class LicenceViewSet(AutoPermModelViewSet):
+class LicenceViewSet(ModelViewSet):
     queryset = Licence.objects.all()
     serializer_class = LicenceModelSerializer
-    custom_permission_required = {
-        "list": None,
-        "retrieve": None,
-    }
+    permission_classes = [DjangoModelPermissionsOrAnonReadOnly]
 
 
-class SourceViewSet(AutoPermModelViewSet):
+class SourceViewSet(UserCreatedObjectViewSet):
     queryset = Source.objects.all()
     serializer_class = SourceModelSerializer
     filterset_class = SourceModelFilterSet
     http_method_names = ["get", "head", "options"]
-    custom_permission_required = {
-        "list": None,
-        "retrieve": None,
-    }

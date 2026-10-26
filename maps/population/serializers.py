@@ -1,5 +1,7 @@
 """Serializers implementing the versioned population bulk-import contract."""
 
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .contracts import SCHEMA_VERSION, SUPPORTED_INDICATORS, UNIT_TO_PERSONS
@@ -11,18 +13,16 @@ class ImportDatasetSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
     provider = serializers.CharField(max_length=255)
     external_id = serializers.CharField(
-        max_length=255, required=False, allow_blank=True, default=""
+        max_length=255, required=False, allow_blank=True
     )
     release = serializers.CharField(
         max_length=100, required=False, allow_blank=True, default=""
     )
     geographic_scope = serializers.ChoiceField(choices=GeographicScope.choices)
     temporal_basis = serializers.ChoiceField(choices=TemporalBasis.choices)
-    source_unit = serializers.CharField(
-        max_length=30, required=False, allow_blank=True, default=""
-    )
+    source_unit = serializers.CharField(max_length=30, required=False, allow_blank=True)
     classification_version = serializers.CharField(
-        max_length=30, required=False, allow_blank=True, default=""
+        max_length=30, required=False, allow_blank=True
     )
     is_canonical = serializers.BooleanField(required=False, default=False)
 
@@ -35,7 +35,9 @@ class ImportObservationSerializer(serializers.Serializer):
     )
     indicator = serializers.ChoiceField(choices=list(SUPPORTED_INDICATORS))
     reference_period = serializers.IntegerField()
-    value = serializers.DecimalField(max_digits=20, decimal_places=6)
+    value = serializers.DecimalField(
+        max_digits=20, decimal_places=6, min_value=Decimal("0")
+    )
     unit = serializers.ChoiceField(choices=sorted(UNIT_TO_PERSONS))
     source_status = serializers.ChoiceField(
         choices=SourceStatus.choices, required=False, default=SourceStatus.FINAL
@@ -64,3 +66,13 @@ class PopulationImportSerializer(serializers.Serializer):
                 f"Unsupported schema_version '{value}'. Expected '{SCHEMA_VERSION}'."
             )
         return value
+
+    def validate(self, attrs):
+        scope = attrs["dataset"]["geographic_scope"].upper()
+        if any(obs["region_scheme"] != scope for obs in attrs["observations"]):
+            raise serializers.ValidationError(
+                {
+                    "observations": "Region schemes must match the dataset geographic scope."
+                }
+            )
+        return attrs

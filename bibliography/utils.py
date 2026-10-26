@@ -1,6 +1,14 @@
+import ipaddress
+import re
+import socket
 import string
+from urllib.parse import urljoin, urlsplit
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.connection import HTTPConnection, HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
+from urllib3.exceptions import NewConnectionError
 
 _REQUEST_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20200101 Firefox/84.0",
@@ -11,43 +19,167 @@ _REQUEST_HEADERS = {
 _REQUEST_TIMEOUT = 10
 
 
+_MAX_REDIRECTS = 10
+_ALLOWED_SCHEMES = frozenset({"http", "https"})
+
+
+class UnsafeURLError(requests.exceptions.RequestException):
+    """Raised when a URL check would reach a non-public destination."""
+
+
 def _is_success_status(status_code):
     return 200 <= status_code < 300
 
 
+def _is_public_http_url(url):
+    """Return True if *url* is http(s) and its host resolves only to public IPs.
+
+    Guards server-side URL checks against requests to loopback, private,
+    link-local (cloud metadata) and other non-global addresses.
+    """
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return False
+    if parts.scheme.lower() not in _ALLOWED_SCHEMES or not parts.hostname:
+        return False
+    try:
+        infos = socket.getaddrinfo(
+            parts.hostname,
+            port or (443 if parts.scheme.lower() == "https" else 80),
+            proto=socket.IPPROTO_TCP,
+        )
+    except (OSError, UnicodeError):
+        return False
+    if not infos:
+        return False
+    return all(_is_public_address(info[4][0]) for info in infos)
+
+
+def _is_public_address(host):
+    try:
+        address = ipaddress.ip_address(str(host).split("%", 1)[0])
+    except ValueError:
+        return False
+    return address.is_global and not address.is_multicast
+
+
+class _PublicOnlyConnectionMixin:
+    """Verify the peer actually connected to is public.
+
+    Checked on the socket itself, before any TLS or HTTP bytes are sent, so a
+    hostname re-resolving to an internal address (DNS rebinding) is refused.
+    """
+
+    def _new_conn(self):
+        sock = super()._new_conn()
+        try:
+            peer = sock.getpeername()[0]
+        except OSError:
+            peer = None
+        if peer is None or not _is_public_address(peer):
+            sock.close()
+            raise NewConnectionError(
+                self, f"Refusing connection to non-public address {peer!r}"
+            )
+        return sock
+
+
+class _PublicOnlyHTTPConnection(_PublicOnlyConnectionMixin, HTTPConnection):
+    pass
+
+
+class _PublicOnlyHTTPSConnection(_PublicOnlyConnectionMixin, HTTPSConnection):
+    pass
+
+
+class _PublicOnlyHTTPConnectionPool(HTTPConnectionPool):
+    ConnectionCls = _PublicOnlyHTTPConnection
+
+
+class _PublicOnlyHTTPSConnectionPool(HTTPSConnectionPool):
+    ConnectionCls = _PublicOnlyHTTPSConnection
+
+
+class _PublicOnlyAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        super().init_poolmanager(*args, **kwargs)
+        self.poolmanager.pool_classes_by_scheme = {
+            "http": _PublicOnlyHTTPConnectionPool,
+            "https": _PublicOnlyHTTPSConnectionPool,
+        }
+
+
+class _PublicOnlySession(requests.Session):
+    """Session that refuses redirects to non-public destinations.
+
+    Environment proxies are ignored because a proxy would resolve hostnames
+    itself, bypassing the destination check.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.trust_env = False
+        self.max_redirects = _MAX_REDIRECTS
+        adapter = _PublicOnlyAdapter()
+        self.mount("http://", adapter)
+        self.mount("https://", adapter)
+
+    def get_redirect_target(self, resp):
+        try:
+            target = super().get_redirect_target(resp)
+        except UnicodeError:
+            resp.close()
+            raise UnsafeURLError(
+                "Undecodable redirect location", response=resp
+            ) from None
+        if target is None:
+            return None
+        try:
+            absolute = urljoin(resp.url, target)
+        except ValueError:
+            absolute = None
+        if absolute is None or not _is_public_http_url(absolute):
+            resp.close()
+            raise UnsafeURLError(f"Refusing redirect to {target!r}", response=resp)
+        return target
+
+
 def check_url(url):
     clean_url = str(url or "").strip()
-    if not clean_url:
+    if not clean_url or not _is_public_http_url(clean_url):
         return False
 
-    try:
-        response = requests.head(
-            clean_url,
-            headers=_REQUEST_HEADERS,
-            allow_redirects=True,
-            timeout=_REQUEST_TIMEOUT,
-        )
-    except requests.exceptions.RequestException:
-        response = None
-    else:
-        if _is_success_status(response.status_code):
-            return True
+    with _PublicOnlySession() as session:
+        try:
+            response = session.head(
+                clean_url,
+                headers=_REQUEST_HEADERS,
+                allow_redirects=True,
+                timeout=_REQUEST_TIMEOUT,
+            )
+        except requests.exceptions.RequestException:
+            response = None
+        else:
+            if _is_success_status(response.status_code):
+                return True
 
-    get_response = None
-    try:
-        get_response = requests.get(
-            clean_url,
-            headers=_REQUEST_HEADERS,
-            allow_redirects=True,
-            timeout=_REQUEST_TIMEOUT,
-            stream=True,
-        )
-        return _is_success_status(get_response.status_code)
-    except requests.exceptions.RequestException:
-        return False
-    finally:
-        if get_response is not None:
-            get_response.close()
+        get_response = None
+        try:
+            get_response = session.get(
+                clean_url,
+                headers=_REQUEST_HEADERS,
+                allow_redirects=True,
+                timeout=_REQUEST_TIMEOUT,
+                stream=True,
+            )
+            return _is_success_status(get_response.status_code)
+        except requests.exceptions.RequestException:
+            return False
+        finally:
+            if get_response is not None:
+                get_response.close()
 
 
 def find_wayback_snapshot_for_year(url, year):
@@ -135,3 +267,33 @@ def generate_citation_key(source):
             return candidate
 
     return base
+
+
+DOI_PREFIXES = ("https://doi.org/", "http://doi.org/", "doi.org/", "doi:")
+DOI_PATTERN = re.compile(r"^10\.\d{4,9}/\S+$")
+DOI_FORMAT_MESSAGE = (
+    "Enter a bare DOI in the form 10.xxxx/..., without a resolver URL or 'doi:' prefix."
+)
+
+
+def normalize_doi(value):
+    """Return the bare ``10.xxxx/...`` DOI for the given raw value.
+
+    Strips resolver URLs (``https://doi.org/``), ``doi:``/``DOI:`` labels and
+    LaTeX ``\\url``/``\\url{...}`` markup that sneak in via imports or
+    copy-paste, in any nesting order. Values wrapped in no known prefix are
+    returned stripped but otherwise unchanged.
+    """
+    doi = str(value or "").strip()
+    previous = None
+    while doi != previous:
+        previous = doi
+        if doi.startswith("\\url{") and doi.endswith("}"):
+            doi = doi[5:-1].strip()
+        elif doi.startswith("\\url"):
+            doi = doi[4:].strip()
+        for prefix in DOI_PREFIXES:
+            if doi.lower().startswith(prefix):
+                doi = doi[len(prefix) :].strip()
+                break
+    return doi

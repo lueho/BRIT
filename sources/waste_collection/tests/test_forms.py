@@ -15,6 +15,7 @@ from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from utils.object_management.models import get_default_owner
 
 from ..forms import (
+    AggregatedCollectionPropertyValueModelForm,
     CollectionAddPredecessorForm,
     CollectionAddWasteSampleForm,
     CollectionFrequencyModelForm,
@@ -289,6 +290,60 @@ class CollectionPropertyValueModelFormTestCase(TestCase):
         self.assertEqual(
             form.fields["standard_deviation"].widget.attrs.get("step"), "any"
         )
+
+    def test_unit_and_property_use_visibility_filtered_autocomplete(self):
+        """Regression test for #666: plain <select> widgets enumerated all
+        units and properties, including private objects of other users."""
+        from django_tomselect.widgets import TomSelectModelWidget
+
+        form = CollectionPropertyValueModelForm()
+
+        self.assertIsInstance(form.fields["unit"].widget, TomSelectModelWidget)
+        self.assertIsInstance(form.fields["property"].widget, TomSelectModelWidget)
+
+    def test_unit_options_depend_on_selected_property(self):
+        form = CollectionPropertyValueModelForm()
+
+        html = str(form["unit"])
+        self.assertIn("source: 'property'", html)
+        self.assertIn("lookup: 'id'", html)
+
+    def test_rejects_unit_not_allowed_for_property(self):
+        from utils.properties.models import Unit
+
+        other_unit = Unit.objects.create(name="Litre")
+        data = QueryDict(mutable=True)
+        data.update(
+            {
+                "collection": self.collection.pk,
+                "property": self.property.pk,
+                "unit": other_unit.pk,
+                "year": 2024,
+                "average": 1.0,
+            }
+        )
+        form = CollectionPropertyValueModelForm(data=data)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("unit", form.errors)
+
+
+class AggregatedCollectionPropertyValueModelFormTestCase(TestCase):
+    def test_unit_options_depend_on_selected_property(self):
+        html = str(AggregatedCollectionPropertyValueModelForm()["unit"])
+
+        self.assertIn("source: 'property'", html)
+        self.assertIn("lookup: 'id'", html)
+
+    def test_unit_and_property_use_visibility_filtered_autocomplete(self):
+        """Regression test for #666: plain <select> widgets enumerated all
+        units and properties, including private objects of other users."""
+        from django_tomselect.widgets import TomSelectModelWidget
+
+        form = AggregatedCollectionPropertyValueModelForm()
+
+        self.assertIsInstance(form.fields["unit"].widget, TomSelectModelWidget)
+        self.assertIsInstance(form.fields["property"].widget, TomSelectModelWidget)
 
 
 class CollectionModelFormTestCase(TestCase):

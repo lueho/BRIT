@@ -32,6 +32,9 @@ This section contains developer-facing documentation for BRIT. Workflow instruct
 - **Waste Atlas routing, public access and permalinks**
   Read [Waste Atlas routing](waste_atlas_routing.md).
 
+- **Population statistics and annual waste-rate calculations**
+  Read [Population Statistics Policy](population_policy.md).
+
 - **Context retention and memory offloading**
   Read [Context Retention](context_retention.md) when moving durable agent memories into repository documentation.
 
