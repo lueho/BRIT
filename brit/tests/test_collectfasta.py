@@ -13,9 +13,62 @@ from django.test import SimpleTestCase, override_settings
 from brit.storages import StaticStorage
 from brit.tests.probes import run_settings_probe
 
+_PRODUCTION_SNAPSHOT_SCRIPT = """
+import json
+
+import brit.settings.heroku as h
+import brit.settings.settings as base
+
+alias = h.CACHES["collectfasta"]
+snapshot = {
+    "installed_apps": list(h.INSTALLED_APPS),
+    "installed_apps_distinct": h.INSTALLED_APPS is not base.INSTALLED_APPS,
+    "base_has_collectfasta_app": "collectfasta" in base.INSTALLED_APPS,
+    "strategy": h.COLLECTFASTA_STRATEGY,
+    "cache_name": h.COLLECTFASTA_CACHE,
+    "threads": h.COLLECTFASTA_THREADS,
+    "caches_distinct": h.CACHES is not base.CACHES,
+    "base_has_collectfasta_cache": "collectfasta" in base.CACHES,
+    "base_default_options_has_max_entries": (
+        "MAX_ENTRIES" in base.CACHES["default"]["OPTIONS"]
+    ),
+    "collectfasta_alias": {
+        "BACKEND": alias["BACKEND"],
+        "LOCATION": alias["LOCATION"],
+        "TIMEOUT": alias["TIMEOUT"],
+        "KEY_PREFIX": alias["KEY_PREFIX"],
+        "OPTIONS": alias["OPTIONS"],
+    },
+}
+
+import django
+
+django.setup()
+from django.core.management import get_commands
+
+snapshot["collectstatic_owner"] = get_commands()["collectstatic"]
+print(json.dumps(snapshot))
+"""
+
 
 class CollectfastaProductionSettingsTests(SimpleTestCase):
-    def run_production_script(self, script, settings_module="brit.settings.heroku"):
+    """All production probes share one subprocess snapshot from setUpClass."""
+
+    snapshot = None
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        completed = cls.run_production_script(_PRODUCTION_SNAPSHOT_SCRIPT)
+        if completed.returncode != 0:
+            raise AssertionError(
+                "production settings probe failed with exit code "
+                f"{completed.returncode}:\n{completed.stderr}"
+            )
+        cls.snapshot = json.loads(completed.stdout)
+
+    @classmethod
+    def run_production_script(cls, script, settings_module="brit.settings.heroku"):
         return run_settings_probe(
             script,
             env={
@@ -32,67 +85,45 @@ class CollectfastaProductionSettingsTests(SimpleTestCase):
         )
 
     def test_collectstatic_command_is_owned_by_collectfasta(self):
-        completed = self.run_production_script(
-            "import django; django.setup(); "
-            "from django.core.management import get_commands; "
-            "assert get_commands()['collectstatic'] == 'collectfasta'"
-        )
-        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(self.snapshot["collectstatic_owner"], "collectfasta")
 
     def test_collectfasta_is_installed_before_staticfiles(self):
-        completed = self.run_production_script(
-            """
-import brit.settings.heroku as h
-import brit.settings.settings as base
-
-assert h.INSTALLED_APPS is not base.INSTALLED_APPS
-assert h.INSTALLED_APPS[0] == "collectfasta"
-assert h.INSTALLED_APPS.index("collectfasta") < h.INSTALLED_APPS.index(
-    "django.contrib.staticfiles"
-)
-assert "collectfasta" not in base.INSTALLED_APPS
-"""
+        installed_apps = self.snapshot["installed_apps"]
+        self.assertTrue(self.snapshot["installed_apps_distinct"])
+        self.assertEqual(installed_apps[0], "collectfasta")
+        self.assertLess(
+            installed_apps.index("collectfasta"),
+            installed_apps.index("django.contrib.staticfiles"),
         )
-        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertFalse(self.snapshot["base_has_collectfasta_app"])
 
     def test_collectfasta_uses_manifest_memory_strategy_without_threads(self):
-        completed = self.run_production_script(
-            """
-import brit.settings.heroku as h
-
-assert h.COLLECTFASTA_STRATEGY == (
-    "collectfasta.strategies.boto3.Boto3ManifestMemoryStrategy"
-)
-assert h.COLLECTFASTA_CACHE == "collectfasta"
-assert h.COLLECTFASTA_THREADS == 0
-"""
+        self.assertEqual(
+            self.snapshot["strategy"],
+            "collectfasta.strategies.boto3.Boto3ManifestMemoryStrategy",
         )
-        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(self.snapshot["cache_name"], "collectfasta")
+        self.assertEqual(self.snapshot["threads"], 0)
 
     def test_collectfasta_cache_alias_is_dedicated_and_namespaced(self):
-        completed = self.run_production_script(
-            """
-import brit.settings.heroku as h
-import brit.settings.settings as base
-
-alias = h.CACHES["collectfasta"]
-assert h.CACHES is not base.CACHES
-assert alias["BACKEND"] == "django_redis.cache.RedisCache"
-assert alias["LOCATION"] == "redis://localhost:6379/0"
-assert alias["TIMEOUT"] == 2592000
-assert alias["KEY_PREFIX"] == "collectfasta:brit-test-assets:static"
-assert alias["OPTIONS"]["CLIENT_CLASS"] == "django_redis.client.DefaultClient"
-assert alias["OPTIONS"]["COMPRESSOR"] == (
-    "django_redis.compressors.zlib.ZlibCompressor"
-)
-assert alias["OPTIONS"]["IGNORE_EXCEPTIONS"] is True
-assert alias["OPTIONS"]["CONNECTION_POOL_KWARGS"] == {}
-assert alias["OPTIONS"]["MAX_ENTRIES"] == 10000
-assert "collectfasta" not in base.CACHES
-assert "MAX_ENTRIES" not in base.CACHES["default"]["OPTIONS"]
-"""
+        self.assertTrue(self.snapshot["caches_distinct"])
+        alias = self.snapshot["collectfasta_alias"]
+        self.assertEqual(alias["BACKEND"], "django_redis.cache.RedisCache")
+        self.assertEqual(alias["LOCATION"], "redis://localhost:6379/0")
+        self.assertEqual(alias["TIMEOUT"], 2592000)
+        self.assertEqual(alias["KEY_PREFIX"], "collectfasta:brit-test-assets:static")
+        self.assertEqual(
+            alias["OPTIONS"]["CLIENT_CLASS"], "django_redis.client.DefaultClient"
         )
-        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(
+            alias["OPTIONS"]["COMPRESSOR"],
+            "django_redis.compressors.zlib.ZlibCompressor",
+        )
+        self.assertIs(alias["OPTIONS"]["IGNORE_EXCEPTIONS"], True)
+        self.assertEqual(alias["OPTIONS"]["CONNECTION_POOL_KWARGS"], {})
+        self.assertEqual(alias["OPTIONS"]["MAX_ENTRIES"], 10000)
+        self.assertFalse(self.snapshot["base_has_collectfasta_cache"])
+        self.assertFalse(self.snapshot["base_default_options_has_max_entries"])
 
     def test_collectstatic_stays_stock_in_testrunner(self):
         completed = self.run_production_script(
@@ -278,3 +309,28 @@ class S3ManifestStaticStorageWrapperTests(SimpleTestCase):
         self.assertEqual(
             wrapper.get_available_name("staticfiles.json"), "staticfiles.json"
         )
+
+
+class CollectfastaProductionProbeCountTests(SimpleTestCase):
+    """The shared production snapshot must come from one subprocess probe."""
+
+    def test_snapshot_probe_runs_one_subprocess(self):
+        class ProbeHarness(CollectfastaProductionSettingsTests):
+            pass
+
+        self.addCleanup(ProbeHarness.doClassCleanups)
+        original_snapshot = CollectfastaProductionSettingsTests.snapshot
+        completed = mock.Mock(
+            returncode=0,
+            stdout=json.dumps({"probe": "sentinel"}),
+            stderr="",
+        )
+        with mock.patch(
+            "brit.tests.test_collectfasta.run_settings_probe",
+            return_value=completed,
+        ) as probe:
+            ProbeHarness.setUpClass()
+
+        probe.assert_called_once()
+        self.assertEqual(ProbeHarness.snapshot, {"probe": "sentinel"})
+        self.assertIs(CollectfastaProductionSettingsTests.snapshot, original_snapshot)
