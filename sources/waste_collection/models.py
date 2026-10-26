@@ -25,6 +25,7 @@ from utils.object_management.models import (
     get_default_owner,
 )
 from utils.object_management.permissions import filter_queryset_for_user
+from utils.object_management.services import perform_transition
 from utils.properties.models import PropertyValue
 
 logger = logging.getLogger(__name__)
@@ -928,6 +929,18 @@ class Collection(NamedUserCreatedObject):
         self.validate_review_readiness()
         return super().submit_for_review()
 
+    def _lock_predecessors(self):
+        """Lock every predecessor row in deterministic order.
+
+        Returns the freshly locked rows; the caller must hold the enclosing
+        transaction.
+        """
+        return list(self.predecessors.order_by("pk").select_for_update())
+
+    def _lock_review_dependencies(self, action):
+        if action == "approve":
+            self._lock_predecessors()
+
     def approve(self, user=None):
         """
         Publish the collection and archive predecessors, with concurrency check.
@@ -941,10 +954,7 @@ class Collection(NamedUserCreatedObject):
 
         with transaction.atomic():
             # Acquire row-level locks on predecessors deterministically to avoid races
-            locked_predecessors_qs = self.predecessors.order_by(
-                "pk"
-            ).select_for_update()
-            predecessors = list(locked_predecessors_qs)
+            predecessors = self._lock_predecessors()
 
             # Re-check after acquiring locks: ensure no other published successor exists
             for predecessor in predecessors:
@@ -958,11 +968,22 @@ class Collection(NamedUserCreatedObject):
 
             super().approve(user=user)
 
-            # Archive all predecessors after publishing self
+            # Archive only published predecessors — archived records are
+            # public historical data, so an unpublished predecessor must
+            # never be forced public here.
             for predecessor in predecessors:
-                if predecessor.publication_status != "archived":
-                    predecessor.publication_status = "archived"
-                    predecessor.save(update_fields=["publication_status"])
+                if predecessor.publication_status == self.STATUS_PUBLISHED:
+                    if user is not None:
+                        perform_transition(
+                            user,
+                            predecessor,
+                            "archive",
+                            expected_revision=predecessor.content_revision,
+                        )
+                    else:
+                        # Raw trusted ORM calls carry no actor and produce
+                        # no fabricated audit event.
+                        predecessor.archive()
 
     @classmethod
     def public_map_url(cls):

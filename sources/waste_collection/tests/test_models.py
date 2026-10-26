@@ -12,6 +12,7 @@ from distributions.models import Period, TemporalDistribution, Timestep
 from materials.models import Material, MaterialCategory, MaterialComponent
 from utils.object_management.models import get_default_owner
 from utils.properties.models import Property, Unit
+from utils.tests.testcases import ensure_test_default_owner
 
 from ..models import (
     AggregatedCollectionPropertyValue,
@@ -189,25 +190,25 @@ class WasteFlyerTestCase(TestCase):
 
 
 class WasteFlyerUrlCheckSignalTestCase(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.owner = get_default_owner()
-        cls.catchment = CollectionCatchment.objects.create(name="Signal Catchment")
-        cls.collection_system = CollectionSystem.objects.create(name="Signal System")
-        cls.category = WasteCategory.objects.create(name="Signal Category")
-        cls.collection = Collection.objects.create(
-            owner=cls.owner,
-            catchment=cls.catchment,
-            collection_system=cls.collection_system,
-            waste_category=cls.category,
+    def setUp(self):
+        ensure_test_default_owner()
+        self.owner = get_default_owner()
+        self.catchment = CollectionCatchment.objects.create(name="Signal Catchment")
+        self.collection_system = CollectionSystem.objects.create(name="Signal System")
+        self.category = WasteCategory.objects.create(name="Signal Category")
+        self.collection = Collection.objects.create(
+            owner=self.owner,
+            catchment=self.catchment,
+            collection_system=self.collection_system,
+            waste_category=self.category,
             valid_from=date(2024, 1, 1),
         )
-        cls.property = Property.objects.create(
-            owner=cls.owner,
+        self.property = Property.objects.create(
+            owner=self.owner,
             name="Signal Property",
         )
-        cls.unit = Unit.objects.create(owner=cls.owner, name="kg", symbol="kg")
-        cls.property.allowed_units.add(cls.unit)
+        self.unit = Unit.objects.create(owner=self.owner, name="kg", symbol="kg")
+        self.property.allowed_units.add(self.unit)
 
     @patch("sources.waste_collection.models.celery.current_app.send_task")
     def test_collection_flyer_add_schedules_wasteflyer_url_check(self, mock_send_task):
@@ -621,6 +622,7 @@ class CollectionVersioningHelpersTestCase(TestCase):
 class CollectionStatisticsAccessorsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.catchment = CollectionCatchment.objects.create(name="C")
         cls.system = CollectionSystem.objects.create(name="S")
         cls.category = WasteCategory.objects.create(name="Cat")
@@ -669,12 +671,10 @@ class CollectionStatisticsAccessorsTestCase(TestCase):
         self.assertEqual(len(anon_list), 1)
         self.assertEqual(anon_list[0].pk, v_succ.pk)
 
-        # Owner-like visibility: simulate staff/owner by passing a dummy user with is_staff=True
-        class U:
-            is_staff = True
-            is_authenticated = True
-
-        full_list = self.succ.collectionpropertyvalues_for_display(user=U())
+        # Owner-like visibility needs the real private-row owner: staff
+        # alone is not private access.
+        owner = get_default_owner()
+        full_list = self.succ.collectionpropertyvalues_for_display(user=owner)
         self.assertEqual(len(full_list), 1)  # dedup keeps published due to ordering
         self.assertEqual(full_list[0].pk, v_succ.pk)
 
@@ -707,13 +707,17 @@ class CollectionStatisticsAccessorsTestCase(TestCase):
         anon = self.root.aggregatedcollectionpropertyvalues_for_display(user=None)
         self.assertEqual([a.year for a in anon], [2021])
 
-        # Staff sees both, order by (property, unit, year, publication_order, -created_at, -pk)
-        class U:
-            is_staff = True
-            is_authenticated = True
-
-        both = self.succ.aggregatedcollectionpropertyvalues_for_display(user=U())
+        # The real owner of the private row sees both; a staff-only
+        # non-owner still sees only the published row.
+        owner = get_default_owner()
+        both = self.succ.aggregatedcollectionpropertyvalues_for_display(user=owner)
         self.assertEqual({a.year for a in both}, {2020, 2021})
+
+        staff_only = User.objects.create_user("staff-viewer", is_staff=True)
+        staff_list = self.succ.aggregatedcollectionpropertyvalues_for_display(
+            user=staff_only
+        )
+        self.assertEqual({a.year for a in staff_list}, {2021})
 
     def test_collectionpropertyvalues_for_display_published_tie_prefers_latest_version(
         self,
