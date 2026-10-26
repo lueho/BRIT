@@ -19,7 +19,13 @@ from django.urls import reverse
 from bibliography.models import Author, Licence, Source, SourceAuthor
 from distributions.models import TemporalDistribution, Timestep
 from inventories.models import ScenarioInventoryConfiguration
-from materials.models import Composition, Material, MaterialComponentGroup, Sample
+from materials.models import (
+    Composition,
+    Material,
+    MaterialComponentGroup,
+    Sample,
+    SampleAuthor,
+)
 from sources.greenhouses.models import (
     Greenhouse,
     GreenhouseGrowthCycle,
@@ -32,7 +38,7 @@ from utils.object_management.admin import (
     _active_admin_actor,
     _scope_relation_formfield,
 )
-from utils.object_management.models import ReviewAction
+from utils.object_management.models import ObjectEditorGrant, ReviewAction
 from utils.object_management.services import content_mutation, perform_transition
 from utils.object_management.tests.test_admin_persistence import _FormCollector
 from utils.tests.testcases import ensure_test_default_owner
@@ -870,3 +876,329 @@ class AdminSafetyTests(TestCase):
                     content_type=self.ct, object_id=obj.pk
                 ).exists()
             )
+
+
+class SampleAuthorInlinePolicyTests(TestCase):
+    """Owned-child inline authorization on ``Sample.sample_authors``.
+
+    The actor edits a FOREIGN private ``Sample`` through an object-level
+    editor grant — never ownership — while ``SampleAuthor`` is a registered
+    owned child (``materials.sampleauthor`` → ``sample``). Every inline write
+    must delegate to the parent's edit decision and author references must be
+    readable rows; legacy child-model CRUD permissions must not reopen a
+    write path on their own.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        ensure_test_default_owner()
+        call_command("sync_roles", "--apply", stdout=StringIO(), stderr=StringIO())
+
+    def setUp(self):
+        self.actor = User.objects.create_user(username="sa-actor", is_staff=True)
+        self.other = User.objects.create_user(username="sa-owner", is_staff=True)
+        self.material = Material.objects.create(
+            owner=self.other,
+            name="SA Material",
+            publication_status="published",
+        )
+        self.sample = Sample.objects.create(
+            owner=self.other,
+            name="SA Sample",
+            material=self.material,
+            standalone=True,
+            publication_status="private",
+        )
+        # Sample.sources is a required (blank=False) M2M; give the sample one
+        # readable published source so scalar validation is clean.
+        self.source = Source.objects.create(
+            owner=self.other,
+            title="SA Source",
+            type="misc",
+            publication_status="published",
+        )
+        self.sample.sources.add(self.source)
+        self.sample.add_editor(self.actor, granted_by=self.other)
+        self.own_author = Author.objects.create(
+            owner=self.actor,
+            first_names="Own",
+            last_names="Author",
+            publication_status="private",
+        )
+        self.public_author = Author.objects.create(
+            owner=self.other,
+            first_names="Public",
+            last_names="Author",
+            publication_status="published",
+        )
+        self.shared_author = Author.objects.create(
+            owner=self.other,
+            first_names="Shared",
+            last_names="Author",
+            publication_status="private",
+        )
+        self.shared_author.add_editor(self.actor, granted_by=self.other)
+        self.foreign_private_author = Author.objects.create(
+            owner=self.other,
+            first_names="Foreign",
+            last_names="Private",
+            publication_status="private",
+        )
+        self.ct = ContentType.objects.get_for_model(Sample)
+        self.change_url = reverse(
+            "admin:materials_sample_change", args=[self.sample.pk]
+        )
+        self.client.force_login(self.actor)
+
+    def _grant_child_perm(self, codename):
+        self.actor.user_permissions.add(
+            Permission.objects.get(
+                codename=codename,
+                content_type=ContentType.objects.get_for_model(SampleAuthor),
+            )
+        )
+
+    def _sample_post(self, rows, *, name=None):
+        data = {
+            "name": name if name is not None else self.sample.name,
+            "material": self.material.pk,
+            "standalone": "on",
+            "sources": [self.source.pk],
+            "sample_authors-TOTAL_FORMS": str(len(rows)),
+            "sample_authors-INITIAL_FORMS": str(sum(1 for row in rows if "id" in row)),
+            "sample_authors-MIN_NUM_FORMS": "0",
+            "sample_authors-MAX_NUM_FORMS": "1000",
+            "_save": "Save",
+        }
+        for index, row in enumerate(rows):
+            for key, value in row.items():
+                data[f"sample_authors-{index}-{key}"] = value
+        return data
+
+    def _assert_sample_untouched(self, name="SA Sample"):
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.name, name)
+        self.assertEqual(self.sample.owner_id, self.other.pk)
+        self.assertEqual(self.sample.content_revision, 1)
+        self.assertFalse(
+            ReviewAction.objects.filter(
+                content_type=self.ct, object_id=self.sample.pk
+            ).exists()
+        )
+        self.assertFalse(LogEntry.objects.exists())
+
+    def _inline_author_errors(self, response):
+        """Return the inline formset's author-field errors, keyed by form index."""
+        formset = response.context["inline_admin_formsets"][0].formset
+        return {
+            index: form.errors["author"]
+            for index, form in enumerate(formset.forms)
+            if "author" in form.errors
+        }
+
+    def test_forged_foreign_private_author_add_rejected(self):
+        # Explicit legacy child CRUD proves the pre-policy stock inline would
+        # have been writable — this is not a hidden-inline false negative.
+        self._grant_child_perm("add_sampleauthor")
+        self._grant_child_perm("change_sampleauthor")
+        response = self.client.post(
+            self.change_url,
+            self._sample_post(
+                [{"author": self.foreign_private_author.pk, "position": "1"}],
+                name="Forged name",
+            ),
+        )
+        self.assertEqual(response.status_code, 200)
+        # The scalar Sample form is clean; only the narrowed author field
+        # rejects the forged reference.
+        self.assertEqual(response.context["adminform"].form.errors, {})
+        self.assertIn(0, self._inline_author_errors(response))
+        self.assertFalse(
+            SampleAuthor.objects.filter(author=self.foreign_private_author).exists()
+        )
+        self._assert_sample_untouched()
+
+    def test_forged_update_existing_link_rejected(self):
+        self._grant_child_perm("change_sampleauthor")
+        link = SampleAuthor.objects.create(
+            sample=self.sample, author=self.own_author, position=1
+        )
+        response = self.client.post(
+            self.change_url,
+            self._sample_post(
+                [
+                    {
+                        "id": link.pk,
+                        "author": self.foreign_private_author.pk,
+                        "position": "9",
+                    }
+                ]
+            ),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["adminform"].form.errors, {})
+        self.assertIn(0, self._inline_author_errors(response))
+        link.refresh_from_db()
+        self.assertEqual(link.author_id, self.own_author.pk)
+        self.assertEqual(link.position, 1)
+        self._assert_sample_untouched()
+
+    def test_change_view_author_field_queryset_is_scoped(self):
+        response = self.client.get(self.change_url)
+        self.assertEqual(response.status_code, 200)
+        formset = response.context["inline_admin_formsets"][0].formset
+        bound_forms = list(formset.forms) + [formset.empty_form]
+        self.assertTrue(bound_forms)
+        for form in bound_forms:
+            field = form.fields["author"]
+            pks = set(field.queryset.values_list("pk", flat=True))
+            self.assertNotIn(self.foreign_private_author.pk, pks)
+            self.assertIn(self.own_author.pk, pks)
+            self.assertIn(self.public_author.pk, pks)
+            self.assertIn(self.shared_author.pk, pks)
+
+    def test_allowed_link_add_via_parent_edit_without_child_perms(self):
+        # Keep the contributor's Sample capabilities and parent edit grant;
+        # owned links do not require separate SampleAuthor CRUD permissions.
+        self.assertFalse(self.actor.has_perm("materials.add_sampleauthor"))
+        self.assertFalse(self.actor.has_perm("materials.change_sampleauthor"))
+        response = self.client.post(
+            self.change_url,
+            self._sample_post(
+                [
+                    {"author": self.public_author.pk, "position": "1"},
+                    {"author": self.shared_author.pk, "position": "2"},
+                ]
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(SampleAuthor.objects.filter(sample=self.sample).count(), 2)
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.owner_id, self.other.pk)
+        self.assertEqual(self.sample.publication_status, "private")
+        self.assertEqual(self.sample.name, "SA Sample")
+        self.assertEqual(self.sample.content_revision, 2)
+        self.assertEqual(
+            ReviewAction.objects.filter(
+                content_type=self.ct,
+                object_id=self.sample.pk,
+                action=ReviewAction.ACTION_EDITED,
+                user=self.actor,
+            ).count(),
+            1,
+        )
+        self.public_author.refresh_from_db()
+        self.shared_author.refresh_from_db()
+        for author in (self.public_author, self.shared_author):
+            self.assertEqual(author.owner_id, self.other.pk)
+            self.assertEqual(author.content_revision, 1)
+
+    def test_allowed_position_only_update_bumps_root_once(self):
+        link = SampleAuthor.objects.create(
+            sample=self.sample, author=self.public_author, position=1
+        )
+        response = self.client.post(
+            self.change_url,
+            self._sample_post(
+                [
+                    {
+                        "id": link.pk,
+                        "author": self.public_author.pk,
+                        "position": "7",
+                    }
+                ]
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        link.refresh_from_db()
+        self.assertEqual(link.author_id, self.public_author.pk)
+        self.assertEqual(link.position, 7)
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.content_revision, 2)
+        self.assertEqual(
+            ReviewAction.objects.filter(
+                content_type=self.ct, object_id=self.sample.pk
+            ).count(),
+            1,
+        )
+
+    def test_revoked_reference_read_inside_boundary_rolls_back(self):
+        # shared_author is readable at form-validation time; revoking the
+        # grant inside the root save transaction — after save_model, before
+        # save_formset — must deny the persistence-time reference
+        # revalidation and roll back every row.
+        original_save_model = admin.ModelAdmin.save_model
+        seen = []
+
+        def revoke_in_save_model(model_admin, request, obj, form, change):
+            original_save_model(model_admin, request, obj, form, change)
+            seen.append(obj.pk)
+            ObjectEditorGrant.for_object(self.shared_author).delete()
+
+        with (
+            patch.object(admin.ModelAdmin, "save_model", revoke_in_save_model),
+            self.assertLogs("django.request", level="WARNING") as logged,
+        ):
+            response = self.client.post(
+                self.change_url,
+                self._sample_post(
+                    [{"author": self.shared_author.pk, "position": "1"}],
+                    name="Must roll back",
+                ),
+            )
+        self.assertEqual(seen, [self.sample.pk])
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("Forbidden", "\n".join(logged.output))
+        self.assertFalse(SampleAuthor.objects.filter(sample=self.sample).exists())
+        self._assert_sample_untouched()
+
+    def test_delete_link_to_inaccessible_author_allowed(self):
+        # Removing a link must not require read access on the referenced row.
+        link = SampleAuthor.objects.create(
+            sample=self.sample,
+            author=self.foreign_private_author,
+            position=1,
+        )
+        response = self.client.post(
+            self.change_url,
+            self._sample_post(
+                [
+                    {
+                        "id": link.pk,
+                        "author": self.foreign_private_author.pk,
+                        "position": "1",
+                        "DELETE": "on",
+                    }
+                ],
+                name="Renamed",
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(SampleAuthor.objects.filter(pk=link.pk).exists())
+        self.assertTrue(
+            Author.objects.filter(pk=self.foreign_private_author.pk).exists()
+        )
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.content_revision, 2)
+
+    def test_frozen_published_sample_denies_inline_mutation(self):
+        self.sample.publication_status = "published"
+        self.sample.save()
+        with self.assertLogs("django.request", level="WARNING") as logged:
+            response = self.client.post(
+                self.change_url,
+                self._sample_post([{"author": self.public_author.pk, "position": "1"}]),
+            )
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("Forbidden", "\n".join(logged.output))
+        self.assertFalse(SampleAuthor.objects.filter(sample=self.sample).exists())
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.name, "SA Sample")
+        self.assertEqual(self.sample.publication_status, "published")
+        self.assertEqual(self.sample.content_revision, 1)
+        self.assertFalse(
+            ReviewAction.objects.filter(
+                content_type=self.ct, object_id=self.sample.pk
+            ).exists()
+        )
+        self.assertFalse(LogEntry.objects.exists())

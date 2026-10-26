@@ -78,6 +78,29 @@ class AtlasUiAuthorizationTests(TestCase):
             params,
         )
 
+    def _change_map_overview_selector(self, **params):
+        response = self.client.get(reverse("waste-atlas-change-map-overview"), params)
+        self.assertEqual(response.status_code, 200)
+        match = re.search(
+            r'<script id="atlas-selector-options" type="application/json">'
+            r"(.*?)</script>",
+            response.content.decode(),
+            re.S,
+        )
+        self.assertIsNotNone(match, "no atlas-selector-options JSON found")
+        return response, json.loads(match.group(1))
+
+    def test_anonymous_change_map_overview_keeps_requested_scope(self):
+        # Anonymous visitors have no scope control, so the selector must
+        # receive the requested scope instead of defaulting to historical.
+        response, options = self._change_map_overview_selector(scope="published")
+        self.assertNotContains(response, 'id="sel-scope"')
+        self.assertEqual(options, {"useChangeUrls": True, "scope": "published"})
+
+    def test_change_map_overview_selector_defaults_to_historical(self):
+        _response, options = self._change_map_overview_selector()
+        self.assertEqual(options["scope"], "historical")
+
     # -- default and explicit public scopes -------------------------------
 
     def test_anonymous_map_defaults_to_historical(self):
