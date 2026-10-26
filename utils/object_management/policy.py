@@ -175,6 +175,8 @@ def object_access_routes(user, obj):
             obj = parent
 
     public_routes = []
+    if policy is not None and policy.kind == KIND_PUBLIC_CATALOGUE:
+        public_routes.append("public catalogue (public read)")
     if getattr(obj, "publication_status", None) == "published":
         public_routes.append("published (public read)")
     if getattr(obj, "publication_status", None) == "archived":

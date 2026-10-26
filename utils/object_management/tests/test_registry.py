@@ -27,7 +27,13 @@ from sources.waste_collection.models import CollectionCatchment
 
 from .. import checks
 from ..models import ObjectEditorGrant, UserCreatedObject
-from ..policy import decide, decide_reassign, scope_queryset, visible_queryset
+from ..policy import (
+    decide,
+    decide_reassign,
+    object_access_routes,
+    scope_queryset,
+    visible_queryset,
+)
 from ..registry import (
     KIND_OWNED,
     KIND_REVIEWABLE,
@@ -342,6 +348,15 @@ class PublicCataloguePolicyTests(TestCase):
             ),
             [self.row.pk],
         )
+
+    def test_public_reads_report_catalogue_route(self):
+        for user in (self.anonymous, self.contributor):
+            with self.subTest(user=user):
+                self.assertTrue(decide(user, "read", self.row).allowed)
+                self.assertEqual(
+                    object_access_routes(user, self.row),
+                    ["public catalogue (public read)"],
+                )
 
     def test_staff_without_model_permission_is_denied(self):
         self.assertEqual(
