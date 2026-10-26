@@ -1,3 +1,4 @@
+from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
@@ -106,3 +107,50 @@ class ShowcaseViewSetTestCase(TestCase):
             reverse("api-showcase-detail", args=[self.published.pk])
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def _grant(self, user, codename):
+        user.user_permissions.add(
+            Permission.objects.get(
+                codename=codename, content_type__app_label="closecycle"
+            )
+        )
+
+    def test_update_403_for_owner_without_change_permission(self):
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-showcase-detail", args=[self.private.pk]),
+            {"name": "Renamed"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.private.refresh_from_db()
+        self.assertEqual(self.private.name, "Private Showcase")
+
+    def test_update_200_for_owner_with_change_permission(self):
+        self._grant(self.owner, "change_showcase")
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-showcase-detail", args=[self.private.pk]),
+            {"name": "Renamed"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.private.refresh_from_db()
+        self.assertEqual(self.private.name, "Renamed")
+
+    def test_destroy_403_for_owner_without_delete_permission(self):
+        self.client.force_login(self.owner)
+        response = self.client.delete(
+            reverse("api-showcase-detail", args=[self.private.pk])
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Showcase.objects.filter(pk=self.private.pk).exists())
+
+    def test_destroy_204_for_owner_with_delete_permission(self):
+        self._grant(self.owner, "delete_showcase")
+        self.client.force_login(self.owner)
+        response = self.client.delete(
+            reverse("api-showcase-detail", args=[self.private.pk])
+        )
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Showcase.objects.filter(pk=self.private.pk).exists())

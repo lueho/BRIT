@@ -15,6 +15,7 @@ from maps.mixins import (
 from maps.models import Catchment, GeoPolygon, Region
 from maps.throttling import GeoJSONAnonThrottle
 from maps.utils import row_xmin_subquery
+from utils.object_management.permissions import UserCreatedObjectPermission
 from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 from .filters import ShowcaseAPIFilterSet
@@ -35,6 +36,10 @@ class ShowcaseViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     filterset_fields = ("id", "region__country")
     filterset_class = ShowcaseAPIFilterSet
     geojson_throttle_classes = (GeoJSONAnonThrottle,)
+    permission_classes = [
+        UserCreatedObjectPermission,
+        DjangoModelPermissionsOrAnonReadOnly,
+    ]
 
     def get_queryset(self):
         queryset = super().get_queryset().select_related("region__borders")
