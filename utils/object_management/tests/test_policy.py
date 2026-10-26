@@ -846,6 +846,18 @@ class PolicyReviewFindingRegressionTests(TestCase):
                 )
                 self.assertEqual(object_access_routes(user, self.private_property), [])
 
+    def test_unsaved_review_candidate_cannot_be_approved(self):
+        candidate = Property(
+            name="Finding unsaved",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+            created_by=self.moderator,
+        )
+        moderator = User.objects.get(pk=self.moderator.pk)
+        decision = decide(moderator, "approve", candidate)
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reason, "four_eyes_required")
+
     def test_revoked_direct_grant_applies_to_cached_user_instance(self):
         self.private_property.add_editor(self.editor)
         editor = User.objects.get(pk=self.editor.pk)

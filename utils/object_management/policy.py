@@ -412,7 +412,9 @@ def _decide_approve(actor, ctx):
         return base
     obj = ctx.obj
     if actor.pk is None or getattr(obj, "pk", None) is None:
-        return _ALLOWED
+        # Without a stored candidate there is no contributor history to
+        # check, so four-eyes separation cannot be established.
+        return _denied("four_eyes_required")
     from .services import contributor_user_ids
 
     if actor.pk in contributor_user_ids(obj):
