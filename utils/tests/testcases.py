@@ -6,7 +6,12 @@ from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from utils.object_management.models import User
+from utils.object_management.models import User, _default_owner_username
+
+
+def ensure_test_default_owner():
+    """Provision the identity used by ownerless model/form construction."""
+    return User.objects.get_or_create(username=_default_owner_username())[0]
 
 
 class UserLoginTestCase(TestCase):
@@ -184,6 +189,7 @@ class AbstractTestCases:
 
         @classmethod
         def setUpTestData(cls):
+            ensure_test_default_owner()
             cls.owner_user = User.objects.create(username="owner")
             cls.non_owner_user = User.objects.create(username="non_owner")
             cls.staff_user = User.objects.create(username="staff", is_staff=True)

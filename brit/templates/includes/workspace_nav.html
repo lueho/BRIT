@@ -1,0 +1,15 @@
+{% load moderation_tags %}
+{% workspace_scope_links private_representation_url|default:request.path as links %}
+{% if links %}
+<nav id="workspace-nav" aria-label="Workspace scope" class="mb-3">
+  <ul class="nav nav-pills">
+    {% for link in links %}
+      <li class="nav-item">
+        <a class="nav-link{% if link.active %} active{% endif %}"
+           {% if link.active %}aria-current="page"{% endif %}
+           href="{{ link.url }}">{{ link.label }}</a>
+      </li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}

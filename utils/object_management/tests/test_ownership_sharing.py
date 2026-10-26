@@ -34,10 +34,10 @@ class OwnershipTransferModelTests(TestCase):
         with self.assertRaises(ValidationError):
             self.collection.transfer_ownership(self.new_owner)
 
-    def test_transfer_ownership_removes_editor_grant_of_new_owner(self):
+    def test_transfer_ownership_preserves_editor_grants(self):
         self.collection.add_editor(self.new_owner)
         self.collection.transfer_ownership(self.new_owner)
-        self.assertFalse(self.collection.editors.filter(pk=self.new_owner.pk).exists())
+        self.assertTrue(self.collection.editors.filter(pk=self.new_owner.pk).exists())
 
 
 class EditorGrantModelTests(TestCase):
@@ -90,6 +90,13 @@ class EditorGrantModelTests(TestCase):
         )
 
     def test_editable_by_user_queryset(self):
+        # Ownership/grant alone never confers the model change capability.
+        change_perm = Permission.objects.get(
+            codename="change_collection",
+            content_type=ContentType.objects.get_for_model(Collection),
+        )
+        self.owner.user_permissions.add(change_perm)
+        self.editor.user_permissions.add(change_perm)
         self.collection.add_editor(self.editor)
         self.assertIn(self.collection, Collection.objects.editable_by_user(self.editor))
         self.assertIn(self.collection, Collection.objects.editable_by_user(self.owner))
@@ -105,6 +112,10 @@ class EditorPermissionTests(TestCase):
         cls.editor = User.objects.create_user(username="editor")
         cls.other = User.objects.create_user(username="other")
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
+        cls.admin = User.objects.create_user(username="sharing-admin", is_staff=True)
+        cls.admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.collection = Collection.objects.create(
             name="Test Collection",
             owner=cls.owner,
@@ -187,8 +198,15 @@ class EditorPermissionTests(TestCase):
             moderator_editor,
             data={"publication_status": UserCreatedObject.STATUS_PUBLISHED},
         )
-        self.assertTrue(
+        # ``publication_status`` is a protected payload field — the request is
+        # rejected because the state transition is not an ordinary write, not
+        # because the record is frozen. Ordinary field edits still go through.
+        self.assertFalse(
             self.permission.has_object_permission(request, None, self.collection)
+        )
+        name_request = self._request(moderator_editor, data={"name": "Renamed"})
+        self.assertTrue(
+            self.permission.has_object_permission(name_request, None, self.collection)
         )
 
     def test_editor_who_is_moderator_can_edit_private_content(self):
@@ -230,15 +248,16 @@ class EditorPermissionTests(TestCase):
             publication_status=UserCreatedObject.STATUS_PRIVATE,
         )
         ContentType.objects.get_for_model(Collection)  # warm ContentType cache
-        self.assertTrue(self.permission._is_editor(self.editor, self.collection))
+        self.assertTrue(self.permission.is_editor(self.editor, self.collection))
         with self.assertNumQueries(0):
-            self.assertTrue(self.permission._is_editor(self.editor, self.collection))
-            self.assertFalse(self.permission._is_editor(self.editor, other_collection))
+            self.assertTrue(self.permission.is_editor(self.editor, self.collection))
+            self.assertFalse(self.permission.is_editor(self.editor, other_collection))
 
     def test_transfer_ownership_permission(self):
         for user, expected in [
             (self.owner, True),
-            (self.staff, True),
+            (self.admin, True),
+            (self.staff, False),
             (self.editor, False),
             (self.other, False),
         ]:
@@ -253,7 +272,8 @@ class EditorPermissionTests(TestCase):
     def test_manage_editors_permission(self):
         for user, expected in [
             (self.owner, True),
-            (self.staff, True),
+            (self.admin, True),
+            (self.staff, False),
             (self.editor, False),
             (self.other, False),
         ]:
@@ -271,6 +291,10 @@ class EditorObjectPolicyTests(TestCase):
         cls.editor = User.objects.create_user(username="editor")
         cls.other = User.objects.create_user(username="other")
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
+        cls.admin = User.objects.create_user(username="sharing-admin", is_staff=True)
+        cls.admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.collection = Collection.objects.create(
             name="Test Collection",
             owner=cls.owner,
@@ -292,10 +316,15 @@ class EditorObjectPolicyTests(TestCase):
         self.assertTrue(policy["can_transfer_ownership"])
         self.assertTrue(policy["can_manage_editors"])
 
-    def test_policy_flags_for_staff(self):
-        policy = get_object_policy(self.staff, self.collection)
+    def test_policy_flags_for_admin(self):
+        policy = get_object_policy(self.admin, self.collection)
         self.assertTrue(policy["can_transfer_ownership"])
         self.assertTrue(policy["can_manage_editors"])
+
+    def test_policy_flags_for_staff_only(self):
+        policy = get_object_policy(self.staff, self.collection)
+        self.assertFalse(policy["can_transfer_ownership"])
+        self.assertFalse(policy["can_manage_editors"])
 
     def test_policy_flags_for_other(self):
         policy = get_object_policy(self.other, self.collection)
@@ -332,6 +361,12 @@ class OwnershipSharingViewTests(TestCase):
             username="other",
         )
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
+        cls.admin = User.objects.create_user(
+            username="sharing-admin", password="pw", is_staff=True
+        )
+        cls.admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.collection = Collection.objects.create(
             name="Test Collection",
             owner=cls.owner,
@@ -353,8 +388,8 @@ class OwnershipSharingViewTests(TestCase):
         response = self.client.get(self.collection.get_absolute_url())
         self.assertContains(response, self._url("manage_access_modal"))
 
-    def test_detail_page_shows_manage_access_button_for_staff(self):
-        self.client.force_login(self.staff)
+    def test_detail_page_shows_manage_access_button_for_admin(self):
+        self.client.force_login(self.admin)
         response = self.client.get(self.collection.get_absolute_url())
         self.assertContains(response, self._url("manage_access_modal"))
 
@@ -416,14 +451,23 @@ class OwnershipSharingViewTests(TestCase):
         self.collection.refresh_from_db()
         self.assertEqual(self.collection.owner, self.new_owner)
 
-    def test_staff_can_transfer_ownership(self):
-        self.client.force_login(self.staff)
+    def test_admin_can_transfer_ownership(self):
+        self.client.force_login(self.admin)
         response = self.client.post(
             self._url("transfer_ownership"), {"new_owner": self.new_owner.username}
         )
         self.assertEqual(response.status_code, 302)
         self.collection.refresh_from_db()
         self.assertEqual(self.collection.owner, self.new_owner)
+
+    def test_staff_only_cannot_transfer_ownership(self):
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            self._url("transfer_ownership"), {"new_owner": self.new_owner.username}
+        )
+        self.assertEqual(response.status_code, 403)
+        self.collection.refresh_from_db()
+        self.assertEqual(self.collection.owner, self.owner)
 
     def test_non_owner_cannot_transfer_ownership(self):
         self.client.force_login(self.other)
@@ -545,7 +589,7 @@ class OwnershipSharingViewTests(TestCase):
     def test_transfer_of_published_object_stays_on_detail(self):
         self.collection.publication_status = UserCreatedObject.STATUS_PUBLISHED
         self.collection.save()
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
         detail_url = self.collection.get_absolute_url()
         response = self.client.post(
             self._url("transfer_ownership"),
