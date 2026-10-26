@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import re
-from datetime import timedelta
+from dataclasses import dataclass
+from datetime import date, timedelta
+from decimal import Decimal
 
 from django.contrib.contenttypes.models import ContentType
 from django.db import connection, transaction
@@ -169,6 +171,35 @@ def _parse_whole_year_fixed_flexible_frequency(value: str) -> dict | None:
         "standard_count": counts[0],
         "option_counts": option_counts,
     }
+
+
+@dataclass
+class _ResolvedImportRecord:
+    """References and scalar values resolved for one import record."""
+
+    collection_system: CollectionSystem
+    waste_category: WasteCategory
+    valid_from: date
+    allowed_materials: list[Material]
+    forbidden_materials: list[Material]
+    allowed_material_ids: set[int]
+    forbidden_material_ids: set[int]
+    catchment: CollectionCatchment
+    collector: Collector | None
+    fee_system: FeeSystem | None
+    frequency: CollectionFrequency | None
+    participation_policy: str | None
+    access_control_bp: bool | None
+    access_control_pap: bool | None
+    bin_configuration: BinConfiguration | None
+    established: int | None
+    bin_cap_ref: str | None
+    valid_until: date | None
+    description: str
+    review_comment: str
+    raw_frequency_name: str
+    min_bin_size: Decimal | None
+    required_bin_capacity: Decimal | None
 
 
 class CollectionImporter:
@@ -361,23 +392,44 @@ class CollectionImporter:
     # ------------------------------------------------------------------
 
     def _import_record(self, record: dict, index: int, stats: dict) -> None:
+        """Orchestrate resolution, update-or-create, and finalization."""
         label = f"record[{index}]"
 
-        collection_system = self._resolve_collection_system(record, label, stats)
-        if collection_system is None:
+        resolved = self._resolve_record_references(record, label, stats)
+        if resolved is None:
             stats["skipped"] += 1
             return
+
+        collection = self._find_existing_for_import(record, resolved)
+        if collection is not None:
+            self._update_existing_collection(record, resolved, collection, label, stats)
+        else:
+            collection = self._create_collection_from_record(record, resolved, stats)
+
+        # Property values
+        for pv in record.get("property_values") or []:
+            self._import_property_value(collection, pv, stats, record=record)
+
+    def _resolve_record_references(
+        self, record: dict, label: str, stats: dict
+    ) -> _ResolvedImportRecord | None:
+        """Resolve every reference and scalar needed to import *record*.
+
+        Returns ``None`` when a mandatory reference cannot be resolved; the
+        caller then counts the record as skipped.
+        """
+        collection_system = self._resolve_collection_system(record, label, stats)
+        if collection_system is None:
+            return None
 
         waste_category = self._resolve_waste_category(record, label, stats)
         if waste_category is None:
-            stats["skipped"] += 1
-            return
+            return None
 
         valid_from = record.get("valid_from")
         if valid_from is None:
             stats["warnings"].append(f"{label}: No valid_from date — record skipped.")
-            stats["skipped"] += 1
-            return
+            return None
 
         allowed_materials, forbidden_materials = self._resolve_material_lists(
             record, label, stats
@@ -397,338 +449,399 @@ class CollectionImporter:
             valid_from=valid_from,
         )
         if catchment is None:
-            stats["skipped"] += 1
-            return
+            return None
 
-        collector = self._resolve_collector(record, label, stats)
-        fee_system = self._resolve_fee_system(record, label, stats)
-        frequency = self._resolve_frequency(record, label, stats)
-        participation_policy = self._resolve_participation_policy(record, label, stats)
-        access_control_bp = record.get(
-            "access_control_bp"
-        )  # bool or None, no mapping needed
-        access_control_pap = record.get(
-            "access_control_pap"
-        )  # bool or None, no mapping needed
-        bin_configuration = self._resolve_bin_configuration(record, label, stats)
-        established = record.get("established")
-        bin_cap_ref = self._resolve_bin_capacity_reference(record)
-
-        valid_until = record.get("valid_until")
-        description = record.get("description") or ""
-        review_comment = str(record.get("review_comment") or "").strip()
-        raw_frequency_name = record.get("frequency") or ""
-        min_bin_size = record.get("min_bin_size")
-        required_bin_capacity = record.get("required_bin_capacity")
-
-        # Check for existing collection with same identity
-        existing = self._find_existing_collection(
-            catchment=catchment,
+        return _ResolvedImportRecord(
             collection_system=collection_system,
             waste_category=waste_category,
             valid_from=valid_from,
+            allowed_materials=allowed_materials,
+            forbidden_materials=forbidden_materials,
             allowed_material_ids=allowed_material_ids,
             forbidden_material_ids=forbidden_material_ids,
+            catchment=catchment,
+            collector=self._resolve_collector(record, label, stats),
+            fee_system=self._resolve_fee_system(record, label, stats),
+            frequency=self._resolve_frequency(record, label, stats),
+            participation_policy=self._resolve_participation_policy(
+                record, label, stats
+            ),
+            access_control_bp=record.get("access_control_bp"),
+            access_control_pap=record.get("access_control_pap"),
+            bin_configuration=self._resolve_bin_configuration(record, label, stats),
+            established=record.get("established"),
+            bin_cap_ref=self._resolve_bin_capacity_reference(record),
+            valid_until=record.get("valid_until"),
+            description=record.get("description") or "",
+            review_comment=str(record.get("review_comment") or "").strip(),
+            raw_frequency_name=record.get("frequency") or "",
+            min_bin_size=record.get("min_bin_size"),
+            required_bin_capacity=record.get("required_bin_capacity"),
+        )
+
+    def _find_existing_for_import(
+        self, record: dict, resolved: _ResolvedImportRecord
+    ) -> Collection | None:
+        """Identity matching for *resolved*, incl. same-year reconciliation."""
+        existing = self._find_existing_collection(
+            catchment=resolved.catchment,
+            collection_system=resolved.collection_system,
+            waste_category=resolved.waste_category,
+            valid_from=resolved.valid_from,
+            allowed_material_ids=resolved.allowed_material_ids,
+            forbidden_material_ids=resolved.forbidden_material_ids,
         )
         if existing is None and record.get("reconcile_same_year_identity"):
             existing = self._find_existing_collection_for_same_year_reconcile(
-                catchment=catchment,
-                waste_category=waste_category,
-                valid_from=valid_from,
-                allowed_material_ids=allowed_material_ids,
-                forbidden_material_ids=forbidden_material_ids,
+                catchment=resolved.catchment,
+                waste_category=resolved.waste_category,
+                valid_from=resolved.valid_from,
+                allowed_material_ids=resolved.allowed_material_ids,
+                forbidden_material_ids=resolved.forbidden_material_ids,
+            )
+        return existing
+
+    def _update_existing_collection(
+        self,
+        record: dict,
+        resolved: _ResolvedImportRecord,
+        collection: Collection,
+        label: str,
+        stats: dict,
+    ) -> None:
+        """Reconcile *collection* with *resolved* and run shared finalization."""
+        description = resolved.description
+        manual_review_note = self._manual_review_note_for_frequency(
+            resolved.raw_frequency_name, resolved.frequency
+        )
+        if manual_review_note and manual_review_note not in description:
+            description = (
+                f"{description}\n\n{manual_review_note}"
+                if description
+                else manual_review_note
+            )
+            stats["warnings"].append(
+                f"{label}: Added manual-review note to description for unresolved frequency '{resolved.raw_frequency_name}'."
             )
 
-        if existing:
-            collection = existing
-            update_fields = []
-            changes = []
-            manual_review_note = self._manual_review_note_for_frequency(
-                raw_frequency_name, frequency
-            )
-            if manual_review_note and manual_review_note not in description:
-                description = (
-                    f"{description}\n\n{manual_review_note}"
-                    if description
-                    else manual_review_note
-                )
-                stats["warnings"].append(
-                    f"{label}: Added manual-review note to description for unresolved frequency '{raw_frequency_name}'."
-                )
+        update_fields, changes = self._reconcile_collection_fields(
+            record, resolved, collection, description
+        )
+        update_allowed_materials, update_forbidden_materials = (
+            self._collection_material_updates(resolved, collection, changes)
+        )
 
-            # Update collector if different
-            if record.get("sync_owner") and collection.owner_id != self.owner.pk:
-                changes.append(f"owner: {collection.owner} → {self.owner}")
-                collection.owner = self.owner
-                update_fields.append("owner")
-
-            if collector and collection.collector_id != (
-                collector.pk if collector else None
-            ):
-                changes.append(
-                    f"collector: {collection.collector or 'None'} → {collector}"
-                )
-                collection.collector = collector
-                update_fields.append("collector")
-
-            if collection.collection_system_id != collection_system.pk:
-                changes.append(
-                    f"collection_system: {collection.collection_system or 'None'} → {collection_system}"
-                )
-                collection.collection_system = collection_system
-                update_fields.append("collection_system")
-
-            # Update fee_system if different
-            if fee_system and collection.fee_system_id != (
-                fee_system.pk if fee_system else None
-            ):
-                changes.append(
-                    f"fee_system: {collection.fee_system or 'None'} → {fee_system}"
-                )
-                collection.fee_system = fee_system
-                update_fields.append("fee_system")
-
-            # Update frequency if different
-            if frequency and collection.frequency_id != (
-                frequency.pk if frequency else None
-            ):
-                changes.append(
-                    f"frequency: {collection.frequency or 'None'} → {frequency}"
-                )
-                collection.frequency = frequency
-                update_fields.append("frequency")
-            elif (
-                record.get("clear_frequency")
-                and not raw_frequency_name
-                and collection.frequency_id is not None
-            ):
-                changes.append(f"frequency: {collection.frequency} → None")
-                collection.frequency = None
-                update_fields.append("frequency")
-
-            # Update participation_policy if different
-            if (
-                participation_policy
-                and collection.participation_policy != participation_policy
-            ):
-                changes.append(
-                    f"participation_policy: {collection.participation_policy or 'None'} → {participation_policy}"
-                )
-                collection.participation_policy = participation_policy
-                update_fields.append("participation_policy")
-
-            # Update access_control_bp if provided and different
-            if (
-                access_control_bp is not None
-                and collection.access_control_bp != access_control_bp
-            ):
-                changes.append(
-                    f"access_control_bp: {collection.access_control_bp} → {access_control_bp}"
-                )
-                collection.access_control_bp = access_control_bp
-                update_fields.append("access_control_bp")
-
-            # Update access_control_pap if provided and different
-            if (
-                access_control_pap is not None
-                and collection.access_control_pap != access_control_pap
-            ):
-                changes.append(
-                    f"access_control_pap: {collection.access_control_pap} → {access_control_pap}"
-                )
-                collection.access_control_pap = access_control_pap
-                update_fields.append("access_control_pap")
-
-            # Update bin_configuration if different
-            if bin_configuration and collection.bin_configuration_id != (
-                bin_configuration.pk if bin_configuration else None
-            ):
-                changes.append(
-                    f"bin_configuration: {collection.bin_configuration or 'None'} → {bin_configuration}"
-                )
-                collection.bin_configuration = bin_configuration
-                update_fields.append("bin_configuration")
-
-            # Update established if different
-            if established is not None and collection.established != established:
-                changes.append(f"established: {collection.established} → {established}")
-                collection.established = established
-                update_fields.append("established")
-
-            if min_bin_size is not None and collection.min_bin_size != min_bin_size:
-                changes.append(
-                    f"min_bin_size: {collection.min_bin_size} → {min_bin_size}"
-                )
-                collection.min_bin_size = min_bin_size
-                update_fields.append("min_bin_size")
-
-            # Update required_bin_capacity if different
-            if (
-                required_bin_capacity is not None
-                and collection.required_bin_capacity != required_bin_capacity
-            ):
-                changes.append(
-                    f"required_bin_capacity: {collection.required_bin_capacity} → {required_bin_capacity}"
-                )
-                collection.required_bin_capacity = required_bin_capacity
-                update_fields.append("required_bin_capacity")
-
-            # Update required_bin_capacity_reference if different
-            if (
-                bin_cap_ref is not None
-                and collection.required_bin_capacity_reference != bin_cap_ref
-            ):
-                changes.append(
-                    f"required_bin_capacity_reference: {collection.required_bin_capacity_reference or 'None'} → {bin_cap_ref}"
-                )
-                collection.required_bin_capacity_reference = bin_cap_ref
-                update_fields.append("required_bin_capacity_reference")
-
-            # Update description if different
-            if description and collection.description != description:
-                changes.append("description updated")
-                collection.description = description
-                update_fields.append("description")
-
-            # Update valid_until if different
-            if valid_until != collection.valid_until:
-                changes.append(f"valid_until: {collection.valid_until} → {valid_until}")
-                collection.valid_until = valid_until
-                update_fields.append("valid_until")
-
-            # Ensure inline waste fields stay in sync with imported payload.
-            if collection.waste_category_id != waste_category.id:
-                changes.append(
-                    f"waste_category: {collection.effective_waste_category or 'None'} → {waste_category}"
-                )
-                collection.waste_category = waste_category
-                update_fields.append("waste_category")
-
-            current_allowed_ids, current_forbidden_ids = (
-                self._effective_material_ids_for_collection(collection)
-            )
-            update_allowed_materials = current_allowed_ids != allowed_material_ids
-            update_forbidden_materials = current_forbidden_ids != forbidden_material_ids
-
+        if not self.dry_run:
+            if update_fields:
+                collection.save(update_fields=[*update_fields, "lastmodified_at"])
             if update_allowed_materials:
-                changes.append("allowed_materials updated")
+                collection.allowed_materials.set(resolved.allowed_materials)
             if update_forbidden_materials:
-                changes.append("forbidden_materials updated")
+                collection.forbidden_materials.set(resolved.forbidden_materials)
 
-            if not self.dry_run:
-                if update_fields:
-                    collection.save(update_fields=[*update_fields, "lastmodified_at"])
-                if update_allowed_materials:
-                    collection.allowed_materials.set(allowed_materials)
-                if update_forbidden_materials:
-                    collection.forbidden_materials.set(forbidden_materials)
+        sources_changed, flyers_changed = self._attach_import_references(
+            collection, record, stats
+        )
+        if sources_changed:
+            changes.append("sources updated")
+        if flyers_changed:
+            changes.append("flyers updated")
 
-            source_urls, update_sources = self._attach_collection_sources(
-                collection, record.get("sources") or [], stats
-            )
-            update_flyers = self._attach_collection_flyers(
-                collection,
-                [*source_urls, *(record.get("flyer_urls") or [])],
-                stats,
-            )
-            if update_sources:
-                changes.append("sources updated")
-            if update_flyers:
-                changes.append("flyers updated")
-
-            if (
-                update_fields
-                or update_allowed_materials
-                or update_forbidden_materials
-                or update_sources
-                or update_flyers
-            ):
-                stats["updated"] = stats.get("updated", 0) + 1
-                stats["changes"] = stats.get("changes", [])
-                stats["changes"].append(f"{label}: {', '.join(changes)}")
-            else:
-                stats["unchanged"] += 1
-
-            if (
-                self.publication_status == "review"
-                and collection.publication_status
-                in (collection.STATUS_PRIVATE, collection.STATUS_DECLINED)
-                and not self.dry_run
-            ):
-                self._submit_for_review(collection)
-
-            review_comment_changed = self._sync_import_review_comment(
-                collection, review_comment, stats
-            )
-            if review_comment_changed:
-                changes.append("review comment updated")
+        if (
+            update_fields
+            or update_allowed_materials
+            or update_forbidden_materials
+            or sources_changed
+            or flyers_changed
+        ):
+            stats["updated"] = stats.get("updated", 0) + 1
+            stats["changes"] = stats.get("changes", [])
+            stats["changes"].append(f"{label}: {', '.join(changes)}")
         else:
-            predecessor = self._find_predecessor(
-                catchment,
-                waste_category,
-                collection_system,
-                valid_from,
+            stats["unchanged"] += 1
+
+        self._submit_imported_collection_for_review(collection)
+
+        review_comment_changed = self._sync_import_review_comment(
+            collection, resolved.review_comment, stats
+        )
+        if review_comment_changed:
+            changes.append("review comment updated")
+
+    def _reconcile_collection_fields(
+        self,
+        record: dict,
+        resolved: _ResolvedImportRecord,
+        collection: Collection,
+        description: str,
+    ) -> tuple[list[str], list[str]]:
+        """Diff record fields against *collection*; return (update_fields, changes)."""
+        update_fields = []
+        changes = []
+
+        # Update collector if different
+        if record.get("sync_owner") and collection.owner_id != self.owner.pk:
+            changes.append(f"owner: {collection.owner} → {self.owner}")
+            collection.owner = self.owner
+            update_fields.append("owner")
+
+        if resolved.collector and collection.collector_id != resolved.collector.pk:
+            changes.append(
+                f"collector: {collection.collector or 'None'} → {resolved.collector}"
             )
+            collection.collector = resolved.collector
+            update_fields.append("collector")
 
-            collection_name = (
-                f"{catchment.name} {waste_category.name} "
-                f"{collection_system.name} {valid_from.year}"
+        if collection.collection_system_id != resolved.collection_system.pk:
+            changes.append(
+                f"collection_system: {collection.collection_system or 'None'} → {resolved.collection_system}"
             )
-            collection = Collection(
-                name=collection_name,
-                owner=self.owner,
-                publication_status="private",
-                catchment=catchment,
-                collector=collector,
-                collection_system=collection_system,
-                waste_category=waste_category,
-                frequency=frequency,
-                fee_system=fee_system,
-                valid_from=valid_from,
-                valid_until=valid_until,
-                participation_policy=participation_policy,
-                access_control_bp=access_control_bp,
-                access_control_pap=access_control_pap,
-                bin_configuration=bin_configuration,
-                established=established,
-                description=description,
+            collection.collection_system = resolved.collection_system
+            update_fields.append("collection_system")
+
+        # Update fee_system if different
+        if resolved.fee_system and collection.fee_system_id != resolved.fee_system.pk:
+            changes.append(
+                f"fee_system: {collection.fee_system or 'None'} → {resolved.fee_system}"
             )
-            if min_bin_size is not None:
-                collection.min_bin_size = min_bin_size
-            if required_bin_capacity is not None:
-                collection.required_bin_capacity = required_bin_capacity
-            if bin_cap_ref:
-                collection.required_bin_capacity_reference = bin_cap_ref
-            collection.save()
-            collection.allowed_materials.set(allowed_materials)
-            collection.forbidden_materials.set(forbidden_materials)
+            collection.fee_system = resolved.fee_system
+            update_fields.append("fee_system")
 
-            if predecessor:
-                collection.predecessors.add(predecessor)
-                if not predecessor.valid_until:
-                    predecessor.valid_until = valid_from - timedelta(days=1)
-                    predecessor.save(update_fields=["valid_until", "lastmodified_at"])
-                stats["predecessor_links"] += 1
-
-            stats["created"] += 1
-
-            source_urls, _ = self._attach_collection_sources(
-                collection, record.get("sources") or [], stats
+        # Update frequency if different
+        if resolved.frequency and collection.frequency_id != resolved.frequency.pk:
+            changes.append(
+                f"frequency: {collection.frequency or 'None'} → {resolved.frequency}"
             )
+            collection.frequency = resolved.frequency
+            update_fields.append("frequency")
+        elif (
+            record.get("clear_frequency")
+            and not resolved.raw_frequency_name
+            and collection.frequency_id is not None
+        ):
+            changes.append(f"frequency: {collection.frequency} → None")
+            collection.frequency = None
+            update_fields.append("frequency")
 
-            self._attach_collection_flyers(
-                collection,
-                [*source_urls, *(record.get("flyer_urls") or [])],
-                stats,
+        # Update participation_policy if different
+        if (
+            resolved.participation_policy
+            and collection.participation_policy != resolved.participation_policy
+        ):
+            changes.append(
+                f"participation_policy: {collection.participation_policy or 'None'} → {resolved.participation_policy}"
             )
-            if self.publication_status == "review":
-                self._submit_for_review(collection)
+            collection.participation_policy = resolved.participation_policy
+            update_fields.append("participation_policy")
 
-            self._sync_import_review_comment(collection, review_comment, stats)
+        # Update access_control_bp if provided and different
+        if (
+            resolved.access_control_bp is not None
+            and collection.access_control_bp != resolved.access_control_bp
+        ):
+            changes.append(
+                f"access_control_bp: {collection.access_control_bp} → {resolved.access_control_bp}"
+            )
+            collection.access_control_bp = resolved.access_control_bp
+            update_fields.append("access_control_bp")
 
-        # Property values
-        for pv in record.get("property_values") or []:
-            self._import_property_value(collection, pv, stats, record=record)
+        # Update access_control_pap if provided and different
+        if (
+            resolved.access_control_pap is not None
+            and collection.access_control_pap != resolved.access_control_pap
+        ):
+            changes.append(
+                f"access_control_pap: {collection.access_control_pap} → {resolved.access_control_pap}"
+            )
+            collection.access_control_pap = resolved.access_control_pap
+            update_fields.append("access_control_pap")
+
+        # Update bin_configuration if different
+        if (
+            resolved.bin_configuration
+            and collection.bin_configuration_id != resolved.bin_configuration.pk
+        ):
+            changes.append(
+                f"bin_configuration: {collection.bin_configuration or 'None'} → {resolved.bin_configuration}"
+            )
+            collection.bin_configuration = resolved.bin_configuration
+            update_fields.append("bin_configuration")
+
+        # Update established if different
+        if (
+            resolved.established is not None
+            and collection.established != resolved.established
+        ):
+            changes.append(
+                f"established: {collection.established} → {resolved.established}"
+            )
+            collection.established = resolved.established
+            update_fields.append("established")
+
+        if (
+            resolved.min_bin_size is not None
+            and collection.min_bin_size != resolved.min_bin_size
+        ):
+            changes.append(
+                f"min_bin_size: {collection.min_bin_size} → {resolved.min_bin_size}"
+            )
+            collection.min_bin_size = resolved.min_bin_size
+            update_fields.append("min_bin_size")
+
+        # Update required_bin_capacity if different
+        if (
+            resolved.required_bin_capacity is not None
+            and collection.required_bin_capacity != resolved.required_bin_capacity
+        ):
+            changes.append(
+                f"required_bin_capacity: {collection.required_bin_capacity} → {resolved.required_bin_capacity}"
+            )
+            collection.required_bin_capacity = resolved.required_bin_capacity
+            update_fields.append("required_bin_capacity")
+
+        # Update required_bin_capacity_reference if different
+        if (
+            resolved.bin_cap_ref is not None
+            and collection.required_bin_capacity_reference != resolved.bin_cap_ref
+        ):
+            changes.append(
+                f"required_bin_capacity_reference: {collection.required_bin_capacity_reference or 'None'} → {resolved.bin_cap_ref}"
+            )
+            collection.required_bin_capacity_reference = resolved.bin_cap_ref
+            update_fields.append("required_bin_capacity_reference")
+
+        # Update description if different
+        if description and collection.description != description:
+            changes.append("description updated")
+            collection.description = description
+            update_fields.append("description")
+
+        # Update valid_until if different
+        if resolved.valid_until != collection.valid_until:
+            changes.append(
+                f"valid_until: {collection.valid_until} → {resolved.valid_until}"
+            )
+            collection.valid_until = resolved.valid_until
+            update_fields.append("valid_until")
+
+        # Ensure inline waste fields stay in sync with imported payload.
+        if collection.waste_category_id != resolved.waste_category.id:
+            changes.append(
+                f"waste_category: {collection.effective_waste_category or 'None'} → {resolved.waste_category}"
+            )
+            collection.waste_category = resolved.waste_category
+            update_fields.append("waste_category")
+
+        return update_fields, changes
+
+    def _collection_material_updates(
+        self,
+        resolved: _ResolvedImportRecord,
+        collection: Collection,
+        changes: list[str],
+    ) -> tuple[bool, bool]:
+        """Flag material-list diffs and record their labels in *changes*."""
+        current_allowed_ids, current_forbidden_ids = (
+            self._effective_material_ids_for_collection(collection)
+        )
+        update_allowed_materials = current_allowed_ids != resolved.allowed_material_ids
+        update_forbidden_materials = (
+            current_forbidden_ids != resolved.forbidden_material_ids
+        )
+        if update_allowed_materials:
+            changes.append("allowed_materials updated")
+        if update_forbidden_materials:
+            changes.append("forbidden_materials updated")
+        return update_allowed_materials, update_forbidden_materials
+
+    def _create_collection_from_record(
+        self,
+        record: dict,
+        resolved: _ResolvedImportRecord,
+        stats: dict,
+    ) -> Collection:
+        """Create a new collection from *resolved* and run shared finalization."""
+        predecessor = self._find_predecessor(
+            resolved.catchment,
+            resolved.waste_category,
+            resolved.collection_system,
+            resolved.valid_from,
+        )
+
+        collection_name = (
+            f"{resolved.catchment.name} {resolved.waste_category.name} "
+            f"{resolved.collection_system.name} {resolved.valid_from.year}"
+        )
+        collection = Collection(
+            name=collection_name,
+            owner=self.owner,
+            publication_status="private",
+            catchment=resolved.catchment,
+            collector=resolved.collector,
+            collection_system=resolved.collection_system,
+            waste_category=resolved.waste_category,
+            frequency=resolved.frequency,
+            fee_system=resolved.fee_system,
+            valid_from=resolved.valid_from,
+            valid_until=resolved.valid_until,
+            participation_policy=resolved.participation_policy,
+            access_control_bp=resolved.access_control_bp,
+            access_control_pap=resolved.access_control_pap,
+            bin_configuration=resolved.bin_configuration,
+            established=resolved.established,
+            description=resolved.description,
+        )
+        if resolved.min_bin_size is not None:
+            collection.min_bin_size = resolved.min_bin_size
+        if resolved.required_bin_capacity is not None:
+            collection.required_bin_capacity = resolved.required_bin_capacity
+        if resolved.bin_cap_ref:
+            collection.required_bin_capacity_reference = resolved.bin_cap_ref
+        collection.save()
+        collection.allowed_materials.set(resolved.allowed_materials)
+        collection.forbidden_materials.set(resolved.forbidden_materials)
+
+        if predecessor:
+            collection.predecessors.add(predecessor)
+            if not predecessor.valid_until:
+                predecessor.valid_until = resolved.valid_from - timedelta(days=1)
+                predecessor.save(update_fields=["valid_until", "lastmodified_at"])
+            stats["predecessor_links"] += 1
+
+        stats["created"] += 1
+
+        self._attach_import_references(collection, record, stats)
+        self._submit_imported_collection_for_review(collection, allow_dry_run=True)
+        self._sync_import_review_comment(collection, resolved.review_comment, stats)
+        return collection
+
+    def _attach_import_references(
+        self, collection: Collection, record: dict, stats: dict
+    ) -> tuple[bool, bool]:
+        """Attach sources and flyers; return (sources, flyers) change flags."""
+        source_urls, sources_changed = self._attach_collection_sources(
+            collection, record.get("sources") or [], stats
+        )
+        flyers_changed = self._attach_collection_flyers(
+            collection,
+            [*source_urls, *(record.get("flyer_urls") or [])],
+            stats,
+        )
+        return sources_changed, flyers_changed
+
+    def _submit_imported_collection_for_review(
+        self, collection: Collection, *, allow_dry_run: bool = False
+    ) -> None:
+        """Submit a private/declined collection for review in review mode."""
+        if self.publication_status != "review":
+            return
+        if self.dry_run and not allow_dry_run:
+            return
+        if collection.publication_status in (
+            collection.STATUS_PRIVATE,
+            collection.STATUS_DECLINED,
+        ):
+            self._submit_for_review(collection)
 
     def _attach_collection_flyers(
         self, collection: Collection, urls: list[str], stats: dict

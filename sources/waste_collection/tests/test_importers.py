@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, timedelta
 from queue import Queue
 from threading import Event
 from time import monotonic
@@ -12,7 +12,7 @@ from django.test import TestCase, TransactionTestCase
 
 from bibliography.models import Source
 from distributions.models import Period, TemporalDistribution, Timestep
-from materials.models import MaterialCategory
+from materials.models import Material, MaterialCategory
 from sources.waste_collection.importers import CollectionImporter
 from sources.waste_collection.models import (
     Collection,
@@ -276,3 +276,180 @@ class ImporterTeardownScopeTests(TestCase):
                 self.assertSetEqual(
                     set(model.objects.values_list("pk", flat=True)), pks
                 )
+
+
+class CollectionImporterRecordTests(TestCase):
+    """Characterization tests for the single-record import pipeline."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="importer-record-owner")
+        cls.catchment = CollectionCatchment.objects.create(name="Record Catchment")
+        cls.system = CollectionSystem.objects.create(name="Record System")
+        cls.other_system = CollectionSystem.objects.create(name="Other Record System")
+        cls.category = WasteCategory.objects.create(name="Record Category")
+        cls.allowed_material = Material.objects.create(
+            name="Record Allowed Material", owner=cls.owner
+        )
+        cls.forbidden_material = Material.objects.create(
+            name="Record Forbidden Material", owner=cls.owner
+        )
+        cls.valid_from = date(2099, 6, 1)
+
+    def _record(self, **overrides):
+        record = {
+            "catchment_name": self.catchment.name,
+            "collection_system": self.system.name,
+            "waste_category": self.category.name,
+            "valid_from": self.valid_from,
+            "sources": [],
+            "flyer_urls": [],
+            "property_values": [],
+        }
+        record.update(overrides)
+        return record
+
+    def _import(self, *records, **kwargs):
+        importer = CollectionImporter(owner=self.owner, **kwargs)
+        return importer.run(list(records))
+
+    def _collection(self, **filters):
+        return Collection.objects.get(catchment=self.catchment, **filters)
+
+    def test_repeated_identical_import_counts_unchanged(self):
+        stats = self._import(self._record())
+        self.assertEqual(stats["created"], 1)
+
+        stats = self._import(self._record())
+
+        self.assertEqual(stats["unchanged"], 1)
+        self.assertEqual(stats.get("updated", 0), 0)
+        self.assertEqual(Collection.objects.filter(catchment=self.catchment).count(), 1)
+
+    def test_existing_collection_update_reports_changes(self):
+        self._import(self._record())
+        frequency = CollectionFrequency.objects.create(name="Record weekly")
+
+        stats = self._import(
+            self._record(frequency=frequency.name, description="Updated")
+        )
+
+        self.assertEqual(stats.get("updated"), 1)
+        collection = self._collection()
+        self.assertEqual(collection.frequency, frequency)
+        self.assertEqual(collection.description, "Updated")
+
+    def test_same_year_reconcile_updates_distinct_system_collection(self):
+        self._import(self._record())
+
+        stats = self._import(
+            self._record(
+                collection_system=self.other_system.name,
+                reconcile_same_year_identity=True,
+            )
+        )
+
+        self.assertEqual(stats.get("updated"), 1)
+        self.assertEqual(Collection.objects.filter(catchment=self.catchment).count(), 1)
+        self.assertEqual(self._collection().collection_system, self.other_system)
+
+    def test_distinct_system_without_reconcile_creates_second_collection(self):
+        self._import(self._record())
+
+        stats = self._import(self._record(collection_system=self.other_system.name))
+
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(Collection.objects.filter(catchment=self.catchment).count(), 2)
+
+    def test_omitted_frequency_keeps_value_but_clear_frequency_removes_it(self):
+        frequency = CollectionFrequency.objects.create(name="Record weekly")
+        self._import(self._record(frequency=frequency.name))
+        self.assertEqual(self._collection().frequency, frequency)
+
+        self._import(self._record(description="Touched"))
+        self.assertEqual(self._collection().frequency, frequency)
+
+        self._import(self._record(clear_frequency=True))
+        self.assertIsNone(self._collection().frequency)
+
+    def test_different_material_lists_create_separate_collection(self):
+        self._import(self._record(allowed_materials=self.allowed_material.name))
+
+        stats = self._import(
+            self._record(
+                allowed_materials=self.forbidden_material.name,
+                forbidden_materials=self.allowed_material.name,
+            )
+        )
+
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(Collection.objects.filter(catchment=self.catchment).count(), 2)
+
+    def test_identical_material_lists_survive_update(self):
+        self._import(
+            self._record(
+                allowed_materials=self.allowed_material.name,
+                forbidden_materials=self.forbidden_material.name,
+            )
+        )
+
+        stats = self._import(
+            self._record(
+                allowed_materials=self.allowed_material.name,
+                forbidden_materials=self.forbidden_material.name,
+                description="Touched",
+            )
+        )
+
+        self.assertEqual(stats.get("updated"), 1)
+        collection = self._collection()
+        self.assertEqual(
+            list(collection.allowed_materials.all()), [self.allowed_material]
+        )
+        self.assertEqual(
+            list(collection.forbidden_materials.all()), [self.forbidden_material]
+        )
+
+    def test_predecessor_is_linked_and_valid_until_updated(self):
+        previous_valid_from = date(2098, 1, 1)
+        self._import(self._record(valid_from=previous_valid_from))
+        predecessor = self._collection(valid_from=previous_valid_from)
+        self.assertIsNone(predecessor.valid_until)
+
+        stats = self._import(self._record())
+
+        self.assertEqual(stats["predecessor_links"], 1)
+        predecessor.refresh_from_db()
+        self.assertEqual(predecessor.valid_until, self.valid_from - timedelta(days=1))
+        collection = self._collection(valid_from=self.valid_from)
+        self.assertIn(predecessor, collection.predecessors.all())
+
+    def test_update_path_syncs_sources_and_review_comment(self):
+        self._import(self._record(sources=["Source A"], review_comment="first"))
+        collection = self._collection()
+        self.assertEqual({s.title for s in collection.sources.all()}, {"Source A"})
+
+        stats = self._import(
+            self._record(sources=["Source B"], review_comment="second")
+        )
+
+        self.assertEqual(stats.get("updated"), 1)
+        self.assertEqual({s.title for s in collection.sources.all()}, {"Source B"})
+        comment = ReviewAction.for_object(collection).get(
+            action=ReviewAction.ACTION_COMMENT,
+            user=self.owner,
+        )
+        self.assertIn("second", comment.comment)
+
+    def test_review_comment_only_change_is_not_counted_as_update(self):
+        self._import(self._record(review_comment="first"))
+
+        stats = self._import(self._record(review_comment="second"))
+
+        self.assertEqual(stats["unchanged"], 1)
+        self.assertEqual(stats["review_comments_created"], 1)
+        comment = ReviewAction.for_object(self._collection()).get(
+            action=ReviewAction.ACTION_COMMENT,
+            user=self.owner,
+        )
+        self.assertIn("second", comment.comment)
