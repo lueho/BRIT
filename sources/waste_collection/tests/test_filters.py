@@ -968,6 +968,21 @@ class CollectionFilterTestCase(TestCase):
         self.assertNotIn(self.child_collection, qs)
         self.assertIn(self.predecessor_collection, qs)
 
+    def test_filter_valid_on_delegates_to_queryset_method(self):
+        """The filter must reuse CollectionQuerySet.valid_on instead of
+        reimplementing the validity-window logic (#246)."""
+        from unittest.mock import patch
+
+        qs = Collection.objects.all()
+        target_date = timezone.now().date()
+        with patch.object(
+            type(qs), "valid_on", return_value=Collection.objects.none()
+        ) as mock_valid_on:
+            result = CollectionFilterSet.filter_valid_on(qs, None, target_date)
+
+        mock_valid_on.assert_called_once_with(target_date)
+        self.assertFalse(result.exists())
+
     def test_required_bin_capacity_filter(self):
         # Filter by required_bin_capacity in range 200-400 (inclusive)
         data = {"required_bin_capacity_min": 200, "required_bin_capacity_max": 400}
