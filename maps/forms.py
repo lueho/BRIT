@@ -444,7 +444,7 @@ class RegionMergeForm(SimpleForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["region"].queryset = Region.objects.filter(
-            pk__in=Subquery(LauRegion.objects.all().values("pk"))
+            pk__in=Subquery(LauRegion.objects.current().values("pk"))
         )
 
 

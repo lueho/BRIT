@@ -11,7 +11,7 @@ from django.contrib.postgres.fields import DateRangeField, RangeOperators
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
-from django.db.models import F, Func, Q
+from django.db.models import F, Func, OuterRef, Q, Subquery
 from django.db.models.signals import m2m_changed, post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.urls import NoReverseMatch, reverse
@@ -561,7 +561,34 @@ class NutsRegion(Region):
         ]
 
 
+class LauRegionQuerySet(UserCreatedObjectQuerySet):
+    def current(self):
+        """Newest-vintage row per (cntr_code, lau_id).
+
+        Rows with year=NULL (unversioned loads) stay visible only when no
+        versioned twin of the same code exists, so adding a second LAU
+        vintage does not duplicate picker entries.
+        """
+        newest = (
+            LauRegion.objects.filter(
+                cntr_code=OuterRef("cntr_code"), lau_id=OuterRef("lau_id")
+            )
+            .order_by(F("year").desc(nulls_last=True))
+            .values("year")[:1]
+        )
+        return self.annotate(_lau_latest=Subquery(newest)).filter(
+            Q(lau_id__isnull=True)
+            | Q(year=F("_lau_latest"))
+            | Q(year__isnull=True, _lau_latest__isnull=True)
+        )
+
+
+class LauRegionManager(models.Manager.from_queryset(LauRegionQuerySet)):
+    pass
+
+
 class LauRegion(Region):
+    objects = LauRegionManager()
     cntr_code = models.CharField(max_length=2, blank=True, null=True)
     lau_id = models.CharField(max_length=13, blank=True, null=True)
     lau_name = models.CharField(max_length=113, blank=True, null=True)

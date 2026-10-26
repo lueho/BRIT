@@ -1560,6 +1560,38 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(item["text"], "Test Region 1 (123)")
 
+    def test_only_newest_vintage_row_per_lau_id_in_queryset(self):
+        LauRegion.objects.create(
+            name="Salzgitter 2021",
+            lau_id="03102000",
+            cntr_code="DE",
+            year=2021,
+            publication_status="published",
+        )
+        lau_2025 = LauRegion.objects.create(
+            name="Salzgitter 2025",
+            lau_id="03102000",
+            cntr_code="DE",
+            year=2025,
+            publication_status="published",
+        )
+        response = self.client.get(self.url, data={"q": "Salzgitter"})
+        self.assertEqual(200, response.status_code)
+        ids = [r["id"] for r in json.loads(response.content)["results"]]
+        self.assertListEqual([lau_2025.pk], ids)
+
+    def test_unversioned_row_shown_when_no_versioned_twin(self):
+        lau_old = LauRegion.objects.create(
+            name="Old Only",
+            lau_id="999",
+            cntr_code="NL",
+            year=None,
+            publication_status="published",
+        )
+        response = self.client.get(self.url, data={"q": "Old Only"})
+        ids = [r["id"] for r in json.loads(response.content)["results"]]
+        self.assertIn(lau_old.pk, ids)
+
 
 class RegionAutocompleteEnglishNameTestCase(ViewWithPermissionsTestCase):
     url = reverse("region-autocomplete")

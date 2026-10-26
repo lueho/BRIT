@@ -1505,7 +1505,9 @@ class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):
         """
         Filter Regions to only show those that have a corresponding LAU Region.
         """
-        return queryset.filter(pk__in=Subquery(LauRegion.objects.all().values("pk")))
+        return queryset.filter(
+            pk__in=Subquery(LauRegion.objects.current().values("pk"))
+        )
 
     def hook_prepare_results(self, results):
         """
