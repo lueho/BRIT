@@ -1478,9 +1478,30 @@ class CompositionTestCase(StandardSampleSeriesTestCase):
         self.assertEqual(self.composition.timestep, Timestep.objects.default())
         self.assertEqual(self.composition.owner, self.user)
 
+    def test_duplicate_sample_group_rejected(self):
+        """#170: at most one Composition per (sample, group) — a second row for
+        the same pair would create ambiguous component-group buckets."""
+        self.composition.publication_status = "published"
+        self.composition.save()
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Composition.objects.create(
+                    owner=self.user,
+                    group=self.default_group,
+                    sample=self.sample0,
+                    fractions_of=self.default_component,
+                    publication_status="published",
+                )
+
     def test_duplicate_creates_new_instance_with_identical_field_values(self):
         creator = User.objects.create(username="creator")
-        duplicate = self.composition.duplicate(creator)
+        with mute_signals(signals.post_save):
+            target_sample = Sample.objects.create(
+                material=self.material1,
+                series=self.sample_series,
+                timestep=self.timestep2,
+            )
+        duplicate = self.composition.duplicate(creator, sample=target_sample)
         self.assertIsInstance(duplicate, Composition)
         self.assertNotEqual(self.composition, duplicate)
         self.assertEqual(duplicate.owner, creator)
@@ -1490,17 +1511,19 @@ class CompositionTestCase(StandardSampleSeriesTestCase):
                 "owner",
                 "created_at",
                 "lastmodified_at",
+                "sample",
             ]:
                 self.assertEqual(
                     getattr(duplicate, field.name),
                     getattr(self.composition, field.name),
                 )
+        self.assertEqual(duplicate.sample, target_sample)
 
     def test_add_next_order_value(self):
         self.assertEqual(self.composition.order, 100)
         second_composition = Composition.objects.create(
             owner=self.user,
-            group=self.default_group,
+            group=self.custom_group,
             sample=self.sample0,
             fractions_of=self.default_component,
         )
@@ -1510,7 +1533,7 @@ class CompositionTestCase(StandardSampleSeriesTestCase):
         self.assertEqual(self.composition.order, 100)
         second_composition = Composition.objects.create(
             owner=self.user,
-            group=self.default_group,
+            group=self.custom_group,
             sample=self.sample0,
             fractions_of=self.default_component,
         )
@@ -1530,7 +1553,7 @@ class CompositionTestCase(StandardSampleSeriesTestCase):
         self.assertEqual(self.composition.order, 100)
         second_composition = Composition.objects.create(
             owner=self.user,
-            group=self.default_group,
+            group=self.custom_group,
             sample=self.sample0,
             fractions_of=self.default_component,
         )
@@ -1550,7 +1573,7 @@ class CompositionTestCase(StandardSampleSeriesTestCase):
         """order_up must swap both orders inside a single transaction."""
         second_composition = Composition.objects.create(
             owner=self.user,
-            group=self.default_group,
+            group=self.custom_group,
             sample=self.sample0,
             fractions_of=self.default_component,
         )
@@ -1568,7 +1591,7 @@ class CompositionTestCase(StandardSampleSeriesTestCase):
         """order_down must swap both orders inside a single transaction."""
         second_composition = Composition.objects.create(
             owner=self.user,
-            group=self.default_group,
+            group=self.custom_group,
             sample=self.sample0,
             fractions_of=self.default_component,
         )

@@ -1074,6 +1074,20 @@ class CollectionPropertyValue(PropertyValue):
                 condition=Q(is_derived=True, year__isnull=True),
                 name="soilcom_unique_derived_cpv_per_key_null_year",
             ),
+            models.UniqueConstraint(
+                fields=["collection", "property", "year", "unit"],
+                condition=Q(is_derived=False, publication_status="published"),
+                name="soilcom_unique_manual_cpv_per_key_unit",
+            ),
+            models.UniqueConstraint(
+                fields=["collection", "property", "unit"],
+                condition=Q(
+                    is_derived=False,
+                    year__isnull=True,
+                    publication_status="published",
+                ),
+                name="soilcom_unique_manual_cpv_per_key_unit_null_year",
+            ),
         ]
         indexes = [
             models.Index(
