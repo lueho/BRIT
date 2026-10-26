@@ -27,7 +27,7 @@ from sources.waste_collection.models import CollectionCatchment
 
 from .. import checks
 from ..models import ObjectEditorGrant, UserCreatedObject
-from ..policy import decide, scope_queryset, visible_queryset
+from ..policy import decide, decide_reassign, scope_queryset, visible_queryset
 from ..registry import (
     KIND_OWNED,
     KIND_REVIEWABLE,
@@ -295,6 +295,13 @@ class MultiHopOwnedChildTests(TestCase):
         decision = decide(self.owner, "read", orphan)
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, "invalid_parent")
+
+    def test_reassign_to_missing_or_unsupported_parent_is_denied(self):
+        for parent in (None, 42, "timestepset", []):
+            with self.subTest(parent=parent):
+                decision = decide_reassign(self.owner, self.share, parent)
+                self.assertFalse(decision.allowed)
+                self.assertEqual(decision.reason, "invalid_parent")
 
     def test_multi_hop_queryset_visibility_and_scopes(self):
         shares = GrowthShare.objects.filter(pk=self.share.pk)

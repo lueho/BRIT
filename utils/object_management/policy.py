@@ -563,7 +563,12 @@ def decide_reassign(user, obj, parent) -> Decision:
         return _denied("authentication_required")
     if getattr(obj, "pk", None) is None:
         return _denied("invalid_parent")
-    parents = (parent,) if isinstance(parent, Model) else tuple(parent)
+    if isinstance(parent, Model):
+        parents = (parent,)
+    elif isinstance(parent, (list, tuple)):
+        parents = tuple(parent)
+    else:
+        return _denied("invalid_parent")
     if not parents:
         return _denied("invalid_parent")
     expected_root = root_model(type(obj), policy.parent_path)
