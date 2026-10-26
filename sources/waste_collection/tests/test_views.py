@@ -70,12 +70,6 @@ from sources.waste_collection.tasks import (
     check_wasteflyer_urls,
     check_wasteflyer_urls_callback,
 )
-from sources.waste_collection.views import (
-    CollectionApproveItemView,
-    CollectionRejectItemView,
-    CollectionSubmitForReviewView,
-    CollectionWithdrawFromReviewView,
-)
 from sources.waste_collection.waste_atlas.map_configs import MAP_CONFIGS
 from sources.waste_collection.waste_atlas.map_selection import (
     WASTE_ATLAS_MAP_SELECTIONS,
@@ -92,6 +86,7 @@ from utils.object_management.models import (
     ReviewAction,
     get_default_owner,
 )
+from utils.object_management.services import perform_transition
 from utils.properties.models import Property, Unit
 from utils.tests.testcases import (
     AbstractTestCases,
@@ -4952,11 +4947,23 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
         self.assertContains(response, 'id="sel-scope"')
         self.assertContains(response, 'value="mine" selected')
         self.assertNotContains(response, 'value="all"')
-        self.assertNotContains(response, 'value="review"')
+        # Any active actor may open the review scope; core visibility keeps
+        # the returned rows restricted.
+        self.assertContains(response, 'value="review"')
         self.assertEqual(self._map_config(response)["scope"], "mine")
 
+        # Unauthorized scopes are forwarded but yield no data — the page may
+        # still render.
         response = self.client.get(url, {"scope": "all"})
-        self.assertEqual(self._map_config(response)["scope"], "published")
+        self.assertEqual(self._map_config(response)["scope"], "all")
+        self.assertNotContains(response, 'value="all"')
+        self.assertEqual(
+            self.client.get(
+                reverse("api-waste-atlas-collection-system-list"),
+                {"country": "DE", "year": 2024, "scope": "all"},
+            ).json(),
+            [],
+        )
 
         moderator = User.objects.create_user("atlas-moderator")
         moderator.user_permissions.add(
@@ -4973,6 +4980,27 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
 
         staff = User.objects.create_user("atlas-staff", is_staff=True)
         self.client.force_login(staff)
+        response = self.client.get(url, {"scope": "all"})
+        # Plain staff is not an administrator: no All option, and the
+        # forwarded scope resolves to no records.
+        self.assertNotContains(response, 'value="all"')
+        self.assertEqual(self._map_config(response)["scope"], "all")
+        self.assertEqual(
+            self.client.get(
+                reverse("api-waste-atlas-collection-system-list"),
+                {"country": "DE", "year": 2024, "scope": "all"},
+            ).json(),
+            [],
+        )
+
+        admin = User.objects.create_user("atlas-admin")
+        admin.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type=ContentType.objects.get_for_model(ReviewAction),
+            )
+        )
+        self.client.force_login(admin)
         response = self.client.get(url, {"scope": "all"})
         self.assertContains(response, 'value="all" selected')
         self.assertEqual(self._map_config(response)["scope"], "all")
@@ -5365,14 +5393,37 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
         self.assertContains(response, '<option value="2020"')
         self.assertContains(response, '<option value="2022"')
 
-    def test_data_conflicts_overview_renders_for_staff(self):
-        self._login_staff()
+    # ---- data conflicts overview tests ------------------------------------
+
+    def _login_staff(self):
+        self.client.force_login(
+            User.objects.create_user(username="conflicts-staff", is_staff=True)
+        )
+
+    def _login_admin(self):
+        admin = User.objects.create_user(username="conflicts-admin")
+        admin.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type=ContentType.objects.get_for_model(ReviewAction),
+            )
+        )
+        self.client.force_login(admin)
+
+    def test_data_conflicts_overview_renders_for_administrators(self):
+        self._login_admin()
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
 
         self.assertEqual(response.status_code, 200)
 
-    def test_data_conflicts_overview_links_back_to_map_overview(self):
+    def test_data_conflicts_overview_denies_plain_staff(self):
         self._login_staff()
+        response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_data_conflicts_overview_links_back_to_map_overview(self):
+        self._login_admin()
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
 
         self.assertEqual(response.status_code, 200)
@@ -5429,7 +5480,7 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
 
         self.assertEqual(response.status_code, 200)
 
-    def test_overview_shows_maintainer_links_only_for_staff(self):
+    def test_overview_shows_maintainer_links_only_for_administrators(self):
         response = self.client.get(reverse("waste-atlas-overview"))
         self.assertEqual(response.status_code, 200)
         self.assertRegex(
@@ -5443,6 +5494,20 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
 
         staff = User.objects.create_user(username="atlas-staff", is_staff=True)
         self.client.force_login(staff)
+
+        response = self.client.get(reverse("waste-atlas-overview"))
+        self.assertNotContains(response, 'id="atlas-tools-menu"')
+        self.assertNotContains(response, reverse("waste-atlas-change-map-overview"))
+        self.assertNotContains(response, reverse("waste-atlas-data-conflicts-overview"))
+
+        admin = User.objects.create_user(username="atlas-admin", password="secret")
+        admin.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type=ContentType.objects.get_for_model(ReviewAction),
+            )
+        )
+        self.client.force_login(admin)
 
         response = self.client.get(reverse("waste-atlas-overview"))
         self.assertNotContains(response, 'id="atlas-tools-menu"')
@@ -5534,7 +5599,7 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
         """The data-conflicts overview surfaces every map whose config opts
         into the maintainer conflict-overlay aid (currently the
         collection_system theme across all regional map sets)."""
-        self._login_staff()
+        self._login_admin()
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
 
         self.assertEqual(response.status_code, 200)
@@ -5898,14 +5963,15 @@ class WasteAtlasPopulationViewSetTests(TestCase):
         )
 
 
-class CollectionCascadeMixinTestCase(TestCase):
-    """Test the CollectionReviewActionCascadeMixin functionality."""
+class CollectionIndependentLifecycleTests(TestCase):
+    """Independent lifecycle regression: collection transitions must not
+    cascade to CollectionPropertyValue/AggregatedCollectionPropertyValue
+    evidence rows — each has its own governed review lifecycle."""
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
 
-        # Create users
         cls.owner = User.objects.create_user(
             username="owner",
             email="owner@test.com",
@@ -5914,11 +5980,16 @@ class CollectionCascadeMixinTestCase(TestCase):
             username="other",
             email="other@test.com",
         )
+        cls.moderator = User.objects.create_user(
+            username="moderator", email="moderator@test.com"
+        )
+        cls.moderator.user_permissions.add(
+            Permission.objects.get(codename="can_moderate_collection")
+        )
         cls.staff = User.objects.create_user(
             username="staff", email="staff@test.com", is_staff=True
         )
 
-        # Create base data
         cls.catchment = CollectionCatchment.objects.create(
             name="Test Catchment", publication_status="published"
         )
@@ -5929,7 +6000,6 @@ class CollectionCascadeMixinTestCase(TestCase):
             name="Test Category", publication_status="published"
         )
 
-        # Create properties
         cls.prop1 = Property.objects.create(
             name="Property 1", publication_status="published"
         )
@@ -5941,10 +6011,7 @@ class CollectionCascadeMixinTestCase(TestCase):
         cls.prop1.allowed_units.add(cls.unit1)
         cls.prop2.allowed_units.add(cls.unit2)
 
-        cls.factory = RequestFactory()
-
     def _create_collection(self, name, owner, status="private", valid_from=None):
-        """Helper to create a collection."""
         return Collection.objects.create(
             name=name,
             catchment=self.catchment,
@@ -5956,7 +6023,6 @@ class CollectionCascadeMixinTestCase(TestCase):
         )
 
     def _create_cpv(self, collection, prop, unit, owner, status="private", **kwargs):
-        """Helper to create a collection property value."""
         return CollectionPropertyValue.objects.create(
             collection=collection,
             property=prop,
@@ -5968,7 +6034,6 @@ class CollectionCascadeMixinTestCase(TestCase):
         )
 
     def _create_acpv(self, collections, prop, unit, owner, status="private", **kwargs):
-        """Helper to create an aggregated collection property value."""
         acpv = AggregatedCollectionPropertyValue.objects.create(
             property=prop,
             unit=unit,
@@ -5980,12 +6045,13 @@ class CollectionCascadeMixinTestCase(TestCase):
         acpv.collections.set(collections)
         return acpv
 
+    def _review_action_count(self, obj):
+        return ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(obj),
+            object_id=obj.pk,
+        ).count()
 
-class SubmitCascadeMixinTest(CollectionCascadeMixinTestCase):
-    """Test submit_for_review cascade via CollectionSubmitForReviewView."""
-
-    def test_submit_cascades_to_owner_cpvs(self):
-        """Submit cascades to owner's private and declined CPVs."""
+    def test_submit_leaves_owner_cpvs_unchanged(self):
         collection = self._create_collection("C1", self.owner, status="private")
         cpv_private = self._create_cpv(
             collection, self.prop1, self.unit1, self.owner, "private", year=2020
@@ -5997,71 +6063,48 @@ class SubmitCascadeMixinTest(CollectionCascadeMixinTestCase):
             collection, self.prop1, self.unit1, self.owner, "published", year=2022
         )
 
-        request = self.factory.post("/")
-        request.user = self.owner
+        perform_transition(self.owner, collection, "submit")
 
-        view = CollectionSubmitForReviewView()
-        view.request = request
-        view.object = collection
-        view.action_attr_name = "submit_for_review"
-        view.post_action_hook(request, "private")
+        collection.refresh_from_db()
+        self.assertEqual(collection.publication_status, "review")
+        for cpv, status in (
+            (cpv_private, "private"),
+            (cpv_declined, "declined"),
+            (cpv_published, "published"),
+        ):
+            cpv.refresh_from_db()
+            self.assertEqual(cpv.publication_status, status)
+            self.assertEqual(self._review_action_count(cpv), 0)
 
-        cpv_private.refresh_from_db()
-        cpv_declined.refresh_from_db()
-        cpv_published.refresh_from_db()
-
-        self.assertEqual(cpv_private.publication_status, "review")
-        self.assertEqual(cpv_declined.publication_status, "review")
-        self.assertEqual(cpv_published.publication_status, "published")  # Unchanged
-
-    def test_submit_includes_collaborator_cpvs(self):
-        """Submit cascades to all CPVs on owner's collection, including collaborators' CPVs."""
+    def test_submit_leaves_collaborator_cpvs_unchanged(self):
         collection = self._create_collection("C1", self.owner, status="private")
         cpv_owner = self._create_cpv(
             collection, self.prop1, self.unit1, self.owner, "private"
         )
-        # Other user contributed a CPV to owner's collection
         cpv_other = self._create_cpv(
             collection, self.prop2, self.unit2, self.other_owner, "private"
         )
 
-        request = self.factory.post("/")
-        request.user = self.owner
-
-        view = CollectionSubmitForReviewView()
-        view.request = request
-        view.object = collection
-        view.action_attr_name = "submit_for_review"
-        view.post_action_hook(request, "private")
+        perform_transition(self.owner, collection, "submit")
 
         cpv_owner.refresh_from_db()
         cpv_other.refresh_from_db()
+        self.assertEqual(cpv_owner.publication_status, "private")
+        self.assertEqual(cpv_other.publication_status, "private")
 
-        # Both cascade because they're on the owner's collection
-        self.assertEqual(cpv_owner.publication_status, "review")
-        self.assertEqual(cpv_other.publication_status, "review")  # Also cascaded
-
-    def test_submit_cascades_to_acpvs(self):
-        """Submit cascades to owner's aggregated property values."""
+    def test_submit_leaves_acpvs_unchanged(self):
         collection = self._create_collection("C1", self.owner, status="private")
         acpv = self._create_acpv(
             [collection], self.prop1, self.unit1, self.owner, "private"
         )
 
-        request = self.factory.post("/")
-        request.user = self.owner
-
-        view = CollectionSubmitForReviewView()
-        view.request = request
-        view.object = collection
-        view.action_attr_name = "submit_for_review"
-        view.post_action_hook(request, "private")
+        perform_transition(self.owner, collection, "submit")
 
         acpv.refresh_from_db()
-        self.assertEqual(acpv.publication_status, "review")
+        self.assertEqual(acpv.publication_status, "private")
+        self.assertEqual(self._review_action_count(acpv), 0)
 
-    def test_submit_cascades_across_version_chain(self):
-        """Submit cascades to CPVs on all versions in the chain."""
+    def test_submit_leaves_version_chain_cpvs_unchanged(self):
         v1 = self._create_collection("V1", self.owner, "published", date(2020, 1, 1))
         v2 = self._create_collection("V2", self.owner, "published", date(2021, 1, 1))
         v3 = self._create_collection("V3", self.owner, "private", date(2022, 1, 1))
@@ -6072,46 +6115,29 @@ class SubmitCascadeMixinTest(CollectionCascadeMixinTestCase):
         cpv2 = self._create_cpv(v2, self.prop1, self.unit1, self.owner, "declined")
         cpv3 = self._create_cpv(v3, self.prop1, self.unit1, self.owner, "private")
 
-        request = self.factory.post("/")
-        request.user = self.owner
+        perform_transition(self.owner, v3, "submit")
 
-        view = CollectionSubmitForReviewView()
-        view.request = request
-        view.object = v3
-        view.action_attr_name = "submit_for_review"
-        view.post_action_hook(request, "private")
+        for cpv, status in (
+            (cpv1, "private"),
+            (cpv2, "declined"),
+            (cpv3, "private"),
+        ):
+            cpv.refresh_from_db()
+            self.assertEqual(cpv.publication_status, status)
 
-        cpv1.refresh_from_db()
-        cpv2.refresh_from_db()
-        cpv3.refresh_from_db()
-
-        self.assertEqual(cpv1.publication_status, "review")
-        self.assertEqual(cpv2.publication_status, "review")
-        self.assertEqual(cpv3.publication_status, "review")
-
-
-class WithdrawCascadeMixinTest(CollectionCascadeMixinTestCase):
-    """Test withdraw_from_review cascade via CollectionWithdrawFromReviewView."""
-
-    def test_withdraw_cascades_to_owner_cpvs(self):
-        """Withdraw cascades to owner's CPVs in review."""
+    def test_withdraw_leaves_owner_cpvs_unchanged(self):
         collection = self._create_collection("C1", self.owner, status="review")
         cpv = self._create_cpv(collection, self.prop1, self.unit1, self.owner, "review")
 
-        request = self.factory.post("/")
-        request.user = self.owner
+        perform_transition(self.owner, collection, "withdraw")
 
-        view = CollectionWithdrawFromReviewView()
-        view.request = request
-        view.object = collection
-        view.action_attr_name = "withdraw_from_review"
-        view.post_action_hook(request, "review")
-
+        collection.refresh_from_db()
+        self.assertEqual(collection.publication_status, "private")
         cpv.refresh_from_db()
-        self.assertEqual(cpv.publication_status, "private")
+        self.assertEqual(cpv.publication_status, "review")
+        self.assertEqual(self._review_action_count(cpv), 0)
 
-    def test_withdraw_includes_collaborator_cpvs(self):
-        """Withdraw cascades to all CPVs on owner's collection, including collaborators'."""
+    def test_withdraw_leaves_collaborator_cpvs_unchanged(self):
         collection = self._create_collection("C1", self.owner, status="review")
         cpv_owner = self._create_cpv(
             collection, self.prop1, self.unit1, self.owner, "review"
@@ -6120,28 +6146,14 @@ class WithdrawCascadeMixinTest(CollectionCascadeMixinTestCase):
             collection, self.prop2, self.unit2, self.other_owner, "review"
         )
 
-        request = self.factory.post("/")
-        request.user = self.owner
-
-        view = CollectionWithdrawFromReviewView()
-        view.request = request
-        view.object = collection
-        view.action_attr_name = "withdraw_from_review"
-        view.post_action_hook(request, "review")
+        perform_transition(self.owner, collection, "withdraw")
 
         cpv_owner.refresh_from_db()
         cpv_other.refresh_from_db()
+        self.assertEqual(cpv_owner.publication_status, "review")
+        self.assertEqual(cpv_other.publication_status, "review")
 
-        # Both cascade because they're on the owner's collection
-        self.assertEqual(cpv_owner.publication_status, "private")
-        self.assertEqual(cpv_other.publication_status, "private")  # Also cascaded
-
-
-class ApproveCascadeMixinTest(CollectionCascadeMixinTestCase):
-    """Test approve cascade via CollectionApproveItemView."""
-
-    def test_approve_cascades_to_all_cpvs_in_review(self):
-        """Approve cascades to ALL CPVs in review, regardless of owner."""
+    def test_approve_leaves_review_cpvs_unchanged(self):
         collection = self._create_collection("C1", self.owner, status="review")
         cpv_owner = self._create_cpv(
             collection, self.prop1, self.unit1, self.owner, "review"
@@ -6150,46 +6162,41 @@ class ApproveCascadeMixinTest(CollectionCascadeMixinTestCase):
             collection, self.prop2, self.unit2, self.other_owner, "review"
         )
 
-        request = self.factory.post("/")
-        request.user = self.staff
+        collection.refresh_from_db()
+        perform_transition(
+            self.moderator,
+            collection,
+            "approve",
+            expected_revision=collection.content_revision,
+        )
 
-        view = CollectionApproveItemView()
-        view.request = request
-        view.object = collection
-        view.action_attr_name = "approve"
-        view.post_action_hook(request, "review")
+        collection.refresh_from_db()
+        self.assertEqual(collection.publication_status, "published")
+        for cpv in (cpv_owner, cpv_other):
+            cpv.refresh_from_db()
+            self.assertEqual(cpv.publication_status, "review")
+            self.assertIsNone(cpv.approved_by)
+            self.assertEqual(self._review_action_count(cpv), 0)
 
-        cpv_owner.refresh_from_db()
-        cpv_other.refresh_from_db()
-
-        # Both should be approved
-        self.assertEqual(cpv_owner.publication_status, "published")
-        self.assertEqual(cpv_other.publication_status, "published")
-        self.assertEqual(cpv_owner.approved_by, self.staff)
-        self.assertEqual(cpv_other.approved_by, self.staff)
-
-    def test_approve_cascades_to_acpvs(self):
-        """Approve cascades to aggregated property values."""
+    def test_approve_leaves_acpvs_unchanged(self):
         collection = self._create_collection("C1", self.owner, status="review")
         acpv = self._create_acpv(
             [collection], self.prop1, self.unit1, self.owner, "review"
         )
 
-        request = self.factory.post("/")
-        request.user = self.staff
-
-        view = CollectionApproveItemView()
-        view.request = request
-        view.object = collection
-        view.action_attr_name = "approve"
-        view.post_action_hook(request, "review")
+        collection.refresh_from_db()
+        perform_transition(
+            self.moderator,
+            collection,
+            "approve",
+            expected_revision=collection.content_revision,
+        )
 
         acpv.refresh_from_db()
-        self.assertEqual(acpv.publication_status, "published")
-        self.assertEqual(acpv.approved_by, self.staff)
+        self.assertEqual(acpv.publication_status, "review")
+        self.assertIsNone(acpv.approved_by)
 
-    def test_approve_cascades_across_version_chain(self):
-        """Approve cascades to CPVs on all versions."""
+    def test_approve_leaves_version_chain_cpvs_unchanged(self):
         v1 = self._create_collection("V1", self.owner, "published", date(2020, 1, 1))
         v2 = self._create_collection("V2", self.owner, "review", date(2021, 1, 1))
         v2.predecessors.add(v1)
@@ -6197,27 +6204,17 @@ class ApproveCascadeMixinTest(CollectionCascadeMixinTestCase):
         cpv1 = self._create_cpv(v1, self.prop1, self.unit1, self.owner, "review")
         cpv2 = self._create_cpv(v2, self.prop1, self.unit1, self.owner, "review")
 
-        request = self.factory.post("/")
-        request.user = self.staff
-
-        view = CollectionApproveItemView()
-        view.request = request
-        view.object = v2
-        view.action_attr_name = "approve"
-        view.post_action_hook(request, "review")
+        v2.refresh_from_db()
+        perform_transition(
+            self.moderator, v2, "approve", expected_revision=v2.content_revision
+        )
 
         cpv1.refresh_from_db()
         cpv2.refresh_from_db()
+        self.assertEqual(cpv1.publication_status, "review")
+        self.assertEqual(cpv2.publication_status, "review")
 
-        self.assertEqual(cpv1.publication_status, "published")
-        self.assertEqual(cpv2.publication_status, "published")
-
-
-class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
-    """Test reject cascade via CollectionRejectItemView."""
-
-    def test_reject_cascades_to_all_cpvs_in_review(self):
-        """Reject cascades to ALL CPVs in review, regardless of owner."""
+    def test_reject_leaves_review_cpvs_unchanged(self):
         collection = self._create_collection("C1", self.owner, status="review")
         cpv_owner = self._create_cpv(
             collection, self.prop1, self.unit1, self.owner, "review"
@@ -6226,43 +6223,27 @@ class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
             collection, self.prop2, self.unit2, self.other_owner, "review"
         )
 
-        request = self.factory.post("/")
-        request.user = self.staff
+        perform_transition(self.moderator, collection, "reject")
 
-        view = CollectionRejectItemView()
-        view.request = request
-        view.object = collection
-        view.action_attr_name = "reject"
-        view.post_action_hook(request, "review")
+        collection.refresh_from_db()
+        self.assertEqual(collection.publication_status, "declined")
+        for cpv in (cpv_owner, cpv_other):
+            cpv.refresh_from_db()
+            self.assertEqual(cpv.publication_status, "review")
+            self.assertEqual(self._review_action_count(cpv), 0)
 
-        cpv_owner.refresh_from_db()
-        cpv_other.refresh_from_db()
-
-        # Both should be rejected
-        self.assertEqual(cpv_owner.publication_status, "declined")
-        self.assertEqual(cpv_other.publication_status, "declined")
-
-    def test_reject_cascades_to_acpvs(self):
-        """Reject cascades to aggregated property values."""
+    def test_reject_leaves_acpvs_unchanged(self):
         collection = self._create_collection("C1", self.owner, status="review")
         acpv = self._create_acpv(
             [collection], self.prop1, self.unit1, self.owner, "review"
         )
 
-        request = self.factory.post("/")
-        request.user = self.staff
-
-        view = CollectionRejectItemView()
-        view.request = request
-        view.object = collection
-        view.action_attr_name = "reject"
-        view.post_action_hook(request, "review")
+        perform_transition(self.moderator, collection, "reject")
 
         acpv.refresh_from_db()
-        self.assertEqual(acpv.publication_status, "declined")
+        self.assertEqual(acpv.publication_status, "review")
 
-    def test_reject_cascades_across_version_chain(self):
-        """Reject cascades to CPVs on all versions."""
+    def test_reject_leaves_version_chain_cpvs_unchanged(self):
         v1 = self._create_collection("V1", self.owner, "published", date(2020, 1, 1))
         v2 = self._create_collection("V2", self.owner, "review", date(2021, 1, 1))
         v2.predecessors.add(v1)
@@ -6270,20 +6251,12 @@ class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
         cpv1 = self._create_cpv(v1, self.prop1, self.unit1, self.owner, "review")
         cpv2 = self._create_cpv(v2, self.prop1, self.unit1, self.owner, "review")
 
-        request = self.factory.post("/")
-        request.user = self.staff
-
-        view = CollectionRejectItemView()
-        view.request = request
-        view.object = v2
-        view.action_attr_name = "reject"
-        view.post_action_hook(request, "review")
+        perform_transition(self.moderator, v2, "reject")
 
         cpv1.refresh_from_db()
         cpv2.refresh_from_db()
-
-        self.assertEqual(cpv1.publication_status, "declined")
-        self.assertEqual(cpv2.publication_status, "declined")
+        self.assertEqual(cpv1.publication_status, "review")
+        self.assertEqual(cpv2.publication_status, "review")
 
 
 class ReviewSubmissionConsistencyTests(TestCase):
@@ -6518,6 +6491,7 @@ class ReviewSubmissionConsistencyTests(TestCase):
                     "object_id": self.collection.pk,
                 },
             ),
+            data={"expected_revision": self.collection.content_revision},
             follow=True,
         )
         self.assertEqual(response.status_code, 200)

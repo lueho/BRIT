@@ -18,7 +18,7 @@
         <i class="fas fa-exchange-alt"></i> Transfer
       </button>
     </div>
-    <div class="form-text">The new owner gains full control of this item.</div>
+    <div class="form-text">The new owner gains ownership of this item. Editing additionally requires the model's change permission, and published or archived items stay frozen for the new owner too.</div>
   </form>
   <h6>Direct user grants</h6>
   {% if editors %}
@@ -58,6 +58,7 @@
         <i class="fas fa-user-plus"></i> Add user
       </button>
     </div>
+    <div class="form-text">The user can only edit if they also hold this record type's change permission.</div>
   </form>
   <h6>Group grants</h6>
   {% if editor_groups %}
@@ -98,10 +99,10 @@
         <i class="fas fa-user-group"></i> Add group
       </button>
     </div>
-    <div class="form-text">Current and future group members inherit this grant. Group membership and permissions are not changed.</div>
+    <div class="form-text">This grant applies to the group — current and future members inherit it. A member can only edit if they also hold this record type's change permission, so group membership alone does not guarantee effective edit access.</div>
   </form>
   <p class="text-muted small mt-3 mb-0">
-    Recipients can read this item. Editing also requires the relevant change permission and an unpublished, non-archived item.
+    Recipients can read this item. Editing also requires the relevant change permission and an editable lifecycle state (private, review, or declined); published and archived items are frozen.
     Removing one grant does not remove access provided by other grants or roles.
   </p>
 {% endblock %}

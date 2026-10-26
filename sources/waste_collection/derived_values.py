@@ -7,9 +7,11 @@ the missing value can be derived via population data:
     specific = total_Mg x 1000 / population
     total_Mg = specific x population / 1000
 
-Derived records are stored with ``is_derived=True`` so they can be
-distinguished from manually entered data. Only editable derived records
-are regenerated automatically.
+Generated records are stored with ``is_derived=True`` and an explicit
+``derived_from`` link to their source evidence. The link — never the
+collection/property/year key — identifies a source's generated output, so
+manually entered counterpart evidence always coexists with generated
+projections and is preferred only in purpose-specific read queries.
 """
 
 import json
@@ -21,6 +23,8 @@ from functools import lru_cache
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
+from django.db.models import Exists, IntegerField, OuterRef, Q, Value
+from django.db.models.functions import Coalesce
 
 from maps.models import RegionProperty
 from maps.population.models import TemporalBasis
@@ -402,44 +406,21 @@ def _calculation_description(cpv, population, *, from_specific):
     )
 
 
-def _derived_counterpart_qs(cpv, target_property_id):
+def _linked_generated_qs(cpv):
+    """The generated output explicitly linked to ``cpv`` as its source."""
     return CollectionPropertyValue.objects.filter(
-        collection=cpv.collection,
-        property_id=target_property_id,
-        year=cpv.year,
-        is_derived=True,
+        is_derived=True, derived_from_id=cpv.pk
     )
 
 
-def _prune_duplicate_derived_rows(cpv, target_property_id):
-    """Keep a single derived counterpart row and delete older duplicates."""
-    derived_qs = (
-        _derived_counterpart_qs(cpv, target_property_id)
-        .exclude(publication_status__in=_FROZEN_STATUSES)
-        .order_by("-lastmodified_at", "-pk")
-    )
-    keep_id = derived_qs.values_list("pk", flat=True).first()
-    if keep_id is None:
-        return 0
-    deleted_count, _ = derived_qs.exclude(pk=keep_id).delete()
-    if deleted_count:
-        logger.warning(
-            "Deleted %d duplicate derived CPV(s) for collection id=%s, property=%s, year=%s",
-            deleted_count,
-            cpv.collection_id,
-            target_property_id,
-            cpv.year,
-        )
-    return deleted_count
-
-
-@transaction.atomic
 def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
-    """Create or update the derived counterpart for a single CPV.
+    """Create or update the generated projection linked to a source CPV.
 
-    Skips if the CPV is itself derived (prevents infinite loops) or if
-    a non-derived (manually entered) counterpart already exists. Published
-    and archived derived counterparts require explicit review to replace.
+    Output identity is the explicit ``derived_from`` link — never the
+    collection/property/year key — so manual counterpart evidence neither
+    blocks nor is overwritten by generated output. When the source is no
+    longer convertible, only this source's linked output is removed;
+    unlinked legacy rows and other sources' artifacts stay untouched.
 
     *owner* and *publication_status* override the values copied from the
     source CPV when provided (useful for batch backfills).
@@ -447,7 +428,7 @@ def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
     Returns ``(derived_instance, action)`` where action is one of:
     ``"created"``, ``"updated"``, ``"skipped"``.
     """
-    if cpv.is_derived:
+    if cpv.is_derived or cpv.pk is None:
         return None, "skipped"
 
     mapping = _counterpart_mapping().get(cpv.property_id)
@@ -465,35 +446,18 @@ def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
 
     result = _compute_counterpart_value(cpv)
     if result is None:
-        return None, "skipped"
-
-    target_property_id, target_unit_id, computed_avg, population = result
-
-    # Check if a manually entered value already exists
-    existing = CollectionPropertyValue.objects.filter(
-        collection=cpv.collection,
-        property_id=target_property_id,
-        year=cpv.year,
-        is_derived=False,
-    ).exists()
-    if existing:
-        # Manual counterpart takes precedence: remove stale derived values.
-        deleted_count, _ = _derived_counterpart_qs(cpv, target_property_id).delete()
+        # A source that is no longer convertible invalidates only its own
+        # linked artifact — stale generated output is not valid evidence.
+        deleted_count, _ = _linked_generated_qs(cpv).delete()
         if deleted_count:
             logger.debug(
-                "Deleted %d stale derived CPV(s) due to manual counterpart "
-                "(property=%s, year=%s, collection id=%s)",
+                "Removed %d stale generated CPV(s) linked to source id=%s",
                 deleted_count,
-                target_property_id,
-                cpv.year,
-                cpv.collection_id,
+                cpv.pk,
             )
         return None, "skipped"
 
-    # Defensive cleanup for pre-constraint duplicates.
-    derived_qs = _derived_counterpart_qs(cpv, target_property_id)
-    if derived_qs.count() > 1:
-        _prune_duplicate_derived_rows(cpv, target_property_id)
+    target_property_id, target_unit_id, computed_avg = result
 
     effective_publication_status = (
         publication_status if publication_status is not None else cpv.publication_status
@@ -514,13 +478,16 @@ def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
     ):
         submitted_at = None
 
-    # Create or update the derived record
+    # Create or update the generated record bound to this source. The copied
+    # fields are compatibility metadata; the source governs authorization
+    # and lifecycle through the shared policy.
     derived, created = CollectionPropertyValue.objects.update_or_create(
-        collection=cpv.collection,
-        property_id=target_property_id,
-        year=cpv.year,
+        derived_from=cpv,
         is_derived=True,
         defaults={
+            "collection": cpv.collection,
+            "property_id": target_property_id,
+            "year": cpv.year,
             "name": f"derived from {cpv.property.name}",
             "average": computed_avg,
             "description": _calculation_description(
@@ -550,53 +517,67 @@ def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
 
 
 def delete_derived_cpv(cpv):
-    """Delete derived counterparts when a source CPV is deleted.
+    """Delete the generated output linked to a deleted source CPV.
 
-    Only deletes editable derived records for the counterpart property,
-    not manually entered, published or archived ones.
+    Only ``is_derived`` rows explicitly bound to ``cpv`` are removed — never
+    another source's output or manual evidence. The FK cascade may already
+    have removed the row, in which case ``0`` is returned.
     """
-    if cpv.is_derived:
+    if cpv.is_derived or cpv.pk is None:
         return 0
 
-    mapping = _counterpart_mapping().get(cpv.property_id)
-    if mapping is None:
-        return 0
-
-    target_property_id, _ = mapping
-    count, _ = (
-        CollectionPropertyValue.objects.filter(
-            collection=cpv.collection,
-            property_id=target_property_id,
-            year=cpv.year,
-            is_derived=True,
-        )
-        .exclude(publication_status__in=_FROZEN_STATUSES)
-        .delete()
-    )
+    count, _ = _linked_generated_qs(cpv).delete()
     if count:
         logger.debug(
-            "Deleted %d derived CPV(s) (property=%s, year=%s) for collection id=%s",
+            "Deleted %d generated CPV(s) linked to source id=%s",
             count,
-            target_property_id,
-            cpv.year,
-            cpv.collection_id,
+            cpv.pk,
         )
     return count
 
 
+def preferred_measurement_queryset(qs):
+    """Narrow an authorized CPV queryset to preferred measurements.
+
+    Every visible raw measurement is kept; a generated row is excluded only
+    when a raw row with the same collection/property/year/unit exists
+    within the *same* input queryset. Private or otherwise inaccessible
+    manual evidence outside the input queryset never suppresses a
+    projection. This is a purpose-specific read preference — it neither
+    widens nor narrows general authorization, and direct detail access is
+    unaffected.
+    """
+    normalized = qs.annotate(
+        _measurement_year=Coalesce("year", Value(-1), output_field=IntegerField()),
+        _measurement_unit=Coalesce("unit_id", Value(-1), output_field=IntegerField()),
+    )
+    manual = normalized.filter(
+        is_derived=False,
+        collection_id=OuterRef("collection_id"),
+        property_id=OuterRef("property_id"),
+        _measurement_year=OuterRef("_measurement_year"),
+        _measurement_unit=OuterRef("_measurement_unit"),
+    )
+    return normalized.annotate(_has_visible_manual=Exists(manual)).filter(
+        Q(is_derived=False) | Q(is_derived=True, _has_visible_manual=False)
+    )
+
+
 def backfill_derived_values(dry_run=False, owner=None, publication_status=None):
-    """Compute derived counterparts for all existing CPV records.
+    """Compute generated counterparts for all existing raw CPV records.
 
     Iterates over all non-derived CPV records for the configured
-    specific and total waste properties,
-    creating or updating derived counterparts where the counterpart
-    does not already exist as a manual entry.
+    specific and total waste properties, creating or updating the
+    generated output explicitly linked to each source via
+    ``derived_from``. Manual counterpart rows and legacy unlinked
+    generated rows never affect the outcome for a source.
 
     *owner* and *publication_status* are forwarded to
     ``create_or_update_derived_cpv`` to override the values that would
     otherwise be copied from each source CPV.
 
-    Returns a dict with counts: ``{created: int, updated: int, skipped: int}``.
+    Returns a dict with counts: ``{created: int, updated: int, skipped: int}``
+    keyed to the source-bound generator outcome.
     """
     stats = {"created": 0, "updated": 0, "skipped": 0}
     cfg = get_derived_value_config()
@@ -615,22 +596,7 @@ def backfill_derived_values(dry_run=False, owner=None, publication_status=None):
                 stats["skipped"] += 1
                 continue
 
-            target_property_id, _, _ = result
-            manual_exists = CollectionPropertyValue.objects.filter(
-                collection=cpv.collection,
-                property_id=target_property_id,
-                year=cpv.year,
-                is_derived=False,
-            ).exists()
-            if manual_exists:
-                stats["skipped"] += 1
-                continue
-
-            derived_qs = _derived_counterpart_qs(cpv, target_property_id)
-            if derived_qs.filter(publication_status__in=_FROZEN_STATUSES).exists():
-                stats["skipped"] += 1
-                continue
-            if derived_qs.exists():
+            if _linked_generated_qs(cpv).exists():
                 stats["updated"] += 1
             else:
                 stats["created"] += 1

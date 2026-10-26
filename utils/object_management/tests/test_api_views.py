@@ -78,6 +78,11 @@ class ReviewAPIViewsTests(TestCase):
             defaults={"name": "Can moderate collections"},
         )
         cls.moderator.user_permissions.add(permission)
+        cls.owner.user_permissions.add(
+            Permission.objects.get(
+                codename="change_collection", content_type=content_type
+            )
+        )
 
         with mute_signals(post_save, pre_save):
             cls.review_collection = Collection.objects.create(
@@ -667,8 +672,8 @@ class ReviewContextCPVEnrichmentTests(TestCase):
         self.assertEqual(ctx["parent_collection"]["id"], self.collection.id)
         self.assertEqual(ctx["parent_collection"]["name"], str(self.collection))
 
-    def test_context_excludes_timeline_for_derived_cpv(self):
-        """Derived CPVs do not get a value_timeline in the context."""
+    def test_context_for_derived_cpv_resolves_to_source(self):
+        """A generated CPV's review context describes its source evidence."""
         derived_cpv = CollectionPropertyValue.objects.create(
             collection=self.collection,
             property=self.prop,
@@ -677,6 +682,7 @@ class ReviewContextCPVEnrichmentTests(TestCase):
             average=50.0,
             owner=self.owner,
             is_derived=True,
+            derived_from=self.cpv_2021,
             publication_status=UserCreatedObject.STATUS_REVIEW,
         )
         url = reverse(
@@ -692,7 +698,17 @@ class ReviewContextCPVEnrichmentTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         ctx = response.json()["context"]
-        self.assertNotIn("value_timeline", ctx)
+        # The candidate object is the source, marked by an additive
+        # projection entry; the source's own timeline/parent are served.
+        self.assertEqual(ctx["object"]["object_id"], self.cpv_2021.id)
+        self.assertEqual(
+            ctx["projection"],
+            {
+                "object_id": derived_cpv.id,
+                "derived_from": self.cpv_2021.id,
+                "read_only": True,
+            },
+        )
         self.assertIn("parent_collection", ctx)
 
     def test_context_does_not_include_cpv_review_guidance(self):

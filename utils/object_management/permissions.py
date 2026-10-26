@@ -1,47 +1,101 @@
 import logging
-from types import SimpleNamespace
 
+from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import Q
 from rest_framework import exceptions as drf_exceptions
 from rest_framework import permissions
 
+from .policy import (
+    capabilities,
+    decide,
+    is_admin,
+    is_editor,
+    is_moderator,
+    is_owner,
+    scope_queryset,
+    visible_queryset,
+)
+from .registry import (
+    KIND_GENERATED,
+    KIND_OWNED,
+    generated_profile,
+    model_policy,
+    record_policy,
+    resolve_parent,
+    review_target,
+)
+
 logger = logging.getLogger(__name__)
 
+_PROPERTY_CHILD_LABEL = {
+    ("materials", "sample"): "materials.materialpropertyvalue",
+    ("waste_collection", "collection"): "waste_collection.collectionpropertyvalue",
+}
 
-def _get_property_add_permission_codename(obj):
-    try:
-        key = (obj._meta.app_label, obj._meta.model_name)
-    except Exception:
-        return None
+OBJECT_ACTION_MAP = {
+    "retrieve": "read",
+    "update": "edit",
+    "partial_update": "edit",
+    "destroy": "delete",
+    "register_for_review": "submit",
+    "submit_for_review": "submit",
+    "submit": "submit",
+    "withdraw_from_review": "withdraw",
+    "withdraw": "withdraw",
+    "approve": "approve",
+    "reject": "reject",
+    "archive": "archive",
+    "new_version": "new_version",
+    "create_new_version": "new_version",
+    "duplicate": "duplicate",
+    "comment": "comment_on_review",
+    "add_review_comment": "comment_on_review",
+}
 
-    permission_by_object = {
-        ("materials", "sample"): "materials.add_materialpropertyvalue",
-        (
-            "waste_collection",
-            "collection",
-        ): "waste_collection.add_collectionpropertyvalue",
+FORBIDDEN_WRITE_PAYLOAD_FIELDS = frozenset(
+    {
+        "owner",
+        "publication_status",
+        "content_revision",
+        "submitted_at",
+        "approved_at",
+        "approved_by",
     }
-    return permission_by_object.get(key)
+)
+
+
+def _forbidden_write_fields(model):
+    """Server-controlled fields a write payload may never carry.
+
+    In addition to the shared lifecycle metadata, generated-projection
+    profiles declare their marker and source pointer read-only: the marker
+    and linkage are assigned by the derivation pipeline, never by a public
+    payload.
+    """
+    forbidden = set(FORBIDDEN_WRITE_PAYLOAD_FIELDS)
+    profile = generated_profile(model) if model is not None else None
+    if profile is not None:
+        forbidden.update(profile)
+    return forbidden
 
 
 class GlobalObjectPermission(permissions.BasePermission):
-    """Allow global-object reads for everyone and writes for staff only."""
+    """Allow global-object reads for everyone and writes for administrators."""
 
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:
             return True
 
-        return request.user and request.user.is_authenticated and request.user.is_staff
+        return is_admin(request.user)
 
 
 class UserCreatedObjectPermission(permissions.BasePermission):
-    """Permission policy for ``UserCreatedObject`` APIs.
+    """DRF adapter delegating to :mod:`utils.object_management.policy`.
 
-    The class combines:
-    - action-level checks (e.g. add permission for create-like actions),
-    - object-level write restrictions (owner vs moderator rules), and
-    - review-workflow capability helpers used by API/HTML flows.
+    Action-level checks resolve the view's model and delegate to
+    ``policy.decide``; object-level checks map DRF actions and named review
+    actions onto the same object actions. Adapters may narrow decisions but
+    never broaden them.
     """
 
     def _get_view_model(self, view):
@@ -59,21 +113,33 @@ class UserCreatedObjectPermission(permissions.BasePermission):
 
         return model
 
+    def _get_action_model(self, view, action, model):
+        """Return the model the action creates, allowing views to declare
+        per-action targets for child/collection creates."""
+        action_models = getattr(view, "action_create_models", None)
+        if not isinstance(action_models, dict):
+            return model
+        return action_models.get(action, model)
+
     def _has_add_model_permission(self, user, view):
         """Return whether ``user`` may create records for ``view``'s model."""
-        if not (user and user.is_authenticated):
-            return False
-        if user.is_staff:
-            return True
-
         model = self._get_view_model(view)
-        if model is None:
-            # If we can't determine the model permission, default to False for security
-            return False
+        return self._has_add_permission_for(user, view, "create", model)
 
-        app_label = model._meta.app_label
-        model_name = model._meta.model_name
-        return user.has_perm(f"{app_label}.add_{model_name}")
+    def _has_add_permission_for(self, user, view, action, model):
+        if model is None:
+            return False
+        target = self._get_action_model(view, action, model)
+        policy = model_policy(target)
+        if policy is None:
+            return False
+        if policy.kind == KIND_OWNED:
+            return bool(
+                user
+                and getattr(user, "is_authenticated", False)
+                and getattr(user, "is_active", False) is True
+            )
+        return decide(user, "create", target).allowed
 
     def has_permission(self, request, view):
         """Evaluate action-level access before object-level checks run."""
@@ -87,7 +153,7 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         if getattr(view, "action", None) in ["list", "retrieve"]:
             return True
 
-        action = getattr(view, "action", None)
+        model = self._get_view_model(view)
         add_permission_actions = {"create"}
         extra_add_permission_actions = getattr(
             view, "requires_add_permission_actions", None
@@ -98,593 +164,286 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         except TypeError:
             pass
 
-        # Create-like actions use explicit model-level add permission.
         if action in add_permission_actions:
-            return self._has_add_model_permission(request.user, view)
+            return self._has_add_permission_for(request.user, view, action, model)
 
-        # Other actions require authentication and are further constrained by
-        # ``has_object_permission``.
-        return request.user and request.user.is_authenticated
+        if request.method in permissions.SAFE_METHODS:
+            from .models import UserCreatedObject
+
+            return not (
+                model is not None
+                and issubclass(model, UserCreatedObject)
+                and model_policy(model) is None
+            )
+
+        if model is not None:
+            policy = model_policy(model)
+            from .models import UserCreatedObject
+
+            if policy is None and issubclass(model, UserCreatedObject):
+                return False
+            if policy is not None and action not in OBJECT_ACTION_MAP:
+                return False
+
+        return bool(
+            request.user
+            and getattr(request.user, "is_authenticated", False)
+            and getattr(request.user, "is_active", False) is True
+        )
 
     def has_object_permission(self, request, view, obj):
-        """Evaluate object-level read/write access."""
-        # Handle safe methods
-        if request.method in permissions.SAFE_METHODS:
-            return self._check_safe_permissions(request, obj)
-
-        # Handle write methods
+        """Evaluate object-level access via the shared policy core."""
         user = request.user
 
-        # Editors (shared edit access) may modify content fields of
-        # non-published objects, but never the publication status, the owner,
-        # and never delete. Requests outside that scope fall through to the
-        # moderator branch below, so editors who are also moderators keep both
-        # abilities.
-        if obj.owner != user and self._is_editor(user, obj):
-            from .models import UserCreatedObject
+        if request.method in permissions.SAFE_METHODS:
+            return decide(user, "read", obj).allowed
 
+        if request.method in ("PUT", "PATCH"):
             try:
                 payload = request.data
             except drf_exceptions.UnsupportedMediaType:
                 payload = {}
-
-            if (
-                request.method in ("PUT", "PATCH")
-                and getattr(obj, "publication_status", None)
-                not in (
-                    UserCreatedObject.STATUS_PUBLISHED,
-                    getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"),
-                )
-                and "publication_status" not in payload
-                and "owner" not in payload
-                and (
-                    user.is_staff
-                    or user.has_perm(
-                        f"{obj._meta.app_label}.change_{obj._meta.model_name}"
-                    )
-                )
-            ):
-                return True
-
-            if not self._is_moderator(user, obj):
-                return False
-
-        if obj.owner == user:
-            from .models import UserCreatedObject
-
-            # Owners cannot modify objects that are already published or archived
-            if getattr(obj, "publication_status", None) in (
-                UserCreatedObject.STATUS_PUBLISHED,
-                getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"),
-            ):
-                return False
-
-            # Safely access request data (can raise UnsupportedMediaType for empty multipart)
-            try:
-                payload = request.data
-            except drf_exceptions.UnsupportedMediaType:
+            except Exception:
                 payload = {}
-
-            # Four eyes principle: moderators cannot publish their own objects
-            if (
-                "publication_status" in payload
-                and payload["publication_status"] == UserCreatedObject.STATUS_PUBLISHED
-                and self._is_moderator(user, obj)
+            if isinstance(payload, dict) and (
+                _forbidden_write_fields(type(obj)) & set(payload.keys())
             ):
                 return False
+            return decide(user, "edit", obj).allowed
 
-            # If attempting to change publication_status, require moderator rights
-            if "publication_status" in payload and not self._is_moderator(user, obj):
-                return False
+        if request.method == "DELETE":
+            return decide(user, "delete", obj).allowed
 
-            return True  # Owners can modify other fields
-
-        # Check if user is a moderator
-        if self._is_moderator(user, obj):
-            # Moderators cannot modify 'private' objects unless they are the owner
-            if (
-                getattr(obj, "publication_status", None) == "private"
-                and obj.owner != user
-            ):
-                return False
-            # Moderators may only change 'publication_status'—nothing else
-            if request.method in ("PATCH", "PUT"):
-                try:
-                    payload = request.data
-                except Exception:
-                    payload = {}
-                # Only allow if the only field being changed is 'publication_status'
-                allowed_fields = {"publication_status"}
-                changed_fields = set(payload.keys())
-                if not changed_fields.issubset(allowed_fields):
-                    return False
-            return True
+        action = getattr(view, "action", None)
+        policy_action = OBJECT_ACTION_MAP.get(action)
+        if policy_action is not None:
+            return decide(user, policy_action, obj).allowed
 
         return False
 
-    def _check_safe_permissions(self, request, obj):
-        """Evaluate read access based on ``publication_status``."""
-        if not hasattr(obj, "publication_status"):
-            return False  # Deny access if publication_status is undefined
+    def is_editor(self, user, obj):
+        """Whether ``user`` holds a direct or group editor grant on ``obj``."""
+        return is_editor(user, obj)
 
-        from .models import UserCreatedObject
+    def is_moderator(self, user, obj):
+        """Whether ``user`` may moderate the model type of ``obj``."""
+        return is_moderator(user, type(obj))
 
-        status = obj.publication_status
-
-        # Published objects are always readable
-        if status == UserCreatedObject.STATUS_PUBLISHED:
-            return True
-
-        # Non-published objects: owner, editor, or moderator/staff can view
-        if status in (
-            UserCreatedObject.STATUS_REVIEW,
-            UserCreatedObject.STATUS_PRIVATE,
-            getattr(UserCreatedObject, "STATUS_DECLINED", "declined"),
-            getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"),
-        ):
-            return (
-                obj.owner == request.user
-                or self._is_editor(request.user, obj)
-                or self._is_moderator(request.user, obj)
-            )
-
-        return False
-
-    def _is_moderator(self, user, obj):
-        """Return whether ``user`` moderates the model type of ``obj``."""
-        if not user or not user.is_authenticated:
-            return False
-
-        model_name = obj._meta.model_name
-        perm_codename = f"can_moderate_{model_name}"
-        app_label = obj._meta.app_label
-        return user.is_staff or user.has_perm(f"{app_label}.{perm_codename}")
-
-    def _is_editor(self, user, obj):
-        """Return whether ``user`` has an editor grant on ``obj``.
-
-        The user's granted object ids are fetched once per model and cached on
-        the user instance, so per-row checks in list views stay query-free.
-        """
-        if not user or not user.is_authenticated:
-            return False
-
-        from django.contrib.contenttypes.models import ContentType
-
-        from .models import editor_grant_object_ids
-
-        try:
-            content_type = ContentType.objects.get_for_model(obj.__class__)
-            cache = getattr(user, "_editor_grant_cache", None)
-            if cache is None:
-                cache = {}
-                user._editor_grant_cache = cache
-            if content_type.pk not in cache:
-                cache[content_type.pk] = set(
-                    editor_grant_object_ids(obj.__class__, user)
-                )
-            return obj.pk in cache[content_type.pk]
-        except Exception:
-            return False
-
-    def is_editor(self, user, obj):  # pragma: no cover - thin wrapper
-        """Public wrapper around ``_is_editor`` for templates and helpers."""
-        return self._is_editor(user, obj)
+    def _action_allowed(self, request, obj, action):
+        return decide(getattr(request, "user", None), action, obj).allowed
 
     def has_transfer_ownership_permission(self, request, obj):
-        """Return whether ``request.user`` may transfer ownership of ``obj``.
-
-        Allowed for the owner and staff members.
-        """
-        if not request.user or not request.user.is_authenticated:
-            return False
-        return obj.owner == request.user or getattr(request.user, "is_staff", False)
+        return self._action_allowed(request, obj, "transfer_ownership")
 
     def has_manage_editors_permission(self, request, obj):
-        """Return whether ``request.user`` may grant/revoke edit access on ``obj``.
-
-        Allowed for the owner and staff members.
-        """
-        if not request.user or not request.user.is_authenticated:
-            return False
-        return obj.owner == request.user or getattr(request.user, "is_staff", False)
-
-    def is_moderator(self, user, obj):  # pragma: no cover - thin wrapper
-        """Public wrapper around ``_is_moderator`` for templates and helpers."""
-        return self._is_moderator(user, obj)
+        return self._action_allowed(request, obj, "manage_editors")
 
     def has_submit_permission(self, request, obj):
-        """Return whether the object can be submitted for review by this user.
-
-        Allowed when the user is authenticated and owner/staff, the object is
-        in ``private`` or ``declined`` status, and not archived.
-        """
-        from .models import UserCreatedObject
-
-        if not request.user or not request.user.is_authenticated:
-            return False
-
-        status = getattr(obj, "publication_status", None)
-        if status == getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"):
-            return False
-
-        allowed_statuses = {
-            getattr(UserCreatedObject, "STATUS_PRIVATE", "private"),
-            getattr(UserCreatedObject, "STATUS_DECLINED", "declined"),
-        }
-        return (
-            obj.owner == request.user or getattr(request.user, "is_staff", False)
-        ) and status in allowed_statuses
+        return self._action_allowed(request, obj, "submit")
 
     def has_withdraw_permission(self, request, obj):
-        """Return whether the object can be withdrawn from review by this user.
-
-        Allowed when the user is authenticated and owner/staff, the object is
-        in ``review`` or ``declined`` status, and not archived.
-        """
-        from .models import UserCreatedObject
-
-        if not request.user or not request.user.is_authenticated:
-            return False
-
-        status = getattr(obj, "publication_status", None)
-        if status == getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"):
-            return False
-
-        allowed_statuses = {
-            getattr(UserCreatedObject, "STATUS_REVIEW", "review"),
-            getattr(UserCreatedObject, "STATUS_DECLINED", "declined"),
-        }
-        return (
-            obj.owner == request.user or getattr(request.user, "is_staff", False)
-        ) and status in allowed_statuses
+        return self._action_allowed(request, obj, "withdraw")
 
     def has_approve_permission(self, request, obj):
-        """Return whether ``request.user`` may approve ``obj``.
-
-        Enforces four-eyes review: moderators/staff may approve only review
-        objects they do not own.
-        """
-        from .models import UserCreatedObject
-
-        if not request.user or not request.user.is_authenticated:
-            return False
-
-        try:
-            publication_status = getattr(obj, "publication_status", None)
-        except AttributeError:
-            return False
-
-        return (
-            self._is_moderator(request.user, obj)
-            and publication_status == UserCreatedObject.STATUS_REVIEW
-            and obj.owner
-            != request.user  # Four eyes principle: can't approve own objects
-        )
+        return self._action_allowed(request, obj, "approve")
 
     def has_reject_permission(self, request, obj):
-        """Return whether ``request.user`` may reject ``obj``.
-
-        Enforces four-eyes review: moderators/staff may reject only review
-        objects they do not own.
-        """
-        from .models import UserCreatedObject
-
-        if not request.user or not request.user.is_authenticated:
-            return False
-
-        try:
-            publication_status = getattr(obj, "publication_status", None)
-        except AttributeError:
-            return False
-
-        return (
-            self._is_moderator(request.user, obj)
-            and publication_status == UserCreatedObject.STATUS_REVIEW
-            and obj.owner
-            != request.user  # Four eyes principle: can't reject own objects
-        )
+        return self._action_allowed(request, obj, "reject")
 
     def has_comment_permission(self, request, obj):
-        """Check if the user can add a review comment on an object.
-
-        Allowed for authenticated users who are one of:
-        - owner
-        - staff
-        - moderator for the model
-        """
-        if not request.user or not request.user.is_authenticated:
-            return False
-
-        is_owner = getattr(obj, "owner_id", None) == getattr(request.user, "id", None)
-        return (
-            is_owner
-            or getattr(request.user, "is_staff", False)
-            or self._is_moderator(request.user, obj)
-        )
+        return self._action_allowed(request, obj, "comment_on_review")
 
     def has_archive_permission(self, request, obj):
-        """Return whether ``request.user`` may archive ``obj``.
+        return self._action_allowed(request, obj, "archive")
 
-        The object must be published (and not archived), and the user must be
-        owner, staff, or moderator for the model.
-        """
-        if not request.user or not request.user.is_authenticated:
-            return False
 
-        try:
-            from .models import UserCreatedObject
+def _status_flags(obj):
+    flags = {
+        "is_private": bool(getattr(obj, "is_private", False)),
+        "is_in_review": bool(getattr(obj, "is_in_review", False)),
+        "is_published": bool(getattr(obj, "is_published", False)),
+        "is_declined": bool(getattr(obj, "is_declined", False)),
+        "is_archived": bool(getattr(obj, "is_archived", False)),
+    }
+    status = getattr(obj, "publication_status", None)
+    mapping = {
+        "private": "is_private",
+        "review": "is_in_review",
+        "published": "is_published",
+        "declined": "is_declined",
+        "archived": "is_archived",
+    }
+    key = mapping.get(status)
+    if key is not None:
+        flags[key] = True
+    return flags
 
-            is_published = getattr(obj, "publication_status", None) == getattr(
-                UserCreatedObject, "STATUS_PUBLISHED", "published"
-            )
-            is_archived = getattr(obj, "publication_status", None) == getattr(
-                UserCreatedObject, "STATUS_ARCHIVED", "archived"
-            )
-        except Exception:
-            # Fail-closed if model does not define statuses
-            return False
 
-        if not is_published or is_archived:
-            return False
+def _can_add_property(user, obj, caps):
+    """Whether ``user`` may add a property/evidence record under ``obj``.
 
-        # Owner, staff, or moderator
-        is_owner = getattr(obj, "owner_id", None) == getattr(request.user, "id", None)
-        return (
-            is_owner
-            or getattr(request.user, "is_staff", False)
-            or self._is_moderator(request.user, obj)
-        )
+    Maps the core create decision: owned children delegate to parent edit,
+    independent evidence children apply the attachment rule (own add
+    capability + parent read + published parent or parent edit).
+    """
+    meta = type(obj)._meta
+    child_label = _PROPERTY_CHILD_LABEL.get((meta.app_label, meta.model_name))
+    if child_label is None:
+        return caps["edit"].allowed
+    child_model = apps.get_model(child_label)
+    if child_model is None or model_policy(child_model) is None:
+        return False
+    return decide(user, "create", child_model, parent=obj).allowed
 
 
 def get_object_policy(user, obj, request=None, review_mode=False):
+    """Compute the shared policy dictionary for templates and helpers.
+
+    All capability keys delegate to ``policy.capabilities``/``decide`` so HTML,
+    API, and background consumers share one authorization contract. ``is_staff``
+    reports the user's actual flag only and never implies access. URL presence
+    is exposed as presentation data (``has_update_url``/``has_delete_url``) and
+    does not affect decisions.
     """
-    Compute a unified policy dictionary for the given object and user.
+    policy_entry = model_policy(type(obj))
+    target = obj
+    invalid_generated = False
+    record = record_policy(obj)
+    if record is not None and record.kind == KIND_GENERATED:
+        # Generated projections display the governance surface of their
+        # validated source (owner, editors, lifecycle, revision); capability
+        # decisions below still run on the projection itself so every
+        # standalone mutation stays denied. Invalid provenance advertises
+        # nothing: copied metadata is stale compatibility data only.
+        target = review_target(obj)
+        if target is None:
+            invalid_generated = True
+            target = obj
+    elif policy_entry is not None and policy_entry.kind == KIND_OWNED:
+        target = resolve_parent(obj, policy_entry.parent_path) or obj
 
-    This is the single source of truth for button visibility in templates and
-    should mirror backend permission checks. Review workflow permissions are
-    delegated (when appropriate) to UserCreatedObjectPermission to ensure
-    consistency with backend behavior.
+    caps = capabilities(user, obj)
+    reason_codes = {action: decision.reason for action, decision in caps.items()}
 
-    Returned dict keys (booleans unless noted):
-      - is_authenticated, is_owner, is_staff, is_moderator
-      - is_private, is_in_review, is_published, is_declined, is_archived
-      - can_edit, can_manage_samples, can_add_property
-      - can_duplicate, can_new_version
-      - can_archive, can_delete
-      - can_submit_review, can_withdraw_review, can_approve, can_reject
-      - can_export, export_list_type ('published'|'private'|None)
-      - has_review_feedback, review_feedback_label, can_view_review_feedback
-    """
-    perm = UserCreatedObjectPermission()
-
-    # Basic identity flags
     is_authenticated = bool(user and getattr(user, "is_authenticated", False))
-    is_staff = bool(
-        getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)
+    is_staff_flag = bool(getattr(user, "is_staff", False))
+    is_owner_flag = (
+        is_owner(user, target)
+        if policy_entry is not None and not invalid_generated
+        else False
     )
-    is_owner = bool(
-        is_authenticated and getattr(obj, "owner_id", None) == getattr(user, "id", None)
-    )
-
-    # Shared edit access via editor grants
     try:
-        is_editor = bool(
-            is_authenticated and not is_owner and perm.is_editor(user, obj)
+        is_editor_flag = bool(
+            is_authenticated
+            and not is_owner_flag
+            and not invalid_generated
+            and is_editor(user, target)
         )
     except Exception:
         logger.exception(
             "Failed checking editor permission in get_object_policy", exc_info=True
         )
-        is_editor = False
+        is_editor_flag = False
 
-    # Publication status helpers (use convenience properties if available)
-    is_private = bool(getattr(obj, "is_private", False))
-    is_in_review = bool(getattr(obj, "is_in_review", False))
-    is_published = bool(getattr(obj, "is_published", False))
-    is_declined = bool(getattr(obj, "is_declined", False))
-    is_archived = bool(getattr(obj, "is_archived", False))
-    # Fallbacks using raw publication_status if convenience properties are unavailable
-    try:
-        _status = getattr(obj, "publication_status", None)
-        if _status is not None:
-            if not is_private and _status == "private":
-                is_private = True
-            if not is_in_review and _status == "review":
-                is_in_review = True
-            if not is_published and _status == "published":
-                is_published = True
-            if not is_declined and _status == "declined":
-                is_declined = True
-            if not is_archived and _status == "archived":
-                is_archived = True
-    except Exception:
-        pass
+    flags = _status_flags(target)
+    if invalid_generated:
+        flags = dict.fromkeys(flags, False)
 
-    # Moderator rights (per-model 'can_moderate_<modelname>' or staff)
     try:
-        is_moderator = is_staff or perm.is_moderator(user, obj)
+        is_moderator_flag = is_moderator(user, type(target))
     except Exception:
         logger.exception(
-            "Failed checking moderator permission in get_object_policy", exc_info=True
+            "Failed checking moderator permission in get_object_policy",
+            exc_info=True,
         )
-        is_moderator = is_staff  # safer default
+        is_moderator_flag = False
 
-    # Ensure we have a request-like object for permission helpers
-    if request is None:
-        request = SimpleNamespace(user=user)
-
-    # Review workflow permissions (delegated to centralized helpers)
-    can_submit_review = (
-        bool(perm.has_submit_permission(request, obj)) if is_authenticated else False
-    )
-    can_withdraw_review = (
-        bool(perm.has_withdraw_permission(request, obj)) if is_authenticated else False
-    )
-    # Approve/Reject via permission helper (four eyes, moderator)
-    can_approve = (
-        bool(perm.has_approve_permission(request, obj)) if is_authenticated else False
-    )
-    can_reject = (
-        bool(perm.has_reject_permission(request, obj)) if is_authenticated else False
-    )
-
-    # CRUD-like actions
-    has_update_url = bool(getattr(obj, "update_url", None))
-    # Support both modal and direct delete URLs across templates
-    has_delete_url = bool(
-        getattr(obj, "modal_delete_url", None) or getattr(obj, "delete_url", None)
-    )
-
-    # Model-level change permission (change_<modelname>), staff always pass
     try:
-        _meta = obj.__class__._meta
-        change_perm = f"{_meta.app_label}.change_{_meta.model_name}"
-        has_change_permission = is_staff or bool(
-            is_authenticated and user.has_perm(change_perm)
+        admin_flag = is_admin(user)
+    except Exception:
+        logger.exception(
+            "Failed checking admin permission in get_object_policy", exc_info=True
         )
+        admin_flag = False
+
+    try:
+        _meta = target.__class__._meta
+        change_perm = f"{_meta.app_label}.change_{_meta.model_name}"
+        has_change_permission = bool(is_authenticated and user.has_perm(change_perm))
     except Exception:
         logger.exception(
             "Failed checking change permission in get_object_policy", exc_info=True
         )
-        has_change_permission = is_staff
+        has_change_permission = False
 
-    # Edit: staff always; owners and editors with change permission if not
-    # published; never when archived
-    can_edit = (
-        has_update_url
-        and not is_archived
-        and (
-            is_staff
-            or ((is_owner or is_editor) and not is_published and has_change_permission)
-        )
+    has_update_url = bool(getattr(obj, "update_url", None))
+    has_delete_url = bool(
+        getattr(obj, "modal_delete_url", None) or getattr(obj, "delete_url", None)
     )
 
-    # Ownership transfer and shared edit access management: owner or staff
-    can_transfer_ownership = is_authenticated and (is_owner or is_staff)
-    can_manage_editors = is_authenticated and (is_owner or is_staff)
-
-    # Delete:
-    # - Archived: staff-only special case (optional "Archive → Delete")
-    # - Published: staff only
-    # - Private/Review/Declined: owner or staff
-    can_delete = has_delete_url and (
-        (is_archived and is_staff)
-        or (
-            (not is_archived)
-            and (
-                (is_published and is_staff)
-                or (not is_published and (is_owner or is_staff))
-            )
-        )
-    )
-
-    # Archive: only when published; not already archived; owner, staff, or moderator
-    can_archive = (
-        is_published and not is_archived and (is_owner or is_staff or is_moderator)
-    )
-
-    # Sample-related management (sample data, series distributions, collection
-    # samples) mirrors can_edit: owners on unpublished records, staff always.
-    can_manage_samples = (
-        is_staff or (is_owner and not is_published)
-    ) and not is_archived
-    property_add_permission = _get_property_add_permission_codename(obj)
-    if property_add_permission is None:
-        can_add_property = (is_owner or is_staff) and not is_archived
+    can_export = caps["export"].allowed
+    if flags["is_published"]:
+        export_list_type = "published"
+    elif flags["is_archived"]:
+        export_list_type = "archived"
     else:
-        has_property_add_permission = bool(
-            is_authenticated and user.has_perm(property_add_permission)
-        )
-        can_add_property = (
-            has_property_add_permission
-            and not is_archived
-            and (
-                is_staff
-                or is_owner
-                or (
-                    property_add_permission
-                    == "waste_collection.add_collectionpropertyvalue"
-                    and is_published
-                )
-            )
-        )
+        export_list_type = "private" if can_export else None
 
-    # Duplicate/new version require model-level add permission.
-    can_duplicate = False
-    try:
-        model = obj.__class__
-        app_label = model._meta.app_label
-        model_name = model._meta.model_name
-        add_perm = f"{app_label}.add_{model_name}"
-        can_duplicate = is_authenticated and user.has_perm(add_perm)
-    except Exception:
-        logger.exception(
-            "Failed checking add permission in get_object_policy", exc_info=True
-        )
-        can_duplicate = False
-    # New versions require add permission, and are allowed on published objects
-    # or on the user's own objects in any non-archived state.
-    can_new_version = can_duplicate and not is_archived and (is_published or is_owner)
-
-    # Export policy: published/archived are public; private export is owner/staff.
-    can_export = (is_published or is_archived) or (
-        is_authenticated and (is_owner or is_staff)
+    has_review_feedback = bool(
+        is_owner_flag and getattr(target, "has_review_feedback", False)
     )
-    export_list_type = (
-        "published"
-        if (is_published or is_archived)
-        else ("private" if (is_owner or is_staff) else None)
+    review_feedback_label = (
+        "Review feedback" if flags["is_declined"] else "Review activity"
     )
-
-    has_review_feedback = bool(is_owner and getattr(obj, "has_review_feedback", False))
-    review_feedback_label = "Review feedback" if is_declined else "Review activity"
     can_view_review_feedback = bool(
-        is_owner and (is_declined or has_review_feedback) and (not bool(review_mode))
+        is_owner_flag
+        and (flags["is_declined"] or has_review_feedback)
+        and (not bool(review_mode))
     )
 
     return {
         "is_authenticated": is_authenticated,
-        "is_owner": is_owner,
-        "is_editor": is_editor,
-        "is_staff": is_staff,
-        "is_moderator": is_moderator,
-        "is_private": is_private,
-        "is_in_review": is_in_review,
-        "is_published": is_published,
-        "is_declined": is_declined,
-        "is_archived": is_archived,
+        "is_owner": is_owner_flag,
+        "is_editor": is_editor_flag,
+        "is_staff": is_staff_flag,
+        "is_admin": admin_flag,
+        "is_moderator": is_moderator_flag,
+        **flags,
         "has_change_permission": has_change_permission,
-        "can_edit": can_edit,
-        "can_transfer_ownership": can_transfer_ownership,
-        "can_manage_editors": can_manage_editors,
-        "can_manage_samples": can_manage_samples,
-        "can_add_property": can_add_property,
-        "can_duplicate": can_duplicate,
-        "can_new_version": can_new_version,
-        "can_archive": can_archive,
-        "can_delete": can_delete,
-        "can_submit_review": can_submit_review,
-        "can_withdraw_review": can_withdraw_review,
-        "can_approve": can_approve,
-        "can_reject": can_reject,
+        "has_update_url": has_update_url,
+        "has_delete_url": has_delete_url,
+        "can_read": caps["read"].allowed,
+        "can_edit": caps["edit"].allowed,
+        "can_transfer_ownership": caps["transfer_ownership"].allowed,
+        "can_manage_editors": caps["manage_editors"].allowed,
+        "can_manage_samples": caps["edit"].allowed,
+        "can_add_property": _can_add_property(user, target, caps),
+        "can_duplicate": caps["duplicate"].allowed,
+        "can_new_version": caps["new_version"].allowed,
+        "can_archive": caps["archive"].allowed,
+        "can_delete": caps["delete"].allowed,
+        "can_submit_review": caps["submit"].allowed,
+        "can_withdraw_review": caps["withdraw"].allowed,
+        "can_approve": caps["approve"].allowed,
+        "can_reject": caps["reject"].allowed,
+        "can_view_review_activity": caps["view_review_activity"].allowed,
+        "can_comment_on_review": caps["comment_on_review"].allowed,
         "can_export": can_export,
         "export_list_type": export_list_type,
         "has_review_feedback": has_review_feedback,
         "review_feedback_label": review_feedback_label,
         "can_view_review_feedback": can_view_review_feedback,
+        "reason_codes": reason_codes,
     }
 
 
 def user_is_moderator_for_model(user, model_class):
-    """Return ``True`` when ``user`` has moderation rights for ``model_class``."""
+    """Return ``True`` when ``user`` may moderate ``model_class``.
 
-    if not user or not getattr(user, "is_authenticated", False):
-        return False
-
-    perm_codename = f"can_moderate_{model_class._meta.model_name}"
-    full_perm = f"{model_class._meta.app_label}.{perm_codename}"
-    return getattr(user, "is_staff", False) or user.has_perm(full_perm)
+    Covers users holding ``can_moderate_<model>`` and administrators; the raw
+    ``is_staff`` flag alone no longer implies moderation rights.
+    """
+    return is_admin(user) or is_moderator(user, model_class)
 
 
 def _resolve_status_value(model, status_name: str):
@@ -694,174 +453,57 @@ def _resolve_status_value(model, status_name: str):
     if hasattr(model, attr_name):
         return getattr(model, attr_name)
 
-    # Fallback to the base implementation on UserCreatedObject
     from .models import UserCreatedObject
 
     if hasattr(UserCreatedObject, attr_name):
         return getattr(UserCreatedObject, attr_name)
 
-    # As a last resort, use the provided string (lowercase) to keep behaviour predictable
     return status_name.lower()
 
 
 def apply_scope_filter(queryset, scope: str | None, user=None):
     """Apply visibility scope filtering to ``queryset``.
 
-    Supported scopes:
-    - ``published``: published records only
-    - ``private``: authenticated owner's records plus editor grants
-    - ``review``: review records visible by role (owner/moderator/staff)
-    - ``declined``/``archived``: owner-only for authenticated users, staff sees all
-
-    Unknown scopes return ``queryset`` unchanged.
+    Delegates to ``policy.scope_queryset`` so API, HTML, and export paths share
+    identical rules. ``scope=None`` applies general read visibility; an unknown
+    scope returns no rows.
     """
-
-    if scope is None:
-        return queryset
-
     model = queryset.model
-
-    if not hasattr(model, "publication_status"):
+    if not hasattr(model, "publication_status") and model_policy(model) is None:
         raise ImproperlyConfigured(
             f"{model.__name__} must define a 'publication_status' field to use scoped lists."
         )
 
-    status_field = "publication_status"
-
-    def _status_kwargs(name: str):
-        return {status_field: _resolve_status_value(model, name)}
-
-    def _ensure_owner_field(scope_name: str):
-        if not hasattr(model, "owner"):
-            raise ImproperlyConfigured(
-                f"{model.__name__} must define an 'owner' field to use the '{scope_name}' scope."
-            )
-
-    is_staff = bool(getattr(user, "is_staff", False))
-    is_moderator = user_is_moderator_for_model(user, model)
-    staff_or_moderator = is_staff or is_moderator
-    is_authenticated = bool(user) and getattr(user, "is_authenticated", False)
-
-    if scope == "published":
-        return queryset.filter(**_status_kwargs("published"))
-
-    if scope == "private":
-        if not is_authenticated:
-            return queryset.none()
-        _ensure_owner_field("private")
-        return queryset.filter(Q(owner=user) | _editor_grant_filter(model, user))
-
-    if scope == "review":
-        filtered = queryset.filter(**_status_kwargs(scope))
-        if staff_or_moderator:
-            return filtered
-        if not is_authenticated:
-            return queryset.none()
-        _ensure_owner_field(scope)
-        return filtered.filter(owner=user)
-
-    if scope in {"declined", "archived"}:
-        filtered = queryset.filter(**_status_kwargs(scope))
-        if is_staff:
-            return filtered
-        if not is_authenticated:
-            return queryset.none()
-        _ensure_owner_field(scope)
-        return filtered.filter(owner=user)
-
-    return queryset
-
-
-def _editor_grant_filter(model, user):
-    """Q filter matching objects the user holds an editor grant for."""
-    from .models import editor_grant_object_ids
-
-    try:
-        return Q(pk__in=editor_grant_object_ids(model, user))
-    except Exception:
-        return Q(pk__in=[])
+    return scope_queryset(user, queryset, scope)
 
 
 def filter_queryset_for_user(queryset, user):
-    """Return the subset of ``queryset`` visible to ``user`` under read policy.
-
-    - staff: full queryset
-    - anonymous: published only
-    - authenticated regular: own + published + editor grants
-    - authenticated moderator: own + published + review + editor grants
-    """
-
-    model = queryset.model
-
-    if getattr(user, "is_staff", False):
-        return queryset
-
-    if not getattr(user, "is_authenticated", False):
-        return queryset.filter(
-            publication_status=_resolve_status_value(model, "published")
-        )
-
-    if not hasattr(model, "owner"):
-        raise ImproperlyConfigured(
-            f"{model.__name__} must define an 'owner' field to apply user visibility filtering."
-        )
-
-    published_filter = Q(publication_status=_resolve_status_value(model, "published"))
-    owner_filter = Q(owner=user)
-
-    editor_filter = _editor_grant_filter(model, user)
-
-    if user_is_moderator_for_model(user, model):
-        review_filter = Q(publication_status=_resolve_status_value(model, "review"))
-        return queryset.filter(
-            owner_filter | published_filter | review_filter | editor_filter
-        )
-
-    return queryset.filter(owner_filter | published_filter | editor_filter)
+    """Return the subset of ``queryset`` visible to ``user`` under read policy."""
+    return visible_queryset(user, queryset)
 
 
 def visible_related_object(obj, user):
     """Return ``obj`` when ``user`` may see it under read policy, else None."""
     if obj is None:
         return None
-    queryset = type(obj)._base_manager.filter(pk=obj.pk)
-    return obj if filter_queryset_for_user(queryset, user).exists() else None
+    return obj if decide(user, "read", obj).allowed else None
 
 
 def build_scope_filter_params(scope: str | None, user):
     """Return list-valued filter kwargs for export endpoints.
 
     These parameters are merged into URL-query-like payloads consumed by
-    filtersets in async export tasks. The ``private`` scope contributes no
-    parameters: owner and editor-grant visibility is enforced by
-    ``apply_scope_filter`` on the task's base queryset.
+    filtersets in async export tasks. The ``private``/``owned``/``shared``
+    scopes contribute no parameters: owner and editor-grant visibility is
+    enforced by ``apply_scope_filter`` on the task's base queryset.
     """
+    from .models import UserCreatedObject
 
-    if scope == "private":
+    if scope in ("private", "owned", "shared"):
         return {}
 
-    if scope == "review":
-        from .models import UserCreatedObject
-
-        return {
-            "publication_status": [_resolve_status_value(UserCreatedObject, "review")]
-        }
-
-    if scope == "declined":
-        from .models import UserCreatedObject
-
-        return {
-            "publication_status": [_resolve_status_value(UserCreatedObject, "declined")]
-        }
-
-    if scope == "archived":
-        from .models import UserCreatedObject
-
-        return {
-            "publication_status": [_resolve_status_value(UserCreatedObject, "archived")]
-        }
-
-    from .models import UserCreatedObject
+    if scope in ("review", "declined", "archived"):
+        return {"publication_status": [_resolve_status_value(UserCreatedObject, scope)]}
 
     return {
         "publication_status": [_resolve_status_value(UserCreatedObject, "published")]

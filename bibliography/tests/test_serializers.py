@@ -1,6 +1,9 @@
 from collections import OrderedDict
 from datetime import date
 
+from django.contrib.auth.models import Permission, User
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import PermissionDenied
 from django.db.models.signals import post_save
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
@@ -54,8 +57,13 @@ class SourceSerializerTest(TestCase):
             source = serializer.save()
 
         self.assertEqual(Source.objects.count(), 1)
-        self.assertEqual(source.authors.count(), 2)
-        self.assertEqual(source.licence.name, "Test Licence")
+        self.assertEqual(source.title, "Test Source")
+        self.assertEqual(
+            source.authors.count(),
+            0,
+            "Nested author payloads are read-only on SourceModelSerializer.",
+        )
+        self.assertIsNone(source.licence)
 
     def test_serializer_with_invalid_data(self):
         invalid_data = self.source_data.copy()
@@ -76,6 +84,13 @@ class SourceSerializerTest(TestCase):
                     if key != "authors" and key != "licence"
                 },
             )
+        author = Author.objects.create(
+            owner=source.owner,
+            first_names="John",
+            last_names="Doe",
+            publication_status="private",
+        )
+        SourceAuthor.objects.create(source=source, author=author, position=1)
 
         update_data = self.source_data.copy()
         update_data["title"] = "Updated Test Source"
@@ -86,6 +101,11 @@ class SourceSerializerTest(TestCase):
             updated_source = serializer.save()
 
         self.assertEqual(updated_source.title, "Updated Test Source")
+        self.assertEqual(updated_source.licence_id, licence.pk)
+        self.assertEqual(
+            list(updated_source.sourceauthors.values_list("author_id", flat=True)),
+            [author.pk],
+        )
 
 
 class SourceCreateSerializerAuthorValidationTestCase(TestCase):
@@ -109,6 +129,60 @@ class SourceCreateSerializerAuthorValidationTestCase(TestCase):
         self.assertIn("authors", serializer.errors)
 
 
+class SourceCreateSerializerPersistenceTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="creator")
+        for model, codename in ((Source, "add_source"), (Author, "add_author")):
+            self.user.user_permissions.add(
+                Permission.objects.get(
+                    codename=codename,
+                    content_type=ContentType.objects.get_for_model(model),
+                )
+            )
+        self.existing_author = Author.objects.create(
+            owner=self.user,
+            first_names="Ada",
+            last_names="Lovelace",
+            publication_status="published",
+        )
+
+    def _serializer(self, data):
+        request = RequestFactory().post("/api/sources/")
+        request.user = self.user
+        return SourceCreateSerializer(data=data, context={"request": request})
+
+    def test_save_creates_private_source_with_ordered_authors(self):
+        serializer = self._serializer(
+            {
+                "title": "Persisted Source",
+                "type": "article",
+                "authors": [
+                    {"id": self.existing_author.pk},
+                    {"last_names": "New", "first_names": "Author"},
+                ],
+            }
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        source = serializer.save()
+
+        self.assertEqual(source.owner, self.user)
+        self.assertEqual(source.publication_status, "private")
+        rows = list(
+            source.sourceauthors.order_by("position").values_list(
+                "position", "author_id"
+            )
+        )
+        self.assertEqual(rows[0], (1, self.existing_author.pk))
+        self.assertEqual(rows[1][0], 2)
+        self.assertEqual(Author.objects.get(pk=rows[1][1]).owner, self.user)
+
+    def test_save_denied_without_add_source(self):
+        self.user.user_permissions.clear()
+        serializer = self._serializer({"title": "T", "type": "misc"})
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        with self.assertRaises(PermissionDenied):
+            serializer.save()
+        self.assertFalse(Source.objects.exists())
 class SourceCreateSerializerDoiValidationTestCase(TestCase):
     def test_non_doi_value_is_invalid(self):
         serializer = SourceCreateSerializer(

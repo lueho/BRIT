@@ -1,6 +1,10 @@
 from django.contrib import admin
 
-from utils.object_management.admin import NamedUserCreatedObjectAdmin
+from utils.object_management.admin import (
+    NamedUserCreatedObjectAdmin,
+    PolicyAdminMixin,
+    PolicyOwnedInlineMixin,
+)
 
 from .models import (
     Process,
@@ -14,42 +18,42 @@ from .models import (
 )
 
 
-class ProcessMaterialInline(admin.TabularInline):
+class ProcessMaterialInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = ProcessMaterial
     extra = 1
     autocomplete_fields = ("material", "quantity_unit")
 
 
-class ProcessOperatingParameterInline(admin.TabularInline):
+class ProcessOperatingParameterInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = ProcessOperatingParameter
     extra = 1
     autocomplete_fields = ("unit",)
 
 
-class ProcessAuthorInline(admin.TabularInline):
+class ProcessAuthorInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = ProcessAuthor
     extra = 1
     autocomplete_fields = ("author",)
 
 
-class ProcessSourceInline(admin.TabularInline):
+class ProcessSourceInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = ProcessSource
     extra = 1
     autocomplete_fields = ("source",)
 
 
-class ProcessLinkInline(admin.TabularInline):
+class ProcessLinkInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = ProcessLink
     extra = 1
 
 
-class ProcessInfoResourceInline(admin.TabularInline):
+class ProcessInfoResourceInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = ProcessInfoResource
     extra = 1
 
 
 @admin.register(Process)
-class ProcessAdmin(NamedUserCreatedObjectAdmin):
+class ProcessAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "author_list", "owner", "publication_status")
     list_filter = ("categories", "publication_status")
     search_fields = (
@@ -79,12 +83,12 @@ class ProcessAdmin(NamedUserCreatedObjectAdmin):
 
 
 @admin.register(ProcessCategory)
-class ProcessCategoryAdmin(NamedUserCreatedObjectAdmin):
+class ProcessCategoryAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     pass
 
 
 @admin.register(ProcessMaterial)
-class ProcessMaterialAdmin(admin.ModelAdmin):
+class ProcessMaterialAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "process",
         "material",
@@ -102,7 +106,7 @@ class ProcessMaterialAdmin(admin.ModelAdmin):
 
 
 @admin.register(ProcessOperatingParameter)
-class ProcessOperatingParameterAdmin(admin.ModelAdmin):
+class ProcessOperatingParameterAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "process",
         "parameter",
@@ -119,13 +123,13 @@ class ProcessOperatingParameterAdmin(admin.ModelAdmin):
 
 
 @admin.register(ProcessLink)
-class ProcessLinkAdmin(admin.ModelAdmin):
+class ProcessLinkAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("label", "process", "order", "open_in_new_tab")
     search_fields = ("label", "url", "process__name")
 
 
 @admin.register(ProcessInfoResource)
-class ProcessInfoResourceAdmin(admin.ModelAdmin):
+class ProcessInfoResourceAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("title", "process", "resource_type", "order")
     list_filter = ("resource_type",)
     search_fields = ("title", "description", "process__name")

@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Prefetch, prefetch_related_objects
+from django.forms.models import construct_instance
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
@@ -23,6 +24,11 @@ from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
     user_is_moderator_for_model,
+)
+from utils.object_management.services import (
+    content_mutation,
+    is_independent_evidence_model,
+    save_evidence_formset_rows,
 )
 from utils.object_management.views import (
     OwnedObjectModelSelectOptionsView,
@@ -763,12 +769,31 @@ class ProcessUpdateView(UserCreatedObjectUpdateView):
         return super().render_to_response(context, **response_kwargs)
 
     def form_valid(self, form):
-        validity = [inline.is_valid() for inline in self.get_inlines()]
+        inlines = self.get_inlines()
+        validity = [inline.is_valid() for inline in inlines]
         if not all(validity):
             return self.form_invalid(form)
-        self.object = form.save()
-        for inline in self.get_inlines():
-            inline.save()
+        evidence_inlines = [
+            inline
+            for inline in inlines
+            if is_independent_evidence_model(getattr(inline, "model", None))
+        ]
+        other_inlines = [inline for inline in inlines if inline not in evidence_inlines]
+        with transaction.atomic():
+            if self.section.get("fields") or other_inlines:
+                with content_mutation(
+                    self.request.user, self.object, action="edit"
+                ) as locked_object:
+                    self.object = locked_object
+                    if self.section.get("fields"):
+                        form.instance = locked_object
+                        construct_instance(form, locked_object)
+                        self.object = form.save()
+                    for inline in other_inlines:
+                        inline.instance = locked_object
+                        inline.save()
+            for inline in evidence_inlines:
+                save_evidence_formset_rows(self.request.user, inline, self.object)
         if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
             context = {"object": self.object, "section": self.section}
             if "role" in self.section:

@@ -11,6 +11,9 @@ from utils.serializers import FieldLabelModelSerializer
 from .models import (
     Catchment,
     GeoPolygon,
+    GeoreferencedCatchment,
+    GeoreferencedNutsRegion,
+    GeoreferencedRegion,
     LauRegion,
     Location,
     MapConfiguration,
@@ -166,10 +169,6 @@ class LocationGeoFeatureModelSerializer(GeoFeatureModelSerializer):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class GeoreferencedRegion(GeoPolygon, Region):
-    pass
-
-
 class RegionModelSerializer(ModelSerializer):
     class Meta:
         model = Region
@@ -196,10 +195,6 @@ class BaseResultMapSerializer(GeoFeatureModelSerializer):
         fields = "__all__"
 
 
-class GeoreferencedCatchment(GeoPolygon, Catchment):
-    pass
-
-
 class CatchmentModelSerializer(ModelSerializer):
     class Meta:
         model = Catchment
@@ -221,8 +216,36 @@ class CatchmentQuerySerializer(ModelSerializer):
         fields = ["owner", "parent_region", "type", "name"]
 
 
-class GeoreferencedNutsRegion(GeoPolygon, NutsRegion):
-    pass
+class NutsRegionModelSerializer(ModelSerializer):
+    population = SerializerMethodField()
+
+    class Meta:
+        model = NutsRegion
+        fields = (
+            "nuts_id",
+            "name",
+            "levl_code",
+            "cntr_code",
+            "parent_id",
+            "population",
+        )
+        field_detail_levels = {
+            "basic": ["nuts_id", "name", "levl_code", "cntr_code", "parent_id"],
+            "extended": [
+                "population",
+            ],
+        }
+
+    @staticmethod
+    def get_population(obj):
+        qs = obj.regionattributevalue_set.filter(property__name="Population").order_by(
+            "-date"
+        )
+        if qs.exists():
+            pop = qs[0]
+            return f"{int(pop.value)} ({pop.date.year})"
+        else:
+            return None
 
 
 class NutsRegionGeometrySerializer(GeoFeatureModelSerializer):

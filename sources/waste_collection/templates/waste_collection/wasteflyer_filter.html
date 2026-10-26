@@ -43,7 +43,7 @@
     </div>
 {% endblock list_table %}
 {% block list_card_options_dropdown_additional_links %}
-    {% if private_list_owner == user or user.is_staff %}
+    {% if private_list_owner == user or 'waste_collection.change_wasteflyer' in perms %}
         <a id="check_url"
            class="btn btn-outline-secondary w-100 mb-2"
            href="#check_url"

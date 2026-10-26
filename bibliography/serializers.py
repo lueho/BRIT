@@ -1,6 +1,6 @@
 from collections import OrderedDict
 
-from rest_framework.exceptions import PermissionDenied
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.serializers import (
     CharField,
     ChoiceField,
@@ -18,7 +18,6 @@ from .models import (
     AuthorCreationDenied,
     Licence,
     Source,
-    SourceAuthor,
     author_name_has_letter,
     find_or_create_author,
     normalize_author_name_part,
@@ -214,26 +213,19 @@ class SourceCreateSerializer(ModelSerializer):
         return authors
 
     def create(self, validated_data):
+        from .services import create_source_with_authors
+
         authors_data = validated_data.pop("authors", [])
-        owner = getattr(self.context.get("request"), "user", None)
-        authors = self._resolve_authors(owner, authors_data)
-        source = Source.objects.create(
-            owner=owner,
-            type=validated_data.pop("type", Source._meta.get_field("type").default),
-            **validated_data,
-        )
-        for position, author in enumerate(authors, start=1):
-            SourceAuthor.objects.create(
-                source=source,
-                author=author,
-                position=position,
-            )
-        return source
+        actor = getattr(self.context.get("request"), "user", None)
+        try:
+            return create_source_with_authors(actor, dict(validated_data), authors_data)
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages) from exc
 
 
 class SourceModelSerializer(ModelSerializer):
-    authors = AuthorModelSerializer(many=True)
-    licence = LicenceModelSerializer()
+    authors = AuthorModelSerializer(many=True, read_only=True)
+    licence = LicenceModelSerializer(read_only=True)
 
     class Meta:
         model = Source
@@ -261,37 +253,6 @@ class SourceModelSerializer(ModelSerializer):
             "last_accessed",
         ]
         read_only_fields = ["url_valid", "url_checked", "doi", "last_accessed"]
-
-    def create(self, validated_data):
-        authors_data = validated_data.pop("authors")
-        licence_data = validated_data.pop("licence")
-        licence = Licence.objects.create(**licence_data)
-        source = Source.objects.create(licence=licence, **validated_data)
-        for position, author_data in enumerate(authors_data):
-            author, _ = Author.objects.get_or_create(**author_data)
-            SourceAuthor.objects.create(
-                source=source, author=author, position=position + 1
-            )
-        return source
-
-    def update(self, instance, validated_data):
-        authors_data = validated_data.pop("authors")
-        licence_data = validated_data.pop("licence")
-
-        Licence.objects.filter(id=instance.licence.id).update(**licence_data)
-
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-
-        instance.authors.clear()
-        for position, author_data in enumerate(authors_data):
-            author, _ = Author.objects.get_or_create(**author_data)
-            SourceAuthor.objects.create(
-                source=instance, author=author, position=position + 1
-            )
-
-        return instance
 
 
 class HyperlinkedLicenceSerializer(HyperlinkedModelSerializer):
