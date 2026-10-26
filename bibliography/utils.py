@@ -1,4 +1,7 @@
+import ipaddress
+import socket
 import string
+from urllib.parse import urljoin, urlsplit
 
 import requests
 
@@ -11,8 +14,70 @@ _REQUEST_HEADERS = {
 _REQUEST_TIMEOUT = 10
 
 
+_MAX_REDIRECTS = 10
+_REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+_ALLOWED_SCHEMES = frozenset({"http", "https"})
+
+
 def _is_success_status(status_code):
     return 200 <= status_code < 300
+
+
+def _is_public_http_url(url):
+    """Return True if *url* is http(s) and its host resolves only to public IPs.
+
+    Guards server-side URL checks against requests to loopback, private,
+    link-local (cloud metadata) and other non-global addresses.
+    """
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return False
+    if parts.scheme.lower() not in _ALLOWED_SCHEMES or not parts.hostname:
+        return False
+    try:
+        infos = socket.getaddrinfo(
+            parts.hostname,
+            port or (443 if parts.scheme.lower() == "https" else 80),
+            proto=socket.IPPROTO_TCP,
+        )
+    except (OSError, UnicodeError):
+        return False
+    if not infos:
+        return False
+    for info in infos:
+        try:
+            address = ipaddress.ip_address(info[4][0].split("%", 1)[0])
+        except ValueError:
+            return False
+        if not address.is_global or address.is_multicast:
+            return False
+    return True
+
+
+def _request_public(method, url, **kwargs):
+    """Send *method* to *url*, following redirects only to public http(s) hosts.
+
+    Returns the final response, or None if any hop targets a non-public
+    destination or the redirect limit is exceeded.
+    """
+    for _ in range(_MAX_REDIRECTS + 1):
+        if not _is_public_http_url(url):
+            return None
+        response = method(
+            url,
+            headers=_REQUEST_HEADERS,
+            allow_redirects=False,
+            timeout=_REQUEST_TIMEOUT,
+            **kwargs,
+        )
+        location = response.headers.get("Location")
+        if response.status_code not in _REDIRECT_STATUSES or not location:
+            return response
+        response.close()
+        url = urljoin(url, location)
+    return None
 
 
 def check_url(url):
@@ -21,28 +86,17 @@ def check_url(url):
         return False
 
     try:
-        response = requests.head(
-            clean_url,
-            headers=_REQUEST_HEADERS,
-            allow_redirects=True,
-            timeout=_REQUEST_TIMEOUT,
-        )
+        response = _request_public(requests.head, clean_url)
     except requests.exceptions.RequestException:
         response = None
     else:
-        if _is_success_status(response.status_code):
+        if response is not None and _is_success_status(response.status_code):
             return True
 
     get_response = None
     try:
-        get_response = requests.get(
-            clean_url,
-            headers=_REQUEST_HEADERS,
-            allow_redirects=True,
-            timeout=_REQUEST_TIMEOUT,
-            stream=True,
-        )
-        return _is_success_status(get_response.status_code)
+        get_response = _request_public(requests.get, clean_url, stream=True)
+        return get_response is not None and _is_success_status(get_response.status_code)
     except requests.exceptions.RequestException:
         return False
     finally:

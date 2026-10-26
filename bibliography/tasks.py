@@ -51,12 +51,20 @@ def check_stale_source_urls(stale_days=30):
     ``url_checked`` unset, and previously-validated URLs that may have rotted.
     """
     stale_before = timezone.localdate() - timedelta(days=stale_days)
-    pks = (
+    rows = (
         Source.objects.exclude(url__isnull=True)
         .exclude(url="")
         .filter(Q(url_checked__isnull=True) | Q(url_checked__lt=stale_before))
-        .values_list("pk", flat=True)
+        .values_list("pk", "type")
     )
-    signatures = [check_source_url.s(pk) for pk in pks]
+    # Waste flyers need their own task, which also recovers broken URLs from
+    # Wayback snapshots. Dispatch it by name: bibliography must not import
+    # from sources.
+    signatures = [
+        app.signature("check_wasteflyer_url", args=(pk,))
+        if source_type == "waste_flyer"
+        else check_source_url.s(pk)
+        for pk, source_type in rows
+    ]
     callback = check_source_urls_callback.s()
     return chord(signatures)(callback)

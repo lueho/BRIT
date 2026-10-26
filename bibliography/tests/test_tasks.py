@@ -32,12 +32,27 @@ class CheckStaleSourceUrlsTestCase(TestCase):
             url_checked=today,
         )
         cls.no_url = Source.objects.create(title="No URL")
+        cls.stale_flyer = Source.objects.create(
+            title="Stale flyer",
+            type="waste_flyer",
+            url="https://example.org/flyer.pdf",
+            url_checked=today - timedelta(days=60),
+        )
 
-    def _enqueued_pks(self, **kwargs):
+    def _enqueued(self, **kwargs):
         with patch("bibliography.tasks.chord") as mock_chord:
             check_stale_source_urls(**kwargs)
         signatures = mock_chord.call_args[0][0]
-        return {sig.args[0] for sig in signatures}
+        return {sig.args[0]: sig.task for sig in signatures}
+
+    def _enqueued_pks(self, **kwargs):
+        return set(self._enqueued(**kwargs))
+
+    def test_routes_waste_flyers_to_flyer_task_with_wayback_recovery(self):
+        enqueued = self._enqueued()
+        self.assertEqual(enqueued[self.stale_flyer.pk], "check_wasteflyer_url")
+        self.assertEqual(enqueued[self.stale.pk], "check_source_url")
+        self.assertEqual(enqueued[self.unchecked.pk], "check_source_url")
 
     def test_enqueues_unchecked_and_stale_sources(self):
         enqueued = self._enqueued_pks()
