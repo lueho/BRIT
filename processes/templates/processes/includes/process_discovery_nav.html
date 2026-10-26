@@ -1,50 +1,43 @@
-<nav class="process-discovery-nav mb-3" aria-label="Process discovery">
-  {% if nav_compact %}
+{% if nav_compact %}
+  <nav class="process-discovery-nav mb-3" aria-label="Process discovery">
     <a class="sdv2-btn sdv2-btn-ghost" href="{{ nav_processes_url }}">
       <i class="fas fa-industry" aria-hidden="true"></i> Processes
     </a>
     <a class="sdv2-btn sdv2-btn-ghost" href="{{ nav_categories_url }}">
       <i class="fas fa-tags" aria-hidden="true"></i> Categories
     </a>
-  {% else %}
-    <ul class="nav nav-pills">
-      <li class="nav-item">
-        <a class="nav-link {% if nav_section == 'processes' %}active{% endif %}"
-           {% if nav_section == 'processes' %}aria-current="page"{% endif %}
-           href="{{ nav_processes_url }}">
-          <i class="fas fa-industry" aria-hidden="true"></i> Processes
-        </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {% if nav_section == 'categories' %}active{% endif %}"
-           {% if nav_section == 'categories' %}aria-current="page"{% endif %}
-           href="{{ nav_categories_url }}">
-          <i class="fas fa-tags" aria-hidden="true"></i> Categories
-        </a>
-      </li>
-    </ul>
+  </nav>
+{% else %}
+  <nav class="process-discovery-nav d-flex align-items-center flex-wrap gap-2"
+       aria-label="Process discovery">
+    <div class="btn-group btn-group-sm" role="group" aria-label="Process section">
+      <a class="btn btn-outline-secondary{% if nav_section == 'processes' %} active{% endif %}"
+         {% if nav_section == 'processes' %}aria-current="page"{% endif %}
+         href="{{ nav_processes_url }}">
+        <i class="fas fa-industry" aria-hidden="true"></i> Processes
+      </a>
+      <a class="btn btn-outline-secondary{% if nav_section == 'categories' %} active{% endif %}"
+         {% if nav_section == 'categories' %}aria-current="page"{% endif %}
+         href="{{ nav_categories_url }}">
+        <i class="fas fa-tags" aria-hidden="true"></i> Categories
+      </a>
+    </div>
     {% if nav_show_scopes %}
-      <ul class="nav nav-pills mt-2" aria-label="Process scope">
-        <li class="nav-item">
-          <a class="nav-link py-1 {% if nav_scope == 'published' %}active{% endif %}"
-             {% if nav_scope == 'published' %}aria-current="page"{% endif %}
-             href="{{ nav_scope_urls.published }}">Published</a>
-        </li>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Process scope">
+        <a class="btn btn-outline-secondary{% if nav_scope == 'published' %} active{% endif %}"
+           {% if nav_scope == 'published' %}aria-current="page"{% endif %}
+           href="{{ nav_scope_urls.published }}">Published</a>
         {% if nav_show_private %}
-          <li class="nav-item">
-            <a class="nav-link py-1 {% if nav_scope == 'private' %}active{% endif %}"
-               {% if nav_scope == 'private' %}aria-current="page"{% endif %}
-               href="{{ nav_scope_urls.private }}">Mine</a>
-          </li>
+          <a class="btn btn-outline-secondary{% if nav_scope == 'private' %} active{% endif %}"
+             {% if nav_scope == 'private' %}aria-current="page"{% endif %}
+             href="{{ nav_scope_urls.private }}">Mine</a>
         {% endif %}
         {% if nav_show_review %}
-          <li class="nav-item">
-            <a class="nav-link py-1 {% if nav_scope == 'review' %}active{% endif %}"
-               {% if nav_scope == 'review' %}aria-current="page"{% endif %}
-               href="{{ nav_scope_urls.review }}">Review</a>
-          </li>
+          <a class="btn btn-outline-secondary{% if nav_scope == 'review' %} active{% endif %}"
+             {% if nav_scope == 'review' %}aria-current="page"{% endif %}
+             href="{{ nav_scope_urls.review }}">Review</a>
         {% endif %}
-      </ul>
+      </div>
     {% endif %}
-  {% endif %}
-</nav>
+  </nav>
+{% endif %}

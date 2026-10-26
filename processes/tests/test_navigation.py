@@ -649,3 +649,41 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
     @staticmethod
     def _hrefs(response):
         return re.findall(r'href="([^"]+)"', response.content.decode())
+
+
+class ProcessDiscoveryNavStylingTests(TestCase):
+    """The Processes | Categories switch uses BRIT's card-header controls."""
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = User.objects.create_user(username="nav-style-owner")
+        cls.category = ProcessCategory.objects.create(
+            name="Thermochemical", owner=owner, publication_status="published"
+        )
+
+    def assert_nav_in_card_header(self, response):
+        content = response.content.decode()
+        nav_start = content.index('class="process-discovery-nav')
+        self.assertLess(content.index("card-header"), nav_start)
+        nav = content[nav_start : content.index("</nav>", nav_start)]
+        self.assertNotIn("nav-pills", nav)
+        self.assertIn('class="btn-group btn-group-sm"', nav)
+        self.assertIn('class="btn btn-outline-secondary active"', nav)
+
+    def test_process_list_switch_sits_in_card_header(self):
+        response = self.client.get(
+            reverse("processes:process-list"), {"scope": "published"}
+        )
+        self.assert_nav_in_card_header(response)
+
+    def test_category_catalogue_switch_sits_in_card_header(self):
+        response = self.client.get(
+            reverse("processes:processcategory-list"), {"scope": "published"}
+        )
+        self.assert_nav_in_card_header(response)
+
+    def test_category_detail_switch_sits_in_card_header(self):
+        response = self.client.get(
+            reverse("processes:processcategory-detail", kwargs={"pk": self.category.pk})
+        )
+        self.assert_nav_in_card_header(response)
