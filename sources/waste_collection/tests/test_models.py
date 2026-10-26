@@ -993,3 +993,33 @@ class CollectionReviewCascadeTransitionTestCase(TestCase):
         ):
             with self.assertRaises(RuntimeError):
                 Collection._apply_review_action_transition([value], "approve")
+
+
+class CollectionIndexTestCase(TestCase):
+    """Regression tests for #168: a subclass ``Meta.indexes`` replaces the
+    abstract base's index list, so hot-path indexes must be declared
+    explicitly on the concrete models."""
+
+    def test_collection_has_publication_status_index(self):
+        index_fields = {tuple(i.fields) for i in Collection._meta.indexes}
+        self.assertIn(("publication_status",), index_fields)
+
+    def test_collection_has_valid_from_index(self):
+        index_fields = {tuple(i.fields) for i in Collection._meta.indexes}
+        self.assertIn(("valid_from",), index_fields)
+
+    def test_collectionpropertyvalue_has_derived_sync_index(self):
+        index_fields = {tuple(i.fields) for i in CollectionPropertyValue._meta.indexes}
+        self.assertIn(("collection", "property", "year", "is_derived"), index_fields)
+
+    def test_index_migration_builds_concurrently(self):
+        from django.contrib.postgres.operations import AddIndexConcurrently
+        from django.db.migrations.loader import MigrationLoader
+
+        migration = MigrationLoader(None).disk_migrations[
+            ("waste_collection", "0009_collection_collection_pub_status_idx_and_more")
+        ]
+        self.assertFalse(migration.atomic)
+        self.assertTrue(migration.operations)
+        for operation in migration.operations:
+            self.assertIsInstance(operation, AddIndexConcurrently)
