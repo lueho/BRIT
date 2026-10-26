@@ -159,16 +159,17 @@ class CollectionCatchmentTestCase(TestCase):
         collections = self.catchment.downstream_collections
         self.assertNotIn(self.unrelated_collection, collections)
 
-    def test_downstream_collections_is_cached_per_instance(self):
-        """Repeated access within one object lifecycle must not re-query (#246)."""
+    def test_downstream_collections_reflects_collections_added_after_access(self):
         list(self.catchment.downstream_collections)
-        with self.assertNumQueries(0):
-            list(self.catchment.downstream_collections)
+        new_collection = Collection.objects.create(catchment=self.child_catchment)
+        self.assertIn(new_collection, list(self.catchment.downstream_collections))
 
-    def test_upstream_collections_is_cached_per_instance(self):
+    def test_upstream_collections_reflects_collections_added_after_access(self):
         list(self.grandchild_catchment.upstream_collections)
-        with self.assertNumQueries(0):
-            list(self.grandchild_catchment.upstream_collections)
+        new_collection = Collection.objects.create(catchment=self.catchment)
+        self.assertIn(
+            new_collection, list(self.grandchild_catchment.upstream_collections)
+        )
 
     def test_upstream_collections_includes_collections_from_all_ancestor_catchments(
         self,
@@ -293,22 +294,29 @@ class CollectionTestCase(TestCase):
     def test_collection_is_named_automatically_on_creation(self):
         self.assertEqual("Catchment Category System 2024", self.collection.name)
 
-    def test_effective_allowed_materials_is_cached_per_instance(self):
-        """Repeated access within one object lifecycle must not re-query (#246)."""
-        self.collection.allowed_materials.add(
-            WasteComponent.objects.create(name="Allowed cached test")
-        )
+    def test_effective_allowed_materials_reflects_relation_updates_after_access(
+        self,
+    ):
         list(self.collection.effective_allowed_materials)
-        with self.assertNumQueries(0):
-            list(self.collection.effective_allowed_materials)
+        material = WasteComponent.objects.create(name="Allowed after access")
+        self.collection.allowed_materials.add(material)
+        self.assertIn(material, list(self.collection.effective_allowed_materials))
 
-    def test_effective_forbidden_materials_is_cached_per_instance(self):
-        self.collection.forbidden_materials.add(
-            WasteComponent.objects.create(name="Forbidden cached test")
-        )
+    def test_effective_forbidden_materials_reflects_relation_updates_after_access(
+        self,
+    ):
         list(self.collection.effective_forbidden_materials)
+        material = WasteComponent.objects.create(name="Forbidden after access")
+        self.collection.forbidden_materials.add(material)
+        self.assertIn(material, list(self.collection.effective_forbidden_materials))
+
+    def test_effective_materials_use_prefetched_relations(self):
+        collection = Collection.objects.prefetch_related(
+            "allowed_materials", "forbidden_materials"
+        ).get(pk=self.collection.pk)
         with self.assertNumQueries(0):
-            list(self.collection.effective_forbidden_materials)
+            list(collection.effective_allowed_materials)
+            list(collection.effective_forbidden_materials)
 
     def test_collection_name_is_updated_on_model_update(self):
         self.collection.collection_system = CollectionSystem.objects.create(
