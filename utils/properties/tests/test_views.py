@@ -108,6 +108,27 @@ class UnitAutocompleteViewTestCase(ViewWithPermissionsTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class UnitAutocompletePropertyFilterTestCase(ViewWithPermissionsTestCase):
+    def test_filter_by_property_returns_only_allowed_units(self):
+        allowed = Unit.objects.create(
+            name="Allowed unit", publication_status="published"
+        )
+        other = Unit.objects.create(name="Other unit", publication_status="published")
+        prop = Property.objects.create(
+            name="Filtered property", publication_status="published"
+        )
+        prop.allowed_units.add(allowed)
+
+        response = self.client.get(
+            reverse("unit-autocomplete"), {"f": f"'property__id={prop.pk}'"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result_ids = {item["id"] for item in response.json()["results"]}
+        self.assertIn(allowed.pk, result_ids)
+        self.assertNotIn(other.pk, result_ids)
+
+
 class PropertyAutocompleteViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
