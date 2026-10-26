@@ -21,7 +21,10 @@ from maps.geojson_assets import (
 )
 from maps.mixins import CachedGeoJSONMixin
 from maps.models import GeoPolygon, Region
-from maps.tasks import warm_static_region_geojson_assets
+from maps.tasks import (
+    warm_all_geojson_caches,
+    warm_static_region_geojson_assets,
+)
 from maps.utils import get_region_cache_key
 from maps.utils import iter_geojson_features as real_iter_geojson_features
 from maps.views import MapMixin
@@ -366,6 +369,29 @@ class StaticRegionGeoJSONAssetTests(TestCase):
         data = self._asset_payload(response)
         self.assertEqual(len(data["features"]), 1)
 
+    def test_conditional_get_on_missing_asset_streams_no_store_fallback(self):
+        # A matching ETag must not yield an immutable 304 while no persisted
+        # asset exists; the client needs the same fallback body a plain GET
+        # receives.
+        with (
+            patch.object(self.storage, "save", side_effect=OSError("storage down")),
+            self.assertLogs("maps.geojson_assets", level="WARNING"),
+        ):
+            response = self.client.get(
+                self.asset_url, HTTP_IF_NONE_MATCH=f'"{self.version}"'
+            )
+            head = self.client.head(
+                self.asset_url, HTTP_IF_NONE_MATCH=f'"{self.version}"'
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Cache-Control"], "no-store")
+        self.assertEqual(response["X-Cache-Status"], "STREAM")
+        data = self._asset_payload(response)
+        self.assertEqual(len(data["features"]), 1)
+        self.assertEqual(head.status_code, 200)
+        self.assertEqual(head["Cache-Control"], "no-store")
+        self.assertEqual(head["X-Cache-Status"], "STREAM")
+
     def test_busy_generation_lock_falls_back_to_fresh_no_store_stream(self):
         name = self._asset_name()
         self.geojson_cache.set(f"region_geojson_asset:lock:{name}", True)
@@ -466,15 +492,22 @@ class StaticRegionGeoJSONAssetTests(TestCase):
         processed = mixin.post_process_map_config(dict(config))
         self.assertEqual(processed["regionLayerGeometriesUrl"], self.api_url)
 
-    def test_storage_save_returning_different_name_is_served(self):
+    def test_renamed_storage_save_is_not_remembered_as_asset(self):
+        # A backend that renames on save leaves the deterministic name
+        # unlocatable; the renamed copy is removed and requests fall back
+        # to streaming rather than orphaning a file per request.
         storage = RenamingStorage(location=self.tmpdir.name)
         with patch("maps.geojson_assets.default_storage", storage):
-            response = self.client.get(self.asset_url)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["X-Cache-Status"], "ASSET")
-        data = self._asset_payload(response)
+            first = self.client.get(self.asset_url)
+            second = self.client.get(self.asset_url)
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first["X-Cache-Status"], "STREAM")
+        self.assertEqual(first["Cache-Control"], "no-store")
+        data = self._asset_payload(first)
         self.assertEqual(len(data["features"]), 1)
-        self.assertTrue(storage.exists(self._asset_name() + ".renamed"))
+        self.assertEqual(second.status_code, 200)
+        self.assertFalse(storage.exists(self._asset_name() + ".renamed"))
+        self.assertFalse(storage.exists(self._asset_name()))
 
     def test_metadata_edit_during_render_aborts_save_and_stale_url_404s(self):
         real_render = geojson_assets.render_geojson_payload
@@ -634,3 +667,20 @@ class StaticRegionGeoJSONWarmupTests(TransactionTestCase):
                     )
                 )
             )
+
+    def test_warm_all_geojson_caches_repairs_static_assets(self):
+        # The scheduled umbrella warmup must rebuild missing persisted
+        # assets, not just Redis entries.
+        with patch("maps.tasks.warm_static_region_geojson_assets") as task:
+            warm_all_geojson_caches.apply(
+                kwargs={"nuts_levels": [], "regions_limit": 0}
+            )
+            task.apply.assert_called_once()
+            warm_all_geojson_caches.apply(
+                kwargs={
+                    "nuts_levels": [],
+                    "regions_limit": 0,
+                    "queue_subtasks": True,
+                }
+            )
+            task.apply_async.assert_called_once()

@@ -203,7 +203,18 @@ def ensure_static_region_geojson_asset(region):
                     exc_info=True,
                 )
                 return None
-            return saved_name
+            # Storage renamed the file: the deterministic name cannot be
+            # located later, so keeping it would orphan a file per request.
+            # Drop the renamed copy and report failure instead.
+            try:
+                default_storage.delete(saved_name)
+            except Exception:
+                logger.warning(
+                    "Failed to remove renamed GeoJSON asset %s",
+                    saved_name,
+                    exc_info=True,
+                )
+            return None
         return name
     finally:
         try:
@@ -283,8 +294,6 @@ class RegionGeoJSONAssetView(APIView):
 
     def get(self, request, pk, version):
         region = self._validated_region(pk, version)
-        if self._etag_matches(request, version):
-            return self._not_modified(version)
         name = ensure_static_region_geojson_asset(region)
         if name is not None:
             try:
@@ -298,6 +307,11 @@ class RegionGeoJSONAssetView(APIView):
                 )
                 payload = None
             if payload is not None and len(payload) <= GEOJSON_MAX_RENDERED_CACHE_BYTES:
+                # Only a verified readable asset may be confirmed via 304;
+                # otherwise a conditional client would be told its empty or
+                # missing representation is fresh.
+                if self._etag_matches(request, version):
+                    return self._not_modified(version)
                 response = StreamingHttpResponse(
                     iter_rendered_geojson(payload),
                     content_type="application/geo+json",
@@ -309,8 +323,6 @@ class RegionGeoJSONAssetView(APIView):
 
     def head(self, request, pk, version):
         region = self._validated_region(pk, version)
-        if self._etag_matches(request, version):
-            return self._not_modified(version)
         name = get_static_region_geojson_asset_name(region.pk, version)
         try:
             persisted = default_storage.exists(name)
@@ -321,6 +333,8 @@ class RegionGeoJSONAssetView(APIView):
                 exc_info=True,
             )
             persisted = False
+        if persisted and self._etag_matches(request, version):
+            return self._not_modified(version)
         response = StreamingHttpResponse((), content_type="application/geo+json")
         response["X-Cache-Status"] = "ASSET" if persisted else "STREAM"
         return self._set_headers(response, version, persisted)

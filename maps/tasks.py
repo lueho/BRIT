@@ -124,6 +124,28 @@ def warm_all_geojson_caches(
         logger.exception("Failed to warm base GeoJSON caches: %s", e)
         results["maps"] = {"status": "error", "error": str(e)}
 
+    # Repair persisted static-region assets too: a lost artifact should be
+    # rebuilt by the scheduled pass, not only on worker start or next request.
+    try:
+        if queue_subtasks:
+            queued = warm_static_region_geojson_assets.apply_async()
+            results["static_region_assets"] = {
+                "status": "queued",
+                "task_id": queued.id,
+            }
+        else:
+            eager = warm_static_region_geojson_assets.apply()
+            if eager.successful():
+                results["static_region_assets"] = eager.result
+            else:
+                results["static_region_assets"] = {
+                    "status": "error",
+                    "error": str(eager.result),
+                }
+    except Exception as e:
+        logger.exception("Failed to warm static region GeoJSON assets: %s", e)
+        results["static_region_assets"] = {"status": "error", "error": str(e)}
+
     for slug, warmer in get_source_domain_geojson_cache_warmers():
         try:
             if queue_subtasks:
