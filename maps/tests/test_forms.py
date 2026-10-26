@@ -238,6 +238,15 @@ class RegionAttributeValueModelFormTestCase(TestCase):
             form.fields["standard_deviation"].widget.attrs.get("step"), "any"
         )
 
+    def test_unit_uses_visibility_filtered_autocomplete(self):
+        """Regression test for #666: a plain <select> widget enumerated all
+        units, including private objects of other users."""
+        from django_tomselect.widgets import TomSelectModelWidget
+
+        form = RegionAttributeValueModelForm()
+
+        self.assertIsInstance(form.fields["unit"].widget, TomSelectModelWidget)
+
     def test_clean_assigns_matching_unit_from_property_when_available(self):
         expected_unit = Unit.objects.create(name="1/km²", symbol="1/km²")
         self.property.allowed_units.add(expected_unit)

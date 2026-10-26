@@ -791,18 +791,19 @@ class CollectionPropertyValueCRUDViewsTestCase(
 
     @classmethod
     def create_related_objects(cls):
+        unit = Unit.objects.create(name="Test Unit", publication_status="published")
+        prop = Property.objects.create(
+            name="Test Property", publication_status="published"
+        )
+        prop.allowed_units.add(unit)
         return {
             "collection": Collection.objects.create(
                 owner=cls.owner_user,
                 name="Test Collection",
                 publication_status="published",
             ),
-            "property": Property.objects.create(
-                name="Test Property", publication_status="published"
-            ),
-            "unit": Unit.objects.create(
-                name="Test Unit", publication_status="published"
-            ),
+            "property": prop,
+            "unit": unit,
         }
 
     def related_objects_post_data(self):
@@ -1037,13 +1038,14 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
 
     @classmethod
     def create_related_objects(cls):
+        unit = Unit.objects.create(name="Test Unit", publication_status="published")
+        prop = Property.objects.create(
+            name="Test Property", publication_status="published"
+        )
+        prop.allowed_units.add(unit)
         return {
-            "property": Property.objects.create(
-                name="Test Property", publication_status="published"
-            ),
-            "unit": Unit.objects.create(
-                name="Test Unit", publication_status="published"
-            ),
+            "property": prop,
+            "unit": unit,
         }
 
     def related_objects_post_data(self):
