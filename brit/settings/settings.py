@@ -351,6 +351,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "cleanup_orphaned_waste_flyers",
         "schedule": crontab(hour=4, minute=30),
     },
+    # Monthly re-validation catches link rot on municipal pages and covers
+    # sources imported before the post-save URL check existed.
+    "recheck-stale-source-urls": {
+        "task": "check_stale_source_urls",
+        "schedule": crontab(day_of_month=1, hour=2, minute=30),
+    },
 }
 
 GEO_BORDER_TOLERANCE = 0.005  # Tolerance for border detection in degrees for EPSG 4326
