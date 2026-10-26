@@ -506,6 +506,10 @@ class WasteAtlasChangeMapOverviewView(AtlasShellTreeMixin, TemplateView):
         ctx["default_to_year"] = str(
             parse_atlas_year(self.request.GET.get("to_year"), default_year)
         )
+        ctx["atlas_selector_options"] = {
+            "useChangeUrls": True,
+            "scope": ctx["atlas_scope"],
+        }
         return ctx
 
 
