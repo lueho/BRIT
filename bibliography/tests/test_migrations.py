@@ -146,7 +146,7 @@ class FinalizedBaselineGraphTests(SimpleTestCase):
         with mock.patch.object(
             MigrationRecorder,
             "applied_migrations",
-            return_value=dict.fromkeys(applied),
+            side_effect=lambda: dict.fromkeys(applied),
         ):
             loader = MigrationLoader(connection)
             loader.check_consistent_history(connection)
@@ -160,7 +160,7 @@ class FinalizedBaselineGraphTests(SimpleTestCase):
         with mock.patch.object(
             MigrationRecorder,
             "applied_migrations",
-            return_value=dict.fromkeys(applied),
+            side_effect=lambda: dict.fromkeys(applied),
         ):
             loader = MigrationLoader(connection)
             loader.check_consistent_history(connection)
@@ -173,7 +173,7 @@ class FinalizedBaselineGraphTests(SimpleTestCase):
         with mock.patch.object(
             MigrationRecorder,
             "applied_migrations",
-            return_value=dict.fromkeys(applied),
+            side_effect=lambda: dict.fromkeys(applied),
         ):
             loader = MigrationLoader(connection)
             with self.assertRaises(InconsistentMigrationHistory) as context:
