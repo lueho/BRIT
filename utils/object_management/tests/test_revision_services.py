@@ -1152,6 +1152,16 @@ class ReassignmentLockTests(RevisionServiceBase):
         self.assertEqual(mpv.sample_id, self.sample_a.pk)
         self.assertEqual(mpv.content_revision, 1)
 
+    def test_evidence_detach_without_proposed_parent_denied(self):
+        mpv = self._mpv(self.sample_a)
+        with self.assertRaises(PermissionDenied):
+            with content_mutation(self.owner, mpv, action="edit") as row:
+                row.sample = None
+                row.save()
+        mpv.refresh_from_db()
+        self.assertEqual(mpv.sample_id, self.sample_a.pk)
+        self.assertEqual(mpv.content_revision, 1)
+
     def test_owned_reparent_without_proposed_parent_denied(self):
         with self.assertRaises(PermissionDenied):
             with content_mutation(self.owner, self.composition, action="edit") as row:
