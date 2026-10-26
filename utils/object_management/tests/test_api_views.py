@@ -1,6 +1,7 @@
 """Tests for review workflow API endpoints in object_management."""
 
 from datetime import date
+from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -13,6 +14,7 @@ from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
+from distributions.utils import ensure_initial_data
 from sources.waste_collection.models import (
     Collection,
     CollectionCountOptions,
@@ -29,6 +31,7 @@ from sources.waste_collection.review_hooks import (
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.review_context import build_review_context
 from utils.properties.models import Property, Unit
+from utils.tests.testcases import ensure_test_default_owner
 
 
 class ReviewAPIViewsTests(TestCase):
@@ -39,6 +42,8 @@ class ReviewAPIViewsTests(TestCase):
         cls.owner = User.objects.create_user(username="owner")
         cls.moderator = User.objects.create_user(username="moderator")
         cls.regular_user = User.objects.create_user(username="regular")
+        ensure_test_default_owner()
+        ensure_initial_data(stdout=StringIO())
         distribution = TemporalDistribution.objects.get(name="Months of the year")
         january = Timestep.objects.get(name="January")
         june = Timestep.objects.get(name="June")
@@ -598,6 +603,7 @@ class ReviewContextCPVEnrichmentTests(TestCase):
             )
             cls.moderator.user_permissions.add(perm)
 
+        ensure_test_default_owner()
         cls.unit = Unit.objects.create(
             name="tonnes", symbol="t", publication_status="published"
         )

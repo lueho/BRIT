@@ -161,13 +161,27 @@ class ReviewItemCollector:
                 logger.warning("Could not load priority model '%s': %s", model_path, e)
         return models
 
+    def _scoped_queryset_for_model(
+        self, model: type[UserCreatedObject]
+    ) -> QuerySet[UserCreatedObject]:
+        """Return the policy-scoped queryset for the requested review scope.
+
+        ``?scope=review`` (default) uses the model's in-review manager; any
+        other scope (``declined``) starts from the full table and lets the
+        policy apply the state filter. Unknown scopes fail closed inside
+        ``reviewable_queryset`` — they never widen the base.
+        """
+        scope = self.params.get("scope", "review")
+        base = (
+            self.in_review_queryset_for_model(model)
+            if scope == "review"
+            else model.objects.all()
+        )
+        return reviewable_queryset(self.user, base, scope=scope)
+
     def _has_visible_review_items(self, model: type[UserCreatedObject]) -> bool:
         """Return whether the model has review items not owned by this user."""
-        return (
-            reviewable_queryset(self.user, self.in_review_queryset_for_model(model))
-            .exclude(owner=self.user)
-            .exists()
-        )
+        return self._scoped_queryset_for_model(model).exclude(owner=self.user).exists()
 
     def available_models(self) -> list[type[UserCreatedObject]]:
         """Discover all concrete UserCreatedObject subclasses that have items in review.
@@ -395,9 +409,7 @@ class ReviewItemCollector:
             ):
                 continue
             try:
-                queryset = reviewable_queryset(
-                    self.user, self.in_review_queryset_for_model(model_class)
-                )
+                queryset = self._scoped_queryset_for_model(model_class)
             except RECOVERABLE_MODEL_ERRORS as exc:
                 logger.warning(
                     "Could not build in-review queryset for %s: %s",
