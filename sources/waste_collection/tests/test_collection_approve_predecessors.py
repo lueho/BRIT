@@ -4,6 +4,7 @@ from unittest.mock import patch
 from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -313,6 +314,58 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
         self.assertEqual(
             self._review_events(candidate, ReviewAction.ACTION_APPROVED).count(),
             0,
+        )
+
+
+    def _assert_older_version_rejected(self, older, approve):
+        with self.assertRaises(ValidationError):
+            approve(older)
+        older.refresh_from_db()
+        self.assertEqual(older.publication_status, "review")
+        self.assertFalse(
+            self._review_events(older, ReviewAction.ACTION_APPROVED).exists()
+        )
+
+    def test_older_version_cannot_publish_after_its_successor(self):
+        older = self._collection("Older", self.other_owner, "private")
+        newer = self._collection("Newer", self.owner, "review")
+        newer.predecessors.add(older)
+        newer.refresh_from_db()
+        perform_transition(
+            self.moderator, newer, "approve", expected_revision=newer.content_revision
+        )
+        older.refresh_from_db()
+        self.assertEqual(older.publication_status, "private")
+
+        older.submit_for_review()
+        older.refresh_from_db()
+        self._assert_older_version_rejected(
+            older,
+            lambda obj: perform_transition(
+                self.moderator, obj, "approve", expected_revision=obj.content_revision
+            ),
+        )
+        newer.refresh_from_db()
+        self.assertEqual(newer.publication_status, "published")
+
+    def test_older_version_cannot_publish_after_later_descendant(self):
+        older = self._collection("Older", self.other_owner, "review")
+        middle = self._collection("Middle", self.owner, "archived")
+        newest = self._collection("Newest", self.owner, "published")
+        middle.predecessors.add(older)
+        newest.predecessors.add(middle)
+
+        self._assert_older_version_rejected(
+            older, lambda obj: obj.approve(user=self.moderator)
+        )
+
+    def test_raw_orm_approve_rejects_older_version_with_published_successor(self):
+        older = self._collection("Older", self.other_owner, "review")
+        newer = self._collection("Newer", self.owner, "published")
+        newer.predecessors.add(older)
+
+        self._assert_older_version_rejected(
+            older, lambda obj: obj.approve(user=self.moderator)
         )
 
 
