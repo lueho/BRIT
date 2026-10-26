@@ -5,16 +5,11 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("maps", "0019_region_name_en"),
+        ("maps", "0021_regionattributevalue_sources"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="attribute",
-            name="content_revision",
-            field=models.PositiveBigIntegerField(default=1, editable=False),
-        ),
         migrations.AddField(
             model_name="catchment",
             name="content_revision",
@@ -74,44 +69,6 @@ class Migration(migrations.Migration):
             model_name="regionproperty",
             name="content_revision",
             field=models.PositiveBigIntegerField(default=1, editable=False),
-        ),
-        migrations.AlterField(
-            model_name="attribute",
-            name="approved_at",
-            field=models.DateTimeField(blank=True, editable=False, null=True),
-        ),
-        migrations.AlterField(
-            model_name="attribute",
-            name="approved_by",
-            field=models.ForeignKey(
-                blank=True,
-                editable=False,
-                null=True,
-                on_delete=django.db.models.deletion.PROTECT,
-                related_name="+",
-                to=settings.AUTH_USER_MODEL,
-            ),
-        ),
-        migrations.AlterField(
-            model_name="attribute",
-            name="publication_status",
-            field=models.CharField(
-                choices=[
-                    ("private", "Private"),
-                    ("review", "Review"),
-                    ("published", "Published"),
-                    ("declined", "Declined"),
-                    ("archived", "Archived"),
-                ],
-                default="private",
-                editable=False,
-                max_length=10,
-            ),
-        ),
-        migrations.AlterField(
-            model_name="attribute",
-            name="submitted_at",
-            field=models.DateTimeField(blank=True, editable=False, null=True),
         ),
         migrations.AlterField(
             model_name="catchment",
