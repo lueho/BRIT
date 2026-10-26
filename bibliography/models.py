@@ -538,15 +538,12 @@ class Source(UserCreatedObject):
         return normalize_doi(stored) or None
 
     def save(self, *args, **kwargs):
-        normalized_doi = normalize_doi(self.doi) or None
-        if normalized_doi != self.doi:
-            self.doi = normalized_doi
-            update_fields = kwargs.get("update_fields")
-            if update_fields is not None:
-                update_fields = list(update_fields)
-                if "doi" not in update_fields:
-                    update_fields.append("doi")
-                kwargs["update_fields"] = update_fields
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = list(update_fields)
+            kwargs["update_fields"] = update_fields
+        if update_fields is None or "doi" in update_fields:
+            self.doi = normalize_doi(self.doi) or None
         if not self.citation_key:
             self.citation_key = generate_citation_key(self)
         super().save(*args, **kwargs)

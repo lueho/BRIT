@@ -371,7 +371,7 @@ class SourceDoiNormalizationTestCase(TestCase):
         source = Source.objects.create(title="Article", doi="10.1234/{part}")
         self.assertEqual(source.doi, "10.1234/{part}")
 
-    def test_partial_save_persists_normalized_doi(self):
+    def test_partial_save_without_doi_leaves_doi_untouched(self):
         source = Source.objects.create(title="Article")
         Source.objects.filter(pk=source.pk).update(
             doi="https://doi.org/10.1000/example"
@@ -380,19 +380,28 @@ class SourceDoiNormalizationTestCase(TestCase):
 
         source.update_abbreviation()
 
+        self.assertEqual(source.doi, "https://doi.org/10.1000/example")
         source.refresh_from_db()
-        self.assertEqual(source.doi, "10.1000/example")
+        self.assertEqual(source.doi, "https://doi.org/10.1000/example")
 
-    def test_partial_save_with_iterator_update_fields(self):
+    def test_partial_save_without_doi_does_not_overwrite_newer_doi(self):
         source = Source.objects.create(title="Article")
-        Source.objects.filter(pk=source.pk).update(doi="DOI: 10.1000/example")
+        Source.objects.filter(pk=source.pk).update(doi="https://doi.org/10.1000/old")
         source.refresh_from_db()
+        Source.objects.filter(pk=source.pk).update(doi="10.1000/new")
 
-        source.title = "Renamed"
-        source.save(update_fields=iter(["title"]))
+        source.update_abbreviation()
 
         source.refresh_from_db()
-        self.assertEqual(source.title, "Renamed")
+        self.assertEqual(source.doi, "10.1000/new")
+
+    def test_partial_save_with_doi_persists_normalized_doi(self):
+        source = Source.objects.create(title="Article")
+        source.doi = "DOI: 10.1000/example"
+
+        source.save(update_fields=iter(["doi"]))
+
+        source.refresh_from_db()
         self.assertEqual(source.doi, "10.1000/example")
 
     def test_clean_allows_unrelated_edit_of_stored_invalid_doi(self):
