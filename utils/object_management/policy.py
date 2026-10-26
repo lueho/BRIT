@@ -202,7 +202,9 @@ def object_access_routes(user, obj):
                 routes.append(f"edit grant via group '{name}'")
         except Exception:
             pass
-    if is_moderator(user, type(obj)):
+    if is_moderator(user, type(obj)) and getattr(obj, "publication_status", None) in (
+        _MODERATED_STATES | {_STATUS_PUBLISHED}
+    ):
         routes.append("moderator")
     routes.extend(public_routes)
     if not routes:
