@@ -97,6 +97,7 @@ from utils.tests.testcases import (
     AbstractTestCases,
     CheckUrlButtonVisibilityTestMixin,
     ViewWithPermissionsTestCase,
+    ensure_test_default_owner,
 )
 
 from .. import views
@@ -179,6 +180,7 @@ class CollectorUpdateViewPermissionTestCase(ViewWithPermissionsTestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         super().setUpTestData()
         cls.collector = Collector.objects.create(
             owner=cls.owner, name="Test Collector", publication_status="private"
@@ -6543,6 +6545,7 @@ class ReviewSubmissionConsistencyTests(TestCase):
 class CheckWasteFlyerUrlsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         with mute_signals(signals.post_save):
             for i in range(1, 5):
                 WasteFlyer.objects.create(
@@ -6644,6 +6647,7 @@ class CheckWasteFlyerUrlsScopeRegressionTestCase(TestCase):
 @patch("sources.waste_collection.tasks.check_url")
 class CheckWasteFlyerUrlWaybackFallbackTestCase(TestCase):
     def setUp(self):
+        ensure_test_default_owner()
         with mute_signals(signals.post_save):
             self.flyer = WasteFlyer.objects.create(
                 title="Waste flyer",

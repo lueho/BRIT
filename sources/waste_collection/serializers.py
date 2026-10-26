@@ -1471,6 +1471,8 @@ class CollectionMutationVersionSerializer(
     )
     flyer_urls = FlexibleUrlListField(child=serializers.URLField(), required=False)
 
+    access_control_bp = serializers.BooleanField(required=False, allow_null=True)
+    access_control_pap = serializers.BooleanField(required=False, allow_null=True)
     valid_from = serializers.DateField()
     valid_until = serializers.DateField(required=False, allow_null=True)
     established = serializers.IntegerField(

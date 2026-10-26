@@ -11,6 +11,7 @@ from rest_framework.test import APITestCase
 from maps.models import (
     LauRegion,
     NutsRegion,
+    NutsVintage,
     Region,
     RegionAttributeValue,
     RegionProperty,
@@ -59,8 +60,9 @@ class CollectionAnalysisApiTests(APITestCase):
         self.assertEqual(
             self.client.get(self.endpoint(), {"page_size": 1}).status_code, 200
         )
+        # The staff flag alone grants neither group membership nor administration.
         self.client.force_authenticate(self.staff_user)
-        self.assertEqual(self.get_extended().status_code, 200)
+        self.assertEqual(self.get_extended().status_code, 403)
 
     def test_default_list_remains_lean(self):
         prop = Property.objects.get_or_create(name="Connection rate")[0]
@@ -231,6 +233,7 @@ class CollectionAnalysisApiTests(APITestCase):
         total = Property.objects.get_or_create(name="total waste collected")[0]
         unit = Unit.objects.get_or_create(name="%")[0]
         population = RegionProperty.objects.get_or_create(name="Population")[0]
+        NutsVintage.objects.get_or_create(year=2021, defaults={"is_current": True})
         nuts0 = NutsRegion.objects.create(
             name="Germany", country="DE", nuts_id="DE", levl_code=0
         )
