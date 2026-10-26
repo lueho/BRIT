@@ -207,6 +207,50 @@ class TestRegionMergeFormset(TestCase):
         self.assertIn(new.region_ptr_id, ids)
         self.assertNotIn(old.region_ptr_id, ids)
 
+    def test_private_newer_vintage_does_not_hide_published_row(self):
+        published = LauRegion.objects.create(
+            name="Hidden Twin 2021",
+            lau_id="03104000",
+            cntr_code="DE",
+            year=2021,
+            publication_status="published",
+        )
+        private = LauRegion.objects.create(
+            name="Hidden Twin 2025",
+            lau_id="03104000",
+            cntr_code="DE",
+            year=2025,
+            publication_status="private",
+        )
+        FormSet = formset_factory(RegionMergeForm, formset=RegionMergeFormSet)
+        qs = FormSet().forms[0].fields["region"].queryset
+        ids = list(qs.values_list("pk", flat=True))
+        self.assertIn(published.region_ptr_id, ids)
+        self.assertNotIn(private.region_ptr_id, ids)
+
+    def test_owner_sees_own_newer_private_vintage(self):
+        owner = User.objects.create_user(username="lau_vintage_owner")
+        published = LauRegion.objects.create(
+            name="Owned Twin 2021",
+            lau_id="03105000",
+            cntr_code="DE",
+            year=2021,
+            publication_status="published",
+        )
+        private = LauRegion.objects.create(
+            name="Owned Twin 2025",
+            lau_id="03105000",
+            cntr_code="DE",
+            year=2025,
+            owner=owner,
+            publication_status="private",
+        )
+        FormSet = formset_factory(RegionMergeForm, formset=RegionMergeFormSet)
+        qs = FormSet(form_kwargs={"user": owner}).forms[0].fields["region"].queryset
+        ids = list(qs.values_list("pk", flat=True))
+        self.assertIn(private.region_ptr_id, ids)
+        self.assertNotIn(published.region_ptr_id, ids)
+
     def test_formset_has_lauregions_as_queryset(self):
         data = {
             "form-INITIAL_FORMS": 2,

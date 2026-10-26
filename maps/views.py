@@ -78,6 +78,7 @@ from .forms import (
     RegionMergeFormSet,
     RegionModelForm,
     build_local_relation_filter_form,
+    selectable_current_lau_regions,
 )
 from .models import (
     Catchment,
@@ -1252,6 +1253,7 @@ class CatchmentCreateMergeLauView(UserCreatedObjectCreateView):
     permission_required = "maps.add_catchment"
 
     def get_formset_kwargs(self, **kwargs):
+        kwargs["form_kwargs"] = {"user": self.request.user}
         if self.request.method in ("POST", "PUT"):
             kwargs.update({"data": self.request.POST.copy()})
         return kwargs
@@ -1506,7 +1508,9 @@ class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):
         Filter Regions to only show those that have a corresponding LAU Region.
         """
         return queryset.filter(
-            pk__in=Subquery(LauRegion.objects.current().values("pk"))
+            pk__in=Subquery(
+                selectable_current_lau_regions(self.request.user).values("pk")
+            )
         )
 
     def hook_prepare_results(self, results):

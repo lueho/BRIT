@@ -1,5 +1,6 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row
+from django.contrib.auth.models import AnonymousUser
 from django.contrib.gis.forms import MultiPolygonField
 from django.db.models import Subquery
 from django.forms import (
@@ -37,6 +38,7 @@ from utils.forms import (
     SourcesFieldMixin,
     UserCreatedObjectFormMixin,
 )
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.forms import NumericMeasurementFieldsFormMixin
 
 from .models import (
@@ -425,6 +427,14 @@ class CatchmentCreateMergeLauForm(SimpleModelForm):
         fields = ("name", "parent_region", "description")
 
 
+def selectable_current_lau_regions(user):
+    """Newest LAU vintage per code among non-archived rows ``user`` may see."""
+    candidates = filter_queryset_for_user(
+        LauRegion.objects.all(), user or AnonymousUser()
+    ).exclude(publication_status=LauRegion.STATUS_ARCHIVED)
+    return LauRegion.objects.current(among=candidates)
+
+
 class RegionMergeFormHelper(FormHelper):
     form_tag = False
     disable_csrf = True
@@ -441,10 +451,10 @@ class RegionMergeForm(SimpleForm):
         required=False,
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["region"].queryset = Region.objects.filter(
-            pk__in=Subquery(LauRegion.objects.current().values("pk"))
+            pk__in=Subquery(selectable_current_lau_regions(user).values("pk"))
         )
 
 
