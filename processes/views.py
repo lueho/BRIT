@@ -6,17 +6,13 @@ BRIT conventions and patterns from utils.object_management.views.
 
 from urllib.parse import urlsplit
 
-from django.contrib import messages
-from django.db import transaction
 from django.db.models import Prefetch, prefetch_related_objects
-from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
 from django.views.generic import TemplateView
 
 from bibliography.models import Author, Source
 from materials.models import Material
-from utils.forms import workspace_section_formsets
 from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import (
     apply_scope_filter,
@@ -39,6 +35,7 @@ from utils.object_management.views import (
     UserCreatedObjectModalDetailView,
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
+    WorkspaceSectionUpdateMixin,
 )
 from utils.views import BreadcrumbContextMixin, get_safe_next_url
 
@@ -691,127 +688,43 @@ class ProcessModalDetailView(UserCreatedObjectModalDetailView):
     model = Process
 
 
-class ProcessUpdateView(UserCreatedObjectUpdateView):
+class ProcessUpdateView(WorkspaceSectionUpdateMixin, UserCreatedObjectUpdateView):
     """Update a Process with related objects."""
 
     model = Process
     form_class = ProcessMaintenanceForm
     template_name = "processes/process_form.html"
+    section_registry = PROCESS_SECTIONS
+    section_formset_class = ProcessSectionFormSet
+    object_label = "process"
+    section_form_template = "processes/includes/process_section_form.html"
+    section_summary_template = "processes/includes/process_section_summary.html"
 
-    def dispatch(self, request, *args, **kwargs):
-        key = request.GET.get("section", "overview")
-        if key not in PROCESS_SECTIONS:
-            raise Http404("Unknown process section.")
-        self.section = {**PROCESS_SECTIONS[key], "key": key}
-        self.inlines = None
-        with transaction.atomic():
-            return super().dispatch(request, *args, **kwargs)
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        return (
-            queryset.select_for_update() if self.request.method == "POST" else queryset
-        )
-
-    def get_form_kwargs(self):
-        return {
-            **super().get_form_kwargs(),
-            "request": self.request,
-            "fields": self.section.get("fields", ()),
-        }
-
-    def get_inlines(self):
-        if self.inlines is None:
-            self.inlines = workspace_section_formsets(
-                self.object,
-                self.section,
-                self.request,
-                formset_class=ProcessSectionFormSet,
+    def get_section_summary_context(self):
+        context = super().get_section_summary_context()
+        if "role" in self.section:
+            links = self.object._material_links_for_role(self.section["role"])
+            visible_material_ids = set(
+                filter_queryset_for_user(
+                    Material.objects.filter(
+                        pk__in={link.material_id for link in links}
+                    ),
+                    self.request.user,
+                ).values_list("pk", flat=True)
             )
-        return self.inlines
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "section": self.section,
-                "section_url": f"{self.object.update_url}?section={self.section['key']}",
-                "workspace_url": self.get_success_url(),
-                "cancel_url": self.get_success_url(),
-                "object_label": "process",
-                "form_title": self.section["label"],
-                "submit_button_text": "Save section",
-                "inlines": self.get_inlines(),
-            }
-        )
+            context["material_links"] = [
+                link for link in links if link.material_id in visible_material_ids
+            ]
         return context
 
-    def render_to_response(self, context, **response_kwargs):
-        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return JsonResponse(
-                {
-                    "section": self.section["key"],
-                    "saved": False,
-                    "html": render_to_string(
-                        "processes/includes/process_section_form.html",
-                        context,
-                        request=self.request,
-                    ),
-                },
-                status=422 if self.request.method == "POST" else 200,
-            )
-        return super().render_to_response(context, **response_kwargs)
-
-    def form_valid(self, form):
-        validity = [inline.is_valid() for inline in self.get_inlines()]
-        if not all(validity):
-            return self.form_invalid(form)
-        self.object = form.save()
-        for inline in self.get_inlines():
-            inline.save()
-        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            context = {"object": self.object, "section": self.section}
-            if "role" in self.section:
-                links = self.object._material_links_for_role(self.section["role"])
-                visible_material_ids = set(
-                    filter_queryset_for_user(
-                        Material.objects.filter(
-                            pk__in={link.material_id for link in links}
-                        ),
-                        self.request.user,
-                    ).values_list("pk", flat=True)
-                )
-                context["material_links"] = [
-                    link for link in links if link.material_id in visible_material_ids
-                ]
-            return JsonResponse(
-                {
-                    "section": self.section["key"],
-                    "saved": True,
-                    "title": self.object.name,
-                    "message": "Saved privately."
-                    if self.object.is_private
-                    else "Changes saved.",
-                    "html": render_to_string(
-                        "processes/includes/process_section_summary.html",
-                        context,
-                        request=self.request,
-                    ),
-                    "progress_html": render_to_string(
-                        "processes/includes/process_section_progress.html",
-                        {"section_progress": process_section_progress(self.object)},
-                        request=self.request,
-                    ),
-                }
-            )
-        messages.success(
-            self.request,
-            "Saved privately." if self.object.is_private else "Changes saved.",
+    def get_section_saved_payload(self, message):
+        payload = super().get_section_saved_payload(message)
+        payload["progress_html"] = render_to_string(
+            "processes/includes/process_section_progress.html",
+            {"section_progress": process_section_progress(self.object)},
+            request=self.request,
         )
-        return HttpResponseRedirect(self.get_success_url())
-
-    def get_success_url(self):
-        return f"{self.object.get_absolute_url()}?mode=edit"
+        return payload
 
 
 class ProcessModalDeleteView(UserCreatedObjectModalDeleteView):

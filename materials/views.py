@@ -4,7 +4,6 @@ from collections import defaultdict
 from decimal import Decimal
 from urllib.parse import parse_qsl, urlsplit
 
-from django.contrib import messages
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
     PermissionRequiredMixin,
@@ -20,7 +19,6 @@ from django.http import (
     JsonResponse,
 )
 from django.shortcuts import get_object_or_404
-from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext
@@ -34,7 +32,6 @@ from utils.file_export.views import (
     GenericUserCreatedObjectExportView,
     SingleObjectFileExportView,
 )
-from utils.forms import workspace_section_formsets
 from utils.modal import BSModalFormView, BSModalUpdateView
 from utils.object_management.access import (
     UserCreatedObjectReadAccessMixin,
@@ -61,6 +58,7 @@ from utils.object_management.views import (
     UserCreatedObjectModalDetailView,
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
+    WorkspaceSectionUpdateMixin,
 )
 from utils.properties.models import Unit
 from utils.properties.units import UnitConversionError
@@ -2078,21 +2076,17 @@ for _model, _review_view in (
     _review_view.register_for_model(_model)
 
 
-class SampleUpdateView(UserCreatedObjectUpdateView):
+class SampleUpdateView(WorkspaceSectionUpdateMixin, UserCreatedObjectUpdateView):
     """Update a Sample one metadata section at a time."""
 
     model = Sample
     form_class = SampleMaintenanceForm
     template_name = "materials/sample_form.html"
-
-    def dispatch(self, request, *args, **kwargs):
-        key = request.GET.get("section", "overview")
-        if key not in SAMPLE_SECTIONS:
-            raise Http404("Unknown sample section.")
-        self.section = {**SAMPLE_SECTIONS[key], "key": key}
-        self.inlines = None
-        with transaction.atomic():
-            return super().dispatch(request, *args, **kwargs)
+    section_registry = SAMPLE_SECTIONS
+    section_formset_class = SampleSectionFormSet
+    object_label = "sample"
+    section_form_template = "materials/includes/sample_section_form.html"
+    section_summary_template = "materials/includes/sample_section_summary.html"
 
     def test_func(self):
         if not self.request.user.is_authenticated:
@@ -2102,94 +2096,11 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
         )
         return bool(policy.get(self.section.get("policy", "can_edit"), False))
 
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        return (
-            queryset.select_for_update() if self.request.method == "POST" else queryset
-        )
-
-    def get_form_kwargs(self):
+    def get_section_summary_context(self):
         return {
-            **super().get_form_kwargs(),
-            "request": self.request,
-            "fields": self.section.get("fields", ()),
+            **super().get_section_summary_context(),
+            "sample_authors": self.object.visible_ordered_authors(self.request.user),
         }
-
-    def get_inlines(self):
-        if self.inlines is None:
-            self.inlines = workspace_section_formsets(
-                self.object,
-                self.section,
-                self.request,
-                formset_class=SampleSectionFormSet,
-            )
-        return self.inlines
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "section": self.section,
-                "section_url": f"{self.object.update_url}?section={self.section['key']}",
-                "workspace_url": self.get_success_url(),
-                "cancel_url": self.get_success_url(),
-                "object_label": "sample",
-                "form_title": self.section["label"],
-                "submit_button_text": "Save section",
-                "inlines": self.get_inlines(),
-            }
-        )
-        return context
-
-    def render_to_response(self, context, **response_kwargs):
-        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return JsonResponse(
-                {
-                    "section": self.section["key"],
-                    "saved": False,
-                    "html": render_to_string(
-                        "materials/includes/sample_section_form.html",
-                        context,
-                        request=self.request,
-                    ),
-                },
-                status=422 if self.request.method == "POST" else 200,
-            )
-        return super().render_to_response(context, **response_kwargs)
-
-    def form_valid(self, form):
-        validity = [inline.is_valid() for inline in self.get_inlines()]
-        if not all(validity):
-            return self.form_invalid(form)
-        self.object = form.save()
-        for inline in self.get_inlines():
-            inline.save()
-        message = "Saved privately." if self.object.is_private else "Changes saved."
-        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return JsonResponse(
-                {
-                    "section": self.section["key"],
-                    "saved": True,
-                    "title": self.object.name,
-                    "message": message,
-                    "html": render_to_string(
-                        "materials/includes/sample_section_summary.html",
-                        {
-                            "object": self.object,
-                            "section": self.section,
-                            "sample_authors": self.object.visible_ordered_authors(
-                                self.request.user
-                            ),
-                        },
-                        request=self.request,
-                    ),
-                }
-            )
-        messages.success(self.request, message)
-        return HttpResponseRedirect(self.get_success_url())
-
-    def get_success_url(self):
-        return f"{self.object.get_absolute_url()}?mode=edit"
 
 
 class SampleModalDeleteView(UserCreatedObjectModalDeleteView):
