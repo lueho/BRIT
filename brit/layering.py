@@ -1,4 +1,5 @@
 import ast
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,7 +20,7 @@ def find_layering_violations(
 ) -> list[str]:
     violations: list[str] = []
 
-    for path in sorted(repo_root.rglob("*.py")):
+    for path in _iter_python_files(repo_root, contract):
         relative_path = path.relative_to(repo_root)
         if _should_ignore_path(relative_path, contract):
             continue
@@ -51,6 +52,31 @@ def find_layering_violations(
             )
 
     return violations
+
+
+def _iter_python_files(repo_root: Path, contract: LayeringContract) -> list[Path]:
+    """Collect scan candidates with pruning before descent.
+
+    Only directories named in ``contract.layers`` are entered at the repo
+    root; ``contract.ignored_path_parts`` directories are pruned at every
+    level so unrelated trees are never traversed.  Root-level ``.py`` files
+    are still collected.  The result is globally sorted for deterministic
+    ordering.
+    """
+    layer_dirs = set(contract.layers)
+    ignored_dirs = contract.ignored_path_parts
+    paths: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(repo_root):
+        depth = len(Path(dirpath).relative_to(repo_root).parts)
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if name not in ignored_dirs and (depth > 0 or name in layer_dirs)
+        ]
+        for filename in filenames:
+            if filename.endswith(".py"):
+                paths.append(Path(dirpath) / filename)
+    return sorted(paths)
 
 
 def _should_ignore_path(relative_path: Path, contract: LayeringContract) -> bool:

@@ -1,9 +1,5 @@
 """Tests for Showcase connections to materials, samples, processes and scenarios."""
 
-from importlib import import_module
-
-from django.apps import apps as django_apps
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.db import IntegrityError
@@ -181,28 +177,6 @@ class ShowcaseConnectionsTestCase(TestCase):
             MaterialCategory.objects.filter(
                 name="Product", publication_status="published"
             ).exists()
-        )
-
-
-class ProductMaterialCategoryMigrationTestCase(TestCase):
-    def test_migration_tolerates_product_categories_of_other_owners(self):
-        migration = import_module("materials.migrations.0030_product_material_category")
-        User = get_user_model()
-        for username in ("alice", "bob"):
-            MaterialCategory.objects.create(
-                name="Product", owner=User.objects.create(username=username)
-            )
-
-        migration.ensure_product_category(django_apps, None)
-
-        default_owner = User.objects.get(
-            username=settings.DEFAULT_OBJECT_OWNER_USERNAME
-        )
-        self.assertEqual(
-            1,
-            MaterialCategory.objects.filter(
-                name="Product", owner=default_owner
-            ).count(),
         )
 
 

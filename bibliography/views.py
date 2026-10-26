@@ -17,7 +17,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from utils.forms import TomSelectFormsetHelper
-from utils.object_management.permissions import get_object_policy
+from utils.object_management.permissions import (
+    UserCreatedObjectPermission,
+    get_object_policy,
+)
 from utils.object_management.templatetags.moderation_tags import safe_back_url
 from utils.object_management.views import (
     PrivateObjectFilterView,
@@ -34,7 +37,6 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateView,
     UserCreatedObjectUpdateWithInlinesView,
 )
-from utils.permissions import HasModelPermission
 from utils.views import BreadcrumbContextMixin, LetterIndexMixin
 
 from .filters import AuthorFilterSet, LicenceListFilter, SourceFilter
@@ -713,9 +715,8 @@ class SourceQuickCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
 
 class SourceCreateAPIView(APIView):
     queryset = Source.objects.all()
-    permission_classes = [HasModelPermission]
+    permission_classes = [UserCreatedObjectPermission]
     action = "create"
-    permission_required = {"create": "bibliography.add_source"}
 
     def post(self, request, *args, **kwargs):
         serializer = SourceCreateSerializer(

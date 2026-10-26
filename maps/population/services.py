@@ -41,18 +41,21 @@ class PopulationResult:
     is_mixed_provenance: bool
 
 
-def _observation_candidates(region_ids, year):
-    return PopulationObservation.objects.filter(
+def _observation_candidates(region_ids, year, *, temporal_basis=None):
+    candidates = PopulationObservation.objects.filter(
         region_id__in=region_ids, year=year
-    ).select_related("dataset")
+    ).select_related("dataset", "import_run")
+    if temporal_basis is not None:
+        candidates = candidates.filter(dataset__temporal_basis=temporal_basis)
+    return candidates
 
 
-def _best_observation_per_region(region_ids, year):
+def _best_observation_per_region(region_ids, year, *, temporal_basis=None):
     """Pick one observation per region, preferring canonical datasets."""
     best = {}
-    for observation in _observation_candidates(region_ids, year).order_by(
-        "region_id", "-dataset__is_canonical", "dataset__slug"
-    ):
+    for observation in _observation_candidates(
+        region_ids, year, temporal_basis=temporal_basis
+    ).order_by("region_id", "-dataset__is_canonical", "dataset__slug"):
         best.setdefault(observation.region_id, observation)
     return best
 
@@ -120,12 +123,13 @@ def _legacy_exact_year_value(region_id, year, legacy_attribute_id):
     )
 
 
-def resolve_composed_population(region, year):
+def resolve_composed_population(region, year, *, temporal_basis=None):
     """Sum exact-year observations over a custom region's components.
 
     Raises :class:`maps.validation.RegionCompositionError` for invalid or
     overlapping compositions. Returns ``None`` when the region has no
-    components or any component lacks an exact-year observation.
+    components or any component lacks an exact-year observation of the
+    requested temporal basis.
     """
     members = list(region.composed_of.all())
     if not members:
@@ -133,7 +137,9 @@ def resolve_composed_population(region, year):
 
     validate_region_composition(members, region=region)
 
-    best = _best_observation_per_region([member.pk for member in members], year)
+    best = _best_observation_per_region(
+        [member.pk for member in members], year, temporal_basis=temporal_basis
+    )
     if any(member.pk not in best for member in members):
         return None
 
@@ -141,7 +147,7 @@ def resolve_composed_population(region, year):
     return _summed_result(observations, year)
 
 
-def resolve_population(region, year, *, legacy_attribute_id=None):
+def resolve_population(region, year, *, legacy_attribute_id=None, temporal_basis=None):
     """Resolve the population of ``region`` for exactly ``year``.
 
     Resolution order:
@@ -153,24 +159,26 @@ def resolve_population(region, year, *, legacy_attribute_id=None):
        requested year when ``legacy_attribute_id`` is provided.
 
     Returns ``None`` when no exact-year value exists. Never selects
-    another year or geography level.
+    another year or geography level. When ``temporal_basis`` is supplied,
+    only observations of that basis qualify; legacy attributes cannot
+    establish a temporal basis and are excluded.
     """
     if region is None or year is None:
         return None
 
     observation = (
-        _observation_candidates([region.pk], year)
+        _observation_candidates([region.pk], year, temporal_basis=temporal_basis)
         .order_by("-dataset__is_canonical", "dataset__slug")
         .first()
     )
     if observation is not None:
         return _direct_result(observation)
 
-    composed = resolve_composed_population(region, year)
+    composed = resolve_composed_population(region, year, temporal_basis=temporal_basis)
     if composed is not None:
         return composed
 
-    if legacy_attribute_id is not None:
+    if legacy_attribute_id is not None and temporal_basis is None:
         return _legacy_exact_year_value(region.pk, year, legacy_attribute_id)
 
     return None
@@ -212,22 +220,25 @@ def materialize_estimate(region, year):
     return estimate
 
 
-def population_values_by_region(region_ids, year, *, legacy_attribute_id=None):
+def population_values_by_region(
+    region_ids, year, *, legacy_attribute_id=None, temporal_basis=None
+):
     """Bulk exact-year population lookup, returning ``{region_id: Decimal}``.
 
     Uses direct observations (canonical datasets preferred) and the
     exact-year legacy adapter. Regions without an exact-year value are
-    omitted; composed regions are not aggregated here.
+    omitted; composed regions are not aggregated here. A requested temporal
+    basis excludes unknown-basis legacy attributes.
     """
     region_ids = list(region_ids)
     values = {
         region_id: observation.value
         for region_id, observation in _best_observation_per_region(
-            region_ids, year
+            region_ids, year, temporal_basis=temporal_basis
         ).items()
     }
 
-    if legacy_attribute_id is not None:
+    if legacy_attribute_id is not None and temporal_basis is None:
         missing = [region_id for region_id in region_ids if region_id not in values]
         if missing:
             legacy_qs = (

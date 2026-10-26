@@ -91,7 +91,16 @@ POPULATION_IMPORT_SCHEMA = {
                         "type": ["integer", "string"],
                         "description": "Reference year.",
                     },
-                    "value": {"type": ["number", "string"]},
+                    "value": {
+                        "anyOf": [
+                            {"type": "number", "minimum": 0},
+                            {
+                                "type": "string",
+                                "pattern": r"^\+?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$",
+                            },
+                        ],
+                        "description": "Nonnegative population in the declared unit.",
+                    },
                     "unit": {"enum": sorted(UNIT_TO_PERSONS)},
                     "source_status": {"enum": ["final", "provisional", "estimated"]},
                     "flags": {"type": "string"},

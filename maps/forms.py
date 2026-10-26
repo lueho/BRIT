@@ -301,11 +301,18 @@ class RegionAttributeValueModelForm(
         ),
         label="Property",
     )
+    unit = TomSelectModelChoiceField(
+        required=False,
+        config=TomSelectConfig(
+            url="unit-autocomplete",
+            label_field="name",
+        ),
+        label="Unit",
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["region"].queryset = Region.objects.all()
-        self.fields["unit"].required = False
 
     def clean(self):
         cleaned_data = super().clean()

@@ -10,7 +10,7 @@ from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
-from maps.models import NutsRegion, NutsVintage
+from maps.models import LauRegion, NutsRegion, NutsVintage
 from maps.population.importers import import_population_payload
 from maps.population.models import PopulationObservation
 from maps.population.serializers import PopulationImportSerializer
@@ -111,35 +111,34 @@ class VintageAwareMatchingTestCase(TestCase):
         self.assertEqual(report.errors, [])
         self.assertEqual(report.resolutions.get("current_vintage"), 1)
 
-    def test_code_missing_from_requested_vintage_falls_back_and_is_reported(self):
+    def test_code_missing_from_requested_vintage_is_rejected_not_fallback(self):
         report = import_population_payload(
             _payload([{"region_code": "DEG0Q", "region_version": "2021"}])
         )
-        self.assertEqual(report.errors, [])
-        self.assertTrue(report.committed)
-        self.assertEqual(report.resolutions.get("fallback_vintage"), 1)
+        self.assertFalse(report.committed)
+        self.assertEqual(len(report.errors), 1)
         self.assertEqual(
-            report.warnings,
-            [
-                {
-                    "index": 0,
-                    "region_scheme": "NUTS",
-                    "region_code": "DEG0Q",
-                    "requested_version": "2021",
-                    "matched_version": "2024",
-                    "resolution": "fallback_vintage",
-                }
-            ],
+            report.errors[0]["reason"],
+            "region code exists only in a different vintage",
         )
+        self.assertNotIn("fallback_vintage", report.resolutions)
+        self.assertFalse(
+            any(w.get("resolution") == "fallback_vintage" for w in report.warnings)
+        )
+        self.assertFalse(PopulationObservation.objects.exists())
 
-    def test_unknown_vintage_label_falls_back_to_a_held_vintage(self):
+    def test_unknown_vintage_label_is_rejected_not_fallback(self):
         report = import_population_payload(
             _payload([{"region_code": "DEG0Q", "region_version": "2016"}])
         )
-        self.assertEqual(report.errors, [])
-        self.assertEqual(report.resolutions.get("fallback_vintage"), 1)
+        self.assertFalse(report.committed)
+        self.assertEqual(len(report.errors), 1)
+        self.assertEqual(
+            report.errors[0]["reason"], "requested NUTS vintage unavailable"
+        )
+        self.assertFalse(PopulationObservation.objects.exists())
 
-    def test_code_in_several_vintages_is_ambiguous_only_without_a_vintage_hint(self):
+    def test_unavailable_vintage_hint_is_rejected(self):
         NutsRegion.objects.create(
             name="Stuttgart",
             country="DE",
@@ -153,7 +152,7 @@ class VintageAwareMatchingTestCase(TestCase):
         self.assertFalse(report.committed)
         self.assertEqual(len(report.errors), 1)
         self.assertEqual(
-            report.errors[0]["reason"], "ambiguous region code (multiple matches)"
+            report.errors[0]["reason"], "requested NUTS vintage unavailable"
         )
 
     def test_vintage_is_resolved_once_per_label_not_once_per_observation(self):
@@ -180,3 +179,112 @@ class VintageAwareMatchingTestCase(TestCase):
         )
         self.assertFalse(report.committed)
         self.assertEqual(report.errors[0]["reason"], "no matching region")
+
+
+class LauVersionMatchingTestCase(TestCase):
+    """``region_version``/``classification_version`` filter ``LauRegion.year``."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.lau_2023 = LauRegion.objects.create(
+            name="Lingen",
+            country="DE",
+            cntr_code="DE",
+            lau_id="03454026",
+            lau_name="Lingen (Ems)",
+            year=2023,
+        )
+
+    def _lau_payload(self, observation=None, **dataset_overrides):
+        obs = {
+            "region_scheme": "LAU",
+            "region_code": "03454026",
+            "indicator": "population",
+            "reference_period": 2023,
+            "value": "52000",
+            "unit": "persons",
+        }
+        if observation:
+            obs.update(observation)
+        # Deliberately no classification_version default: unversioned LAU
+        # fixtures must not inherit a NUTS vintage hint.
+        dataset = {
+            "slug": "destatis-lau",
+            "name": "LAU population",
+            "provider": "destatis",
+            "geographic_scope": "lau",
+            "temporal_basis": "point_in_time",
+        }
+        dataset.update(dataset_overrides)
+        payload = {
+            "schema_version": "1.0",
+            "dataset": dataset,
+            "observations": [obs],
+        }
+        serializer = PopulationImportSerializer(data=payload)
+        serializer.is_valid(raise_exception=True)
+        return serializer.validated_data
+
+    def test_lau_observation_version_matches_lau_year(self):
+        for version in ("2023", "LAU2023"):
+            with self.subTest(version=version):
+                report = import_population_payload(
+                    self._lau_payload({"region_version": version})
+                )
+                self.assertEqual(report.errors, [])
+                self.assertTrue(report.committed)
+                self.assertEqual(
+                    PopulationObservation.objects.get().region_id,
+                    self.lau_2023.pk,
+                )
+                PopulationObservation.objects.all().delete()
+
+    def test_lau_dataset_version_matches_lau_year(self):
+        for version in ("2023", "LAU2023"):
+            with self.subTest(version=version):
+                report = import_population_payload(
+                    self._lau_payload(classification_version=version)
+                )
+                self.assertTrue(report.committed)
+                self.assertEqual(
+                    PopulationObservation.objects.get().region_id,
+                    self.lau_2023.pk,
+                )
+                PopulationObservation.objects.all().delete()
+
+    def test_lau_unheld_year_is_rejected(self):
+        report = import_population_payload(
+            self._lau_payload({"region_version": "2020"})
+        )
+        self.assertFalse(report.committed)
+        self.assertEqual(len(report.errors), 1)
+        self.assertFalse(PopulationObservation.objects.exists())
+
+    def test_lau_wrong_kind_version_is_rejected(self):
+        report = import_population_payload(
+            self._lau_payload({"region_version": "NUTS2021"})
+        )
+        self.assertFalse(report.committed)
+        self.assertFalse(PopulationObservation.objects.exists())
+
+    def test_lau_version_selects_among_same_code_years(self):
+        lau_2020 = LauRegion.objects.create(
+            name="Lingen alt",
+            country="DE",
+            cntr_code="DE",
+            lau_id="03454026",
+            lau_name="Lingen (Ems)",
+            year=2020,
+        )
+        report = import_population_payload(
+            self._lau_payload({"region_version": "2020"})
+        )
+        self.assertTrue(report.committed)
+        self.assertEqual(PopulationObservation.objects.get().region_id, lau_2020.pk)
+
+    def test_lau_without_version_keeps_unique_code_matching(self):
+        report = import_population_payload(self._lau_payload())
+        self.assertTrue(report.committed)
+        self.assertEqual(
+            PopulationObservation.objects.get().region_id, self.lau_2023.pk
+        )

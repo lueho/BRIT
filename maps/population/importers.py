@@ -7,6 +7,7 @@ fails to match or convert, nothing is persisted and the failures are returned
 in the report. ``dry_run`` validates and reports without persisting.
 """
 
+import re
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -89,32 +90,35 @@ def _match_region(
 
     Codes are only unique within a vintage, so an unscoped lookup would report
     every code carried by more than one vintage as ambiguous. When BRIT does not
-    hold the requested vintage but the code exists in exactly one held vintage,
-    that row is matched and the fallback is reported.
+    hold the requested vintage, a different held vintage is not a substitute.
     """
     if scheme != "NUTS":
-        return _unique_or_error(
-            list(LauRegion.objects.filter(lau_id=code)[:2]), "exact"
-        )
+        regions = LauRegion.objects.filter(lau_id=code)
+        label = region_version or classification_version
+        if label:
+            version = re.fullmatch(r"(?:LAU)?(\d{4})", label, flags=re.IGNORECASE)
+            if version is None:
+                return RegionMatch(None, "exact", error="invalid LAU vintage")
+            regions = regions.filter(year=int(version.group(1)))
+        return _unique_or_error(list(regions[:2]), "exact")
 
     resolver = resolver or VintageResolver()
     vintage, resolution = resolver.resolve(region_version, classification_version)
-    if vintage is not None:
-        regions = list(NutsRegion.objects.filter(nuts_id=code, version=vintage)[:2])
-        if regions:
-            return _unique_or_error(
-                regions, resolution, matched_version=str(vintage.year)
-            )
-
-    regions = list(
-        NutsRegion.objects.filter(nuts_id=code).select_related("version")[:2]
-    )
-    match = _unique_or_error(regions, "fallback_vintage")
-    if match.region is not None:
-        match.matched_version = (
-            str(match.region.version.year) if match.region.version_id else ""
+    if vintage is None:
+        return RegionMatch(None, resolution, error="requested NUTS vintage unavailable")
+    regions = list(NutsRegion.objects.filter(nuts_id=code, version=vintage)[:2])
+    if not regions and NutsRegion.objects.filter(nuts_id=code).exists():
+        return RegionMatch(
+            None, resolution, error="region code exists only in a different vintage"
         )
-    return match
+    return _unique_or_error(regions, resolution, matched_version=str(vintage.year))
+
+
+_OPTIONAL_DEFINITION_FIELDS = {
+    "external_id": "source_code",
+    "source_unit": "source_unit",
+    "classification_version": "classification_version",
+}
 
 
 def _upsert_dataset(data):
@@ -122,17 +126,39 @@ def _upsert_dataset(data):
     defaults = {
         "name": data["name"],
         "provider": data["provider"],
-        "source_code": data.get("external_id", ""),
         "geographic_scope": data["geographic_scope"],
         "temporal_basis": data["temporal_basis"],
-        "source_unit": data.get("source_unit", ""),
-        "classification_version": data.get("classification_version", ""),
         "is_canonical": data.get("is_canonical", False),
     }
-    dataset, created = PopulationDataset.objects.get_or_create(
+    for payload_name, field_name in _OPTIONAL_DEFINITION_FIELDS.items():
+        defaults[field_name] = data.get(payload_name, "")
+    dataset, created = PopulationDataset.objects.select_for_update().get_or_create(
         slug=slug, defaults=defaults
     )
     if not created:
+        # Omitted optional metadata keeps the stored value; only an explicit
+        # value (including blank) counts as a definition change.
+        for payload_name, field_name in _OPTIONAL_DEFINITION_FIELDS.items():
+            if payload_name not in data:
+                defaults[field_name] = getattr(dataset, field_name)
+        definition_fields = (
+            "provider",
+            "source_code",
+            "geographic_scope",
+            "temporal_basis",
+            "source_unit",
+            "classification_version",
+        )
+        changed = [
+            name
+            for name in definition_fields
+            if getattr(dataset, name) != defaults[name]
+        ]
+        if changed and dataset.observations.exists():
+            raise ValueError(
+                f"Dataset definition changed ({', '.join(changed)}); "
+                "use a new dataset slug for a different statistical series."
+            )
         for field_name, value in defaults.items():
             setattr(dataset, field_name, value)
         dataset.save()
@@ -149,7 +175,13 @@ def import_population_payload(payload, *, user=None, dry_run=False):
     report = ImportReport(schema_version=payload["schema_version"], dry_run=dry_run)
 
     with transaction.atomic():
-        dataset, dataset_created = _upsert_dataset(payload["dataset"])
+        try:
+            dataset, dataset_created = _upsert_dataset(payload["dataset"])
+        except ValueError as error:
+            report.dataset_slug = payload["dataset"]["slug"]
+            report.errors.append({"dataset": report.dataset_slug, "reason": str(error)})
+            transaction.set_rollback(True)
+            return report
         report.dataset_slug = dataset.slug
         report.dataset_created = dataset_created
 
@@ -161,7 +193,7 @@ def import_population_payload(payload, *, user=None, dry_run=False):
             structure_version=payload["dataset"].get("release", ""),
         )
 
-        classification_version = payload["dataset"].get("classification_version", "")
+        classification_version = dataset.classification_version
         resolver = VintageResolver()
 
         for index, observation in enumerate(payload["observations"]):
@@ -188,19 +220,6 @@ def import_population_payload(payload, *, user=None, dry_run=False):
             report.resolutions[match.resolution] = (
                 report.resolutions.get(match.resolution, 0) + 1
             )
-            if match.resolution == "fallback_vintage":
-                report.warnings.append(
-                    {
-                        "index": index,
-                        "region_scheme": observation["region_scheme"],
-                        "region_code": observation["region_code"],
-                        "requested_version": requested_version
-                        or classification_version,
-                        "matched_version": match.matched_version,
-                        "resolution": "fallback_vintage",
-                    }
-                )
-
             value = _value_in_persons(observation["value"], observation["unit"])
             year = observation["reference_period"]
             defaults = {

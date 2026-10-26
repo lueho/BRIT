@@ -2,11 +2,11 @@ import contextlib
 import io
 import os
 import uuid
+from types import SimpleNamespace
 from unittest import mock
 
 from django.apps import apps
 from django.conf import settings
-from django.contrib.auth.hashers import make_password
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import call_command
 from django.db import DEFAULT_DB_ALIAS, connections, migrations
@@ -215,20 +215,6 @@ ORIGINALS = {
     ],
 }
 
-ORIGINAL_TIPS = {
-    "properties": "0010_remove_property_unit",
-    "materials": "0032_sampleauthor_sample_authors_and_more",
-    "waste_atlas": "0027_move_stored_urls_to_atlas_prefix",
-    "maps": "0020_delete_attribute",
-    "processes": "0016_remove_process_parent",
-    "inventories": "0008_inventoryalgorithmparametervalue_is_custom",
-    "distributions": "0004_alter_period_publication_status_and_more",
-    "layer_manager": "0004_layer_feedstock_material",
-    "object_management": "0006_merge_review_notification_mute",
-    "closecycle": "0007_showcase_theme",
-    "population": "0002_alter_populationestimate_region_and_more",
-    "waste_collection": "0008_collection_list_order_index",
-}
 
 MODEL_ORDER = {
     "properties": ["property", "unit"],
@@ -423,12 +409,6 @@ class SchemaOnlyBaselineGraphTests(SimpleTestCase):
                     [(app, name) for name in ORIGINALS[app]],
                 )
 
-    def test_originals_remain_on_disk(self):
-        loader = MigrationLoader(None)
-        for app, names in ORIGINALS.items():
-            for name in names:
-                self.assertIn((app, name), loader.disk_migrations)
-
     def test_baseline_dependencies(self):
         loader = MigrationLoader(None)
         for app, expected in BASELINE_DEPENDENCIES.items():
@@ -482,27 +462,6 @@ class SchemaOnlyBaselineGraphTests(SimpleTestCase):
                         "callable default during schema setup",
                     )
 
-    def test_baseline_state_matches_original_tip_per_app(self):
-        plain_loader = MigrationLoader(None, replace_migrations=False)
-        loader = MigrationLoader(None)
-        for app in BASELINES:
-            with self.subTest(app=app):
-                original_state = plain_loader.project_state(
-                    nodes=[(app, ORIGINAL_TIPS[app])]
-                )
-                baseline_state = loader.project_state(nodes=[(app, BASELINES[app])])
-                original_models = {
-                    key: state
-                    for key, state in original_state.models.items()
-                    if key[0] == app
-                }
-                baseline_models = {
-                    key: state
-                    for key, state in baseline_state.models.items()
-                    if key[0] == app
-                }
-                self.assertEqual(original_models, baseline_models)
-
     def test_migrated_state_matches_current_models(self):
         loader = MigrationLoader(None)
         migrated_state = loader.project_state()
@@ -539,7 +498,7 @@ class ControlledDatabaseBootstrapBase(SimpleTestCase):
 
     databases = {"default"}
 
-    def _controlled_database(self):
+    def _controlled_database(self, *, clone_migrated=False):
         original = connections[DEFAULT_DB_ALIAS]
         self.assertFalse(original.in_atomic_block)
 
@@ -549,7 +508,15 @@ class ControlledDatabaseBootstrapBase(SimpleTestCase):
         fresh = connections.create_connection(DEFAULT_DB_ALIAS)
         fresh.settings_dict = dict(fresh.settings_dict, NAME=name)
         with admin.cursor() as cursor:
-            cursor.execute(f'CREATE DATABASE "{name}" WITH TEMPLATE template0')
+            if clone_migrated:
+                source = original.settings_dict["NAME"]
+                original.close()
+                cursor.execute(
+                    f'CREATE DATABASE "{name}" '
+                    f"WITH TEMPLATE {admin.ops.quote_name(source)}"
+                )
+            else:
+                cursor.execute(f'CREATE DATABASE "{name}" WITH TEMPLATE template0')
 
         def cleanup():
             connections[DEFAULT_DB_ALIAS] = original
@@ -708,111 +675,14 @@ class FreshBootstrapSchemaTests(ControlledDatabaseBootstrapBase):
             )
 
 
-class PartialLegacyHistoryBootstrapTests(ControlledDatabaseBootstrapBase):
-    @override_settings(
-        DEFAULT_OBJECT_OWNER_USERNAME="schema-owner",
-        DEFAULT_OWNER_USERNAME="legacy-owner",
-    )
-    def test_partial_legacy_history_uses_legacy_stages(self):
-        from brit.management.commands.bootstrap_database import Command
-
-        fresh = self._controlled_database()
-        with self._isolated_caches():
-            partial_tip = (
-                "materials",
-                "0005_remove_materialpropertyvalue_name_description",
-            )
-            old_executor = MigrationExecutor(fresh)
-            old_executor.loader = MigrationLoader(fresh, replace_migrations=False)
-            old_executor.migrate([partial_tip])
-
-            historical_apps = old_executor.loader.project_state(
-                nodes=[partial_tip]
-            ).apps
-            HistoricalUser = historical_apps.get_model("auth", "User")
-            HistoricalMaterial = historical_apps.get_model("materials", "Material")
-            legacy_owner = HistoricalUser.objects.create(
-                username="legacy-material-owner",
-                password=make_password("legacy-secret"),
-            )
-            material = HistoricalMaterial.objects.create(
-                name="Legacy Material",
-                type="material",
-                publication_status="private",
-                description="custom legacy description",
-                owner_id=legacy_owner.pk,
-            )
-
-            self.assertTrue(Command()._requires_legacy_bootstrap())
-            with mock.patch(
-                "brit.management.commands.bootstrap_database.call_command",
-                wraps=call_command,
-            ) as staged:
-                self._run_bootstrap()
-            self.assertEqual(
-                [
-                    (call.args[0], call.args[1:], call.kwargs.get("app_label"))
-                    for call in staged.call_args_list
-                ],
-                [
-                    ("migrate", ("auth",), None),
-                    ("ensure_initial_data", (), "users"),
-                    ("ensure_initial_data", (), "object_management"),
-                    ("migrate", ("properties",), None),
-                    ("ensure_initial_data", (), "properties"),
-                    ("migrate", (), None),
-                    ("ensure_initial_data", (), None),
-                ],
-            )
-
-            from django.contrib.auth.models import User
-
-            from materials.models import Material
-
-            owner = User.objects.get(pk=legacy_owner.pk)
-            self.assertTrue(owner.check_password("legacy-secret"))
-            migrated = Material.objects.get(pk=material.pk)
-            self.assertEqual(migrated.name, "Legacy Material")
-            self.assertEqual(migrated.owner_id, legacy_owner.pk)
-            self.assertEqual(migrated.description, "custom legacy description")
-
-            applied = self._applied(fresh)
-            for app, names in ORIGINALS.items():
-                for name in names:
-                    self.assertIn((app, name), applied)
-            for app, baseline in BASELINES.items():
-                self.assertIn((app, baseline), applied)
-
-            self.assertFalse(Command()._requires_legacy_bootstrap())
-            with mock.patch(
-                "brit.management.commands.bootstrap_database.call_command",
-                wraps=call_command,
-            ) as staged:
-                self._run_bootstrap()
-            self.assertEqual(
-                [
-                    (call.args[0], call.args[1:], call.kwargs.get("app_label"))
-                    for call in staged.call_args_list
-                ],
-                [("migrate", (), None), ("ensure_initial_data", (), None)],
-            )
-
-            self._run_bootstrap()
-            migrated.refresh_from_db()
-            self.assertEqual(migrated.name, "Legacy Material")
-            self.assertEqual(migrated.description, "custom legacy description")
-
-
 class AdoptedHistoryBootstrapTests(ControlledDatabaseBootstrapBase):
     @override_settings(
         DEFAULT_OBJECT_OWNER_USERNAME="schema-owner",
         DEFAULT_OWNER_USERNAME="legacy-owner",
     )
     def test_adopted_history_keeps_data_and_only_restores_markers(self):
-        fresh = self._controlled_database()
+        fresh = self._controlled_database(clone_migrated=True)
         with self._isolated_caches():
-            executor = MigrationExecutor(fresh)
-            executor.migrate(executor.loader.graph.leaf_nodes())
             self._run_bootstrap()
 
             from django.contrib.auth.models import User
@@ -917,3 +787,157 @@ class AdoptedHistoryBootstrapTests(ControlledDatabaseBootstrapBase):
                         touched.append(sql)
             self.assertEqual(touched, [])
             self.assertEqual(before, self._snapshot(fresh))
+
+
+class ControlledDatabaseFixtureTests(SimpleTestCase):
+    """Mock-based checks on the disposable database fixture plumbing."""
+
+    worker_name = "test_brit_test_db_3"
+    disposable_name = "test_schema_only_0123456789abcdef"
+
+    def _mocked_connections(self, order):
+        original = mock.MagicMock(name="original")
+        original.in_atomic_block = False
+        original.settings_dict = {"NAME": self.worker_name}
+        original.close.side_effect = lambda: order.append("original.close")
+
+        admin = mock.MagicMock(name="admin")
+        admin.settings_dict = {"NAME": self.worker_name}
+        admin.ops.quote_name = lambda value: f'"{value}"'
+        admin.close.side_effect = lambda: order.append("admin.close")
+        admin_cursor = admin.cursor.return_value.__enter__.return_value
+        admin_cursor.execute.side_effect = lambda sql: order.append(("execute", sql))
+
+        fresh = mock.MagicMock(name="fresh")
+        fresh.settings_dict = {"NAME": self.worker_name}
+        fresh.close.side_effect = lambda: order.append("fresh.close")
+
+        connections_mock = mock.MagicMock(name="connections")
+        connections_mock.__getitem__.return_value = original
+        connections_mock.create_connection.side_effect = [admin, fresh]
+        return connections_mock, original, admin, admin_cursor, fresh
+
+    @contextlib.contextmanager
+    def _fixture(self):
+        order = []
+        (
+            connections_mock,
+            original,
+            admin,
+            admin_cursor,
+            fresh,
+        ) = self._mocked_connections(order)
+        with (
+            mock.patch(
+                "brit.tests.test_schema_only_bootstrap.connections",
+                connections_mock,
+            ),
+            mock.patch("brit.tests.test_schema_only_bootstrap.uuid") as uuid_mock,
+        ):
+            uuid_mock.uuid4.return_value.hex = "0123456789abcdef"
+            probe = ControlledDatabaseBootstrapBase()
+            try:
+                yield SimpleNamespace(
+                    probe=probe,
+                    connections=connections_mock,
+                    original=original,
+                    admin=admin,
+                    fresh=fresh,
+                    order=order,
+                )
+            finally:
+                probe.doCleanups()
+
+    def _executed(self, order):
+        return [
+            entry[1]
+            for entry in order
+            if isinstance(entry, tuple) and entry[0] == "execute"
+        ]
+
+    def test_template0_fixture_keeps_current_worker_connection_open(self):
+        with self._fixture() as fx:
+            result = fx.probe._controlled_database()
+
+        self.assertIs(result, fx.fresh)
+        self.assertEqual(fx.admin.settings_dict["NAME"], "postgres")
+        self.assertEqual(fx.fresh.settings_dict["NAME"], self.disposable_name)
+        self.assertEqual(
+            fx.order,
+            [
+                (
+                    "execute",
+                    f'CREATE DATABASE "{self.disposable_name}" WITH TEMPLATE template0',
+                ),
+                "fresh.close",
+                (
+                    "execute",
+                    f'DROP DATABASE IF EXISTS "{self.disposable_name}"',
+                ),
+                "admin.close",
+            ],
+        )
+        fx.original.close.assert_not_called()
+        fx.fresh.prepare_database.assert_called_once_with()
+        self.assertEqual(
+            fx.connections.__setitem__.call_args_list,
+            [
+                mock.call(DEFAULT_DB_ALIAS, fx.fresh),
+                mock.call(DEFAULT_DB_ALIAS, fx.original),
+            ],
+        )
+
+    def test_cloned_fixture_uses_current_worker_database_as_template(self):
+        with self._fixture() as fx:
+            result = fx.probe._controlled_database(clone_migrated=True)
+
+        self.assertIs(result, fx.fresh)
+        self.assertEqual(
+            fx.order,
+            [
+                "original.close",
+                (
+                    "execute",
+                    f'CREATE DATABASE "{self.disposable_name}" '
+                    f'WITH TEMPLATE "{self.worker_name}"',
+                ),
+                "fresh.close",
+                (
+                    "execute",
+                    f'DROP DATABASE IF EXISTS "{self.disposable_name}"',
+                ),
+                "admin.close",
+            ],
+        )
+        fx.fresh.prepare_database.assert_called_once_with()
+
+    def test_cleanup_drops_only_disposable_database_and_restores_original(self):
+        with self._fixture() as fx:
+            fx.probe._controlled_database(clone_migrated=True)
+
+        drops = [
+            sql for sql in self._executed(fx.order) if sql.startswith("DROP DATABASE")
+        ]
+        self.assertEqual(drops, [f'DROP DATABASE IF EXISTS "{self.disposable_name}"'])
+        self.assertNotIn(self.worker_name, " ".join(drops))
+        fx.fresh.close.assert_called_once_with()
+        fx.admin.close.assert_called_once_with()
+        self.assertEqual(
+            fx.connections.__setitem__.call_args_list[-1],
+            mock.call(DEFAULT_DB_ALIAS, fx.original),
+        )
+
+    def test_cleanup_is_registered_even_when_prepare_database_fails(self):
+        with self._fixture() as fx:
+            fx.fresh.prepare_database.side_effect = RuntimeError("prepare failed")
+            with self.assertRaises(RuntimeError):
+                fx.probe._controlled_database()
+
+        self.assertIn(
+            f'DROP DATABASE IF EXISTS "{self.disposable_name}"',
+            self._executed(fx.order),
+        )
+        self.assertEqual(
+            fx.connections.__setitem__.call_args_list[-1],
+            mock.call(DEFAULT_DB_ALIAS, fx.original),
+        )

@@ -110,10 +110,7 @@ services:
       retries: 3
 
   redis:
-    build:
-      context: ./docker/redis/
-    volumes:
-      - ./docker/redis/tests/:/tests
+    image: redis:7-alpine
     networks:
       - full
 

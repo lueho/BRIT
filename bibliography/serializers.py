@@ -23,6 +23,7 @@ from .models import (
     find_or_create_author,
     normalize_author_name_part,
 )
+from .utils import DOI_FORMAT_MESSAGE, DOI_PATTERN, normalize_doi
 
 
 class AuthorModelSerializer(ModelSerializer):
@@ -153,6 +154,12 @@ class SourceCreateSerializer(ModelSerializer):
             "publication_status",
         ]
         read_only_fields = ["id", "publication_status"]
+
+    def validate_doi(self, value):
+        doi = normalize_doi(value) or None
+        if doi and not DOI_PATTERN.match(doi):
+            raise ValidationError(DOI_FORMAT_MESSAGE)
+        return doi
 
     def _resolve_authors(self, owner, authors_data):
         authors = []

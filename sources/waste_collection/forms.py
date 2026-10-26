@@ -468,7 +468,27 @@ class CollectionPropertyValueModelFormHelper(FormHelper):
     )
 
 
+class AllowedUnitFormMixin:
+    """Reject units that are not allowed for the selected property."""
+
+    def clean(self):
+        cleaned_data = super().clean()
+        prop = cleaned_data.get("property")
+        unit = cleaned_data.get("unit")
+        if (
+            prop
+            and unit
+            and {"property", "unit"} & set(self.changed_data)
+            and not prop.allowed_units.filter(pk=unit.pk).exists()
+        ):
+            self.add_error(
+                "unit", _("This unit is not allowed for the selected property.")
+            )
+        return cleaned_data
+
+
 class CollectionPropertyValueModelForm(
+    AllowedUnitFormMixin,
     NumericMeasurementFieldsFormMixin,
     UserCreatedObjectFormMixin,
     SourcesFieldMixin,
@@ -480,6 +500,21 @@ class CollectionPropertyValueModelForm(
             label_field="name",
         ),
         label="Collection",
+    )
+    property = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="property-autocomplete",
+            label_field="name",
+        ),
+        label="Property",
+    )
+    unit = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="unit-autocomplete",
+            label_field="name",
+            filter_by=("property", "id"),
+        ),
+        label="Unit",
     )
 
     class Meta:
@@ -513,6 +548,7 @@ class AggregatedCollectionPropertyValueModelFormHelper(FormHelper):
 
 
 class AggregatedCollectionPropertyValueModelForm(
+    AllowedUnitFormMixin,
     NumericMeasurementFieldsFormMixin,
     UserCreatedObjectFormMixin,
     SourcesFieldMixin,
@@ -524,6 +560,21 @@ class AggregatedCollectionPropertyValueModelForm(
             label_field="name",
         ),
         label="Collections",
+    )
+    property = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="property-autocomplete",
+            label_field="name",
+        ),
+        label="Property",
+    )
+    unit = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="unit-autocomplete",
+            label_field="name",
+            filter_by=("property", "id"),
+        ),
+        label="Unit",
     )
 
     class Meta:
