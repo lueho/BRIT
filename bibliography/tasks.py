@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from celery import chord
+from django.db.models import Q
 from django.utils import timezone
 
 from brit.celery import app
@@ -38,3 +41,22 @@ def check_source_urls(params):
     callback = check_source_urls_callback.s()
     task_chord = chord(signatures)(callback)
     return task_chord
+
+
+@app.task(name="check_stale_source_urls")
+def check_stale_source_urls(stale_days=30):
+    """Re-check source URLs that were never checked or are stale (#391).
+
+    Covers the gap the post-save signal leaves: imported or old rows with
+    ``url_checked`` unset, and previously-validated URLs that may have rotted.
+    """
+    stale_before = timezone.localdate() - timedelta(days=stale_days)
+    pks = (
+        Source.objects.exclude(url__isnull=True)
+        .exclude(url="")
+        .filter(Q(url_checked__isnull=True) | Q(url_checked__lt=stale_before))
+        .values_list("pk", flat=True)
+    )
+    signatures = [check_source_url.s(pk) for pk in pks]
+    callback = check_source_urls_callback.s()
+    return chord(signatures)(callback)
