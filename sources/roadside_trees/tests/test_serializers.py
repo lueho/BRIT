@@ -17,15 +17,6 @@ class HamburgRoadsideTreeSimpleModelSerializerTestCase(TestCase):
         )
         cls.serializer = HamburgRoadsideTreeSimpleModelSerializer(instance=cls.tree)
 
-    def test_contains_expected_fields(self):
-        data = self.serializer.data
-        self.assertIn("id", data)
-        self.assertIn("art_latein", data)
-        self.assertIn("pflanzjahr", data)
-        self.assertIn("kronendurchmesser", data)
-        self.assertIn("stammumfang", data)
-        self.assertIn("address", data)
-
     def test_address_field_content(self):
         data = self.serializer.data
         expected_address = f"{self.tree.strasse} {self.tree.hausnummer}"

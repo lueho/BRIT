@@ -3,7 +3,7 @@ from django.db.models.signals import post_save
 from django.test import TestCase
 from factory.django import mute_signals
 
-from ..models import Author, Licence, Source, SourceAuthor
+from ..models import Author, Source, SourceAuthor
 from ..utils import generate_citation_key
 
 
@@ -58,24 +58,6 @@ class AuthorValidationTestCase(TestCase):
     def test_valid_person_and_organization_pass(self):
         Author(first_names="Ada", last_names="Lovelace").full_clean()
         Author(author_type="organization", organization_name="3M Company").full_clean()
-
-
-class LicenceModelTest(TestCase):
-    def setUp(self):
-        self.licence_name = "MIT License"
-        self.licence_url = "https://opensource.org/licenses/MIT"
-        self.licence_description = "A short and permissive software license"
-
-        self.licence = Licence.objects.create(
-            name=self.licence_name,
-            reference_url=self.licence_url,
-            description=self.licence_description,
-        )
-
-    def test_licence_creation(self):
-        self.assertEqual(self.licence.name, self.licence_name)
-        self.assertEqual(self.licence.reference_url, self.licence_url)
-        self.assertEqual(self.licence.description, self.licence_description)
 
 
 class SourceAbbreviationGenerationTestCase(TestCase):

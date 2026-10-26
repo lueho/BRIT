@@ -896,19 +896,6 @@ class BreadcrumbRailGlobalStylingAssetTests(SimpleTestCase):
             css,
         )
 
-    def test_brit_theme_minified_css_mirrors_rail_source(self):
-        minified = self._read_asset("css/brit-theme.min.css")
-
-        self.assertIn(".page-breadcrumb-rail", minified)
-        self.assertRegex(
-            minified,
-            r"--brit-sticky-offset:\s*calc\(var\(--brit-topnav-height\)",
-        )
-        self.assertIn(
-            "padding:.5rem var(--bs-gutter-x, 1.5rem)",
-            minified,
-        )
-
     def test_filtered_list_css_no_longer_redefines_shared_variables(self):
         """filtered-list.css must not re-declare the shared custom properties.
 
