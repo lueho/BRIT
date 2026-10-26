@@ -15,11 +15,11 @@ _REQUEST_TIMEOUT = 10
 
 
 _MAX_REDIRECTS = 10
-_REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 _ALLOWED_SCHEMES = frozenset({"http", "https"})
-# An environment proxy would resolve hostnames itself, bypassing the
-# destination check, so URL checks always connect directly.
-_NO_PROXIES = {"http": None, "https": None, "all": None}
+
+
+class UnsafeURLError(requests.exceptions.RequestException):
+    """Raised when a URL check would reach a non-public destination."""
 
 
 def _is_success_status(status_code):
@@ -59,56 +59,66 @@ def _is_public_http_url(url):
     return True
 
 
-def _request_public(method, url, **kwargs):
-    """Send *method* to *url*, following redirects only to public http(s) hosts.
+class _PublicOnlySession(requests.Session):
+    """Session that refuses redirects to non-public destinations.
 
-    Returns the final response, or None if any hop targets a non-public
-    destination or the redirect limit is exceeded.
+    Environment proxies are ignored because a proxy would resolve hostnames
+    itself, bypassing the destination check.
     """
-    for _ in range(_MAX_REDIRECTS + 1):
-        if not _is_public_http_url(url):
+
+    def __init__(self):
+        super().__init__()
+        self.trust_env = False
+        self.max_redirects = _MAX_REDIRECTS
+
+    def get_redirect_target(self, resp):
+        target = super().get_redirect_target(resp)
+        if target is None:
             return None
-        response = method(
-            url,
-            headers=_REQUEST_HEADERS,
-            allow_redirects=False,
-            timeout=_REQUEST_TIMEOUT,
-            proxies=_NO_PROXIES,
-            **kwargs,
-        )
-        location = response.headers.get("Location")
-        if response.status_code not in _REDIRECT_STATUSES or not location:
-            return response
-        response.close()
         try:
-            url = urljoin(url, location)
+            absolute = urljoin(resp.url, target)
         except ValueError:
-            return None
-    return None
+            absolute = None
+        if absolute is None or not _is_public_http_url(absolute):
+            resp.close()
+            raise UnsafeURLError(f"Refusing redirect to {target!r}", response=resp)
+        return target
 
 
 def check_url(url):
     clean_url = str(url or "").strip()
-    if not clean_url:
+    if not clean_url or not _is_public_http_url(clean_url):
         return False
 
-    try:
-        response = _request_public(requests.head, clean_url)
-    except requests.exceptions.RequestException:
-        response = None
-    else:
-        if response is not None and _is_success_status(response.status_code):
-            return True
+    with _PublicOnlySession() as session:
+        try:
+            response = session.head(
+                clean_url,
+                headers=_REQUEST_HEADERS,
+                allow_redirects=True,
+                timeout=_REQUEST_TIMEOUT,
+            )
+        except requests.exceptions.RequestException:
+            response = None
+        else:
+            if _is_success_status(response.status_code):
+                return True
 
-    get_response = None
-    try:
-        get_response = _request_public(requests.get, clean_url, stream=True)
-        return get_response is not None and _is_success_status(get_response.status_code)
-    except requests.exceptions.RequestException:
-        return False
-    finally:
-        if get_response is not None:
-            get_response.close()
+        get_response = None
+        try:
+            get_response = session.get(
+                clean_url,
+                headers=_REQUEST_HEADERS,
+                allow_redirects=True,
+                timeout=_REQUEST_TIMEOUT,
+                stream=True,
+            )
+            return _is_success_status(get_response.status_code)
+        except requests.exceptions.RequestException:
+            return False
+        finally:
+            if get_response is not None:
+                get_response.close()
 
 
 def find_wayback_snapshot_for_year(url, year):

@@ -1,12 +1,12 @@
 import os
 import socket
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import requests
 from django.test import SimpleTestCase
 
 from ..utils import (
-    _NO_PROXIES,
+    _MAX_REDIRECTS,
     _REQUEST_HEADERS,
     _REQUEST_TIMEOUT,
     check_url,
@@ -25,9 +25,30 @@ def _resolve_public(host, *args, **kwargs):
     return _addrinfo("93.184.216.34")
 
 
+def _resolver(mapping):
+    def resolve(host, *args, **kwargs):
+        if host not in mapping:
+            raise socket.gaierror("unknown host")
+        return _addrinfo(*mapping[host])
+
+    return resolve
+
+
+def _response(request, status_code=200, location=None):
+    response = requests.Response()
+    response.status_code = status_code
+    response.url = request.url
+    response.request = request
+    response._content = b""
+    response._content_consumed = True
+    if location is not None:
+        response.headers["Location"] = location
+    return response
+
+
 @patch("bibliography.utils.socket.getaddrinfo", _resolve_public)
-@patch("requests.get")
-@patch("requests.head")
+@patch("requests.Session.get")
+@patch("requests.Session.head")
 class SourceCheckUrlTestCase(SimpleTestCase):
     def setUp(self):
         self.url = "https://www.flyer-test-url.org"
@@ -40,9 +61,8 @@ class SourceCheckUrlTestCase(SimpleTestCase):
         mock_head.assert_called_once_with(
             self.url,
             headers=self.headers,
-            allow_redirects=False,
+            allow_redirects=True,
             timeout=_REQUEST_TIMEOUT,
-            proxies=_NO_PROXIES,
         )
 
     def test_request_with_http_status_404_falls_back_to_get(self, mock_head, mock_get):
@@ -53,9 +73,8 @@ class SourceCheckUrlTestCase(SimpleTestCase):
         mock_get.assert_called_once_with(
             self.url,
             headers=self.headers,
-            allow_redirects=False,
+            allow_redirects=True,
             timeout=_REQUEST_TIMEOUT,
-            proxies=_NO_PROXIES,
             stream=True,
         )
 
@@ -71,9 +90,8 @@ class SourceCheckUrlTestCase(SimpleTestCase):
         mock_get.assert_called_once_with(
             self.url,
             headers=self.headers,
-            allow_redirects=False,
+            allow_redirects=True,
             timeout=_REQUEST_TIMEOUT,
-            proxies=_NO_PROXIES,
             stream=True,
         )
 
@@ -85,9 +103,8 @@ class SourceCheckUrlTestCase(SimpleTestCase):
         mock_get.assert_called_once_with(
             self.url,
             headers=self.headers,
-            allow_redirects=False,
+            allow_redirects=True,
             timeout=_REQUEST_TIMEOUT,
-            proxies=_NO_PROXIES,
             stream=True,
         )
 
@@ -98,24 +115,10 @@ class SourceCheckUrlTestCase(SimpleTestCase):
         self.assertFalse(check_url(self.url))
 
 
-def _redirect(location, status_code=302):
-    response = MagicMock(status_code=status_code)
-    response.headers = {"Location": location}
-    return response
-
-
-@patch("requests.get")
-@patch("requests.head")
+@patch("requests.Session.get")
+@patch("requests.Session.head")
 class SourceCheckUrlDestinationTestCase(SimpleTestCase):
     """Server-side URL checks must not reach internal services (SSRF)."""
-
-    def _resolve(self, mapping):
-        def resolve(host, *args, **kwargs):
-            if host not in mapping:
-                raise socket.gaierror("unknown host")
-            return _addrinfo(*mapping[host])
-
-        return patch("bibliography.utils.socket.getaddrinfo", side_effect=resolve)
 
     def test_rejects_loopback_and_private_ip_literals(self, mock_head, mock_get):
         for url in (
@@ -131,13 +134,15 @@ class SourceCheckUrlDestinationTestCase(SimpleTestCase):
         self.assertFalse(mock_get.called)
 
     def test_rejects_hostname_resolving_to_private_address(self, mock_head, mock_get):
-        with self._resolve({"intranet.example.org": ["192.168.1.10"]}):
+        resolve = _resolver({"intranet.example.org": ["192.168.1.10"]})
+        with patch("bibliography.utils.socket.getaddrinfo", side_effect=resolve):
             self.assertFalse(check_url("https://intranet.example.org/"))
         self.assertFalse(mock_head.called)
         self.assertFalse(mock_get.called)
 
     def test_rejects_hostname_with_any_private_address(self, mock_head, mock_get):
-        with self._resolve({"mixed.example.org": ["93.184.216.34", "10.1.2.3"]}):
+        resolve = _resolver({"mixed.example.org": ["93.184.216.34", "10.1.2.3"]})
+        with patch("bibliography.utils.socket.getaddrinfo", side_effect=resolve):
             self.assertFalse(check_url("https://mixed.example.org/"))
         self.assertFalse(mock_head.called)
 
@@ -148,44 +153,60 @@ class SourceCheckUrlDestinationTestCase(SimpleTestCase):
         self.assertFalse(mock_head.called)
         self.assertFalse(mock_get.called)
 
-    def test_does_not_follow_redirect_to_internal_address(self, mock_head, mock_get):
-        mock_head.return_value = _redirect("http://169.254.169.254/latest/")
-        mock_get.return_value = _redirect("http://169.254.169.254/latest/")
-        with self._resolve({"example.org": ["93.184.216.34"]}):
-            self.assertFalse(check_url("https://example.org/doc"))
-        mock_head.assert_called_once()
-        mock_get.assert_called_once()
-        self.assertEqual(mock_head.call_args[0][0], "https://example.org/doc")
-
-    def test_follows_redirect_to_public_address(self, mock_head, mock_get):
-        mock_head.side_effect = [
-            _redirect("/moved", status_code=301),
-            MagicMock(status_code=200),
-        ]
-        with self._resolve({"example.org": ["93.184.216.34"]}):
-            self.assertTrue(check_url("https://example.org/doc"))
-        self.assertEqual(
-            [c[0][0] for c in mock_head.call_args_list],
-            ["https://example.org/doc", "https://example.org/moved"],
-        )
-        self.assertFalse(mock_get.called)
-
-    def test_gives_up_after_too_many_redirects(self, mock_head, mock_get):
-        mock_head.return_value = _redirect("https://example.org/loop")
-        mock_get.return_value = _redirect("https://example.org/loop")
-        with self._resolve({"example.org": ["93.184.216.34"]}):
-            self.assertFalse(check_url("https://example.org/loop"))
-
-    def test_malformed_redirect_location_is_invalid(self, mock_head, mock_get):
-        mock_head.return_value = _redirect("http://[")
-        mock_get.return_value = _redirect("http://[")
-        with self._resolve({"example.org": ["93.184.216.34"]}):
-            self.assertFalse(check_url("https://example.org/doc"))
-
     def test_unresolvable_host_is_invalid(self, mock_head, mock_get):
-        with self._resolve({}):
+        with patch("bibliography.utils.socket.getaddrinfo", side_effect=_resolver({})):
             self.assertFalse(check_url("https://does-not-exist.invalid/"))
         self.assertFalse(mock_head.called)
+
+
+@patch(
+    "bibliography.utils.socket.getaddrinfo",
+    side_effect=_resolver({"example.org": ["93.184.216.34"]}),
+)
+@patch("requests.adapters.HTTPAdapter.send")
+class SourceCheckUrlRedirectTestCase(SimpleTestCase):
+    """Redirects are followed by requests, but only to public destinations."""
+
+    def _serve(self, mock_send, routes):
+        def send(request, **kwargs):
+            return _response(request, *routes[request.url])
+
+        mock_send.side_effect = send
+
+    def _sent_urls(self, mock_send):
+        return [c.args[0].url for c in mock_send.call_args_list]
+
+    def test_does_not_follow_redirect_to_internal_address(self, mock_send, _):
+        self._serve(
+            mock_send,
+            {"https://example.org/doc": (302, "http://169.254.169.254/latest/")},
+        )
+        self.assertFalse(check_url("https://example.org/doc"))
+        self.assertNotIn("http://169.254.169.254/latest/", self._sent_urls(mock_send))
+
+    def test_follows_redirect_to_public_address(self, mock_send, _):
+        self._serve(
+            mock_send,
+            {
+                "https://example.org/doc": (301, "/moved"),
+                "https://example.org/moved": (200,),
+            },
+        )
+        self.assertTrue(check_url("https://example.org/doc"))
+        self.assertEqual(
+            self._sent_urls(mock_send),
+            ["https://example.org/doc", "https://example.org/moved"],
+        )
+
+    def test_malformed_redirect_location_is_invalid(self, mock_send, _):
+        self._serve(mock_send, {"https://example.org/doc": (302, "http://[")})
+        self.assertFalse(check_url("https://example.org/doc"))
+
+    def test_gives_up_after_too_many_redirects(self, mock_send, _):
+        self._serve(mock_send, {"https://example.org/loop": (302, "/loop")})
+        self.assertFalse(check_url("https://example.org/loop"))
+        # HEAD and the GET fallback each stop at the redirect limit.
+        self.assertLessEqual(mock_send.call_count, 2 * (_MAX_REDIRECTS + 1))
 
 
 class SourceCheckUrlProxyTestCase(SimpleTestCase):
@@ -194,10 +215,7 @@ class SourceCheckUrlProxyTestCase(SimpleTestCase):
     @patch("bibliography.utils.socket.getaddrinfo", _resolve_public)
     @patch("requests.adapters.HTTPAdapter.send")
     def test_ignores_environment_proxies(self, mock_send):
-        response = requests.Response()
-        response.status_code = 200
-        response._content = b""
-        mock_send.return_value = response
+        mock_send.side_effect = lambda request, **kwargs: _response(request)
         env = {
             "HTTP_PROXY": "http://10.0.0.1:3128",
             "HTTPS_PROXY": "http://10.0.0.1:3128",
