@@ -1332,9 +1332,7 @@ class Sample(NamedUserCreatedObject):
             )
 
             for composition in self.compositions.all():
-                duplicate_composition = composition.duplicate(creator)
-                duplicate_composition.sample = duplicate
-                duplicate_composition.save()
+                composition.duplicate(creator, sample=duplicate)
 
             for prop in self.get_property_values_queryset():
                 prop.duplicate(creator, sample=duplicate)
@@ -1463,6 +1461,13 @@ class Composition(NamedUserCreatedObject):
 
     class Meta:
         ordering = ["order"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sample", "group"],
+                condition=Q(publication_status="published"),
+                name="composition_unique_sample_group_published",
+            ),
+        ]
 
     @property
     def material(self):
@@ -1519,13 +1524,13 @@ class Composition(NamedUserCreatedObject):
                 previous_composition.save(update_fields=["order"])
                 self.save(update_fields=["order"])
 
-    def duplicate(self, creator):
+    def duplicate(self, creator, sample):
         post_save.disconnect(add_next_order_value, sender=Composition)
         try:
             duplicate = Composition.objects.create(
                 owner=creator,
                 group=self.group,
-                sample=self.sample,
+                sample=sample,
                 fractions_of=self.fractions_of,
                 order=self.order,
             )

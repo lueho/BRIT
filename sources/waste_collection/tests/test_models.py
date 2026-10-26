@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.db.models import signals
 from django.test import TestCase
 from factory.django import mute_signals
@@ -957,3 +958,71 @@ class CollectionReviewCascadeTransitionTestCase(TestCase):
         ):
             with self.assertRaises(RuntimeError):
                 Collection._apply_review_action_transition([value], "approve")
+
+
+class ManualCollectionPropertyValueUniquenessTestCase(TestCase):
+    """Regression tests for #170: published manual CPVs must not allow exact
+    duplicate (collection, property, year, unit) rows. Unit variants and
+    non-published rows stay allowed — the 24 unit-variant prod groups need a
+    merge decision, and review/private rows are legitimate pending or
+    collaborative states."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.collection = Collection.objects.create(
+            catchment=CollectionCatchment.objects.create(name="CPV Catchment"),
+            valid_from=date(2024, 1, 1),
+        )
+        cls.property = Property.objects.create(name="CPV Property")
+        cls.unit = Unit.objects.create(name="kg/a CPV")
+        cls.other_unit = Unit.objects.create(name="t/a CPV")
+
+    def _create(self, **overrides):
+        defaults = {
+            "collection": self.collection,
+            "property": self.property,
+            "unit": self.unit,
+            "year": 2024,
+            "average": 1.0,
+            "publication_status": "published",
+        }
+        defaults.update(overrides)
+        return CollectionPropertyValue.objects.create(**defaults)
+
+    def test_duplicate_published_manual_cpv_same_key_and_unit_rejected(self):
+        self._create()
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                self._create()
+
+    def test_published_manual_cpv_same_key_different_unit_allowed(self):
+        """Unit-variant rows exist in prod; merging them is a data decision,
+        so the constraint must not forbid them."""
+        self._create()
+        self._create(unit=self.other_unit)
+
+    def test_derived_cpv_same_key_does_not_collide_with_manual(self):
+        self._create()
+        self._create(is_derived=True)
+
+    def test_private_manual_cpv_same_key_allowed(self):
+        """Private rows may be pending submission or owned by different
+        users; uniqueness is enforced at publish time instead."""
+        self._create(publication_status="private")
+        self._create(publication_status="private")
+
+    def test_review_manual_cpv_same_key_allowed(self):
+        """A review-status row may be a pending revision of the published
+        value and must be allowed to coexist with it."""
+        self._create()
+        self._create(publication_status="review")
+
+    def test_duplicate_published_manual_cpv_null_year_rejected(self):
+        self._create(year=None)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                self._create(year=None)
+
+    def test_published_manual_cpv_null_year_different_unit_allowed(self):
+        self._create(year=None)
+        self._create(year=None, unit=self.other_unit)
