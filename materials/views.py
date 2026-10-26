@@ -1683,10 +1683,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
         return charts
 
     def _fetch_sample_data(self):
-        """Serialize the sample and fetch measurements/compositions for context."""
-        data = SampleModelSerializer(
-            self.object, context={"request": self.request}
-        ).data
+        """Fetch page data once and serialize the sample with it."""
         property_values = (
             self.object.get_property_values_queryset()
             .select_related(
@@ -1724,6 +1721,14 @@ class SampleDetailView(UserCreatedObjectDetailView):
             component_measurements=component_measurements,
             composition_settings_by_group=composition_settings_by_group,
         )
+        data = SampleModelSerializer(
+            self.object,
+            context={
+                "request": self.request,
+                "sample_normalized_compositions": compositions,
+                "sample_property_values": property_values,
+            },
+        ).data
         return data, property_values, component_measurements, compositions
 
     def _build_sample_summary(
@@ -1764,7 +1769,6 @@ class SampleDetailView(UserCreatedObjectDetailView):
         data, property_values, component_measurements, compositions = (
             self._fetch_sample_data()
         )
-        charts = self._build_composition_charts(compositions)
         sample_summary = self._build_sample_summary(
             component_measurements, property_values, compositions
         )
@@ -1780,12 +1784,9 @@ class SampleDetailView(UserCreatedObjectDetailView):
         )
         sample_layout_mode = self._determine_layout_mode(sample_policy)
 
-        data["compositions"] = compositions
-
         context.update(
             {
                 "data": data,
-                "charts": charts,
                 "property_values": property_values,
                 "component_measurements": component_measurements,
                 "sample_summary": sample_summary,

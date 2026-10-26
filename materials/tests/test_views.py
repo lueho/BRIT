@@ -30,6 +30,7 @@ from utils.object_management.views import SubmitForReviewView
 from utils.properties.models import Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
+from ..composition_normalization import get_sample_normalized_compositions
 from ..models import (
     AnalyticalMethod,
     ComponentMeasurement,
@@ -51,7 +52,11 @@ from ..models import (
     get_sample_substrate_category_name,
 )
 from ..serializers import SampleAPISerializer, SampleModelSerializer
-from ..views import DETAIL_RELATED_LIMIT, SampleSubstrateMaterialQuickCreateView
+from ..views import (
+    DETAIL_RELATED_LIMIT,
+    SampleDetailView,
+    SampleSubstrateMaterialQuickCreateView,
+)
 
 User = get_user_model()
 
@@ -7685,6 +7690,99 @@ class SampleDetailCompositionDisplayTestCase(SampleDetailPresentationMixin, Test
         self.assertContains(response, "Volatile solids")
         self.assertContains(response, "Canonical: Organic matter")
         self.assertContains(response, "↔ Organic matter")
+
+    def test_sample_detail_prepares_compositions_charts_and_properties_once(self):
+        """A populated detail request performs one normalization and chart pass."""
+        sample = Sample.objects.create(
+            name="Sample Prepared Once",
+            material=Material.objects.create(name="Test Material", type="material"),
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        group = MaterialComponentGroup.objects.create(
+            name="Chemical Elements",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        carbon = MaterialComponent.objects.create(
+            name="Carbon",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        unit_percent = Unit.objects.filter(name="%").first()
+        if unit_percent is None:
+            unit_percent = Unit.objects.create(
+                name="%", symbol="percent", owner=self.staff_user
+            )
+        elif not unit_percent.symbol:
+            unit_percent.symbol = "percent"
+            unit_percent.save(update_fields=["symbol"])
+
+        ComponentMeasurement.objects.create(
+            owner=self.staff_user,
+            sample=sample,
+            group=group,
+            component=carbon,
+            unit=unit_percent,
+            average=Decimal("100"),
+        )
+        property_obj = MaterialProperty.objects.create(
+            name="Dry Matter",
+            owner=self.staff_user,
+            publication_status="published",
+        )
+        MaterialPropertyValue.objects.create(
+            sample=sample,
+            property=property_obj,
+            unit=unit_percent,
+            average=Decimal("42"),
+            owner=self.staff_user,
+        )
+
+        with (
+            patch(
+                "materials.views.get_sample_normalized_compositions",
+                wraps=get_sample_normalized_compositions,
+            ) as view_normalize,
+            patch(
+                "materials.serializers.get_sample_normalized_compositions",
+                wraps=get_sample_normalized_compositions,
+            ) as serializer_normalize,
+            patch.object(
+                SampleDetailView,
+                "_build_composition_charts",
+                autospec=True,
+                side_effect=SampleDetailView._build_composition_charts,
+            ) as build_charts,
+            patch.object(
+                Sample,
+                "get_property_values_queryset",
+                autospec=True,
+                side_effect=Sample.get_property_values_queryset,
+            ) as property_values_query,
+        ):
+            response = self.client.get(
+                reverse("sample-detail", kwargs={"pk": sample.pk})
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(view_normalize.call_count, 1)
+        self.assertEqual(serializer_normalize.call_count, 0)
+        self.assertEqual(build_charts.call_count, 1)
+        self.assertEqual(property_values_query.call_count, 1)
+
+        compositions = response.context["data"]["compositions"]
+        self.assertEqual(len(compositions), 1)
+        self.assertEqual(compositions[0]["group_name"], "Chemical Elements")
+        self.assertEqual(
+            {share["component_name"] for share in compositions[0]["shares"]},
+            {"Carbon"},
+        )
+        self.assertEqual(
+            list(response.context["charts"]),
+            [f"composition-chart-{compositions[0]['id']}"],
+        )
+        self.assertEqual(len(response.context["data"]["properties"]), 1)
 
 
 class MaterialsReviewWorkflowTests(TestCase):
