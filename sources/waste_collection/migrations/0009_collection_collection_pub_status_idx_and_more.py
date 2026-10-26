@@ -25,9 +25,7 @@ class Migration(migrations.Migration):
         ),
         AddIndexConcurrently(
             model_name="collection",
-            index=models.Index(
-                fields=["valid_from", "valid_until"], name="collection_validity_idx"
-            ),
+            index=models.Index(fields=["valid_from"], name="collection_valid_from_idx"),
         ),
         AddIndexConcurrently(
             model_name="collectionpropertyvalue",

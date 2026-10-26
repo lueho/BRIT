@@ -968,9 +968,9 @@ class CollectionIndexTestCase(TestCase):
         index_fields = {tuple(i.fields) for i in Collection._meta.indexes}
         self.assertIn(("publication_status",), index_fields)
 
-    def test_collection_has_validity_window_index(self):
+    def test_collection_has_valid_from_index(self):
         index_fields = {tuple(i.fields) for i in Collection._meta.indexes}
-        self.assertIn(("valid_from", "valid_until"), index_fields)
+        self.assertIn(("valid_from",), index_fields)
 
     def test_collectionpropertyvalue_has_derived_sync_index(self):
         index_fields = {tuple(i.fields) for i in CollectionPropertyValue._meta.indexes}

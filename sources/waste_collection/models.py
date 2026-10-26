@@ -541,9 +541,9 @@ class Collection(NamedUserCreatedObject):
             models.Index(
                 fields=["publication_status"], name="collection_pub_status_idx"
             ),
-            models.Index(
-                fields=["valid_from", "valid_until"], name="collection_validity_idx"
-            ),
+            # valid_until stays out: valid_on() ORs it with IS NULL, so it can
+            # never become an index condition.
+            models.Index(fields=["valid_from"], name="collection_valid_from_idx"),
         ]
 
     VERSION_REVIEW_FIELD_NAMES = (
