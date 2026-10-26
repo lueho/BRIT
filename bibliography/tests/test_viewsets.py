@@ -312,3 +312,17 @@ class SourceViewSetTestCase(TestCase):
             reverse("api-source-detail", args=[self.published_source.pk])
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_options_list_200_for_anonymous(self):
+        response = self.client.options(reverse("api-source-list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_options_detail_200_for_anonymous(self):
+        response = self.client.options(
+            reverse("api-source-detail", args=[self.published_source.pk])
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_options_source_create_200_for_anonymous(self):
+        response = self.client.options(reverse("api-source-create"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

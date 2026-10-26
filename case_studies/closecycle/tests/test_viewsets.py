@@ -96,3 +96,13 @@ class ShowcaseViewSetTestCase(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_options_list_200_for_anonymous(self):
+        response = self.client.options(reverse("api-showcase-list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_options_detail_200_for_anonymous(self):
+        response = self.client.options(
+            reverse("api-showcase-detail", args=[self.published.pk])
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
