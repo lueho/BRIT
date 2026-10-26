@@ -97,11 +97,14 @@ still established, never read from a stale decision afterwards.
 
 Archival on approval is restricted to predecessors whose freshly locked
 status is ``published``: unpublished predecessors are never forced into the
-public historical archive. Governed approval archives them through
-``perform_transition(..., "archive")``, producing an actor- and
-revision-bound audit event in the same transaction; raw ORM
-``approve()`` with no actor archives only published predecessors without
-fabricating audit entries.
+public historical archive. Predecessors are archived through
+``perform_transition(..., "archive")`` with the approving user, producing an
+actor- and revision-bound audit event in the same transaction; ``approve()``
+without a user is rejected.
+
+Because unpublished predecessors stay unpublished, approval also rejects a
+record when any later version in its chain is already published, so an
+older version can never be published alongside its successor.
 
 A pre-existing ``archived`` status alone does NOT prove prior publication —
 legacy rows may carry that state without a matching ``archived`` audit event.
