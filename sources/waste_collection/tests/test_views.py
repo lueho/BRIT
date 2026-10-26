@@ -92,6 +92,7 @@ from utils.object_management.models import (
     ReviewAction,
     get_default_owner,
 )
+from utils.object_management.services import run_review_cascade
 from utils.properties.models import Property, Unit
 from utils.tests.testcases import (
     AbstractTestCases,
@@ -6004,7 +6005,7 @@ class SubmitCascadeMixinTest(CollectionCascadeMixinTestCase):
         view.request = request
         view.object = collection
         view.action_attr_name = "submit_for_review"
-        view.post_action_hook(request, "private")
+        run_review_cascade(view.object, view.action_attr_name, request.user, "private")
 
         cpv_private.refresh_from_db()
         cpv_declined.refresh_from_db()
@@ -6032,7 +6033,7 @@ class SubmitCascadeMixinTest(CollectionCascadeMixinTestCase):
         view.request = request
         view.object = collection
         view.action_attr_name = "submit_for_review"
-        view.post_action_hook(request, "private")
+        run_review_cascade(view.object, view.action_attr_name, request.user, "private")
 
         cpv_owner.refresh_from_db()
         cpv_other.refresh_from_db()
@@ -6055,7 +6056,7 @@ class SubmitCascadeMixinTest(CollectionCascadeMixinTestCase):
         view.request = request
         view.object = collection
         view.action_attr_name = "submit_for_review"
-        view.post_action_hook(request, "private")
+        run_review_cascade(view.object, view.action_attr_name, request.user, "private")
 
         acpv.refresh_from_db()
         self.assertEqual(acpv.publication_status, "review")
@@ -6079,7 +6080,7 @@ class SubmitCascadeMixinTest(CollectionCascadeMixinTestCase):
         view.request = request
         view.object = v3
         view.action_attr_name = "submit_for_review"
-        view.post_action_hook(request, "private")
+        run_review_cascade(view.object, view.action_attr_name, request.user, "private")
 
         cpv1.refresh_from_db()
         cpv2.refresh_from_db()
@@ -6105,7 +6106,7 @@ class WithdrawCascadeMixinTest(CollectionCascadeMixinTestCase):
         view.request = request
         view.object = collection
         view.action_attr_name = "withdraw_from_review"
-        view.post_action_hook(request, "review")
+        run_review_cascade(view.object, view.action_attr_name, request.user, "review")
 
         cpv.refresh_from_db()
         self.assertEqual(cpv.publication_status, "private")
@@ -6127,7 +6128,7 @@ class WithdrawCascadeMixinTest(CollectionCascadeMixinTestCase):
         view.request = request
         view.object = collection
         view.action_attr_name = "withdraw_from_review"
-        view.post_action_hook(request, "review")
+        run_review_cascade(view.object, view.action_attr_name, request.user, "review")
 
         cpv_owner.refresh_from_db()
         cpv_other.refresh_from_db()
@@ -6157,7 +6158,7 @@ class ApproveCascadeMixinTest(CollectionCascadeMixinTestCase):
         view.request = request
         view.object = collection
         view.action_attr_name = "approve"
-        view.post_action_hook(request, "review")
+        run_review_cascade(view.object, view.action_attr_name, request.user, "review")
 
         cpv_owner.refresh_from_db()
         cpv_other.refresh_from_db()
@@ -6182,7 +6183,7 @@ class ApproveCascadeMixinTest(CollectionCascadeMixinTestCase):
         view.request = request
         view.object = collection
         view.action_attr_name = "approve"
-        view.post_action_hook(request, "review")
+        run_review_cascade(view.object, view.action_attr_name, request.user, "review")
 
         acpv.refresh_from_db()
         self.assertEqual(acpv.publication_status, "published")
@@ -6204,7 +6205,7 @@ class ApproveCascadeMixinTest(CollectionCascadeMixinTestCase):
         view.request = request
         view.object = v2
         view.action_attr_name = "approve"
-        view.post_action_hook(request, "review")
+        run_review_cascade(view.object, view.action_attr_name, request.user, "review")
 
         cpv1.refresh_from_db()
         cpv2.refresh_from_db()
@@ -6233,7 +6234,7 @@ class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
         view.request = request
         view.object = collection
         view.action_attr_name = "reject"
-        view.post_action_hook(request, "review")
+        run_review_cascade(view.object, view.action_attr_name, request.user, "review")
 
         cpv_owner.refresh_from_db()
         cpv_other.refresh_from_db()
@@ -6256,7 +6257,7 @@ class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
         view.request = request
         view.object = collection
         view.action_attr_name = "reject"
-        view.post_action_hook(request, "review")
+        run_review_cascade(view.object, view.action_attr_name, request.user, "review")
 
         acpv.refresh_from_db()
         self.assertEqual(acpv.publication_status, "declined")
@@ -6277,7 +6278,7 @@ class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
         view.request = request
         view.object = v2
         view.action_attr_name = "reject"
-        view.post_action_hook(request, "review")
+        run_review_cascade(view.object, view.action_attr_name, request.user, "review")
 
         cpv1.refresh_from_db()
         cpv2.refresh_from_db()

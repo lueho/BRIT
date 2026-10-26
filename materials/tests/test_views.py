@@ -26,6 +26,7 @@ from utils.object_management.models import (
     ReviewAction,
     UserCreatedObject,
 )
+from utils.object_management.services import run_review_cascade
 from utils.object_management.views import SubmitForReviewView
 from utils.properties.models import Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
@@ -371,14 +372,16 @@ class AnalyticalMethodReviewCascadeTest(TestCase):
         )
 
     def _run_action(self, obj, action_attr_name, hook_status):
-        """Run a review action's cascade hook the way the view layer does."""
+        """Run the model cascade the way the shared transition service does."""
         request = self.factory.post("/")
         request.user = self.owner
         view = SubmitForReviewView()
         view.request = request
         view.object = obj
         view.action_attr_name = action_attr_name
-        view.post_action_hook(request, hook_status)
+        run_review_cascade(
+            view.object, view.action_attr_name, request.user, hook_status
+        )
 
     def _assert_statuses(self, expected):
         """Refresh each source and assert its publication status."""

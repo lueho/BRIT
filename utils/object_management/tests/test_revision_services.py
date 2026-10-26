@@ -17,6 +17,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
 from django.forms.models import inlineformset_factory, modelform_factory
 from django.test import TestCase, TransactionTestCase
+from django.urls import reverse
 
 from bibliography.models import Author, Source, SourceAuthor
 from maps.models import (
@@ -1104,6 +1105,51 @@ class ReassignmentLockTests(RevisionServiceBase):
         self.assertEqual(_actions_for(self.sample_a, "edited").count(), 1)
         self.assertEqual(_actions_for(self.sample_b, "edited").count(), 1)
 
+    def test_drf_update_moves_owned_child_between_editable_roots(self):
+        from rest_framework import serializers
+
+        from utils.object_management.viewsets import perform_policy_update
+
+        class CompositionSampleSerializer(serializers.ModelSerializer):
+            class Meta:
+                model = Composition
+                fields = ["sample"]
+
+        serializer = CompositionSampleSerializer(
+            self.composition, data={"sample": self.sample_b.pk}, partial=True
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        view = SimpleNamespace(request=SimpleNamespace(user=self.owner))
+        perform_policy_update(view, serializer)
+        self.composition.refresh_from_db()
+        self.assertEqual(self.composition.sample_id, self.sample_b.pk)
+        self.assertEqual(_actions_for(self.sample_a, "edited").count(), 1)
+        self.assertEqual(_actions_for(self.sample_b, "edited").count(), 1)
+
+    def test_html_update_moves_owned_child_between_editable_roots(self):
+        from django.http import HttpResponse
+
+        from utils.object_management.views import _perform_bound_update
+
+        form_class = modelform_factory(Composition, fields=["sample"])
+        form = form_class({"sample": self.sample_b.pk}, instance=self.composition)
+        self.assertTrue(form.is_valid(), form.errors)
+
+        def fake_super(bound_form):
+            view.object = bound_form.save()
+            return HttpResponse()
+
+        view = SimpleNamespace(
+            object=self.composition,
+            request=SimpleNamespace(user=self.owner),
+            _call_super_form_valid=fake_super,
+        )
+        _perform_bound_update(view, form)
+        self.composition.refresh_from_db()
+        self.assertEqual(self.composition.sample_id, self.sample_b.pk)
+        self.assertEqual(_actions_for(self.sample_a, "edited").count(), 1)
+        self.assertEqual(_actions_for(self.sample_b, "edited").count(), 1)
+
     def test_owned_move_denied_without_edit_on_new_root(self):
         foreign = Sample.objects.create(
             name="F",
@@ -1489,3 +1535,91 @@ class OwnedMtiFacetTests(TestCase):
         nuts.refresh_from_db()
         self.assertEqual(nuts.name, "N renamed")
         self.assertEqual(nuts.content_revision, 2)
+
+
+class TransitionCascadeTests(RevisionServiceBase):
+    def setUp(self):
+        super().setUp()
+        self.moderator.user_permissions.add(_perm(Source, "can_moderate_source"))
+        self.source = Source.objects.create(
+            title="Cascading Source", owner=self.owner, publication_status="private"
+        )
+        self.author = Author.objects.create(
+            last_names="Cascade", owner=self.owner, publication_status="private"
+        )
+        SourceAuthor.objects.create(source=self.source, author=self.author, position=1)
+
+    def test_submit_and_approve_cascade_to_linked_authors(self):
+        perform_transition(self.owner, self.source, "submit", cascade=True)
+        self.author.refresh_from_db()
+        self.assertEqual(self.author.publication_status, "review")
+
+        self.source.refresh_from_db()
+        perform_transition(
+            self.moderator,
+            self.source,
+            "approve",
+            expected_revision=self.source.content_revision,
+            cascade=True,
+        )
+        self.source.refresh_from_db()
+        self.author.refresh_from_db()
+        self.assertEqual(self.source.publication_status, "published")
+        self.assertEqual(self.author.publication_status, "published")
+        self.assertEqual(self.author.approved_by, self.moderator)
+
+    def test_withdraw_cascades_to_linked_authors(self):
+        perform_transition(self.owner, self.source, "submit", cascade=True)
+        perform_transition(self.owner, self.source, "withdraw", cascade=True)
+        self.author.refresh_from_db()
+        self.assertEqual(self.author.publication_status, "private")
+
+    def test_expected_cascade_failure_is_logged_and_transition_kept(self):
+        with (
+            self.assertLogs(
+                "utils.object_management.services", level="WARNING"
+            ) as logs,
+            patch.object(
+                Source,
+                "cascade_review_action",
+                side_effect=ValidationError("cascade broke"),
+            ),
+        ):
+            perform_transition(self.owner, self.source, "submit", cascade=True)
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.publication_status, "review")
+        self.assertIn("Review action cascade failed", logs.output[0])
+
+    def test_unexpected_cascade_failure_rolls_back_transition(self):
+        with (
+            patch.object(
+                Source, "cascade_review_action", side_effect=RuntimeError("boom")
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            perform_transition(self.owner, self.source, "submit", cascade=True)
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.publication_status, "private")
+        self.assertFalse(_actions_for(self.source, "submitted").exists())
+
+    def test_service_does_not_cascade_unless_requested(self):
+        perform_transition(self.owner, self.source, "submit")
+        self.author.refresh_from_db()
+        self.assertEqual(self.author.publication_status, "private")
+
+    def test_html_review_action_cascades_to_linked_authors(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse(
+                "object_management:submit_for_review",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(Source).pk,
+                    "object_id": self.source.pk,
+                },
+            )
+        )
+        self.assertEqual(response.status_code, 302)
+        self.source.refresh_from_db()
+        self.author.refresh_from_db()
+        self.assertEqual(self.source.publication_status, "review")
+        self.assertEqual(self.author.publication_status, "review")

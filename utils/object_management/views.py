@@ -15,6 +15,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.api import MessageFailure
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import (
+    FieldDoesNotExist,
     FieldError,
     ImproperlyConfigured,
     ObjectDoesNotExist,
@@ -73,6 +74,7 @@ from utils.object_management.policy import (
 from utils.object_management.registry import (
     KIND_OWNED,
     KIND_REVIEWABLE,
+    declared_parent_changed,
     model_policy,
     resolve_create_parent,
     review_target,
@@ -641,6 +643,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
                 policy_action,
                 expected_revision=self._get_expected_revision(request),
                 comment=comment,
+                cascade=True,
             )
 
             # Success message
@@ -780,6 +783,19 @@ class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
         context = super().get_context_data(**kwargs)
         # Pass through 'next' if provided in the opener link; templates will append it to the form action
         context["next_url"] = self.request.GET.get("next")
+        obj = context.get("object")
+        action = getattr(self, "action_attr_name", None)
+        if obj is not None and action and hasattr(obj, "affected_author_count"):
+            try:
+                context["cascade_author_count"] = obj.affected_author_count(action)
+            except (
+                AttributeError,
+                TypeError,
+                FieldDoesNotExist,
+                FieldError,
+                DatabaseError,
+            ):
+                context["cascade_author_count"] = 0
         expected = self._parse_revision_param(self.request.GET.get("expected_revision"))
         context["expected_revision"] = expected
         context["expected_revision_bound"] = expected is not None
@@ -1993,7 +2009,7 @@ def _perform_bound_update(view, form):
     proposed_parent = None
     if (
         policy is not None
-        and policy.kind == KIND_REVIEWABLE
+        and policy.kind in (KIND_REVIEWABLE, KIND_OWNED)
         and policy.parent_path is not None
     ):
         parent_field = policy.parent_path.split("__")[0]
@@ -2003,8 +2019,7 @@ def _perform_bound_update(view, form):
             )
             if new_parent is None:
                 raise ValidationError("invalid_parent")
-            old_pk = getattr(obj, f"{parent_field}_id", None)
-            if old_pk is None or getattr(new_parent, "pk", None) != old_pk:
+            if declared_parent_changed(obj, policy.parent_path, new_parent):
                 proposed_parent = new_parent
     with content_mutation(
         view.request.user, obj, action="edit", proposed_parent=proposed_parent
