@@ -1,6 +1,6 @@
 import os
 import socket
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import requests
 from django.test import SimpleTestCase
@@ -9,6 +9,7 @@ from ..utils import (
     _MAX_REDIRECTS,
     _REQUEST_HEADERS,
     _REQUEST_TIMEOUT,
+    _PublicOnlyHTTPConnection,
     check_url,
     find_wayback_snapshot_for_year,
 )
@@ -202,11 +203,41 @@ class SourceCheckUrlRedirectTestCase(SimpleTestCase):
         self._serve(mock_send, {"https://example.org/doc": (302, "http://[")})
         self.assertFalse(check_url("https://example.org/doc"))
 
+    def test_undecodable_redirect_location_is_invalid(self, mock_send, _):
+        self._serve(mock_send, {"https://example.org/doc": (302, "/\xff")})
+        self.assertFalse(check_url("https://example.org/doc"))
+
     def test_gives_up_after_too_many_redirects(self, mock_send, _):
         self._serve(mock_send, {"https://example.org/loop": (302, "/loop")})
         self.assertFalse(check_url("https://example.org/loop"))
         # HEAD and the GET fallback each stop at the redirect limit.
         self.assertLessEqual(mock_send.call_count, 2 * (_MAX_REDIRECTS + 1))
+
+
+@patch("bibliography.utils.socket.getaddrinfo", _resolve_public)
+@patch("urllib3.util.connection.create_connection")
+class SourceCheckUrlDnsRebindingTestCase(SimpleTestCase):
+    """The connected peer is re-checked, so a host re-resolving privately fails."""
+
+    def _socket(self, peer):
+        sock = MagicMock()
+        sock.getpeername.return_value = (peer, 80)
+        return sock
+
+    def test_refuses_connection_when_peer_is_private(self, mock_connect):
+        sock = self._socket("127.0.0.1")
+        mock_connect.return_value = sock
+        self.assertFalse(check_url("http://rebind.example.org/"))
+        sock.close.assert_called()
+        sock.sendall.assert_not_called()
+        sock.send.assert_not_called()
+
+    def test_allows_connection_when_peer_is_public(self, mock_connect):
+        sock = self._socket("93.184.216.34")
+        mock_connect.return_value = sock
+        conn = _PublicOnlyHTTPConnection("example.org", 80)
+        self.assertIs(conn._new_conn(), sock)
+        sock.close.assert_not_called()
 
 
 class SourceCheckUrlProxyTestCase(SimpleTestCase):

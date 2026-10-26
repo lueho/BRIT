@@ -4,6 +4,10 @@ import string
 from urllib.parse import urljoin, urlsplit
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.connection import HTTPConnection, HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
+from urllib3.exceptions import NewConnectionError
 
 _REQUEST_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20200101 Firefox/84.0",
@@ -49,14 +53,61 @@ def _is_public_http_url(url):
         return False
     if not infos:
         return False
-    for info in infos:
+    return all(_is_public_address(info[4][0]) for info in infos)
+
+
+def _is_public_address(host):
+    try:
+        address = ipaddress.ip_address(str(host).split("%", 1)[0])
+    except ValueError:
+        return False
+    return address.is_global and not address.is_multicast
+
+
+class _PublicOnlyConnectionMixin:
+    """Verify the peer actually connected to is public.
+
+    Checked on the socket itself, before any TLS or HTTP bytes are sent, so a
+    hostname re-resolving to an internal address (DNS rebinding) is refused.
+    """
+
+    def _new_conn(self):
+        sock = super()._new_conn()
         try:
-            address = ipaddress.ip_address(info[4][0].split("%", 1)[0])
-        except ValueError:
-            return False
-        if not address.is_global or address.is_multicast:
-            return False
-    return True
+            peer = sock.getpeername()[0]
+        except OSError:
+            peer = None
+        if peer is None or not _is_public_address(peer):
+            sock.close()
+            raise NewConnectionError(
+                self, f"Refusing connection to non-public address {peer!r}"
+            )
+        return sock
+
+
+class _PublicOnlyHTTPConnection(_PublicOnlyConnectionMixin, HTTPConnection):
+    pass
+
+
+class _PublicOnlyHTTPSConnection(_PublicOnlyConnectionMixin, HTTPSConnection):
+    pass
+
+
+class _PublicOnlyHTTPConnectionPool(HTTPConnectionPool):
+    ConnectionCls = _PublicOnlyHTTPConnection
+
+
+class _PublicOnlyHTTPSConnectionPool(HTTPSConnectionPool):
+    ConnectionCls = _PublicOnlyHTTPSConnection
+
+
+class _PublicOnlyAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        super().init_poolmanager(*args, **kwargs)
+        self.poolmanager.pool_classes_by_scheme = {
+            "http": _PublicOnlyHTTPConnectionPool,
+            "https": _PublicOnlyHTTPSConnectionPool,
+        }
 
 
 class _PublicOnlySession(requests.Session):
@@ -70,9 +121,18 @@ class _PublicOnlySession(requests.Session):
         super().__init__()
         self.trust_env = False
         self.max_redirects = _MAX_REDIRECTS
+        adapter = _PublicOnlyAdapter()
+        self.mount("http://", adapter)
+        self.mount("https://", adapter)
 
     def get_redirect_target(self, resp):
-        target = super().get_redirect_target(resp)
+        try:
+            target = super().get_redirect_target(resp)
+        except UnicodeError:
+            resp.close()
+            raise UnsafeURLError(
+                "Undecodable redirect location", response=resp
+            ) from None
         if target is None:
             return None
         try:
