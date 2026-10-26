@@ -975,3 +975,15 @@ class CollectionIndexTestCase(TestCase):
     def test_collectionpropertyvalue_has_derived_sync_index(self):
         index_fields = {tuple(i.fields) for i in CollectionPropertyValue._meta.indexes}
         self.assertIn(("collection", "property", "year", "is_derived"), index_fields)
+
+    def test_index_migration_builds_concurrently(self):
+        from django.contrib.postgres.operations import AddIndexConcurrently
+        from django.db.migrations.loader import MigrationLoader
+
+        migration = MigrationLoader(None).disk_migrations[
+            ("waste_collection", "0009_collection_collection_pub_status_idx_and_more")
+        ]
+        self.assertFalse(migration.atomic)
+        self.assertTrue(migration.operations)
+        for operation in migration.operations:
+            self.assertIsInstance(operation, AddIndexConcurrently)
