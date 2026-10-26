@@ -140,6 +140,9 @@ def generate_citation_key(source):
 
 DOI_PREFIXES = ("https://doi.org/", "http://doi.org/", "doi.org/", "doi:")
 DOI_PATTERN = re.compile(r"^10\.\d{4,9}/\S+$")
+DOI_FORMAT_MESSAGE = (
+    "Enter a bare DOI in the form 10.xxxx/..., without a resolver URL or 'doi:' prefix."
+)
 
 
 def normalize_doi(value):
@@ -147,14 +150,19 @@ def normalize_doi(value):
 
     Strips resolver URLs (``https://doi.org/``), ``doi:``/``DOI:`` labels and
     LaTeX ``\\url``/``\\url{...}`` markup that sneak in via imports or
-    copy-paste. Values wrapped in no known prefix are returned stripped but
-    otherwise unchanged.
+    copy-paste, in any nesting order. Values wrapped in no known prefix are
+    returned stripped but otherwise unchanged.
     """
     doi = str(value or "").strip()
-    for prefix in DOI_PREFIXES:
-        if doi.lower().startswith(prefix):
-            doi = doi[len(prefix) :]
-            break
-    if doi.startswith("\\url"):
-        doi = doi[4:]
-    return doi.strip("{}").strip()
+    previous = None
+    while doi != previous:
+        previous = doi
+        if doi.startswith("\\url{") and doi.endswith("}"):
+            doi = doi[5:-1].strip()
+        elif doi.startswith("\\url"):
+            doi = doi[4:].strip()
+        for prefix in DOI_PREFIXES:
+            if doi.lower().startswith(prefix):
+                doi = doi[len(prefix) :].strip()
+                break
+    return doi

@@ -10,7 +10,12 @@ from utils.object_management.models import (
     UserCreatedObjectManager,
 )
 
-from .utils import DOI_PATTERN, generate_citation_key, normalize_doi
+from .utils import (
+    DOI_FORMAT_MESSAGE,
+    DOI_PATTERN,
+    generate_citation_key,
+    normalize_doi,
+)
 
 AUTHOR_TYPES = (("person", "Person"), ("organization", "Organization"))
 
@@ -514,18 +519,34 @@ class Source(UserCreatedObject):
     def clean(self):
         super().clean()
         self.doi = normalize_doi(self.doi) or None
-        if self.doi and not DOI_PATTERN.match(self.doi):
-            raise ValidationError(
-                {
-                    "doi": (
-                        "Enter a bare DOI in the form 10.xxxx/..., without a "
-                        "resolver URL or 'doi:' prefix."
-                    )
-                }
-            )
+        if (
+            self.doi
+            and not DOI_PATTERN.match(self.doi)
+            and self.doi != self._stored_normalized_doi()
+        ):
+            raise ValidationError({"doi": DOI_FORMAT_MESSAGE})
+
+    def _stored_normalized_doi(self):
+        if self._state.adding or self.pk is None:
+            return None
+        stored = (
+            type(self)
+            ._base_manager.filter(pk=self.pk)
+            .values_list("doi", flat=True)
+            .first()
+        )
+        return normalize_doi(stored) or None
 
     def save(self, *args, **kwargs):
-        self.doi = normalize_doi(self.doi) or None
+        normalized_doi = normalize_doi(self.doi) or None
+        if normalized_doi != self.doi:
+            self.doi = normalized_doi
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                update_fields = list(update_fields)
+                if "doi" not in update_fields:
+                    update_fields.append("doi")
+                kwargs["update_fields"] = update_fields
         if not self.citation_key:
             self.citation_key = generate_citation_key(self)
         super().save(*args, **kwargs)

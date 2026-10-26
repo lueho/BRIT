@@ -350,3 +350,65 @@ class SourceDoiNormalizationTestCase(TestCase):
     def test_clean_accepts_empty_doi(self):
         source = Source(title="Article")
         source.full_clean()
+
+    def test_latex_wrapped_resolver_url_is_normalized(self):
+        raw = r"\url{https://doi.org/10.1000/example}"
+        source = Source.objects.create(title="Article", doi=raw)
+        self.assertEqual(source.doi, "10.1000/example")
+        unsaved = Source(title="Article", doi=raw)
+        unsaved.full_clean()
+        self.assertEqual(unsaved.doi, "10.1000/example")
+
+    def test_label_before_resolver_url_is_normalized(self):
+        raw = "doi: https://doi.org/10.1000/example"
+        source = Source.objects.create(title="Article", doi=raw)
+        self.assertEqual(source.doi, "10.1000/example")
+        unsaved = Source(title="Article", doi=raw)
+        unsaved.full_clean()
+        self.assertEqual(unsaved.doi, "10.1000/example")
+
+    def test_bare_doi_suffix_braces_are_preserved(self):
+        source = Source.objects.create(title="Article", doi="10.1234/{part}")
+        self.assertEqual(source.doi, "10.1234/{part}")
+
+    def test_partial_save_persists_normalized_doi(self):
+        source = Source.objects.create(title="Article")
+        Source.objects.filter(pk=source.pk).update(
+            doi="https://doi.org/10.1000/example"
+        )
+        source.refresh_from_db()
+
+        source.update_abbreviation()
+
+        source.refresh_from_db()
+        self.assertEqual(source.doi, "10.1000/example")
+
+    def test_partial_save_with_iterator_update_fields(self):
+        source = Source.objects.create(title="Article")
+        Source.objects.filter(pk=source.pk).update(doi="DOI: 10.1000/example")
+        source.refresh_from_db()
+
+        source.title = "Renamed"
+        source.save(update_fields=iter(["title"]))
+
+        source.refresh_from_db()
+        self.assertEqual(source.title, "Renamed")
+        self.assertEqual(source.doi, "10.1000/example")
+
+    def test_clean_allows_unrelated_edit_of_stored_invalid_doi(self):
+        source = Source.objects.create(title="Book")
+        Source.objects.filter(pk=source.pk).update(doi="ISBN 978-3-03736-016-3")
+        source.refresh_from_db()
+
+        source.title = "Book, 2nd edition"
+        source.full_clean()
+
+    def test_clean_rejects_changed_invalid_doi_on_existing_source(self):
+        source = Source.objects.create(title="Book")
+        Source.objects.filter(pk=source.pk).update(doi="ISBN 978-3-03736-016-3")
+        source.refresh_from_db()
+
+        source.doi = "ISBN 978-0-00000-000-0"
+        with self.assertRaises(ValidationError) as ctx:
+            source.full_clean()
+        self.assertIn("doi", ctx.exception.error_dict)
