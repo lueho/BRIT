@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from utils.object_management.admin import NamedUserCreatedObjectAdmin
+from utils.object_management.admin import NamedUserCreatedObjectAdmin, PolicyAdminMixin
 
 from .models import (
     AggregatedCollectionPropertyValue,
@@ -19,33 +19,33 @@ from .models import (
 
 
 @admin.register(Collector)
-class CollectorAdmin(NamedUserCreatedObjectAdmin):
+class CollectorAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "website", "catchment", "owner", "publication_status")
     search_fields = ("name", "description")
 
 
 @admin.register(CollectionSystem)
-class CollectionSystemAdmin(NamedUserCreatedObjectAdmin):
+class CollectionSystemAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     pass
 
 
 @admin.register(BinConfiguration)
-class BinConfigurationAdmin(NamedUserCreatedObjectAdmin):
+class BinConfigurationAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     pass
 
 
 @admin.register(WasteCategory)
-class WasteCategoryAdmin(NamedUserCreatedObjectAdmin):
+class WasteCategoryAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     pass
 
 
 @admin.register(WasteComponent)
-class WasteComponentAdmin(NamedUserCreatedObjectAdmin):
+class WasteComponentAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     pass
 
 
 @admin.register(WasteFlyer)
-class WasteFlyerAdmin(admin.ModelAdmin):
+class WasteFlyerAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = ("__str__", "url", "url_valid", "owner", "publication_status")
     search_fields = ("url", "title")
     list_filter = ("publication_status", "url_valid")
@@ -53,7 +53,7 @@ class WasteFlyerAdmin(admin.ModelAdmin):
 
 
 @admin.register(CollectionSeason)
-class CollectionSeasonAdmin(admin.ModelAdmin):
+class CollectionSeasonAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "distribution",
@@ -67,18 +67,18 @@ class CollectionSeasonAdmin(admin.ModelAdmin):
 
 
 @admin.register(CollectionFrequency)
-class CollectionFrequencyAdmin(NamedUserCreatedObjectAdmin):
+class CollectionFrequencyAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "type", "owner", "publication_status")
     list_filter = ("publication_status", "type")
 
 
 @admin.register(FeeSystem)
-class FeeSystemAdmin(NamedUserCreatedObjectAdmin):
+class FeeSystemAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     pass
 
 
 @admin.register(Collection)
-class CollectionAdmin(NamedUserCreatedObjectAdmin):
+class CollectionAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "collector",
@@ -101,7 +101,7 @@ class CollectionAdmin(NamedUserCreatedObjectAdmin):
 
 
 @admin.register(CollectionPropertyValue)
-class CollectionPropertyValueAdmin(admin.ModelAdmin):
+class CollectionPropertyValueAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "collection",
@@ -118,7 +118,7 @@ class CollectionPropertyValueAdmin(admin.ModelAdmin):
 
 
 @admin.register(AggregatedCollectionPropertyValue)
-class AggregatedCollectionPropertyValueAdmin(admin.ModelAdmin):
+class AggregatedCollectionPropertyValueAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "property",
