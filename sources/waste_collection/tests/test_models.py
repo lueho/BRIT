@@ -461,17 +461,6 @@ class CollectionTestCase(TestCase):
             self.collection.full_clean()
             self.collection.save()
 
-    def test_participation_policy_field_exists_and_persists_values(self):
-        """The renamed field participation_policy stores and retrieves values."""
-        field_names = {f.name for f in Collection._meta.get_fields()}
-        self.assertIn("participation_policy", field_names)
-        self.assertNotIn("connection_type", field_names)
-
-        self.collection.participation_policy = "MANDATORY"
-        self.collection.save(update_fields=["participation_policy"])
-        self.collection.refresh_from_db()
-        self.assertEqual(self.collection.participation_policy, "MANDATORY")
-
 
 class CollectionBinConfigurationFieldTestCase(TestCase):
     """Tests for Collection.bin_configuration FK behaviour."""

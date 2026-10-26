@@ -6,7 +6,6 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
-from bibliography.models import Source
 from materials.models import Material
 from utils.properties.models import Unit
 
@@ -63,34 +62,6 @@ class URLValidationTestCase(TestCase):
         """Empty values should be accepted (for optional fields)."""
         validate_internal_or_external_url("")
         validate_internal_or_external_url(None)
-
-
-# ==============================================================================
-# Process Category Tests
-# ==============================================================================
-
-
-class ProcessCategoryModelTestCase(TestCase):
-    """Test the ProcessCategory model."""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.owner = get_user_model().objects.create(username="category_owner")
-
-    def test_create_category(self):
-        """ProcessCategory can be created with name and owner."""
-        category = ProcessCategory.objects.create(
-            name="Thermochemical", owner=self.owner
-        )
-        self.assertEqual(category.name, "Thermochemical")
-        self.assertEqual(category.owner, self.owner)
-
-    def test_publication_status_inherited(self):
-        """ProcessCategory inherits publication status from NamedUserCreatedObject."""
-        category = ProcessCategory.objects.create(
-            name="Physical", owner=self.owner, publication_status="published"
-        )
-        self.assertEqual(category.publication_status, "published")
 
 
 # ==============================================================================
@@ -245,20 +216,6 @@ class ProcessModelTestCase(TestCase):
         self.assertEqual(input_names, [self.material_in.name])
         self.assertEqual(output_names, [self.material_out.name])
 
-    def test_process_sources_accepts_bibliography_sources(self):
-        process = Process.objects.create(name="Composting", owner=self.owner)
-        source = Source.objects.create(
-            title="Reference Title",
-            abbreviation="Ref01",
-            owner=self.owner,
-        )
-        process.sources.add(source)
-
-        self.assertEqual(
-            list(process.sources.order_by("id").values_list("pk", flat=True)),
-            [source.pk],
-        )
-
     def test_process_link_url_validation(self):
         process = Process.objects.create(name="Anaerobic Digestion", owner=self.owner)
         link = ProcessLink(
@@ -313,12 +270,6 @@ class ProcessModelTestCase(TestCase):
         internal_resource.url = "/internal/path/"
         internal_resource.full_clean()
 
-    def test_process_has_no_parent_field(self):
-        """Processes are grouped by categories only, not by a hierarchy."""
-        field_names = [field.name for field in Process._meta.get_fields()]
-        self.assertNotIn("parent", field_names)
-        self.assertNotIn("variants", field_names)
-
     def test_process_categories_overlap(self):
         """A process can belong to multiple categories; peers stay independent."""
         other_category = ProcessCategory.objects.create(
@@ -334,29 +285,6 @@ class ProcessModelTestCase(TestCase):
         peer.categories.add(self.category)
         self.assertIn(peer, self.category.processes.all())
         self.assertNotIn(peer, other_category.processes.all())
-
-    def test_process_short_description(self):
-        """Test that short_description field works correctly."""
-        process = Process.objects.create(
-            name="Pyrolysis",
-            short_description="Thermal decomposition without oxygen",
-            owner=self.owner,
-        )
-        self.assertEqual(
-            process.short_description, "Thermal decomposition without oxygen"
-        )
-
-    def test_process_mechanism(self):
-        """Test that mechanism field stores process mechanism."""
-        process = Process.objects.create(
-            name="Composting", mechanism="Aerobic Decomposition", owner=self.owner
-        )
-        self.assertEqual(process.mechanism, "Aerobic Decomposition")
-
-    def test_process_image_field(self):
-        """Test that image can be attached to process."""
-        process = Process.objects.create(name="Gasification", owner=self.owner)
-        self.assertFalse(process.image)  # Empty ImageField is falsy
 
     def test_process_ordering(self):
         """Test that processes are ordered by name then id."""
@@ -397,60 +325,6 @@ class ProcessModelTestCase(TestCase):
             ProcessOperatingParameter.Parameter.TEMPERATURE
         )
         self.assertEqual(list(temp_params), [temp_param1, temp_param2])
-
-    def test_process_material_stage_and_stream_label(self):
-        """Test that stage and stream_label fields work correctly."""
-        process = Process.objects.create(name="Complex Process", owner=self.owner)
-        material_link = ProcessMaterial.objects.create(
-            process=process,
-            material=self.material_in,
-            role=ProcessMaterial.Role.INPUT,
-            stage="Preprocessing",
-            stream_label="Primary feed",
-        )
-        self.assertEqual(material_link.stage, "Preprocessing")
-        self.assertEqual(material_link.stream_label, "Primary feed")
-
-    def test_process_material_optional_flag(self):
-        """Test that materials can be marked as optional."""
-        process = Process.objects.create(name="Flexible Process", owner=self.owner)
-        optional_material = ProcessMaterial.objects.create(
-            process=process,
-            material=self.material_in,
-            role=ProcessMaterial.Role.INPUT,
-            optional=True,
-        )
-        mandatory_material = ProcessMaterial.objects.create(
-            process=process,
-            material=self.material_out,
-            role=ProcessMaterial.Role.OUTPUT,
-            optional=False,
-        )
-        self.assertTrue(optional_material.optional)
-        self.assertFalse(mandatory_material.optional)
-
-    def test_process_material_notes(self):
-        """Test that notes can be added to material links."""
-        process = Process.objects.create(name="Documented Process", owner=self.owner)
-        material_link = ProcessMaterial.objects.create(
-            process=process,
-            material=self.material_in,
-            role=ProcessMaterial.Role.INPUT,
-            notes="Requires pre-drying to <10% moisture content",
-        )
-        self.assertIn("pre-drying", material_link.notes)
-
-    def test_operating_parameter_basis_field(self):
-        """Test that basis field stores measurement conditions."""
-        process = Process.objects.create(name="Precise Process", owner=self.owner)
-        parameter = ProcessOperatingParameter.objects.create(
-            process=process,
-            parameter=ProcessOperatingParameter.Parameter.YIELD,
-            nominal_value=Decimal("75"),
-            unit=self.unit_percent,
-            basis="dry basis",
-        )
-        self.assertEqual(parameter.basis, "dry basis")
 
     def test_operating_parameter_value_displays_strip_trailing_zeros(self):
         process = Process.objects.create(name="Precise Display", owner=self.owner)

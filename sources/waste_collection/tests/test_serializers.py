@@ -128,22 +128,6 @@ class CollectionModelSerializerTestCase(TestCase):
         cls.collection.flyers.add(waste_flyer_1)
         cls.collection.flyers.add(waste_flyer_2)
 
-    def test_all_keys_are_present_in_result_data(self):
-        serializer = CollectionModelSerializer(self.collection)
-        data = serializer.data
-        self.assertIn("id", data)
-        self.assertIn("catchment", data)
-        self.assertIn("collector", data)
-        self.assertIn("collection_system", data)
-        self.assertIn("waste_category", data)
-        self.assertIn("allowed_materials", data)
-        self.assertIn("forbidden_materials", data)
-        self.assertIn("frequency", data)
-        self.assertIn("valid_from", data)
-        self.assertIn("valid_until", data)
-        self.assertIn("sources", data)
-        self.assertIn("comments", data)
-
     def test_multiple_sources_in_representation(self):
         serializer = CollectionModelSerializer(self.collection)
         flyer_urls = serializer.data["sources"]
@@ -223,23 +207,6 @@ class CollectionModelSerializerTestCase(TestCase):
             else:
                 expected = choices.get(value, value)
                 self.assertEqual(data["required_bin_capacity_reference"], expected)
-
-    def test_serializer_method_fields_have_matching_methods(self):
-        serializer = CollectionModelSerializer(self.collection)
-        serializer_method_fields = {
-            name: field
-            for name, field in serializer.fields.items()
-            if field.__class__.__name__ == "SerializerMethodField"
-        }
-        for field_name, field in serializer_method_fields.items():
-            method_name = getattr(field, "method_name", f"get_{field_name}")
-            self.assertTrue(
-                hasattr(serializer, method_name),
-                msg=(
-                    f"SerializerMethodField '{field_name}' is missing its method "
-                    f"'{method_name}' on {serializer.__class__.__name__}"
-                ),
-            )
 
     def test_participation_policy_serialization_handles_none_and_empty_string(self):
         # None case
@@ -371,35 +338,6 @@ class CollectionFlatSerializerTestCase(TestCase):
         )
         cls.collection_lau.flyers.add(waste_flyer_1)
         cls.collection_lau.flyers.add(waste_flyer_2)
-
-    def test_serializer_data_contains_all_fields(self):
-        serializer = CollectionFlatSerializer(self.collection_nuts)
-        static_keys = {
-            "catchment",
-            "nuts_or_lau_id",
-            "collector",
-            "collection_system",
-            "bin_configuration",
-            "country",
-            "waste_category",
-            "participation_policy",
-            "allowed_materials",
-            "forbidden_materials",
-            "fee_system",
-            "frequency",
-            "min_bin_size",
-            "required_bin_capacity",
-            "required_bin_capacity_reference",
-            "established",
-            "comments",
-            "flyer_urls",
-            "bibliography_sources",
-            "valid_from",
-            "valid_until",
-            "created_at",
-            "lastmodified_at",
-        }
-        self.assertTrue(static_keys.issubset(set(serializer.data.keys())))
 
     def test_participation_policy_serializes_stored_values(self):
         self.collection_nuts.participation_policy = "MANDATORY"

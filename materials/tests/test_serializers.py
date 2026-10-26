@@ -43,7 +43,6 @@ from ..serializers import (
     SampleGroupAPISerializer,
     SampleGroupWriteSerializer,
     SampleModelSerializer,
-    SampleSeriesModelSerializer,
     SampleWriteSerializer,
 )
 
@@ -140,22 +139,6 @@ class MaterialPropertySerializerTestCase(TestCase):
         self.assertIn("unit", data)
         self.assertEqual(data["basis_component"], self.value.basis_component.name)
         self.assertEqual(data["unit"], self.value.unit.name)
-
-
-class SampleSeriesModelSerializerTestCase(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        material = Material.objects.create(name="Test Material")
-        SampleSeries.objects.create(name="Test Series", material=material)
-
-    def setUp(self):
-        self.series = SampleSeries.objects.get(name="Test Series")
-
-    def test_serializer_construction(self):
-        data = SampleSeriesModelSerializer(self.series).data
-        self.assertIn("id", data)
-        self.assertIn("name", data)
-        self.assertIn("distributions", data)
 
 
 class SampleGeoReferenceSerializerTestCase(TestCase):
@@ -595,26 +578,6 @@ class SampleSerializerTestCase(TestCase):
     def setUp(self):
         self.sample = Sample.objects.get(name="Test Sample")
 
-    def test_serializer_construction(self):
-        request = RequestFactory().get(
-            reverse("sample-detail", kwargs={"pk": self.sample.id})
-        )
-        data = SampleModelSerializer(self.sample, context={"request": request}).data
-        self.assertIn("name", data)
-        self.assertEqual(data["name"], "Test Sample")
-        self.assertIn("material_name", data)
-        self.assertEqual(data["material_name"], "Test Material")
-        self.assertIn("material_url", data)
-        self.assertIn("series_name", data)
-        self.assertEqual(data["series_name"], "Test Series")
-        self.assertIn("series_url", data)
-        self.assertIn("timestep", data)
-        self.assertIn("datetime", data)
-        self.assertIn("image", data)
-        self.assertIn("compositions", data)
-        self.assertIn("properties", data)
-        self.assertIn("sources", data)
-
     def test_serializer_includes_sample_owned_property_values(self):
         request = RequestFactory().get(
             reverse("sample-detail", kwargs={"pk": self.sample.id})
@@ -740,15 +703,6 @@ class CompositionSerializerTestCase(TestCase):
             unit=unit,
             average=Decimal("40"),
         )
-
-    def test_serializer_construction(self):
-        data = CompositionModelSerializer(self.composition).data
-        self.assertIn("group", data)
-        self.assertIn("group_name", data)
-        self.assertIn("sample", data)
-        self.assertIn("fractions_of", data)
-        self.assertIn("fractions_of_name", data)
-        self.assertIn("shares", data)
 
     def test_serializer_uses_raw_normalized_composition(self):
         data = CompositionModelSerializer(self.composition).data

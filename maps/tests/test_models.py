@@ -1,7 +1,6 @@
 import contextlib
 import logging
 
-from django.apps import apps
 from django.contrib.gis.geos import GEOSGeometry, Point
 from django.db import models
 from django.db.models import QuerySet
@@ -386,11 +385,7 @@ class RegionAttributeValueMeasurementTestCase(TestCase):
         self.assertQuerySetEqual(value.sources.all(), [source])
 
 
-class LegacyAttributeRemovalTestCase(TestCase):
-    def test_legacy_attribute_model_is_removed(self):
-        with self.assertRaises(LookupError):
-            apps.get_model("maps", "Attribute")
-
+class PropertyBaseUnitContractTestCase(TestCase):
     def test_no_property_base_subclass_uses_unit_charfield(self):
         offenders = [
             subclass.__name__

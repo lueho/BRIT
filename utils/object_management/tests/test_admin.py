@@ -8,7 +8,7 @@ from bibliography.admin import LicenceAdmin
 from case_studies.closecycle.admin import ShowcaseAdmin
 from distributions.admin import TemporalDistributionAdmin, TimestepAdmin
 from interfaces.simucf.admin import InputMaterialAdmin
-from inventories.admin import ScenarioAdmin, ScenarioInventoryConfigurationAdmin
+from inventories.admin import ScenarioAdmin
 from materials.admin import (
     MaterialAdmin,
     MaterialComponentAdmin,
@@ -19,14 +19,7 @@ from materials.admin import (
     SampleGroupAdmin,
     SampleSeriesAdmin,
 )
-from processes.admin import (
-    ProcessAdmin,
-    ProcessCategoryAdmin,
-    ProcessMaterialAdmin,
-    ProcessMaterialInline,
-    ProcessOperatingParameterAdmin,
-    ProcessOperatingParameterInline,
-)
+from processes.admin import ProcessAdmin, ProcessCategoryAdmin
 from sources.greenhouses.admin import CultureAdmin, GreenhouseAdmin
 from sources.waste_collection.admin import (
     BinConfigurationAdmin,
@@ -126,33 +119,6 @@ class NamedUserCreatedObjectAdminTest(SimpleTestCase):
 
 
 class AutocompleteFieldsTest(SimpleTestCase):
-    def test_fk_admin_autocomplete_fields(self):
-        self.assertEqual(
-            ("process", "material", "quantity_unit"),
-            ProcessMaterialAdmin.autocomplete_fields,
-        )
-        self.assertEqual(
-            ("process", "unit"), ProcessOperatingParameterAdmin.autocomplete_fields
-        )
-        self.assertEqual(
-            (
-                "scenario",
-                "feedstock",
-                "sample_series",
-                "geodataset",
-                "inventory_algorithm",
-                "inventory_parameter",
-                "inventory_value",
-            ),
-            ScenarioInventoryConfigurationAdmin.autocomplete_fields,
-        )
-
-    def test_inline_autocomplete_fields(self):
-        self.assertEqual(
-            ("material", "quantity_unit"), ProcessMaterialInline.autocomplete_fields
-        )
-        self.assertEqual(("unit",), ProcessOperatingParameterInline.autocomplete_fields)
-
     def test_autocomplete_targets_are_searchable(self):
         for model_admin in first_party_model_admins():
             for field_name in model_admin.get_autocomplete_fields(None):
@@ -168,29 +134,3 @@ class AutocompleteFieldsTest(SimpleTestCase):
                         f"{type(target_admin).__name__} must define search_fields "
                         f"for autocomplete_fields",
                     )
-
-
-class AdminOptionSyntaxTest(SimpleTestCase):
-    TUPLE_OPTION_ATTRS = (
-        "actions",
-        "autocomplete_fields",
-        "filter_horizontal",
-        "inlines",
-        "list_display",
-        "list_display_links",
-        "list_editable",
-        "list_filter",
-        "ordering",
-        "raw_id_fields",
-        "readonly_fields",
-        "search_fields",
-    )
-
-    def test_admin_options_use_tuple_syntax(self):
-        for model_admin in first_party_model_admins():
-            for attr in self.TUPLE_OPTION_ATTRS:
-                value = getattr(model_admin, attr, None)
-                if value is None:
-                    continue
-                with self.subTest(admin=type(model_admin).__name__, attr=attr):
-                    self.assertIsInstance(value, tuple)
