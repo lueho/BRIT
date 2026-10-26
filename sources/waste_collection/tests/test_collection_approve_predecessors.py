@@ -291,31 +291,44 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
                 .exists()
             )
 
-    def test_raw_orm_approve_archives_only_published_predecessors(self):
+    def test_direct_approve_archives_only_published_predecessors(self):
         published = self._collection("Published pred", self.owner, "published")
         private = self._collection("Private pred", self.other_owner, "private")
         candidate = self._collection("Candidate", self.owner, "review")
         candidate.predecessors.add(published, private)
 
-        candidate.approve()
+        candidate.approve(user=self.moderator)
 
         candidate.refresh_from_db()
         published.refresh_from_db()
         private.refresh_from_db()
         self.assertEqual(candidate.publication_status, "published")
+        self.assertEqual(candidate.approved_by, self.moderator)
         self.assertEqual(published.publication_status, "archived")
         self.assertEqual(private.publication_status, "private")
-        # Raw ORM approval does not invent historic audit actors.
-        self.assertEqual(
-            self._review_events(published, ReviewAction.ACTION_ARCHIVED).count(),
-            0,
-        )
-        # ...and none for the candidate's own approval either.
+        archived_event = self._review_events(
+            published, ReviewAction.ACTION_ARCHIVED
+        ).get()
+        self.assertEqual(archived_event.user, self.moderator)
+        self.assertEqual(self._review_events(private).count(), 0)
+        # Only perform_transition records the candidate's own approval.
         self.assertEqual(
             self._review_events(candidate, ReviewAction.ACTION_APPROVED).count(),
             0,
         )
 
+    def test_approve_without_user_is_rejected(self):
+        published = self._collection("Published pred", self.owner, "published")
+        candidate = self._collection("Candidate", self.owner, "review")
+        candidate.predecessors.add(published)
+
+        with self.assertRaises(ValidationError):
+            candidate.approve()
+
+        candidate.refresh_from_db()
+        published.refresh_from_db()
+        self.assertEqual(candidate.publication_status, "review")
+        self.assertEqual(published.publication_status, "published")
 
     def _assert_older_version_rejected(self, older, approve):
         with self.assertRaises(ValidationError):
@@ -359,7 +372,7 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
             older, lambda obj: obj.approve(user=self.moderator)
         )
 
-    def test_raw_orm_approve_rejects_older_version_with_published_successor(self):
+    def test_direct_approve_rejects_older_version_with_published_successor(self):
         older = self._collection("Older", self.other_owner, "review")
         newer = self._collection("Newer", self.owner, "published")
         newer.predecessors.add(older)

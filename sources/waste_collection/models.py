@@ -994,17 +994,12 @@ class Collection(NamedUserCreatedObject):
             # never be forced public here.
             for predecessor in predecessors:
                 if predecessor.publication_status == self.STATUS_PUBLISHED:
-                    if user is not None:
-                        perform_transition(
-                            user,
-                            predecessor,
-                            "archive",
-                            expected_revision=predecessor.content_revision,
-                        )
-                    else:
-                        # Raw trusted ORM calls carry no actor and produce
-                        # no fabricated audit event.
-                        predecessor.archive()
+                    perform_transition(
+                        user,
+                        predecessor,
+                        "archive",
+                        expected_revision=predecessor.content_revision,
+                    )
 
     @classmethod
     def public_map_url(cls):
