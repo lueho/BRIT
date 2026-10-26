@@ -218,6 +218,36 @@ def _get_model_list_url(model):
     return getter
 
 
+def _get_breadcrumb_singular_model_name(model):
+    """Singular label for form titles and page titles; ``"Object"`` as fallback."""
+    if model is None:
+        return "Object"
+    getter = getattr(model, "get_breadcrumb_singular_label", None)
+    if callable(getter):
+        return capfirst(str(getter()))
+    return "Object"
+
+
+def _build_object_form_breadcrumb_context(
+    model, *, obj=None, action_label=None, page_title=None
+):
+    """Shared breadcrumb context for the object create/update form views."""
+    module_label, _ = _get_default_breadcrumb_module(model)
+    parent_label, _ = _get_default_breadcrumb_parent_module(model)
+    return build_breadcrumb_context(
+        parent_module_label=parent_label,
+        parent_module_url=_get_default_breadcrumb_parent_module_url(model),
+        module_label=module_label,
+        module_url=_get_default_breadcrumb_module_url(model),
+        section_label=_get_default_breadcrumb_section_label(model),
+        section_url=_get_model_list_url(model),
+        object_label=_get_default_breadcrumb_object_label(obj),
+        object_url=getattr(obj, "detail_url", None) if obj is not None else None,
+        action_label=action_label,
+        page_title=page_title,
+    )
+
+
 def parse_tomselect_filter_expression(raw_expression):
     """Parse a TomSelect filter expression into a lookup/value pair.
 
@@ -1717,47 +1747,44 @@ class ReviewObjectListView(ReviewObjectListMixin, ListView):
         return template_names
 
 
-class UserCreatedObjectCreateView(
-    CreateUserObjectMixin, NoFormTagMixin, SuccessMessageMixin, CreateView
-):
+class RequestAwareFormMixin:
+    """Pass ``request`` to forms that are built to receive it.
+
+    Forms mixing in ``UserCreatedObjectFormMixin`` or ``SourcesFieldMixin``
+    accept a ``request`` keyword argument; other forms must not get it.
+    Modal form views receive ``request`` unconditionally through
+    ``PassRequestMixin`` instead.
+    """
+
+    request_form_mixins = (UserCreatedObjectFormMixin, SourcesFieldMixin)
+
     def get_form_kwargs(self):
-        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
         kwargs = super().get_form_kwargs()
-        form_class = self.get_form_class()
-
-        # Only pass request if form knows how to handle it
-        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
+        if issubclass(self.get_form_class(), self.request_form_mixins):
             kwargs["request"] = self.request
-
         return kwargs
 
+
+class UserCreatedObjectCreateView(
+    RequestAwareFormMixin,
+    CreateUserObjectMixin,
+    NoFormTagMixin,
+    SuccessMessageMixin,
+    CreateView,
+):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         model = _get_breadcrumb_model(self)
-        model_name = "Object"
-
-        if model is not None:
-            getter = getattr(model, "get_breadcrumb_singular_label", None)
-            if callable(getter):
-                model_name = capfirst(str(getter()))
-
+        model_name = _get_breadcrumb_singular_model_name(model)
         context.update(
             {
                 "form_title": f"Create New {model_name}",
                 "submit_button_text": "Save",
             }
         )
-        default_module_label, _ = _get_default_breadcrumb_module(model)
-        default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
-        breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
         context.update(
-            build_breadcrumb_context(
-                parent_module_label=default_parent_label,
-                parent_module_url=_get_default_breadcrumb_parent_module_url(model),
-                module_label=default_module_label,
-                module_url=_get_default_breadcrumb_module_url(model),
-                section_label=breadcrumb_section_label,
-                section_url=_get_model_list_url(model),
+            _build_object_form_breadcrumb_context(
+                model,
                 action_label="Create",
                 page_title=f"Create {model_name}",
             )
@@ -2167,44 +2194,26 @@ class UserCreatedObjectModalDetailView(
 
 
 class UserCreatedObjectUpdateView(
-    UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, UpdateView
+    RequestAwareFormMixin,
+    UserCreatedObjectWriteAccessMixin,
+    NextOrSuccessUrlMixin,
+    UpdateView,
 ):
-    def get_form_kwargs(self):
-        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
-        kwargs = super().get_form_kwargs()
-        form_class = self.get_form_class()
-
-        # Only pass request if form knows how to handle it
-        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
-            kwargs["request"] = self.request
-
-        return kwargs
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        model = self.object.__class__
-        default_module_label, _ = _get_default_breadcrumb_module(model)
-        default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
-        breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
-        breadcrumb_object_label = _get_default_breadcrumb_object_label(self.object)
+        verbose_name = self.object._meta.verbose_name
         context.update(
             {
-                "form_title": f"Update {self.object._meta.verbose_name}",
+                "form_title": f"Update {verbose_name}",
                 "submit_button_text": "Save",
             }
         )
         context.update(
-            build_breadcrumb_context(
-                parent_module_label=default_parent_label,
-                parent_module_url=_get_default_breadcrumb_parent_module_url(model),
-                module_label=default_module_label,
-                module_url=_get_default_breadcrumb_module_url(model),
-                section_label=breadcrumb_section_label,
-                section_url=_get_model_list_url(model),
-                object_label=breadcrumb_object_label,
-                object_url=getattr(self.object, "detail_url", None),
+            _build_object_form_breadcrumb_context(
+                self.object.__class__,
+                obj=self.object,
                 action_label="Update",
-                page_title=f"Update {self.object._meta.verbose_name}",
+                page_title=f"Update {verbose_name}",
             )
         )
         return context
@@ -2219,25 +2228,14 @@ class UserCreatedObjectUpdateView(
 
 
 class UserCreatedObjectCreateWithInlinesView(
-    CreateUserObjectMixin, CreateWithInlinesView
+    RequestAwareFormMixin, CreateUserObjectMixin, CreateWithInlinesView
 ):
     formset_helper_class = DynamicTableInlineFormSetHelper
-
-    def get_form_kwargs(self):
-        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
-        kwargs = super().get_form_kwargs()
-        form_class = self.get_form_class()
-
-        # Only pass request if form knows how to handle it
-        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
-            kwargs["request"] = self.request
-
-        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         model = _get_breadcrumb_model(self)
-        model_name = capfirst(str(model.get_breadcrumb_singular_label()))
+        model_name = _get_breadcrumb_singular_model_name(model)
         context.update(
             {
                 "form_title": f"Create New {model_name}",
@@ -2245,17 +2243,9 @@ class UserCreatedObjectCreateWithInlinesView(
                 "formset_helper": self.formset_helper_class(),
             }
         )
-        default_module_label, _ = _get_default_breadcrumb_module(model)
-        default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
-        breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
         context.update(
-            build_breadcrumb_context(
-                parent_module_label=default_parent_label,
-                parent_module_url=_get_default_breadcrumb_parent_module_url(model),
-                module_label=default_module_label,
-                module_url=_get_default_breadcrumb_module_url(model),
-                section_label=breadcrumb_section_label,
-                section_url=_get_model_list_url(model),
+            _build_object_form_breadcrumb_context(
+                model,
                 action_label="Create",
                 page_title=f"Create {model_name}",
             )
@@ -2272,47 +2262,29 @@ class UserCreatedObjectCreateWithInlinesView(
 
 
 class UserCreatedObjectUpdateWithInlinesView(
-    UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView
+    RequestAwareFormMixin,
+    UserCreatedObjectWriteAccessMixin,
+    NextOrSuccessUrlMixin,
+    UpdateWithInlinesView,
 ):
     formset_helper_class = DynamicTableInlineFormSetHelper
 
-    def get_form_kwargs(self):
-        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
-        kwargs = super().get_form_kwargs()
-        form_class = self.get_form_class()
-
-        # Only pass request if form knows how to handle it
-        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
-            kwargs["request"] = self.request
-
-        return kwargs
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        model = self.object.__class__
-        default_module_label, _ = _get_default_breadcrumb_module(model)
-        default_parent_label, _ = _get_default_breadcrumb_parent_module(model)
-        breadcrumb_section_label = _get_default_breadcrumb_section_label(model)
-        breadcrumb_object_label = _get_default_breadcrumb_object_label(self.object)
+        verbose_name = self.object._meta.verbose_name
         context.update(
             {
-                "form_title": f"Update {self.object._meta.verbose_name}",
+                "form_title": f"Update {verbose_name}",
                 "submit_button_text": "Save",
                 "formset_helper": self.formset_helper_class(),
             }
         )
         context.update(
-            build_breadcrumb_context(
-                parent_module_label=default_parent_label,
-                parent_module_url=_get_default_breadcrumb_parent_module_url(model),
-                module_label=default_module_label,
-                module_url=_get_default_breadcrumb_module_url(model),
-                section_label=breadcrumb_section_label,
-                section_url=_get_model_list_url(model),
-                object_label=breadcrumb_object_label,
-                object_url=getattr(self.object, "detail_url", None),
+            _build_object_form_breadcrumb_context(
+                self.object.__class__,
+                obj=self.object,
                 action_label="Update",
-                page_title=f"Update {self.object._meta.verbose_name}",
+                page_title=f"Update {verbose_name}",
             )
         )
         return context
@@ -2331,17 +2303,6 @@ class UserCreatedObjectModalUpdateView(
 ):
     template_name = "modal_form.html"
     success_message = "Successfully updated."
-
-    def get_form_kwargs(self):
-        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
-        kwargs = super().get_form_kwargs()
-        form_class = self.get_form_class()
-
-        # Only pass request if form knows how to handle it
-        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
-            kwargs["request"] = self.request
-
-        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
