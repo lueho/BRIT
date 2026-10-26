@@ -208,8 +208,6 @@ def object_access_routes(user, obj):
     ):
         routes.append("moderator")
     routes.extend(public_routes)
-    if not routes:
-        routes.append("read access")
     if generated:
         routes.append("generated value (read-only; governed by source evidence)")
     return routes

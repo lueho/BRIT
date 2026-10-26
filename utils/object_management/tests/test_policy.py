@@ -854,9 +854,7 @@ class PolicyReviewFindingRegressionTests(TestCase):
         )
         moderator = User.objects.get(pk=self.moderator.pk)
         self.assertFalse(decide(moderator, "read", self.private_property).allowed)
-        self.assertNotIn(
-            "moderator", object_access_routes(moderator, self.private_property)
-        )
+        self.assertEqual(object_access_routes(moderator, self.private_property), [])
         self.assertIn(
             "moderator", object_access_routes(moderator, self.review_property)
         )
