@@ -1,3 +1,4 @@
+import os
 import socket
 from unittest.mock import MagicMock, patch
 
@@ -5,6 +6,7 @@ import requests
 from django.test import SimpleTestCase
 
 from ..utils import (
+    _NO_PROXIES,
     _REQUEST_HEADERS,
     _REQUEST_TIMEOUT,
     check_url,
@@ -40,6 +42,7 @@ class SourceCheckUrlTestCase(SimpleTestCase):
             headers=self.headers,
             allow_redirects=False,
             timeout=_REQUEST_TIMEOUT,
+            proxies=_NO_PROXIES,
         )
 
     def test_request_with_http_status_404_falls_back_to_get(self, mock_head, mock_get):
@@ -52,6 +55,7 @@ class SourceCheckUrlTestCase(SimpleTestCase):
             headers=self.headers,
             allow_redirects=False,
             timeout=_REQUEST_TIMEOUT,
+            proxies=_NO_PROXIES,
             stream=True,
         )
 
@@ -69,6 +73,7 @@ class SourceCheckUrlTestCase(SimpleTestCase):
             headers=self.headers,
             allow_redirects=False,
             timeout=_REQUEST_TIMEOUT,
+            proxies=_NO_PROXIES,
             stream=True,
         )
 
@@ -82,6 +87,7 @@ class SourceCheckUrlTestCase(SimpleTestCase):
             headers=self.headers,
             allow_redirects=False,
             timeout=_REQUEST_TIMEOUT,
+            proxies=_NO_PROXIES,
             stream=True,
         )
 
@@ -170,10 +176,38 @@ class SourceCheckUrlDestinationTestCase(SimpleTestCase):
         with self._resolve({"example.org": ["93.184.216.34"]}):
             self.assertFalse(check_url("https://example.org/loop"))
 
+    def test_malformed_redirect_location_is_invalid(self, mock_head, mock_get):
+        mock_head.return_value = _redirect("http://[")
+        mock_get.return_value = _redirect("http://[")
+        with self._resolve({"example.org": ["93.184.216.34"]}):
+            self.assertFalse(check_url("https://example.org/doc"))
+
     def test_unresolvable_host_is_invalid(self, mock_head, mock_get):
         with self._resolve({}):
             self.assertFalse(check_url("https://does-not-exist.invalid/"))
         self.assertFalse(mock_head.called)
+
+
+class SourceCheckUrlProxyTestCase(SimpleTestCase):
+    """A proxy would resolve hosts itself and bypass the destination check."""
+
+    @patch("bibliography.utils.socket.getaddrinfo", _resolve_public)
+    @patch("requests.adapters.HTTPAdapter.send")
+    def test_ignores_environment_proxies(self, mock_send):
+        response = requests.Response()
+        response.status_code = 200
+        response._content = b""
+        mock_send.return_value = response
+        env = {
+            "HTTP_PROXY": "http://10.0.0.1:3128",
+            "HTTPS_PROXY": "http://10.0.0.1:3128",
+            "ALL_PROXY": "http://10.0.0.1:3128",
+            "NO_PROXY": "",
+        }
+        with patch.dict(os.environ, env):
+            self.assertTrue(check_url("https://example.org/doc"))
+        proxies = mock_send.call_args.kwargs["proxies"]
+        self.assertFalse(any(proxies.values()), proxies)
 
 
 @patch("requests.get")

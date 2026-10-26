@@ -17,6 +17,9 @@ _REQUEST_TIMEOUT = 10
 _MAX_REDIRECTS = 10
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 _ALLOWED_SCHEMES = frozenset({"http", "https"})
+# An environment proxy would resolve hostnames itself, bypassing the
+# destination check, so URL checks always connect directly.
+_NO_PROXIES = {"http": None, "https": None, "all": None}
 
 
 def _is_success_status(status_code):
@@ -70,13 +73,17 @@ def _request_public(method, url, **kwargs):
             headers=_REQUEST_HEADERS,
             allow_redirects=False,
             timeout=_REQUEST_TIMEOUT,
+            proxies=_NO_PROXIES,
             **kwargs,
         )
         location = response.headers.get("Location")
         if response.status_code not in _REDIRECT_STATUSES or not location:
             return response
         response.close()
-        url = urljoin(url, location)
+        try:
+            url = urljoin(url, location)
+        except ValueError:
+            return None
     return None
 
 
