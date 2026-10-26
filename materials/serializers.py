@@ -277,9 +277,10 @@ class SampleModelSerializer(ModelSerializer):
                     "unit",
                 )
                 .prefetch_related("sources")
+                .order_by("property__name", "id")
             )
         return MaterialPropertyValueModelSerializer(
-            queryset.order_by("property__name", "id"),
+            queryset,
             many=True,
             context={"request": request},
         ).data

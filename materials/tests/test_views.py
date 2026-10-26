@@ -10,9 +10,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.db.models.signals import post_save, pre_save
 from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import escape
@@ -7760,6 +7762,7 @@ class SampleDetailCompositionDisplayTestCase(SampleDetailPresentationMixin, Test
                 autospec=True,
                 side_effect=Sample.get_property_values_queryset,
             ) as property_values_query,
+            CaptureQueriesContext(connection) as queries,
         ):
             response = self.client.get(
                 reverse("sample-detail", kwargs={"pk": sample.pk})
@@ -7770,6 +7773,13 @@ class SampleDetailCompositionDisplayTestCase(SampleDetailPresentationMixin, Test
         self.assertEqual(serializer_normalize.call_count, 0)
         self.assertEqual(build_charts.call_count, 1)
         self.assertEqual(property_values_query.call_count, 1)
+        property_value_table = MaterialPropertyValue._meta.db_table
+        property_value_queries = [
+            query["sql"]
+            for query in queries.captured_queries
+            if f'FROM "{property_value_table}"' in query["sql"]
+        ]
+        self.assertEqual(len(property_value_queries), 1, property_value_queries)
 
         compositions = response.context["data"]["compositions"]
         self.assertEqual(len(compositions), 1)
