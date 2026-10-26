@@ -942,9 +942,9 @@ class Collection(NamedUserCreatedObject):
         visited = {self.pk}
         frontier = [self.pk]
         while frontier:
-            successors = Collection.objects.filter(
-                predecessors__in=frontier
-            ).exclude(pk__in=visited)
+            successors = Collection.objects.filter(predecessors__in=frontier).exclude(
+                pk__in=visited
+            )
             if successors.filter(publication_status=self.STATUS_PUBLISHED).exists():
                 return True
             frontier = list(successors.values_list("pk", flat=True).distinct())
