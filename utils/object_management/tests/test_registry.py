@@ -303,6 +303,14 @@ class MultiHopOwnedChildTests(TestCase):
                 self.assertFalse(decision.allowed)
                 self.assertEqual(decision.reason, "invalid_parent")
 
+    def test_reassign_accepts_queryset_parent_selection(self):
+        self.owner.user_permissions.add(
+            model_permission(Greenhouse, "change_greenhouse")
+        )
+        owner = User.objects.get(pk=self.owner.pk)
+        parents = Greenhouse.objects.filter(pk=self.greenhouse.pk)
+        self.assertEqual(decide_reassign(owner, self.share, parents).reason, "allowed")
+
     def test_multi_hop_queryset_visibility_and_scopes(self):
         shares = GrowthShare.objects.filter(pk=self.share.pk)
         self.assertEqual(list(visible_queryset(self.stranger, shares)), [])

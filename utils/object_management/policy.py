@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from django.db.models import Model, Q
@@ -569,7 +570,7 @@ def decide_reassign(user, obj, parent) -> Decision:
         return _denied("invalid_parent")
     if isinstance(parent, Model):
         parents = (parent,)
-    elif isinstance(parent, (list, tuple)):
+    elif isinstance(parent, Iterable) and not isinstance(parent, (str, bytes)):
         parents = tuple(parent)
     else:
         return _denied("invalid_parent")
