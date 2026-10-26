@@ -355,7 +355,12 @@ class ReviewWorkflowViewTests(TestCase):
         # Moderator should be able to approve an object in review
         self.client.force_login(self.moderator)
         with mute_signals(post_save, pre_save):
-            response = self.client.post(url)
+            response = self.client.post(
+                url,
+                {
+                    "expected_revision": self.review_collection.content_revision,
+                },
+            )
         self.assertEqual(response.status_code, 302)  # Redirect after success
 
         # Refresh from database
@@ -628,22 +633,25 @@ class ReviewPipelineTypeHintTests(TestCase):
                 )
 
     def test_review_dashboard_pipeline_methods_are_annotated(self):
-        for cls, method_name in (
-            (ReviewItemCollector, "available_models"),
-            (ReviewItemCollector, "references"),
-            (ReviewItemCollector, "hydrate"),
-            (ReviewItemCollector, "collect"),
-            (ReviewItemCollector, "has_review_items"),
-            (ReviewItemCollector, "fallback_queryset"),
-            (ReviewItemCollector, "in_review_queryset_for_model"),
-            (ReviewItemCollector, "_apply_database_review_filters"),
-            (ReviewItemCollector, "_apply_requested_ordering"),
-            (ReviewDashboardView, "get_available_models"),
-            (ReviewDashboardView, "collect_review_items"),
-            (ReviewDashboardView, "get_queryset"),
+        for method_name in (
+            "get_available_models",
+            "collect_review_items",
+            "get_queryset",
         ):
             with self.subTest(method=method_name):
-                hints = get_type_hints(getattr(cls, method_name))
+                hints = get_type_hints(getattr(ReviewDashboardView, method_name))
+                self.assertIn("return", hints)
+        for method_name in (
+            "available_models",
+            "references",
+            "hydrate",
+            "collect",
+            "has_review_items",
+            "_apply_database_review_filters",
+            "_apply_requested_ordering",
+        ):
+            with self.subTest(method=f"ReviewItemCollector.{method_name}"):
+                hints = get_type_hints(getattr(ReviewItemCollector, method_name))
                 self.assertIn("return", hints)
 
     def test_review_item_reference_is_a_typed_namedtuple(self):
@@ -664,6 +672,9 @@ class ReviewExceptionHandlingTests(TestCase):
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(username="exc-owner")
         cls.staff = User.objects.create_user(username="exc-staff", is_staff=True)
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.moderator = User.objects.create_user(username="exc-moderator")
         cls.collection_ct_id = ContentType.objects.get_for_model(Collection).id
         cls.source_ct_id = ContentType.objects.get_for_model(Source).id
@@ -731,29 +742,29 @@ class ReviewExceptionHandlingTests(TestCase):
             with self.assertRaises(RuntimeError):
                 view.get_available_models()
 
-    # --- ReviewItemCollector.references ---
+    # --- ReviewDashboardView._get_review_references ---
 
     def test_review_references_propagates_unexpected_errors(self):
-        collector = ReviewItemCollector(self.staff)
+        view = self._dashboard_view()
         with patch.object(
             ReviewItemCollector,
             "in_review_queryset_for_model",
             side_effect=RuntimeError("boom"),
         ):
             with self.assertRaises(RuntimeError):
-                collector.references([Collection])
+                view.collector.references([Collection])
 
-    # --- ReviewItemCollector.has_review_items ---
+    # --- ReviewDashboardView.has_review_items ---
 
     def test_has_review_items_propagates_unexpected_errors(self):
-        collector = ReviewItemCollector(self.staff)
+        view = self._dashboard_view()
         with patch.object(
             ReviewItemCollector,
             "in_review_queryset_for_model",
             side_effect=RuntimeError("boom"),
         ):
             with self.assertRaises(RuntimeError):
-                collector.has_review_items()
+                view.collector.has_review_items()
 
     # --- BaseReviewActionView._is_review_detail_url ---
 
@@ -836,26 +847,35 @@ class ReviewExceptionHandlingTests(TestCase):
             with self.assertRaises(RuntimeError):
                 self.client.post(self._submit_url())
 
-    def test_submit_post_survives_audit_log_db_failure(self):
+    def test_submit_post_propagates_audit_log_db_failure_and_rolls_back(self):
         self.client.force_login(self.owner)
         with (
-            patch("utils.object_management.helpers.ReviewAction") as review_action,
-            self.assertLogs("utils.object_management.helpers", level="WARNING") as logs,
+            patch("utils.object_management.services.ReviewAction") as review_action,
+            self.assertLogs("django.request", level="ERROR"),
         ):
             review_action.objects.create.side_effect = DatabaseError("boom")
-            response = self.client.post(self._submit_url())
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("Failed to create ReviewAction", "\n".join(logs.output))
+            with self.assertRaises(DatabaseError):
+                self.client.post(self._submit_url())
+        self.private_collection.refresh_from_db()
+        self.assertEqual(
+            self.private_collection.publication_status,
+            UserCreatedObject.STATUS_PRIVATE,
+        )
 
     def test_submit_post_propagates_unexpected_audit_log_errors(self):
         self.client.force_login(self.owner)
         with (
-            patch("utils.object_management.helpers.ReviewAction") as review_action,
+            patch("utils.object_management.services.ReviewAction") as review_action,
             self.assertLogs("django.request", level="ERROR"),
         ):
             review_action.objects.create.side_effect = RuntimeError("boom")
             with self.assertRaises(RuntimeError):
                 self.client.post(self._submit_url())
+        self.private_collection.refresh_from_db()
+        self.assertEqual(
+            self.private_collection.publication_status,
+            UserCreatedObject.STATUS_PRIVATE,
+        )
 
     def test_submit_post_propagates_unexpected_message_errors(self):
         self.client.force_login(self.owner)
@@ -871,11 +891,12 @@ class ReviewExceptionHandlingTests(TestCase):
 
     # --- BaseReviewActionView.post_action_hook ---
 
-    def test_submit_post_propagates_unexpected_cascade_errors(self):
+    def test_submit_post_propagates_unexpected_transition_service_errors(self):
         self.client.force_login(self.owner)
         with (
-            patch.object(
-                Collection, "cascade_review_action", side_effect=RuntimeError("boom")
+            patch(
+                "utils.object_management.views.perform_transition",
+                side_effect=RuntimeError("boom"),
             ),
             self.assertLogs("django.request", level="ERROR"),
         ):
@@ -896,7 +917,7 @@ class ReviewExceptionHandlingTests(TestCase):
 
     # --- BaseReviewActionModalView.get_context_data ---
 
-    def test_approve_modal_propagates_unexpected_cascade_count_errors(self):
+    def test_approve_modal_propagates_unexpected_policy_errors(self):
         self.client.force_login(self.moderator)
         url = reverse(
             "object_management:approve_item_modal",
@@ -906,8 +927,9 @@ class ReviewExceptionHandlingTests(TestCase):
             },
         )
         with (
-            patch.object(
-                Source, "affected_author_count", side_effect=RuntimeError("boom")
+            patch(
+                "utils.object_management.permissions.decide",
+                side_effect=RuntimeError("boom"),
             ),
             self.assertLogs("django.request", level="ERROR"),
         ):
@@ -1075,11 +1097,11 @@ class FilterDefaultsMixinTest(TestCase):
         ):
             with self.subTest(view=view_class.__name__):
                 request = self.factory.get("/filtered/")
-                request.user = (
-                    AnonymousUser()
-                    if scope == "published"
-                    else User(pk=1, is_staff=True)
-                )
+                if scope == "published":
+                    request.user = AnonymousUser()
+                else:
+                    request.user = User(pk=1)
+                    request.user.has_perm = lambda *args, **kwargs: True
 
                 with self.assertNumQueries(0):
                     response = view_class.as_view()(request)
@@ -1525,6 +1547,12 @@ class SharedListScopeCountTestCase(TestCase):
         cls.staff = User.objects.create_user(
             username="scope-count-staff", is_staff=True
         )
+        cls.staff.user_permissions.add(
+            Permission.objects.get(
+                codename="can_moderate_property",
+                content_type=ContentType.objects.get_for_model(Property),
+            )
+        )
         cls.other = User.objects.create_user(username="scope-count-other")
         Property.objects.bulk_create(
             [
@@ -1549,6 +1577,7 @@ class SharedListScopeCountTestCase(TestCase):
 
     def test_lists_only_count_the_filtered_paginator_results(self):
         ContentType.objects.get_for_model(Property)
+        self.staff.has_perm("properties.can_moderate_property")
         for view_class, user, expected, query_budget in (
             (PublishedObjectFilterView, AnonymousUser(), 2, 1),
             (PublishedObjectFilterView, self.staff, 2, 3),
@@ -1787,7 +1816,7 @@ class FormRequestKwargsContractTests(TestCase):
 
 
 class ReadAccessArchivedDetailTests(TestCase):
-    """Ensure archived objects' detail views are NOT publicly accessible."""
+    """Archived objects are retained public historical data."""
 
     @classmethod
     def setUpTestData(cls):
@@ -1800,11 +1829,11 @@ class ReadAccessArchivedDetailTests(TestCase):
                 publication_status=UserCreatedObject.STATUS_ARCHIVED,
             )
 
-    def test_archived_detail_is_not_public(self):
+    def test_archived_detail_is_publicly_readable(self):
         url = reverse("collection-detail", kwargs={"pk": self.archived.id})
-        # Unauthenticated request should be redirected to login (302)
+        # Archived stays publicly readable like published data.
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
 
 
 class DetailViewObjectCachingTests(TestCase):
@@ -1947,11 +1976,19 @@ class ReviewWorkflowModalViewTests(TestCase):
         )
 
         self.client.force_login(self.moderator)
-        response = self.client.get(url)
+        response = self.client.get(
+            url,
+            {"expected_revision": self.review_collection.content_revision},
+        )
         self.assertEqual(response.status_code, 200)
 
         with mute_signals(post_save, pre_save):
-            response = self.client.post(url)
+            response = self.client.post(
+                url,
+                {
+                    "expected_revision": self.review_collection.content_revision,
+                },
+            )
         self.assertEqual(response.status_code, 302)
 
         self.review_collection.refresh_from_db()
@@ -2011,6 +2048,9 @@ class CollectionPropertyValueReviewDashboardTest(TestCase):
         cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
         cls.owner_user = User.objects.create_user(
             username="owner",
+        )
+        cls.staff_user.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
         )
 
         cls.unit = Unit.objects.create(name="kg")
@@ -2096,6 +2136,15 @@ class ReviewDashboardPaginationQueryTests(TestCase):
     def setUpTestData(cls):
         cls.staff = User.objects.create_user(username="queue-staff", is_staff=True)
         cls.owner = User.objects.create_user(username="queue-owner")
+        # The queue persona intentionally holds model moderation rights;
+        # is_staff alone is not an application access route.
+        for model in (Property, Collection, Source):
+            cls.staff.user_permissions.add(
+                Permission.objects.get(
+                    content_type=ContentType.objects.get_for_model(model),
+                    codename=f"can_moderate_{model._meta.model_name}",
+                )
+            )
         cls.now = (timezone.now() - timedelta(days=1)).replace(
             hour=12, minute=0, second=0, microsecond=0
         )
@@ -2337,6 +2386,9 @@ class ReviewDashboardViewTests(TestCase):
             username="regular",
         )
         cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
+        cls.staff_user.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
 
         collection_ct = ContentType.objects.get_for_model(Collection)
         collection_perm, _ = Permission.objects.get_or_create(
@@ -2662,11 +2714,11 @@ class ReviewDashboardViewTests(TestCase):
         with (
             patch.object(view, "get_available_models", return_value=[Collection]),
             patch.object(
-                ReviewItemCollector,
-                "in_review_queryset_for_model",
+                view,
+                "_in_review_queryset_for_model",
                 side_effect=FieldError("boom"),
             ),
-            self.assertLogs("utils.object_management.review_queue", level="WARNING"),
+            self.assertLogs("utils.object_management.views", level="WARNING"),
         ):
             review_items = view.collect_review_items()
 
@@ -2683,9 +2735,7 @@ class ReviewDashboardViewTests(TestCase):
         with (
             patch.object(view, "get_available_models", return_value=[]),
             patch.object(
-                ReviewItemCollector,
-                "fallback_queryset",
-                return_value=fallback_queryset,
+                view, "_get_fallback_queryset", return_value=fallback_queryset
             ),
         ):
             kwargs = view.get_filterset_kwargs(view.filterset_class)
@@ -2703,9 +2753,7 @@ class ReviewDashboardViewTests(TestCase):
         with (
             patch.object(view, "get_available_models", return_value=[]),
             patch.object(
-                ReviewItemCollector,
-                "fallback_queryset",
-                return_value=fallback_queryset,
+                view, "_get_fallback_queryset", return_value=fallback_queryset
             ),
         ):
             queryset = view.get_queryset()

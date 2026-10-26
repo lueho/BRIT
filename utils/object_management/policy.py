@@ -7,6 +7,7 @@ from .registry import (
     KIND_OWNED,
     KIND_PUBLIC_CATALOGUE,
     KIND_REVIEWABLE,
+    administrator_managed,
     generated_profile,
     generated_source,
     model_policy,
@@ -582,6 +583,8 @@ def decide_reassign(user, obj, parent) -> Decision:
             gate = _decide_edit(actor, _context(actor, root))
             if not gate.allowed:
                 return gate
+        if administrator_managed(type(obj)) and not actor.admin:
+            return _denied("admin_required")
         return _ALLOWED
     if policy.kind != KIND_REVIEWABLE:
         return _denied("unsupported_model")
@@ -622,7 +625,12 @@ def _decide_class(actor, action, model, policy, parent):
         ctx = _context(actor, parent)
         if ctx.status not in _KNOWN_STATES:
             return _denied("invalid_state")
-        return _decide_edit(actor, ctx)
+        gate = _decide_edit(actor, ctx)
+        if not gate.allowed:
+            return gate
+        if administrator_managed(model) and not actor.admin:
+            return _denied("admin_required")
+        return gate
     if parent is not None:
         parents = (parent,) if isinstance(parent, Model) else tuple(parent)
         if not parents:
@@ -668,7 +676,12 @@ def _decide_owned(actor, action, obj, policy, parent):
         return _denied("invalid_state")
     if action in ("read", "export"):
         return _decide_read(actor, ctx)
-    return _decide_edit(actor, ctx)
+    gate = _decide_edit(actor, ctx)
+    if not gate.allowed:
+        return gate
+    if administrator_managed(type(obj)) and not actor.admin:
+        return _denied("admin_required")
+    return gate
 
 
 # Actions a generated projection delegates to its linked source evidence.
@@ -919,6 +932,8 @@ def editable_queryset(user, queryset):
     if not actor.active:
         return queryset.none()
     if policy.kind == KIND_OWNED:
+        if administrator_managed(model) and not actor.admin:
+            return queryset.none()
         root = _reviewable_root(model, policy)
         if root is None:
             return queryset.none()

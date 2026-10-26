@@ -24,7 +24,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import router, transaction
-from django.db.models import ForeignKey, Max, Model
+from django.db.models import ForeignKey, Max, Model, QuerySet
 from django.db.models.deletion import Collector
 from django.forms.models import construct_instance
 from django.utils import timezone
@@ -112,6 +112,106 @@ def _norm(value):
     if hasattr(value, "ewkt"):
         return value.ewkt
     return value
+
+
+def authorize_create(actor, model, *, parent=None):
+    """Authoritative ``create`` authorization inside the write boundary.
+
+    Resolves the registered policy, enforces the declared ``parent_path``
+    context, re-reads the actor through ``_fresh_actor``, and refreshes every
+    declared parent row via ``_base_manager`` — a stale permission cache or a
+    vanished, unsaved, or wrongly typed parent can never authorize a write.
+    Returns the fresh actor for owner attribution and audit writes.
+
+    Callers must only route registered models here; unregistered non-UCO
+    persistence stays on the plain adapter path.
+    """
+    policy = model_policy(model)
+    if policy is None:
+        raise PermissionDenied("unsupported_model")
+    actor = _fresh_actor(actor)
+    if policy.parent_path is not None:
+        try:
+            members = (parent,) if isinstance(parent, Model) else tuple(parent or ())
+        except TypeError:
+            raise PermissionDenied("invalid_parent") from None
+        if not members:
+            raise PermissionDenied("Creation requires a valid parent context.")
+        expected = root_model(model, policy.parent_path)
+        fresh = []
+        for candidate in members:
+            pk = getattr(candidate, "pk", None)
+            if expected is None or not isinstance(candidate, expected) or pk is None:
+                raise PermissionDenied("invalid_parent")
+            row = type(candidate)._base_manager.filter(pk=pk).first()
+            if row is None:
+                raise PermissionDenied("invalid_parent")
+            fresh.append(row)
+        parent = fresh[0] if isinstance(parent, Model) else tuple(fresh)
+    decision = decide(actor, "create", model, parent=parent)
+    if not decision.allowed:
+        raise PermissionDenied(decision.reason)
+    return actor
+
+
+def validate_references(actor, validated_data):
+    """Require read access on every referenced record in validated data.
+
+    Traverses model instances, dicts, and list/tuple/queryset values: a
+    ``UserCreatedObject`` or explicitly policy-registered instance is
+    re-fetched via ``_base_manager`` — a stale instance whose access was
+    revoked, an unsaved row, or a deleted row fails closed with
+    ``PermissionDenied`` — and then must satisfy ``decide(actor, "read")``.
+    Scalar and unregistered non-UCO values pass through. Foreign keys are
+    enforced on the resolved instances, never inferred from raw ids.
+    """
+
+    def visit(value):
+        if isinstance(value, dict):
+            for item in value.values():
+                visit(item)
+        elif isinstance(value, (list, tuple, QuerySet)):
+            for item in value:
+                visit(item)
+        elif isinstance(value, Model) and (
+            isinstance(value, UserCreatedObject)
+            or model_policy(type(value)) is not None
+        ):
+            fresh = type(value)._base_manager.filter(pk=value.pk).first()
+            if fresh is None:
+                raise PermissionDenied("inaccessible_reference")
+            if not decide(actor, "read", fresh).allowed:
+                raise PermissionDenied("inaccessible_reference")
+
+    if isinstance(validated_data, dict):
+        for item in validated_data.values():
+            visit(item)
+    else:
+        visit(validated_data)
+
+
+def validate_created_parent(obj, *, parent):
+    """Assert the persisted row's declared parents equal the authorized
+    context.
+
+    Runs after actual persistence inside the same atomic write: a serializer
+    or form that stored a different parent than the authorized one fails
+    closed and rolls the whole write back. Identity uses the ``_storage_key``
+    normalization so proxy/MTI aliases cannot fake a match.
+    """
+    policy = model_policy(type(obj))
+    if policy is None or policy.parent_path is None:
+        return
+    if getattr(obj, "pk", None) is None:
+        return  # advisory preflight path; nothing persisted to compare
+    persisted = type(obj)._base_manager.filter(pk=obj.pk).first()
+    if persisted is None:
+        raise PermissionDenied("invalid_parent")
+    actual = {_storage_key(p) for p in resolve_parents(persisted, policy.parent_path)}
+    members = (parent,) if isinstance(parent, Model) else tuple(parent)
+    expected = {_storage_key(p) for p in members}
+    if not actual or actual != expected:
+        raise PermissionDenied("invalid_parent")
 
 
 def _row_snapshot(obj):

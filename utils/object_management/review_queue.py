@@ -16,13 +16,14 @@ from typing import NamedTuple
 
 from django.apps import apps
 from django.conf import settings
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldDoesNotExist, FieldError
 from django.db.models import CharField, Q, QuerySet, Value
 from django.http import QueryDict
 
 from .models import ReviewAction, UserCreatedObject
+from .policy import is_active_actor, is_admin, reviewable_queryset
+from .registry import KIND_REVIEWABLE, model_policy
 from .review_filtering import ReviewItemFilter
 from .review_hooks import get_review_search_fields
 
@@ -114,11 +115,18 @@ class ReviewItemCollector:
 
     @staticmethod
     def _candidate_models() -> Iterable[type[UserCreatedObject]]:
-        """Yield concrete UserCreatedObject subclasses with a default manager."""
+        """Yield concrete UserCreatedObject subclasses registered as reviewable.
+
+        Only models whose registry policy is ``KIND_REVIEWABLE`` are moderation
+        targets; owned children and unregistered subclasses are never queued.
+        """
         for model in apps.get_models():
+            policy = model_policy(model)
             if (
                 issubclass(model, UserCreatedObject)
                 and not model._meta.abstract
+                and policy is not None
+                and policy.kind == KIND_REVIEWABLE
                 and ReviewItemCollector.is_primary_model_module(model)
                 and hasattr(model, "objects")
             ):
@@ -128,19 +136,18 @@ class ReviewItemCollector:
     def _moderation_checker(user):
         """Return a predicate: can ``user`` moderate the given model class.
 
-        Pre-fetches all of the user's permissions (direct and via groups) in
-        two queries to avoid N+1 permission checks per model.
+        Inactive actors can moderate nothing; administrators can moderate all
+        registered models; everyone else needs the explicit
+        ``<app_label>.can_moderate_<model>`` permission — staff status alone
+        grants no moderation capability.
         """
-        if user.is_staff:
+        if not is_active_actor(user):
+            return lambda model: False
+        if is_admin(user):
             return lambda model: True
-        codenames = set(
-            Permission.objects.filter(user=user).values_list("codename", flat=True)
-        ) | set(
-            Permission.objects.filter(group__user=user).values_list(
-                "codename", flat=True
-            )
+        return lambda model: user.has_perm(
+            f"{model._meta.app_label}.can_moderate_{model._meta.model_name}"
         )
-        return lambda model: f"can_moderate_{model._meta.model_name}" in codenames
 
     @staticmethod
     def _priority_models() -> list[type[UserCreatedObject]]:
@@ -157,7 +164,9 @@ class ReviewItemCollector:
     def _has_visible_review_items(self, model: type[UserCreatedObject]) -> bool:
         """Return whether the model has review items not owned by this user."""
         return (
-            self.in_review_queryset_for_model(model).exclude(owner=self.user).exists()
+            reviewable_queryset(self.user, self.in_review_queryset_for_model(model))
+            .exclude(owner=self.user)
+            .exists()
         )
 
     def available_models(self) -> list[type[UserCreatedObject]]:
@@ -171,6 +180,10 @@ class ReviewItemCollector:
         Results are cached per collector instance.
         """
         if self._available_models_cache is not None:
+            return self._available_models_cache
+
+        if not is_active_actor(self.user):
+            self._available_models_cache = []
             return self._available_models_cache
 
         priority_positions = {
@@ -382,7 +395,9 @@ class ReviewItemCollector:
             ):
                 continue
             try:
-                queryset = self.in_review_queryset_for_model(model_class)
+                queryset = reviewable_queryset(
+                    self.user, self.in_review_queryset_for_model(model_class)
+                )
             except RECOVERABLE_MODEL_ERRORS as exc:
                 logger.warning(
                     "Could not build in-review queryset for %s: %s",

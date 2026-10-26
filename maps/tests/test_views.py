@@ -9,7 +9,8 @@ from unittest.mock import Mock, patch
 from urllib.parse import urlencode, urlparse, urlunparse
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, Permission, User
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.core.cache import caches
 from django.core.exceptions import ImproperlyConfigured
@@ -29,6 +30,7 @@ from bibliography.models import Source
 from maps.mixins import CachedGeoJSONMixin
 from maps.serializers import RegionGeoFeatureModelSerializer
 from maps.views import CatchmentCreateMergeLauView
+from utils.object_management.models import ReviewAction
 from utils.properties.models import Unit
 from utils.tests.testcases import (
     AbstractTestCases,
@@ -374,7 +376,32 @@ class GeoDataSetRepresentationViewsTestCase(ViewWithPermissionsTestCase):
             f"{settings.LOGIN_URL}?next={reverse('geodataset-gallery-owned')}%3Fscope%3Dprivate",
         )
 
-    def test_owned_gallery_renders_for_owner(self):
+    def test_published_owned_gallery_hides_edit_metadata(self):
+        # Published datasets are frozen: even their owner sees no edit affordance.
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("geodataset-gallery-owned"), {"scope": "published"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Edit metadata")
+
+    def test_private_owned_gallery_renders_edit_metadata(self):
+        # Provisioned supported workflow: registered contributors own/edit
+        # their private datasets.
+        call_command("sync_roles", "--apply", stdout=io.StringIO())
+        self.owner.groups.add(Group.objects.get(name="registered"))
+        private_dataset = GeoDataset.objects.create(
+            name="Private Dataset",
+            owner=self.owner,
+            publication_status="private",
+            region=self.region,
+            model_name="NutsRegion",
+        )
+        GeoDatasetRuntimeConfiguration.objects.create(
+            dataset=private_dataset,
+            backend_type="django_model",
+            runtime_model_name="NutsRegion",
+        )
         self.client.force_login(self.owner)
         response = self.client.get(
             reverse("geodataset-gallery-owned"), {"scope": "private"}
@@ -1728,14 +1755,24 @@ class NutsRegionAutocompleteFilterParsingTestCase(ViewWithPermissionsTestCase):
 
 
 class ClearGeojsonCacheViewTest(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.staff_user = User.objects.create_user(username="staff", is_staff=True)
-        cls.non_staff_user = User.objects.create_user(username="nonstaff")
+    def setUp(self):
+        self.staff_user = User.objects.create_user(username="staff")
+        self.staff_user.is_staff = True
+        self.staff_user.save()
+
+        self.admin_user = User.objects.create_user(username="cache-admin")
+        self.admin_user.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(ReviewAction),
+                codename="administer_objects",
+            )
+        )
+
+        self.non_staff_user = User.objects.create_user(username="nonstaff")
 
     @patch("maps.views.clear_geojson_cache_pattern")
-    def test_clear_geojson_cache_as_staff(self, mock_clear):
-        self.client.force_login(self.staff_user)
+    def test_clear_geojson_cache_as_admin(self, mock_clear):
+        self.client.force_login(self.admin_user)
         url = reverse("clear-geojson-cache") + "?pattern=testpattern"
         response = self.client.get(url)
 
@@ -1746,6 +1783,16 @@ class ClearGeojsonCacheViewTest(TestCase):
         )
 
         mock_clear.assert_called_once_with("testpattern")
+
+    @patch("maps.views.clear_geojson_cache_pattern")
+    def test_clear_geojson_cache_staff_only_denied(self, mock_clear):
+        # is_staff is Django-admin eligibility only, not an app capability.
+        self.client.force_login(self.staff_user)
+        url = reverse("clear-geojson-cache") + "?pattern=testpattern"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 403)
+        mock_clear.assert_not_called()
 
     def test_clear_geojson_cache_as_non_staff(self):
         self.client.force_login(self.non_staff_user)

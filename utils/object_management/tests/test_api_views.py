@@ -78,6 +78,11 @@ class ReviewAPIViewsTests(TestCase):
             defaults={"name": "Can moderate collections"},
         )
         cls.moderator.user_permissions.add(permission)
+        cls.owner.user_permissions.add(
+            Permission.objects.get(
+                codename="change_collection", content_type=content_type
+            )
+        )
 
         with mute_signals(post_save, pre_save):
             cls.review_collection = Collection.objects.create(
