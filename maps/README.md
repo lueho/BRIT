@@ -208,6 +208,17 @@ configuration; the snapshot does not inspect or create the physical relation.
 Link identity is frozen after creation and `PROTECT` on both sides keeps the
 historical chain intact under ordinary deletes.
 
+Once a snapshot is registered, the dataset's runtime identity fields (dataset
+link, backend type, runtime model name, schema and relation name, geometry
+column, primary-key column, features API basename) cannot be changed or the
+runtime configuration deleted through normal model saves, forms, or the
+admin; `label_field` and column-policy presentation stay editable. Snapshot
+records themselves cannot be removed with ordinary instance or
+`QuerySet.delete()` calls — importing a new relation means registering a new
+`GeoDataset` plus a new snapshot. These guards cover model saves and the
+collector; physical relation immutability and raw SQL or `QuerySet.update()`
+bypasses remain out of scope.
+
 Operator flow:
 
 1. Register the provider as a `GeoDatasetSource` (metadata only).

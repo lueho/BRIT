@@ -1047,7 +1047,25 @@ class GeoDataset(NamedUserCreatedObject):
             return reverse("geodataset-list")
 
 
+def _lock_geodataset_rows(dataset_ids, using=None):
+    for dataset_id in sorted({pk for pk in dataset_ids if pk is not None}):
+        GeoDataset.objects.using(using).select_for_update().filter(
+            pk=dataset_id
+        ).exists()
+
+
 class GeoDatasetRuntimeConfiguration(models.Model):
+    IDENTITY_FIELDS = (
+        "dataset",
+        "backend_type",
+        "runtime_model_name",
+        "schema_name",
+        "relation_name",
+        "geometry_column",
+        "primary_key_column",
+        "features_api_basename",
+    )
+
     dataset = models.OneToOneField(
         GeoDataset,
         on_delete=models.CASCADE,
@@ -1066,6 +1084,86 @@ class GeoDatasetRuntimeConfiguration(models.Model):
 
     def __str__(self):
         return f"Runtime config for {self.dataset}"
+
+    def clean(self):
+        super().clean()
+        persisted = None
+        if self.pk:
+            persisted = type(self).objects.filter(pk=self.pk).first()
+        errors = self._snapshot_identity_errors(persisted)
+        if errors:
+            raise ValidationError(errors)
+
+    def _snapshot_identity_errors(self, persisted):
+        if persisted is None:
+            if (
+                self.dataset_id is not None
+                and GeoDatasetSnapshot.objects.filter(
+                    dataset_id=self.dataset_id
+                ).exists()
+            ):
+                return {
+                    "dataset": (
+                        "A snapshotted dataset's runtime identity cannot be "
+                        "replaced; create a new dataset and snapshot instead."
+                    )
+                }
+            return {}
+        dataset_ids = {persisted.dataset_id, self.dataset_id}
+        if not GeoDatasetSnapshot.objects.filter(dataset_id__in=dataset_ids).exists():
+            return {}
+        changed = [
+            field_name
+            for field_name in self.IDENTITY_FIELDS
+            if getattr(persisted, self._meta.get_field(field_name).attname)
+            != getattr(self, self._meta.get_field(field_name).attname)
+        ]
+        return dict.fromkeys(
+            changed,
+            "Runtime identity is fixed once a snapshot is registered; "
+            "create a new dataset and snapshot instead.",
+        )
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            persisted_dataset_id = None
+            if self.pk:
+                persisted_dataset_id = (
+                    type(self)
+                    .objects.filter(pk=self.pk)
+                    .values_list("dataset_id", flat=True)
+                    .first()
+                )
+            locked_ids = {self.dataset_id, persisted_dataset_id}
+            _lock_geodataset_rows(locked_ids)
+            persisted = None
+            if self.pk:
+                persisted = (
+                    type(self).objects.select_for_update().filter(pk=self.pk).first()
+                )
+                if persisted is None:
+                    if persisted_dataset_id is not None:
+                        raise ValidationError(
+                            {
+                                "dataset": (
+                                    "Runtime configuration changed concurrently; "
+                                    "reload and retry."
+                                )
+                            }
+                        )
+                elif persisted.dataset_id not in locked_ids:
+                    raise ValidationError(
+                        {
+                            "dataset": (
+                                "Runtime configuration was reassigned concurrently; "
+                                "reload and retry."
+                            )
+                        }
+                    )
+            errors = self._snapshot_identity_errors(persisted)
+            if errors:
+                raise ValidationError(errors)
+            super().save(*args, **kwargs)
 
 
 class GeoDatasetColumnPolicy(models.Model):
@@ -1334,13 +1432,20 @@ class GeoDatasetSnapshot(models.Model):
 
     def save(self, *args, **kwargs):
         with transaction.atomic():
+            persisted = None
             if not self._state.adding:
-                self._validate_links_unchanged()
+                persisted = type(self).objects.select_for_update().get(pk=self.pk)
+            _lock_geodataset_rows(
+                {self.dataset_id, getattr(persisted, "dataset_id", None)}
+            )
+            if persisted is not None:
+                self._validate_links_unchanged(persisted)
             self.full_clean()
             super().save(*args, **kwargs)
 
-    def _validate_links_unchanged(self):
-        persisted = type(self).objects.select_for_update().get(pk=self.pk)
+    def _validate_links_unchanged(self, persisted=None):
+        if persisted is None:
+            persisted = type(self).objects.select_for_update().get(pk=self.pk)
         errors = {
             field: "Snapshot links are frozen once recorded."
             for field in self.LINK_FIELDS

@@ -31,6 +31,27 @@ class GeoDatasetRuntimeConfigurationInline(admin.StackedInline):
     extra = 0
     max_num = 1
 
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(super().get_readonly_fields(request, obj))
+        if (
+            obj is not None
+            and GeoDatasetSnapshot.objects.filter(dataset_id=obj.pk).exists()
+        ):
+            readonly_fields.extend(
+                field
+                for field in GeoDatasetRuntimeConfiguration.IDENTITY_FIELDS
+                if field != "dataset" and field not in readonly_fields
+            )
+        return readonly_fields
+
+    def has_delete_permission(self, request, obj=None):
+        if (
+            obj is not None
+            and GeoDatasetSnapshot.objects.filter(dataset_id=obj.pk).exists()
+        ):
+            return False
+        return super().has_delete_permission(request, obj)
+
 
 class GeoDatasetColumnPolicyInline(admin.TabularInline):
     model = GeoDatasetColumnPolicy
@@ -194,6 +215,27 @@ class GeoDatasetRuntimeConfigurationAdmin(admin.ModelAdmin):
         "schema_name",
         "relation_name",
     )
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(super().get_readonly_fields(request, obj))
+        if (
+            obj is not None
+            and GeoDatasetSnapshot.objects.filter(dataset_id=obj.dataset_id).exists()
+        ):
+            readonly_fields.extend(
+                field
+                for field in GeoDatasetRuntimeConfiguration.IDENTITY_FIELDS
+                if field not in readonly_fields
+            )
+        return readonly_fields
+
+    def has_delete_permission(self, request, obj=None):
+        if (
+            obj is not None
+            and GeoDatasetSnapshot.objects.filter(dataset_id=obj.dataset_id).exists()
+        ):
+            return False
+        return super().has_delete_permission(request, obj)
 
 
 @admin.register(GeoDatasetColumnPolicy)
