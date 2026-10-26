@@ -4,6 +4,7 @@ from typing import get_type_hints
 from unittest.mock import patch
 from urllib.parse import urlencode
 
+from django import forms
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
@@ -42,6 +43,7 @@ from sources.waste_collection.views import (
     CollectionPublishedListView,
     CollectionReviewFilterView,
 )
+from utils.forms import SourcesFieldMixin, UserCreatedObjectFormMixin
 from utils.object_management.models import (
     ObjectEditorGrant,
     ReviewAction,
@@ -62,6 +64,11 @@ from utils.object_management.views import (
     ReviewDashboardView,
     SubmitForReviewView,
     UserCreatedObjectCreateView,
+    UserCreatedObjectCreateWithInlinesView,
+    UserCreatedObjectModalCreateView,
+    UserCreatedObjectModalUpdateView,
+    UserCreatedObjectUpdateView,
+    UserCreatedObjectUpdateWithInlinesView,
     WithdrawFromReviewView,
 )
 from utils.properties.models import Property, Unit
@@ -956,6 +963,29 @@ class TestPropertyCreateView(UserCreatedObjectCreateView):
     permission_required = "properties.add_property"
 
 
+class TestPropertyUpdateView(UserCreatedObjectUpdateView):
+    model = Property
+    fields = ["name"]
+
+
+class OrdinaryPropertyForm(forms.ModelForm):
+    class Meta:
+        model = Property
+        fields = ["name"]
+
+
+class RequestAwarePropertyForm(UserCreatedObjectFormMixin, forms.ModelForm):
+    class Meta:
+        model = Property
+        fields = ["name"]
+
+
+class SourcesAwarePropertyForm(SourcesFieldMixin, forms.ModelForm):
+    class Meta:
+        model = Property
+        fields = ["name"]
+
+
 class FilterDefaultsMixinTest(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
@@ -1561,6 +1591,12 @@ class BreadcrumbContractViewTests(TestCase):
                 codename="add_property",
             )
         )
+        cls.owner.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Property),
+                codename="change_property",
+            )
+        )
         cls.author = Author.objects.create(
             first_names="Ada",
             last_names="Lovelace",
@@ -1644,6 +1680,110 @@ class BreadcrumbContractViewTests(TestCase):
             "<title>\n  BRIT | Create Property\n</title>",
             html=True,
         )
+
+    def test_shared_update_form_renders_module_section_object_and_action_breadcrumbs(
+        self,
+    ):
+        property_obj = Property.objects.create(
+            name="Water content",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        request = self.factory.get(
+            reverse("property-update", kwargs={"pk": property_obj.pk})
+        )
+        request.user = self.owner
+
+        response = TestPropertyUpdateView.as_view()(request, pk=property_obj.pk)
+        response.render()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'<a href="{reverse("properties-explorer")}">Properties</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<a href="{reverse("property-list")}">Properties</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            f'<a href="{property_obj.detail_url}">{property_obj}</a>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            '<li aria-current="page" class="breadcrumb-item active">Update</li>',
+            html=True,
+        )
+        self.assertContains(
+            response,
+            "<title>\n  BRIT | Update property\n</title>",
+            html=True,
+        )
+
+
+class FormRequestKwargsContractTests(TestCase):
+    """Contract for request injection in the shared object CRUD views.
+
+    Regular and inline create/update views pass ``request`` only to forms that
+    consume it (``UserCreatedObjectFormMixin`` or ``SourcesFieldMixin``). Modal
+    views always pass it: modal create via its explicit override and modal
+    update via ``PassRequestMixin`` from ``BSModalUpdateView``.
+    """
+
+    regular_view_classes = [
+        UserCreatedObjectCreateView,
+        UserCreatedObjectUpdateView,
+        UserCreatedObjectCreateWithInlinesView,
+        UserCreatedObjectUpdateWithInlinesView,
+    ]
+    modal_view_classes = [
+        UserCreatedObjectModalCreateView,
+        UserCreatedObjectModalUpdateView,
+    ]
+    request_aware_forms = [RequestAwarePropertyForm, SourcesAwarePropertyForm]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(username="form-kwargs-user")
+
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def _view_with_form(self, view_class, form_class):
+        view = view_class()
+        view.request = self.factory.get("/")
+        view.request.user = self.user
+        view.kwargs = {}
+        view.object = None
+        view.form_class = form_class
+        return view
+
+    def test_regular_and_inline_views_pass_request_to_request_aware_forms(self):
+        for view_class in self.regular_view_classes:
+            for form_class in self.request_aware_forms:
+                with self.subTest(view=view_class.__name__, form=form_class.__name__):
+                    view = self._view_with_form(view_class, form_class)
+                    self.assertIs(view.get_form_kwargs().get("request"), view.request)
+
+    def test_regular_and_inline_views_omit_request_for_ordinary_forms(self):
+        for view_class in self.regular_view_classes:
+            with self.subTest(view=view_class.__name__):
+                view = self._view_with_form(view_class, OrdinaryPropertyForm)
+                self.assertNotIn("request", view.get_form_kwargs())
+
+    def test_modal_views_always_pass_request(self):
+        for view_class in self.modal_view_classes:
+            for form_class in [
+                OrdinaryPropertyForm,
+                *self.request_aware_forms,
+            ]:
+                with self.subTest(view=view_class.__name__, form=form_class.__name__):
+                    view = self._view_with_form(view_class, form_class)
+                    self.assertIs(view.get_form_kwargs().get("request"), view.request)
 
 
 class ReadAccessArchivedDetailTests(TestCase):
