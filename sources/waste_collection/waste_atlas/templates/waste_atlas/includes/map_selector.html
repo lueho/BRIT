@@ -1,4 +1,4 @@
-{% load cache %}
+{% load cache atlas_navigation %}
   <form class="atlas-selector-form"
         id="atlas-selection-form"
         data-empty-message="No maps match these filters."
@@ -44,20 +44,7 @@
         <label for="sel-theme">Theme</label>
         <select id="sel-theme">
           {% cache 3600 atlas_theme_options selected_map_set selected_map_theme atlas_urlconf %}
-          {% for map_set, themes in map_selection_themes_by_map_set.items %}
-            {% for option in themes %}
-              <option value="{{ option.value }}"
-                      data-map-set="{{ map_set }}"
-                      data-theme-group="{{ option.theme_group }}"
-                      data-waste-category="{{ option.waste_category }}"
-                      data-search="{{ option.label|lower }} {{ option.value|lower }} {{ option.theme_group|lower }}"
-                      data-url="{{ option.url }}"
-                      {% if option.change_url %}data-change-url="{{ option.change_url }}"{% endif %}
-                      {% if map_set == selected_map_set and option.value == selected_map_theme %}selected{% endif %}>
-                {{ option.label }}
-              </option>
-            {% endfor %}
-          {% endfor %}
+          {% atlas_theme_options map_selection_themes_by_map_set selected_map_set selected_map_theme %}
           {% endcache %}
         </select>
       </div>

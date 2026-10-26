@@ -2,6 +2,7 @@ import contextlib
 import io
 import os
 import uuid
+from types import SimpleNamespace
 from unittest import mock
 
 from django.apps import apps
@@ -539,7 +540,7 @@ class ControlledDatabaseBootstrapBase(SimpleTestCase):
 
     databases = {"default"}
 
-    def _controlled_database(self):
+    def _controlled_database(self, *, clone_migrated=False):
         original = connections[DEFAULT_DB_ALIAS]
         self.assertFalse(original.in_atomic_block)
 
@@ -549,7 +550,15 @@ class ControlledDatabaseBootstrapBase(SimpleTestCase):
         fresh = connections.create_connection(DEFAULT_DB_ALIAS)
         fresh.settings_dict = dict(fresh.settings_dict, NAME=name)
         with admin.cursor() as cursor:
-            cursor.execute(f'CREATE DATABASE "{name}" WITH TEMPLATE template0')
+            if clone_migrated:
+                source = original.settings_dict["NAME"]
+                original.close()
+                cursor.execute(
+                    f'CREATE DATABASE "{name}" '
+                    f"WITH TEMPLATE {admin.ops.quote_name(source)}"
+                )
+            else:
+                cursor.execute(f'CREATE DATABASE "{name}" WITH TEMPLATE template0')
 
         def cleanup():
             connections[DEFAULT_DB_ALIAS] = original
@@ -809,10 +818,8 @@ class AdoptedHistoryBootstrapTests(ControlledDatabaseBootstrapBase):
         DEFAULT_OWNER_USERNAME="legacy-owner",
     )
     def test_adopted_history_keeps_data_and_only_restores_markers(self):
-        fresh = self._controlled_database()
+        fresh = self._controlled_database(clone_migrated=True)
         with self._isolated_caches():
-            executor = MigrationExecutor(fresh)
-            executor.migrate(executor.loader.graph.leaf_nodes())
             self._run_bootstrap()
 
             from django.contrib.auth.models import User
@@ -917,3 +924,157 @@ class AdoptedHistoryBootstrapTests(ControlledDatabaseBootstrapBase):
                         touched.append(sql)
             self.assertEqual(touched, [])
             self.assertEqual(before, self._snapshot(fresh))
+
+
+class ControlledDatabaseFixtureTests(SimpleTestCase):
+    """Mock-based checks on the disposable database fixture plumbing."""
+
+    worker_name = "test_brit_test_db_3"
+    disposable_name = "test_schema_only_0123456789abcdef"
+
+    def _mocked_connections(self, order):
+        original = mock.MagicMock(name="original")
+        original.in_atomic_block = False
+        original.settings_dict = {"NAME": self.worker_name}
+        original.close.side_effect = lambda: order.append("original.close")
+
+        admin = mock.MagicMock(name="admin")
+        admin.settings_dict = {"NAME": self.worker_name}
+        admin.ops.quote_name = lambda value: f'"{value}"'
+        admin.close.side_effect = lambda: order.append("admin.close")
+        admin_cursor = admin.cursor.return_value.__enter__.return_value
+        admin_cursor.execute.side_effect = lambda sql: order.append(("execute", sql))
+
+        fresh = mock.MagicMock(name="fresh")
+        fresh.settings_dict = {"NAME": self.worker_name}
+        fresh.close.side_effect = lambda: order.append("fresh.close")
+
+        connections_mock = mock.MagicMock(name="connections")
+        connections_mock.__getitem__.return_value = original
+        connections_mock.create_connection.side_effect = [admin, fresh]
+        return connections_mock, original, admin, admin_cursor, fresh
+
+    @contextlib.contextmanager
+    def _fixture(self):
+        order = []
+        (
+            connections_mock,
+            original,
+            admin,
+            admin_cursor,
+            fresh,
+        ) = self._mocked_connections(order)
+        with (
+            mock.patch(
+                "brit.tests.test_schema_only_bootstrap.connections",
+                connections_mock,
+            ),
+            mock.patch("brit.tests.test_schema_only_bootstrap.uuid") as uuid_mock,
+        ):
+            uuid_mock.uuid4.return_value.hex = "0123456789abcdef"
+            probe = ControlledDatabaseBootstrapBase()
+            try:
+                yield SimpleNamespace(
+                    probe=probe,
+                    connections=connections_mock,
+                    original=original,
+                    admin=admin,
+                    fresh=fresh,
+                    order=order,
+                )
+            finally:
+                probe.doCleanups()
+
+    def _executed(self, order):
+        return [
+            entry[1]
+            for entry in order
+            if isinstance(entry, tuple) and entry[0] == "execute"
+        ]
+
+    def test_template0_fixture_keeps_current_worker_connection_open(self):
+        with self._fixture() as fx:
+            result = fx.probe._controlled_database()
+
+        self.assertIs(result, fx.fresh)
+        self.assertEqual(fx.admin.settings_dict["NAME"], "postgres")
+        self.assertEqual(fx.fresh.settings_dict["NAME"], self.disposable_name)
+        self.assertEqual(
+            fx.order,
+            [
+                (
+                    "execute",
+                    f'CREATE DATABASE "{self.disposable_name}" WITH TEMPLATE template0',
+                ),
+                "fresh.close",
+                (
+                    "execute",
+                    f'DROP DATABASE IF EXISTS "{self.disposable_name}"',
+                ),
+                "admin.close",
+            ],
+        )
+        fx.original.close.assert_not_called()
+        fx.fresh.prepare_database.assert_called_once_with()
+        self.assertEqual(
+            fx.connections.__setitem__.call_args_list,
+            [
+                mock.call(DEFAULT_DB_ALIAS, fx.fresh),
+                mock.call(DEFAULT_DB_ALIAS, fx.original),
+            ],
+        )
+
+    def test_cloned_fixture_uses_current_worker_database_as_template(self):
+        with self._fixture() as fx:
+            result = fx.probe._controlled_database(clone_migrated=True)
+
+        self.assertIs(result, fx.fresh)
+        self.assertEqual(
+            fx.order,
+            [
+                "original.close",
+                (
+                    "execute",
+                    f'CREATE DATABASE "{self.disposable_name}" '
+                    f'WITH TEMPLATE "{self.worker_name}"',
+                ),
+                "fresh.close",
+                (
+                    "execute",
+                    f'DROP DATABASE IF EXISTS "{self.disposable_name}"',
+                ),
+                "admin.close",
+            ],
+        )
+        fx.fresh.prepare_database.assert_called_once_with()
+
+    def test_cleanup_drops_only_disposable_database_and_restores_original(self):
+        with self._fixture() as fx:
+            fx.probe._controlled_database(clone_migrated=True)
+
+        drops = [
+            sql for sql in self._executed(fx.order) if sql.startswith("DROP DATABASE")
+        ]
+        self.assertEqual(drops, [f'DROP DATABASE IF EXISTS "{self.disposable_name}"'])
+        self.assertNotIn(self.worker_name, " ".join(drops))
+        fx.fresh.close.assert_called_once_with()
+        fx.admin.close.assert_called_once_with()
+        self.assertEqual(
+            fx.connections.__setitem__.call_args_list[-1],
+            mock.call(DEFAULT_DB_ALIAS, fx.original),
+        )
+
+    def test_cleanup_is_registered_even_when_prepare_database_fails(self):
+        with self._fixture() as fx:
+            fx.fresh.prepare_database.side_effect = RuntimeError("prepare failed")
+            with self.assertRaises(RuntimeError):
+                fx.probe._controlled_database()
+
+        self.assertIn(
+            f'DROP DATABASE IF EXISTS "{self.disposable_name}"',
+            self._executed(fx.order),
+        )
+        self.assertEqual(
+            fx.connections.__setitem__.call_args_list[-1],
+            mock.call(DEFAULT_DB_ALIAS, fx.original),
+        )
