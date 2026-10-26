@@ -17,6 +17,10 @@ from utils.tests.testrunner import serial_test
 
 APP_LABEL = "bibliography"
 SQUASHED_KEY = (APP_LABEL, "0001_squashed_0012")
+REVISION_KEY = (
+    APP_LABEL,
+    "0013_author_content_revision_licence_content_revision_and_more",
+)
 OBSOLETE_MIGRATIONS = [
     "0001_initial",
     "0002_author_approved_at_author_approved_by_and_more",
@@ -52,12 +56,12 @@ class FinalizedBaselineGraphTests(SimpleTestCase):
         loader.graph.validate_consistency()
         loader.graph.ensure_not_cyclic()
 
-    def test_disk_migrations_are_exactly_the_baseline(self):
+    def test_disk_migrations_are_baseline_plus_revision_descendant(self):
         loader = MigrationLoader(None)
-        bibliography_keys = [
+        bibliography_keys = {
             key for key in loader.disk_migrations if key[0] == APP_LABEL
-        ]
-        self.assertEqual(bibliography_keys, [SQUASHED_KEY])
+        }
+        self.assertEqual(bibliography_keys, {SQUASHED_KEY, REVISION_KEY})
         migration = loader.disk_migrations[SQUASHED_KEY]
         self.assertTrue(migration.initial)
         self.assertEqual(
@@ -67,6 +71,16 @@ class FinalizedBaselineGraphTests(SimpleTestCase):
         self.assertEqual(
             migration.dependencies,
             [migrations.swappable_dependency(settings.AUTH_USER_MODEL)],
+        )
+        revision = loader.disk_migrations[REVISION_KEY]
+        self.assertFalse(revision.initial)
+        self.assertEqual(revision.replaces, [])
+        self.assertEqual(
+            revision.dependencies,
+            [
+                SQUASHED_KEY,
+                migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+            ],
         )
         for name in OBSOLETE_MIGRATIONS:
             self.assertNotIn((APP_LABEL, name), loader.disk_migrations)
@@ -109,15 +123,21 @@ class FinalizedBaselineGraphTests(SimpleTestCase):
         self.assertEqual(remaining[0].model_name, "source")
         self.assertEqual(remaining[0].name, "authors")
 
-    def test_fresh_plan_contains_only_the_baseline(self):
+    def test_fresh_plan_covers_baseline_and_revision_descendant(self):
         loader = MigrationLoader(None)
-        self.assertEqual(loader.graph.leaf_nodes(APP_LABEL), [SQUASHED_KEY])
-        plan = [
+        self.assertEqual(loader.graph.leaf_nodes(APP_LABEL), [REVISION_KEY])
+        baseline_plan = [
             node
             for node in loader.graph.forwards_plan(SQUASHED_KEY)
             if node[0] == APP_LABEL
         ]
-        self.assertEqual(plan, [SQUASHED_KEY])
+        self.assertEqual(baseline_plan, [SQUASHED_KEY])
+        leaf_plan = [
+            node
+            for node in loader.graph.forwards_plan(REVISION_KEY)
+            if node[0] == APP_LABEL
+        ]
+        self.assertEqual(leaf_plan, [SQUASHED_KEY, REVISION_KEY])
 
     def test_migrated_state_matches_current_models(self):
         loader = MigrationLoader(None)
@@ -307,17 +327,25 @@ class FinalizedBaselineRuntimeTests(SimpleTestCase):
         )
 
     @override_settings(INSTALLED_APPS=MIGRATION_TEST_APPS)
-    def test_fresh_database_applies_baseline_schema(self):
+    def test_fresh_database_applies_schema_through_revision_leaf(self):
         schema = self._scratch_schema()
         executor = self._executor()
         leaf = executor.loader.graph.leaf_nodes(APP_LABEL)[0]
-        self.assertEqual(leaf, SQUASHED_KEY)
+        self.assertEqual(leaf, REVISION_KEY)
         executor.migrate([leaf])
         self.assertTrue(set(BIBLIOGRAPHY_TABLES).issubset(self._tables(schema)))
         for table in BIBLIOGRAPHY_TABLES:
             self.assertEqual(self._row_count(schema, table), 0, table)
         self.assertEqual(self._row_count(schema, "auth_user"), 0)
-        self.assertIn(SQUASHED_KEY, self._applied())
+        applied = self._applied()
+        self.assertIn(SQUASHED_KEY, applied)
+        self.assertIn(REVISION_KEY, applied)
+        for table in (
+            "bibliography_author",
+            "bibliography_licence",
+            "bibliography_source",
+        ):
+            self.assertIn("content_revision", self._columns(schema, table))
 
         apps = executor.loader.project_state(nodes=[leaf]).apps
         Source = apps.get_model("bibliography", "Source")
