@@ -67,6 +67,7 @@ from utils.object_management.permissions import (
 )
 from utils.object_management.policy import (
     decide,
+    governance_object,
     is_active_actor,
     object_access_routes,
     visible_queryset,
@@ -1229,7 +1230,7 @@ class YourAccessModalView(BaseObjectAccessActionView):
     def get(self, request, *args, **kwargs):
         obj = self.get_object()
         edit_decision = decide(request.user, "edit", obj)
-        root = review_target(obj) or obj
+        root = governance_object(obj) or obj
         context = {
             "object": obj,
             "governance_object": root,
