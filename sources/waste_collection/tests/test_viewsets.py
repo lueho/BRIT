@@ -2,6 +2,7 @@ import json
 import math
 from collections import Counter
 from datetime import date, timedelta
+from io import StringIO
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -10,6 +11,7 @@ from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache, caches
+from django.core.management import call_command
 from django.db import connection
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
@@ -22,6 +24,7 @@ from rest_framework.throttling import ScopedRateThrottle
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
+from distributions.utils import ensure_initial_data as ensure_distribution_data
 from maps.models import (
     CatchmentRevision,
     GeoPolygon,
@@ -1441,37 +1444,12 @@ class CollectionMutationApiTestCase(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
+        ensure_distribution_data(stdout=StringIO())
+        call_command("sync_roles", "--apply", stdout=StringIO(), stderr=StringIO())
         cls.owner = User.objects.create_user(username="agent-owner")
         cls.other_user = User.objects.create_user(username="agent-other")
         cls.staff = User.objects.create_user(username="agent-staff", is_staff=True)
-
-        collection_content_type = ContentType.objects.get_for_model(Collection)
-        cls.add_collection_permission, _ = Permission.objects.get_or_create(
-            content_type=collection_content_type,
-            codename="add_collection",
-            defaults={"name": "Can add collection"},
-        )
-        cpv_content_type = ContentType.objects.get_for_model(CollectionPropertyValue)
-        cls.add_collection_property_value_permission, _ = (
-            Permission.objects.get_or_create(
-                content_type=cpv_content_type,
-                codename="add_collectionpropertyvalue",
-                defaults={"name": "Can add collection property value"},
-            )
-        )
-        frequency_content_type = ContentType.objects.get_for_model(CollectionFrequency)
-        cls.add_collection_frequency_permission, _ = Permission.objects.get_or_create(
-            content_type=frequency_content_type,
-            codename="add_collectionfrequency",
-            defaults={"name": "Can add collection frequency"},
-        )
-        cls.owner.user_permissions.add(cls.add_collection_permission)
-        cls.owner.user_permissions.add(cls.add_collection_property_value_permission)
-        cls.owner.user_permissions.add(cls.add_collection_frequency_permission)
-        cls.other_user.user_permissions.add(cls.add_collection_permission)
-        cls.other_user.user_permissions.add(
-            cls.add_collection_property_value_permission
-        )
 
         cls.catchment = CollectionCatchment.objects.create(name="Agent Catchment")
         cls.collection_system = CollectionSystem.objects.create(name="Agent System")
@@ -1483,7 +1461,9 @@ class CollectionMutationApiTestCase(APITestCase):
         cls.allowed_material = Material.objects.create(
             name="Agent Allowed Material", owner=cls.owner
         )
-        cls.updated_collector = Collector.objects.create(name="Updated Agent Collector")
+        cls.updated_collector = Collector.objects.create(
+            name="Updated Agent Collector", owner=cls.owner
+        )
         cls.updated_allowed_material = Material.objects.create(
             name="Agent Updated Allowed Material", owner=cls.owner
         )
@@ -1566,6 +1546,7 @@ class CollectionMutationApiTestCase(APITestCase):
 
     def test_create_endpoint_requires_add_permission(self):
         user = User.objects.create_user(username="agent-no-perm")
+        user.groups.clear()
         self.client.force_login(user)
 
         response = self.client.post(
@@ -1644,6 +1625,26 @@ class CollectionMutationApiTestCase(APITestCase):
             ReviewAction.for_object(collection)
             .filter(action=ReviewAction.ACTION_SUBMITTED)
             .exists()
+        )
+
+    def test_create_rejects_unreadable_source_without_partial_collection(self):
+        before_ids = set(Collection.objects.values_list("pk", flat=True))
+        self.client.force_login(self.other_user)
+        response = self.client.post(
+            reverse("api-waste-collection-create"),
+            {
+                "catchment": self.catchment.pk,
+                "waste_category": self.waste_category.pk,
+                "collection_system": self.collection_system.pk,
+                "sources": [self.source.pk],
+                "valid_from": "2025-02-01",
+                "submit_for_review": False,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            set(Collection.objects.values_list("pk", flat=True)), before_ids
         )
 
     def test_create_endpoint_submits_without_source_or_flyer(self):
@@ -1774,14 +1775,6 @@ class CollectionMutationApiTestCase(APITestCase):
         )
 
     def _login_aggregated_property_value_author(self):
-        permission, _ = Permission.objects.get_or_create(
-            content_type=ContentType.objects.get_for_model(
-                AggregatedCollectionPropertyValue
-            ),
-            codename="add_aggregatedcollectionpropertyvalue",
-            defaults={"name": "Can add aggregated collection property value"},
-        )
-        self.other_user.user_permissions.add(permission)
         self.client.force_login(self.other_user)
 
     def _aggregated_property_value_payload(self):
@@ -1867,6 +1860,7 @@ class CollectionMutationApiTestCase(APITestCase):
 
     def test_create_frequency_endpoint_requires_add_permission(self):
         user = User.objects.create_user(username="agent-no-frequency-perm")
+        user.groups.clear()
         self.client.force_login(user)
 
         response = self.client.post(
@@ -1976,7 +1970,7 @@ class CollectionMutationApiTestCase(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_endpoint_rejects_identity_mismatch(self):
         self.client.force_login(self.owner)
@@ -2293,6 +2287,10 @@ class CollectionMutationApiTestCase(APITestCase):
         )
 
     def test_new_version_with_add_permission_succeeds(self):
+        self.source.publication_status = "published"
+        self.source.save(update_fields=["publication_status"])
+        self.predecessor_flyer.publication_status = "published"
+        self.predecessor_flyer.save(update_fields=["publication_status"])
         self.client.force_login(self.other_user)
 
         response = self.client.post(
@@ -2313,6 +2311,7 @@ class CollectionMutationApiTestCase(APITestCase):
         self,
     ):
         user = User.objects.create_user(username="agent-no-add-version")
+        user.groups.clear()
         self.client.force_login(user)
 
         response = self.client.post(
@@ -2326,9 +2325,28 @@ class CollectionMutationApiTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_new_version_does_not_copy_an_unreadable_source(self):
+        before_ids = set(Collection.objects.values_list("pk", flat=True))
+        predecessor_anchor = self.predecessor.version_anchor.pk
+        self.client.force_login(self.other_user)
+        response = self.client.post(
+            reverse(
+                "api-waste-collection-new-version",
+                kwargs={"pk": self.predecessor.pk},
+            ),
+            {"valid_from": "2025-03-15", "submit_for_review": False},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            set(Collection.objects.values_list("pk", flat=True)), before_ids
+        )
+        predecessor = Collection.objects.get(pk=self.predecessor.pk)
+        self.assertEqual(predecessor.version_anchor.pk, predecessor_anchor)
+        self.assertFalse(predecessor.successors.exists())
+
     def test_new_version_rejects_private_predecessor_of_other_user(self):
         user = User.objects.create_user(username="agent-private-denied")
-        user.user_permissions.add(self.add_collection_permission)
         self.client.force_login(user)
 
         response = self.client.post(
@@ -2344,7 +2362,6 @@ class CollectionMutationApiTestCase(APITestCase):
 
     def test_new_version_allows_own_private_predecessor_with_add_permission(self):
         user = User.objects.create_user(username="agent-own-private")
-        user.user_permissions.add(self.add_collection_permission)
         own_predecessor = Collection.objects.create(
             owner=user,
             publication_status="private",
