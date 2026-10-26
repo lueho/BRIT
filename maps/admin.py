@@ -9,7 +9,10 @@ from .models import (
     CategoricalAttribute,
     GeoDataset,
     GeoDatasetColumnPolicy,
+    GeoDatasetImportRun,
     GeoDatasetRuntimeConfiguration,
+    GeoDatasetSnapshot,
+    GeoDatasetSource,
     Location,
     MapConfiguration,
     MapLayerConfiguration,
@@ -232,6 +235,73 @@ class MapConfigurationModelAdmin(admin.ModelAdmin):
 @admin.register(ModelMapConfiguration)
 class ModelMapConfigurationModelAdmin(admin.ModelAdmin):
     autocomplete_fields = ("map_config",)  # TODO autocomplete for model_name
+
+
+@admin.register(GeoDatasetSource)
+class GeoDatasetSourceAdmin(admin.ModelAdmin):
+    autocomplete_fields = ("bibliography_source",)
+    list_display = ("name", "slug", "connector_type", "is_enabled")
+    list_filter = ("connector_type", "is_enabled")
+    search_fields = ("name", "slug", "endpoint_url", "feature_type")
+
+
+@admin.register(GeoDatasetImportRun)
+class GeoDatasetImportRunAdmin(admin.ModelAdmin):
+    autocomplete_fields = ("source",)
+    list_display = ("source", "status", "started_at", "finished_at")
+    list_filter = ("status",)
+    readonly_fields = ("source_configuration",)
+    search_fields = ("source__name", "source__slug")
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(super().get_readonly_fields(request, obj))
+        if obj is None:
+            return readonly_fields
+        readonly_fields.extend(
+            field
+            for field in (
+                "source",
+                "bibliography_source",
+                "source_configuration",
+                "extraction_specification",
+                "started_at",
+            )
+            if field not in readonly_fields
+        )
+        if obj.status in (
+            GeoDatasetImportRun.Status.SUCCEEDED,
+            GeoDatasetImportRun.Status.FAILED,
+        ):
+            readonly_fields.extend(
+                field
+                for field in ("status", "finished_at", "error_message")
+                if field not in readonly_fields
+            )
+        return readonly_fields
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(GeoDatasetSnapshot)
+class GeoDatasetSnapshotAdmin(admin.ModelAdmin):
+    autocomplete_fields = ("dataset", "import_run")
+    list_display = ("dataset", "import_run", "created_at")
+    readonly_fields = ("created_at",)
+    search_fields = ("dataset__name", "import_run__source__name")
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(super().get_readonly_fields(request, obj))
+        if obj is not None:
+            readonly_fields.extend(
+                field
+                for field in ("dataset", "import_run")
+                if field not in readonly_fields
+            )
+        return readonly_fields
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Region)
