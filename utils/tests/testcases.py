@@ -52,12 +52,21 @@ class ViewSetWithPermissionsTestCase(ViewWithPermissionsTestCase):
     """
     This TestCase is used for testing ViewSets. It has the same functionality as ViewWithPermissionsTestCase,
     but it uses the APIClient class provided by django rest framework instead of the standard django test client.
+
+    API tests compare object ownership, not capability: ``owner`` and ``staff``
+    receive a copy of ``member``'s declared ``member_permissions`` so the only
+    variable distinguishing the personas is object ownership/role, while
+    ``member`` keeps the declared model capabilities outright. This is per-class
+    fixture sharing, not a global role application.
     """
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
         cls.client = APIClient()
+        member_model_permissions = tuple(cls.member.user_permissions.all())
+        cls.owner.user_permissions.add(*member_model_permissions)
+        cls.staff.user_permissions.add(*member_model_permissions)
 
 
 def comparable_model_dict(instance):
