@@ -278,6 +278,26 @@ def resolve_parent(instance, parent_path):
     return current
 
 
+def declared_parent_changed(instance, parent_path, new_parent):
+    """Whether ``new_parent`` re-targets ``instance`` away from its stored parent.
+
+    The stored row is re-read because form validation already copies the
+    posted parent onto the in-memory instance.
+    """
+    if instance.pk is not None:
+        stored = type(instance)._base_manager.filter(pk=instance.pk).first()
+        if stored is not None:
+            instance = stored
+    if isinstance(new_parent, (list, tuple)):
+        new_keys = sorted(getattr(p, "pk", None) for p in new_parent)
+        old_keys = sorted(p.pk for p in resolve_parents(instance, parent_path))
+        return new_keys != old_keys
+    old_parent = resolve_parent(instance, parent_path)
+    if old_parent is None:
+        return True
+    return getattr(new_parent, "pk", None) != old_parent.pk
+
+
 def resolve_parents(instance, parent_path):
     """Resolve every persisted parent row for a declared ``parent_path``.
 

@@ -70,7 +70,9 @@ class ReviewQueueAPIView(APIView):
             "name": str(item),
             "owner_id": getattr(item, "owner_id", None),
             "publication_status": getattr(item, "publication_status", None),
-            "submitted_at": getattr(item, "submitted_at", None),
+            "submitted_at": getattr(
+                item, "review_submitted_at", getattr(item, "submitted_at", None)
+            ),
             "lastmodified_at": getattr(item, "lastmodified_at", None),
             "content_revision": getattr(item, "content_revision", None),
             "my_last_reviewed_revision": last_reviewed_revision(user, item),
