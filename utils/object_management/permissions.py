@@ -417,7 +417,9 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         "can_edit": caps["edit"].allowed,
         "can_transfer_ownership": caps["transfer_ownership"].allowed,
         "can_manage_editors": caps["manage_editors"].allowed,
-        "can_manage_samples": caps["edit"].allowed,
+        "can_manage_samples": bool(
+            caps["edit"].allowed and (is_owner_flag or admin_flag)
+        ),
         "can_add_property": _can_add_property(user, target, caps),
         "can_duplicate": caps["duplicate"].allowed,
         "can_new_version": caps["new_version"].allowed,

@@ -792,12 +792,17 @@ class ReviewActivityHttpTests(TestCase):
             self.assertEqual(response.status_code, 200)
 
     def test_stranger_and_inactive_denied_review_detail(self):
-        for user in (self.stranger, self.inactive):
-            self.client.force_login(user)
-            response = self.client.get(self._detail_url())
-            self.assertEqual(response.status_code, 403)
+        self.client.force_login(self.stranger)
         response = self.client.get(self._detail_url())
-        self.assertIn(response.status_code, (302, 403))
+        self.assertEqual(response.status_code, 403)
+        # Inactive users cannot authenticate; they follow the anonymous
+        # login-redirect path.
+        self.client.force_login(self.inactive)
+        response = self.client.get(self._detail_url())
+        self.assertEqual(response.status_code, 302)
+        self.client.logout()
+        response = self.client.get(self._detail_url())
+        self.assertEqual(response.status_code, 302)
 
     def test_editor_post_comment(self):
         self.client.force_login(self.editor)

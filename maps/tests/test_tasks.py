@@ -17,6 +17,7 @@ from maps.tasks import (
     warm_geojson_caches_on_worker_ready,
 )
 from maps.utils import (
+    AUTHZ_GEOJSON_CACHE_PREFIX,
     compute_collection_dataset_version,
     geojson_version_aggregates,
     geojson_version_token,
@@ -51,11 +52,14 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
         }
         mock_import_module.return_value = Mock(Collection=mock_collection)
 
-        version = compute_collection_dataset_version(scope="published")
+        with patch(
+            "maps.utils.scope_queryset", return_value=published_qs
+        ) as mock_scope_queryset:
+            version = compute_collection_dataset_version(scope="published")
 
         self.assertEqual(len(version), 12)
         mock_collection.objects.all.assert_called_once_with()
-        base_qs.filter.assert_called_once_with(publication_status="published")
+        mock_scope_queryset.assert_called_once_with(None, base_qs, "published")
         published_qs.aggregate.assert_called_once()
 
     @patch(
@@ -69,12 +73,19 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
 
         self.assertEqual(len(version), 12)
 
+    @patch("maps.tasks.warm_static_region_geojson_assets")
     @patch("maps.tasks._warm_base_geojson_caches")
     @patch("maps.tasks.get_source_domain_geojson_cache_warmers")
     def test_warm_all_geojson_caches_uses_plugin_declared_warmers(
-        self, mock_get_source_domain_geojson_cache_warmers, mock_base_warmup
+        self,
+        mock_get_source_domain_geojson_cache_warmers,
+        mock_base_warmup,
+        mock_static,
     ):
         mock_base_warmup.return_value = {"status": "success"}
+        mock_static.apply.return_value = EagerResult(
+            "static-task", {"status": "success", "assets_ready": 0}, "SUCCESS"
+        )
 
         collection_warmer = Mock()
         collection_warmer.apply.return_value = EagerResult(
@@ -101,12 +112,20 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
         self.assertEqual(result["waste_collection"]["features_count"], 3)
         tree_warmer.apply.assert_called_once_with()
         collection_warmer.apply.assert_called_once_with()
+        mock_static.apply.assert_called_once_with()
+        self.assertEqual(
+            result["static_region_assets"],
+            {"status": "success", "assets_ready": 0},
+        )
 
+    @patch("maps.tasks.warm_static_region_geojson_assets")
     @patch("maps.tasks.warm_base_geojson_caches")
     @patch("maps.tasks.get_source_domain_geojson_cache_warmers")
     def test_queued_warmup_runs_each_domain_in_separate_tasks(
-        self, mock_get_warmers, mock_base_task
+        self, mock_get_warmers, mock_base_task, mock_static
     ):
+        mock_static.apply_async.return_value.id = "static-task"
+
         tree_warmer = Mock()
         collection_warmer = Mock()
         mock_base_task.apply_async.side_effect = [
@@ -145,12 +164,25 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
             result["waste_collection"],
             {"status": "queued", "task_id": "collection-task"},
         )
+        mock_static.apply_async.assert_called_once_with()
+        self.assertEqual(
+            result["static_region_assets"],
+            {"status": "queued", "task_id": "static-task"},
+        )
 
+    @patch("maps.tasks.warm_static_region_geojson_assets")
     @patch("maps.tasks._warm_base_geojson_caches")
     @patch("maps.tasks.get_source_domain_geojson_cache_warmers")
     def test_warm_all_geojson_caches_includes_base_caches(
-        self, mock_get_source_domain_geojson_cache_warmers, mock_base_warmup
+        self,
+        mock_get_source_domain_geojson_cache_warmers,
+        mock_base_warmup,
+        mock_static,
     ):
+        mock_static.apply.return_value = EagerResult(
+            "static-task", {"status": "success", "assets_ready": 0}, "SUCCESS"
+        )
+
         mock_get_source_domain_geojson_cache_warmers.return_value = ()
         mock_base_warmup.return_value = {
             "nuts": {"status": "success"},
@@ -161,25 +193,48 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
 
         self.assertEqual(result["maps"]["nuts"]["status"], "success")
         mock_base_warmup.assert_called_once()
+        mock_static.apply.assert_called_once_with()
+        self.assertEqual(
+            result["static_region_assets"],
+            {"status": "success", "assets_ready": 0},
+        )
 
+    @patch("maps.tasks.warm_static_region_geojson_assets")
     @patch("maps.tasks._warm_base_geojson_caches")
     @patch("maps.tasks.get_source_domain_geojson_cache_warmers")
     def test_warm_all_geojson_caches_forwards_cli_overrides(
-        self, mock_get_source_domain_geojson_cache_warmers, mock_base_warmup
+        self,
+        mock_get_source_domain_geojson_cache_warmers,
+        mock_base_warmup,
+        mock_static,
     ):
         mock_get_source_domain_geojson_cache_warmers.return_value = ()
         mock_base_warmup.return_value = {"status": "success"}
+        mock_static.apply.return_value = EagerResult(
+            "static-task", {"status": "success", "assets_ready": 0}, "SUCCESS"
+        )
 
-        warm_all_geojson_caches.run(nuts_levels=[0], nuts_limit=10, regions_limit=5)
+        result = warm_all_geojson_caches.run(
+            nuts_levels=[0], nuts_limit=10, regions_limit=5
+        )
 
         mock_base_warmup.assert_called_once_with(
             nuts_levels=[0], regions_limit=5, nuts_limit=10
         )
+        mock_static.apply.assert_called_once_with()
+        self.assertEqual(
+            result["static_region_assets"],
+            {"status": "success", "assets_ready": 0},
+        )
 
+    @patch("maps.tasks.warm_static_region_geojson_assets")
     @patch("maps.tasks._warm_base_geojson_caches")
     @patch("maps.tasks.get_source_domain_geojson_cache_warmers")
     def test_warm_all_geojson_caches_never_calls_result_get_inside_task(
-        self, mock_get_source_domain_geojson_cache_warmers, mock_base_warmup
+        self,
+        mock_get_source_domain_geojson_cache_warmers,
+        mock_base_warmup,
+        mock_static,
     ):
         """Inside a running task, EagerResult.get() raises RuntimeError.
 
@@ -187,6 +242,9 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
         simulates a real worker context where blocking calls are forbidden.
         """
         mock_base_warmup.return_value = {"status": "success"}
+        mock_static.apply.return_value = EagerResult(
+            "static-task", {"status": "success", "assets_ready": 0}, "SUCCESS"
+        )
         warmer = Mock()
         warmer.apply.return_value = EagerResult(
             "task", {"status": "success", "features_count": 1}, "SUCCESS"
@@ -199,6 +257,11 @@ class GeoJSONCacheDependencyBoundaryTests(SimpleTestCase):
             result = warm_all_geojson_caches.run()
 
         self.assertEqual(result["roadside_trees"]["features_count"], 1)
+        mock_static.apply.assert_called_once_with()
+        self.assertEqual(
+            result["static_region_assets"],
+            {"status": "success", "assets_ready": 0},
+        )
 
 
 class WorkerReadyWarmupTaskTests(TestCase):
@@ -254,8 +317,9 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
             levl_code=0,
             cntr_code="DE",
             version=self.vintage,
+            publication_status="published",
         )
-        region = Region(name="Warmable Region")
+        region = Region(name="Warmable Region", publication_status="published")
         region.geom = MultiPolygon(Polygon(((0, 0), (1, 0), (1, 1), (0, 1), (0, 0))))
         region.save()
         self.region = region
@@ -265,10 +329,16 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
 
         year = self.vintage.year
         self.assertIsNotNone(
-            self.geojson_cache.get(get_nuts_region_cache_key(level=0, version=year))
+            self.geojson_cache.get(
+                AUTHZ_GEOJSON_CACHE_PREFIX
+                + get_nuts_region_cache_key(level=0, version=year)
+            )
         )
         self.assertIsNotNone(
-            self.geojson_cache.get(get_region_cache_key(region_id=self.region.id))
+            self.geojson_cache.get(
+                AUTHZ_GEOJSON_CACHE_PREFIX
+                + get_region_cache_key(region_id=self.region.id)
+            )
         )
         self.assertEqual(result["nuts"]["status"], "success")
         self.assertEqual(result["regions"]["status"], "success")
@@ -296,10 +366,16 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
 
         year = self.vintage.year
         self.assertIsNone(
-            self.geojson_cache.get(get_nuts_region_cache_key(level=0, version=year))
+            self.geojson_cache.get(
+                AUTHZ_GEOJSON_CACHE_PREFIX
+                + get_nuts_region_cache_key(level=0, version=year)
+            )
         )
         self.assertIsNotNone(
-            self.geojson_cache.get(get_region_cache_key(region_id=self.region.id))
+            self.geojson_cache.get(
+                AUTHZ_GEOJSON_CACHE_PREFIX
+                + get_region_cache_key(region_id=self.region.id)
+            )
         )
         self.assertNotIn("nuts", result)
 
@@ -307,7 +383,10 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
         result = warm_base_geojson_caches.run(nuts_levels=[0], regions_limit=None)
 
         self.assertIsNone(
-            self.geojson_cache.get(get_region_cache_key(region_id=self.region.id))
+            self.geojson_cache.get(
+                AUTHZ_GEOJSON_CACHE_PREFIX
+                + get_region_cache_key(region_id=self.region.id)
+            )
         )
         self.assertNotIn("regions", result)
 
@@ -321,7 +400,10 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
             result = warm_base_geojson_caches.run(nuts_levels=None, regions_limit=10)
 
         self.assertIsNone(
-            self.geojson_cache.get(get_region_cache_key(region_id=self.region.id))
+            self.geojson_cache.get(
+                AUTHZ_GEOJSON_CACHE_PREFIX
+                + get_region_cache_key(region_id=self.region.id)
+            )
         )
         self.assertEqual(result["regions"]["status"], "success")
         self.assertEqual(result["regions"]["features_count"], 0)
@@ -350,11 +432,13 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
             levl_code=0,
             cntr_code="LU",
             version=self.vintage,
+            publication_status="published",
         )
         warm_base_geojson_caches.run(nuts_levels=[0], regions_limit=None, nuts_limit=1)
         self.assertIsNone(
             self.geojson_cache.get(
-                get_nuts_region_cache_key(level=0, version=self.vintage.year)
+                AUTHZ_GEOJSON_CACHE_PREFIX
+                + get_nuts_region_cache_key(level=0, version=self.vintage.year)
             )
         )
 
@@ -365,6 +449,7 @@ class WarmBaseGeojsonCachesTaskTests(TestCase):
             levl_code=0,
             cntr_code="LU",
             version=self.vintage,
+            publication_status="published",
         )
 
         result = warm_base_geojson_caches.run(
@@ -390,6 +475,7 @@ class NutsWarmupConnectionReleaseTests(TestCase):
                 levl_code=0,
                 cntr_code=nuts_id,
                 version=self.vintage,
+                publication_status="published",
             )
             region.geom = MultiPolygon(
                 Polygon(((0, 0), (1, 0), (1, 1), (0, 1), (0, 0)))
@@ -416,5 +502,9 @@ class NutsWarmupConnectionReleaseTests(TestCase):
         )
         level_key = get_nuts_region_cache_key(level=0, version=self.vintage.year)
         self.assertTrue(
-            self.geojson_cache.has_key(rendered_geojson_cache_key(level_key, token))
+            self.geojson_cache.has_key(
+                rendered_geojson_cache_key(
+                    AUTHZ_GEOJSON_CACHE_PREFIX + level_key, token
+                )
+            )
         )

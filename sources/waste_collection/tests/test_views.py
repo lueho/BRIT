@@ -199,11 +199,23 @@ class CollectorUpdateViewPermissionTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
-    def test_get_http_200_for_staff_without_explicit_permission(self):
+    def test_get_http_200_for_admin_with_change_permission(self):
+        # Administrators still need the model's change capability; the
+        # administer_objects grant alone does not open the update view.
+        perm = Permission.objects.get(codename="change_collector")
+        self.staff.user_permissions.add(perm)
         self.client.force_login(self.staff)
         url = reverse("collector-update", kwargs={"pk": self.collector.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
+
+    def test_get_http_403_for_admin_without_change_permission(self):
+        # The staff fixture already holds administer_objects; without
+        # change_collector the update view must stay closed.
+        self.client.force_login(self.staff)
+        url = reverse("collector-update", kwargs={"pk": self.collector.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
 
 
 class CollectionSystemUpdateViewPermissionTestCase(ViewWithPermissionsTestCase):
@@ -733,6 +745,22 @@ class CollectionFrequencyCRUDViewsTestCase(
         self.assertIsNone(self.options_2.option_2)
         self.assertIsNone(self.options_2.option_3)
 
+    def _detach_count_options(self):
+        # CollectionCountOptions rows are independently governed records;
+        # deleting their frequency would cross the record boundary, so the
+        # delete tests detach them first.
+        CollectionCountOptions.objects.filter(
+            frequency=self.unpublished_object
+        ).delete()
+
+    def test_delete_view_post_unpublished_as_owner(self):
+        self._detach_count_options()
+        super().test_delete_view_post_unpublished_as_owner()
+
+    def test_delete_view_post_unpublished_as_staff_user(self):
+        self._detach_count_options()
+        super().test_delete_view_post_unpublished_as_staff_user()
+
     def test_update_ignores_unchanged_empty_extra_season_form(self):
         frequency = CollectionFrequency.objects.create(
             owner=self.owner_user,
@@ -927,9 +955,11 @@ class CollectionPropertyValueCRUDViewsTestCase(
             {predecessor.pk, self.related_objects["collection"].pk},
         )
 
-    def test_detail_collection_button_skips_archived_collection_for_anonymous(self):
+    def test_detail_collection_button_skips_invisible_collection_for_anonymous(self):
+        # Archived collections are public historical records, so an
+        # invisible chain version must be a private one.
         collection = self.related_objects["collection"]
-        collection.publication_status = "archived"
+        collection.publication_status = "private"
         collection.save()
         successor = Collection.objects.create(
             owner=self.owner_user,
@@ -947,8 +977,10 @@ class CollectionPropertyValueCRUDViewsTestCase(
         self.assertNotContains(response, collection.get_absolute_url())
 
     def test_detail_hides_collection_links_when_no_chain_version_is_visible(self):
+        # Archived collections are public historical records; only a
+        # private collection leaves no visible chain version for anonymous.
         collection = self.related_objects["collection"]
-        collection.publication_status = "archived"
+        collection.publication_status = "private"
         collection.save()
 
         response = self.client.get(self.get_detail_url(self.published_object.pk))
@@ -1205,10 +1237,11 @@ class CollectionCatchmentCRUDViewsTestCase(
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        # The update view operates on the concrete Catchment model
-        cls.owner_user.user_permissions.add(
-            Permission.objects.get(codename="change_catchment")
-        )
+        # The update view operates on the concrete Catchment model; staff
+        # administrators need the same explicit capability as owners.
+        change_perm = Permission.objects.get(codename="change_catchment")
+        cls.owner_user.user_permissions.add(change_perm)
+        cls.staff_user.user_permissions.add(change_perm)
 
     @classmethod
     def create_related_objects(cls):
@@ -4143,6 +4176,11 @@ class CollectionFrequencyDisplayTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.staff = User.objects.create(username="frequency-moderator", is_staff=True)
+        # Review detail requires a real capability; this staff persona acts
+        # as administrator via the explicit administer_objects grant.
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         distribution = TemporalDistribution.objects.get(name="Months of the year")
         january = Timestep.objects.get(name="January")
         february = Timestep.objects.get(name="February")
@@ -4358,6 +4396,11 @@ class CollectionDetailQueryCountTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.staff = User.objects.create(username="query-guard-mod", is_staff=True)
+        # Review detail requires a real capability; this staff persona acts
+        # as administrator via the explicit administer_objects grant.
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         distribution = TemporalDistribution.objects.get(name="Months of the year")
         season, _ = CollectionSeason.objects.get_or_create(
             distribution=distribution,
@@ -4464,6 +4507,9 @@ class CollectionReviewDetailPropertiesTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.staff = User.objects.create(username="moderator", is_staff=True)
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="can_moderate_collection")
+        )
         cls.bin_configuration = BinConfiguration.objects.create(
             name="Optical sorting",
             owner=cls.staff,
@@ -4531,6 +4577,12 @@ class CollectionPropertyValueReviewDetailRelatedCollectionsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.staff = User.objects.create(username="cpv-review-staff", is_staff=True)
+        # Reviewing the property value and seeing its review-state parent
+        # collection in the chain each need their own moderation capability.
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="can_moderate_collectionpropertyvalue"),
+            Permission.objects.get(codename="can_moderate_collection"),
+        )
 
         cls.catchment = CollectionCatchment.objects.create(name="CPV RC")
         cls.system = CollectionSystem.objects.create(name="CPV RS")
@@ -4656,6 +4708,11 @@ class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):
 
     def test_staff_detail_only_shows_published_cpvs(self):
         staff = User.objects.create(username="staff-user", is_staff=True)
+        # Administrators (administer_objects, not the bare staff flag) may
+        # see private values attached to a published collection.
+        staff.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         self.client.force_login(staff)
         response = self.client.get(
             reverse("collection-detail", kwargs={"pk": self.collection.pk})
@@ -4702,6 +4759,9 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.staff = User.objects.create(username="reviewer", is_staff=True)
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="can_moderate_collection")
+        )
         cls.predecessor_owner = User.objects.create(username="predecessor-owner")
 
         cls.catchment = CollectionCatchment.objects.create(name="RC")
@@ -7449,7 +7509,9 @@ class CollectionDetailV2LayoutTestCase(TestCase):
         self.assertContains(response, 'class="sdv2-rail"')
         self.assertContains(response, "sdv2-status-pill")
         self.assertContains(response, "sdv2-actions-menu")
-        self.assertContains(
+        # Published collections are frozen for everyone — the rail shows no
+        # update affordance, not even for privileged users.
+        self.assertNotContains(
             response,
             reverse("collection-update", kwargs={"pk": self.collection.pk}),
         )
@@ -7489,6 +7551,9 @@ class CollectionDetailV2LayoutTestCase(TestCase):
 
     def test_review_detail_uses_v2_layout(self):
         staff = User.objects.create_user(username="v2-reviewer", is_staff=True)
+        staff.user_permissions.add(
+            Permission.objects.get(codename="can_moderate_collection")
+        )
         self.client.force_login(staff)
         content_type = ContentType.objects.get_for_model(Collection)
         response = self.client.get(
