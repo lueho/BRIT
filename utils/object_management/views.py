@@ -2350,6 +2350,8 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
            return its response.
         4. Otherwise execute base authorization and rendering.
         """
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
         obj = self.get_object()
         model_class = obj.__class__
 
