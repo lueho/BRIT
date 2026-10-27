@@ -899,8 +899,9 @@ class Collection(NamedUserCreatedObject):
             return ["private", "declined"]
         if action_name == "withdraw_from_review":
             return ["review"]
-        if action_name in ("approve", "reject"):
+        if action_name == "approve":
             return ["review"]
+        # Rejection never cascades: property values are independently reviewed.
         return []
 
     @staticmethod

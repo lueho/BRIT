@@ -32,6 +32,7 @@ from django.http import (
     HttpResponseBadRequest,
     HttpResponseNotAllowed,
     HttpResponseRedirect,
+    JsonResponse,
 )
 from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string, select_template
@@ -96,6 +97,7 @@ from ..forms import (
     DynamicTableInlineFormSetHelper,
     SourcesFieldMixin,
     UserCreatedObjectFormMixin,
+    workspace_section_formsets,
 )
 from ..views import (
     FilterDefaultsMixin,
@@ -2807,6 +2809,121 @@ class UserCreatedObjectModalDeleteView(
 
         # Fallback to public list without scope
         return self.model.public_list_url()
+
+
+class WorkspaceSectionUpdateMixin:
+    """Shared section-editing flow for workspace update views.
+
+    Subclasses define ``section_registry``, ``section_formset_class``,
+    ``object_label``, and the section form/summary templates. They may also
+    extend ``get_section_summary_context`` and ``get_section_saved_payload``
+    for resource-specific summary data and JSON fields.
+    """
+
+    section_registry = None
+    section_formset_class = None
+    object_label = "object"
+    section_form_template = None
+    section_summary_template = None
+    default_section = "overview"
+
+    def dispatch(self, request, *args, **kwargs):
+        key = request.GET.get("section", self.default_section)
+        if key not in self.section_registry:
+            raise Http404(f"Unknown {self.object_label} section.")
+        self.section = {**self.section_registry[key], "key": key}
+        self.inlines = None
+        with transaction.atomic():
+            return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return (
+            queryset.select_for_update() if self.request.method == "POST" else queryset
+        )
+
+    def get_form_kwargs(self):
+        return {
+            **super().get_form_kwargs(),
+            "request": self.request,
+            "fields": self.section.get("fields", ()),
+        }
+
+    def get_inlines(self):
+        if self.inlines is None:
+            self.inlines = workspace_section_formsets(
+                self.object,
+                self.section,
+                self.request,
+                formset_class=self.section_formset_class,
+            )
+        return self.inlines
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "section": self.section,
+                "section_url": f"{self.object.update_url}?section={self.section['key']}",
+                "workspace_url": self.get_success_url(),
+                "cancel_url": self.get_success_url(),
+                "object_label": self.object_label,
+                "form_title": self.section["label"],
+                "submit_button_text": "Save section",
+                "inlines": self.get_inlines(),
+            }
+        )
+        return context
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(
+                {
+                    "section": self.section["key"],
+                    "saved": False,
+                    "html": render_to_string(
+                        self.section_form_template,
+                        context,
+                        request=self.request,
+                    ),
+                },
+                status=422 if self.request.method == "POST" else 200,
+            )
+        return super().render_to_response(context, **response_kwargs)
+
+    def form_valid(self, form):
+        validity = [inline.is_valid() for inline in self.get_inlines()]
+        if not all(validity):
+            return self.form_invalid(form)
+        self.object = form.save()
+        for inline in self.get_inlines():
+            inline.save()
+        message = "Saved privately." if self.object.is_private else "Changes saved."
+        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(self.get_section_saved_payload(message))
+        messages.success(self.request, message)
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_section_saved_payload(self, message):
+        """AJAX success payload for a saved section."""
+        return {
+            "section": self.section["key"],
+            "saved": True,
+            "title": self.object.name,
+            "message": message,
+            "html": render_to_string(
+                self.section_summary_template,
+                self.get_section_summary_context(),
+                request=self.request,
+            ),
+        }
+
+    def get_section_summary_context(self):
+        """Template context for the refreshed section summary."""
+        return {"object": self.object, "section": self.section}
+
+    def get_success_url(self):
+        return f"{self.object.get_absolute_url()}?mode=edit"
 
 
 class OwnedObjectModelSelectOptionsView(ModelSelectOptionsView):

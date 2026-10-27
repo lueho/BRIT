@@ -846,6 +846,32 @@ class PolicyReviewFindingRegressionTests(TestCase):
                 )
                 self.assertEqual(object_access_routes(user, self.private_property), [])
 
+    def test_access_routes_report_moderator_only_where_moderation_applies(self):
+        published = Property.objects.create(
+            name="Finding moderated published",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
+        )
+        moderator = User.objects.get(pk=self.moderator.pk)
+        self.assertFalse(decide(moderator, "read", self.private_property).allowed)
+        self.assertEqual(object_access_routes(moderator, self.private_property), [])
+        self.assertIn(
+            "moderator", object_access_routes(moderator, self.review_property)
+        )
+        self.assertIn("moderator", object_access_routes(moderator, published))
+
+    def test_unsaved_review_candidate_cannot_be_approved(self):
+        candidate = Property(
+            name="Finding unsaved",
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_REVIEW,
+            created_by=self.moderator,
+        )
+        moderator = User.objects.get(pk=self.moderator.pk)
+        decision = decide(moderator, "approve", candidate)
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reason, "four_eyes_required")
+
     def test_revoked_direct_grant_applies_to_cached_user_instance(self):
         self.private_property.add_editor(self.editor)
         editor = User.objects.get(pk=self.editor.pk)

@@ -696,13 +696,15 @@ def content_mutation(
             active_roots[primary_key]["deleted_by"] = actor
         if policy.parent_path is not None and target_exists:
             # Parent changes are reassignments: without ``proposed_parent``
-            # the callback may not attach the row to an unauthorized parent.
+            # the callback may not attach the row to an unauthorized parent
+            # or detach it from all of its stored parents.
             allowed_keys = {_storage_key(p) for p in (*stored_parents, *proposed)}
             current = model._base_manager.get(pk=target.pk)
             current_keys = {
                 _storage_key(p) for p in resolve_parents(current, policy.parent_path)
             }
-            if not current_keys <= allowed_keys:
+            detached = bool(stored_parents) and not current_keys
+            if detached or not current_keys <= allowed_keys:
                 raise PermissionDenied(
                     "Changing the parent requires an authorized reassignment."
                 )

@@ -2,21 +2,24 @@ from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from users.roles import role_state
+from users.roles import is_privileged_permission, role_state
 
 
 class Command(BaseCommand):
     help = (
         "Report or reconcile managed role permissions. "
-        "Default is a dry-run; use --apply to add missing grants or "
-        "--check to fail on drift."
+        "Default is a dry-run; use --apply to add missing grants and revoke "
+        "privileged grants outside the manifest, or --check to fail on drift."
     )
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--apply",
             action="store_true",
-            help="Add missing required permissions to managed roles.",
+            help=(
+                "Add missing required permissions to managed roles and revoke "
+                "moderation/administration grants the manifest does not require."
+            ),
         )
         parser.add_argument(
             "--check",
@@ -58,6 +61,14 @@ class Command(BaseCommand):
                         group.permissions.add(*info["missing"])
                         self.stdout.write(
                             f"{role}: added {len(info['missing'])} permissions"
+                        )
+                    privileged = [
+                        p for p in info["extraneous"] if is_privileged_permission(p)
+                    ]
+                    if privileged:
+                        group.permissions.remove(*privileged)
+                        self.stdout.write(
+                            f"{role}: revoked {len(privileged)} privileged permissions"
                         )
             return
         if options["check"]:
