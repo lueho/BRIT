@@ -1668,14 +1668,14 @@ class ForeignKeyCreateAffordanceRenderTests(TestCase):
     ROOT_URLCONF="utils.object_management.tests.test_shared_adapter_http"
 )
 class UnregisteredPlainModelCreateTests(TestCase):
-    """Unregistered non-UCO models keep the plain adapter path: capability
-    via the model's own add permission, no policy boundary involved."""
+    """Unregistered models fail closed through the generic adapter: an
+    ``add`` capability alone does not admit creation outside the registry."""
 
     @classmethod
     def setUpTestData(cls):
         call_command("sync_roles", "--apply", stdout=io.StringIO())
 
-    def test_authorized_plain_create_persists(self):
+    def test_add_capability_does_not_admit_unregistered_model(self):
         user = User.objects.create_user(username="plain-creator")
         user.groups.clear()
         user.user_permissions.add(Permission.objects.get(codename="add_group"))
@@ -1685,8 +1685,8 @@ class UnregisteredPlainModelCreateTests(TestCase):
             {"name": "plain-created"},
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 201)
-        self.assertTrue(Group.objects.filter(name="plain-created").exists())
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Group.objects.filter(name="plain-created").exists())
         self.assertFalse(ReviewAction.objects.exists())
 
     def test_missing_add_capability_denied(self):
