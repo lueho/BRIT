@@ -113,11 +113,14 @@ class SourceAuthorReviewCascadeTest(TestCase):
         ]
         for position, (author, _) in enumerate(authors, start=1):
             self._link(source, author, position=position)
+        # Records saved directly with a published status carry owner approval
+        # metadata; the source's approve must leave each author's approver as-is.
+        expected_approvers = {author.pk: author.approved_by_id for author, _ in authors}
         self._approve(source)
         self.assertEqual(source.publication_status, "published")
         for author, _ in authors:
             author.refresh_from_db()
-            self.assertIsNone(author.approved_by)
+            self.assertEqual(author.approved_by_id, expected_approvers[author.pk])
         self._assert_authors_untouched(authors)
 
     def test_reject_does_not_touch_linked_authors(self):
