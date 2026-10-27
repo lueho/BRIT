@@ -1,3 +1,4 @@
+from django.contrib.auth.models import Permission
 from django.test import SimpleTestCase
 from django.urls import reverse
 
@@ -91,6 +92,23 @@ class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        # Growth cycles are owned children of their greenhouse: every write
+        # decision resolves to edit access on the parent, which requires the
+        # ``change_greenhouse`` capability (administrator status alone never
+        # substitutes a model permission).
+        change_perm = Permission.objects.get(codename="change_greenhouse")
+        cls.owner_user.user_permissions.add(change_perm)
+        cls.staff_user.user_permissions.add(change_perm)
+        # The "unpublished" fixture needs an editable (private) parent — a
+        # cycle under the shared published greenhouse is frozen and publicly
+        # readable through the parent's lifecycle state.
+        cls.private_greenhouse = Greenhouse.objects.create(
+            owner=cls.owner_user,
+            name="Private Test Greenhouse",
+            publication_status="private",
+        )
+        cls.unpublished_object.greenhouse = cls.private_greenhouse
+        cls.unpublished_object.save()
         distribution = TemporalDistribution.objects.create(name="Test Distribution")
         timestep = Timestep.objects.create(
             name="Test Timestep", distribution=distribution
@@ -133,19 +151,30 @@ class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
             ),
         }
 
+    def compile_update_post_data(self):
+        # Keep the cycle attached to its editable private parent: reposting
+        # the shared published greenhouse would attempt a reassign onto a
+        # frozen parent, which the policy must deny.
+        data = super().compile_update_post_data()
+        data["greenhouse"] = self.unpublished_object.greenhouse.pk
+        return data
+
     def get_update_success_url(self, pk=None):
         return reverse(
-            "greenhouse-detail", kwargs={"pk": self.related_objects["greenhouse"].pk}
+            "greenhouse-detail", kwargs={"pk": self.unpublished_object.greenhouse.pk}
         )
 
     def get_delete_success_url(self, publication_status=None):
         return reverse(
-            "greenhouse-detail", kwargs={"pk": self.related_objects["greenhouse"].pk}
+            "greenhouse-detail", kwargs={"pk": self.unpublished_object.greenhouse.pk}
         )
 
 
 class GrowthCycleModalCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = "add_greenhousegrowthcycle"
+    # Creating a growth cycle is governed by edit access on the parent
+    # greenhouse (``change_greenhouse``); the child add permission alone
+    # does not authorize the write.
+    member_permissions = ("add_greenhousegrowthcycle", "change_greenhouse")
 
     @classmethod
     def setUpTestData(cls):
@@ -280,7 +309,9 @@ class GrowthCycleModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 403)
         self.assertFalse(GreenhouseGrowthCycle.objects.exists())
 
-    def test_staff_can_add_cycle_to_published_greenhouse(self):
+    def test_staff_cannot_add_cycle_to_published_greenhouse(self):
+        # Published parents are frozen: administrator status cannot attach
+        # new growth cycles either.
         self.greenhouse.publication_status = "published"
         self.greenhouse.save()
         self.culture.publication_status = "published"
@@ -291,12 +322,8 @@ class GrowthCycleModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
         response = self.client.post(self.url, self.data)
 
-        self.assertRedirects(
-            response, self.greenhouse.get_absolute_url(), fetch_redirect_response=False
-        )
-        cycle = GreenhouseGrowthCycle.objects.get(greenhouse=self.greenhouse)
-        self.assertEqual(cycle.owner, self.staff)
-        self.assertEqual(cycle.group_settings, self.base_composition)
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(GreenhouseGrowthCycle.objects.exists())
 
     def test_culture_field_excludes_foreign_private_cultures(self):
         foreign_culture = Culture.objects.create(
@@ -322,21 +349,33 @@ class GrowthCycleModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertFalse(GreenhouseGrowthCycle.objects.exists())
 
     def test_foreign_private_composition_is_not_selected(self):
+        # Compositions inherit visibility from their parent sample: only a
+        # composition on a foreign private sample of the same series is
+        # invisible to the member and must not be selected.
         group = MaterialComponentGroup.objects.create(name="Macro Components")
-        Composition.objects.create(owner=self.owner, group=group, sample=self.sample)
+        foreign_sample = Sample.objects.create(
+            owner=self.owner,
+            name="Foreign private sample",
+            material=self.residue.material,
+            series=self.residue,
+            publication_status="private",
+        )
+        Composition.objects.create(owner=self.owner, group=group, sample=foreign_sample)
 
         response = self.client.post(self.url, self.data)
 
         self.assert_cycle_created(response, self.base_composition)
 
-    def test_published_greenhouse_rejects_unpublished_culture(self):
+    def test_published_greenhouse_rejects_cycle_creation_for_admin(self):
+        # The unpublished culture never reaches form validation: the frozen
+        # published parent already denies the write for administrators.
         self.greenhouse.publication_status = "published"
         self.greenhouse.save()
         self.client.force_login(self.staff)
 
         response = self.client.post(self.url, self.data)
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 403)
         self.assertFalse(GreenhouseGrowthCycle.objects.exists())
 
 
@@ -366,15 +405,31 @@ class GreenhouseUpdateViewPermissionTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
-    def test_get_http_200_for_staff_without_explicit_permission(self):
+    def test_get_http_200_for_admin_with_change_permission(self):
+        # Administrators still need the model's change capability; the
+        # administer_objects grant alone does not open the update view.
+        perm = Permission.objects.get(codename="change_greenhouse")
+        self.staff.user_permissions.add(perm)
         self.client.force_login(self.staff)
         url = reverse("greenhouse-update", kwargs={"pk": self.greenhouse.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
+    def test_get_http_403_for_admin_without_change_permission(self):
+        # The staff fixture already holds administer_objects; without
+        # change_greenhouse the update view must stay closed.
+        self.client.force_login(self.staff)
+        url = reverse("greenhouse-update", kwargs={"pk": self.greenhouse.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
 
 class GreenhouseDetailPermissionRegressionTest(ViewWithPermissionsTestCase):
-    member_permissions = "add_greenhousegrowthcycle"
+    # Adding a growth cycle is governed by edit access on the parent
+    # greenhouse alone; the member deliberately does not hold
+    # ``add_greenhousegrowthcycle`` so the affordance cannot pass on a
+    # secondary permission the policy never consults.
+    member_permissions = "change_greenhouse"
 
     @classmethod
     def setUpTestData(cls):
@@ -436,13 +491,15 @@ class GreenhouseDetailPermissionRegressionTest(ViewWithPermissionsTestCase):
             ),
         )
 
-    def test_detail_shows_add_growth_cycle_link_for_staff(self):
+    def test_detail_hides_add_growth_cycle_link_for_staff(self):
+        # Published parents are frozen: not even administrators may attach
+        # new cycles, so the affordance must stay hidden.
         self.client.force_login(self.staff)
         response = self.client.get(
             reverse("greenhouse-detail", kwargs={"pk": self.published_greenhouse.pk})
         )
 
-        self.assertContains(
+        self.assertNotContains(
             response,
             reverse(
                 "greenhousegrowthcycle-create",

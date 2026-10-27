@@ -1134,6 +1134,11 @@ class CollectionReviewActionApiTestCase(APITestCase):
         cls.owner = User.objects.create_user(username="owner")
         cls.other_owner = User.objects.create_user(username="other-owner")
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
+        # Review actions require the explicit moderation capability; the
+        # staff flag alone grants nothing.
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="can_moderate_collection")
+        )
 
         cls.catchment = CollectionCatchment.objects.create(name="Test Catchment")
         cls.collector = Collector.objects.create(name="Test Collector")
@@ -1237,7 +1242,9 @@ class CollectionReviewActionApiTestCase(APITestCase):
 
         self.client.force_login(self.staff)
         url = reverse("api-waste-collection-approve", kwargs={"pk": collection.pk})
-        response = self.client.post(url)
+        response = self.client.post(
+            url, {"expected_revision": collection.content_revision}
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         collection.refresh_from_db()
@@ -2032,6 +2039,8 @@ class CollectionMutationApiTestCase(APITestCase):
         )
 
     def test_update_endpoint_denies_non_owner(self):
+        # A private collection is invisible to non-owners: the update
+        # endpoint must not leak its existence with a 403.
         self.client.force_login(self.other_user)
 
         response = self.client.post(

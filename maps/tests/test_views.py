@@ -54,7 +54,7 @@ from ..models import (
     RegionAttributeValue,
     RegionProperty,
 )
-from ..utils import get_region_cache_key
+from ..utils import AUTHZ_GEOJSON_CACHE_PREFIX, get_region_cache_key
 from ..views import MapMixin
 from ..viewsets import RegionViewSet
 
@@ -1922,8 +1922,12 @@ def _redis_geojson_test_caches():
 class GeoJSONCachingTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.region1 = Region.objects.create(name="TestRegion1")
-        cls.region2 = Region.objects.create(name="TestRegion2")
+        cls.region1 = Region.objects.create(
+            name="TestRegion1", publication_status="published"
+        )
+        cls.region2 = Region.objects.create(
+            name="TestRegion2", publication_status="published"
+        )
         cls.regions_geojson_url = reverse("api-region-geojson")
 
     def setUp(self):
@@ -1940,58 +1944,50 @@ class GeoJSONCachingTests(TestCase):
     def test_geojson_cache_miss_and_hit(self):
         """Verify first request is MISS, second is HIT with correct headers."""
         unique_name = f"TestRegion1_{uuid.uuid4()}"
-        Region.objects.create(name=unique_name)
+        Region.objects.create(name=unique_name, publication_status="published")
         url = self.regions_geojson_url + f"?name={unique_name}"
         response_miss = self.client.get(url)
         self.assertEqual(response_miss.status_code, 200)
         self.assertEqual(response_miss["X-Cache-Status"], "MISS")
         self.assertTrue("X-Cache-Time" in response_miss)
         self.assertContains(response_miss, unique_name)
-        expected_key = get_region_cache_key(filters={"name": unique_name})
-        cached_value = self.geojson_cache.get(expected_key)
-        if cached_value is None:
-            self.skipTest(
-                "GeoJSON cache backend did not store entry; skipping HIT check."
-            )
+        expected_key = AUTHZ_GEOJSON_CACHE_PREFIX + get_region_cache_key(
+            filters={"name": unique_name}
+        )
+        self.assertIsNotNone(
+            self.geojson_cache.get(expected_key),
+            "MISS response must store the geojson payload under the authz key",
+        )
         response_hit = self.client.get(url)
         self.assertEqual(response_hit.status_code, 200)
-        if response_hit["X-Cache-Status"] != "HIT":
-            self.skipTest(
-                "Cache did not return HIT on second request; skipping HIT assertion."
-            )
+        self.assertEqual(response_hit["X-Cache-Status"], "HIT")
         self.assertTrue("X-Cache-Time" in response_hit)
         self.assertEqual(response_miss.content, response_hit.content)
 
     def test_cache_invalidation_on_save(self):
         """Verify cache is invalidated when a relevant model instance is saved."""
-        region = Region.objects.create(name=f"UniqueRegion_{uuid.uuid4()}")
+        region = Region.objects.create(
+            name=f"UniqueRegion_{uuid.uuid4()}", publication_status="published"
+        )
         url = f"{reverse('api-region-geojson')}?id={region.pk}"
         list_url = self.regions_geojson_url
-        list_key = get_region_cache_key(filters=None)
-        detail_key = get_region_cache_key(region_id=region.pk)
+        list_key = AUTHZ_GEOJSON_CACHE_PREFIX + get_region_cache_key(filters=None)
+        detail_key = AUTHZ_GEOJSON_CACHE_PREFIX + get_region_cache_key(
+            region_id=region.pk
+        )
         self.client.get(url)
         self.client.get(list_url)
-        detail_cached = self.geojson_cache.get(detail_key)
-        list_cached = self.geojson_cache.get(list_key)
-        if detail_cached is None or list_cached is None:
-            self.skipTest(
-                "GeoJSON cache backend did not store entries; skipping invalidation assertions."
-            )
+        self.assertIsNotNone(self.geojson_cache.get(detail_key))
+        self.assertIsNotNone(self.geojson_cache.get(list_key))
         region.name = "UpdatedRegion1"
         region.save()
         self.assertIsNone(
             self.geojson_cache.get(detail_key), "Specific detail key not invalidated"
         )
-        if hasattr(self.geojson_cache, "delete_pattern") and callable(
-            getattr(self.geojson_cache, "delete_pattern", None)
-        ):
-            self.assertIsNone(
-                self.geojson_cache.get(list_key), "List key not invalidated by pattern"
-            )
-        else:
-            self.skipTest(
-                "Cache backend does not support pattern-based deletion; cannot fully test broad invalidation."
-            )
+        self.assertIsNone(
+            self.geojson_cache.get(list_key),
+            "List key not invalidated by broad invalidation",
+        )
         response_after_save = self.client.get(url)
         self.assertEqual(response_after_save["X-Cache-Status"], "MISS")
         response_list_after_save = self.client.get(list_url)
@@ -1999,16 +1995,19 @@ class GeoJSONCachingTests(TestCase):
 
     def test_cache_invalidation_on_delete(self):
         """Verify cache is invalidated when a relevant model instance is deleted."""
-        region = Region.objects.create(name=f"UniqueRegion_{uuid.uuid4()}")
+        region = Region.objects.create(
+            name=f"UniqueRegion_{uuid.uuid4()}", publication_status="published"
+        )
+        url = f"{reverse('api-region-geojson')}?id={region.pk}"
         list_url = self.regions_geojson_url
-        list_key = get_region_cache_key(filters=None)
-        detail_key = get_region_cache_key(region_id=region.pk)
+        list_key = AUTHZ_GEOJSON_CACHE_PREFIX + get_region_cache_key(filters=None)
+        detail_key = AUTHZ_GEOJSON_CACHE_PREFIX + get_region_cache_key(
+            region_id=region.pk
+        )
+        self.client.get(url)
         self.client.get(list_url)
-        list_cached = self.geojson_cache.get(list_key)
-        if list_cached is None:
-            self.skipTest(
-                "GeoJSON cache backend did not store list entry; skipping invalidation assertions."
-            )
+        self.assertIsNotNone(self.geojson_cache.get(detail_key))
+        self.assertIsNotNone(self.geojson_cache.get(list_key))
         region_id_to_delete = region.id
         region.delete()
         self.assertIsNone(
@@ -2061,15 +2060,14 @@ class GeoJSONCachingTests(TestCase):
         """Test the clear_geojson_cache management command."""
         # 1. Use a unique key for this test
         unique_name = f"Test Region 1 {uuid.uuid4()}"
-        key_to_clear = get_region_cache_key(filters={"name": unique_name})
+        key_to_clear = AUTHZ_GEOJSON_CACHE_PREFIX + get_region_cache_key(
+            filters={"name": unique_name}
+        )
         self.client.get(self.regions_geojson_url + f"?name={unique_name}")
-        # Assert the key is present (skip if not, to avoid parallel interference)
-        cached_value = self.geojson_cache.get(key_to_clear)
-        if cached_value is None:
-            self.skipTest(
-                "Cache key missing before clear; likely due to parallel interference."
-            )
-        self.assertIsNotNone(cached_value)
+        self.assertIsNotNone(
+            self.geojson_cache.get(key_to_clear),
+            "MISS response must store the geojson payload under the authz key",
+        )
 
         # 2. Run clear command
         out = io.StringIO()
@@ -2086,7 +2084,7 @@ class GeoJSONCachingTests(TestCase):
 class LargeGeometryMemoryTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.region = Region(name="Large geometry")
+        cls.region = Region(name="Large geometry", publication_status="published")
         cls.region.geom = MultiPolygon(
             Polygon(((0, 0), (1, 0), (1, 1), (0, 1), (0, 0)))
         )
@@ -2201,7 +2199,11 @@ class StreamingGeoJSONTests(TestCase):
         # Create enough regions to trigger streaming (> STREAMING_THRESHOLD)
         cls.regions = []
         for i in range(150):
-            cls.regions.append(Region.objects.create(name=f"StreamTestRegion_{i}"))
+            cls.regions.append(
+                Region.objects.create(
+                    name=f"StreamTestRegion_{i}", publication_status="published"
+                )
+            )
         cls.regions_geojson_url = reverse("api-region-geojson")
 
     def setUp(self):
@@ -2381,8 +2383,12 @@ class StreamingGeoJSONTests(TestCase):
 class GeoJSONHeadTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.first = Region.objects.create(name="Head first")
-        cls.second = Region.objects.create(name="Head second")
+        cls.first = Region.objects.create(
+            name="Head first", publication_status="published"
+        )
+        cls.second = Region.objects.create(
+            name="Head second", publication_status="published"
+        )
 
     def setUp(self):
         self.cache = caches["geojson"]
@@ -2418,11 +2424,13 @@ class GeoJSONHeadTests(TestCase):
         self.assertEqual(response["X-Total-Count"], "2")
         self.assertEqual(materialize.call_count, 0)
         self.assertFalse(hasattr(response, "data"))
-        self.assertIsNone(self.cache.get("head-test-data"))
+        self.assertIsNone(self.cache.get(f"{AUTHZ_GEOJSON_CACHE_PREFIX}head-test-data"))
         get = self.request("get")
         self.assertEqual(len(get.data["features"]), 2)
         self.assert_metadata_equal(response, get)
-        self.assertIsNotNone(self.cache.get("head-test-data"))
+        self.assertIsNotNone(
+            self.cache.get(f"{AUTHZ_GEOJSON_CACHE_PREFIX}head-test-data")
+        )
 
     def test_cold_head_uses_single_stats_query(self):
         with CaptureQueriesContext(connection) as queries:
@@ -2449,40 +2457,50 @@ class GeoJSONHeadTests(TestCase):
         self.assertEqual(head["X-Cache-Status"], "HIT")
         self.assertEqual(head["X-Total-Count"], "2")
         keys = [call.args[0] for call in cache_get.call_args_list]
-        self.assertIn("head-test-data:count", keys)
-        self.assertNotIn("head-test-data", keys)
+        self.assertIn(f"{AUTHZ_GEOJSON_CACHE_PREFIX}head-test-data:count", keys)
+        self.assertNotIn(f"{AUTHZ_GEOJSON_CACHE_PREFIX}head-test-data", keys)
 
     def test_cached_head_heals_missing_count_meta(self):
         self.request("get")
-        self.cache.delete("head-test-data:count")
+        self.cache.delete(f"{AUTHZ_GEOJSON_CACHE_PREFIX}head-test-data:count")
         head = self.request("head")
         self.assertEqual(head["X-Cache-Status"], "HIT")
         self.assertEqual(head["X-Total-Count"], "2")
-        self.assertEqual(self.cache.get("head-test-data:count"), 2)
+        self.assertEqual(
+            self.cache.get(f"{AUTHZ_GEOJSON_CACHE_PREFIX}head-test-data:count"), 2
+        )
         with patch.object(self.cache, "get", wraps=self.cache.get) as cache_get:
             self.request("head")
         keys = [call.args[0] for call in cache_get.call_args_list]
-        self.assertNotIn("head-test-data", keys)
+        self.assertNotIn(f"{AUTHZ_GEOJSON_CACHE_PREFIX}head-test-data", keys)
 
     def test_orphaned_count_meta_reports_miss(self):
         self.request("get")
-        self.cache.delete("head-test-data")
-        self.assertEqual(self.cache.get("head-test-data:count"), 2)
+        self.cache.delete(f"{AUTHZ_GEOJSON_CACHE_PREFIX}head-test-data")
+        self.assertEqual(
+            self.cache.get(f"{AUTHZ_GEOJSON_CACHE_PREFIX}head-test-data:count"), 2
+        )
         head = self.request("head")
         self.assertEqual(head["X-Cache-Status"], "MISS")
         self.assertEqual(head["X-Total-Count"], "2")
-        self.assertIsNone(self.cache.get("head-test-data:count"))
+        self.assertIsNone(
+            self.cache.get(f"{AUTHZ_GEOJSON_CACHE_PREFIX}head-test-data:count")
+        )
 
     def test_healed_count_meta_inherits_payload_ttl(self):
         self.request("get")
-        self.cache.delete("head-test-data:count")
+        self.cache.delete(f"{AUTHZ_GEOJSON_CACHE_PREFIX}head-test-data:count")
         self.cache.ttl = Mock(return_value=60)
         self.addCleanup(delattr, self.cache, "ttl")
         with patch.object(self.cache, "set", wraps=self.cache.set) as cache_set:
             head = self.request("head")
         self.assertEqual(head["X-Cache-Status"], "HIT")
-        self.cache.ttl.assert_called_once_with("head-test-data")
-        cache_set.assert_called_once_with("head-test-data:count", 2, timeout=60)
+        self.cache.ttl.assert_called_once_with(
+            f"{AUTHZ_GEOJSON_CACHE_PREFIX}head-test-data"
+        )
+        cache_set.assert_called_once_with(
+            f"{AUTHZ_GEOJSON_CACHE_PREFIX}head-test-data:count", 2, timeout=60
+        )
 
     def test_cached_head_has_no_response_payload(self):
         self.request("get")

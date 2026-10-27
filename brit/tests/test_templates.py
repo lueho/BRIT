@@ -444,9 +444,14 @@ class BreadcrumbNestedSourcesDomainTests(TestCase):
 
     def test_collection_create_form_renders_nested_parent_crumb(self):
         """Create forms under a nested source-domain parent expose the full path."""
+        from django.contrib.auth.models import Permission
+
         from utils.object_management.models import User
 
         staff = User.objects.create(username="phase5_staff", is_staff=True)
+        # The create view requires the model's add capability; the staff
+        # flag alone grants nothing.
+        staff.user_permissions.add(Permission.objects.get(codename="add_collection"))
         self.client.force_login(staff)
 
         response = self.client.get(reverse("collection-create"))
@@ -475,13 +480,25 @@ class BreadcrumbNestedSourcesDomainTests(TestCase):
 
     def test_collection_update_form_renders_nested_parent_crumb(self):
         """Update forms expose the full nested path down to the current object."""
+        from django.contrib.auth.models import Permission
+
+        from sources.waste_collection.models import Collection
         from utils.object_management.models import User
 
         staff = User.objects.create(username="phase5_staff_update", is_staff=True)
+        # Published collections are frozen; the update form is only
+        # reachable on an editable private record with the change capability.
+        staff.user_permissions.add(Permission.objects.get(codename="change_collection"))
+        private_collection = Collection.objects.create(
+            name="Phase 5 Private Collection",
+            owner=staff,
+            catchment=self.collection.catchment,
+            publication_status="private",
+        )
         self.client.force_login(staff)
 
         response = self.client.get(
-            reverse("collection-update", kwargs={"pk": self.collection.pk})
+            reverse("collection-update", kwargs={"pk": private_collection.pk})
         )
 
         self.assertEqual(response.status_code, 200)
@@ -502,8 +519,8 @@ class BreadcrumbNestedSourcesDomainTests(TestCase):
         )
         self.assertContains(
             response,
-            f'<a href="{self.collection.detail_url}">'
-            f"{self.collection.get_breadcrumb_object_label()}</a>",
+            f'<a href="{private_collection.detail_url}">'
+            f"{private_collection.get_breadcrumb_object_label()}</a>",
             html=True,
         )
         self.assertContains(
@@ -581,9 +598,25 @@ class SampleDetailV2BreadcrumbHarmonizationTests(TestCase):
     def test_v2_preserves_sample_action_rail(self):
         """The sample-specific action rail (status pill, edit mode action,
         context navigation, actions menu) must remain intact."""
+        from django.contrib.auth.models import Permission
+
+        from materials.models import Sample
+
+        # The edit-mode affordance only renders on an editable sample: a
+        # private record whose owner holds the change capability.
+        self.owner.user_permissions.add(
+            Permission.objects.get(codename="change_sample")
+        )
+        private_sample = Sample.objects.create(
+            name="Phase 3 Private Sample",
+            material=self.material,
+            owner=self.owner,
+            publication_status="private",
+        )
         self.client.force_login(self.owner)
         response = self.client.get(
-            reverse("sample-detail", kwargs={"pk": self.sample.pk}) + "?experience=v2"
+            reverse("sample-detail", kwargs={"pk": private_sample.pk})
+            + "?experience=v2"
         )
 
         self.assertEqual(response.status_code, 200)

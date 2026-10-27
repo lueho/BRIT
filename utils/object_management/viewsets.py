@@ -18,6 +18,7 @@ from .policy import decide
 from .registry import (
     KIND_OWNED,
     KIND_REVIEWABLE,
+    allows_unattached_create,
     declared_parent_changed,
     model_policy,
     resolve_create_parent,
@@ -70,7 +71,7 @@ def perform_policy_create(view, serializer):
     parent = None
     if policy.parent_path is not None:
         parent = _create_parent(view, serializer, policy)
-        if parent is None:
+        if parent is None and not allows_unattached_create(model):
             raise PermissionDenied("Creation requires a valid parent context.")
     decision = decide(view.request.user, "create", model, parent=parent)
     if not decision.allowed:
@@ -100,6 +101,7 @@ def finalize_policy_create(view, serializer, policy, parent):
             view.request.user, parent, action="edit"
         ) as locked_parent:
             actor = authorize_create(view.request.user, model, parent=locked_parent)
+            view.request.user = actor
             validate_references(actor, validated)
             if is_uco:
                 obj = serializer.save(
@@ -115,6 +117,7 @@ def finalize_policy_create(view, serializer, policy, parent):
             actor = authorize_create(view.request.user, model, parent=parent)
         else:
             actor = _fresh_actor(view.request.user)
+        view.request.user = actor
         validate_references(actor, validated)
         if is_uco:
             obj = serializer.save(
@@ -165,10 +168,9 @@ def perform_policy_update(view, serializer):
         proposed_parent=proposed_parent,
     ) as fresh:
         serializer.instance = fresh
-        validate_references(
-            _fresh_actor(view.request.user),
-            getattr(serializer, "validated_data", None),
-        )
+        actor = _fresh_actor(view.request.user)
+        view.request.user = actor
+        validate_references(actor, getattr(serializer, "validated_data", None))
         serializer.save()
 
 

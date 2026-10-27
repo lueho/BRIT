@@ -14,7 +14,11 @@ from ..models import (
     NutsVintage,
     Region,
 )
-from ..utils import get_nuts_region_cache_key, get_region_cache_key
+from ..utils import (
+    AUTHZ_GEOJSON_CACHE_PREFIX,
+    get_nuts_region_cache_key,
+    get_region_cache_key,
+)
 
 
 class WarmGeojsonCacheCommandTests(TestCase):
@@ -148,7 +152,7 @@ class WarmGeojsonCacheRegionsTests(TestCase):
         ring = [(0, 0)]
         ring += [(i + 1, (i % 2) + 1) for i in range(max(num_vertices - 1, 1))]
         ring.append((0, 0))
-        region = Region(name=name)
+        region = Region(name=name, publication_status="published")
         region.geom = MultiPolygon(Polygon(tuple(ring)))
         region.save()
         return region
@@ -159,7 +163,9 @@ class WarmGeojsonCacheRegionsTests(TestCase):
 
         call_command("warm_geojson_cache", regions=True, regions_limit=10, stdout=out)
 
-        cached = self.geojson_cache.get(get_region_cache_key(region_id=region.id))
+        cached = self.geojson_cache.get(
+            AUTHZ_GEOJSON_CACHE_PREFIX + get_region_cache_key(region_id=region.id)
+        )
         self.assertIsNotNone(cached)
         self.assertEqual(len(cached["features"]), 1)
         self.assertIn("Region cache warmup complete!", out.getvalue())
@@ -172,10 +178,14 @@ class WarmGeojsonCacheRegionsTests(TestCase):
         call_command("warm_geojson_cache", regions=True, regions_limit=1, stdout=out)
 
         self.assertIsNotNone(
-            self.geojson_cache.get(get_region_cache_key(region_id=big.id))
+            self.geojson_cache.get(
+                AUTHZ_GEOJSON_CACHE_PREFIX + get_region_cache_key(region_id=big.id)
+            )
         )
         self.assertIsNone(
-            self.geojson_cache.get(get_region_cache_key(region_id=small.id))
+            self.geojson_cache.get(
+                AUTHZ_GEOJSON_CACHE_PREFIX + get_region_cache_key(region_id=small.id)
+            )
         )
 
 
@@ -193,6 +203,7 @@ class WarmGeojsonCacheNutsTests(TestCase):
             levl_code=0,
             cntr_code="DE",
             version=self.vintage,
+            publication_status="published",
         )
 
     def test_warmed_keys_carry_the_vintage_the_viewset_asks_for(self):
@@ -202,10 +213,14 @@ class WarmGeojsonCacheNutsTests(TestCase):
 
         year = self.vintage.year
         self.assertIsNotNone(
-            self.geojson_cache.get(get_nuts_region_cache_key(level=0, version=year))
+            self.geojson_cache.get(
+                AUTHZ_GEOJSON_CACHE_PREFIX
+                + get_nuts_region_cache_key(level=0, version=year)
+            )
         )
         self.assertIsNotNone(
             self.geojson_cache.get(
-                get_nuts_region_cache_key(nuts_id=self.region.id, version=year)
+                AUTHZ_GEOJSON_CACHE_PREFIX
+                + get_nuts_region_cache_key(nuts_id=self.region.id, version=year)
             )
         )
