@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from unittest.mock import patch
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import signals
@@ -712,6 +712,17 @@ class CollectionStatisticsAccessorsTestCase(TestCase):
         owner = get_default_owner()
         both = self.succ.aggregatedcollectionpropertyvalues_for_display(user=owner)
         self.assertEqual({a.year for a in both}, {2020, 2021})
+
+        # Administrators see both; the bare staff flag grants nothing, so a
+        # real administer_objects grant is required.
+        admin = User.objects.create_user(username="stats-admin")
+        admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
+        admin_both = self.succ.aggregatedcollectionpropertyvalues_for_display(
+            user=admin
+        )
+        self.assertEqual({a.year for a in admin_both}, {2020, 2021})
 
         staff_only = User.objects.create_user("staff-viewer", is_staff=True)
         staff_list = self.succ.aggregatedcollectionpropertyvalues_for_display(

@@ -512,6 +512,10 @@ class WasteFlyerPrivateFilterView(PrivateObjectFilterView):
 
 
 class WasteFlyerCreateView(SourceCreateView):
+    # The policy model must be WasteFlyer: inheriting ``model = Source``
+    # would authorize creates against ``bibliography.add_source`` instead of
+    # the declared ``waste_collection.add_wasteflyer``.
+    model = WasteFlyer
     form_class = WasteFlyerModelForm
     success_url = reverse_lazy("wasteflyer-list")
     permission_required = "waste_collection.add_wasteflyer"

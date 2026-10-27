@@ -1139,6 +1139,8 @@ class CollectionReviewActionApiTestCase(APITestCase):
         cls.owner = User.objects.create_user(username="owner")
         cls.other_owner = User.objects.create_user(username="other-owner")
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
+        # Review actions require the explicit moderation capability; the
+        # staff flag alone grants nothing.
         cls.staff.user_permissions.add(
             Permission.objects.get(
                 codename="can_moderate_collection",
@@ -2075,6 +2077,8 @@ class CollectionMutationApiTestCase(APITestCase):
         )
 
     def test_update_endpoint_denies_non_owner(self):
+        # A private collection is invisible to non-owners: the update
+        # endpoint must not leak its existence with a 403.
         self.client.force_login(self.other_user)
 
         response = self.client.post(

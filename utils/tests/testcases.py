@@ -42,7 +42,10 @@ class ViewWithPermissionsTestCase(UserLoginTestCase):
         cls.member = User.objects.create(username="member")
         cls.staff = User.objects.create(username="staff", is_staff=True)
         cls.staff.user_permissions.add(
-            Permission.objects.get(codename="administer_objects")
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type__app_label="object_management",
+            )
         )
         if cls.member_permissions:
             if isinstance(cls.member_permissions, str):
@@ -57,12 +60,21 @@ class ViewSetWithPermissionsTestCase(ViewWithPermissionsTestCase):
     """
     This TestCase is used for testing ViewSets. It has the same functionality as ViewWithPermissionsTestCase,
     but it uses the APIClient class provided by django rest framework instead of the standard django test client.
+
+    API tests compare object ownership, not capability: ``owner`` and ``staff``
+    receive a copy of ``member``'s declared ``member_permissions`` so the only
+    variable distinguishing the personas is object ownership/role, while
+    ``member`` keeps the declared model capabilities outright. This is per-class
+    fixture sharing, not a global role application.
     """
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
         cls.client = APIClient()
+        member_model_permissions = tuple(cls.member.user_permissions.all())
+        cls.owner.user_permissions.add(*member_model_permissions)
+        cls.staff.user_permissions.add(*member_model_permissions)
 
 
 def comparable_model_dict(instance):
@@ -208,7 +220,10 @@ class AbstractTestCases:
                 delete_perm = Permission.objects.get(codename=f"delete_{model_name}")
                 cls.owner_user.user_permissions.add(change_perm, delete_perm)
 
-                admin_perm = Permission.objects.get(codename="administer_objects")
+                admin_perm = Permission.objects.get(
+                    codename="administer_objects",
+                    content_type__app_label="object_management",
+                )
                 cls.staff_user.user_permissions.add(
                     admin_perm, add_perm, change_perm, delete_perm
                 )

@@ -37,6 +37,20 @@ class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         return cls.model.objects.create(owner=cls.owner_user, **data)
 
     @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        # Timesteps are owned children of their distribution: the private
+        # fixture needs an editable private parent to stay invisible to
+        # non-owners.
+        cls.private_distribution = TemporalDistribution.objects.create(
+            owner=cls.owner_user,
+            name="Private Test Temporal Distribution",
+            publication_status="private",
+        )
+        cls.unpublished_object.distribution = cls.private_distribution
+        cls.unpublished_object.save()
+
+    @classmethod
     def create_related_objects(cls):
         return {
             "distribution": TemporalDistribution.objects.create(
