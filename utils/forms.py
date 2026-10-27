@@ -589,15 +589,19 @@ class SourcesFieldMixin:
             )
 
         if isinstance(sources_field.widget, SourceListWidget):
-            from bibliography.models import Author, Source
+            from django.apps import apps
+
             from utils.object_management.policy import decide
 
+            # Resolve models lazily: utils (L0) must not statically import
+            # bibliography (L1). Source comes from the injected field.
+            author_model = apps.get_model("bibliography", "Author")
             user = getattr(request or getattr(self, "request", None), "user", None)
             sources_field.widget.can_create_source = decide(
-                user, "create", Source
+                user, "create", source_model
             ).allowed
             sources_field.widget.can_create_author = decide(
-                user, "create", Author
+                user, "create", author_model
             ).allowed
 
         # Populate queryset with assigned + submitted sources for validation
