@@ -216,6 +216,11 @@ class ProcessAPIPermissionsTestCase(APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.owner = get_user_model().objects.create_user(username="api_owner")
+        cls.owner.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="processes", codename="change_process"
+            )
+        )
         cls.member = get_user_model().objects.create_user(username="api_member")
         cls.member.user_permissions.add(
             *Permission.objects.filter(
@@ -320,14 +325,35 @@ class ProcessAPIPermissionsTestCase(APITestCase):
         self.private_process.refresh_from_db()
         self.assertEqual(self.private_process.name, "Renamed Private")
 
+    def test_owner_without_change_permission_cannot_patch_private_process(self):
+        owner_without_capability = get_user_model().objects.create_user(
+            username="api_owner_nocap"
+        )
+        capability_process = Process.objects.create(
+            name="NoCap Process", owner=owner_without_capability
+        )
+        owner_without_capability.user_permissions.clear()
+        owner_without_capability.groups.clear()
+        self.client.force_login(owner_without_capability)
+        response = self.client.patch(
+            f"/processes/api/processes/{capability_process.pk}/",
+            {"name": "Hacked"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        capability_process.refresh_from_db()
+        self.assertEqual(capability_process.name, "NoCap Process")
+
     def test_non_owner_cannot_patch_private_process(self):
+        """A private process is invisible to non-owners, so writes surface
+        as 404 rather than a leaking 403."""
         self.client.force_login(self.member)
         response = self.client.patch(
             f"/processes/api/processes/{self.private_process.pk}/",
             {"name": "Hijack"},
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.private_process.refresh_from_db()
         self.assertEqual(self.private_process.name, "Private Process")
 

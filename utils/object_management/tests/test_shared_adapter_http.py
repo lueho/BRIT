@@ -7,6 +7,7 @@ endpoints for a real registered model (``utils.properties.Property``).
 """
 
 import io
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -34,12 +35,28 @@ from maps.models import (
     GeoPolygon,
     Region,
 )
-from materials.models import Material, SampleSeries
+from materials.models import (
+    ComponentMeasurement,
+    Composition,
+    Material,
+    MaterialProperty,
+    MaterialPropertyValue,
+    Sample,
+    SampleSeries,
+)
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
     Collection,
 )
-from utils.object_management.policy import decide, decide_reassign, editable_queryset
+from utils.object_management.policy import (
+    decide,
+    decide_reassign,
+    editable_queryset,
+)
+from utils.object_management.services import (
+    authorize_create,
+    validate_created_parent,
+)
 from utils.properties.models import Property, Unit
 
 from ..models import (
@@ -1072,6 +1089,9 @@ class AuthorizeCreateBoundaryTests(TestCase):
         self.prop = Property.objects.create(
             name="p", owner=self.owner, publication_status="private"
         )
+        self.material = Material.objects.create(
+            name="Boundary material", owner=self.owner
+        )
         self.unit = Unit.objects.create(name="kg", symbol="kg", owner=self.owner)
         self.c1 = Collection.objects.create(
             name="C1", owner=self.owner, publication_status="published"
@@ -1149,9 +1169,83 @@ class AuthorizeCreateBoundaryTests(TestCase):
                     )
                     self.assertFalse(ReviewAction.objects.exists())
 
-    def test_unsaved_parent_denied_direct(self):
-        from utils.object_management.services import authorize_create
+    def test_unattached_create_allowed_for_nullable_fk_parent(self):
+        """MaterialPropertyValue.sample is an optional direct FK: a capable
+        actor may create the row without a resolved parent."""
+        actor = authorize_create(self.owner, MaterialPropertyValue, parent=None)
+        self.assertEqual(actor.username, self.owner.username)
 
+    def test_unattached_create_requires_add_capability(self):
+        """Without the model add capability, an unattached create still fails
+        closed."""
+        no_capability = User.objects.create_user(username="ac-nocap")
+        # New users autojoin the registered group; strip role-derived
+        # permissions so the actor genuinely lacks the add capability.
+        no_capability.groups.clear()
+        no_capability.user_permissions.clear()
+        no_capability = User.objects.get(pk=no_capability.pk)
+        with self.assertRaises(PermissionDenied):
+            authorize_create(no_capability, MaterialPropertyValue, parent=None)
+
+    def test_unattached_create_denied_for_required_parent(self):
+        """Composition.sample and ComponentMeasurement.sample are required
+        direct FKs: a missing parent context stays denied."""
+        for model in (Composition, ComponentMeasurement):
+            with self.subTest(model=model.__name__):
+                with self.assertRaises(PermissionDenied):
+                    authorize_create(self.owner, model, parent=None)
+
+    def test_empty_list_parent_denied(self):
+        """An empty parent list is not an unattached create."""
+        with self.assertRaises(PermissionDenied):
+            authorize_create(self.owner, AggregatedCollectionPropertyValue, parent=[])
+
+    def test_validate_created_parent_denies_attached_row_with_none_context(self):
+        """A persisted row that landed on a real parent while the authorized
+        context was None fails closed."""
+        sample = Sample.objects.create(
+            name="Attached sample",
+            material=self.material,
+            owner=self.owner,
+            standalone=True,
+        )
+        material_property = MaterialProperty.objects.create(
+            name="Boundary property",
+            owner=self.owner,
+            publication_status="published",
+        )
+        value = MaterialPropertyValue.objects.create(
+            sample=sample,
+            property=material_property,
+            unit=self.unit,
+            average=Decimal("10.0"),
+            owner=self.owner,
+        )
+        with self.assertRaises(PermissionDenied):
+            validate_created_parent(value, parent=None)
+
+    def test_validate_created_parent_accepts_unattached_row_without_parent(
+        self,
+    ):
+        """The attached-parent identity check stays green for a genuinely
+        unattached row authorized with parent=None."""
+        material_property = MaterialProperty.objects.create(
+            name="Boundary property 2",
+            owner=self.owner,
+            publication_status="published",
+        )
+        value = MaterialPropertyValue.objects.create(
+            sample=None,
+            property=material_property,
+            unit=self.unit,
+            average=Decimal("10.0"),
+            owner=self.owner,
+        )
+        # authorized parent is None and the persisted row is genuinely
+        # unattached -> no denial
+        validate_created_parent(value, parent=None)
+
+    def test_unsaved_parent_denied_direct(self):
         unsaved = Collection(name="unsaved", owner=self.owner)
         with self.assertRaises(PermissionDenied):
             authorize_create(
@@ -1161,8 +1255,6 @@ class AuthorizeCreateBoundaryTests(TestCase):
             )
 
     def test_wrong_parent_type_denied_direct(self):
-        from utils.object_management.services import authorize_create
-
         with self.assertRaises(PermissionDenied):
             authorize_create(
                 self.owner,
@@ -1611,8 +1703,6 @@ class BoundCreateFreshReferencesTests(TestCase):
         self.assertEqual(self.dataset_b.content_revision, rev_b)
 
     def test_wrong_scalar_parent_denied(self):
-        from utils.object_management.services import authorize_create
-
         with self.assertRaises(PermissionDenied):
             authorize_create(
                 self.owner,
@@ -1668,14 +1758,14 @@ class ForeignKeyCreateAffordanceRenderTests(TestCase):
     ROOT_URLCONF="utils.object_management.tests.test_shared_adapter_http"
 )
 class UnregisteredPlainModelCreateTests(TestCase):
-    """Unregistered non-UCO models keep the plain adapter path: capability
-    via the model's own add permission, no policy boundary involved."""
+    """Unregistered models fail closed through the generic adapter: an
+    ``add`` capability alone does not admit creation outside the registry."""
 
     @classmethod
     def setUpTestData(cls):
         call_command("sync_roles", "--apply", stdout=io.StringIO())
 
-    def test_authorized_plain_create_persists(self):
+    def test_add_capability_does_not_admit_unregistered_model(self):
         user = User.objects.create_user(username="plain-creator")
         user.groups.clear()
         user.user_permissions.add(Permission.objects.get(codename="add_group"))
@@ -1685,8 +1775,8 @@ class UnregisteredPlainModelCreateTests(TestCase):
             {"name": "plain-created"},
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 201)
-        self.assertTrue(Group.objects.filter(name="plain-created").exists())
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Group.objects.filter(name="plain-created").exists())
         self.assertFalse(ReviewAction.objects.exists())
 
     def test_missing_add_capability_denied(self):

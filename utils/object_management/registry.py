@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 
 from django.apps import apps
+from django.core.exceptions import FieldDoesNotExist
+from django.db.models import ForeignKey
 
 KIND_REVIEWABLE = "reviewable"
 KIND_OWNED = "owned"
@@ -254,6 +256,26 @@ def review_target(obj):
     if policy is not None and policy.kind == KIND_GENERATED:
         return generated_source(obj)
     return obj
+
+
+def allows_unattached_create(model):
+    """Whether a registered model may be created without a resolved parent.
+
+    True only for ``KIND_REVIEWABLE`` policies whose ``parent_path`` is a
+    single direct nullable ``ForeignKey``. Owned children, M2M/``__`` paths,
+    required FKs and unresolved fields all fail closed.
+    """
+    policy = model_policy(model)
+    if policy is None or policy.kind != KIND_REVIEWABLE:
+        return False
+    parent_path = policy.parent_path
+    if not parent_path or "__" in parent_path:
+        return False
+    try:
+        field = model._meta.get_field(parent_path)
+    except FieldDoesNotExist:
+        return False
+    return isinstance(field, ForeignKey) and bool(field.null)
 
 
 def root_model(model, parent_path):

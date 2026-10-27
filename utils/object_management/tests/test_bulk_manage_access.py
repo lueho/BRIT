@@ -23,11 +23,22 @@ class BulkManageAccessViewTests(TestCase):
         cls.other = User.objects.create_user(
             username="other",
         )
+        cls.staff = User.objects.create_user(username="staff", is_staff=True)
         cls.admin = User.objects.create_user(
             username="sharing-admin", password="pw", is_staff=True
         )
         cls.admin.user_permissions.add(
-            Permission.objects.get(codename="administer_objects")
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type__app_label="object_management",
+            )
+        )
+        cls.administrator = User.objects.create_user(username="administrator")
+        cls.administrator.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type__app_label="object_management",
+            )
         )
         cls.collection_a = Collection.objects.create(
             name="Collection A",
@@ -115,8 +126,38 @@ class BulkManageAccessViewTests(TestCase):
             self.foreign_collection.editors.filter(pk=self.editor.pk).exists()
         )
 
+    def test_staff_cannot_bulk_manage_foreign_objects(self):
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            self.url,
+            {
+                "bulk_action": "add_editor",
+                "username": self.editor.username,
+                "items": [self._item(self.foreign_collection)],
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            self.foreign_collection.editors.filter(pk=self.editor.pk).exists()
+        )
+
     def test_admin_can_bulk_manage_foreign_objects(self):
         self.client.force_login(self.admin)
+        response = self.client.post(
+            self.url,
+            {
+                "bulk_action": "add_editor",
+                "username": self.editor.username,
+                "items": [self._item(self.foreign_collection)],
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            self.foreign_collection.editors.filter(pk=self.editor.pk).exists()
+        )
+
+    def test_administrator_can_bulk_manage_foreign_objects(self):
+        self.client.force_login(self.administrator)
         response = self.client.post(
             self.url,
             {
