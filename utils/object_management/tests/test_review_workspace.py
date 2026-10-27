@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlsplit
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import call_command
+from django.http import QueryDict
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -22,6 +23,8 @@ from utils.object_management.models import (
     ReviewAction,
 )
 from utils.object_management.policy import reviewable_queryset
+from utils.object_management.review_queue import ReviewItemCollector
+from utils.object_management.services import perform_transition
 from utils.object_management.views import ReviewDashboardView
 from utils.properties.models import Property, Unit
 
@@ -377,7 +380,65 @@ class ReviewQueueScopeTests(ReviewWorkspaceFixture):
         for params in ("", "?scope=declined"):
             response = self._dashboard(params)
             self.assertEqual(response.status_code, 200)
-            self.assertFalse(response.context["view"].has_review_items(), params)
+            self.assertFalse(
+                response.context["view"].collector.has_review_items(), params
+            )
+
+    def test_collector_pending_indicator_ignores_selected_scope(self):
+        """A collector built for ``?scope=declined`` still answers
+        ``has_review_items`` for the pending queue only, while dashboard
+        discovery keeps following the selected scope."""
+        AnalyticalMethod.objects.filter(
+            pk__in=[self.in_review.pk, self.foreign_review.pk]
+        ).delete()
+        collector = ReviewItemCollector(self.moderator, QueryDict("scope=declined"))
+        self.assertIn(AnalyticalMethod, collector.available_models())
+        self.assertFalse(collector.has_review_items())
+        self.assertFalse(ReviewItemCollector(self.moderator).has_review_items())
+
+    def _submit_and_reject(self, name, submitted_on):
+        obj = AnalyticalMethod.objects.create(
+            owner=self.owner, name=name, publication_status="private"
+        )
+        perform_transition(self.owner, obj, "submit")
+        ReviewAction.objects.filter(
+            object_id=obj.pk, content_type=self.ct, action="submitted"
+        ).update(created_at=submitted_on)
+        perform_transition(self.moderator, obj, "reject")
+        obj.refresh_from_db()
+        self.assertEqual(obj.publication_status, "declined")
+        self.assertIsNone(obj.submitted_at)
+        return obj
+
+    def test_declined_scope_dates_use_last_submission(self):
+        """``reject`` clears ``submitted_at``; declined date filters, ordering
+        and the displayed submission time fall back to the last submission
+        event instead of dropping or reordering the record."""
+        now = timezone.now().replace(microsecond=0)
+        older = self._submit_and_reject("RW rejected older", now - timedelta(days=5))
+        newer = self._submit_and_reject("RW rejected newer", now - timedelta(days=1))
+        self.client.force_login(self.moderator)
+        after = (now - timedelta(days=3)).date().isoformat()
+        response = self._dashboard(f"?scope=declined&submitted_after={after}")
+        self.assertEqual(list(response.context["review_items"]), [newer])
+        before = (now - timedelta(days=3)).date().isoformat()
+        response = self._dashboard(f"?scope=declined&submitted_before={before}")
+        self.assertEqual(list(response.context["review_items"]), [older])
+        self.assertContains(response, (now - timedelta(days=5)).strftime("%Y-%m-%d"))
+
+        for ordering, expected in (
+            ("-submitted_at", [newer, older]),
+            ("submitted_at", [older, newer]),
+        ):
+            with self.subTest(ordering=ordering):
+                response = self._dashboard(
+                    f"?scope=declined&search=rejected&ordering={ordering}"
+                )
+                self.assertEqual(list(response.context["review_items"]), expected)
+
+        payload = self._queue(f"?scope=declined&submitted_after={after}").json()
+        self.assertEqual([item["object_id"] for item in payload["results"]], [newer.pk])
+        self.assertIsNotNone(payload["results"][0]["submitted_at"])
 
     def test_dashboard_scope_select_is_rendered(self):
         """The filter form must actually render a ``scope`` select with the

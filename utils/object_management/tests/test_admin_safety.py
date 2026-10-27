@@ -1181,6 +1181,112 @@ class SampleAuthorInlinePolicyTests(TestCase):
         self.sample.refresh_from_db()
         self.assertEqual(self.sample.content_revision, 2)
 
+    def _hidden_author_link(self):
+        return SampleAuthor.objects.create(
+            sample=self.sample,
+            author=self.foreign_private_author,
+            position=1,
+        )
+
+    def test_unchanged_hidden_author_link_does_not_block_parent_edit(self):
+        link = self._hidden_author_link()
+        response = self.client.post(
+            self.change_url,
+            self._sample_post(
+                [
+                    {
+                        "id": link.pk,
+                        "author": self.foreign_private_author.pk,
+                        "position": "1",
+                    }
+                ],
+                name="Renamed",
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.name, "Renamed")
+        link.refresh_from_db()
+        self.assertEqual(link.author_id, self.foreign_private_author.pk)
+
+    def test_hidden_author_link_position_update_allowed(self):
+        link = self._hidden_author_link()
+        response = self.client.post(
+            self.change_url,
+            self._sample_post(
+                [
+                    {
+                        "id": link.pk,
+                        "author": self.foreign_private_author.pk,
+                        "position": "4",
+                    }
+                ]
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        link.refresh_from_db()
+        self.assertEqual(link.author_id, self.foreign_private_author.pk)
+        self.assertEqual(link.position, 4)
+
+    def test_hidden_author_link_can_be_replaced_by_readable_author(self):
+        link = self._hidden_author_link()
+        response = self.client.post(
+            self.change_url,
+            self._sample_post(
+                [{"id": link.pk, "author": self.public_author.pk, "position": "1"}]
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        link.refresh_from_db()
+        self.assertEqual(link.author_id, self.public_author.pk)
+
+    def test_hidden_author_link_cannot_be_swapped_for_other_hidden_author(self):
+        link = self._hidden_author_link()
+        other_hidden = Author.objects.create(
+            owner=self.other,
+            first_names="Other",
+            last_names="Hidden",
+            publication_status="private",
+        )
+        response = self.client.post(
+            self.change_url,
+            self._sample_post(
+                [{"id": link.pk, "author": other_hidden.pk, "position": "1"}],
+                name="Forged name",
+            ),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(0, self._inline_author_errors(response))
+        link.refresh_from_db()
+        self.assertEqual(link.author_id, self.foreign_private_author.pk)
+        self._assert_sample_untouched()
+
+    def test_hidden_author_link_renders_masked_and_is_not_offered_elsewhere(self):
+        self._hidden_author_link()
+        response = self.client.get(self.change_url)
+        self.assertEqual(response.status_code, 200)
+        formset = response.context["inline_admin_formsets"][0].formset
+        field = formset.initial_forms[0].fields["author"]
+        pks = set(field.queryset.values_list("pk", flat=True))
+        self.assertIn(self.foreign_private_author.pk, pks)
+        self.assertIn(self.public_author.pk, pks)
+        self.assertEqual(
+            field.label_from_instance(self.foreign_private_author),
+            "Restricted author",
+        )
+        self.assertNotEqual(
+            field.label_from_instance(self.public_author), "Restricted author"
+        )
+        self.assertContains(
+            response,
+            f'<option value="{self.foreign_private_author.pk}" selected>'
+            "Restricted author</option>",
+            html=True,
+        )
+        for form in formset.extra_forms + [formset.empty_form]:
+            pks = set(form.fields["author"].queryset.values_list("pk", flat=True))
+            self.assertNotIn(self.foreign_private_author.pk, pks)
+
     def test_frozen_published_sample_denies_inline_mutation(self):
         self.sample.publication_status = "published"
         self.sample.save()

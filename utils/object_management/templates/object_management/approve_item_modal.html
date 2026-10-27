@@ -11,6 +11,12 @@
     {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
     <input type="hidden" name="expected_revision" value="{{ expected_revision }}">
     <p class="mb-3">{% trans "Are you sure you want to approve this?" %}</p>
+    {% if cascade_author_count %}
+      <div class="alert alert-info mb-3">
+        <i class="fas fa-info-circle"></i>
+        {{ cascade_author_count }} linked author{{ cascade_author_count|pluralize }} will also be published.
+      </div>
+    {% endif %}
     <p class="text-muted small mb-3">{% blocktrans %}Approving revision {{ expected_revision }} exactly as inspected.{% endblocktrans %}</p>
     <div class="mb-3">
       <label for="approve-comment-textarea-{{ object.id }}" class="form-label">{% trans "Review comment (optional)" %}</label>

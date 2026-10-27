@@ -319,6 +319,44 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
                 )
                 self.assertNotContains(response, "process-list-review")
 
+    def test_workspace_subscopes_survive_process_category_navigation(self):
+        self.client.force_login(self.owner)
+        for scope in ("owned", "shared"):
+            with self.subTest(scope=scope):
+                response = self.client.get(
+                    reverse("processes:process-list-owned"), {"scope": scope}
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(
+                    response,
+                    f'href="{reverse("processes:processcategory-list")}?scope={scope}"',
+                )
+                catalogue = self.client.get(
+                    reverse("processes:processcategory-list"), {"scope": scope}
+                )
+                expected = (
+                    f"{reverse('processes:process-list-owned')}"
+                    f"?categories={self.category.pk}&scope={scope}"
+                )
+                self.assertContains(
+                    catalogue, f'href="{expected.replace("&", "&amp;")}"'
+                )
+                self.assertContains(
+                    catalogue, f'<input type="hidden" name="scope" value="{scope}">'
+                )
+
+    def test_anonymous_supplied_workspace_subscope_normalizes_to_published(self):
+        for scope in ("owned", "shared"):
+            with self.subTest(scope=scope):
+                response = self.client.get(
+                    reverse("processes:processcategory-list"), {"scope": scope}
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertNotContains(response, "scope=" + scope)
+                self.assertNotContains(
+                    response, reverse("processes:process-list-owned")
+                )
+
     def test_category_management_lists_without_scope_keep_route_scope(self):
         superuser = User.objects.create_superuser(username="nav-superuser")
         for user, url_name, process_url_name, scope in (

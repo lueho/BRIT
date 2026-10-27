@@ -14,6 +14,15 @@ class BulkManageAccessViewTests(TestCase):
         cls.owner = User.objects.create_user(
             username="owner",
         )
+        cls.editor = User.objects.create_user(
+            username="editor",
+        )
+        cls.new_owner = User.objects.create_user(
+            username="new_owner",
+        )
+        cls.other = User.objects.create_user(
+            username="other",
+        )
         cls.admin = User.objects.create_user(
             username="sharing-admin", password="pw", is_staff=True
         )

@@ -38,7 +38,7 @@
                                 <a href="{% detail_or_review_url object use_back=True %}">{{ object.name|default:object }}</a>
                             </td>
                             <td data-label="Owner">{{ object.owner.username }}</td>
-                            <td data-label="Submitted">{{ object.submitted_at|date:"Y-m-d H:i"|default:"—" }}</td>
+                            <td data-label="Submitted">{{ object.review_submitted_at|default:object.submitted_at|date:"Y-m-d H:i"|default:"—" }}</td>
                             <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
                         </tr>
                     {% endfor %}
