@@ -23,6 +23,9 @@ class SupportingFileDownloadTests:
         cls.staff = user_model.objects.create_user(
             username="download-staff", is_staff=True
         )
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.moderator = user_model.objects.create_user(username="download-moderator")
         cls.moderator.user_permissions.add(
             *Permission.objects.filter(
@@ -152,16 +155,22 @@ class SupportingFileDownloadTests:
     def test_editor_can_download_private_file(self):
         self.assert_access_matches_detail(self.editor, "private", 200)
 
-    def test_staff_can_download_private_file(self):
+    def test_admin_can_download_private_file(self):
+        # The staff persona doubles as administrator through the explicit
+        # administer_objects grant; the staff flag alone would be denied.
         self.assert_access_matches_detail(self.staff, "private", 200)
 
-    def test_moderator_can_download_private_file(self):
-        self.assert_access_matches_detail(self.moderator, "private", 200)
+    def test_moderator_cannot_download_private_file(self):
+        # can_moderate_<model> opens review and declined records only;
+        # unsubmitted private records stay closed to moderators.
+        self.assert_access_matches_detail(self.moderator, "private", 403)
 
     def test_archived_access_matches_actual_detail_for_all_roles(self):
+        # Archived content is public historical data: readable and
+        # downloadable by every actor, including anonymous visitors.
         for user, status in (
-            (None, 302),
-            (self.other, 403),
+            (None, 200),
+            (self.other, 200),
             (self.owner, 200),
             (self.editor, 200),
             (self.staff, 200),
@@ -172,7 +181,12 @@ class SupportingFileDownloadTests:
 
     def test_review_and_declined_access_matches_detail(self):
         for publication_status in ("review", "declined"):
-            for user, status in ((None, 302), (self.other, 403), (self.owner, 200)):
+            for user, status in (
+                (None, 302),
+                (self.other, 403),
+                (self.owner, 200),
+                (self.moderator, 200),
+            ):
                 with self.subTest(publication_status=publication_status, user=user):
                     self.assert_access_matches_detail(user, publication_status, status)
 

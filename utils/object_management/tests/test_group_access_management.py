@@ -20,7 +20,17 @@ class GroupAccessManagementTests(TestCase):
         cls.staff = User.objects.create_user(username="access-staff", is_staff=True)
         cls.admin = User.objects.create_user(username="access-admin", is_staff=True)
         cls.admin.user_permissions.add(
-            Permission.objects.get(codename="administer_objects")
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type__app_label="object_management",
+            )
+        )
+        cls.administrator = User.objects.create_user(username="access-administrator")
+        cls.administrator.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type__app_label="object_management",
+            )
         )
         cls.group = Group.objects.create(name="Workshop editors")
         cls.group.permissions.add(
@@ -75,6 +85,14 @@ class GroupAccessManagementTests(TestCase):
         self.assertTrue(get_object_policy(self.member, self.process)["can_edit"])
         self.assertFalse(get_object_policy(self.member, self.unshared)["can_edit"])
 
+    def test_staff_cannot_grant_group_access(self):
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            self.url("add_editor_group"), {"group": self.group.name}
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(ObjectGroupEditorGrant.for_object(self.process).exists())
+
     def test_admin_can_grant_group_access(self):
         self.client.force_login(self.admin)
         response = self.client.post(
@@ -83,6 +101,17 @@ class GroupAccessManagementTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             ObjectGroupEditorGrant.for_object(self.process).get().granted_by, self.admin
+        )
+
+    def test_administrator_can_grant_group_access(self):
+        self.client.force_login(self.administrator)
+        response = self.client.post(
+            self.url("add_editor_group"), {"group": self.group.name}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            ObjectGroupEditorGrant.for_object(self.process).get().granted_by,
+            self.administrator,
         )
 
     def test_group_grants_do_not_change_membership_or_model_permissions(self):
@@ -96,7 +125,7 @@ class GroupAccessManagementTests(TestCase):
 
     def test_repeated_add_does_not_duplicate_grant_or_replace_actor(self):
         self.client.post(self.url("add_editor_group"), {"group": self.group.name})
-        self.client.force_login(self.staff)
+        self.client.force_login(self.administrator)
         self.client.post(self.url("add_editor_group"), {"group": self.group.name})
         grants = ObjectGroupEditorGrant.for_object(self.process)
         self.assertEqual(grants.count(), 1)
@@ -204,9 +233,31 @@ class GroupAccessManagementTests(TestCase):
         self.assertFalse(get_object_policy(self.member, self.process)["can_edit"])
         self.assertTrue(self.group.user_set.filter(pk=self.member.pk).exists())
 
+    def test_staff_cannot_revoke_group_access(self):
+        self.grant()
+        self.client.force_login(self.staff)
+        self.assertEqual(
+            self.client.post(
+                self.url("remove_editor_group"), {"group": self.group.name}
+            ).status_code,
+            403,
+        )
+        self.assertTrue(ObjectGroupEditorGrant.for_object(self.process).exists())
+
     def test_admin_can_revoke_group_access(self):
         self.grant()
         self.client.force_login(self.admin)
+        self.assertEqual(
+            self.client.post(
+                self.url("remove_editor_group"), {"group": self.group.name}
+            ).status_code,
+            302,
+        )
+        self.assertFalse(ObjectGroupEditorGrant.for_object(self.process).exists())
+
+    def test_administrator_can_revoke_group_access(self):
+        self.grant()
+        self.client.force_login(self.administrator)
         self.assertEqual(
             self.client.post(
                 self.url("remove_editor_group"), {"group": self.group.name}
