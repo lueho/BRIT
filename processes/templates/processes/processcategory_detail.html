@@ -4,9 +4,10 @@
 {% block title %}
     BRIT | Process Category: {{ object.name }}
 {% endblock title %}
-{% block detail_nav %}
+{% block detail_header_primary_actions %}
     {% process_discovery_nav "categories" %}
-{% endblock detail_nav %}
+    {{ block.super }}
+{% endblock detail_header_primary_actions %}
 {% block detail_body %}
     <dl class="row">
         <dt class="col-sm-3">Name</dt>
