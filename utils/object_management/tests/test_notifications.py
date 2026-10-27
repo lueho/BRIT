@@ -612,14 +612,31 @@ class ReviewNotificationOptOutTests(ReviewNotificationTestBase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(ReviewNotificationMute.objects.filter(user=self.owner).exists())
 
-    def test_staff_can_mute_own_subscription(self):
+    def test_staff_cannot_mute_own_subscription(self):
         staff = User.objects.create_user(
             username="staffer", email="staffer@example.com", is_staff=True
         )
         self.client.force_login(staff)
         response = self.client.post(self._mute_url())
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(ReviewNotificationMute.objects.filter(user=staff).exists())
+
+    def test_administrator_can_mute_own_subscription(self):
+        administrator = User.objects.create_user(
+            username="administrator", email="administrator@example.com"
+        )
+        administrator.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type__app_label="object_management",
+            )
+        )
+        self.client.force_login(administrator)
+        response = self.client.post(self._mute_url())
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(ReviewNotificationMute.objects.filter(user=staff).exists())
+        self.assertTrue(
+            ReviewNotificationMute.objects.filter(user=administrator).exists()
+        )
 
     def test_moderator_can_mute_own_subscription(self):
         self.client.force_login(self.moderator)

@@ -38,6 +38,7 @@ from .registry import (
     KIND_OWNED,
     KIND_REVIEWABLE,
     OWNED_CHILDREN,
+    allows_unattached_create,
     generated_profile,
     generated_source,
     model_policy,
@@ -135,23 +136,32 @@ def authorize_create(actor, model, *, parent=None):
         raise PermissionDenied("unsupported_model")
     actor = _fresh_actor(actor)
     if policy.parent_path is not None:
-        try:
-            members = (parent,) if isinstance(parent, Model) else tuple(parent or ())
-        except TypeError:
-            raise PermissionDenied("invalid_parent") from None
-        if not members:
-            raise PermissionDenied("Creation requires a valid parent context.")
-        expected = root_model(model, policy.parent_path)
-        fresh = []
-        for candidate in members:
-            pk = getattr(candidate, "pk", None)
-            if expected is None or not isinstance(candidate, expected) or pk is None:
-                raise PermissionDenied("invalid_parent")
-            row = type(candidate)._base_manager.filter(pk=pk).first()
-            if row is None:
-                raise PermissionDenied("invalid_parent")
-            fresh.append(row)
-        parent = fresh[0] if isinstance(parent, Model) else tuple(fresh)
+        if parent is None and allows_unattached_create(model):
+            pass  # optional direct-FK parent legitimately omitted
+        else:
+            try:
+                members = (
+                    (parent,) if isinstance(parent, Model) else tuple(parent or ())
+                )
+            except TypeError:
+                raise PermissionDenied("invalid_parent") from None
+            if not members:
+                raise PermissionDenied("Creation requires a valid parent context.")
+            expected = root_model(model, policy.parent_path)
+            fresh = []
+            for candidate in members:
+                pk = getattr(candidate, "pk", None)
+                if (
+                    expected is None
+                    or not isinstance(candidate, expected)
+                    or pk is None
+                ):
+                    raise PermissionDenied("invalid_parent")
+                row = type(candidate)._base_manager.filter(pk=pk).first()
+                if row is None:
+                    raise PermissionDenied("invalid_parent")
+                fresh.append(row)
+            parent = fresh[0] if isinstance(parent, Model) else tuple(fresh)
     decision = decide(actor, "create", model, parent=parent)
     if not decision.allowed:
         raise PermissionDenied(decision.reason)
@@ -211,6 +221,13 @@ def validate_created_parent(obj, *, parent):
     persisted = type(obj)._base_manager.filter(pk=obj.pk).first()
     if persisted is None:
         raise PermissionDenied("invalid_parent")
+    if parent is None:
+        if not allows_unattached_create(type(obj)):
+            raise PermissionDenied("invalid_parent")
+        fk_field = type(obj)._meta.get_field(policy.parent_path)
+        if getattr(persisted, fk_field.attname) is not None:
+            raise PermissionDenied("invalid_parent")
+        return
     actual = {_storage_key(p) for p in resolve_parents(persisted, policy.parent_path)}
     members = (parent,) if isinstance(parent, Model) else tuple(parent)
     expected = {_storage_key(p) for p in members}

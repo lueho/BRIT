@@ -62,6 +62,7 @@ from utils.object_management.review_queue import (
 from utils.object_management.views import (
     BaseReviewActionView,
     ReviewDashboardView,
+    ReviewItemDetailView,
     SubmitForReviewView,
     UserCreatedObjectCreateView,
     UserCreatedObjectCreateWithInlinesView,
@@ -575,6 +576,34 @@ class ReviewDetailAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, f"{settings.LOGIN_URL}?next={url}")
+
+    def test_anonymous_missing_object_is_redirected_to_login(self):
+        """Anonymous requests must redirect even when the object does not
+        exist: authentication is checked before object resolution."""
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={"content_type_id": self.ct_id, "object_id": 999999},
+        )
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"{settings.LOGIN_URL}?next={url}")
+
+    def test_anonymous_does_not_resolve_object(self):
+        """The anonymous path returns the login redirect without touching the
+        database for the target record."""
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={"content_type_id": self.ct_id, "object_id": self.obj_review.id},
+        )
+        with patch.object(
+            ReviewItemDetailView, "get_object", side_effect=AssertionError
+        ) as get_object:
+            response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 302)
+        get_object.assert_not_called()
 
     def test_review_detail_renders_markdown_comments(self):
         """Markdown comments are rendered as HTML in the review panel."""
@@ -2714,15 +2743,23 @@ class ReviewDashboardViewTests(TestCase):
         with (
             patch.object(view, "get_available_models", return_value=[Collection]),
             patch.object(
-                view,
-                "_in_review_queryset_for_model",
+                view.collector,
+                "in_review_queryset_for_model",
                 side_effect=FieldError("boom"),
             ),
-            self.assertLogs("utils.object_management.views", level="WARNING"),
+            self.assertLogs(
+                "utils.object_management.review_queue", level="WARNING"
+            ) as logs,
         ):
             review_items = view.collect_review_items()
 
         self.assertEqual(review_items, [])
+        self.assertTrue(
+            any(
+                "Could not build in-review queryset for Collection: boom" in record
+                for record in logs.output
+            )
+        )
 
     def test_get_filterset_kwargs_uses_sources_collection_fallback_queryset(self):
         request = RequestFactory().get(reverse("object_management:review_dashboard"))
@@ -2735,7 +2772,7 @@ class ReviewDashboardViewTests(TestCase):
         with (
             patch.object(view, "get_available_models", return_value=[]),
             patch.object(
-                view, "_get_fallback_queryset", return_value=fallback_queryset
+                view.collector, "fallback_queryset", return_value=fallback_queryset
             ),
         ):
             kwargs = view.get_filterset_kwargs(view.filterset_class)
@@ -2753,7 +2790,7 @@ class ReviewDashboardViewTests(TestCase):
         with (
             patch.object(view, "get_available_models", return_value=[]),
             patch.object(
-                view, "_get_fallback_queryset", return_value=fallback_queryset
+                view.collector, "fallback_queryset", return_value=fallback_queryset
             ),
         ):
             queryset = view.get_queryset()
