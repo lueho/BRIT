@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from django.db.models import Model, Q
@@ -174,6 +175,8 @@ def object_access_routes(user, obj):
             obj = parent
 
     public_routes = []
+    if policy is not None and policy.kind == KIND_PUBLIC_CATALOGUE:
+        public_routes.append("public catalogue (public read)")
     if getattr(obj, "publication_status", None) == "published":
         public_routes.append("published (public read)")
     if getattr(obj, "publication_status", None) == "archived":
@@ -202,11 +205,11 @@ def object_access_routes(user, obj):
                 routes.append(f"edit grant via group '{name}'")
         except Exception:
             pass
-    if is_moderator(user, type(obj)):
+    if is_moderator(user, type(obj)) and getattr(obj, "publication_status", None) in (
+        _MODERATED_STATES | {_STATUS_PUBLISHED}
+    ):
         routes.append("moderator")
     routes.extend(public_routes)
-    if not routes:
-        routes.append("read access")
     if generated:
         routes.append("generated value (read-only; governed by source evidence)")
     return routes
@@ -412,7 +415,9 @@ def _decide_approve(actor, ctx):
         return base
     obj = ctx.obj
     if actor.pk is None or getattr(obj, "pk", None) is None:
-        return _ALLOWED
+        # Without a stored candidate there is no contributor history to
+        # check, so four-eyes separation cannot be established.
+        return _denied("four_eyes_required")
     from .services import contributor_user_ids
 
     if actor.pk in contributor_user_ids(obj):
@@ -563,7 +568,12 @@ def decide_reassign(user, obj, parent) -> Decision:
         return _denied("authentication_required")
     if getattr(obj, "pk", None) is None:
         return _denied("invalid_parent")
-    parents = (parent,) if isinstance(parent, Model) else tuple(parent)
+    if isinstance(parent, Model):
+        parents = (parent,)
+    elif isinstance(parent, Iterable) and not isinstance(parent, (str, bytes)):
+        parents = tuple(parent)
+    else:
+        return _denied("invalid_parent")
     if not parents:
         return _denied("invalid_parent")
     expected_root = root_model(type(obj), policy.parent_path)
