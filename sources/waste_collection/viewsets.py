@@ -158,6 +158,14 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         return getattr(settings, "COLLECTION_LIST_SLOW_LOG_THRESHOLD_SECONDS", 1.0)
 
     def get_queryset(self):
+        if getattr(self, "action", None) == "geojson" and not (
+            self.request.query_params.get("scope")
+        ):
+            # Match get_cache_key and the warm-up: a scope-free map request is
+            # the published set, never the broader read-visible set.
+            return apply_scope_filter(
+                self.queryset, "published", user=self.request.user
+            )
         if (
             getattr(self, "action", None) == "list"
             and self._extended_list_requested()

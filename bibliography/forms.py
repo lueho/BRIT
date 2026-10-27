@@ -1,4 +1,4 @@
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import NON_FIELD_ERRORS, PermissionDenied, ValidationError
 from django.db import transaction
 from django.forms import BaseInlineFormSet, CharField, DateInput, Textarea
 from django.utils import timezone
@@ -165,8 +165,29 @@ class SourceBibtexArticleImportForm(SimpleForm):
                     "You need permission to create missing authors from BibTeX imports."
                 ) from exc
             raise ValidationError(str(exc)) from exc
+        except ValidationError as exc:
+            raise ValidationError(
+                [
+                    f'Entry "{parsed_entry["title"]}": {message}'
+                    for message in self._flatten_validation_messages(exc)
+                ]
+            ) from exc
         source.update_abbreviation()
         return source
+
+    @staticmethod
+    def _flatten_validation_messages(exc):
+        if not hasattr(exc, "error_dict"):
+            return exc.messages
+        messages = []
+        for field, field_messages in exc.message_dict.items():
+            for message in field_messages:
+                if field == NON_FIELD_ERRORS:
+                    messages.append(message)
+                else:
+                    label = Source._meta.get_field(field).verbose_name
+                    messages.append(f"{label}: {message}")
+        return messages
 
     @staticmethod
     def _parsed_author_is_usable(parsed_author):

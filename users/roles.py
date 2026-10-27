@@ -74,6 +74,19 @@ def role_manifest():
     }
 
 
+def is_privileged_permission(permission):
+    """Moderation and administration grants that only their manifest roles
+    may hold; reconciliation revokes them from every other managed role."""
+    codename = permission.codename
+    if codename.startswith("can_moderate_"):
+        return True
+    admin_app_label = ADMIN_PERMISSION_MODEL.split(".", 1)[0]
+    return (
+        permission.content_type.app_label == admin_app_label
+        and codename == ADMIN_PERMISSION_CODENAME
+    )
+
+
 def resolve_permission(model_label, codename):
     model = apps.get_model(model_label)
     content_type = ContentType.objects.get_for_model(model, for_concrete_model=False)

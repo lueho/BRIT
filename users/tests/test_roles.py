@@ -127,6 +127,41 @@ class SyncRolesTests(TestCase):
         self.assertIn(extra, registered.permissions.all())
         self.assertIn(member, registered.user_set.all())
 
+    def test_apply_revokes_unmanifested_privileged_grants(self):
+        run_sync("--apply")
+        registered = Group.objects.get(name="registered")
+        administer = Permission.objects.get(
+            content_type=ContentType.objects.get_for_model(ReviewAction),
+            codename="administer_objects",
+        )
+        moderate = permission_for(Source, "can_moderate_source")
+        extra = permission_for(SourceAuthor, "view_sourceauthor")
+        registered.permissions.add(administer, moderate, extra)
+        member = User.objects.create_user(username="privileged-member")
+        member.groups.add(registered)
+
+        out = run_sync("--apply")
+
+        registered = Group.objects.get(name="registered")
+        granted = set(registered.permissions.all())
+        self.assertNotIn(administer, granted)
+        self.assertNotIn(moderate, granted)
+        self.assertIn(extra, granted)
+        self.assertIn("registered: revoked 2 privileged permissions", out)
+        member = User.objects.get(pk=member.pk)
+        self.assertFalse(member.has_perm("object_management.administer_objects"))
+        self.assertFalse(member.has_perm("bibliography.can_moderate_source"))
+        self.assertTrue(
+            Group.objects.get(name=ROLE_ADMINISTRATORS)
+            .permissions.filter(pk=administer.pk)
+            .exists()
+        )
+        self.assertTrue(
+            Group.objects.get(name="moderators")
+            .permissions.filter(pk=moderate.pk)
+            .exists()
+        )
+
     def test_check_denies_extraneous_grants_and_preserves_them(self):
         Group.objects.filter(name="moderators").delete()
         run_sync("--apply")

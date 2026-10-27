@@ -38,7 +38,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied
 from django.db import transaction
 from django.db.models import Model, ProtectedError, Q, RestrictedError
-from django.forms.models import construct_instance
+from django.forms.models import ModelMultipleChoiceField, construct_instance
 from django.template.response import TemplateResponse
 
 from .models import ReviewAction, UserCreatedObject
@@ -117,6 +117,56 @@ def _scope_relation_formfield(formfield, db_field, user):
     ):
         formfield.queryset = visible_queryset(user, formfield.queryset)
     return formfield
+
+
+def _admit_unreadable_existing_references(form, user):
+    """Keep an existing inline row's unreadable FK value valid, masked.
+
+    The scoped choice field would otherwise reject the row's own persisted
+    reference and block unrelated parent edits. Only this row admits that
+    value, and its label hides the referenced record.
+    """
+    instance = form.instance
+    if instance is None or instance._state.adding:
+        return
+    for name, field in form.fields.items():
+        queryset = getattr(field, "queryset", None)
+        if queryset is None or isinstance(field, ModelMultipleChoiceField):
+            continue
+        try:
+            model_field = instance._meta.get_field(name)
+        except FieldDoesNotExist:
+            continue
+        if not (model_field.many_to_one or model_field.one_to_one):
+            continue
+        current = getattr(instance, model_field.attname, None)
+        if current is None:
+            continue
+        related = queryset.model
+        if model_policy(related) is None and not issubclass(related, UserCreatedObject):
+            continue
+        key_name = field.to_field_name or "pk"
+        current_rows = related._base_manager.filter(**{key_name: current})
+        if visible_queryset(user, current_rows).exists():
+            continue
+        field.queryset = related._base_manager.filter(
+            Q(pk__in=queryset.values("pk")) | Q(**{key_name: current})
+        ).order_by(*queryset.query.order_by)
+        field.label_from_instance = _masked_label(
+            field.label_from_instance,
+            key_name,
+            str(current),
+            f"Restricted {related._meta.verbose_name}",
+        )
+
+
+def _masked_label(label_from_instance, key_name, hidden_key, masked):
+    def label(obj):
+        if str(getattr(obj, key_name)) == hidden_key:
+            return masked
+        return label_from_instance(obj)
+
+    return label
 
 
 def _metadata_readonly(model, fields, readonly):
@@ -855,6 +905,18 @@ class PolicyOwnedInlineMixin:
         formfield = super().formfield_for_manytomany(db_field, request, **kwargs)
         return _scope_relation_formfield(formfield, db_field, request.user)
 
+    def get_formset(self, request, obj=None, **kwargs):
+        formset_class = super().get_formset(request, obj, **kwargs)
+        user = request.user
+
+        class PolicyOwnedInlineFormSet(formset_class):
+            def _construct_form(self, i, **form_kwargs):
+                form = super()._construct_form(i, **form_kwargs)
+                _admit_unreadable_existing_references(form, user)
+                return form
+
+        return PolicyOwnedInlineFormSet
+
     def authorize_formset(self, request, formset, change):
         """Reauthorize touched inline rows at persistence time.
 
@@ -911,14 +973,27 @@ class PolicyOwnedInlineMixin:
         if self._inline_write_denied(request):
             raise PermissionDenied("administrator_required")
         # References are re-validated only on touched, non-deleted rows —
-        # deleting must not require reading a now-inaccessible reference.
+        # deleting must not require reading a now-inaccessible reference,
+        # and an existing row's unchanged reference is not re-read.
         for bound_form in formset.forms:
+            cleaned_data = getattr(bound_form, "cleaned_data", None)
             if (
-                bound_form not in getattr(formset, "deleted_forms", ())
-                and getattr(bound_form, "cleaned_data", None)
-                and getattr(bound_form, "has_changed", lambda: False)()
+                bound_form in getattr(formset, "deleted_forms", ())
+                or not cleaned_data
+                or not getattr(bound_form, "has_changed", lambda: False)()
             ):
-                validate_references(actor, bound_form.cleaned_data)
+                continue
+            if bound_form.instance._state.adding:
+                validate_references(actor, cleaned_data)
+            else:
+                validate_references(
+                    actor,
+                    {
+                        name: cleaned_data[name]
+                        for name in bound_form.changed_data
+                        if name in cleaned_data
+                    },
+                )
 
 
 class NamedUserCreatedObjectAdmin(admin.ModelAdmin):
