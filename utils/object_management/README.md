@@ -67,7 +67,7 @@ BRIT uses a centralized permission system for `UserCreatedObject` models with au
 
 3. **Idempotent**: Uses `get_or_create()` to safely handle multiple executions without errors.
 
-4. **No group assignment**: The signal never creates groups or assigns permissions. Managed roles (`registered`, `editors`, `librarians`, the moderators group named by `settings.REVIEW_MODERATORS_GROUP_NAME`, and `administrators`) are reconciled from the manifest in `users/roles.py` by `python manage.py sync_roles` (dry-run report), `sync_roles --apply` (add missing grants) or `sync_roles --check` (fail on drift).
+4. **No group assignment**: The signal never creates groups or assigns permissions. Managed roles (`registered`, `editors`, `librarians`, the moderators group named by `settings.REVIEW_MODERATORS_GROUP_NAME`, and `administrators`) are reconciled from the manifest in `users/roles.py` by `python manage.py sync_roles` (dry-run report), `sync_roles --apply` (add missing grants and revoke moderation/administration grants the role's manifest does not require; other extra grants are kept) or `sync_roles --check` (fail on drift).
 
 **Example:**
 

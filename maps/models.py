@@ -11,7 +11,8 @@ from django.contrib.postgres.fields import DateRangeField, RangeOperators
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
-from django.db.models import F, Func, Q
+from django.db.models import F, Func, OuterRef, Q, Subquery, Value
+from django.db.models.functions import Coalesce
 from django.db.models.signals import m2m_changed, post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.urls import NoReverseMatch, reverse
@@ -569,7 +570,35 @@ class GeoreferencedNutsRegion(GeoPolygon, NutsRegion):
     pass
 
 
+class LauRegionQuerySet(UserCreatedObjectQuerySet):
+    def current(self, among=None):
+        """Rows that are the newest-vintage row of their (cntr_code, lau_id).
+
+        The winner per code is picked from ``among`` (default: all LAU
+        regions), so callers can restrict it to rows a user may select.
+        Years rank newest first with NULL (unversioned) last, ties go to the
+        highest pk, and NULL ``cntr_code`` groups with NULL. Rows with NULL
+        ``lau_id`` are always kept.
+        """
+        candidates = LauRegion.objects.all() if among is None else among
+        winner = (
+            candidates.annotate(_cntr_key=Coalesce("cntr_code", Value("")))
+            .filter(
+                lau_id=OuterRef("lau_id"),
+                _cntr_key=Coalesce(OuterRef("cntr_code"), Value("")),
+            )
+            .order_by(F("year").desc(nulls_last=True), "-pk")
+            .values("pk")[:1]
+        )
+        return self.filter(Q(lau_id__isnull=True) | Q(pk=Subquery(winner)))
+
+
+class LauRegionManager(models.Manager.from_queryset(LauRegionQuerySet)):
+    pass
+
+
 class LauRegion(Region):
+    objects = LauRegionManager()
     cntr_code = models.CharField(max_length=2, blank=True, null=True)
     lau_id = models.CharField(max_length=13, blank=True, null=True)
     lau_name = models.CharField(max_length=113, blank=True, null=True)
