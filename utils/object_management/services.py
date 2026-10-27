@@ -16,6 +16,7 @@ Authorization itself is never duplicated here: every boundary delegates to
 from __future__ import annotations
 
 import contextvars
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -24,7 +25,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import router, transaction
+from django.db import DatabaseError, router, transaction
 from django.db.models import ForeignKey, Max, Model, QuerySet
 from django.db.models.deletion import Collector
 from django.forms.models import construct_instance
@@ -69,6 +70,8 @@ _AUDIT_FIELD_NAMES = frozenset(
         "evaluation_status",
     }
 )
+
+logger = logging.getLogger(__name__)
 
 _TRANSITION_METHODS = {
     "submit": ("submit_for_review", ReviewAction.ACTION_SUBMITTED),
@@ -695,13 +698,15 @@ def content_mutation(
             active_roots[primary_key]["deleted_by"] = actor
         if policy.parent_path is not None and target_exists:
             # Parent changes are reassignments: without ``proposed_parent``
-            # the callback may not attach the row to an unauthorized parent.
+            # the callback may not attach the row to an unauthorized parent
+            # or detach it from all of its stored parents.
             allowed_keys = {_storage_key(p) for p in (*stored_parents, *proposed)}
             current = model._base_manager.get(pk=target.pk)
             current_keys = {
                 _storage_key(p) for p in resolve_parents(current, policy.parent_path)
             }
-            if not current_keys <= allowed_keys:
+            detached = bool(stored_parents) and not current_keys
+            if detached or not current_keys <= allowed_keys:
                 raise PermissionDenied(
                     "Changing the parent requires an authorized reassignment."
                 )
@@ -798,8 +803,38 @@ def _validate_comment_watermark(current, expected):
     return watermark
 
 
+_CASCADE_EXCEPTIONS = (AttributeError, TypeError, ValidationError, DatabaseError)
+
+
+def run_review_cascade(obj, action_name, actor, previous_status):
+    """Apply the model's ``cascade_review_action`` to linked records.
+
+    Runs in a savepoint inside the transition transaction so an expected
+    cascade failure is logged and rolled back without undoing the primary
+    transition; unexpected errors propagate and abort the whole transition.
+    """
+    handler = getattr(obj, "cascade_review_action", None)
+    if not callable(handler):
+        return
+    try:
+        with transaction.atomic():
+            handler(
+                action_name=action_name,
+                actor=actor,
+                previous_status=previous_status,
+            )
+    except _CASCADE_EXCEPTIONS as exc:
+        logger.warning("Review action cascade failed for %s: %s", obj, exc)
+
+
 def perform_transition(
-    actor, target, action: str, *, expected_revision=None, comment: str = ""
+    actor,
+    target,
+    action: str,
+    *,
+    expected_revision=None,
+    comment: str = "",
+    cascade: bool = False,
 ):
     """Apply a named review transition under the root lock.
 
@@ -826,6 +861,7 @@ def perform_transition(
         decision = decide(actor, action, fresh)
         if not decision.allowed:
             raise PermissionDenied(decision.reason)
+        previous_status = fresh.publication_status
         bound_revision = _validate_expected_revision(
             fresh.content_revision, expected_revision, required=action == "approve"
         )
@@ -836,6 +872,8 @@ def perform_transition(
             transition(user=actor)
         else:
             transition()
+        if cascade:
+            run_review_cascade(fresh, method_name, actor, previous_status)
         if review_action is not None:
             _record_event(
                 fresh,

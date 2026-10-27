@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from django.db.models import Model, Q
@@ -152,6 +153,23 @@ def is_owner(user, obj):
     )
 
 
+def governance_object(obj):
+    """Return the record whose owner governs access to ``obj``.
+
+    Generated projections resolve to their validated source evidence and
+    owned children to their registered parent. ``None`` marks a generated
+    row whose source is missing or invalid.
+    """
+    policy = record_policy(obj)
+    if policy is not None and policy.kind == KIND_GENERATED:
+        return generated_source(obj)
+    if policy is not None and policy.kind == KIND_OWNED:
+        parent = resolve_parent(obj, policy.parent_path)
+        if parent is not None:
+            return parent
+    return obj
+
+
 def object_access_routes(user, obj):
     """Describe the actor's own access routes to ``obj``.
 
@@ -162,19 +180,15 @@ def object_access_routes(user, obj):
     """
     policy = record_policy(obj)
     generated = policy is not None and policy.kind == KIND_GENERATED
-    if generated:
-        source = generated_source(obj)
-        if source is None:
-            # Invalid provenance: copied owner/status metadata is not
-            # governance and every actor is denied — report no access route.
-            return ["generated value (read-only; invalid source)"]
-        obj = source
-    elif policy is not None and policy.kind == KIND_OWNED:
-        parent = resolve_parent(obj, policy.parent_path)
-        if parent is not None:
-            obj = parent
+    obj = governance_object(obj)
+    if obj is None:
+        # Invalid provenance: copied owner/status metadata is not
+        # governance and every actor is denied — report no access route.
+        return ["generated value (read-only; invalid source)"]
 
     public_routes = []
+    if policy is not None and policy.kind == KIND_PUBLIC_CATALOGUE:
+        public_routes.append("public catalogue (public read)")
     if getattr(obj, "publication_status", None) == "published":
         public_routes.append("published (public read)")
     if getattr(obj, "publication_status", None) == "archived":
@@ -203,11 +217,11 @@ def object_access_routes(user, obj):
                 routes.append(f"edit grant via group '{name}'")
         except Exception:
             pass
-    if is_moderator(user, type(obj)):
+    if is_moderator(user, type(obj)) and getattr(obj, "publication_status", None) in (
+        _MODERATED_STATES | {_STATUS_PUBLISHED}
+    ):
         routes.append("moderator")
     routes.extend(public_routes)
-    if not routes:
-        routes.append("read access")
     if generated:
         routes.append("generated value (read-only; governed by source evidence)")
     return routes
@@ -413,7 +427,9 @@ def _decide_approve(actor, ctx):
         return base
     obj = ctx.obj
     if actor.pk is None or getattr(obj, "pk", None) is None:
-        return _ALLOWED
+        # Without a stored candidate there is no contributor history to
+        # check, so four-eyes separation cannot be established.
+        return _denied("four_eyes_required")
     from .services import contributor_user_ids
 
     if actor.pk in contributor_user_ids(obj):
@@ -564,7 +580,12 @@ def decide_reassign(user, obj, parent) -> Decision:
         return _denied("authentication_required")
     if getattr(obj, "pk", None) is None:
         return _denied("invalid_parent")
-    parents = (parent,) if isinstance(parent, Model) else tuple(parent)
+    if isinstance(parent, Model):
+        parents = (parent,)
+    elif isinstance(parent, Iterable) and not isinstance(parent, (str, bytes)):
+        parents = tuple(parent)
+    else:
+        return _denied("invalid_parent")
     if not parents:
         return _denied("invalid_parent")
     expected_root = root_model(type(obj), policy.parent_path)

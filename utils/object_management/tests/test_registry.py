@@ -27,7 +27,13 @@ from sources.waste_collection.models import CollectionCatchment
 
 from .. import checks
 from ..models import ObjectEditorGrant, UserCreatedObject
-from ..policy import decide, scope_queryset, visible_queryset
+from ..policy import (
+    decide,
+    decide_reassign,
+    object_access_routes,
+    scope_queryset,
+    visible_queryset,
+)
 from ..registry import (
     KIND_OWNED,
     KIND_REVIEWABLE,
@@ -296,6 +302,21 @@ class MultiHopOwnedChildTests(TestCase):
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, "invalid_parent")
 
+    def test_reassign_to_missing_or_unsupported_parent_is_denied(self):
+        for parent in (None, 42, "timestepset", []):
+            with self.subTest(parent=parent):
+                decision = decide_reassign(self.owner, self.share, parent)
+                self.assertFalse(decision.allowed)
+                self.assertEqual(decision.reason, "invalid_parent")
+
+    def test_reassign_accepts_queryset_parent_selection(self):
+        self.owner.user_permissions.add(
+            model_permission(Greenhouse, "change_greenhouse")
+        )
+        owner = User.objects.get(pk=self.owner.pk)
+        parents = Greenhouse.objects.filter(pk=self.greenhouse.pk)
+        self.assertEqual(decide_reassign(owner, self.share, parents).reason, "allowed")
+
     def test_multi_hop_queryset_visibility_and_scopes(self):
         shares = GrowthShare.objects.filter(pk=self.share.pk)
         self.assertEqual(list(visible_queryset(self.stranger, shares)), [])
@@ -327,6 +348,15 @@ class PublicCataloguePolicyTests(TestCase):
             ),
             [self.row.pk],
         )
+
+    def test_public_reads_report_catalogue_route(self):
+        for user in (self.anonymous, self.contributor):
+            with self.subTest(user=user):
+                self.assertTrue(decide(user, "read", self.row).allowed)
+                self.assertEqual(
+                    object_access_routes(user, self.row),
+                    ["public catalogue (public read)"],
+                )
 
     def test_staff_without_model_permission_is_denied(self):
         self.assertEqual(

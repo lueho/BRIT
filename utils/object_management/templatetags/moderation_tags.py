@@ -13,10 +13,10 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 from utils.object_management.policy import (
     decide,
+    governance_object,
     is_active_actor,
     object_access_routes,
 )
-from utils.object_management.registry import review_target
 
 register = template.Library()
 
@@ -630,5 +630,5 @@ def workspace_access(context, obj):
     user = getattr(request, "user", None)
     if not is_active_actor(user) or not decide(user, "read", obj).allowed:
         return {}
-    root = review_target(obj) or obj
+    root = governance_object(obj) or obj
     return {"owner": root.owner, "routes": object_access_routes(user, obj)}

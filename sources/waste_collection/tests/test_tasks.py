@@ -157,7 +157,7 @@ class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["features_count"], 3)
         self.assertTrue(
-            result["cache_key"].startswith("collection_geojson:key:json:v2:")
+            result["cache_key"].startswith("authz-v1:collection_geojson:key:json:v2:")
         )
         mock_collection.objects.filter.assert_called_once_with(
             publication_status="published"

@@ -18,7 +18,8 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldDoesNotExist, FieldError
-from django.db.models import CharField, Q, QuerySet, Value
+from django.db.models import CharField, F, OuterRef, Q, QuerySet, Subquery, Value
+from django.db.models.functions import Coalesce
 from django.http import QueryDict
 
 from .models import ReviewAction, UserCreatedObject
@@ -161,27 +162,53 @@ class ReviewItemCollector:
                 logger.warning("Could not load priority model '%s': %s", model_path, e)
         return models
 
-    def _scoped_queryset_for_model(
-        self, model: type[UserCreatedObject]
-    ) -> QuerySet[UserCreatedObject]:
-        """Return the policy-scoped queryset for the requested review scope.
+    @property
+    def scope(self) -> str:
+        """Return the requested review scope (``review`` by default)."""
+        return self.params.get("scope", "review")
 
-        ``?scope=review`` (default) uses the model's in-review manager; any
-        other scope (``declined``) starts from the full table and lets the
-        policy apply the state filter. Unknown scopes fail closed inside
-        ``reviewable_queryset`` — they never widen the base.
+    def _scoped_queryset_for_model(
+        self, model: type[UserCreatedObject], scope: str | None = None
+    ) -> QuerySet[UserCreatedObject]:
+        """Return the policy-scoped queryset for a review scope.
+
+        ``scope`` defaults to the requested one. ``review`` uses the model's
+        in-review manager; any other scope (``declined``) starts from the full
+        table and lets the policy apply the state filter. Unknown scopes fail
+        closed inside ``reviewable_queryset`` — they never widen the base.
+
+        Rows carry ``review_submitted_at``: the stored ``submitted_at``, or —
+        because ``reject`` clears it — the last submission event for
+        declined rows.
         """
-        scope = self.params.get("scope", "review")
-        base = (
-            self.in_review_queryset_for_model(model)
-            if scope == "review"
-            else model.objects.all()
-        )
+        if scope is None:
+            scope = self.scope
+        if scope == "review":
+            base = self.in_review_queryset_for_model(model).annotate(
+                review_submitted_at=F("submitted_at")
+            )
+        else:
+            last_submission = ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(model),
+                object_id=OuterRef("pk"),
+                action=ReviewAction.ACTION_SUBMITTED,
+            ).order_by("-created_at", "-id")
+            base = model.objects.annotate(
+                review_submitted_at=Coalesce(
+                    "submitted_at", Subquery(last_submission.values("created_at")[:1])
+                )
+            )
         return reviewable_queryset(self.user, base, scope=scope)
 
-    def _has_visible_review_items(self, model: type[UserCreatedObject]) -> bool:
-        """Return whether the model has review items not owned by this user."""
-        return self._scoped_queryset_for_model(model).exclude(owner=self.user).exists()
+    def _has_visible_review_items(
+        self, model: type[UserCreatedObject], scope: str | None = None
+    ) -> bool:
+        """Return whether the model has items in ``scope`` not owned by this user."""
+        return (
+            self._scoped_queryset_for_model(model, scope)
+            .exclude(owner=self.user)
+            .exists()
+        )
 
     def available_models(self) -> list[type[UserCreatedObject]]:
         """Discover all concrete UserCreatedObject subclasses that have items in review.
@@ -240,7 +267,7 @@ class ReviewItemCollector:
             if not can_moderate(model):
                 continue
             try:
-                if self._has_visible_review_items(model):
+                if self._has_visible_review_items(model, scope="review"):
                     return True
             except RECOVERABLE_MODEL_ERRORS as exc:
                 logger.debug(
@@ -346,11 +373,11 @@ class ReviewItemCollector:
 
         submitted_after = self._parse_submitted_date("submitted_after")
         if submitted_after is not None:
-            queryset = queryset.filter(submitted_at__date__gte=submitted_after)
+            queryset = queryset.filter(review_submitted_at__date__gte=submitted_after)
 
         submitted_before = self._parse_submitted_date("submitted_before")
         if submitted_before is not None:
-            queryset = queryset.filter(submitted_at__date__lte=submitted_before)
+            queryset = queryset.filter(review_submitted_at__date__lte=submitted_before)
 
         search = self.params.get("search", "").strip()
         if search:
@@ -421,13 +448,13 @@ class ReviewItemCollector:
             queryset = self._apply_database_review_filters(queryset, model_class)
             querysets[model_class] = queryset
             if not active_filters:
-                queryset = queryset.order_by("-submitted_at", "pk")
+                queryset = queryset.order_by("-review_submitted_at", "pk")
             try:
                 model_class._meta.get_field("name")
                 name = "name"
             except FieldDoesNotExist:
                 name = Value("", output_field=CharField())
-            metadata = queryset.values_list("pk", name, "submitted_at")
+            metadata = queryset.values_list("pk", name, "review_submitted_at")
             if limit_per_model is not None:
                 metadata = metadata[:limit_per_model]
             references.extend(

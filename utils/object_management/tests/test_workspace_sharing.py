@@ -17,7 +17,14 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from bibliography.models import Author, Source, SourceAuthor
-from materials.models import AnalyticalMethod
+from materials.models import (
+    AnalyticalMethod,
+    Composition,
+    Material,
+    MaterialComponentGroup,
+    Sample,
+)
+from sources.waste_collection.models import Collection
 from utils.object_management.models import (
     ObjectEditorGrant,
     ObjectGroupEditorGrant,
@@ -296,6 +303,24 @@ class YourAccessModalTests(SharingFixture):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "edit grant")
         self.assertNotContains(response, "share-team")
+
+    def test_owned_child_names_governing_parent_owner(self):
+        sample = Sample.objects.create(
+            name="Shared sample",
+            owner=self.owner,
+            material=Material.objects.create(name="Shared material", owner=self.owner),
+            publication_status="private",
+        )
+        composition = Composition.objects.create(
+            sample=sample,
+            group=MaterialComponentGroup.objects.create(name="Shared group"),
+            owner=self.other,
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(self.access_url(obj=composition))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<strong>share-owner</strong>", html=False)
+        self.assertNotContains(response, "share-other")
 
     def test_readable_actor_without_edit_sees_explanation(self):
         self.method.publication_status = "published"
@@ -978,6 +1003,20 @@ class ReviewActivityAccessTests(SharingFixture):
         for obj in (self.method, source):
             with self.subTest(model=type(obj)):
                 response = self.client.get(obj.get_absolute_url())
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "Review activity")
+
+    def test_editor_sees_review_activity_on_collection_detail(self):
+        for status in ("review", "declined"):
+            with self.subTest(status=status):
+                collection = Collection.objects.create(
+                    name=f"Shared {status} collection",
+                    owner=self.owner,
+                    publication_status=status,
+                )
+                collection.add_editor(self.recipient, granted_by=self.owner)
+                self.client.force_login(self.recipient)
+                response = self.client.get(collection.get_absolute_url())
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, "Review activity")
 
