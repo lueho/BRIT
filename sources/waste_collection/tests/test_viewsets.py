@@ -206,6 +206,68 @@ class CollectionViewSetTestCase(APITestCase):
         denied = self.client.get(url, {"scope": "private"}, REMOTE_ADDR="10.9.8.1")
         self.assertIn(denied.status_code, (401, 403))
 
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-archived-default",
+            },
+            "geojson": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-archived-data",
+                "TIMEOUT": 86400,
+            },
+        }
+    )
+    def test_scope_free_geojson_excludes_archived_and_shares_published_cache(self):
+        archived = self._create_collection(
+            name="Archived Collection",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_ARCHIVED,
+        )
+        url = reverse("api-waste-collection-geojson")
+
+        def feature_ids(response):
+            if response.streaming:
+                payload = json.loads(b"".join(response.streaming_content))
+            else:
+                payload = response.json()
+            return {feature["properties"]["id"] for feature in payload["features"]}
+
+        default = self.client.get(url, REMOTE_ADDR="10.9.8.3")
+        published = self.client.get(url, {"scope": "published"}, REMOTE_ADDR="10.9.8.3")
+
+        self.assertEqual(default.status_code, 200)
+        self.assertEqual(published.status_code, 200)
+        self.assertNotIn(archived.pk, feature_ids(default))
+        self.assertNotIn(archived.pk, feature_ids(published))
+        self.assertEqual(published["X-Cache-Status"], "HIT")
+
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-warmup-default",
+            },
+            "geojson": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-warmup-data",
+                "TIMEOUT": 86400,
+            },
+        }
+    )
+    def test_anonymous_geojson_reads_warmed_cache(self):
+        from sources.waste_collection.tasks import warm_collection_geojson_cache
+
+        result = warm_collection_geojson_cache.apply().get()
+        self.assertEqual(result["status"], "success")
+
+        response = self.client.get(
+            reverse("api-waste-collection-geojson"), REMOTE_ADDR="10.9.8.4"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Cache-Status"], "HIT")
+
     def test_geojson_endpoint_with_published_scope(self):
         """Should return only published collections for 'published' scope."""
         self.client.force_login(self.regular_user)
@@ -1185,6 +1247,28 @@ class CollectionReviewActionApiTestCase(APITestCase):
         self.assertEqual(cpv_other.approved_by, self.staff)
         self.assertEqual(acpv_review.publication_status, "published")
         self.assertEqual(acpv_review.approved_by, self.staff)
+
+    def test_reject_does_not_decline_independent_property_values(self):
+        collection = self._create_collection(
+            "Collection Reject",
+            owner=self.owner,
+            publication_status="review",
+        )
+        cpv_other = self._create_cpv(collection, self.other_owner, "review")
+        acpv_other = self._create_acpv([collection], self.other_owner, "review")
+
+        self.client.force_login(self.staff)
+        url = reverse("api-waste-collection-reject", kwargs={"pk": collection.pk})
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        collection.refresh_from_db()
+        cpv_other.refresh_from_db()
+        acpv_other.refresh_from_db()
+
+        self.assertEqual(collection.publication_status, "declined")
+        self.assertEqual(cpv_other.publication_status, "review")
+        self.assertEqual(acpv_other.publication_status, "review")
 
 
 class CollectionImporterWorkflowTestCase(APITestCase):

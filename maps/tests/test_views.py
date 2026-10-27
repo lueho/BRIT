@@ -1587,6 +1587,101 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(item["text"], "Test Region 1 (123)")
 
+    def test_only_newest_vintage_row_per_lau_id_in_queryset(self):
+        LauRegion.objects.create(
+            name="Salzgitter 2021",
+            lau_id="03102000",
+            cntr_code="DE",
+            year=2021,
+            publication_status="published",
+        )
+        lau_2025 = LauRegion.objects.create(
+            name="Salzgitter 2025",
+            lau_id="03102000",
+            cntr_code="DE",
+            year=2025,
+            publication_status="published",
+        )
+        response = self.client.get(self.url, data={"q": "Salzgitter"})
+        self.assertEqual(200, response.status_code)
+        ids = [r["id"] for r in json.loads(response.content)["results"]]
+        self.assertListEqual([lau_2025.pk], ids)
+
+    def test_unversioned_row_shown_when_no_versioned_twin(self):
+        lau_old = LauRegion.objects.create(
+            name="Old Only",
+            lau_id="999",
+            cntr_code="NL",
+            year=None,
+            publication_status="published",
+        )
+        response = self.client.get(self.url, data={"q": "Old Only"})
+        ids = [r["id"] for r in json.loads(response.content)["results"]]
+        self.assertIn(lau_old.pk, ids)
+
+    def test_versioned_row_without_country_code_in_queryset(self):
+        lau = LauRegion.objects.create(
+            name="No Country",
+            lau_id="777",
+            cntr_code=None,
+            year=2025,
+            publication_status="published",
+        )
+        response = self.client.get(self.url, data={"q": "No Country"})
+        ids = [r["id"] for r in json.loads(response.content)["results"]]
+        self.assertListEqual([lau.pk], ids)
+
+    def test_only_newest_vintage_without_country_code_in_queryset(self):
+        LauRegion.objects.create(
+            name="Null Twin 2021",
+            lau_id="778",
+            cntr_code=None,
+            year=2021,
+            publication_status="published",
+        )
+        new = LauRegion.objects.create(
+            name="Null Twin 2025",
+            lau_id="778",
+            cntr_code=None,
+            year=2025,
+            publication_status="published",
+        )
+        response = self.client.get(self.url, data={"q": "Null Twin"})
+        ids = [r["id"] for r in json.loads(response.content)["results"]]
+        self.assertListEqual([new.pk], ids)
+
+    def test_same_year_twins_listed_once(self):
+        for _ in range(2):
+            LauRegion.objects.create(
+                name="Same Year Twin",
+                lau_id="03103000",
+                cntr_code="DE",
+                year=2025,
+                publication_status="published",
+            )
+        response = self.client.get(self.url, data={"q": "Same Year Twin"})
+        ids = [r["id"] for r in json.loads(response.content)["results"]]
+        self.assertEqual(1, len(ids))
+
+    def test_private_newer_vintage_does_not_hide_published_row(self):
+        published = LauRegion.objects.create(
+            name="Hidden Twin 2021",
+            lau_id="03104000",
+            cntr_code="DE",
+            year=2021,
+            publication_status="published",
+        )
+        LauRegion.objects.create(
+            name="Hidden Twin 2025",
+            lau_id="03104000",
+            cntr_code="DE",
+            year=2025,
+            publication_status="private",
+        )
+        response = self.client.get(self.url, data={"q": "Hidden Twin"})
+        ids = [r["id"] for r in json.loads(response.content)["results"]]
+        self.assertListEqual([published.pk], ids)
+
 
 class RegionAutocompleteEnglishNameTestCase(ViewWithPermissionsTestCase):
     url = reverse("region-autocomplete")

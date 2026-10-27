@@ -15,6 +15,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.api import MessageFailure
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import (
+    FieldDoesNotExist,
     FieldError,
     ImproperlyConfigured,
     ObjectDoesNotExist,
@@ -31,6 +32,7 @@ from django.http import (
     HttpResponseBadRequest,
     HttpResponseNotAllowed,
     HttpResponseRedirect,
+    JsonResponse,
 )
 from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string, select_template
@@ -73,6 +75,7 @@ from utils.object_management.policy import (
 from utils.object_management.registry import (
     KIND_OWNED,
     KIND_REVIEWABLE,
+    declared_parent_changed,
     model_policy,
     resolve_create_parent,
     review_target,
@@ -94,6 +97,7 @@ from ..forms import (
     DynamicTableInlineFormSetHelper,
     SourcesFieldMixin,
     UserCreatedObjectFormMixin,
+    workspace_section_formsets,
 )
 from ..views import (
     FilterDefaultsMixin,
@@ -641,6 +645,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
                 policy_action,
                 expected_revision=self._get_expected_revision(request),
                 comment=comment,
+                cascade=True,
             )
 
             # Success message
@@ -780,6 +785,19 @@ class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
         context = super().get_context_data(**kwargs)
         # Pass through 'next' if provided in the opener link; templates will append it to the form action
         context["next_url"] = self.request.GET.get("next")
+        obj = context.get("object")
+        action = getattr(self, "action_attr_name", None)
+        if obj is not None and action and hasattr(obj, "affected_author_count"):
+            try:
+                context["cascade_author_count"] = obj.affected_author_count(action)
+            except (
+                AttributeError,
+                TypeError,
+                FieldDoesNotExist,
+                FieldError,
+                DatabaseError,
+            ):
+                context["cascade_author_count"] = 0
         expected = self._parse_revision_param(self.request.GET.get("expected_revision"))
         context["expected_revision"] = expected
         context["expected_revision_bound"] = expected is not None
@@ -1993,7 +2011,7 @@ def _perform_bound_update(view, form):
     proposed_parent = None
     if (
         policy is not None
-        and policy.kind == KIND_REVIEWABLE
+        and policy.kind in (KIND_REVIEWABLE, KIND_OWNED)
         and policy.parent_path is not None
     ):
         parent_field = policy.parent_path.split("__")[0]
@@ -2003,8 +2021,7 @@ def _perform_bound_update(view, form):
             )
             if new_parent is None:
                 raise ValidationError("invalid_parent")
-            old_pk = getattr(obj, f"{parent_field}_id", None)
-            if old_pk is None or getattr(new_parent, "pk", None) != old_pk:
+            if declared_parent_changed(obj, policy.parent_path, new_parent):
                 proposed_parent = new_parent
     with content_mutation(
         view.request.user, obj, action="edit", proposed_parent=proposed_parent
@@ -2792,6 +2809,121 @@ class UserCreatedObjectModalDeleteView(
 
         # Fallback to public list without scope
         return self.model.public_list_url()
+
+
+class WorkspaceSectionUpdateMixin:
+    """Shared section-editing flow for workspace update views.
+
+    Subclasses define ``section_registry``, ``section_formset_class``,
+    ``object_label``, and the section form/summary templates. They may also
+    extend ``get_section_summary_context`` and ``get_section_saved_payload``
+    for resource-specific summary data and JSON fields.
+    """
+
+    section_registry = None
+    section_formset_class = None
+    object_label = "object"
+    section_form_template = None
+    section_summary_template = None
+    default_section = "overview"
+
+    def dispatch(self, request, *args, **kwargs):
+        key = request.GET.get("section", self.default_section)
+        if key not in self.section_registry:
+            raise Http404(f"Unknown {self.object_label} section.")
+        self.section = {**self.section_registry[key], "key": key}
+        self.inlines = None
+        with transaction.atomic():
+            return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return (
+            queryset.select_for_update() if self.request.method == "POST" else queryset
+        )
+
+    def get_form_kwargs(self):
+        return {
+            **super().get_form_kwargs(),
+            "request": self.request,
+            "fields": self.section.get("fields", ()),
+        }
+
+    def get_inlines(self):
+        if self.inlines is None:
+            self.inlines = workspace_section_formsets(
+                self.object,
+                self.section,
+                self.request,
+                formset_class=self.section_formset_class,
+            )
+        return self.inlines
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "section": self.section,
+                "section_url": f"{self.object.update_url}?section={self.section['key']}",
+                "workspace_url": self.get_success_url(),
+                "cancel_url": self.get_success_url(),
+                "object_label": self.object_label,
+                "form_title": self.section["label"],
+                "submit_button_text": "Save section",
+                "inlines": self.get_inlines(),
+            }
+        )
+        return context
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(
+                {
+                    "section": self.section["key"],
+                    "saved": False,
+                    "html": render_to_string(
+                        self.section_form_template,
+                        context,
+                        request=self.request,
+                    ),
+                },
+                status=422 if self.request.method == "POST" else 200,
+            )
+        return super().render_to_response(context, **response_kwargs)
+
+    def form_valid(self, form):
+        validity = [inline.is_valid() for inline in self.get_inlines()]
+        if not all(validity):
+            return self.form_invalid(form)
+        self.object = form.save()
+        for inline in self.get_inlines():
+            inline.save()
+        message = "Saved privately." if self.object.is_private else "Changes saved."
+        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(self.get_section_saved_payload(message))
+        messages.success(self.request, message)
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_section_saved_payload(self, message):
+        """AJAX success payload for a saved section."""
+        return {
+            "section": self.section["key"],
+            "saved": True,
+            "title": self.object.name,
+            "message": message,
+            "html": render_to_string(
+                self.section_summary_template,
+                self.get_section_summary_context(),
+                request=self.request,
+            ),
+        }
+
+    def get_section_summary_context(self):
+        """Template context for the refreshed section summary."""
+        return {"object": self.object, "section": self.section}
+
+    def get_success_url(self):
+        return f"{self.object.get_absolute_url()}?mode=edit"
 
 
 class OwnedObjectModelSelectOptionsView(ModelSelectOptionsView):
