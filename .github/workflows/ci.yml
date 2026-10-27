@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, docs/auth-policy-contract, 'refactor/auth-*']
+  workflow_dispatch:
 
 env:
   UV_CACHE_DIR: /tmp/uv-cache
