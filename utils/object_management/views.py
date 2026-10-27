@@ -69,6 +69,7 @@ from utils.object_management.permissions import (
 )
 from utils.object_management.policy import (
     decide,
+    editable_queryset,
     is_active_actor,
     visible_queryset,
 )
@@ -79,6 +80,7 @@ from utils.object_management.registry import (
     model_policy,
     resolve_create_parent,
     review_target,
+    root_model,
 )
 from utils.object_management.review_hooks import get_breadcrumb_module
 from utils.object_management.services import (
@@ -1985,7 +1987,14 @@ class PolicyPermissionRequiredMixin(PermissionRequiredMixin):
             return super().has_permission()
         parent = self.get_policy_parent()
         if policy.kind == KIND_OWNED and parent is None:
-            return is_active_actor(self.request.user)
+            if not is_active_actor(self.request.user):
+                return False
+            root = root_model(model, policy.parent_path)
+            if root is None:
+                return False
+            return editable_queryset(
+                self.request.user, root._base_manager.all()
+            ).exists()
         return decide(
             self.request.user,
             self.policy_action,

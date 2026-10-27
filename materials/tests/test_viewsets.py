@@ -42,6 +42,18 @@ from ..serializers import (
 JSON = "application/json"
 
 
+def _make_editor(username, *codenames):
+    """Create a user holding only the given direct materials permissions."""
+    user = User.objects.create_user(username=username)
+    user.user_permissions.add(
+        *Permission.objects.filter(
+            content_type__app_label="materials", codename__in=codenames
+        )
+    )
+    user.groups.clear()
+    return user
+
+
 class MaterialViewSetTestCase(ViewSetWithPermissionsTestCase):
     member_permissions = (
         "view_material",
@@ -1014,7 +1026,114 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
             ).exists()
         )
 
+    def test_post_http_201_for_editor_with_edit_grant_on_private_sample(self):
+        """Owned children resolve through parent edit: an editor with a
+        direct grant and ``change_sample`` may add compositions without
+        owning the sample or holding ``add_composition``."""
+        editor = _make_editor(
+            "composition-editor", "change_sample", "change_composition"
+        )
+        self.private_parent_sample.add_editor(editor, granted_by=self.owner)
+        extra_group = MaterialComponentGroup.objects.create(
+            name="Editor Composition Group", publication_status="published"
+        )
+        self.client.force_login(editor)
+
+        response = self.client.post(
+            reverse("api-composition-list"),
+            data=json.dumps(
+                {"sample": self.private_parent_sample.pk, "group": extra_group.pk}
+            ),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(
+            Composition.objects.filter(
+                sample=self.private_parent_sample,
+                group=extra_group,
+                owner=editor,
+            ).exists()
+        )
+
+    def test_post_http_403_for_sample_owner_without_change_sample(self):
+        """Ownership and add capability alone are not enough: the actor must
+        still be able to edit the parent sample."""
+        no_change_owner = _make_editor(
+            "no-change-owner", "add_composition", "change_composition"
+        )
+        sample = Sample.objects.create(
+            material=self.material,
+            name="No-change owner's sample",
+            owner=no_change_owner,
+            standalone=True,
+            publication_status="private",
+        )
+        extra_group = MaterialComponentGroup.objects.create(
+            name="No-change Group", publication_status="published"
+        )
+        self.client.force_login(no_change_owner)
+
+        response = self.client.post(
+            reverse("api-composition-list"),
+            data=json.dumps({"sample": sample.pk, "group": extra_group.pk}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Composition.objects.filter(sample=sample, group=extra_group).exists()
+        )
+
     # --- update ---
+
+    def test_patch_http_200_for_editor_reparenting_between_granted_samples(self):
+        """Reparenting an owned child re-checks both parents: an editor with
+        grants on the source and target samples may move a composition."""
+        editor = _make_editor("reparent-editor", "change_sample", "change_composition")
+        target_sample = Sample.objects.create(
+            material=self.material,
+            name="Reparent Target Sample",
+            owner=self.owner,
+            standalone=True,
+            publication_status="private",
+        )
+        self.private_parent_sample.add_editor(editor, granted_by=self.owner)
+        target_sample.add_editor(editor, granted_by=self.owner)
+        self.client.force_login(editor)
+
+        response = self.client.patch(
+            reverse(
+                "api-composition-detail",
+                kwargs={"pk": self.private_composition.pk},
+            ),
+            data=json.dumps({"sample": target_sample.pk}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.private_composition.refresh_from_db()
+        self.assertEqual(self.private_composition.sample, target_sample)
+
+    def test_patch_http_403_for_editor_reparenting_to_ungranted_sample(self):
+        editor = _make_editor(
+            "reparent-denied-editor", "change_sample", "change_composition"
+        )
+        self.private_parent_sample.add_editor(editor, granted_by=self.owner)
+        self.client.force_login(editor)
+
+        response = self.client.patch(
+            reverse(
+                "api-composition-detail",
+                kwargs={"pk": self.private_composition.pk},
+            ),
+            data=json.dumps({"sample": self.member_sample.pk}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.private_composition.refresh_from_db()
+        self.assertEqual(self.private_composition.sample, self.private_parent_sample)
 
     def test_patch_http_403_when_owner_targets_another_users_sample(self):
         self.client.force_login(self.owner)
@@ -1246,6 +1365,72 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
                 component=self.component,
                 average=Decimal("5.0"),
                 owner=self.member,
+            ).exists()
+        )
+
+    def test_post_http_403_for_editor_without_add_permission(self):
+        """Independent evidence needs its own add capability: a parent edit
+        grant alone must not let an editor attach measurements."""
+        editor = _make_editor(
+            "cm-editor-no-add", "change_sample", "change_componentmeasurement"
+        )
+        self.member_sample.add_editor(editor, granted_by=self.member)
+        self.client.force_login(editor)
+
+        response = self.client.post(
+            reverse("api-componentmeasurement-list"),
+            data=json.dumps(
+                {
+                    "sample": self.member_sample.pk,
+                    "group": self.group.pk,
+                    "component": self.component.pk,
+                    "unit": self.unit.pk,
+                    "average": "7.5",
+                }
+            ),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            ComponentMeasurement.objects.filter(
+                sample=self.member_sample, owner=editor
+            ).exists()
+        )
+
+    def test_post_http_201_for_editor_with_add_permission_and_grant(self):
+        """With both the add capability and a parent edit grant, an editor
+        may attach independent evidence to a sample they do not own."""
+        editor = _make_editor(
+            "cm-editor",
+            "change_sample",
+            "add_componentmeasurement",
+            "change_componentmeasurement",
+        )
+        self.member_sample.add_editor(editor, granted_by=self.member)
+        self.client.force_login(editor)
+
+        response = self.client.post(
+            reverse("api-componentmeasurement-list"),
+            data=json.dumps(
+                {
+                    "sample": self.member_sample.pk,
+                    "group": self.group.pk,
+                    "component": self.component.pk,
+                    "unit": self.unit.pk,
+                    "average": "7.5",
+                }
+            ),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(
+            ComponentMeasurement.objects.filter(
+                sample=self.member_sample,
+                component=self.component,
+                average=Decimal("7.5"),
+                owner=editor,
             ).exists()
         )
 
