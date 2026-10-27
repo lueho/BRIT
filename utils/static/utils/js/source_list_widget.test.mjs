@@ -167,3 +167,49 @@ test("deleteQuickCreatedSource sends the author cleanup token", async () => {
         author_cleanup_token: "signed-token",
     });
 });
+
+async function loadAuthorOptions(authorDataset) {
+    let config = null;
+    const sandbox = {
+        console,
+        document: {
+            addEventListener() {},
+            querySelectorAll() {
+                return [];
+            },
+        },
+        fetch: async () => ({ json: async () => ({ results: [{ id: 3, label: "Hopper, Grace" }] }) }),
+        TomSelect: function (_element, options) {
+            config = options;
+        },
+    };
+    vm.runInNewContext(source, sandbox);
+    const authorInput = {
+        dataset: authorDataset,
+        getAttribute() {
+            return null;
+        },
+    };
+    sandbox.initAuthorTomSelect(authorInput);
+    return plain(await new Promise((resolve) => config.load("Grace Hopper", resolve)));
+}
+
+test("initAuthorTomSelect offers pending author options when author creation is allowed", async () => {
+    const options = await loadAuthorOptions({
+        authorAutocompleteUrl: "/authors/autocomplete/",
+        authorQuickCreateUrl: "/authors/quick-create/",
+    });
+
+    assert.deepEqual(
+        options.map((option) => Boolean(option.pending)),
+        [false, true, true]
+    );
+});
+
+test("initAuthorTomSelect only offers existing authors without author creation", async () => {
+    const options = await loadAuthorOptions({
+        authorAutocompleteUrl: "/authors/autocomplete/",
+    });
+
+    assert.deepEqual(options, [{ id: 3, label: "Hopper, Grace" }]);
+});

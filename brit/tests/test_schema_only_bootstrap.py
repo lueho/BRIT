@@ -19,7 +19,6 @@ from django.test import SimpleTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 
 import utils.object_management.models as object_management_models
-import utils.object_management.signals as object_management_signals
 
 BASELINES = {
     "properties": "0001_squashed_0010",
@@ -536,11 +535,6 @@ class ControlledDatabaseBootstrapBase(SimpleTestCase):
             mock.patch.dict(object_management_models._default_owner_pk_cache)
         )
         object_management_models._default_owner_pk_cache.clear()
-        stack.enter_context(
-            mock.patch.object(
-                object_management_signals, "_moderation_permissions_loaded", set()
-            )
-        )
         ContentType.objects.clear_cache()
         stack.callback(ContentType.objects.clear_cache)
         return stack

@@ -18,6 +18,8 @@ from utils.object_management.permissions import user_is_moderator_for_model
 from .models import Process
 
 PROCESS_SCOPES = ("published", "private", "review")
+WORKSPACE_SUBSCOPES = ("owned", "shared")
+_DISCOVERY_SCOPES = PROCESS_SCOPES + WORKSPACE_SUBSCOPES
 
 PRESERVED_FILTER_PARAMS = (
     "name",
@@ -34,6 +36,8 @@ _SCOPE_LIST_ROUTES = {
     "published": "processes:process-list",
     "private": "processes:process-list-owned",
     "review": "processes:process-list-review",
+    "owned": "processes:process-list-owned",
+    "shared": "processes:process-list-owned",
 }
 
 _RETURN_CONTEXT_ROUTES = frozenset(
@@ -152,7 +156,9 @@ def _normalized_scope(scope, user):
     published context and only process moderators keep ``review``."""
     if scope == "review" and not user_is_moderator_for_model(user, Process):
         return "published"
-    if scope == "private" and not (user and user.is_authenticated):
+    if scope in ("private", *WORKSPACE_SUBSCOPES) and not (
+        user and user.is_authenticated
+    ):
         return "published"
     return scope
 
@@ -181,8 +187,8 @@ def discovery_context(request):
 
     filters = _filtered_query(request.GET)
     scope = request.GET.get("scope")
-    explicit = scope in PROCESS_SCOPES or bool(filters)
-    if scope not in PROCESS_SCOPES:
+    explicit = scope in _DISCOVERY_SCOPES or bool(filters)
+    if scope not in _DISCOVERY_SCOPES:
         scope = None
 
     if scope is None or not filters:
@@ -193,7 +199,7 @@ def discovery_context(request):
                 filters = _filtered_query(return_params)
             if scope is None:
                 scope = return_params.get("scope")
-                if scope not in PROCESS_SCOPES:
+                if scope not in _DISCOVERY_SCOPES:
                     scope = _ROUTE_SCOPES.get(route)
 
     if scope is None:

@@ -277,7 +277,8 @@ async function createSourceFromInput(title, quickCreateUrl, feedbackElement, met
 /**
  * Initialize author TomSelect for optional source metadata input.
  *
- * The dropdown always offers explicit "Create person" / "Create organization"
+ * When the input advertises author creation (``data-author-quick-create-url``),
+ * the dropdown also offers explicit "Create person" / "Create organization"
  * options for the typed name.  Selecting one adds a pending chip — the author
  * record is only created server-side when the source itself is saved.
  */
@@ -291,6 +292,8 @@ function initAuthorTomSelect(authorInput) {
     if (!authorAutocompleteUrl) {
         return null;
     }
+
+    const canCreateAuthor = Boolean(authorInput.dataset.authorQuickCreateUrl);
 
     if (authorInput.tomselect) {
         authorInput.tomselect.destroy();
@@ -306,7 +309,7 @@ function initAuthorTomSelect(authorInput) {
         create: false,
         persist: false,
         load: function (query, callback) {
-            const createOptions = buildAuthorCreateOptions(query);
+            const createOptions = canCreateAuthor ? buildAuthorCreateOptions(query) : [];
             const url = authorAutocompleteUrl + '?q=' + encodeURIComponent(query);
             fetch(url)
                 .then(response => response.json())

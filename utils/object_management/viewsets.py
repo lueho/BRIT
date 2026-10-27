@@ -18,10 +18,9 @@ from .policy import decide
 from .registry import (
     KIND_OWNED,
     KIND_REVIEWABLE,
+    declared_parent_changed,
     model_policy,
     resolve_create_parent,
-    resolve_parent,
-    resolve_parents,
 )
 from .services import (
     StaleRevisionError,
@@ -148,7 +147,7 @@ def perform_policy_update(view, serializer):
     proposed_parent = None
     if (
         policy is not None
-        and policy.kind == KIND_REVIEWABLE
+        and policy.kind in (KIND_REVIEWABLE, KIND_OWNED)
         and policy.parent_path is not None
     ):
         parent_field = policy.parent_path.split("__")[0]
@@ -157,17 +156,8 @@ def perform_policy_update(view, serializer):
             new_parent = resolve_create_parent(policy, validated_data=validated)
             if new_parent is None:
                 raise ValidationError("invalid_parent")
-            if isinstance(new_parent, (list, tuple)):
-                new_keys = sorted(getattr(p, "pk", None) for p in new_parent)
-                old_keys = sorted(
-                    p.pk for p in resolve_parents(instance, policy.parent_path)
-                )
-                if new_keys != old_keys:
-                    proposed_parent = new_parent
-            else:
-                old_parent = resolve_parent(instance, policy.parent_path)
-                if getattr(new_parent, "pk", None) != getattr(old_parent, "pk", None):
-                    proposed_parent = new_parent
+            if declared_parent_changed(instance, policy.parent_path, new_parent):
+                proposed_parent = new_parent
     with content_mutation(
         view.request.user,
         instance,
@@ -273,6 +263,7 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
                 policy_action,
                 expected_revision=self._get_expected_revision(request),
                 comment=self._get_comment(request),
+                cascade=True,
             )
         except StaleRevisionError as e:
             return Response(
