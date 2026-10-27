@@ -10,7 +10,8 @@ published-visible rows.
 from unittest.mock import Mock
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AnonymousUser, Group
+from django.contrib.auth.models import AnonymousUser, Group, Permission
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.core.cache import caches
 from django.test import TestCase
@@ -18,13 +19,14 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from rest_framework.test import APIRequestFactory
 
-from maps.models import GeoPolygon, Region
+from maps.models import Catchment, GeoPolygon, Location, NutsRegion, NutsVintage, Region
 from maps.utils import (
     AUTHZ_GEOJSON_CACHE_PREFIX,
     get_catchment_cache_key,
     get_region_cache_key,
 )
 from maps.viewsets import RegionViewSet
+from utils.object_management.models import ReviewAction
 
 User = get_user_model()
 
@@ -294,3 +296,281 @@ class GeoJsonCacheKeyFactoryTests(TestCase):
         catch = get_catchment_cache_key(9, {"id": "9", "scope": "private"})
         self.assertTrue(catch.startswith("catchment_geojson:id:9"))
         self.assertNotEqual(catch, "catchment_geojson:id:9")
+
+
+class MapOrdinaryApiAuthzTests(TestCase):
+    """Ordinary (non-geojson) map viewsets follow the shared UCO read/write
+    policy: private rows are invisible to strangers and anonymous actors,
+    readable to owners and grantees, and writes stay governed."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="map-owner")
+        cls.stranger = User.objects.create_user(username="map-stranger")
+        cls.staff = User.objects.create_user(username="map-staff", is_staff=True)
+        cls.public_region = Region.objects.create(
+            name="Public",
+            country="DE",
+            owner=cls.owner,
+            publication_status="published",
+            borders=_polygon(0),
+        )
+        cls.private_region = Region.objects.create(
+            name="Private",
+            country="DE",
+            owner=cls.owner,
+            publication_status="private",
+            borders=_polygon(10),
+        )
+        cls.public_catchment = Catchment.objects.create(
+            name="Public catchment",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.private_catchment = Catchment.objects.create(
+            name="Private catchment",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.public_location = Location.objects.create(
+            name="Public loc", owner=cls.owner, publication_status="published"
+        )
+        cls.private_location = Location.objects.create(
+            name="Private loc", owner=cls.owner, publication_status="private"
+        )
+        cls.vintage = NutsVintage.default()
+        cls.public_nuts = NutsRegion.objects.create(
+            name="DE public",
+            nuts_id="DEPU",
+            levl_code=1,
+            cntr_code="DE",
+            version=cls.vintage,
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.private_nuts = NutsRegion.objects.create(
+            name="DE private",
+            nuts_id="DEPR",
+            levl_code=1,
+            cntr_code="DE",
+            version=cls.vintage,
+            owner=cls.owner,
+            publication_status="private",
+        )
+
+    def _grant(self, obj, user):
+        obj.add_editor(user, granted_by=self.owner)
+
+    def test_region_list_scopes_to_readable_rows(self):
+        url = reverse("api-region-list")
+        anonymous = self.client.get(url)
+        self.assertEqual(anonymous.status_code, 200)
+        ids = {row["id"] for row in anonymous.json()}
+        self.assertIn(self.public_region.pk, ids)
+        self.assertNotIn(self.private_region.pk, ids)
+
+        self.client.force_login(self.stranger)
+        ids = {row["id"] for row in self.client.get(url).json()}
+        self.assertNotIn(self.private_region.pk, ids)
+
+        self._grant(self.private_region, self.stranger)
+        ids = {row["id"] for row in self.client.get(url).json()}
+        self.assertIn(self.private_region.pk, ids)
+
+        self.private_region.remove_editor(self.stranger)
+        ids = {row["id"] for row in self.client.get(url).json()}
+        self.assertNotIn(self.private_region.pk, ids)
+
+        self.client.force_login(self.owner)
+        ids = {row["id"] for row in self.client.get(url).json()}
+        self.assertIn(self.private_region.pk, ids)
+
+    def test_region_detail_private_404_for_stranger_200_for_owner(self):
+        url = reverse("api-region-detail", args=[self.private_region.pk])
+        self.client.force_login(self.stranger)
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.client.force_login(self.owner)
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_unknown_scope_is_rejected(self):
+        """RegionFilterSet's ChoiceFilter rejects unknown scope values."""
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("api-region-list") + "?scope=bogus")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("scope", response.json())
+
+    def test_location_catchment_nuts_lists_scoped(self):
+        cases = (
+            ("api-location-list", self.public_location, self.private_location),
+            ("api-catchment-list", self.public_catchment, self.private_catchment),
+            ("api-nuts-region-list", self.public_nuts, self.private_nuts),
+        )
+        for url_name, public_obj, private_obj in cases:
+            with self.subTest(endpoint=url_name):
+                url = reverse(url_name)
+
+                anonymous = self.client.get(url)
+                self.assertEqual(anonymous.status_code, 200)
+                ids = {row["id"] for row in anonymous.json()}
+                self.assertIn(public_obj.pk, ids)
+                self.assertNotIn(private_obj.pk, ids)
+
+                self.client.force_login(self.stranger)
+                ids = {row["id"] for row in self.client.get(url).json()}
+                self.assertNotIn(private_obj.pk, ids)
+
+                private_obj.add_editor(self.stranger, granted_by=self.owner)
+                ids = {row["id"] for row in self.client.get(url).json()}
+                self.assertIn(private_obj.pk, ids)
+
+                private_obj.remove_editor(self.stranger)
+                ids = {row["id"] for row in self.client.get(url).json()}
+                self.assertNotIn(private_obj.pk, ids)
+
+                self.client.force_login(self.owner)
+                ids = {row["id"] for row in self.client.get(url).json()}
+                self.assertIn(private_obj.pk, ids)
+                self.client.logout()
+
+    def test_region_patch_owner_change_capable(self):
+        self.owner.user_permissions.add(
+            Permission.objects.get(
+                codename="change_region", content_type__app_label="maps"
+            )
+        )
+        before = self.private_region.content_revision
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-region-detail", args=[self.private_region.pk]),
+            {"name": "Renamed"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.private_region.refresh_from_db()
+        self.assertEqual(self.private_region.name, "Renamed")
+        self.assertEqual(self.private_region.content_revision, before + 1)
+        self.assertEqual(
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(Region),
+                object_id=self.private_region.pk,
+                action="edited",
+            ).count(),
+            1,
+        )
+
+    def test_region_patch_owner_without_change_capability_denied(self):
+        self.owner.groups.clear()
+        self.owner.user_permissions.clear()
+        owner = User.objects.get(pk=self.owner.pk)
+        self.assertFalse(owner.has_perm("maps.change_region"))
+        before = self.private_region.content_revision
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-region-detail", args=[self.private_region.pk]),
+            {"name": "Forged"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.private_region.refresh_from_db()
+        self.assertEqual(self.private_region.name, "Private")
+        self.assertEqual(self.private_region.content_revision, before)
+        self.assertEqual(
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(Region),
+                object_id=self.private_region.pk,
+                action="edited",
+            ).count(),
+            0,
+        )
+
+    def test_region_patch_denied_without_capability_and_on_published(self):
+        # stranger with no capability -> 404 (invisible row)
+        self.client.force_login(self.stranger)
+        response = self.client.patch(
+            reverse("api-region-detail", args=[self.private_region.pk]),
+            {"name": "Forged"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 404)
+        # staff-only without edit grant/capability -> denied
+        self.client.force_login(self.staff)
+        response = self.client.patch(
+            reverse("api-region-detail", args=[self.private_region.pk]),
+            {"name": "Forged"},
+            content_type="application/json",
+        )
+        self.assertIn(response.status_code, (403, 404))
+        # published rows are frozen even for a capable owner
+        self.owner.user_permissions.add(
+            Permission.objects.get(
+                codename="change_region", content_type__app_label="maps"
+            )
+        )
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-region-detail", args=[self.public_region.pk]),
+            {"name": "Forged"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.public_region.refresh_from_db()
+        self.assertEqual(self.public_region.name, "Public")
+
+    def test_catchment_patch_rejects_inaccessible_region(self):
+        self.owner.user_permissions.add(
+            Permission.objects.get(
+                codename="change_catchment", content_type__app_label="maps"
+            )
+        )
+        hidden_region = Region.objects.create(
+            name="Stranger's",
+            owner=self.stranger,
+            publication_status="private",
+        )
+        before = self.private_catchment.content_revision
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-catchment-detail", args=[self.private_catchment.pk]),
+            {"name": "Renamed", "region": hidden_region.pk},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.private_catchment.refresh_from_db()
+        self.assertEqual(self.private_catchment.name, "Private catchment")
+        self.assertIsNone(self.private_catchment.region)
+        self.assertEqual(self.private_catchment.content_revision, before)
+        self.assertEqual(
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(Catchment),
+                object_id=self.private_catchment.pk,
+                action="edited",
+            ).count(),
+            0,
+        )
+
+    def test_catchment_patch_accepts_readable_region(self):
+        self.owner.user_permissions.add(
+            Permission.objects.get(
+                codename="change_catchment", content_type__app_label="maps"
+            )
+        )
+        before = self.private_catchment.content_revision
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-catchment-detail", args=[self.private_catchment.pk]),
+            {"name": "Renamed", "region": self.public_region.pk},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.private_catchment.refresh_from_db()
+        self.assertEqual(self.private_catchment.name, "Renamed")
+        self.assertEqual(self.private_catchment.region_id, self.public_region.pk)
+        self.assertEqual(self.private_catchment.content_revision, before + 1)
+        self.assertEqual(
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(Catchment),
+                object_id=self.private_catchment.pk,
+                action="edited",
+            ).count(),
+            1,
+        )
