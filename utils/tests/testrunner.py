@@ -11,6 +11,7 @@ from django.apps import AppConfig
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import call_command
+from django.db import connections
 from django.db.models.signals import post_migrate
 from django.dispatch import receiver
 from django.test.runner import (
@@ -191,6 +192,22 @@ class CleanCacheParallelTestSuite(ParallelTestSuite):
     init_worker = _clean_cache_init_worker
 
 
+class FreshConnectionSuite(unittest.TestSuite):
+    """Drop connections the parallel phase may have invalidated.
+
+    Parallel workers are forked while the parent holds open database
+    connections. When a worker exits, its interpreter teardown closes the
+    shared socket (sending a Terminate to the backend), leaving the parent's
+    wrapper with a silently dead connection that reports the next query as
+    "server closed the connection unexpectedly". Closing every connection
+    before the serial suite discards such zombies; the next use reconnects.
+    """
+
+    def run(self, result, debug=False):
+        connections.close_all()
+        return super().run(result, debug=debug)
+
+
 class SerialAwareTestRunner(DiscoverRunner):
     """
     Django test runner with serial test support and initial data loading.
@@ -299,7 +316,7 @@ class SerialAwareTestRunner(DiscoverRunner):
             if requested_parallel > 1:
                 self.parallel = 1
 
-        serial_suite = self.test_suite(serial_tests)
+        serial_suite = FreshConnectionSuite(serial_tests)
 
         if parallel_tests and serial_tests:
             return self.test_suite([parallel_suite, serial_suite])
