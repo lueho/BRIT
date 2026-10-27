@@ -949,7 +949,7 @@ class SourceListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
 
 
 class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ["add_source"]
+    member_permissions = ["add_source", "delete_source"]
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         response = self.client.post(
@@ -1110,8 +1110,8 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.member.user_permissions.add(add_author_permission)
         self.client.force_login(self.member)
 
-        with patch.object(Source.objects, "create") as mock_create:
-            mock_create.side_effect = RuntimeError("simulated failure")
+        with patch.object(Source, "save") as mock_save:
+            mock_save.side_effect = RuntimeError("simulated failure")
             with (
                 self.assertLogs("django.request", level="ERROR"),
                 self.assertRaises(RuntimeError),
