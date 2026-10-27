@@ -151,6 +151,16 @@ class GeoDatasetModelAdmin(admin.ModelAdmin):
     search_fields = ("name", "model_name", "region__name")
     inlines = (GeoDatasetRuntimeConfigurationInline, GeoDatasetColumnPolicyInline)
 
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(super().get_readonly_fields(request, obj))
+        if (
+            obj is not None
+            and "model_name" not in readonly_fields
+            and GeoDatasetSnapshot.objects.filter(dataset_id=obj.pk).exists()
+        ):
+            readonly_fields.append("model_name")
+        return readonly_fields
+
     @admin.display(description="Local relation column review")
     def relation_column_review(self, obj):
         if not obj or not obj.pk:

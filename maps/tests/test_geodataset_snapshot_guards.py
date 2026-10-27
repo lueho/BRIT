@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from bibliography.models import Source
 from maps.admin import (
+    GeoDatasetModelAdmin,
     GeoDatasetRuntimeConfigurationAdmin,
     GeoDatasetRuntimeConfigurationInline,
 )
@@ -242,6 +243,35 @@ class SnapshottedRuntimeConfigurationTestCase(
         self.assertEqual(runtime.relation_name, "repointed_features")
 
 
+class SnapshottedDatasetModelNameTestCase(SnapshottedDatasetFixturesMixin, TestCase):
+    def test_model_name_change_rejected_for_snapshotted_dataset(self):
+        self.assertEqual(self.dataset.get_features_api_basename(), "")
+        self.dataset.model_name = "NutsRegion"
+
+        with self.assertRaises(ValidationError) as ctx:
+            self.dataset.save()
+
+        self.assertIn("model_name", ctx.exception.message_dict)
+        self.dataset.refresh_from_db()
+        self.assertIsNone(self.dataset.model_name)
+        self.assertEqual(self.dataset.get_features_api_basename(), "")
+
+    def test_other_fields_stay_editable_for_snapshotted_dataset(self):
+        self.dataset.name = "Renamed snapshotted"
+        self.dataset.save()
+        self.dataset.refresh_from_db()
+        self.assertEqual(self.dataset.name, "Renamed snapshotted")
+
+    def test_model_name_change_allowed_for_plain_dataset(self):
+        plain = self.create_local_relation_dataset(
+            "Plain model name", relation_name="plain_model_name"
+        )
+        plain.model_name = "NutsRegion"
+        plain.save()
+        plain.refresh_from_db()
+        self.assertEqual(plain.model_name, "NutsRegion")
+
+
 class SnapshotDeletionGuardTestCase(SnapshottedDatasetFixturesMixin, TestCase):
     def test_snapshot_instance_delete_raises_protected_error(self):
         with self.assertRaises(ProtectedError), transaction.atomic():
@@ -398,6 +428,7 @@ class SnapshottedDatasetFormTestCase(SnapshottedDatasetFixturesMixin, TestCase):
             self.assertTrue(
                 form.fields[field_name].disabled, f"{field_name} should be disabled"
             )
+        self.assertTrue(form.fields["model_name"].disabled)
         self.assertFalse(form.fields["label_field"].disabled)
 
     def test_identity_fields_editable_for_plain_dataset(self):
@@ -405,7 +436,7 @@ class SnapshottedDatasetFormTestCase(SnapshottedDatasetFixturesMixin, TestCase):
             "Editable dataset", relation_name="editable_features"
         )
         form = GeoDataSetModelForm(instance=plain)
-        for field_name in ("relation_name", "schema_name"):
+        for field_name in ("relation_name", "schema_name", "model_name"):
             self.assertFalse(form.fields[field_name].disabled)
 
     def test_tampered_post_cannot_repoint_runtime(self):
@@ -413,6 +444,7 @@ class SnapshottedDatasetFormTestCase(SnapshottedDatasetFixturesMixin, TestCase):
             relation_name="hacked_table",
             schema_name="hacked",
             features_api_basename="hacked-api",
+            model_name="NutsRegion",
         )
         form = GeoDataSetModelForm(data=data, instance=self.dataset)
 
@@ -427,6 +459,8 @@ class SnapshottedDatasetFormTestCase(SnapshottedDatasetFixturesMixin, TestCase):
         self.assertEqual(runtime.label_field, "feature_label")
         self.dataset.refresh_from_db()
         self.assertEqual(self.dataset.name, "Renamed dataset")
+        self.assertIsNone(self.dataset.model_name)
+        self.assertEqual(self.dataset.get_features_api_basename(), "")
 
     def test_form_save_guard_failure_rolls_back_dataset_changes(self):
         data = self._post_data(name="Should not persist")
@@ -556,6 +590,22 @@ class SnapshottedRuntimeAdminTestCase(SnapshottedDatasetFixturesMixin, TestCase)
             self.assertIn(field_name, readonly)
         self.assertNotIn("label_field", readonly)
         self.assertFalse(inline.has_delete_permission(self.request, self.dataset))
+
+    def test_dataset_admin_readonly_model_name_for_snapshotted(self):
+        model_admin = GeoDatasetModelAdmin(GeoDataset, self.site)
+        readonly = model_admin.get_readonly_fields(self.request, self.dataset)
+        self.assertIn("model_name", readonly)
+        self.assertIn("relation_column_review", readonly)
+
+    def test_dataset_admin_model_name_editable_for_plain(self):
+        plain = self.create_local_relation_dataset(
+            "Admin plain dataset", relation_name="admin_plain_dataset"
+        )
+        model_admin = GeoDatasetModelAdmin(GeoDataset, self.site)
+        self.assertNotIn(
+            "model_name", model_admin.get_readonly_fields(self.request, plain)
+        )
+        self.assertNotIn("model_name", model_admin.get_readonly_fields(self.request))
 
     def test_inline_stays_editable_and_deletable_for_plain_parent(self):
         plain = self.create_local_relation_dataset(

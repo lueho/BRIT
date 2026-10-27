@@ -171,7 +171,10 @@ class GeoDataSetModelForm(
             and self.instance.pk
             and GeoDatasetSnapshot.objects.filter(dataset_id=self.instance.pk).exists()
         ):
-            for field_name in GeoDatasetRuntimeConfiguration.IDENTITY_FIELDS:
+            for field_name in (
+                "model_name",
+                *GeoDatasetRuntimeConfiguration.IDENTITY_FIELDS,
+            ):
                 if field_name != "dataset" and field_name in self.fields:
                     self.fields[field_name].disabled = True
 

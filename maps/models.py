@@ -983,6 +983,34 @@ class GeoDataset(NamedUserCreatedObject):
         related_name="geodatasets",
     )
 
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if self._state.adding or (
+            update_fields is not None and "model_name" not in update_fields
+        ):
+            return super().save(*args, **kwargs)
+        with transaction.atomic():
+            persisted_model_name = (
+                type(self)
+                .objects.select_for_update()
+                .filter(pk=self.pk)
+                .values_list("model_name", flat=True)
+                .first()
+            )
+            if (
+                persisted_model_name != self.model_name
+                and GeoDatasetSnapshot.objects.filter(dataset_id=self.pk).exists()
+            ):
+                raise ValidationError(
+                    {
+                        "model_name": (
+                            "Model name is fixed once a snapshot is registered; "
+                            "create a new dataset and snapshot instead."
+                        )
+                    }
+                )
+            return super().save(*args, **kwargs)
+
     def get_runtime_configuration(self):
         try:
             return self.runtime_configuration
