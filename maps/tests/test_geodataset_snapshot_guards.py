@@ -256,6 +256,23 @@ class SnapshottedDatasetModelNameTestCase(SnapshottedDatasetFixturesMixin, TestC
         self.assertIsNone(self.dataset.model_name)
         self.assertEqual(self.dataset.get_features_api_basename(), "")
 
+    def test_keyed_fresh_instance_cannot_overwrite_model_name(self):
+        replacement = GeoDataset(
+            pk=self.dataset.pk,
+            name="Imported",
+            region=self.region,
+            model_name="NutsRegion",
+        )
+        self.assertTrue(replacement._state.adding)
+
+        with self.assertRaises(ValidationError) as ctx:
+            replacement.save()
+
+        self.assertIn("model_name", ctx.exception.message_dict)
+        self.dataset.refresh_from_db()
+        self.assertIsNone(self.dataset.model_name)
+        self.assertEqual(self.dataset.name, "Snapshotted dataset")
+
     def test_other_fields_stay_editable_for_snapshotted_dataset(self):
         self.dataset.name = "Renamed snapshotted"
         self.dataset.save()

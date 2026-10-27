@@ -985,7 +985,7 @@ class GeoDataset(NamedUserCreatedObject):
 
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")
-        if self._state.adding or (
+        if self.pk is None or (
             update_fields is not None and "model_name" not in update_fields
         ):
             return super().save(*args, **kwargs)
