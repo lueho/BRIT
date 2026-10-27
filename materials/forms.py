@@ -37,6 +37,7 @@ from utils.forms import (
     image_metadata_section,
 )
 from utils.object_management.permissions import filter_queryset_for_user
+from utils.object_management.policy import editable_queryset
 from utils.properties.forms import NumericMeasurementFieldsFormMixin
 from utils.properties.models import Unit, get_default_unit_pk
 
@@ -542,11 +543,7 @@ class SampleSeriesModalModelForm(ModalModelFormMixin, SampleSeriesModelForm):
 
 
 def _editable_by(queryset, user):
-    if getattr(user, "is_staff", False):
-        return queryset.all()
-    if getattr(user, "is_authenticated", False):
-        return queryset.editable_by_user(user)
-    return queryset.none()
+    return editable_queryset(user, queryset)
 
 
 def _sample_groups_editable_by(user):

@@ -148,7 +148,9 @@ class CollectionAnalysisApiTests(APITestCase):
         ids = {row["id"] for row in response.data["results"]}
         self.assertIn(self.private_collection.pk, ids)
         self.assertNotIn(self.other_user_private_collection.pk, ids)
-        all_visible = self.get_extended({"scope": "all"})
+        # Omitting the scope parameter requests everything the user may
+        # see; "all" is not a canonical scope and filters to nothing.
+        all_visible = self.get_extended()
         self.assertEqual(all_visible.status_code, 200)
         visible_ids = {row["id"] for row in all_visible.data["results"]}
         self.assertIn(self.published_collection.pk, visible_ids)

@@ -2159,6 +2159,12 @@ class ProcessWorkshopJourneyViewsTestCase(TestCase):
         cls.moderator = user_model.objects.create_user(
             username="workshop-moderator", is_staff=True
         )
+        cls.moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="processes",
+                codename="can_moderate_process",
+            )
+        )
         cls.feed_material = Material.objects.create(
             name="Workshop feedstock",
             owner=cls.participant,
@@ -2556,6 +2562,11 @@ class ProcessCategoryModalDeleteRedirectTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        # Deleting a private ProcessCategory requires the model's delete
+        # capability in addition to ownership.
+        cls.owner.user_permissions.add(
+            Permission.objects.get(codename="delete_processcategory")
+        )
         cls.category = ProcessCategory.objects.create(
             name="Doomed Category", owner=cls.owner
         )

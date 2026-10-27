@@ -63,18 +63,18 @@ class ShowcaseViewSetTestCase(TestCase):
         self.assertIn(self.published.pk, ids)
         self.assertIn(self.private.pk, ids)
 
-    def test_retrieve_private_showcase_401_for_anonymous(self):
+    def test_retrieve_private_showcase_404_for_anonymous(self):
         response = self.client.get(
             reverse("api-showcase-detail", args=[self.private.pk])
         )
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_retrieve_private_showcase_403_for_outsider(self):
+    def test_retrieve_private_showcase_404_for_outsider(self):
         self.client.force_login(self.outsider)
         response = self.client.get(
             reverse("api-showcase-detail", args=[self.private.pk])
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_retrieve_private_showcase_200_for_owner(self):
         self.client.force_login(self.owner)
