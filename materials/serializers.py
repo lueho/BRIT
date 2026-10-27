@@ -83,7 +83,12 @@ class VisibleHyperlinkedRelatedField(
 
 
 class NormalizedCompositionsField(Field):
-    """Read-only field rendering a sample's normalized compositions."""
+    """Read-only field rendering a sample's normalized compositions.
+
+    Callers may supply a precomputed result via the
+    ``sample_normalized_compositions`` serializer context key; without it the
+    composition is computed here as usual.
+    """
 
     def __init__(self, **kwargs):
         kwargs["read_only"] = True
@@ -93,7 +98,10 @@ class NormalizedCompositionsField(Field):
         return instance
 
     def to_representation(self, instance):
-        return get_sample_normalized_compositions(instance)
+        compositions = self.context.get("sample_normalized_compositions")
+        if compositions is None:
+            compositions = get_sample_normalized_compositions(instance)
+        return compositions
 
 
 class CompositionModelSerializer(ModelSerializer):
@@ -258,18 +266,21 @@ class SampleModelSerializer(ModelSerializer):
 
     def get_properties(self, obj):
         request = self.context.get("request")
-        queryset = (
-            obj.get_property_values_queryset()
-            .select_related(
-                "property",
-                "basis_component",
-                "analytical_method",
-                "unit",
+        queryset = self.context.get("sample_property_values")
+        if queryset is None:
+            queryset = (
+                obj.get_property_values_queryset()
+                .select_related(
+                    "property",
+                    "basis_component",
+                    "analytical_method",
+                    "unit",
+                )
+                .prefetch_related("sources")
+                .order_by("property__name", "id")
             )
-            .prefetch_related("sources")
-        )
         return MaterialPropertyValueModelSerializer(
-            queryset.order_by("property__name", "id"),
+            queryset,
             many=True,
             context={"request": request},
         ).data
