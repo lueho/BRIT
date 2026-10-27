@@ -17,6 +17,7 @@ from maps.cache_warmup import (
     warm_nuts_geojson_cache,
     warm_region_geojson_cache,
 )
+from maps.models import Region
 from maps.registry import get_source_domain_geojson_cache_warmers
 
 logger = logging.getLogger(__name__)
@@ -123,6 +124,28 @@ def warm_all_geojson_caches(
         logger.exception("Failed to warm base GeoJSON caches: %s", e)
         results["maps"] = {"status": "error", "error": str(e)}
 
+    # Repair persisted static-region assets too: a lost artifact should be
+    # rebuilt by the scheduled pass, not only on worker start or next request.
+    try:
+        if queue_subtasks:
+            queued = warm_static_region_geojson_assets.apply_async()
+            results["static_region_assets"] = {
+                "status": "queued",
+                "task_id": queued.id,
+            }
+        else:
+            eager = warm_static_region_geojson_assets.apply()
+            if eager.successful():
+                results["static_region_assets"] = eager.result
+            else:
+                results["static_region_assets"] = {
+                    "status": "error",
+                    "error": str(eager.result),
+                }
+    except Exception as e:
+        logger.exception("Failed to warm static region GeoJSON assets: %s", e)
+        results["static_region_assets"] = {"status": "error", "error": str(e)}
+
     for slug, warmer in get_source_domain_geojson_cache_warmers():
         try:
             if queue_subtasks:
@@ -139,6 +162,39 @@ def warm_all_geojson_caches(
             results[slug] = {"status": "error", "error": str(e)}
 
     return results
+
+
+@shared_task(bind=True, name="warm_static_region_geojson_assets")
+def warm_static_region_geojson_assets(self):
+    """Ensure persisted GeoJSON assets exist for the nominated static regions.
+
+    Only builds missing assets: existing files are kept untouched, so repeated
+    runs are cheap metadata checks.
+    """
+    from maps.geojson_assets import ensure_static_region_geojson_asset
+
+    names = getattr(settings, "GEOJSON_STATIC_REGION_NAMES", ())
+    ready = 0
+    if names:
+        regions = list(
+            Region.objects.filter(
+                publication_status="published",
+                borders__isnull=False,
+                name__in=names,
+            ).only(
+                "id",
+                "name",
+                "country",
+                "description",
+                "publication_status",
+                "lastmodified_at",
+                "borders",
+            )
+        )
+        for region in regions:
+            if ensure_static_region_geojson_asset(region):
+                ready += 1
+    return {"status": "success", "assets_ready": ready}
 
 
 @worker_ready.connect
@@ -166,6 +222,7 @@ def warm_geojson_caches_on_worker_ready(sender=None, **kwargs):
         warm_all_geojson_caches.apply_async(
             kwargs={"queue_subtasks": True}, countdown=30
         )
+        warm_static_region_geojson_assets.apply_async(countdown=30)
     except Exception:
         geojson_cache.delete(flag_key)
         raise
