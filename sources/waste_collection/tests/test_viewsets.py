@@ -3640,6 +3640,7 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         ensure_test_default_owner()
+        NutsVintage.objects.filter(year=2021).delete()
         cls.vintage = NutsVintage.objects.create(year=2021, is_current=True)
         cls.be1_region = NutsRegion.objects.create(
             name="Brussels",
