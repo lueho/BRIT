@@ -14,7 +14,8 @@ from unittest.mock import patch
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import connection
+from django.db import connection, transaction
+from django.db.models.signals import post_save
 from django.forms.models import inlineformset_factory, modelform_factory
 from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
@@ -30,6 +31,7 @@ from maps.models import (
 )
 from materials.models import (
     AnalyticalMethod,
+    ComponentMeasurement,
     Composition,
     Material,
     MaterialComponent,
@@ -37,7 +39,9 @@ from materials.models import (
     MaterialProperty,
     MaterialPropertyValue,
     Sample,
+    add_default_composition,
 )
+from materials.serializers import ComponentMeasurementWriteSerializer
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
     Collection,
@@ -60,6 +64,7 @@ from ..services import (
     save_evidence_formset_rows,
     validate_reassignment,
 )
+from ..viewsets import UserCreatedObjectViewSet
 
 
 def _perm(model, codename):
@@ -856,6 +861,144 @@ class OwnedChildApprovalRaceTests(TransactionTestCase):
         self.assertEqual(self.source.publication_status, "review")
         self.assertEqual(self.source.content_revision, 2)
         self.assertEqual(self.link.position, 2)
+
+
+class _RaceMeasurementViewSet(UserCreatedObjectViewSet):
+    queryset = ComponentMeasurement.objects.all()
+    serializer_class = ComponentMeasurementWriteSerializer
+
+
+class CreateApprovalRaceTests(TransactionTestCase):
+    """Create-versus-approval TOCTOU boundary on the shared create path.
+
+    A create authorized against an editable parent must re-decide on the
+    locked parent row. The approval thread holds the parent's row lock and
+    waits until the creator thread is actually attempting that lock; it then
+    runs a real ``perform_transition`` approval and commits. The creator's
+    ``select_for_update`` returns the now-published row, the re-run create
+    decision fails closed, and no row or audit side-effect persists.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username="car-owner")
+        self.owner.user_permissions.add(
+            _perm(ComponentMeasurement, "add_componentmeasurement"),
+            _perm(Sample, "change_sample"),
+        )
+        self.moderator = User.objects.create_user(username="car-moderator")
+        self.moderator.user_permissions.add(_perm(Sample, "can_moderate_sample"))
+        self.material = Material.objects.create(
+            name="Race material",
+            owner=self.owner,
+            publication_status="published",
+        )
+        # Sample.approve() refuses while the auto-created default composition
+        # still lacks component measurements; the race fixture needs an
+        # approvable parent, so the composition signal is skipped entirely.
+        post_save.disconnect(add_default_composition, sender=Sample)
+        try:
+            self.sample = Sample.objects.create(
+                name="Race sample",
+                material=self.material,
+                owner=self.owner,
+                standalone=True,
+                publication_status="review",
+            )
+        finally:
+            post_save.connect(add_default_composition, sender=Sample)
+        self.group = MaterialComponentGroup.objects.create(
+            name="Race group",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.component = MaterialComponent.objects.create(
+            name="Race component",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.unit = Unit.objects.create(
+            name="g/kg",
+            symbol="g/kg",
+            owner=self.owner,
+            publication_status="published",
+        )
+
+    def test_concurrent_approval_makes_create_fail_closed(self):
+        approve_locked = threading.Event()
+        create_attempted = threading.Event()
+        results = {}
+        errors = {}
+
+        real_lock = services._lock_instance
+
+        def signaling_lock(obj):
+            create_attempted.set()
+            return real_lock(obj)
+
+        def approver():
+            with transaction.atomic():
+                services._lock_instance(self.sample)
+                approve_locked.set()
+                create_attempted.wait(timeout=10)
+                perform_transition(
+                    self.moderator,
+                    self.sample,
+                    "approve",
+                    expected_revision=self.sample.content_revision,
+                )
+
+        def creator():
+            serializer = ComponentMeasurementWriteSerializer(
+                data={
+                    "sample": self.sample.pk,
+                    "group": self.group.pk,
+                    "component": self.component.pk,
+                    "unit": self.unit.pk,
+                    "average": "10.0",
+                }
+            )
+            if not serializer.is_valid():
+                raise AssertionError(serializer.errors)
+            view = _RaceMeasurementViewSet()
+            view.request = SimpleNamespace(user=self.owner)
+            view.kwargs = {}
+            with patch.object(services, "_lock_instance", side_effect=signaling_lock):
+                view.perform_create(serializer)
+
+        def run(fn, key):
+            import traceback
+
+            try:
+                fn()
+            except PermissionDenied as exc:
+                results[key] = (exc, traceback.format_exc())
+            except Exception as exc:  # pragma: no cover
+                errors[key] = (exc, traceback.format_exc())
+            finally:
+                connection.close()
+
+        t_approve = threading.Thread(target=lambda: run(approver, "approver"))
+        t_approve.start()
+        self.assertTrue(approve_locked.wait(timeout=10))
+
+        t_create = threading.Thread(target=lambda: run(creator, "creator"))
+        t_create.start()
+        t_approve.join(timeout=15)
+        t_create.join(timeout=15)
+
+        self.assertFalse(t_approve.is_alive() or t_create.is_alive())
+        self.assertFalse(errors, errors)
+        denial = results.get("creator")
+        self.assertIsNotNone(denial, "create unexpectedly succeeded")
+        exc, tb = denial
+        self.assertIsInstance(exc, PermissionDenied, tb)
+
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.publication_status, "published")
+        self.assertFalse(ComponentMeasurement.objects.exists())
+        self.assertFalse(
+            ReviewAction.objects.filter(action=ReviewAction.ACTION_CREATED).exists()
+        )
 
 
 class OwnedParentResolutionTests(TestCase):
