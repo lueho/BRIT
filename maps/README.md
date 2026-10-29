@@ -31,6 +31,9 @@ The Maps module is a core component of the Bioresource Inventory Tool (BRIT) tha
 
 ### Data Management
 - **GeoDataset**: Holds metadata about geographic datasets
+- **GeoDatasetSource**: Operator-managed metadata for an external geodata provider (WFS first)
+- **GeoDatasetImportRun**: Provenance record for one import recorded against a source
+- **GeoDatasetSnapshot**: Links a GeoDataset to the successful import run that produced it
 - **RegionProperty**: Defines numeric attributes that can be attached to regions
 - **CategoricalAttribute**: Defines categorical attributes for regions
 - **RegionAttributeValue**: Attaches numeric values to regions
@@ -63,6 +66,10 @@ erDiagram
     Catchment ||--o{ CatchmentRevision : "has_boundary_history"
     CatchmentRevision }o--o{ Region : "composed_of"
     CatchmentRevision }o--o{ CatchmentRevision : "succeeds"
+
+    GeoDatasetSource ||--o{ GeoDatasetImportRun : "produces"
+    GeoDatasetImportRun ||--o| GeoDatasetSnapshot : "recorded_by"
+    GeoDataset ||--o| GeoDatasetSnapshot : "has_external_snapshot"
 ```
 
 ## Versioning catchment boundaries
@@ -176,13 +183,62 @@ Some existing datasets still use model-backed compatibility metadata:
 
 These paths remain for existing Django-model datasets and source-domain maps. New ordinary local table/view onboarding should prefer the `local_relation` runtime path unless custom domain behavior is genuinely required.
 
+### External sources and versioned snapshots
+
+`GeoDatasetSource` is operator-managed metadata about an external provider
+endpoint (WFS first): slug, endpoint URL, feature type, attribution, licence
+URL and a protected link to a `bibliography.Source`. `is_enabled` marks a
+source usable but never schedules anything by itself.
+
+`GeoDatasetImportRun` records one import attempt against a source. On insert
+it captures `source_configuration` — the persisted endpoint, feature type,
+licence, attribution and bibliography link — so later source edits cannot
+rewrite a run's provenance. Runs move `running → succeeded|failed` with
+consistent finish timestamps and error messages, enforced by model validation
+in `save()` and database check constraints. Source link, captured
+configuration, extraction specification and start time are frozen once
+recorded; a finished run is immutable. `extraction_specification` is an
+opaque metadata object, not executable configuration. Freezing is enforced by
+normal model saves and the admin — raw SQL or `QuerySet.update()` bypass it.
+
+`GeoDatasetSnapshot` links an existing `GeoDataset` one-to-one to the
+successful import run that produced it (`dataset.external_snapshot`,
+`run.snapshot`). The dataset must resolve a valid `local_relation` runtime
+configuration; the snapshot does not inspect or create the physical relation.
+Link identity is frozen after creation and `PROTECT` on both sides keeps the
+historical chain intact under ordinary deletes.
+
+Once a snapshot is registered, the dataset's runtime identity fields (dataset
+link, backend type, runtime model name, schema and relation name, geometry
+column, primary-key column, features API basename) cannot be changed or the
+runtime configuration deleted through normal model saves, forms, or the
+admin; `label_field` and column-policy presentation stay editable. Snapshot
+records themselves cannot be removed with ordinary instance or
+`QuerySet.delete()` calls — importing a new relation means registering a new
+`GeoDataset` plus a new snapshot. These guards cover model saves and the
+collector; physical relation immutability and raw SQL or `QuerySet.update()`
+bypasses remain out of scope.
+
+Operator flow:
+
+1. Register the provider as a `GeoDatasetSource` (metadata only).
+2. Record a `GeoDatasetImportRun` and mark it `succeeded` with its finish
+   timestamp once the data exists locally.
+3. Create the `GeoDatasetSnapshot` linking that run to the `local_relation`
+   `GeoDataset` that serves the imported data.
+
+Non-goals for this foundation slice: no fetching, importing or scheduling; no
+raw-data tables or row ingestion; no physical relation immutability; no
+automatic inventory compatibility or dataset publication. Acquisition and
+provider mapping code live outside the registry.
+
 ### Current limits
 
-- Federation, refresh/version metadata, exports, summaries, schema-drift checks, and inventory version pinning are later roadmap phases.
+- Federation, automated refresh and data version pinning, exports, summaries, schema-drift checks, and inventory version pinning are later roadmap phases; physical relation immutability is not part of the source/run/snapshot foundation.
 - The generic runtime does not accept arbitrary SQL or user-defined expressions.
 - A production pilot should still validate the full operator workflow before broad use.
 
 ### Notes for developers
 
-- The authoritative roadmap is `docs/04_design_decisions/2026-04-16_dataset_registry_and_federated_geodata_target_state_plan.md`.
+- The authoritative roadmap is tracked in [issue #85](https://github.com/lueho/BRIT/issues/85); WFS-first external sources and versioned snapshots land there in slices.
 - Keep ingestion, transformation, and harmonization logic outside the generic registry runtime unless the roadmap explicitly moves that boundary.

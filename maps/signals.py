@@ -2,18 +2,23 @@ import logging
 
 from django.conf import settings
 from django.core.cache import caches
-from django.db.models.signals import post_delete, post_save
+from django.db import transaction
+from django.db.models import ProtectedError
+from django.db.models.signals import post_delete, post_save, pre_delete
 from django.dispatch import receiver
 from django.utils import timezone
 
 from .models import (
     Catchment,
+    GeoDatasetRuntimeConfiguration,
+    GeoDatasetSnapshot,
     GeoPolygon,
     LauRegion,
     NutsRegion,
     Region,
     RegionAttributeTextValue,
     RegionAttributeValue,
+    _lock_geodataset_rows,
 )
 
 logger = logging.getLogger(__name__)
@@ -262,3 +267,46 @@ def invalidate_lau_region_cache(sender, instance, **kwargs):
     if hasattr(instance, "nuts_parent") and instance.nuts_parent:
         clear_geojson_cache_pattern(f"nuts_geojson:id:{instance.nuts_parent.id}")
         clear_geojson_cache_pattern(f"nuts_geojson:parent:{instance.nuts_parent.id}:*")
+
+
+@receiver(pre_delete, sender=GeoDatasetSnapshot)
+def protect_geodataset_snapshot(sender, instance, **kwargs):
+    raise ProtectedError(
+        "GeoDatasetSnapshot records cannot be deleted; "
+        "register a new snapshot instead.",
+        {instance},
+    )
+
+
+@receiver(pre_delete, sender=GeoDatasetRuntimeConfiguration)
+def protect_snapshotted_runtime_configuration(sender, instance, using=None, **kwargs):
+    dataset_id = (
+        GeoDatasetRuntimeConfiguration.objects.using(using)
+        .filter(pk=instance.pk)
+        .values_list("dataset_id", flat=True)
+        .first()
+    )
+    if dataset_id is None:
+        return
+    with transaction.atomic(using=using):
+        _lock_geodataset_rows({dataset_id}, using=using)
+        rechecked_dataset_id = (
+            GeoDatasetRuntimeConfiguration.objects.using(using)
+            .filter(pk=instance.pk)
+            .values_list("dataset_id", flat=True)
+            .first()
+        )
+        if rechecked_dataset_id != dataset_id:
+            raise ProtectedError(
+                "Runtime configuration changed during deletion; retry.",
+                {instance},
+            )
+        if (
+            GeoDatasetSnapshot.objects.using(using)
+            .filter(dataset_id=rechecked_dataset_id)
+            .exists()
+        ):
+            raise ProtectedError(
+                "Cannot delete the runtime configuration of a snapshotted dataset.",
+                {instance},
+            )
