@@ -905,8 +905,9 @@ class Collection(NamedUserCreatedObject):
             return ["private", "declined"]
         if action_name == "withdraw_from_review":
             return ["review"]
-        if action_name in ("approve", "reject"):
+        if action_name == "approve":
             return ["review"]
+        # Rejection never cascades: property values are independently reviewed.
         return []
 
     @staticmethod
@@ -969,33 +970,6 @@ class Collection(NamedUserCreatedObject):
                 if predecessor.publication_status != "archived":
                     predecessor.publication_status = "archived"
                     predecessor.save(update_fields=["publication_status"])
-
-    def reject(self):
-        """Reject the collection and cascade to related property values in review."""
-
-        from utils.object_management.models import UserCreatedObject
-
-        review_status = UserCreatedObject.STATUS_REVIEW
-
-        with transaction.atomic():
-            pending_property_values = list(
-                self.collectionpropertyvalue_set.filter(
-                    publication_status=review_status
-                )
-            )
-            pending_aggregated_values = list(
-                self.aggregatedcollectionpropertyvalue_set.filter(
-                    publication_status=review_status
-                ).distinct()
-            )
-
-            super().reject()
-
-            for value in pending_property_values:
-                value.reject()
-
-            for aggregated_value in pending_aggregated_values:
-                aggregated_value.reject()
 
     @classmethod
     def public_map_url(cls):
