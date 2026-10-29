@@ -14,7 +14,6 @@ def ensure_initial_data(stdout=None):
     Permissions are assigned separately by the sync_roles command.
     """
     registered, _ = Group.objects.get_or_create(name="registered")
-    Group.objects.get_or_create(name="analysis_api")
     for name in MANAGED_ROLES:
         Group.objects.get_or_create(name=name)
 
