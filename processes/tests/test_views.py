@@ -2232,14 +2232,14 @@ class ProcessWorkshopJourneyViewsTestCase(TestCase):
             reverse("processes:process-list-owned"), {"scope": "private"}
         )
         self.assertContains(
-            private_response, "<strong>My processes</strong>", html=True
+            private_response, "<strong>Workspace processes</strong>", html=True
         )
 
         published_response = self.client.get(
             reverse("processes:process-list"), {"scope": "published"}
         )
         self.assertContains(published_response, "<strong>Processes</strong>", html=True)
-        self.assertNotContains(published_response, "My processes")
+        self.assertNotContains(published_response, "Workspace processes")
 
         self.client.force_login(self.moderator)
         review_response = self.client.get(
