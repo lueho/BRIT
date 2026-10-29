@@ -251,8 +251,13 @@ class ReviewAPIViewsTests(TestCase):
             "Please clarify the collection frequency.",
         )
 
-    def test_review_context_exposes_collection_update_contract_for_owner_only(self):
-        """Only owners receive programmatic collection update hints in context."""
+    def test_review_context_exposes_collection_update_contract_for_editors(self):
+        """Programmatic update hints follow the central ``edit`` decision.
+
+        The advertised audience matches the endpoint's own authorization:
+        the owner, editors holding a grant, and administrators — never
+        moderators or unrelated readers.
+        """
         url = reverse(
             "object_management:api_review_context",
             kwargs={
@@ -283,6 +288,20 @@ class ReviewAPIViewsTests(TestCase):
                 kwargs={"pk": self.review_collection.pk},
             ),
         )
+
+        editor = User.objects.create_user(username="collection-editor")
+        editor.user_permissions.add(
+            Permission.objects.get(
+                codename="change_collection",
+                content_type=ContentType.objects.get_for_model(Collection),
+            )
+        )
+        self.review_collection.add_editor(editor, granted_by=self.owner)
+        self.client.force_login(editor)
+        editor_response = self.client.get(url)
+        self.assertEqual(editor_response.status_code, 200)
+        editor_context = editor_response.json()["context"]["collection_update"]
+        self.assertTrue(editor_context["available"])
 
         self.client.force_login(self.moderator)
         moderator_response = self.client.get(url)

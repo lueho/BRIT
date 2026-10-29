@@ -845,6 +845,28 @@ class ScenarioDownloadSummaryAuthTests(TestCase):
         cls.scenario = Scenario.objects.create(
             name="S", owner=cls.owner, region=region, catchment=catchment
         )
+        cls.review_scenario = Scenario.objects.create(
+            name="S in review",
+            owner=cls.owner,
+            region=region,
+            catchment=catchment,
+            publication_status=Scenario.STATUS_REVIEW,
+        )
+
+    @staticmethod
+    def _moderator():
+        moderator = User.objects.create_user(username="mod")
+        # get_for_model() is fed from a process-global cache that parallel test
+        # workers inherit from their parent — query the row directly so the
+        # permission is attached to the correct content type.
+        ct = ContentType.objects.get(app_label="inventories", model="scenario")
+        perm, _ = Permission.objects.get_or_create(
+            codename="can_moderate_scenario",
+            content_type=ct,
+            defaults={"name": "Can moderate scenario"},
+        )
+        moderator.user_permissions.add(perm)
+        return moderator
 
     def test_anonymous_is_denied(self):
         url = reverse(
@@ -859,7 +881,7 @@ class ScenarioDownloadSummaryAuthTests(TestCase):
             "scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk}
         )
         response = self.client.get(url)
-        self.assertIn(response.status_code, [302, 403])
+        self.assertIn(response.status_code, [403, 404])
 
     def test_owner_can_download(self):
         self.client.force_login(self.owner)
@@ -869,26 +891,44 @@ class ScenarioDownloadSummaryAuthTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
-    def test_moderator_can_download(self):
-        moderator = User.objects.create_user(
-            username="mod",
-        )
-        # get_for_model() is fed from a process-global cache that parallel test
-        # workers inherit from their parent — query the row directly so the
-        # permission is attached to the correct content type.
-        ct = ContentType.objects.get(app_label="inventories", model="scenario")
-        perm, _ = Permission.objects.get_or_create(
-            codename="can_moderate_scenario",
-            content_type=ct,
-            defaults={"name": "Can moderate scenario"},
-        )
-        moderator.user_permissions.add(perm)
-        self.client.force_login(moderator)
+    def test_editor_with_grant_can_download(self):
+        self.scenario.add_editor(self.other_user, granted_by=self.owner)
+        self.client.force_login(self.other_user)
         url = reverse(
             "scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk}
         )
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
+
+    def test_staff_only_is_denied_on_private_scenario(self):
+        """A bare is_staff flag never widens export access."""
+        staff = User.objects.create_user(username="staff", is_staff=True)
+        self.client.force_login(staff)
+        url = reverse(
+            "scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk}
+        )
+        response = self.client.get(url)
+        self.assertIn(response.status_code, [403, 404])
+
+    def test_moderator_can_download_review_scenario(self):
+        moderator = self._moderator()
+        self.client.force_login(moderator)
+        url = reverse(
+            "scenario-download-summary",
+            kwargs={"scenario_pk": self.review_scenario.pk},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_moderator_is_denied_on_private_scenario(self):
+        """Moderation rights apply to moderated states, not private rows."""
+        moderator = self._moderator()
+        self.client.force_login(moderator)
+        url = reverse(
+            "scenario-download-summary", kwargs={"scenario_pk": self.scenario.pk}
+        )
+        response = self.client.get(url)
+        self.assertIn(response.status_code, [403, 404])
 
 
 class ScenarioDownloadResultSummaryAuthTests(TestCase):
@@ -910,6 +950,28 @@ class ScenarioDownloadResultSummaryAuthTests(TestCase):
         cls.scenario = Scenario.objects.create(
             name="S", owner=cls.owner, region=region, catchment=catchment
         )
+        cls.review_scenario = Scenario.objects.create(
+            name="S in review",
+            owner=cls.owner,
+            region=region,
+            catchment=catchment,
+            publication_status=Scenario.STATUS_REVIEW,
+        )
+
+    @staticmethod
+    def _moderator():
+        moderator = User.objects.create_user(username="mod")
+        # get_for_model() is fed from a process-global cache that parallel test
+        # workers inherit from their parent — query the row directly so the
+        # permission is attached to the correct content type.
+        ct = ContentType.objects.get(app_label="inventories", model="scenario")
+        perm, _ = Permission.objects.get_or_create(
+            codename="can_moderate_scenario",
+            content_type=ct,
+            defaults={"name": "Can moderate scenario"},
+        )
+        moderator.user_permissions.add(perm)
+        return moderator
 
     def test_anonymous_is_denied(self):
         url = reverse(
@@ -926,7 +988,7 @@ class ScenarioDownloadResultSummaryAuthTests(TestCase):
             kwargs={"scenario_pk": self.scenario.pk},
         )
         response = self.client.get(url)
-        self.assertIn(response.status_code, [302, 403])
+        self.assertIn(response.status_code, [403, 404])
 
     def test_owner_can_download(self):
         self.client.force_login(self.owner)
@@ -937,27 +999,47 @@ class ScenarioDownloadResultSummaryAuthTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
-    def test_moderator_can_download(self):
-        moderator = User.objects.create_user(
-            username="mod",
-        )
-        # get_for_model() is fed from a process-global cache that parallel test
-        # workers inherit from their parent — query the row directly so the
-        # permission is attached to the correct content type.
-        ct = ContentType.objects.get(app_label="inventories", model="scenario")
-        perm, _ = Permission.objects.get_or_create(
-            codename="can_moderate_scenario",
-            content_type=ct,
-            defaults={"name": "Can moderate scenario"},
-        )
-        moderator.user_permissions.add(perm)
-        self.client.force_login(moderator)
+    def test_editor_with_grant_can_download(self):
+        self.scenario.add_editor(self.other_user, granted_by=self.owner)
+        self.client.force_login(self.other_user)
         url = reverse(
             "scenario-download-result-summary",
             kwargs={"scenario_pk": self.scenario.pk},
         )
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
+
+    def test_staff_only_is_denied_on_private_scenario(self):
+        """A bare is_staff flag never widens export access."""
+        staff = User.objects.create_user(username="staff", is_staff=True)
+        self.client.force_login(staff)
+        url = reverse(
+            "scenario-download-result-summary",
+            kwargs={"scenario_pk": self.scenario.pk},
+        )
+        response = self.client.get(url)
+        self.assertIn(response.status_code, [403, 404])
+
+    def test_moderator_can_download_review_scenario(self):
+        moderator = self._moderator()
+        self.client.force_login(moderator)
+        url = reverse(
+            "scenario-download-result-summary",
+            kwargs={"scenario_pk": self.review_scenario.pk},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_moderator_is_denied_on_private_scenario(self):
+        """Moderation rights apply to moderated states, not private rows."""
+        moderator = self._moderator()
+        self.client.force_login(moderator)
+        url = reverse(
+            "scenario-download-result-summary",
+            kwargs={"scenario_pk": self.scenario.pk},
+        )
+        response = self.client.get(url)
+        self.assertIn(response.status_code, [403, 404])
 
 
 class EvaluationStatusAuthTests(TestCase):
