@@ -7,7 +7,8 @@ from django.core.management.base import CommandError
 from django.test import TestCase
 
 from bibliography.models import Source, SourceAuthor
-from users.roles import MANAGED_ROLES, ROLE_ADMINISTRATORS
+from sources.waste_collection.models import Collection
+from users.roles import MANAGED_ROLES, ROLE_ADMINISTRATORS, ROLE_ANALYSIS_API
 from utils.object_management.models import ReviewAction
 
 
@@ -67,6 +68,26 @@ class SyncRolesTests(TestCase):
         self.assertIn(("bibliography", "view_author"), registered)
         self.assertIn(("bibliography", "view_source"), registered)
         self.assertIn(("materials", "view_sample"), registered)
+
+    def test_apply_provisions_analysis_api_capability(self):
+        run_sync("--apply")
+        analysis_api = group_permissions(ROLE_ANALYSIS_API)
+        self.assertEqual(analysis_api, {("waste_collection", "access_analysis_api")})
+        member = User.objects.create_user(username="analyst")
+        member.groups.add(Group.objects.get(name=ROLE_ANALYSIS_API))
+        member = User.objects.get(pk=member.pk)
+        self.assertTrue(member.has_perm("waste_collection.access_analysis_api"))
+
+    def test_apply_revokes_unmanifested_analysis_api_capability(self):
+        run_sync("--apply")
+        registered = Group.objects.get(name="registered")
+        registered.permissions.add(permission_for(Collection, "access_analysis_api"))
+        run_sync("--apply")
+        registered = Group.objects.get(name="registered")
+        self.assertNotIn(
+            ("waste_collection", "access_analysis_api"),
+            group_permissions("registered"),
+        )
 
     def test_apply_does_not_grant_privileged_or_through_permissions(self):
         run_sync("--apply")
