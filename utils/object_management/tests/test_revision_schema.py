@@ -130,7 +130,7 @@ class RevisionMigrationGraphTests(SimpleTestCase):
     """
 
     EXPECTED_LEAVES = {
-        "maps": ("maps", "0022_catchment_content_revision_and_more"),
+        "maps": ("maps", "0023_catchment_content_revision_and_more"),
         "materials": (
             "materials",
             "0036_analyticalmethod_content_revision_and_more",
@@ -151,7 +151,7 @@ class RevisionMigrationGraphTests(SimpleTestCase):
     def test_maps_revision_migration_drops_no_removed_attribute_ops(self):
         loader = MigrationLoader(None)
         migration = loader.disk_migrations[
-            ("maps", "0022_catchment_content_revision_and_more")
+            ("maps", "0023_catchment_content_revision_and_more")
         ]
         touched_models = {operation.model_name for operation in migration.operations}
         self.assertNotIn("attribute", touched_models)
