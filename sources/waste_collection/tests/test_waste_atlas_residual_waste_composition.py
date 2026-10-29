@@ -1,6 +1,7 @@
 from datetime import date
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -167,10 +168,10 @@ class ResidualWasteCompositionViewSetTests(APITestCase):
             publication_status=publication_status,
         )
 
-    def _by_catchment(self):
+    def _by_catchment(self, **params):
         response = self.client.get(
             self.endpoint,
-            {"country": "DE", "year": 2024},
+            {"country": "DE", "year": 2024, **params},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         return {row["catchment_id"]: row for row in response.data}
@@ -208,10 +209,24 @@ class ResidualWasteCompositionViewSetTests(APITestCase):
     def test_excludes_catchments_without_a_residual_waste_collection(self):
         self.assertNotIn(self.biowaste_only_catchment.id, self._by_catchment())
 
-    def test_staff_preview_includes_the_latest_review_value(self):
+    def test_administrator_preview_includes_the_latest_review_value(self):
+        # Review-stage evidence only enters the administrator ``all`` scope;
+        # the bare staff flag must not widen the preview.
         self.client.force_authenticate(self.staff_user)
-
         row = self._by_catchment()[self.catchment_with_data.id]
+        self.assertEqual(row["bw_rw_percentage"], 23.4)
+        # ``all`` is administrator-only and fails closed for bare staff.
+        self.assertNotIn(self.catchment_with_data.id, self._by_catchment(scope="all"))
+
+        administrator = get_user_model().objects.create_user(
+            username="composition-map-administrator"
+        )
+        administrator.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
+        self.client.force_authenticate(administrator)
+
+        row = self._by_catchment(scope="all")[self.catchment_with_data.id]
 
         self.assertEqual(row["bw_rw_percentage"], 88)
         self.assertEqual(row["analysis_year"], 2025)
