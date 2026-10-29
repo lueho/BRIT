@@ -5,6 +5,7 @@ from importlib import import_module
 
 from django.urls import reverse
 
+from utils.object_management.policy import decide
 from utils.object_management.review_context import (
     _serialize_m2m_sources,
     _serialize_value,
@@ -83,12 +84,12 @@ def serialize_collection_update_context(
     if not is_collection(obj):
         return None
 
-    is_owner = bool(user and user.is_authenticated and obj.owner_id == user.id)
-    if not is_owner:
+    if not decide(user, "edit", obj).allowed:
         return {
             "available": False,
             "detail": (
-                "Only the collection owner may use the programmatic update endpoint."
+                "Only users with edit access to the collection may use the "
+                "programmatic update endpoint."
             ),
         }
 

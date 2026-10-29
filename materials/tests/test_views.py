@@ -5218,7 +5218,7 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
 
 class RemoveSeasonalVariationViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = "change_composition"
+    member_permissions = ("change_sampleseries", "delete_sample")
 
     @classmethod
     def setUpTestData(cls):
@@ -5318,6 +5318,46 @@ class RemoveSeasonalVariationViewTestCase(ViewWithPermissionsTestCase):
             self.composition.sample.series.temporal_distributions.all(),
         )
         self.assertTrue(Composition.objects.filter(pk=self.composition.pk).exists())
+
+    def test_post_anonymous_redirects_to_login(self):
+        url = self.get_url()
+
+        response = self.client.post(url)
+
+        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertIn(
+            self.distribution,
+            self.composition.sample.series.temporal_distributions.all(),
+        )
+
+    def test_post_denied_for_outsider_and_preserves_rows(self):
+        """A user without edit access deletes nothing and unlinks nothing."""
+        self.client.force_login(self.outsider)
+        series = self.composition.sample.series
+        sample_count = series.samples.count()
+
+        response = self.client.post(self.get_url())
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(series.samples.count(), sample_count)
+        self.assertIn(self.distribution, series.temporal_distributions.all())
+
+    def test_post_denied_for_series_editor_without_delete_sample(self):
+        """Edit access on the series alone cannot delete timestep samples."""
+        series = self.composition.sample.series
+        editor = User.objects.create(username="series-editor")
+        editor.user_permissions.add(
+            Permission.objects.get(codename="change_sampleseries")
+        )
+        series.add_editor(editor, granted_by=self.member)
+        sample_count = series.samples.count()
+        self.client.force_login(editor)
+
+        response = self.client.post(self.get_url())
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(series.samples.count(), sample_count)
+        self.assertIn(self.distribution, series.temporal_distributions.all())
 
 
 class SeasonalVariationStandaloneSampleTestCase(ViewWithPermissionsTestCase):
@@ -5789,7 +5829,7 @@ class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
 
 
 class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = "add_composition"
+    member_permissions = ("add_composition", "change_sample")
 
     @classmethod
     def setUpTestData(cls):
@@ -5862,6 +5902,37 @@ class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
         )
         for sample in self.series.samples.all():
             Composition.objects.get(sample=sample, group=self.component_group)
+
+    def test_post_denied_when_a_series_sample_is_not_editable(self):
+        """One non-editable sample in the series fails the whole write."""
+        foreign_sample = Sample.objects.create(
+            owner=self.owner,
+            name="Foreign sample",
+            series=self.series,
+            material=self.series.material,
+        )
+        self.client.force_login(self.member)
+        data = {
+            "group": self.component_group.pk,
+            "fractions_of": MaterialComponent.objects.default().pk,
+        }
+
+        response = self.client.post(
+            reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk}),
+            data,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Composition.objects.filter(
+                group=self.component_group, sample__series=self.series
+            ).exists()
+        )
+        self.assertFalse(
+            Composition.objects.filter(
+                group=self.component_group, sample=foreign_sample
+            ).exists()
+        )
 
 
 class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):

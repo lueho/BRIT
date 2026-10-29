@@ -2742,6 +2742,17 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             description="Private predecessor",
             publication_status="private",
         )
+        cls.archived_collection = Collection.objects.create(
+            name="archived-predecessor",
+            owner=cls.member,
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
+            waste_category=waste_category,
+            frequency=cls.frequency,
+            description="Archived predecessor",
+            publication_status="archived",
+        )
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(
@@ -2801,6 +2812,23 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(
             reverse(self.url_name, kwargs={"pk": self.private_collection.id})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_for_editor_with_grant_on_private_predecessor(self):
+        """An editor grant on the predecessor satisfies ``new_version``."""
+        self.private_collection.add_editor(self.member, granted_by=self.owner)
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": self.private_collection.id})
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_403_for_owner_of_archived_predecessor(self):
+        """Archived predecessors are frozen: even their owner is denied."""
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": self.archived_collection.id})
         )
         self.assertEqual(response.status_code, 403)
 

@@ -44,6 +44,8 @@ from utils.object_management.permissions import (
     user_is_moderator_for_model,
     visible_related_object,
 )
+from utils.object_management.policy import decide
+from utils.object_management.services import authorize_create, content_mutation
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -2379,13 +2381,33 @@ class DerivedCompositionOrderDownView(_DerivedCompositionOrderView):
 
 
 class AddCompositionView(
-    PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUpdateView
+    PermissionRequiredMixin,
+    UserPassesTestMixin,
+    NextOrSuccessUrlMixin,
+    BSModalUpdateView,
 ):
     model = SampleSeries
     form_class = AddCompositionModalForm
     template_name = "modal_form.html"
     permission_required = "materials.add_composition"
     success_message = "Composition successfully added."
+
+    def test_func(self):
+        """Advisory object check: the operation attaches a composition child
+        to every sample of the series, so the actor must pass the per-sample
+        attach decision for each of them. ``form_valid`` re-decides inside
+        the authorized create boundary under row locks.
+        """
+        try:
+            series = self.get_object()
+        except Http404:
+            raise
+        except Exception:
+            return False
+        return all(
+            can_add_data_to_sample(self.request.user, Composition, sample, None)
+            for sample in series.samples.all()
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -2398,9 +2420,21 @@ class AddCompositionView(
         return context
 
     def form_valid(self, form):
-        self.get_object().add_component_group(
-            form.cleaned_data["group"], fractions_of=form.cleaned_data["fractions_of"]
-        )
+        series = self.get_object()
+        with transaction.atomic():
+            for sample in series.samples.order_by("pk"):
+                with content_mutation(
+                    self.request.user, sample, action="edit"
+                ) as locked_sample:
+                    actor = authorize_create(
+                        self.request.user, Composition, parent=locked_sample
+                    )
+                    Composition.objects.create(
+                        owner=actor,
+                        group=form.cleaned_data["group"],
+                        sample=locked_sample,
+                        fractions_of=form.cleaned_data["fractions_of"],
+                    )
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -2448,7 +2482,7 @@ class AddSeasonalVariationView(
         return self.get_object().get_absolute_url()
 
 
-class RemoveSeasonalVariationView(UserCreatedObjectDetailView):
+class RemoveSeasonalVariationView(LoginRequiredMixin, UserCreatedObjectDetailView):
     template_name = "modal_delete.html"
     model = Composition
 
@@ -2460,6 +2494,31 @@ class RemoveSeasonalVariationView(UserCreatedObjectDetailView):
         return get_object_or_404(
             self.get_object().sample.series.temporal_distributions,
             id=self.kwargs.get("distribution_pk"),
+        )
+
+    def _affected_samples(self, series, distribution):
+        return series.samples.filter(timestep__distribution=distribution).order_by("pk")
+
+    def test_func(self):
+        """Advisory write gate mirroring the governed boundary in ``post``.
+
+        Removing a seasonal distribution edits the owning series and deletes
+        the samples bound to the distribution's timesteps — each an
+        independent reviewable root — so both decisions must pass.
+        """
+        try:
+            composition = self.get_object()
+        except Http404:
+            raise
+        except Exception:
+            return False
+        series = composition.sample.series
+        user = self.request.user
+        if not decide(user, "edit", series).allowed:
+            return False
+        return all(
+            decide(user, "delete", sample).allowed
+            for sample in self._affected_samples(series, self.get_distribution())
         )
 
     def get_context_data(self, **kwargs):
@@ -2481,7 +2540,19 @@ class RemoveSeasonalVariationView(UserCreatedObjectDetailView):
 
     def post(self, request, *args, **kwargs):
         success_url = self.get_success_url()
-        self.get_object().remove_temporal_distribution(self.get_distribution())
+        series = self.get_object().sample.series
+        distribution = self.get_distribution()
+        with transaction.atomic():
+            for sample in self._affected_samples(series, distribution):
+                with content_mutation(
+                    request.user, sample, action="delete"
+                ) as locked_sample:
+                    locked_sample.delete()
+            with content_mutation(request.user, series, action="edit") as locked_series:
+                if locked_series.temporal_distributions.filter(
+                    pk=distribution.pk
+                ).exists():
+                    locked_series.temporal_distributions.remove(distribution)
         return HttpResponseRedirect(success_url)
 
 
