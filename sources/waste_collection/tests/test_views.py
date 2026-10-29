@@ -5000,10 +5000,15 @@ class WasteAtlasMapViewTestBase(TestCase):
         end = html.find('<div class="tab-pane', start)
         return html[start:] if end == -1 else html[start:end]
 
-    def _login_staff(self):
-        self.client.force_login(
-            User.objects.create_user(username="conflicts-staff", is_staff=True)
+    def _login_maintainer(self):
+        maintainer = User.objects.create_user(username="conflicts-maintainer")
+        maintainer.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
         )
+        self.client.force_login(maintainer)
 
 
 class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
@@ -5013,13 +5018,13 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
         url = reverse("waste-atlas-germany-collection-system-map")
         response = self.client.get(url, {"scope": "mine"})
         self.assertContains(response, 'id="sel-scope"')
-        self.assertContains(response, 'value="mine" selected')
+        self.assertContains(response, 'value="private" selected')
         self.assertNotContains(response, 'value="all"')
-        self.assertNotContains(response, 'value="review"')
-        self.assertEqual(self._map_config(response)["scope"], "mine")
+        self.assertEqual(self._map_config(response)["scope"], "private")
 
         response = self.client.get(url, {"scope": "all"})
-        self.assertEqual(self._map_config(response)["scope"], "published")
+        self.assertContains(response, "Unavailable scope")
+        self.assertEqual(self._map_config(response)["scope"], "all")
 
         moderator = User.objects.create_user("atlas-moderator")
         moderator.user_permissions.add(
@@ -5037,15 +5042,28 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
         staff = User.objects.create_user("atlas-staff", is_staff=True)
         self.client.force_login(staff)
         response = self.client.get(url, {"scope": "all"})
+        # The staff flag alone is not an administrator grant: ``all`` stays
+        # an unavailable option instead of silently widening.
+        self.assertContains(response, "Unavailable scope")
+        self.assertEqual(self._map_config(response)["scope"], "all")
+
+        administrator = User.objects.create_user("atlas-administrator")
+        administrator.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
+        self.client.force_login(administrator)
+        response = self.client.get(url, {"scope": "all"})
         self.assertContains(response, 'value="all" selected')
         self.assertEqual(self._map_config(response)["scope"], "all")
 
     def test_change_map_scope_is_preserved_in_config_and_toggle(self):
         url = reverse("waste-atlas-change-map", args=["DE", "collection_system"])
         response = self.client.get(url, {"scope": "mine"})
-        self.assertEqual(self._map_config(response)["scope"], "mine")
+        # The legacy ``mine`` alias normalizes to ``private``; the effective
+        # scope is what the config and the toggle URL carry.
+        self.assertEqual(self._map_config(response)["scope"], "private")
         self.assertContains(response, 'id="sel-scope"')
-        self.assertIn("scope=mine", response.context["map_toggle_url"])
+        self.assertIn("scope=private", response.context["map_toggle_url"])
 
     def test_change_map_overview_offers_review_scope_to_moderators(self):
         moderator = User.objects.create_user("change-overview-moderator")
@@ -5428,14 +5446,14 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
         self.assertContains(response, '<option value="2020"')
         self.assertContains(response, '<option value="2022"')
 
-    def test_data_conflicts_overview_renders_for_staff(self):
-        self._login_staff()
+    def test_data_conflicts_overview_renders_for_maintainer(self):
+        self._login_maintainer()
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
 
         self.assertEqual(response.status_code, 200)
 
     def test_data_conflicts_overview_links_back_to_map_overview(self):
-        self._login_staff()
+        self._login_maintainer()
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
 
         self.assertEqual(response.status_code, 200)
@@ -5450,7 +5468,7 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
 
         self.assertEqual(response.status_code, 302)
 
-    def test_data_conflicts_overview_denies_non_staff_users(self):
+    def test_data_conflicts_overview_denies_non_maintainer_users(self):
         non_atlas_user = User.objects.create_user(
             username="non-atlas-user-conflicts",
         )
@@ -5492,7 +5510,7 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
 
         self.assertEqual(response.status_code, 200)
 
-    def test_overview_shows_maintainer_links_only_for_staff(self):
+    def test_overview_shows_maintainer_links_only_for_maintainers(self):
         response = self.client.get(reverse("waste-atlas-overview"))
         self.assertEqual(response.status_code, 200)
         self.assertRegex(
@@ -5506,6 +5524,20 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
 
         staff = User.objects.create_user(username="atlas-staff", is_staff=True)
         self.client.force_login(staff)
+
+        # The staff flag alone does not unlock maintainer aids.
+        response = self.client.get(reverse("waste-atlas-overview"))
+        self.assertNotContains(response, reverse("waste-atlas-change-map-overview"))
+        self.assertNotContains(response, reverse("waste-atlas-data-conflicts-overview"))
+
+        maintainer = User.objects.create_user(username="atlas-maintainer")
+        maintainer.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(Collection),
+                codename="can_moderate_collection",
+            )
+        )
+        self.client.force_login(maintainer)
 
         response = self.client.get(reverse("waste-atlas-overview"))
         self.assertNotContains(response, 'id="atlas-tools-menu"')
@@ -5597,7 +5629,7 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
         """The data-conflicts overview surfaces every map whose config opts
         into the maintainer conflict-overlay aid (currently the
         collection_system theme across all regional map sets)."""
-        self._login_staff()
+        self._login_maintainer()
         response = self.client.get(reverse("waste-atlas-data-conflicts-overview"))
 
         self.assertEqual(response.status_code, 200)
