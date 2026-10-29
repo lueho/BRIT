@@ -67,6 +67,7 @@ from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
 )
+from utils.object_management.policy import is_active_actor, is_admin
 from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 logger = logging.getLogger(__name__)
@@ -308,18 +309,20 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             return {"skip_min_max": True}
         return {}
 
-    analysis_group_name = "analysis_api"
+    analysis_api_permission = "waste_collection.access_analysis_api"
 
-    def _enforce_analysis_group(self, request):
+    def _enforce_analysis_capability(self, request):
         user = getattr(request, "user", None)
         if user is None or not user.is_authenticated:
             raise NotAuthenticated(
                 "Authentication is required for the extended collection list."
             )
-        if user.is_staff or user.groups.filter(name=self.analysis_group_name).exists():
+        if is_active_actor(user) and (
+            is_admin(user) or user.has_perm(self.analysis_api_permission)
+        ):
             return
         raise PermissionDenied(
-            f"Membership in the '{self.analysis_group_name}' group is required "
+            f"The '{self.analysis_api_permission}' capability is required "
             "for the extended collection list."
         )
 
@@ -338,7 +341,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         if "view" in request.query_params and not self._extended_list_requested():
             raise ValidationError({"view": "Use 'extended' or omit this parameter."})
         if self._extended_list_requested():
-            self._enforce_analysis_group(request)
+            self._enforce_analysis_capability(request)
         self._enforce_authenticated_non_public_scope(request)
         started_at = time.perf_counter()
         query_count_start = (

@@ -13,6 +13,7 @@ ROLE_REGISTERED = "registered"
 ROLE_EDITORS = "editors"
 ROLE_LIBRARIANS = "librarians"
 ROLE_ADMINISTRATORS = "administrators"
+ROLE_ANALYSIS_API = "analysis_api"
 
 MODERATORS_GROUP_NAME = getattr(settings, "REVIEW_MODERATORS_GROUP_NAME", "moderators")
 
@@ -22,10 +23,14 @@ MANAGED_ROLES = (
     ROLE_LIBRARIANS,
     MODERATORS_GROUP_NAME,
     ROLE_ADMINISTRATORS,
+    ROLE_ANALYSIS_API,
 )
 
 ADMIN_PERMISSION_MODEL = "object_management.reviewaction"
 ADMIN_PERMISSION_CODENAME = "administer_objects"
+
+ANALYSIS_API_PERMISSION_MODEL = "waste_collection.collection"
+ANALYSIS_API_PERMISSION_CODENAME = "access_analysis_api"
 
 _CRUD_ACTIONS = ("add", "change", "delete", "view")
 
@@ -71,20 +76,29 @@ def role_manifest():
             (ADMIN_PERMISSION_MODEL, ADMIN_PERMISSION_CODENAME),
         }
         | _crud_permissions(reviewable | _labels(KIND_PUBLIC_CATALOGUE)),
+        ROLE_ANALYSIS_API: {
+            (ANALYSIS_API_PERMISSION_MODEL, ANALYSIS_API_PERMISSION_CODENAME),
+        },
     }
 
 
+_PRIVILEGED_PERMISSIONS = frozenset(
+    {
+        (ADMIN_PERMISSION_MODEL, ADMIN_PERMISSION_CODENAME),
+        (ANALYSIS_API_PERMISSION_MODEL, ANALYSIS_API_PERMISSION_CODENAME),
+    }
+)
+
+
 def is_privileged_permission(permission):
-    """Moderation and administration grants that only their manifest roles
-    may hold; reconciliation revokes them from every other managed role."""
+    """Moderation, administration, and service grants that only their
+    manifest roles may hold; reconciliation revokes them from every other
+    managed role."""
     codename = permission.codename
     if codename.startswith("can_moderate_"):
         return True
-    admin_app_label = ADMIN_PERMISSION_MODEL.split(".", 1)[0]
-    return (
-        permission.content_type.app_label == admin_app_label
-        and codename == ADMIN_PERMISSION_CODENAME
-    )
+    label = f"{permission.content_type.app_label}.{permission.content_type.model}"
+    return (label, codename) in _PRIVILEGED_PERMISSIONS
 
 
 def resolve_permission(model_label, codename):
