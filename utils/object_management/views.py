@@ -87,9 +87,11 @@ from utils.object_management.services import (
     _fresh_actor,
     authorize_create,
     content_mutation,
+    is_independent_evidence_model,
     perform_transition,
     record_comment,
     record_creation,
+    save_evidence_formset_rows,
     validate_created_parent,
     validate_references,
 )
@@ -2902,13 +2904,47 @@ class WorkspaceSectionUpdateMixin:
             )
         return super().render_to_response(context, **response_kwargs)
 
+    def _section_writes_governed_root(self):
+        """Whether saving this section mutates governed root content.
+
+        Sections declaring root ``fields`` or formsets of owned children
+        write through the root's ``content_mutation`` boundary — the
+        post-lock lifecycle re-check, protected-metadata enforcement,
+        ``content_revision`` bump, and audit event all apply, and the
+        root snapshot captures owned-child row changes. Sections
+        carrying only independent-evidence or unregistered formsets
+        leave the root untouched; each evidence row runs its own
+        boundary inside ``save_evidence_formset_rows``.
+        """
+        if self.section.get("fields"):
+            return True
+        return any(
+            (policy := model_policy(inline.model)) is not None
+            and policy.kind == KIND_OWNED
+            for inline in self.get_inlines()
+        )
+
+    def _call_super_form_valid(self, form):
+        return self._save_section_response(form)
+
     def form_valid(self, form):
         validity = [inline.is_valid() for inline in self.get_inlines()]
         if not all(validity):
             return self.form_invalid(form)
+        if self._section_writes_governed_root():
+            response = _perform_bound_update(self, form)
+            if response is not None:
+                return response
+        return self._save_section_response(form)
+
+    def _save_section_response(self, form):
         self.object = form.save()
         for inline in self.get_inlines():
-            inline.save()
+            inline.instance = self.object
+            if is_independent_evidence_model(inline.model):
+                save_evidence_formset_rows(self.request.user, inline, self.object)
+            else:
+                inline.save()
         message = "Saved privately." if self.object.is_private else "Changes saved."
         if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return JsonResponse(self.get_section_saved_payload(message))
