@@ -5994,7 +5994,13 @@ class WasteAtlasPopulationViewSetTests(TestCase):
 
 
 class CollectionCascadeMixinTestCase(TestCase):
-    """Test the CollectionReviewActionCascadeMixin functionality."""
+    """Shared fixtures for the collection review-cascade boundary tests.
+
+    CollectionPropertyValues and AggregatedCollectionPropertyValues are
+    independent reviewable records: collection review transitions do not
+    cascade to them, even when ``run_review_cascade`` is invoked
+    explicitly.
+    """
 
     @classmethod
     def setUpTestData(cls):
@@ -6077,10 +6083,10 @@ class CollectionCascadeMixinTestCase(TestCase):
 
 
 class SubmitCascadeMixinTest(CollectionCascadeMixinTestCase):
-    """Test submit_for_review cascade via CollectionSubmitForReviewView."""
+    """Collection submit_for_review leaves linked property values untouched."""
 
-    def test_submit_cascades_to_owner_cpvs(self):
-        """Submit cascades to owner's private and declined CPVs."""
+    def test_submit_leaves_owner_cpvs_untouched(self):
+        """Submit does not cascade to the owner's CPVs."""
         collection = self._create_collection("C1", self.owner, status="private")
         cpv_private = self._create_cpv(
             collection, self.prop1, self.unit1, self.owner, "private", year=2020
@@ -6105,12 +6111,12 @@ class SubmitCascadeMixinTest(CollectionCascadeMixinTestCase):
         cpv_declined.refresh_from_db()
         cpv_published.refresh_from_db()
 
-        self.assertEqual(cpv_private.publication_status, "review")
-        self.assertEqual(cpv_declined.publication_status, "review")
-        self.assertEqual(cpv_published.publication_status, "published")  # Unchanged
+        self.assertEqual(cpv_private.publication_status, "private")
+        self.assertEqual(cpv_declined.publication_status, "declined")
+        self.assertEqual(cpv_published.publication_status, "published")
 
-    def test_submit_includes_collaborator_cpvs(self):
-        """Submit cascades to all CPVs on owner's collection, including collaborators' CPVs."""
+    def test_submit_leaves_collaborator_cpvs_untouched(self):
+        """Submit does not cascade to collaborators' CPVs either."""
         collection = self._create_collection("C1", self.owner, status="private")
         cpv_owner = self._create_cpv(
             collection, self.prop1, self.unit1, self.owner, "private"
@@ -6132,12 +6138,11 @@ class SubmitCascadeMixinTest(CollectionCascadeMixinTestCase):
         cpv_owner.refresh_from_db()
         cpv_other.refresh_from_db()
 
-        # Both cascade because they're on the owner's collection
-        self.assertEqual(cpv_owner.publication_status, "review")
-        self.assertEqual(cpv_other.publication_status, "review")  # Also cascaded
+        self.assertEqual(cpv_owner.publication_status, "private")
+        self.assertEqual(cpv_other.publication_status, "private")
 
-    def test_submit_cascades_to_acpvs(self):
-        """Submit cascades to owner's aggregated property values."""
+    def test_submit_leaves_acpvs_untouched(self):
+        """Submit does not cascade to aggregated property values."""
         collection = self._create_collection("C1", self.owner, status="private")
         acpv = self._create_acpv(
             [collection], self.prop1, self.unit1, self.owner, "private"
@@ -6153,10 +6158,10 @@ class SubmitCascadeMixinTest(CollectionCascadeMixinTestCase):
         run_review_cascade(view.object, view.action_attr_name, request.user, "private")
 
         acpv.refresh_from_db()
-        self.assertEqual(acpv.publication_status, "review")
+        self.assertEqual(acpv.publication_status, "private")
 
-    def test_submit_cascades_across_version_chain(self):
-        """Submit cascades to CPVs on all versions in the chain."""
+    def test_submit_leaves_version_chain_cpvs_untouched(self):
+        """Submit does not cascade to CPVs on any version in the chain."""
         v1 = self._create_collection("V1", self.owner, "published", date(2020, 1, 1))
         v2 = self._create_collection("V2", self.owner, "published", date(2021, 1, 1))
         v3 = self._create_collection("V3", self.owner, "private", date(2022, 1, 1))
@@ -6180,16 +6185,16 @@ class SubmitCascadeMixinTest(CollectionCascadeMixinTestCase):
         cpv2.refresh_from_db()
         cpv3.refresh_from_db()
 
-        self.assertEqual(cpv1.publication_status, "review")
-        self.assertEqual(cpv2.publication_status, "review")
-        self.assertEqual(cpv3.publication_status, "review")
+        self.assertEqual(cpv1.publication_status, "private")
+        self.assertEqual(cpv2.publication_status, "declined")
+        self.assertEqual(cpv3.publication_status, "private")
 
 
 class WithdrawCascadeMixinTest(CollectionCascadeMixinTestCase):
-    """Test withdraw_from_review cascade via CollectionWithdrawFromReviewView."""
+    """Collection withdraw_from_review leaves linked property values untouched."""
 
-    def test_withdraw_cascades_to_owner_cpvs(self):
-        """Withdraw cascades to owner's CPVs in review."""
+    def test_withdraw_leaves_owner_cpvs_untouched(self):
+        """Withdraw does not cascade to the owner's CPVs in review."""
         collection = self._create_collection("C1", self.owner, status="review")
         cpv = self._create_cpv(collection, self.prop1, self.unit1, self.owner, "review")
 
@@ -6203,10 +6208,10 @@ class WithdrawCascadeMixinTest(CollectionCascadeMixinTestCase):
         run_review_cascade(view.object, view.action_attr_name, request.user, "review")
 
         cpv.refresh_from_db()
-        self.assertEqual(cpv.publication_status, "private")
+        self.assertEqual(cpv.publication_status, "review")
 
-    def test_withdraw_includes_collaborator_cpvs(self):
-        """Withdraw cascades to all CPVs on owner's collection, including collaborators'."""
+    def test_withdraw_leaves_collaborator_cpvs_untouched(self):
+        """Withdraw does not cascade to collaborators' CPVs either."""
         collection = self._create_collection("C1", self.owner, status="review")
         cpv_owner = self._create_cpv(
             collection, self.prop1, self.unit1, self.owner, "review"
@@ -6227,16 +6232,15 @@ class WithdrawCascadeMixinTest(CollectionCascadeMixinTestCase):
         cpv_owner.refresh_from_db()
         cpv_other.refresh_from_db()
 
-        # Both cascade because they're on the owner's collection
-        self.assertEqual(cpv_owner.publication_status, "private")
-        self.assertEqual(cpv_other.publication_status, "private")  # Also cascaded
+        self.assertEqual(cpv_owner.publication_status, "review")
+        self.assertEqual(cpv_other.publication_status, "review")
 
 
 class ApproveCascadeMixinTest(CollectionCascadeMixinTestCase):
-    """Test approve cascade via CollectionApproveItemView."""
+    """Collection approve leaves linked property values untouched."""
 
-    def test_approve_cascades_to_all_cpvs_in_review(self):
-        """Approve cascades to ALL CPVs in review, regardless of owner."""
+    def test_approve_leaves_all_cpvs_in_review_untouched(self):
+        """Approve does not cascade to CPVs in review, regardless of owner."""
         collection = self._create_collection("C1", self.owner, status="review")
         cpv_owner = self._create_cpv(
             collection, self.prop1, self.unit1, self.owner, "review"
@@ -6257,14 +6261,14 @@ class ApproveCascadeMixinTest(CollectionCascadeMixinTestCase):
         cpv_owner.refresh_from_db()
         cpv_other.refresh_from_db()
 
-        # Both should be approved
-        self.assertEqual(cpv_owner.publication_status, "published")
-        self.assertEqual(cpv_other.publication_status, "published")
-        self.assertEqual(cpv_owner.approved_by, self.staff)
-        self.assertEqual(cpv_other.approved_by, self.staff)
+        # Independent reviewable records keep their review state
+        self.assertEqual(cpv_owner.publication_status, "review")
+        self.assertEqual(cpv_other.publication_status, "review")
+        self.assertIsNone(cpv_owner.approved_by)
+        self.assertIsNone(cpv_other.approved_by)
 
-    def test_approve_cascades_to_acpvs(self):
-        """Approve cascades to aggregated property values."""
+    def test_approve_leaves_acpvs_untouched(self):
+        """Approve does not cascade to aggregated property values."""
         collection = self._create_collection("C1", self.owner, status="review")
         acpv = self._create_acpv(
             [collection], self.prop1, self.unit1, self.owner, "review"
@@ -6280,11 +6284,11 @@ class ApproveCascadeMixinTest(CollectionCascadeMixinTestCase):
         run_review_cascade(view.object, view.action_attr_name, request.user, "review")
 
         acpv.refresh_from_db()
-        self.assertEqual(acpv.publication_status, "published")
-        self.assertEqual(acpv.approved_by, self.staff)
+        self.assertEqual(acpv.publication_status, "review")
+        self.assertIsNone(acpv.approved_by)
 
-    def test_approve_cascades_across_version_chain(self):
-        """Approve cascades to CPVs on all versions."""
+    def test_approve_leaves_version_chain_cpvs_untouched(self):
+        """Approve does not cascade to CPVs on any version in the chain."""
         v1 = self._create_collection("V1", self.owner, "published", date(2020, 1, 1))
         v2 = self._create_collection("V2", self.owner, "review", date(2021, 1, 1))
         v2.predecessors.add(v1)
@@ -6304,8 +6308,8 @@ class ApproveCascadeMixinTest(CollectionCascadeMixinTestCase):
         cpv1.refresh_from_db()
         cpv2.refresh_from_db()
 
-        self.assertEqual(cpv1.publication_status, "published")
-        self.assertEqual(cpv2.publication_status, "published")
+        self.assertEqual(cpv1.publication_status, "review")
+        self.assertEqual(cpv2.publication_status, "review")
 
 
 class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
