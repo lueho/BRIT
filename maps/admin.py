@@ -61,7 +61,7 @@ class CatchmentModelAdmin(PolicyAdminMixin, admin.ModelAdmin):
 
 @admin.register(CatchmentRevision)
 class CatchmentRevisionModelAdmin(PolicyAdminMixin, GISModelAdmin):
-    actions = ("submit_selected_for_review", "approve_selected")
+    actions = ("submit_selected_for_review",)
     list_display = (
         "name",
         "catchment",
@@ -104,38 +104,6 @@ class CatchmentRevisionModelAdmin(PolicyAdminMixin, GISModelAdmin):
         for revision in queryset.order_by("effective_from", "pk"):
             try:
                 perform_transition(request.user, revision, "submit")
-            except PermissionDenied as error:
-                self.message_user(
-                    request,
-                    f"{revision}: {error}",
-                    level=messages.ERROR,
-                )
-            except ValidationError as error:
-                self.message_user(
-                    request,
-                    f"{revision}: {'; '.join(error.messages)}",
-                    level=messages.ERROR,
-                )
-            else:
-                completed += 1
-        if completed:
-            self.message_user(
-                request,
-                f"Updated {completed} catchment revision(s).",
-                level=messages.SUCCESS,
-            )
-
-    @admin.action(description="Approve selected revisions")
-    def approve_selected(self, request, queryset):
-        completed = 0
-        for revision in queryset.order_by("effective_from", "pk"):
-            try:
-                perform_transition(
-                    request.user,
-                    revision,
-                    "approve",
-                    expected_revision=revision.content_revision,
-                )
             except PermissionDenied as error:
                 self.message_user(
                     request,
