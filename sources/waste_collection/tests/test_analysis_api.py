@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import Group, Permission, User
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -22,7 +22,6 @@ from sources.waste_collection.models import (
     CollectionPropertyValue,
 )
 from sources.waste_collection.tests import test_viewsets as fixtures
-from sources.waste_collection.viewsets import CollectionViewSet
 from utils.properties.models import Property, Unit
 
 
@@ -36,9 +35,13 @@ class CollectionAnalysisApiTests(APITestCase):
 
     def setUp(self):
         super().setUp()
-        self.analysis_group = Group.objects.get_or_create(
-            name=CollectionViewSet.analysis_group_name
-        )[0]
+        self.analysis_group = Group.objects.get_or_create(name="analysis_api")[0]
+        self.analysis_group.permissions.add(
+            Permission.objects.get(
+                content_type__app_label="waste_collection",
+                codename="access_analysis_api",
+            )
+        )
         self.analyst = User.objects.create_user(username="analyst")
         self.analyst.groups.add(self.analysis_group)
         self.regular_user.groups.add(self.analysis_group)
@@ -50,7 +53,7 @@ class CollectionAnalysisApiTests(APITestCase):
     def get_extended(self, params=None):
         return self.client.get(self.endpoint(), {"view": "extended", **(params or {})})
 
-    def test_extended_view_requires_analysis_group(self):
+    def test_extended_view_requires_analysis_capability(self):
         self.client.force_authenticate(None)
         self.assertEqual(self.get_extended().status_code, 401)
         outsider = User.objects.create_user(username="outsider")
@@ -59,8 +62,38 @@ class CollectionAnalysisApiTests(APITestCase):
         self.assertEqual(
             self.client.get(self.endpoint(), {"page_size": 1}).status_code, 200
         )
+        # The staff flag alone grants neither the capability nor administration.
         self.client.force_authenticate(self.staff_user)
+        self.assertEqual(self.get_extended().status_code, 403)
+        administrator = User.objects.create_user(username="administrator")
+        administrator.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="object_management",
+                codename="administer_objects",
+            )
+        )
+        self.client.force_authenticate(administrator)
         self.assertEqual(self.get_extended().status_code, 200)
+
+    def test_capability_without_group_membership_allows_access(self):
+        holder = User.objects.create_user(username="capability-holder")
+        holder.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="waste_collection",
+                codename="access_analysis_api",
+            )
+        )
+        self.client.force_authenticate(holder)
+        self.assertEqual(self.get_extended().status_code, 200)
+
+    def test_group_membership_without_capability_is_denied(self):
+        # The group only provisions the capability; membership in a group
+        # lacking the grant must not open the extended view.
+        self.analysis_group.permissions.clear()
+        member = User.objects.create_user(username="member-only")
+        member.groups.add(self.analysis_group)
+        self.client.force_authenticate(member)
+        self.assertEqual(self.get_extended().status_code, 403)
 
     def test_default_list_remains_lean(self):
         prop = Property.objects.get_or_create(name="Connection rate")[0]
