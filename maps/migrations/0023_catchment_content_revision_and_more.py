@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("maps", "0021_regionattributevalue_sources"),
+        ("maps", "0022_geodatasetimportrun_geodatasetsnapshot_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
