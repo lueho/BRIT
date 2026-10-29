@@ -535,6 +535,12 @@ class Collection(NamedUserCreatedObject):
     objects = CollectionQuerySet.as_manager()
 
     class Meta(NamedUserCreatedObject.Meta):
+        permissions = [
+            (
+                "access_analysis_api",
+                "Can access the analysis API extended collection view",
+            ),
+        ]
         indexes = [
             models.Index(fields=["name", "id"], name="collection_name_id_idx"),
             # Meta.indexes replaces the abstract base's list, so the shared
