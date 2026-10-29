@@ -24,7 +24,11 @@ from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import (
+    ObjectDoesNotExist,
+    PermissionDenied,
+    ValidationError,
+)
 from django.db import DatabaseError, router, transaction
 from django.db.models import ForeignKey, Max, Model, QuerySet
 from django.db.models.deletion import Collector
@@ -123,10 +127,20 @@ def authorize_create(actor, model, *, parent=None):
     """Authoritative ``create`` authorization inside the write boundary.
 
     Resolves the registered policy, enforces the declared ``parent_path``
-    context, re-reads the actor through ``_fresh_actor``, and refreshes every
-    declared parent row via ``_base_manager`` — a stale permission cache or a
-    vanished, unsaved, or wrongly typed parent can never authorize a write.
-    Returns the fresh actor for owner attribution and audit writes.
+    context, re-reads the actor through ``_fresh_actor``, and locks every
+    declared parent row via ``select_for_update`` in deterministic storage
+    order — a stale permission cache, a vanished, unsaved, or wrongly typed
+    parent, or a parent lifecycle transition committed since any advisory
+    check can never authorize a write. Returns the fresh actor for owner
+    attribution and audit writes.
+
+    Locking the parents serializes creates against concurrent review
+    transitions on the same rows (the same ``_storage_key`` ordering
+    ``content_mutation`` uses, so no deadlock cycle is possible): an
+    approval that commits first is re-decided against the fresh locked row,
+    and one that arrives later waits until this boundary commits. Callers
+    must therefore invoke this inside the atomic write boundary that
+    persists the object so the locks are held through the save.
 
     Callers must only route registered models here; unregistered non-UCO
     persistence stays on the plain adapter path.
@@ -148,7 +162,6 @@ def authorize_create(actor, model, *, parent=None):
             if not members:
                 raise PermissionDenied("Creation requires a valid parent context.")
             expected = root_model(model, policy.parent_path)
-            fresh = []
             for candidate in members:
                 pk = getattr(candidate, "pk", None)
                 if (
@@ -157,10 +170,16 @@ def authorize_create(actor, model, *, parent=None):
                     or pk is None
                 ):
                     raise PermissionDenied("invalid_parent")
-                row = type(candidate)._base_manager.filter(pk=pk).first()
-                if row is None:
-                    raise PermissionDenied("invalid_parent")
-                fresh.append(row)
+            locked = {}
+            for candidate in sorted(members, key=_storage_key):
+                key = _storage_key(candidate)
+                if key in locked:
+                    continue
+                try:
+                    locked[key] = _lock_instance(candidate)
+                except ObjectDoesNotExist:
+                    raise PermissionDenied("invalid_parent") from None
+            fresh = [locked[_storage_key(candidate)] for candidate in members]
             parent = fresh[0] if isinstance(parent, Model) else tuple(fresh)
     decision = decide(actor, "create", model, parent=parent)
     if not decision.allowed:
