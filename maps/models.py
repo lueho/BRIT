@@ -8,7 +8,11 @@ from django.contrib.gis.db.models import MultiPolygonField, PointField
 from django.contrib.gis.geos import GEOSGeometry, MultiPolygon
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import DateRangeField, RangeOperators
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.exceptions import (
+    ImproperlyConfigured,
+    ObjectDoesNotExist,
+    ValidationError,
+)
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
 from django.db.models import F, Func, OuterRef, Q, Subquery, Value
@@ -1020,6 +1024,34 @@ class GeoDataset(NamedUserCreatedObject):
         related_name="geodatasets",
     )
 
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if self.pk is None or (
+            update_fields is not None and "model_name" not in update_fields
+        ):
+            return super().save(*args, **kwargs)
+        with transaction.atomic():
+            persisted_model_name = (
+                type(self)
+                .objects.select_for_update()
+                .filter(pk=self.pk)
+                .values_list("model_name", flat=True)
+                .first()
+            )
+            if (
+                persisted_model_name != self.model_name
+                and GeoDatasetSnapshot.objects.filter(dataset_id=self.pk).exists()
+            ):
+                raise ValidationError(
+                    {
+                        "model_name": (
+                            "Model name is fixed once a snapshot is registered; "
+                            "create a new dataset and snapshot instead."
+                        )
+                    }
+                )
+            return super().save(*args, **kwargs)
+
     def get_runtime_configuration(self):
         try:
             return self.runtime_configuration
@@ -1084,7 +1116,25 @@ class GeoDataset(NamedUserCreatedObject):
             return reverse("geodataset-list")
 
 
+def _lock_geodataset_rows(dataset_ids, using=None):
+    for dataset_id in sorted({pk for pk in dataset_ids if pk is not None}):
+        GeoDataset.objects.using(using).select_for_update().filter(
+            pk=dataset_id
+        ).exists()
+
+
 class GeoDatasetRuntimeConfiguration(models.Model):
+    IDENTITY_FIELDS = (
+        "dataset",
+        "backend_type",
+        "runtime_model_name",
+        "schema_name",
+        "relation_name",
+        "geometry_column",
+        "primary_key_column",
+        "features_api_basename",
+    )
+
     dataset = models.OneToOneField(
         GeoDataset,
         on_delete=models.CASCADE,
@@ -1103,6 +1153,86 @@ class GeoDatasetRuntimeConfiguration(models.Model):
 
     def __str__(self):
         return f"Runtime config for {self.dataset}"
+
+    def clean(self):
+        super().clean()
+        persisted = None
+        if self.pk:
+            persisted = type(self).objects.filter(pk=self.pk).first()
+        errors = self._snapshot_identity_errors(persisted)
+        if errors:
+            raise ValidationError(errors)
+
+    def _snapshot_identity_errors(self, persisted):
+        if persisted is None:
+            if (
+                self.dataset_id is not None
+                and GeoDatasetSnapshot.objects.filter(
+                    dataset_id=self.dataset_id
+                ).exists()
+            ):
+                return {
+                    "dataset": (
+                        "A snapshotted dataset's runtime identity cannot be "
+                        "replaced; create a new dataset and snapshot instead."
+                    )
+                }
+            return {}
+        dataset_ids = {persisted.dataset_id, self.dataset_id}
+        if not GeoDatasetSnapshot.objects.filter(dataset_id__in=dataset_ids).exists():
+            return {}
+        changed = [
+            field_name
+            for field_name in self.IDENTITY_FIELDS
+            if getattr(persisted, self._meta.get_field(field_name).attname)
+            != getattr(self, self._meta.get_field(field_name).attname)
+        ]
+        return dict.fromkeys(
+            changed,
+            "Runtime identity is fixed once a snapshot is registered; "
+            "create a new dataset and snapshot instead.",
+        )
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            persisted_dataset_id = None
+            if self.pk:
+                persisted_dataset_id = (
+                    type(self)
+                    .objects.filter(pk=self.pk)
+                    .values_list("dataset_id", flat=True)
+                    .first()
+                )
+            locked_ids = {self.dataset_id, persisted_dataset_id}
+            _lock_geodataset_rows(locked_ids)
+            persisted = None
+            if self.pk:
+                persisted = (
+                    type(self).objects.select_for_update().filter(pk=self.pk).first()
+                )
+                if persisted is None:
+                    if persisted_dataset_id is not None:
+                        raise ValidationError(
+                            {
+                                "dataset": (
+                                    "Runtime configuration changed concurrently; "
+                                    "reload and retry."
+                                )
+                            }
+                        )
+                elif persisted.dataset_id not in locked_ids:
+                    raise ValidationError(
+                        {
+                            "dataset": (
+                                "Runtime configuration was reassigned concurrently; "
+                                "reload and retry."
+                            )
+                        }
+                    )
+            errors = self._snapshot_identity_errors(persisted)
+            if errors:
+                raise ValidationError(errors)
+            super().save(*args, **kwargs)
 
 
 class GeoDatasetColumnPolicy(models.Model):
@@ -1132,6 +1262,266 @@ class GeoDatasetColumnPolicy(models.Model):
 
     def __str__(self):
         return f"{self.dataset}: {self.column_name}"
+
+
+class GeoDatasetSource(models.Model):
+    """Operator-managed metadata for an external geodata provider.
+
+    Records where versioned dataset snapshots originate. Enabling a source
+    marks it usable but never schedules fetches by itself.
+    """
+
+    class ConnectorType(models.TextChoices):
+        WFS = "wfs", "WFS"
+
+    slug = models.SlugField(unique=True)
+    name = models.CharField(max_length=255)
+    connector_type = models.CharField(
+        max_length=32, choices=ConnectorType.choices, default=ConnectorType.WFS
+    )
+    endpoint_url = models.URLField(max_length=2048)
+    feature_type = models.CharField(max_length=255)
+    bibliography_source = models.ForeignKey(
+        Source, on_delete=models.PROTECT, related_name="geodataset_sources"
+    )
+    attribution = models.TextField()
+    license_url = models.URLField(max_length=2048)
+    is_enabled = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name", "pk"]
+
+    def __str__(self):
+        return self.name
+
+
+class GeoDatasetImportRun(models.Model):
+    """Provenance record for one operator-recorded import of a source.
+
+    The source configuration is captured from the persisted source row on
+    insert, so later metadata edits cannot rewrite a run's provenance.
+    """
+
+    class Status(models.TextChoices):
+        RUNNING = "running", "Running"
+        SUCCEEDED = "succeeded", "Succeeded"
+        FAILED = "failed", "Failed"
+
+    PROVENANCE_FIELDS = (
+        "source_id",
+        "bibliography_source_id",
+        "source_configuration",
+        "extraction_specification",
+        "started_at",
+    )
+    STATE_FIELDS = ("status", "finished_at", "error_message")
+    TERMINAL_STATUSES = (Status.SUCCEEDED, Status.FAILED)
+
+    source = models.ForeignKey(
+        GeoDatasetSource, on_delete=models.PROTECT, related_name="import_runs"
+    )
+    bibliography_source = models.ForeignKey(
+        Source,
+        on_delete=models.PROTECT,
+        related_name="geodataset_import_runs",
+        editable=False,
+    )
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.RUNNING
+    )
+    source_configuration = models.JSONField(default=dict, editable=False)
+    extraction_specification = models.JSONField(default=dict, blank=True)
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-started_at", "-pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(status="running", finished_at__isnull=True, error_message="")
+                    | Q(
+                        status="succeeded",
+                        finished_at__isnull=False,
+                        error_message="",
+                    )
+                    | (
+                        Q(status="failed", finished_at__isnull=False)
+                        & ~Q(error_message="")
+                    )
+                ),
+                name="geodataset_import_run_status_state_consistent",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(finished_at__isnull=True) | Q(finished_at__gte=F("started_at"))
+                ),
+                name="geodataset_import_run_finished_after_started",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.source.name if self.source_id else '?'} ({self.status})"
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.status == self.Status.RUNNING:
+            if self.finished_at is not None:
+                errors["finished_at"] = "A running import cannot be finished."
+            if self.error_message:
+                errors["error_message"] = (
+                    "A running import cannot carry an error message."
+                )
+        elif self.status == self.Status.SUCCEEDED:
+            if self.finished_at is None:
+                errors["finished_at"] = "A succeeded import needs a finish timestamp."
+            if self.error_message:
+                errors["error_message"] = (
+                    "A succeeded import cannot carry an error message."
+                )
+        elif self.status == self.Status.FAILED:
+            if self.finished_at is None:
+                errors["finished_at"] = "A failed import needs a finish timestamp."
+            if not (self.error_message or "").strip():
+                errors["error_message"] = "A failed import needs an error message."
+        if (
+            self.finished_at is not None
+            and self.started_at is not None
+            and self.finished_at < self.started_at
+        ):
+            errors["finished_at"] = "Finish timestamp cannot precede start timestamp."
+        if not isinstance(self.extraction_specification, dict):
+            errors["extraction_specification"] = (
+                "Extraction specification must be a JSON object."
+            )
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            if self._state.adding:
+                self._meta.get_field("source").clean(self.source_id, self)
+                self._capture_source_configuration()
+                self.full_clean()
+            else:
+                self._validate_against_persisted_row()
+                self.full_clean()
+            super().save(*args, **kwargs)
+
+    def _capture_source_configuration(self):
+        persisted_source = GeoDatasetSource.objects.get(pk=self.source_id)
+        self.bibliography_source_id = persisted_source.bibliography_source_id
+        self.source_configuration = {
+            "connector_type": persisted_source.connector_type,
+            "endpoint_url": persisted_source.endpoint_url,
+            "feature_type": persisted_source.feature_type,
+            "bibliography_source_id": persisted_source.bibliography_source_id,
+            "license_url": persisted_source.license_url,
+            "attribution": persisted_source.attribution,
+        }
+
+    def _validate_against_persisted_row(self):
+        persisted = type(self).objects.select_for_update().get(pk=self.pk)
+        if persisted.status in self.TERMINAL_STATUSES:
+            locked_fields = (*self.PROVENANCE_FIELDS, *self.STATE_FIELDS)
+            message = "A finished import run is immutable."
+        else:
+            locked_fields = self.PROVENANCE_FIELDS
+            message = "Import run provenance is frozen once recorded."
+        errors = {
+            field: message
+            for field in locked_fields
+            if getattr(persisted, field) != getattr(self, field)
+        }
+        if errors:
+            raise ValidationError(errors)
+
+
+class GeoDatasetSnapshot(models.Model):
+    """Links a GeoDataset to the successful import run that produced it.
+
+    The source identity is derived through the import run; snapshot links are
+    immutable so the historical provenance chain stays intact.
+    """
+
+    LINK_FIELDS = ("dataset_id", "import_run_id")
+
+    dataset = models.OneToOneField(
+        GeoDataset, on_delete=models.PROTECT, related_name="external_snapshot"
+    )
+    import_run = models.OneToOneField(
+        GeoDatasetImportRun, on_delete=models.PROTECT, related_name="snapshot"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.dataset_id} via run {self.import_run_id}"
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.import_run_id is not None:
+            persisted_run = GeoDatasetImportRun.objects.filter(
+                pk=self.import_run_id
+            ).first()
+            if (
+                persisted_run is not None
+                and persisted_run.status != GeoDatasetImportRun.Status.SUCCEEDED
+            ):
+                errors["import_run"] = (
+                    "A snapshot can only link a succeeded import run."
+                )
+        if self.dataset_id is not None:
+            dataset = GeoDataset.objects.filter(pk=self.dataset_id).first()
+            if dataset is not None:
+                runtime_error = self._dataset_runtime_error(dataset)
+                if runtime_error:
+                    errors["dataset"] = runtime_error
+        if errors:
+            raise ValidationError(errors)
+
+    @staticmethod
+    def _dataset_runtime_error(dataset):
+        from maps.runtime_adapters import (
+            LocalRelationDatasetRuntimeAdapter,
+            get_dataset_runtime_adapter,
+        )
+
+        try:
+            adapter = get_dataset_runtime_adapter(dataset)
+        except ImproperlyConfigured as error:
+            return f"Dataset runtime is not a valid local relation: {error}"
+        if not isinstance(adapter, LocalRelationDatasetRuntimeAdapter):
+            return "Snapshots require a local_relation dataset runtime."
+        return None
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            persisted = None
+            if not self._state.adding:
+                persisted = type(self).objects.select_for_update().get(pk=self.pk)
+            _lock_geodataset_rows(
+                {self.dataset_id, getattr(persisted, "dataset_id", None)}
+            )
+            if persisted is not None:
+                self._validate_links_unchanged(persisted)
+            self.full_clean()
+            super().save(*args, **kwargs)
+
+    def _validate_links_unchanged(self, persisted=None):
+        if persisted is None:
+            persisted = type(self).objects.select_for_update().get(pk=self.pk)
+        errors = {
+            field: "Snapshot links are frozen once recorded."
+            for field in self.LINK_FIELDS
+            if getattr(persisted, field) != getattr(self, field)
+        }
+        if errors:
+            raise ValidationError(errors)
 
 
 class RegionProperty(PropertyBase):
