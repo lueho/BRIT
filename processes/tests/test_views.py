@@ -19,6 +19,7 @@ from django.utils.html import escape
 
 from bibliography.models import Author, Source
 from materials.models import Material
+from utils.object_management.models import ReviewAction
 from utils.properties.models import Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
@@ -509,6 +510,22 @@ class ProcessMaintenanceViewsTestCase(TestCase):
         )
         response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
         self.assertNotContains(response, "data-workspace")
+
+    def test_owned_child_save_bumps_root_revision_and_writes_audit_event(self):
+        revision = self.process.content_revision
+        response = self.client.post(self.section_url("inputs"), self.material_data())
+        self.assertEqual(response.status_code, 302)
+        self.process.refresh_from_db()
+        self.assertEqual(self.process.content_revision, revision + 1)
+        self.input.refresh_from_db()
+        self.assertEqual(self.input.notes, "Updated input only")
+        event = ReviewAction.objects.get(
+            content_type=ContentType.objects.get_for_model(Process),
+            object_id=self.process.pk,
+            action=ReviewAction.ACTION_EDITED,
+        )
+        self.assertEqual(event.user, self.owner)
+        self.assertEqual(event.content_revision, self.process.content_revision)
 
     def test_fragment_get_and_save_return_only_requested_section(self):
         headers = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}

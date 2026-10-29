@@ -1001,9 +1001,11 @@ def save_evidence_formset_rows(actor, formset, parent) -> None:
 
     Each changed row is its own registry root: edits/deletes run inside a
     ``content_mutation`` on the evidence record itself and creations are
-    recorded with ``record_creation`` — never as edits of the parent. The
-    caller is expected to hold an outer ``transaction.atomic`` batch and to
-    have validated the formset already.
+    authorized through ``authorize_create`` — locking and re-deciding
+    against the declared parent inside the write boundary — then recorded
+    with ``record_creation``. Never as edits of the parent. The caller is
+    expected to hold an outer ``transaction.atomic`` batch and to have
+    validated the formset already.
     """
     actor = _fresh_actor(actor)
     for form in formset.forms:
@@ -1027,9 +1029,7 @@ def save_evidence_formset_rows(actor, formset, parent) -> None:
                 resolve_create_parent(model_policy(type(instance)), instance, data)
                 or parent
             )
-            decision = decide(actor, "create", type(instance), parent=create_parent)
-            if not decision.allowed:
-                raise PermissionDenied(decision.reason)
+            actor = authorize_create(actor, type(instance), parent=create_parent)
             if isinstance(instance, UserCreatedObject):
                 instance.owner = actor
                 instance.publication_status = UserCreatedObject.STATUS_PRIVATE
