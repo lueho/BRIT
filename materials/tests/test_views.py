@@ -3593,6 +3593,57 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.sample.refresh_from_db()
         self.assertEqual(self.sample.name, "Pilot sample")
 
+    def test_section_save_bumps_content_revision_and_writes_audit_event(self):
+        revision = self.sample.content_revision
+        response = self.client.post(
+            self.section_url("overview"),
+            {
+                "name": "Renamed sample",
+                "material": str(self.substrate.pk),
+                "description": "New description",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.content_revision, revision + 1)
+        event = ReviewAction.objects.get(
+            content_type=ContentType.objects.get_for_model(Sample),
+            object_id=self.sample.pk,
+            action=ReviewAction.ACTION_EDITED,
+        )
+        self.assertEqual(event.user, self.owner)
+        self.assertEqual(event.content_revision, self.sample.content_revision)
+        self.assertIn("name", event.changed_fields)
+
+    def test_denied_post_lock_decision_rolls_back_section_save(self):
+        from utils.object_management.policy import Decision
+
+        revision = self.sample.content_revision
+        with patch(
+            "utils.object_management.services.decide",
+            side_effect=lambda *args, **kwargs: Decision(False, "immutable_state"),
+        ):
+            response = self.client.post(
+                self.section_url("overview"),
+                {
+                    "name": "Must not save",
+                    "material": str(self.substrate.pk),
+                    "description": "Must not save",
+                },
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+        self.assertEqual(response.status_code, 403)
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.name, "Pilot sample")
+        self.assertEqual(self.sample.content_revision, revision)
+        self.assertFalse(
+            ReviewAction.objects.filter(
+                object_id=self.sample.pk, action=ReviewAction.ACTION_EDITED
+            ).exists()
+        )
+
 
 class SampleDetailAttributionTestCase(ViewWithPermissionsTestCase):
     """Sample detail attribution: bibliography authors, not the owner."""
@@ -3661,6 +3712,9 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
                 codename__in=[
                     "add_sample",
                     "change_sample",
+                    "add_componentmeasurement",
+                    "change_componentmeasurement",
+                    "delete_componentmeasurement",
                     "add_materialpropertyvalue",
                 ],
             )
@@ -4176,6 +4230,48 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         self.assertTrue(response.json()["saved"])
         value = self.sample.property_values.get()
         self.assertEqual(value.comment, "calculated; C approximated as OM/1.8")
+
+    def test_properties_post_records_creation_audit_on_evidence_row(self):
+        response = self.client.post(
+            self.section_url("properties"),
+            self.property_formset(
+                [
+                    {
+                        "property": str(self.property.pk),
+                        "average": "312.5",
+                        "unit": str(self.unit.pk),
+                    }
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        value = self.sample.property_values.get()
+        event = ReviewAction.objects.get(
+            content_type=ContentType.objects.get_for_model(MaterialPropertyValue),
+            object_id=value.pk,
+            action=ReviewAction.ACTION_CREATED,
+        )
+        self.assertEqual(event.user, self.owner)
+        self.assertEqual(event.content_revision, value.content_revision)
+
+    def test_denied_boundary_rolls_back_measurement_rows(self):
+        from utils.object_management.policy import Decision
+
+        with patch(
+            "utils.object_management.services.decide",
+            side_effect=lambda *args, **kwargs: Decision(False, "invalid_state"),
+        ):
+            response = self.client.post(
+                self.section_url("measurements"),
+                self.measurement_formset(
+                    [self.measurement_row(component=str(self.moisture.pk))]
+                ),
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.sample.component_measurements.count(), 1)
 
 
 # ----------- Sample utilities -----------------------------------------------------------------------------------------
