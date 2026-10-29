@@ -11,6 +11,9 @@ from utils.serializers import FieldLabelModelSerializer
 from .models import (
     Catchment,
     GeoPolygon,
+    GeoreferencedCatchment,
+    GeoreferencedNutsRegion,
+    GeoreferencedRegion,
     LauRegion,
     Location,
     MapConfiguration,
@@ -166,10 +169,6 @@ class LocationGeoFeatureModelSerializer(GeoFeatureModelSerializer):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class GeoreferencedRegion(GeoPolygon, Region):
-    pass
-
-
 class RegionModelSerializer(ModelSerializer):
     class Meta:
         model = Region
@@ -196,10 +195,6 @@ class BaseResultMapSerializer(GeoFeatureModelSerializer):
         fields = "__all__"
 
 
-class GeoreferencedCatchment(GeoPolygon, Catchment):
-    pass
-
-
 class CatchmentModelSerializer(ModelSerializer):
     class Meta:
         model = Catchment
@@ -219,10 +214,6 @@ class CatchmentQuerySerializer(ModelSerializer):
     class Meta:
         model = Catchment
         fields = ["owner", "parent_region", "type", "name"]
-
-
-class GeoreferencedNutsRegion(GeoPolygon, NutsRegion):
-    pass
 
 
 class NutsRegionGeometrySerializer(GeoFeatureModelSerializer):
