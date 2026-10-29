@@ -50,7 +50,6 @@ from sources.waste_collection.serializers import (
     CollectionFlatSerializer,
     CollectionFrequencyMutationSerializer,
     CollectionFrequencyReferenceSerializer,
-    CollectionImportRecordSerializer,
     CollectionModelSerializer,
     CollectionMutationCreateSerializer,
     CollectionMutationUpdateSerializer,
@@ -1487,94 +1486,12 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             status=status.HTTP_201_CREATED,
         )
 
-    @action(
-        detail=False,
-        methods=["post"],
-        permission_classes=[permissions.IsAuthenticated],
-        url_path="import",
-    )
-    def bulk_import(self, request, *args, **kwargs):
-        """Bulk-import waste collection records from a JSON array.
-
-        Accepts a JSON body with a top-level ``records`` list.  Each element
-        follows the ``CollectionImportRecordSerializer`` schema.
-
-        Optional top-level fields:
-
-        - ``dry_run`` (bool, default false) – validate and report without writing.
-        - ``publication_status`` (str, default ``"private"``) – status to assign
-          to newly created records.
-
-        Returns a summary dict with created/skipped counts and any warnings.
-
-        Only users holding the ``create`` capability for ``Collection`` (and
-        ``Collector`` when ``create_collectors`` is set) may call this
-        endpoint.
-        """
-        if not decide(request.user, "create", Collection).allowed:
-            return Response(
-                {"detail": "You may not create collection records."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        payload = request.data
-        if not isinstance(payload, dict):
-            return Response(
-                {"detail": "Request body must be a JSON object."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        records_raw = payload.get("records")
-        if not isinstance(records_raw, list):
-            return Response(
-                {"detail": "'records' must be a JSON array."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        dry_run = payload.get("dry_run", False)
-        if not isinstance(dry_run, bool):
-            return Response(
-                {"detail": "'dry_run' must be a boolean."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        create_collectors = payload.get("create_collectors", False)
-        if not isinstance(create_collectors, bool):
-            return Response(
-                {"detail": "'create_collectors' must be a boolean."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if create_collectors and not decide(request.user, "create", Collector).allowed:
-            return Response(
-                {"detail": "You may not create collector records."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        pub_status = payload.get("publication_status", "private")
-        valid_statuses = ("private", "review")
-        if pub_status not in valid_statuses:
-            return Response(
-                {"detail": f"'publication_status' must be one of {valid_statuses}."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Validate all records up-front; collect per-record errors
-        serializer = CollectionImportRecordSerializer(data=records_raw, many=True)
-        if not serializer.is_valid():
-            return Response(
-                {"detail": "Validation failed.", "errors": serializer.errors},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        importer = CollectionImporter(
-            owner=request.user,
-            publication_status=pub_status,
-            create_collectors=create_collectors,
-        )
-        stats = importer.run(serializer.validated_data, dry_run=dry_run)
-
-        http_status = status.HTTP_200_OK if dry_run else status.HTTP_201_CREATED
-        return Response({"dry_run": dry_run, "stats": stats}, status=http_status)
+    # The ``bulk_import`` HTTP entry point is intentionally removed: the
+    # trusted ``CollectionImporter`` performs writes on existing records that
+    # the ``add_collection`` capability cannot authorize (re-owning collections
+    # and property values, deleting generated values, mutating frozen
+    # predecessors, ungoverned review submission). It stays disabled until
+    # those operations route through governed persistence.
 
     @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
     def summaries(self, request, *args, **kwargs):

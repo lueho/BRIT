@@ -1318,14 +1318,6 @@ class CollectionImporterWorkflowTestCase(APITestCase):
             name="Importer Test System"
         )
         cls.waste_category = WasteCategory.objects.create(name="Importer Test Category")
-        cls.allowed_material = Material.objects.create(
-            name="Importer Allowed Material",
-            owner=cls.owner,
-        )
-        cls.forbidden_material = Material.objects.create(
-            name="Importer Forbidden Material",
-            owner=cls.owner,
-        )
         cls.valid_from = datetime.date(2099, 6, 1)
 
     def _make_record(self):
@@ -1449,97 +1441,34 @@ class CollectionImporterWorkflowTestCase(APITestCase):
             ).exists()
         )
 
-    def test_bulk_import_endpoint_persists_review_comment(self):
+    def test_bulk_import_endpoint_is_disabled(self):
+        """The bulk-import HTTP entry point is disabled.
+
+        ``CollectionImporter`` performs writes on existing records that the
+        ``add_collection`` capability cannot authorize, so the route is removed
+        until importer operations route through governed persistence. Importer
+        behavior itself stays covered by the unit tests above.
+        """
         self.client.force_login(self.staff_owner)
 
         response = self.client.post(
-            reverse("api-waste-collection-bulk-import"),
+            "/waste_collection/api/collection/import/",
             {
-                "records": [
-                    self._make_record()
-                    | {
-                        "review_comment": "Please verify unresolved sorting map interpretation."
-                    }
-                ],
+                "records": [self._make_record()],
                 "publication_status": "private",
                 "dry_run": False,
             },
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        collection = Collection.objects.get(
-            owner=self.staff_owner,
-            valid_from=self.valid_from,
-            collection_system=self.collection_system,
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(
+            Collection.objects.filter(
+                owner=self.staff_owner,
+                valid_from=self.valid_from,
+                collection_system=self.collection_system,
+            ).exists()
         )
-        comment_action = ReviewAction.for_object(collection).get(
-            action=ReviewAction.ACTION_COMMENT,
-            user=self.staff_owner,
-        )
-        self.assertIn(
-            "Please verify unresolved sorting map interpretation.",
-            comment_action.comment,
-        )
-
-    def test_bulk_import_endpoint_preserves_material_lists(self):
-        self.client.force_login(self.staff_owner)
-
-        response = self.client.post(
-            reverse("api-waste-collection-bulk-import"),
-            {
-                "records": [
-                    self._make_record()
-                    | {
-                        "allowed_materials": self.allowed_material.name,
-                        "forbidden_materials": self.forbidden_material.name,
-                    }
-                ],
-                "publication_status": "private",
-                "dry_run": False,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        collection = Collection.objects.get(
-            owner=self.staff_owner,
-            valid_from=self.valid_from,
-            collection_system=self.collection_system,
-        )
-        self.assertEqual(
-            list(collection.allowed_materials.values_list("name", flat=True)),
-            [self.allowed_material.name],
-        )
-        self.assertEqual(
-            list(collection.forbidden_materials.values_list("name", flat=True)),
-            [self.forbidden_material.name],
-        )
-
-    def test_bulk_import_endpoint_can_create_missing_collectors(self):
-        self.client.force_login(self.staff_owner)
-
-        response = self.client.post(
-            reverse("api-waste-collection-bulk-import"),
-            {
-                "records": [
-                    self._make_record() | {"collector_name": "Ajuntament de Cardona"}
-                ],
-                "publication_status": "private",
-                "dry_run": False,
-                "create_collectors": True,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        collection = Collection.objects.get(
-            owner=self.staff_owner,
-            valid_from=self.valid_from,
-            collection_system=self.collection_system,
-        )
-        self.assertEqual(collection.collector.name, "Ajuntament de Cardona")
-        self.assertEqual(response.data["stats"]["collectors_created"], 1)
 
 
 class CollectionMutationApiTestCase(APITestCase):

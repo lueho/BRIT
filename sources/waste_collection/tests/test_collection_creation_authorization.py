@@ -1,11 +1,15 @@
 """Governed programmatic collection creation authorization.
 
-The custom collection create, new-version, frequency-create and bulk-import
-routes must delegate to the shared policy instead of staff shortcuts:
-creation requires the model ``add`` capability, every referenced record
-requires independent read access, new roots get a creation audit, and
-submissions flow through the revision-bound transition service. ``is_staff``
-grants none of this.
+The custom collection create, new-version and frequency-create routes must
+delegate to the shared policy instead of staff shortcuts: creation requires
+the model ``add`` capability, every referenced record requires independent
+read access, new roots get a creation audit, and submissions flow through
+the revision-bound transition service. ``is_staff`` grants none of this.
+
+The bulk-import application entry point is disabled outright: the trusted
+``CollectionImporter`` performs writes on existing records that
+``add_collection`` cannot authorize, so the HTTP route stays removed until
+those operations route through governed persistence.
 """
 
 from io import StringIO
@@ -13,7 +17,7 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -1175,33 +1179,39 @@ class CollectionFrequencyGovernanceTests(CollectionFrequencyAuthorizationTests):
         self.assertEqual(row.publication_status, "review")
 
 
-class BulkImportGateTests(CollectionCreationFixture, APITestCase):
-    """The bulk-import gate uses create capabilities, not staff status."""
+class BulkImportDisabledTests(CollectionCreationFixture, APITestCase):
+    """The bulk-import application entry point is disabled.
+
+    The trusted ``CollectionImporter`` performs writes the ``add_collection``
+    capability cannot authorize (re-owning existing records, generated-value
+    deletion, frozen-predecessor mutation, ungoverned submit), so the HTTP
+    route is removed until those operations use governed persistence. No
+    capability set may reach it.
+    """
+
+    BULK_IMPORT_PATH = "/waste_collection/api/collection/import/"
 
     def _post(self, user, **payload):
         self.client.force_login(user)
         data = {"records": [], "dry_run": True}
         data.update(payload)
-        return self.client.post(
-            reverse("api-waste-collection-bulk-import"), data, format="json"
-        )
+        return self.client.post(self.BULK_IMPORT_PATH, data, format="json")
 
-    def test_staff_only_without_capability_is_denied(self):
+    def test_bulk_import_url_name_is_removed(self):
+        with self.assertRaises(NoReverseMatch):
+            reverse("api-waste-collection-bulk-import")
+
+    def test_staff_only_is_denied(self):
         response = self._post(self.staff_only)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_contributor_with_create_capability_passes_gate(self):
+    def test_contributor_with_create_capability_is_denied(self):
         response = self._post(self.owner)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(response.data["dry_run"])
-
-    def test_create_collectors_requires_collector_capability(self):
-        response = self._post(self.staff_col_only, create_collectors=True)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_create_collectors_allowed_with_capability(self):
+    def test_create_collectors_flag_stays_denied(self):
         response = self._post(self.owner, create_collectors=True)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class ScopedReadAdapterTests(CollectionCreationFixture, APITestCase):
