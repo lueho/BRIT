@@ -1,24 +1,28 @@
 from django.contrib import admin
 
-from utils.object_management.admin import NamedUserCreatedObjectAdmin
+from utils.object_management.admin import (
+    NamedUserCreatedObjectAdmin,
+    PolicyAdminMixin,
+    PolicyOwnedInlineMixin,
+)
 
 from .models import Showcase, ShowcaseMaterial, ShowcaseProcess
 
 
-class ShowcaseMaterialInline(admin.TabularInline):
+class ShowcaseMaterialInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = ShowcaseMaterial
     extra = 0
     autocomplete_fields = ("material",)
 
 
-class ShowcaseProcessInline(admin.TabularInline):
+class ShowcaseProcessInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = ShowcaseProcess
     extra = 0
     autocomplete_fields = ("process",)
 
 
 @admin.register(Showcase)
-class ShowcaseAdmin(NamedUserCreatedObjectAdmin):
+class ShowcaseAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "theme",

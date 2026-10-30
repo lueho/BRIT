@@ -1,6 +1,10 @@
 from django.contrib import admin
 
-from utils.object_management.admin import NamedUserCreatedObjectAdmin
+from utils.object_management.admin import (
+    NamedUserCreatedObjectAdmin,
+    PolicyAdminMixin,
+    PolicyOwnedInlineMixin,
+)
 
 from .models import (
     AnalyticalMethod,
@@ -19,14 +23,14 @@ from .models import (
 )
 
 
-class SampleAuthorInline(admin.TabularInline):
+class SampleAuthorInline(PolicyOwnedInlineMixin, admin.TabularInline):
     model = SampleAuthor
     extra = 1
     autocomplete_fields = ("author",)
 
 
 @admin.register(AnalyticalMethod)
-class AnalyticalMethodAdmin(admin.ModelAdmin):
+class AnalyticalMethodAdmin(PolicyAdminMixin, admin.ModelAdmin):
     """
     Admin interface for the AnalyticalMethod model with autocomplete for sources.
     """
@@ -68,13 +72,13 @@ class AnalyticalMethodAdmin(admin.ModelAdmin):
 
 
 @admin.register(Material)
-class MaterialAdmin(NamedUserCreatedObjectAdmin):
+class MaterialAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "abbreviation", "owner", "publication_status")
     search_fields = ("name", "abbreviation", "description")
 
 
 @admin.register(MaterialComponent)
-class MaterialComponentAdmin(NamedUserCreatedObjectAdmin):
+class MaterialComponentAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "abbreviation",
@@ -88,12 +92,12 @@ class MaterialComponentAdmin(NamedUserCreatedObjectAdmin):
 
 
 @admin.register(MaterialComponentGroup)
-class MaterialComponentGroupAdmin(NamedUserCreatedObjectAdmin):
+class MaterialComponentGroupAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     pass
 
 
 @admin.register(MaterialProperty)
-class MaterialPropertyAdmin(NamedUserCreatedObjectAdmin):
+class MaterialPropertyAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "abbreviation",
@@ -109,12 +113,12 @@ class MaterialPropertyAdmin(NamedUserCreatedObjectAdmin):
 
 
 @admin.register(MaterialPropertyGroup)
-class MaterialPropertyGroupAdmin(NamedUserCreatedObjectAdmin):
+class MaterialPropertyGroupAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     pass
 
 
 @admin.register(MaterialPropertyValue)
-class MaterialPropertyValueAdmin(admin.ModelAdmin):
+class MaterialPropertyValueAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "property",
@@ -131,7 +135,7 @@ class MaterialPropertyValueAdmin(admin.ModelAdmin):
 
 
 @admin.register(SampleSeries)
-class SampleSeriesAdmin(NamedUserCreatedObjectAdmin):
+class SampleSeriesAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "material",
@@ -145,7 +149,7 @@ class SampleSeriesAdmin(NamedUserCreatedObjectAdmin):
 
 
 @admin.register(SampleGroup)
-class SampleGroupAdmin(NamedUserCreatedObjectAdmin):
+class SampleGroupAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "kind", "owner", "publication_status")
     search_fields = ("name", "description", "sources__title")
     list_filter = ("kind", "publication_status")
@@ -153,7 +157,7 @@ class SampleGroupAdmin(NamedUserCreatedObjectAdmin):
 
 
 @admin.register(Sample)
-class SampleAdmin(NamedUserCreatedObjectAdmin):
+class SampleAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "material",
@@ -171,7 +175,7 @@ class SampleAdmin(NamedUserCreatedObjectAdmin):
 
 
 @admin.register(Composition)
-class CompositionAdmin(admin.ModelAdmin):
+class CompositionAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "sample",
@@ -187,7 +191,7 @@ class CompositionAdmin(admin.ModelAdmin):
 
 
 @admin.register(ComponentMeasurement)
-class ComponentMeasurementAdmin(admin.ModelAdmin):
+class ComponentMeasurementAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "sample",

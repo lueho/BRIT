@@ -1,17 +1,17 @@
 from django.contrib import admin
 
-from utils.object_management.admin import NamedUserCreatedObjectAdmin
+from utils.object_management.admin import NamedUserCreatedObjectAdmin, PolicyAdminMixin
 
 from .models import Period, TemporalDistribution, Timestep
 
 
 @admin.register(TemporalDistribution)
-class TemporalDistributionAdmin(NamedUserCreatedObjectAdmin):
+class TemporalDistributionAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     pass
 
 
 @admin.register(Timestep)
-class TimestepAdmin(NamedUserCreatedObjectAdmin):
+class TimestepAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = ("name", "distribution", "order", "owner", "publication_status")
     list_filter = ("publication_status", "distribution")
     ordering = ("distribution", "order")
@@ -19,7 +19,7 @@ class TimestepAdmin(NamedUserCreatedObjectAdmin):
 
 
 @admin.register(Period)
-class PeriodAdmin(admin.ModelAdmin):
+class PeriodAdmin(PolicyAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "distribution",
