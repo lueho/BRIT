@@ -126,12 +126,14 @@ def authorize_create(actor, model, *, parent=None):
     """Authoritative ``create`` authorization inside the write boundary.
 
     Resolves the registered policy, enforces the declared ``parent_path``
-    context, re-reads the actor through ``_fresh_actor``, and locks every
-    declared parent row via ``select_for_update`` in deterministic storage
-    order — a stale permission cache, a vanished, unsaved, or wrongly typed
-    parent, or a parent lifecycle transition committed since any advisory
-    check can never authorize a write. Returns the fresh actor for owner
-    attribution and audit writes.
+    context, and locks every declared parent row via ``select_for_update``
+    in deterministic storage order — a stale permission cache, a vanished,
+    unsaved, or wrongly typed parent, or a parent lifecycle transition
+    committed since any advisory check can never authorize a write. The
+    actor is re-read through ``_fresh_actor`` only after every potentially
+    blocking lock is held, so a deactivation committed while this boundary
+    waited can never authorize a write either. Returns the fresh actor for
+    owner attribution and audit writes.
 
     Locking the parents serializes creates against concurrent review
     transitions on the same rows (the same ``_storage_key`` ordering
@@ -147,7 +149,6 @@ def authorize_create(actor, model, *, parent=None):
     policy = model_policy(model)
     if policy is None:
         raise PermissionDenied("unsupported_model")
-    actor = _fresh_actor(actor)
     if policy.parent_path is not None:
         if parent is None and allows_unattached_create(model):
             pass  # optional direct-FK parent legitimately omitted
@@ -180,6 +181,7 @@ def authorize_create(actor, model, *, parent=None):
                     raise PermissionDenied("invalid_parent") from None
             fresh = [locked[_storage_key(candidate)] for candidate in members]
             parent = fresh[0] if isinstance(parent, Model) else tuple(fresh)
+    actor = _fresh_actor(actor)
     decision = decide(actor, "create", model, parent=parent)
     if not decision.allowed:
         raise PermissionDenied(decision.reason)

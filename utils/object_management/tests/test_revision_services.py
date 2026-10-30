@@ -999,6 +999,131 @@ class CreateApprovalRaceTests(TransactionTestCase):
         )
 
 
+class CreateActorDeactivationRaceTests(TransactionTestCase):
+    """Create-versus-deactivation TOCTOU boundary on the shared create path.
+
+    The actor refresh inside ``authorize_create`` must run after every
+    potentially blocking ``select_for_update`` parent lock: while the
+    creator thread waits on a parent row locked by a concurrent
+    transaction, the account is deactivated. The create must then decide
+    on the fresh ``is_active`` state and fail closed — no row and no audit
+    event may persist.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username="cad-owner")
+        self.owner.user_permissions.add(
+            _perm(ComponentMeasurement, "add_componentmeasurement"),
+            _perm(Sample, "change_sample"),
+        )
+        self.material = Material.objects.create(
+            name="Deactivation material",
+            owner=self.owner,
+            publication_status="published",
+        )
+        post_save.disconnect(add_default_composition, sender=Sample)
+        try:
+            self.sample = Sample.objects.create(
+                name="Deactivation sample",
+                material=self.material,
+                owner=self.owner,
+                standalone=True,
+                publication_status="review",
+            )
+        finally:
+            post_save.connect(add_default_composition, sender=Sample)
+        self.group = MaterialComponentGroup.objects.create(
+            name="Deactivation group",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.component = MaterialComponent.objects.create(
+            name="Deactivation component",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.unit = Unit.objects.create(
+            name="g/kg",
+            symbol="g/kg",
+            owner=self.owner,
+            publication_status="published",
+        )
+
+    def test_deactivation_while_blocked_on_parent_lock_denies_create(self):
+        parent_locked = threading.Event()
+        create_attempted = threading.Event()
+        release = threading.Event()
+        results = {}
+        errors = {}
+
+        real_lock = services._lock_instance
+
+        def signaling_lock(obj):
+            create_attempted.set()
+            return real_lock(obj)
+
+        def blocker():
+            with transaction.atomic():
+                services._lock_instance(self.sample)
+                parent_locked.set()
+                release.wait(timeout=10)
+
+        def creator():
+            serializer = ComponentMeasurementWriteSerializer(
+                data={
+                    "sample": self.sample.pk,
+                    "group": self.group.pk,
+                    "component": self.component.pk,
+                    "unit": self.unit.pk,
+                    "average": "10.0",
+                }
+            )
+            if not serializer.is_valid():
+                raise AssertionError(serializer.errors)
+            view = _RaceMeasurementViewSet()
+            view.request = SimpleNamespace(user=self.owner)
+            view.kwargs = {}
+            with patch.object(services, "_lock_instance", side_effect=signaling_lock):
+                view.perform_create(serializer)
+
+        def run(fn, key):
+            import traceback
+
+            try:
+                fn()
+            except PermissionDenied as exc:
+                results[key] = (exc, traceback.format_exc())
+            except Exception as exc:  # pragma: no cover
+                errors[key] = (exc, traceback.format_exc())
+            finally:
+                connection.close()
+
+        t_block = threading.Thread(target=lambda: run(blocker, "blocker"))
+        t_block.start()
+        self.assertTrue(parent_locked.wait(timeout=10))
+
+        t_create = threading.Thread(target=lambda: run(creator, "creator"))
+        t_create.start()
+        self.assertTrue(create_attempted.wait(timeout=10))
+
+        User.objects.filter(pk=self.owner.pk).update(is_active=False)
+        release.set()
+        t_block.join(timeout=15)
+        t_create.join(timeout=15)
+
+        self.assertFalse(t_block.is_alive() or t_create.is_alive())
+        self.assertFalse(errors, errors)
+        denial = results.get("creator")
+        self.assertIsNotNone(denial, "create unexpectedly succeeded")
+        exc, tb = denial
+        self.assertIsInstance(exc, PermissionDenied, tb)
+
+        self.assertFalse(ComponentMeasurement.objects.exists())
+        self.assertFalse(
+            ReviewAction.objects.filter(action=ReviewAction.ACTION_CREATED).exists()
+        )
+
+
 class OwnedParentResolutionTests(TestCase):
     """Owned children must re-resolve their stored parent under the root lock."""
 
