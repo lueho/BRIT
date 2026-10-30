@@ -522,6 +522,103 @@ class SourceCRUDViewsTestCase(
         source = Source.objects.latest("pk")
         self.assertEqual(source.sourceauthors.count(), 0)
 
+    def test_update_source_inline_only_change_runs_in_mutation_boundary(self):
+        """An update that only adds an inline SourceAuthor row is a governed
+        write: it runs inside the root's content_mutation boundary, so the
+        snapshot diff records the created child row, bumps
+        ``content_revision`` and writes one ``edited`` audit event."""
+        from django.contrib.contenttypes.models import ContentType
+        from django.utils import timezone
+
+        from utils.object_management.models import ReviewAction
+
+        source = Source.objects.create(
+            owner=self.owner_user,
+            publication_status="private",
+            title="Inline governed source",
+            citation_key="IGS",
+            type="misc",
+            url="https://example.org/inline",
+            last_accessed=timezone.now().date(),
+        )
+        self.assertEqual(source.content_revision, 1)
+        self.client.force_login(self.owner_user)
+        post_data = {
+            "title": source.title,
+            "citation_key": source.citation_key,
+            "type": source.type,
+            "url": source.url,
+            "sourceauthors-TOTAL_FORMS": 1,
+            "sourceauthors-INITIAL_FORMS": 0,
+            "sourceauthors-0-id": "",
+            "sourceauthors-0-source": "",
+            "sourceauthors-0-author": self.source_author_1.author.pk,
+        }
+        response = self.client.post(
+            self.get_update_url(source.pk), post_data, follow=True
+        )
+        self.assertEqual(response.status_code, 200)
+        source.refresh_from_db()
+        self.assertEqual(source.sourceauthors.count(), 1)
+        self.assertEqual(source.content_revision, 2)
+        events = ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(Source),
+            object_id=source.pk,
+            action=ReviewAction.ACTION_EDITED,
+        )
+        self.assertEqual(events.count(), 1)
+        link = source.sourceauthors.get()
+        self.assertIn(
+            f"bibliography.sourceauthor#{link.pk}:created",
+            events.get().changed_fields,
+        )
+
+    def test_update_source_post_lock_denial_rolls_back_inline_writes(self):
+        """A lifecycle change committed while the view waits on the row lock
+        denies the whole mutation: no form update, no inline rows, no audit."""
+        from django.contrib.contenttypes.models import ContentType
+
+        from utils.object_management import services
+        from utils.object_management.models import ReviewAction
+
+        source = Source.objects.create(
+            owner=self.owner_user,
+            publication_status="private",
+            title="Locked source",
+            citation_key="LCK",
+            type="misc",
+        )
+        self.client.force_login(self.owner_user)
+        real_lock = services._lock_instance
+
+        def publish_then_lock(obj):
+            Source.objects.filter(pk=source.pk).update(publication_status="published")
+            return real_lock(obj)
+
+        post_data = {
+            "title": "Changed title",
+            "citation_key": source.citation_key,
+            "type": source.type,
+            "sourceauthors-TOTAL_FORMS": 1,
+            "sourceauthors-INITIAL_FORMS": 0,
+            "sourceauthors-0-id": "",
+            "sourceauthors-0-source": "",
+            "sourceauthors-0-author": self.source_author_1.author.pk,
+        }
+        with patch.object(services, "_lock_instance", side_effect=publish_then_lock):
+            response = self.client.post(self.get_update_url(source.pk), post_data)
+        self.assertEqual(response.status_code, 403)
+        source.refresh_from_db()
+        self.assertEqual(source.title, "Locked source")
+        self.assertEqual(source.content_revision, 1)
+        self.assertFalse(SourceAuthor.objects.filter(source=source).exists())
+        self.assertFalse(
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(Source),
+                object_id=source.pk,
+            ).exists()
+        )
+
     def test_update_source_add_authors(self):
         """
         Test updating a Source that was created with no authors to add one or more authors.

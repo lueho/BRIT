@@ -2758,14 +2758,44 @@ class UserCreatedObjectUpdateWithInlinesView(
 ):
     formset_helper_class = DynamicTableInlineFormSetHelper
 
+    def forms_valid(self, form, inlines):
+        """Stash the validated inline formsets so the governed write persists
+        them inside the ``content_mutation`` boundary.
+
+        ``extra_views`` saves each formset after ``form_valid`` returns —
+        outside the boundary that locks, re-checks, snapshots and audits the
+        root. Routing through ``self.form_valid`` lets
+        ``_call_super_form_valid`` save the formsets against the locked
+        instance while the root lock and atomic block are still held.
+        """
+        self._pending_inline_formsets = list(inlines)
+        return self.form_valid(form)
+
     def _call_super_form_valid(self, form):
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        self._save_pending_inlines()
+        return response
+
+    def _save_pending_inlines(self):
+        """Persist stashed inline formsets against the saved object.
+
+        On the governed path this runs inside ``content_mutation`` so child
+        rows join the root snapshot diff and roll back with it. On the
+        non-governed fallback the same ordering as ``extra_views``
+        (form first, then formsets) is preserved.
+        """
+        for formset in getattr(self, "_pending_inline_formsets", None) or ():
+            formset.instance = self.object
+            formset.save()
+        self._pending_inline_formsets = []
 
     def form_valid(self, form):
         response = _perform_bound_update(self, form)
         if response is not None:
             return response
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        self._save_pending_inlines()
+        return response
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
