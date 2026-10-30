@@ -270,20 +270,6 @@ class GrowthTimeStepSetModalUpdateView(UserCreatedObjectUpdateWithInlinesView):
     fields = []
     template_name = "modal_form_with_formset.html"
 
-    def forms_valid(self, form, inlines):
-        # extra_views persists inline formsets after ``form_valid`` returns —
-        # outside the bound update. Stash them so the share rows save inside
-        # the same ``content_mutation`` on the parent greenhouse root.
-        self._inlines = inlines
-        return self.form_valid(form)
-
-    def _call_super_form_valid(self, form):
-        response = super()._call_super_form_valid(form)
-        for formset in self._inlines:
-            formset.instance = self.object
-            formset.save()
-        return response
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         inline_helper = GrowthShareFormSetHelper()
