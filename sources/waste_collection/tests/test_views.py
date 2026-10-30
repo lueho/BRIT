@@ -2740,6 +2740,17 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             description="Private predecessor",
             publication_status="private",
         )
+        cls.archived_collection = Collection.objects.create(
+            name="archived-predecessor",
+            owner=cls.member,
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
+            waste_category=waste_category,
+            frequency=cls.frequency,
+            description="Archived predecessor",
+            publication_status="archived",
+        )
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(
@@ -2799,6 +2810,23 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(
             reverse(self.url_name, kwargs={"pk": self.private_collection.id})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_for_editor_with_grant_on_private_predecessor(self):
+        """An editor grant on the predecessor satisfies ``new_version``."""
+        self.private_collection.add_editor(self.member, granted_by=self.owner)
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": self.private_collection.id})
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_403_for_owner_of_archived_predecessor(self):
+        """Archived predecessors are frozen: even their owner is denied."""
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": self.archived_collection.id})
         )
         self.assertEqual(response.status_code, 403)
 
@@ -3216,7 +3244,10 @@ class CollectionWasteSamplesViewTestCase(
         )
         cls.unpublished_object.samples.add(
             Sample.objects.create(
-                name="Test Sample 1", material=material, series=series
+                name="Test Sample 1",
+                material=material,
+                series=series,
+                publication_status="published",
             )
         )
         cls.sample = Sample.objects.create(
@@ -7130,8 +7161,9 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
         cls.collection.allowed_materials.add(cls.allowed_material)
         cls.collection.predecessors.add(cls.predecessor)
 
-    def test_predecessor_valid_until_updated_on_form_save(self):
-        """Verify predecessors' valid_until is updated when form is saved."""
+    def test_predecessor_valid_until_untouched_by_form_save(self):
+        """Ordinary form saves never write predecessor state: ``valid_until``
+        closes only inside the governed approve operation."""
         self.assertIsNone(self.predecessor.valid_until)
 
         form_data = {
@@ -7152,7 +7184,7 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
         form.save()
 
         self.predecessor.refresh_from_db()
-        self.assertEqual(self.predecessor.valid_until, date(2024, 5, 31))
+        self.assertIsNone(self.predecessor.valid_until)
 
     @patch("sources.waste_collection.signals.clear_geojson_cache_pattern")
     def test_predecessor_save_minimizes_cache_invalidation(self, mock_clear):

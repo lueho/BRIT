@@ -1,5 +1,5 @@
 import logging
-from datetime import date
+from datetime import date, timedelta
 from functools import cached_property
 
 import celery
@@ -996,10 +996,17 @@ class Collection(NamedUserCreatedObject):
 
             super().approve(user=user)
 
-            # Archive only published predecessors — archived records are
-            # public historical data, so an unpublished predecessor must
-            # never be forced public here.
             for predecessor in predecessors:
+                # Close the predecessor's validity where this version's
+                # period starts. The rows are already locked inside this
+                # governed transition — ordinary edits of the successor
+                # must never write predecessor state before approval.
+                if self.valid_from is not None:
+                    predecessor.valid_until = self.valid_from - timedelta(days=1)
+                    predecessor.save(update_fields=["valid_until", "lastmodified_at"])
+                # Archive only published predecessors — archived records are
+                # public historical data, so an unpublished predecessor must
+                # never be forced public here.
                 if predecessor.publication_status == self.STATUS_PUBLISHED:
                     perform_transition(
                         user,

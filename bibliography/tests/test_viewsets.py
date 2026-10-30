@@ -35,6 +35,40 @@ class AuthorViewSetPermissionTestCase(ViewSetWithPermissionsTestCase):
         response = self.client.get(reverse("api-author-list"))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_list_scopes_private_authors_for_anonymous(self):
+        # Private rows owned by others must not leak to unauthenticated
+        # readers; the viewset delegates scoping to the shared read policy.
+        response = self.client.get(reverse("api-author-list"))
+        ids = {entry["id"] for entry in response.data}
+        self.assertIn(self.author.pk, ids)
+        self.assertNotIn(self.member_author.pk, ids)
+
+    def test_list_scopes_private_authors_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse("api-author-list"))
+        ids = {entry["id"] for entry in response.data}
+        self.assertIn(self.author.pk, ids)
+        self.assertNotIn(self.member_author.pk, ids)
+
+    def test_retrieve_private_author_404_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(
+            reverse("api-author-detail", args=[self.member_author.pk])
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_update_denied_on_foreign_private_author(self):
+        self.client.force_login(self.outsider)
+        response = self.client.put(
+            reverse("api-author-detail", args=[self.member_author.pk]),
+            self.author_data,
+            content_type="application/json",
+        )
+        self.assertIn(
+            response.status_code,
+            (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND),
+        )
+
     def test_list_200_ok_for_outsiders(self):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse("api-author-list"))

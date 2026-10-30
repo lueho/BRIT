@@ -6,7 +6,7 @@ import re
 from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.db import connection, transaction
+from django.db import connection
 from django.db.models import Prefetch, Q
 from django.http import (
     Http404,
@@ -20,7 +20,6 @@ from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.generic import (
-    CreateView,
     DetailView,
     RedirectView,
     TemplateView,
@@ -38,10 +37,9 @@ from maps.models import Catchment, GeoDataset, Region
 from maps.serializers import BaseResultMapSerializer
 from maps.views import GeoDataSetAutocompleteView, MapMixin
 from materials.models import Material, SampleSeries
-from utils.object_management.permissions import (
-    filter_queryset_for_user,
-    get_object_policy,
-)
+from utils.object_management.permissions import filter_queryset_for_user
+from utils.object_management.policy import decide
+from utils.object_management.services import content_mutation
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -122,10 +120,13 @@ class InventoriesExplorerView(BreadcrumbContextMixin, TemplateView):
         return context
 
 
-class SeasonalDistributionCreateView(LoginRequiredMixin, CreateView):
+class SeasonalDistributionCreateView(UserCreatedObjectCreateView):
     form_class = SeasonalDistributionModelForm
     template_name = "seasonal_distribution_create.html"
-    success_url = "/inventories/materials/{material_id}"
+    permission_required = "distributions.add_temporaldistribution"
+
+    def get_success_url(self):
+        return f"/inventories/materials/{self.kwargs['material_pk']}"
 
 
 # ----------- Inventory Algorithm Utils --------------------------------------------------------------------------------
@@ -259,12 +260,7 @@ class ScenarioDetailView(ScenarioMapMixin, UserCreatedObjectDetailView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
-        if (
-            not request.user.is_authenticated
-            or not get_object_policy(request.user, scenario, request=request)[
-                "can_edit"
-            ]
-        ):
+        if not decide(request.user, "edit", scenario).allowed:
             return HttpResponseForbidden()
         start_inventory_run(scenario.id)
         return redirect("scenario-result", scenario.id)
@@ -435,7 +431,8 @@ def get_evaluation_status(request, task_id=None):
 
 
 class ScenarioEditPermissionMixin:
-    """test_func checking ``can_edit`` on the scenario named by ``scenario_kwarg``."""
+    """test_func delegating to the central ``edit`` decision on the scenario
+    named by ``scenario_kwarg``."""
 
     scenario_kwarg = "scenario_pk"
     scenario = None
@@ -444,10 +441,7 @@ class ScenarioEditPermissionMixin:
         self.scenario = get_object_or_404(
             Scenario, id=self.kwargs.get(self.scenario_kwarg)
         )
-        policy = get_object_policy(
-            self.request.user, self.scenario, request=self.request
-        )
-        return policy["can_edit"]
+        return decide(self.request.user, "edit", self.scenario).allowed
 
 
 class ScenarioAddInventoryAlgorithmView(
@@ -485,9 +479,15 @@ class ScenarioAddInventoryAlgorithmView(
             raise Http404
         try:
             sample_series = _posted_sample_series(request, feedstock)
-            with transaction.atomic():
-                values = resolve_parameter_values(request, algorithm, scenario)
-                scenario.add_inventory_algorithm(
+            # The configuration rows are owned children of the scenario:
+            # their create writes inside the scenario's content_mutation
+            # boundary — the shared InventoryAlgorithmParameter(Value) rows
+            # stay unregistered config entities inside the same atomic.
+            with content_mutation(
+                request.user, scenario, action="edit"
+            ) as locked_scenario:
+                values = resolve_parameter_values(request, algorithm, locked_scenario)
+                locked_scenario.add_inventory_algorithm(
                     feedstock, algorithm, values, sample_series=sample_series
                 )
         except InvalidParameterValue as exc:
@@ -554,9 +554,11 @@ class ScenarioAddInventoryAlgorithmView(
                 return HttpResponseBadRequest("The feature filter is too long.")
 
         try:
-            with transaction.atomic():
+            with content_mutation(
+                request.user, scenario, action="edit"
+            ) as locked_scenario:
                 self._apply_generic_post(
-                    scenario,
+                    locked_scenario,
                     function_name,
                     geodataset,
                     filter_spec,
@@ -721,12 +723,18 @@ class ScenarioAlgorithmConfigurationUpdateView(
         )
         try:
             sample_series = _posted_sample_series(request, feedstock)
-            with transaction.atomic():
-                values = resolve_parameter_values(request, new_algorithm, scenario)
-                scenario.remove_inventory_algorithm(
+            # The remove+add pair replaces one configuration atomically
+            # inside the scenario's content_mutation boundary.
+            with content_mutation(
+                request.user, scenario, action="edit"
+            ) as locked_scenario:
+                values = resolve_parameter_values(
+                    request, new_algorithm, locked_scenario
+                )
+                locked_scenario.remove_inventory_algorithm(
                     current_algorithm, current_feedstock
                 )
-                scenario.add_inventory_algorithm(
+                locked_scenario.add_inventory_algorithm(
                     feedstock, new_algorithm, values, sample_series=sample_series
                 )
         except InvalidParameterValue as exc:
@@ -771,9 +779,14 @@ class ScenarioRemoveInventoryAlgorithmView(
             InventoryAlgorithm, id=self.kwargs.get("algorithm_pk")
         )
         self.feedstock = get_object_or_404(Material, id=self.kwargs.get("feedstock_pk"))
-        self.scenario.remove_inventory_algorithm(
-            algorithm=self.algorithm, feedstock=self.feedstock
-        )
+        # Removing the configuration rows is a content edit on the scenario
+        # root: the central decide inside the boundary re-checks the lock.
+        with content_mutation(
+            request.user, self.scenario, action="edit"
+        ) as locked_scenario:
+            locked_scenario.remove_inventory_algorithm(
+                algorithm=self.algorithm, feedstock=self.feedstock
+            )
         return redirect("scenario-detail", pk=self.scenario.id)
 
 
@@ -978,17 +991,11 @@ class InventoryAlgorithmParametersAPIView(APIView):
 
 @login_required
 def download_scenario_summary(request, scenario_pk):
-    try:
-        scenario = Scenario.objects.get(id=scenario_pk)
-    except Scenario.DoesNotExist:
-        raise Http404 from None
-    policy = get_object_policy(request.user, scenario, request=request)
-    if not (
-        policy["is_owner"]
-        or policy["is_published"]
-        or policy["is_staff"]
-        or policy["is_moderator"]
-    ):
+    scenario = get_object_or_404(
+        filter_queryset_for_user(Scenario.objects.all(), request.user),
+        pk=scenario_pk,
+    )
+    if not decide(request.user, "export", scenario).allowed:
         return HttpResponseForbidden()
     file_name = f"scenario_{scenario_pk}_summary.json"
     with io.StringIO(json.dumps(scenario.summary_dict(), indent=4)) as file:
@@ -1220,17 +1227,11 @@ class ScenarioResultDetailMapView(MapMixin, DetailView):
 
 @login_required
 def download_scenario_result_summary(request, scenario_pk):
-    try:
-        scenario = Scenario.objects.get(id=scenario_pk)
-    except Scenario.DoesNotExist:
-        raise Http404 from None
-    policy = get_object_policy(request.user, scenario, request=request)
-    if not (
-        policy["is_owner"]
-        or policy["is_published"]
-        or policy["is_staff"]
-        or policy["is_moderator"]
-    ):
+    scenario = get_object_or_404(
+        filter_queryset_for_user(Scenario.objects.all(), request.user),
+        pk=scenario_pk,
+    )
+    if not decide(request.user, "export", scenario).allowed:
         return HttpResponseForbidden()
     result = ScenarioResult(scenario)
     with io.StringIO(json.dumps(result.summary_dict(), indent=4)) as file:

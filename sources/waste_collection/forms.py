@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Div, Field, Layout, Row
 from django.core.exceptions import ValidationError
@@ -65,6 +63,7 @@ from utils.forms import (
     UserCreatedObjectFormMixin,
 )
 from utils.object_management.models import get_default_owner
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.forms import NumericMeasurementFieldsFormMixin
 
 
@@ -649,6 +648,7 @@ class CollectionModelForm(
         qs = self._ordered_waste_component_qs()
         self.fields["allowed_materials"].queryset = qs
         self.fields["forbidden_materials"].queryset = qs
+        self._scope_reference_querysets()
         if not self.is_bound:
             description = self.initial.get("description")
             if description is None and getattr(self.instance, "description", None):
@@ -658,6 +658,27 @@ class CollectionModelForm(
                 self.initial["description"] = normalized_description
                 self.fields["description"].initial = normalized_description
         self.helper = self.Meta.form_helper_class(self)
+
+    def _scope_reference_querysets(self):
+        """Restrict declared reference choices to what the request user may read.
+
+        ``UserCreatedObjectFormMixin`` already validates posted references in
+        ``clean()``; without a request the declared querysets stay unscoped
+        for non-view consumers.
+        """
+        user = getattr(getattr(self, "request", None), "user", None)
+        if user is None:
+            return
+        for field_name in (
+            "collection_system",
+            "waste_category",
+            "fee_system",
+            "bin_configuration",
+            "allowed_materials",
+            "forbidden_materials",
+        ):
+            field = self.fields[field_name]
+            field.queryset = filter_queryset_for_user(field.queryset, user)
 
     def clean_description(self):
         return normalize_collection_description(self.cleaned_data.get("description"))
@@ -810,17 +831,18 @@ class CollectionModelForm(
         instance.waste_category = data["waste_category"]
         if commit:
             instance.save()
-            for predecessor in instance.predecessors.all():
-                valid_until = instance.valid_from - timedelta(days=1)
-                predecessor.valid_until = valid_until
-                predecessor.save(update_fields=["valid_until", "lastmodified_at"])
             self.save_m2m()
             return instance
         else:
             return instance
 
 
-class CollectionAddWasteSampleForm(SimpleForm):
+def _request_user(form):
+    """Return the user attached to the form's request, or None."""
+    return getattr(getattr(form, "request", None), "user", None)
+
+
+class CollectionAddWasteSampleForm(UserCreatedObjectFormMixin, SimpleForm):
     sample = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="sample-autocomplete",
@@ -831,16 +853,22 @@ class CollectionAddWasteSampleForm(SimpleForm):
     )
 
     def __init__(self, *args, **kwargs):
-        collection = kwargs.pop("instance", None)
+        # ``UserCreatedObjectFormMixin`` inspects ``self.instance`` while
+        # narrowing bound-field querysets, so it must exist beforehand.
+        self.instance = kwargs.pop("instance", None)
+        collection = self.instance
         super().__init__(*args, **kwargs)
 
         queryset = Sample.objects.order_by("name")
+        user = _request_user(self)
+        if user is not None:
+            queryset = filter_queryset_for_user(queryset, user)
         if isinstance(collection, Collection) and collection.pk:
             queryset = queryset.exclude(collections=collection)
         self.fields["sample"].queryset = queryset
 
 
-class CollectionRemoveWasteSampleForm(SimpleModelForm):
+class CollectionRemoveWasteSampleForm(UserCreatedObjectFormMixin, SimpleModelForm):
     sample = ModelChoiceField(
         queryset=Sample.objects.all(),
         label="Sample",
@@ -853,12 +881,14 @@ class CollectionRemoveWasteSampleForm(SimpleModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["sample"].queryset = Sample.objects.filter(
-            collections=self.instance
-        ).order_by("name")
+        queryset = Sample.objects.filter(collections=self.instance).order_by("name")
+        user = _request_user(self)
+        if user is not None:
+            queryset = filter_queryset_for_user(queryset, user)
+        self.fields["sample"].queryset = queryset
 
 
-class CollectionAddPredecessorForm(SimpleModelForm):
+class CollectionAddPredecessorForm(UserCreatedObjectFormMixin, SimpleModelForm):
     predecessor = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="collection-autocomplete",
@@ -873,12 +903,14 @@ class CollectionAddPredecessorForm(SimpleModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["predecessor"].queryset = Collection.objects.exclude(
-            id=self.instance.id
-        )
+        queryset = Collection.objects.exclude(id=self.instance.id)
+        user = _request_user(self)
+        if user is not None:
+            queryset = filter_queryset_for_user(queryset, user)
+        self.fields["predecessor"].queryset = queryset
 
 
-class CollectionRemovePredecessorForm(SimpleModelForm):
+class CollectionRemovePredecessorForm(UserCreatedObjectFormMixin, SimpleModelForm):
     predecessor = ModelChoiceField(queryset=Collection.objects.all())
 
     class Meta:
@@ -887,9 +919,11 @@ class CollectionRemovePredecessorForm(SimpleModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["predecessor"].queryset = Collection.objects.filter(
-            successors=self.instance
-        )
+        queryset = Collection.objects.filter(successors=self.instance)
+        user = _request_user(self)
+        if user is not None:
+            queryset = filter_queryset_for_user(queryset, user)
+        self.fields["predecessor"].queryset = queryset
 
 
 __all__ = [

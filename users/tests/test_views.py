@@ -5,7 +5,7 @@ import smtplib
 from unittest.mock import patch
 
 from django.conf import settings
-from django.contrib.auth.models import AnonymousUser, User
+from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.sites.models import Site
 from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
@@ -237,3 +237,48 @@ class ReviewNotificationPreferenceViewTests(TestCase):
         self.assertIn("CSRF", output)
         self.assertIn(reverse("review_notification_preference"), output)
         self.assertFalse(UserProfile.objects.filter(user=self.user).exists())
+
+
+class UserDeleteViewTests(TestCase):
+    """Deleting an account is restricted to the account holder or an
+    object administrator; previously any authenticated user could delete
+    any account by pk."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.plain = User.objects.create_user(username="plain")
+        cls.victim = User.objects.create_user(username="victim")
+        cls.admin = User.objects.create_user(username="objadmin")
+        cls.admin.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type__app_label="object_management",
+            )
+        )
+
+    def url(self, user):
+        return reverse("user_delete", kwargs={"pk": user.pk})
+
+    def test_post_redirects_anonymous_to_login(self):
+        response = self.client.post(self.url(self.victim))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("auth_login"), response["Location"])
+        self.assertTrue(User.objects.filter(pk=self.victim.pk).exists())
+
+    def test_post_denied_when_deleting_another_user(self):
+        self.client.force_login(self.plain)
+        response = self.client.post(self.url(self.victim))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(User.objects.filter(pk=self.victim.pk).exists())
+
+    def test_post_allows_self_delete(self):
+        self.client.force_login(self.plain)
+        response = self.client.post(self.url(self.plain))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(User.objects.filter(pk=self.plain.pk).exists())
+
+    def test_post_allows_admin_delete(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(self.url(self.victim))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(User.objects.filter(pk=self.victim.pk).exists())

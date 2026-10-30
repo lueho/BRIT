@@ -1,10 +1,13 @@
 from datetime import timedelta
+from types import SimpleNamespace
 
 from celery import chord
+from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
 
 from brit.celery import app
+from utils.object_management.permissions import filter_queryset_for_user
 
 from .filters import SourceFilter
 from .models import Source
@@ -33,8 +36,17 @@ def check_source_urls_callback(results):
 
 
 @app.task()
-def check_source_urls(params):
-    qs = SourceFilter(params, queryset=Source.objects.all()).qs
+def check_source_urls(params, user_id=None):
+    user = None
+    if user_id:
+        user = get_user_model().objects.filter(pk=user_id).first()
+    request = SimpleNamespace(user=user)
+
+    qs = SourceFilter(params, queryset=Source.objects.all(), request=request).qs
+    # The bulk check writes on behalf of ``user``: scope the matched sources
+    # to what that user may read so forged filter params cannot schedule
+    # writes on invisible records.
+    qs = filter_queryset_for_user(qs, user)
     signatures = []
     for _i, flyer in enumerate(qs):
         signatures.append(check_source_url.s(flyer.pk))

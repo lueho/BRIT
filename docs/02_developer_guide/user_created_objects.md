@@ -132,6 +132,25 @@ Map-configuration pages require explicit application administration; conflict ai
 
 Live-browser verification with representative snapshot data, legacy archive provenance, geography fallbacks and cross-reference visibility, wider version-graph locking, remaining domain/HTML/formset/importer writers, generated values and rollout hardening remain open. This checkpoint does not close those objectives or establish deployment readiness.
 
+## Governed programmatic collection updates
+
+*Part 9c draft runtime checkpoint - not a deployment claim.*
+
+The programmatic collection update route and its legacy alias use `content_mutation` on the freshly locked collection. Expected identity values are conflict guards, never authorization inputs; mismatches return 409 without a write. Authorized owner, direct/group editor and administrator edits use the same capability/lifecycle policy, retain review state/history, and record one meaningful root revision/audit across scalar and M2M changes.
+
+Shared reference validation governs submitted related records. Existing flyer reuse requires its own read access but not add capability; new flyers require their own create capability before persistence, are private and owned by the acting user, and have a creation audit. Compound failures roll back root, relations, new flyers and new events.
+
+The shared flyer helper also serves collection create/version reference attachment; their root persistence and frequency creation remain un-migrated. HTML/formset/importer writers, generated profiles/evidence extraction, browser/runtime and rollout gates remain open.
+
+## Deliberate operator and worker paths
+
+The following writes stay outside the per-object decision core **by design**. Each is gated by a model-level capability or role at its entry point, then executes as a system actor; none widens ordinary user rights.
+
+- **Operator ingestion APIs** — `NutsImportView` (`maps/nuts_import`) and `PopulationImportView` (`maps/population`) bulk-import whole vintages/datasets through the versioned public contracts. They gate on the model-level `add` + `change` capability (`CanImportNutsRegions`, `CanImportPopulation`) — a generic permission check, not a named-group lookup, so the manifest already provisions who may call them. Routing each imported row through `decide`/`content_mutation` would attach owner, lifecycle and revision semantics that bulk vintage data deliberately does not carry.
+- **Celery worker writes** — `check_source_url`/`check_source_urls` (bibliography) and `check_wasteflyer_url`/`check_wasteflyer_urls` (waste_collection) update only `url_valid`/`url_checked`, which are audit-exempt operational metadata that never bump a content revision. `check_stale_source_urls` is beat-scheduled (operator-driven). `cleanup_orphaned_waste_flyers`, inventory `finalize_inventory`/`layer.publish()`, and the GeoJSON cache warmers act on generated artifacts or system-owned rows. The authorization boundary sits at **scheduling**: HTTP endpoints decide first (`decide(..., "check_url", obj)` or a model `change` permission), and bulk schedulers pass the requester id so the task scopes its queryset through `filter_queryset_for_user` — forged filter parameters can never schedule writes on records the requester cannot read.
+- **`UserAutocompleteView`** — enumerates active usernames for the review dashboard "Submitted by" filter. Upstream `AutocompleteModelView` defaults `allow_anonymous = False`, keeping the endpoint authenticated-only; the enumeration is deliberate for moderation workflows, not a public user directory.
+- **Waste Atlas configuration** — `WasteAtlasMapConfiguration` and `WasteAtlasRenderingSettings` are plain configuration models outside the governed registry (no owner, lifecycle or content revision exist to enforce). Their HTML edit views are gated by `WasteAtlasAdminMixin` → `is_admin`, and `WasteAtlasMapConfigurationUpdateView` persists exactly once: `form.save()` is the sole write because `FormView`'s `form_valid` only redirects.
+
 ## Legacy moderator checks (pre-migration)
 
 - Per-model moderation rights use `can_moderate_<model>`.
