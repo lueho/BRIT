@@ -15,7 +15,7 @@ from django.core.management import call_command
 from django.db import connection
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.request import Request
@@ -70,6 +70,7 @@ class CollectionViewSetTestCase(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.regular_user = User.objects.create_user(username="testuser")
         cls.staff_user = User.objects.create_user(username="staffuser", is_staff=True)
 
@@ -1127,17 +1128,24 @@ class CollectorGeoJSONVersionRotationTests(TransactionTestCase):
 
 
 class CollectionReviewActionApiTestCase(APITestCase):
-    """Ensure review action API endpoints trigger collection cascade behavior."""
+    """Collection review actions keep independent evidence lifecycles intact.
+
+    CPV/ACPV records are independent reviewable objects: registering or
+    approving a collection must not transition them."""
 
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.owner = User.objects.create_user(username="owner")
         cls.other_owner = User.objects.create_user(username="other-owner")
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
         # Review actions require the explicit moderation capability; the
         # staff flag alone grants nothing.
         cls.staff.user_permissions.add(
-            Permission.objects.get(codename="can_moderate_collection")
+            Permission.objects.get(
+                codename="can_moderate_collection",
+                content_type=ContentType.objects.get_for_model(Collection),
+            )
         )
 
         cls.catchment = CollectionCatchment.objects.create(name="Test Catchment")
@@ -1200,7 +1208,7 @@ class CollectionReviewActionApiTestCase(APITestCase):
         acpv.collections.set(collections)
         return acpv
 
-    def test_register_for_review_cascades_property_values(self):
+    def test_register_for_review_does_not_cascade_property_values(self):
         collection = self._create_collection(
             "Collection Submit",
             owner=self.owner,
@@ -1225,12 +1233,12 @@ class CollectionReviewActionApiTestCase(APITestCase):
         acpv_private.refresh_from_db()
 
         self.assertEqual(collection.publication_status, "review")
-        self.assertEqual(cpv_private.publication_status, "review")
-        self.assertEqual(cpv_declined.publication_status, "review")
+        self.assertEqual(cpv_private.publication_status, "private")
+        self.assertEqual(cpv_declined.publication_status, "declined")
         self.assertEqual(cpv_published.publication_status, "published")
-        self.assertEqual(acpv_private.publication_status, "review")
+        self.assertEqual(acpv_private.publication_status, "private")
 
-    def test_approve_cascades_property_values(self):
+    def test_approve_does_not_cascade_property_values(self):
         collection = self._create_collection(
             "Collection Approve",
             owner=self.owner,
@@ -1243,7 +1251,7 @@ class CollectionReviewActionApiTestCase(APITestCase):
         self.client.force_login(self.staff)
         url = reverse("api-waste-collection-approve", kwargs={"pk": collection.pk})
         response = self.client.post(
-            url, {"expected_revision": collection.content_revision}
+            url, {"expected_revision": collection.content_revision}, format="json"
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -1253,12 +1261,12 @@ class CollectionReviewActionApiTestCase(APITestCase):
         acpv_review.refresh_from_db()
 
         self.assertEqual(collection.publication_status, "published")
-        self.assertEqual(cpv_owner.publication_status, "published")
-        self.assertEqual(cpv_other.publication_status, "published")
-        self.assertEqual(cpv_owner.approved_by, self.staff)
-        self.assertEqual(cpv_other.approved_by, self.staff)
-        self.assertEqual(acpv_review.publication_status, "published")
-        self.assertEqual(acpv_review.approved_by, self.staff)
+        self.assertEqual(cpv_owner.publication_status, "review")
+        self.assertIsNone(cpv_owner.approved_by)
+        self.assertEqual(cpv_other.publication_status, "review")
+        self.assertIsNone(cpv_other.approved_by)
+        self.assertEqual(acpv_review.publication_status, "review")
+        self.assertIsNone(acpv_review.approved_by)
 
     def test_reject_does_not_decline_independent_property_values(self):
         collection = self._create_collection(
@@ -1295,7 +1303,11 @@ class CollectionImporterWorkflowTestCase(APITestCase):
     def setUpTestData(cls):
         import datetime
 
+        ensure_test_default_owner()
+        call_command("sync_roles", "--apply", stdout=StringIO(), stderr=StringIO())
         cls.owner = User.objects.create_user(username="importer-owner")
+        # Baseline contributor role supplies the required create capabilities;
+        # the staff flag alone no longer passes the import gate.
         cls.staff_owner = User.objects.create_user(
             username="importer-staff", is_staff=True
         )
@@ -1306,14 +1318,6 @@ class CollectionImporterWorkflowTestCase(APITestCase):
             name="Importer Test System"
         )
         cls.waste_category = WasteCategory.objects.create(name="Importer Test Category")
-        cls.allowed_material = Material.objects.create(
-            name="Importer Allowed Material",
-            owner=cls.owner,
-        )
-        cls.forbidden_material = Material.objects.create(
-            name="Importer Forbidden Material",
-            owner=cls.owner,
-        )
         cls.valid_from = datetime.date(2099, 6, 1)
 
     def _make_record(self):
@@ -1437,97 +1441,34 @@ class CollectionImporterWorkflowTestCase(APITestCase):
             ).exists()
         )
 
-    def test_bulk_import_endpoint_persists_review_comment(self):
+    def test_bulk_import_endpoint_is_disabled(self):
+        """The bulk-import HTTP entry point is disabled.
+
+        ``CollectionImporter`` performs writes on existing records that the
+        ``add_collection`` capability cannot authorize, so the route is removed
+        until importer operations route through governed persistence. Importer
+        behavior itself stays covered by the unit tests above.
+        """
         self.client.force_login(self.staff_owner)
 
         response = self.client.post(
-            reverse("api-waste-collection-bulk-import"),
+            "/waste_collection/api/collection/import/",
             {
-                "records": [
-                    self._make_record()
-                    | {
-                        "review_comment": "Please verify unresolved sorting map interpretation."
-                    }
-                ],
+                "records": [self._make_record()],
                 "publication_status": "private",
                 "dry_run": False,
             },
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        collection = Collection.objects.get(
-            owner=self.staff_owner,
-            valid_from=self.valid_from,
-            collection_system=self.collection_system,
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(
+            Collection.objects.filter(
+                owner=self.staff_owner,
+                valid_from=self.valid_from,
+                collection_system=self.collection_system,
+            ).exists()
         )
-        comment_action = ReviewAction.for_object(collection).get(
-            action=ReviewAction.ACTION_COMMENT,
-            user=self.staff_owner,
-        )
-        self.assertIn(
-            "Please verify unresolved sorting map interpretation.",
-            comment_action.comment,
-        )
-
-    def test_bulk_import_endpoint_preserves_material_lists(self):
-        self.client.force_login(self.staff_owner)
-
-        response = self.client.post(
-            reverse("api-waste-collection-bulk-import"),
-            {
-                "records": [
-                    self._make_record()
-                    | {
-                        "allowed_materials": self.allowed_material.name,
-                        "forbidden_materials": self.forbidden_material.name,
-                    }
-                ],
-                "publication_status": "private",
-                "dry_run": False,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        collection = Collection.objects.get(
-            owner=self.staff_owner,
-            valid_from=self.valid_from,
-            collection_system=self.collection_system,
-        )
-        self.assertEqual(
-            list(collection.allowed_materials.values_list("name", flat=True)),
-            [self.allowed_material.name],
-        )
-        self.assertEqual(
-            list(collection.forbidden_materials.values_list("name", flat=True)),
-            [self.forbidden_material.name],
-        )
-
-    def test_bulk_import_endpoint_can_create_missing_collectors(self):
-        self.client.force_login(self.staff_owner)
-
-        response = self.client.post(
-            reverse("api-waste-collection-bulk-import"),
-            {
-                "records": [
-                    self._make_record() | {"collector_name": "Ajuntament de Cardona"}
-                ],
-                "publication_status": "private",
-                "dry_run": False,
-                "create_collectors": True,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        collection = Collection.objects.get(
-            owner=self.staff_owner,
-            valid_from=self.valid_from,
-            collection_system=self.collection_system,
-        )
-        self.assertEqual(collection.collector.name, "Ajuntament de Cardona")
-        self.assertEqual(response.data["stats"]["collectors_created"], 1)
 
 
 class CollectionMutationApiTestCase(APITestCase):
@@ -1538,19 +1479,43 @@ class CollectionMutationApiTestCase(APITestCase):
         ensure_test_default_owner()
         ensure_distribution_data(stdout=StringIO())
         call_command("sync_roles", "--apply", stdout=StringIO(), stderr=StringIO())
+        months_distribution = TemporalDistribution.objects.get(
+            name="Months of the year"
+        )
+        months_distribution.publication_status = "published"
+        months_distribution.save(update_fields=["publication_status"])
+        Timestep.objects.filter(distribution=months_distribution).update(
+            publication_status="published"
+        )
         cls.owner = User.objects.create_user(username="agent-owner")
         cls.other_user = User.objects.create_user(username="agent-other")
         cls.staff = User.objects.create_user(username="agent-staff", is_staff=True)
 
-        cls.catchment = CollectionCatchment.objects.create(name="Agent Catchment")
-        cls.collection_system = CollectionSystem.objects.create(name="Agent System")
-        cls.waste_category = WasteCategory.objects.create(name="Agent Waste")
-        cls.collector = Collector.objects.create(name="Agent Collector")
-        cls.frequency = CollectionFrequency.objects.create(name="Agent Frequency")
-        cls.fee_system = FeeSystem.objects.create(name="Agent Fee")
-        cls.bin_configuration = BinConfiguration.objects.create(name="Agent Sorting")
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Agent Catchment", publication_status="published"
+        )
+        cls.collection_system = CollectionSystem.objects.create(
+            name="Agent System", publication_status="published"
+        )
+        cls.waste_category = WasteCategory.objects.create(
+            name="Agent Waste", publication_status="published"
+        )
+        cls.collector = Collector.objects.create(
+            name="Agent Collector", publication_status="published"
+        )
+        cls.frequency = CollectionFrequency.objects.create(
+            name="Agent Frequency", publication_status="published"
+        )
+        cls.fee_system = FeeSystem.objects.create(
+            name="Agent Fee", publication_status="published"
+        )
+        cls.bin_configuration = BinConfiguration.objects.create(
+            name="Agent Sorting", publication_status="published"
+        )
         cls.allowed_material = Material.objects.create(
-            name="Agent Allowed Material", owner=cls.owner
+            name="Agent Allowed Material",
+            owner=cls.owner,
+            publication_status="published",
         )
         cls.updated_collector = Collector.objects.create(
             name="Updated Agent Collector", owner=cls.owner
@@ -1559,7 +1524,9 @@ class CollectionMutationApiTestCase(APITestCase):
             name="Agent Updated Allowed Material", owner=cls.owner
         )
         cls.forbidden_material = Material.objects.create(
-            name="Agent Forbidden Material", owner=cls.owner
+            name="Agent Forbidden Material",
+            owner=cls.owner,
+            publication_status="published",
         )
         cls.source = Source.objects.create(
             owner=cls.owner,
@@ -1806,11 +1773,22 @@ class CollectionMutationApiTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("valid_until", response.data)
 
-    def test_property_value_create_allows_non_owner_on_published_collection(self):
-        self.client.force_login(self.other_user)
+    def test_property_value_create_endpoint_is_disabled(self):
+        """The property-value create HTTP entry point is disabled.
 
+        The trusted ``CollectionImporter`` matches existing values by
+        collection/property/unit/year without ownership or editability
+        checks and attaches sources to them directly, so the route is
+        removed until those writes route through governed persistence —
+        the same reason ``bulk_import`` is disabled. No value may be
+        created or matched.
+        """
+        with self.assertRaises(NoReverseMatch):
+            reverse("api-waste-collection-property-value-create")
+
+        self.client.force_login(self.other_user)
         response = self.client.post(
-            reverse("api-waste-collection-property-value-create"),
+            "/waste_collection/api/collection/property-value/create/",
             {
                 "collection": self.predecessor.pk,
                 "property_id": self.property.pk,
@@ -1822,122 +1800,27 @@ class CollectionMutationApiTestCase(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        cpv = CollectionPropertyValue.objects.get(pk=response.data["id"])
-        self.assertEqual(cpv.collection, self.predecessor)
-        self.assertEqual(cpv.owner, self.other_user)
-
-    def test_property_value_create_existing_value_returns_unchanged(self):
-        self.client.force_login(self.other_user)
-        cpv = CollectionPropertyValue.objects.create(
-            collection=self.predecessor,
-            property=self.property,
-            unit=self.unit,
-            owner=self.other_user,
-            publication_status="private",
-            year=2025,
-            average=42.0,
-        )
-
-        response = self.client.post(
-            reverse("api-waste-collection-property-value-create"),
-            {
-                "collection": self.predecessor.pk,
-                "property_id": self.property.pk,
-                "unit_name": self.unit.name,
-                "year": 2025,
-                "average": 42.0,
-                "submit_for_review": False,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["id"], cpv.pk)
-        self.assertEqual(response.data["cpv_unchanged"], 1)
-        self.assertEqual(
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(
             CollectionPropertyValue.objects.filter(
                 collection=self.predecessor,
                 property=self.property,
                 unit=self.unit,
                 year=2025,
-            ).count(),
-            1,
+            ).exists()
         )
 
-    def _login_aggregated_property_value_author(self):
+    def test_aggregated_property_value_create_endpoint_is_disabled(self):
+        """The aggregated property-value create HTTP entry point is disabled
+        for the same ungoverned importer writes."""
+        with self.assertRaises(NoReverseMatch):
+            reverse("api-waste-collection-aggregated-property-value-create")
+
         self.client.force_login(self.other_user)
-
-    def _aggregated_property_value_payload(self):
-        return {
-            "collections": [self.predecessor.pk],
-            "property_id": self.property.pk,
-            "unit_name": self.unit.name,
-            "year": 2025,
-            "average": 42.0,
-            "submit_for_review": False,
-        }
-
-    def test_aggregated_property_value_create_reuses_existing_value(self):
-        self._login_aggregated_property_value_author()
-        url = reverse("api-waste-collection-aggregated-property-value-create")
-
-        first = self.client.post(
-            url, self._aggregated_property_value_payload(), format="json"
-        )
-        second = self.client.post(
-            url, self._aggregated_property_value_payload(), format="json"
-        )
-
-        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(first.data["created"])
-        self.assertEqual(second.status_code, status.HTTP_201_CREATED)
-        self.assertFalse(second.data["created"])
-        self.assertEqual(second.data["id"], first.data["id"])
-        self.assertEqual(
-            AggregatedCollectionPropertyValue.objects.filter(
-                owner=self.other_user, property=self.property, unit=self.unit, year=2025
-            ).count(),
-            1,
-        )
-
-    def test_aggregated_property_value_create_locks_owner_before_lookup(self):
-        self._login_aggregated_property_value_author()
-        acpv_table = AggregatedCollectionPropertyValue._meta.db_table
-        user_table = User._meta.db_table
-
-        with CaptureQueriesContext(connection) as captured:
-            response = self.client.post(
-                reverse("api-waste-collection-aggregated-property-value-create"),
-                self._aggregated_property_value_payload(),
-                format="json",
-            )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        sqls = [query["sql"] for query in captured.captured_queries]
-        lock_index = next(
-            (
-                index
-                for index, sql in enumerate(sqls)
-                if f'FROM "{user_table}"' in sql and "FOR UPDATE" in sql
-            ),
-            None,
-        )
-        lookup_index = next(
-            index
-            for index, sql in enumerate(sqls)
-            if sql.startswith("SELECT") and f'FROM "{acpv_table}"' in sql
-        )
-        self.assertIsNotNone(lock_index)
-        self.assertLess(lock_index, lookup_index)
-
-    def test_property_value_create_denies_non_owner_on_private_collection(self):
-        self.client.force_login(self.other_user)
-
         response = self.client.post(
-            reverse("api-waste-collection-property-value-create"),
+            "/waste_collection/api/collection/aggregated-property-value/create/",
             {
-                "collection": self.private_predecessor.pk,
+                "collections": [self.predecessor.pk],
                 "property_id": self.property.pk,
                 "unit_name": self.unit.name,
                 "year": 2025,
@@ -1947,7 +1830,15 @@ class CollectionMutationApiTestCase(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(
+            AggregatedCollectionPropertyValue.objects.filter(
+                owner=self.other_user,
+                property=self.property,
+                unit=self.unit,
+                year=2025,
+            ).exists()
+        )
 
     def test_create_frequency_endpoint_requires_add_permission(self):
         user = User.objects.create_user(username="agent-no-frequency-perm")
@@ -2418,9 +2309,7 @@ class CollectionMutationApiTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_new_version_does_not_copy_an_unreadable_source(self):
-        before_ids = set(Collection.objects.values_list("pk", flat=True))
-        predecessor_anchor = self.predecessor.version_anchor.pk
+    def test_new_version_drops_an_unreadable_inherited_source(self):
         self.client.force_login(self.other_user)
         response = self.client.post(
             reverse(
@@ -2430,13 +2319,11 @@ class CollectionMutationApiTestCase(APITestCase):
             {"valid_from": "2025-03-15", "submit_for_review": False},
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(
-            set(Collection.objects.values_list("pk", flat=True)), before_ids
-        )
-        predecessor = Collection.objects.get(pk=self.predecessor.pk)
-        self.assertEqual(predecessor.version_anchor.pk, predecessor_anchor)
-        self.assertFalse(predecessor.successors.exists())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        version = Collection.objects.get(pk=response.data["id"])
+        self.assertEqual(version.owner, self.other_user)
+        self.assertFalse(version.sources.filter(pk=self.source.pk).exists())
+        self.assertTrue(version.predecessors.filter(pk=self.predecessor.pk).exists())
 
     def test_new_version_rejects_private_predecessor_of_other_user(self):
         user = User.objects.create_user(username="agent-private-denied")
@@ -3640,8 +3527,15 @@ class NutsPrefixAtlasFilteringTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         ensure_test_default_owner()
-        NutsVintage.objects.filter(year=2021).delete()
-        cls.vintage = NutsVintage.objects.create(year=2021, is_current=True)
+        NutsVintage.objects.filter(is_current=True).exclude(year=2021).update(
+            is_current=False
+        )
+        cls.vintage, _ = NutsVintage.objects.get_or_create(
+            year=2021, defaults={"is_current": True}
+        )
+        if not cls.vintage.is_current:
+            cls.vintage.is_current = True
+            cls.vintage.save(update_fields=["is_current"])
         cls.be1_region = NutsRegion.objects.create(
             name="Brussels",
             country="BE",

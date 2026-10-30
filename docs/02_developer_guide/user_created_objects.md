@@ -140,7 +140,19 @@ The programmatic collection update route and its legacy alias use `content_mutat
 
 Shared reference validation governs submitted related records. Existing flyer reuse requires its own read access but not add capability; new flyers require their own create capability before persistence, are private and owned by the acting user, and have a creation audit. Compound failures roll back root, relations, new flyers and new events.
 
-The shared flyer helper also serves collection create/version reference attachment; their root persistence and frequency creation remain un-migrated. HTML/formset/importer writers, generated profiles/evidence extraction, browser/runtime and rollout gates remain open.
+The shared flyer helper also serves collection create/version reference attachment. The 9c note that root persistence and frequency creation remained un-migrated is historical; the Part 9d checkpoint below now covers those write boundaries. HTML/formset/importer writers, generated profiles/evidence extraction, browser/runtime and rollout gates remain open.
+
+## Governed programmatic collection creation
+
+*Part 9d draft runtime checkpoint - not a deployment claim.*
+
+The collection create and new-version routes authorize inside their write boundary: creation requires the fresh `add_collection` capability, and shared reference validation runs against references resolved on the locked predecessor, not prefetched or pre-transaction state. New versions decide `read` and `new_version` on the locked predecessor: an unreadable predecessor answers 404, an archived predecessor or missing capability answers 403, and every inherited scalar and material default comes from the locked record. Unreadable inherited sources and flyers are dropped; explicit unreadable references are denied.
+
+Submission helpers refresh the record after the transition, so responses report the persisted publication status. Creation plus submission records exactly one created and one submitted event, both bound to the content revision.
+
+Frequency creation authorizes each independent model inside the transaction: a new frequency, each count-options row and each new season require their own add capability, are private, are owned by the acting user and receive one creation audit each. The frequency-create endpoint itself always requires a fresh `add_collectionfrequency` capability, including on reuse; the reused frequency needs read access to be locked and inspected, while reusing an existing season needs read access only and adds no row or season capability requirements. Seeded calendar distributions and timesteps currently default to private - a rollout/data gap, not an authorization bypass. `access_control_bp` and `access_control_pap` now persist, inherit and can be overridden on create and new-version payloads.
+
+HTML/formset/importer writers, generated profiles/evidence extraction, the trusted `CollectionImporter`, browser/runtime and rollout gates remain open. The `bulk_import` application entry point is DISABLED: its route is removed from `CollectionViewSet` because `add_collection` cannot authorize the importer's writes on existing records. Re-enabling it requires the importer's remaining ungoverned operations to route through governed persistence first: `sync_owner` re-owning collections and property values, generated property-value deletion, frozen-predecessor `valid_until` mutation, and ungoverned review submission that bypasses the decide/submit boundary. The CPV/ACPV endpoints (`create_collection_property_value`, `create_aggregated_collection_property_value`) are likewise DISABLED: they invoked the same trusted `CollectionImporter`, matching existing values by collection/property/unit/year without ownership or editability checks and attaching sources to them directly. They stay disabled until all writes to existing records route through the central write services; the importer machinery itself remains for its remaining trusted callers and unit tests.
 
 ## Deliberate operator and worker paths
 

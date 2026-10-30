@@ -85,3 +85,20 @@ moderation rights may still reject it.
 
 Domain-specific review integration, admin adapters, generated-provenance
 surfaces, and final browser/release verification remain separate work.
+
+## Programmatic collection creation
+
+The collection API endpoints for creating records and new versions apply the
+same capability, sharing and lifecycle rules described above: you need the
+collection create capability, every referenced record must be readable by
+you, and `submit_for_review` produces a response that matches the stored
+review state. Creating a collection frequency or season requires that model's
+own create capability; reusing an existing readable frequency still requires
+the frequency create capability on the endpoint itself, while reusing an
+existing readable season needs only read access.
+
+The bulk-import endpoint is still a trusted legacy path and is **not
+policy-complete or approved for rollout**: it can modify frozen predecessors,
+re-own evidence and delete history while requiring only the create
+capability, and no administrator role makes those writes legitimate until the
+path is migrated to the shared policy.

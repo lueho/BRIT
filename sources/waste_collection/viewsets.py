@@ -2,11 +2,10 @@ import logging
 import time
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import connection, transaction
-from django.db.models import BigIntegerField, F, Max, Prefetch, Q
+from django.db.models import BigIntegerField, F, Max, Prefetch
 from django.db.models.functions import Cast
 from django.urls import reverse
 from django.utils import timezone
@@ -15,6 +14,7 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import (
     NotAuthenticated,
+    NotFound,
     PermissionDenied,
     ValidationError,
 )
@@ -31,47 +31,45 @@ from sources.waste_collection.filters import (
     CollectionFilterSet,
 )
 from sources.waste_collection.geojson import exclude_published_predecessors
-from sources.waste_collection.importers import CollectionImporter
 from sources.waste_collection.models import (
-    AggregatedCollectionPropertyValue,
     Collection,
     CollectionCountOptions,
     CollectionFrequency,
     CollectionPropertyValue,
     CollectionSeason,
     Collector,
-    WasteFlyer,
 )
 from sources.waste_collection.serializers import (
     GEOMETRY_SIMPLIFY_TOLERANCE,
-    AggregatedCollectionPropertyValueMutationSerializer,
     CollectionAnalysisSerializer,
     CollectionFlatSerializer,
     CollectionFrequencyMutationSerializer,
     CollectionFrequencyReferenceSerializer,
-    CollectionImportRecordSerializer,
     CollectionModelSerializer,
     CollectionMutationCreateSerializer,
     CollectionMutationUpdateSerializer,
     CollectionMutationVersionSerializer,
-    CollectionPropertyValueMutationSerializer,
     CollectionPropertyValueSerializer,
     CollectionResearchSerializer,
     CollectorGeometrySerializer,
     WasteCollectionGeometrySerializer,
 )
-from sources.waste_collection.services import flyer_title, resolve_flyer
-from utils.object_management.models import ReviewAction
-from utils.object_management.permissions import (
-    UserCreatedObjectPermission,
-    apply_scope_filter,
-    filter_queryset_for_user,
-    get_object_policy,
+from sources.waste_collection.services import resolve_flyer
+from utils.object_management.permissions import apply_scope_filter
+from utils.object_management.policy import (
+    PUBLIC_READ_STATES,
+    decide,
+    is_active_actor,
+    is_admin,
+    visible_queryset,
 )
-from utils.object_management.policy import is_active_actor, is_admin
 from utils.object_management.services import (
     _fresh_actor,
+    _lock_instance,
+    authorize_create,
     content_mutation,
+    perform_transition,
+    record_creation,
     validate_references,
 )
 from utils.object_management.viewsets import UserCreatedObjectViewSet
@@ -136,8 +134,11 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     requires_add_permission_actions = {
         "create_collection",
         "create_new_version",
-        "create_collection_property_value",
-        "create_aggregated_collection_property_value",
+    }
+
+    action_create_models = {
+        "create_collection": Collection,
+        "create_collection_frequency": CollectionFrequency,
     }
 
     def _slow_log_threshold_seconds(self):
@@ -154,7 +155,17 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             return apply_scope_filter(
                 self.queryset, "published", user=self.request.user
             )
-        queryset = super().get_queryset()
+        if (
+            getattr(self, "action", None) == "list"
+            and self._extended_list_requested()
+            and (self.request.query_params.get("scope") or "").lower() == "all"
+        ):
+            # On the extended list ``all`` means "all records the actor may
+            # see" (CollectionExtendedFilterSet applies the same rule), which
+            # is general read authorization, not a named core scope.
+            queryset = visible_queryset(self.request.user, self.queryset)
+        else:
+            queryset = super().get_queryset()
         if getattr(self, "action", None) != "list":
             return queryset
 
@@ -334,7 +345,8 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
 
     def _enforce_authenticated_non_public_scope(self, request):
         scope = (request.query_params.get("scope") or "published").lower()
-        if scope == "published":
+        # ``archived`` is public historical data, not a privileged scope.
+        if scope in PUBLIC_READ_STATES:
             return
 
         user = getattr(request, "user", None)
@@ -453,33 +465,14 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             raise PermissionDenied("Authentication is required for this action.")
         return actor
 
-    @staticmethod
-    def _require_add_permission_for_model(actor, model):
-        if actor.is_staff:
-            return
-        app_label = model._meta.app_label
-        model_name = model._meta.model_name
-        if not actor.has_perm(f"{app_label}.add_{model_name}"):
+    @classmethod
+    def _require_create_capability(cls, actor, action_name, *, parent=None):
+        model = cls.action_create_models[action_name]
+        decision = decide(actor, "create", model, parent=parent)
+        if not decision.allowed:
             raise PermissionDenied(
                 f"You do not have permission to add {model._meta.verbose_name}."
             )
-
-    @staticmethod
-    def _require_can_add_property(request, collection):
-        policy = get_object_policy(
-            getattr(request, "user", None), collection, request=request
-        )
-        if policy.get("can_add_property"):
-            return
-
-        raise PermissionDenied(
-            "You do not have permission to add statistics to this collection."
-        )
-
-    @staticmethod
-    def _flyer_title(url):
-        """Return a short title derived from the URL hostname (max 255 chars)."""
-        return flyer_title(url)
 
     @staticmethod
     def _attach_sources_and_flyers(
@@ -524,80 +517,27 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             else:
                 collection.flyers.add(*flyers)
 
-    @staticmethod
-    def _attach_sources_and_flyers_to_property_value(obj, sources, flyer_urls):
-        if sources:
-            obj.sources.add(*sources)
-
-        for url in flyer_urls:
-            if len(url) > 2083:
-                continue
-
-            flyer, _ = WasteFlyer.objects.get_or_create_by_url(
-                url=url,
-                defaults={
-                    "owner": obj.owner,
-                    "title": CollectionViewSet._flyer_title(url),
-                    "publication_status": "private",
-                },
-            )
-            obj.sources.add(flyer)
-
-    @staticmethod
-    def _new_version_predecessor_queryset(user):
-        """Return predecessor queryset visible for version creation.
-
-        Rule: authenticated users may branch from published collections and
-        from their own collections.
-        """
-        if not user or not user.is_authenticated:
-            return Collection.objects.none()
-        return Collection.objects.filter(
-            Q(publication_status=Collection.STATUS_PUBLISHED) | Q(owner=user)
-        )
-
     def _submit_for_review_if_requested(self, request, collection, submit_for_review):
-        """Submit ``collection`` for review and create a submitted ReviewAction."""
+        """Submit ``collection`` for review through the transition service."""
         if not submit_for_review:
             return False
 
-        permission = UserCreatedObjectPermission()
-        if not permission.has_submit_permission(request, collection):
-            raise PermissionDenied(
-                "You do not have permission to submit this collection for review."
-            )
-
         try:
-            collection.submit_for_review()
+            perform_transition(request.user, collection, "submit")
         except DjangoValidationError as exc:
             raise ValidationError(exc.message_dict or exc.messages) from exc
-        ReviewAction.objects.create(
-            content_type=ContentType.objects.get_for_model(collection.__class__),
-            object_id=collection.pk,
-            user=request.user,
-            action=ReviewAction.ACTION_SUBMITTED,
-            comment="",
-        )
+        collection.refresh_from_db()
         return True
 
     def _submit_object_for_review_if_requested(self, request, obj, submit_for_review):
         if not submit_for_review:
             return False
 
-        permission = UserCreatedObjectPermission()
-        if not permission.has_submit_permission(request, obj):
-            raise PermissionDenied(
-                f"You do not have permission to submit this {obj._meta.verbose_name} for review."
-            )
-
-        obj.submit_for_review()
-        ReviewAction.objects.create(
-            content_type=ContentType.objects.get_for_model(obj.__class__),
-            object_id=obj.pk,
-            user=request.user,
-            action=ReviewAction.ACTION_SUBMITTED,
-            comment="",
-        )
+        try:
+            perform_transition(request.user, obj, "submit")
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.message_dict or exc.messages) from exc
+        obj.refresh_from_db()
         return True
 
     @staticmethod
@@ -752,61 +692,60 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     @staticmethod
     def _visible_summary_queryset(request):
         queryset = Collection.objects.all()
-        scope = request.query_params.get("scope")
-        user = getattr(request, "user", None)
-
-        if scope in {"published", "private", "review", "declined", "archived"}:
-            return apply_scope_filter(queryset, scope, user=user)
-
-        return filter_queryset_for_user(queryset, user)
+        return apply_scope_filter(
+            queryset,
+            request.query_params.get("scope"),
+            user=getattr(request, "user", None),
+        )
 
     @staticmethod
     def _visible_frequency_queryset(request):
         queryset = CollectionFrequency.objects.all()
-        scope = request.query_params.get("scope", "published")
-        user = getattr(request, "user", None)
-
-        if scope in {"published", "private", "review", "declined", "archived"}:
-            return apply_scope_filter(queryset, scope, user=user)
-
-        return filter_queryset_for_user(queryset, user)
+        return apply_scope_filter(
+            queryset,
+            request.query_params.get("scope", "published"),
+            user=getattr(request, "user", None),
+        )
 
     @staticmethod
     def _visible_property_value_queryset(request):
         queryset = CollectionPropertyValue.objects.all()
-        scope = request.query_params.get("scope", "published")
-        user = getattr(request, "user", None)
-
-        if scope in {"published", "private", "review", "declined", "archived"}:
-            return apply_scope_filter(queryset, scope, user=user)
-
-        return filter_queryset_for_user(queryset, user)
-
-    @staticmethod
-    def _existing_mutation_frequency(actor, canonical_name):
-        if actor is None or not actor.is_authenticated:
-            return CollectionFrequency.objects.none().first()
-
-        return (
-            CollectionFrequency.objects.filter(
-                Q(name__iexact=canonical_name)
-                & (
-                    Q(owner=actor)
-                    | Q(publication_status=CollectionFrequency.STATUS_PUBLISHED)
-                )
-            )
-            .order_by("pk")
-            .first()
+        return apply_scope_filter(
+            queryset,
+            request.query_params.get("scope", "published"),
+            user=getattr(request, "user", None),
         )
 
-    @staticmethod
-    def _get_or_create_frequency_season(row):
-        season, _ = CollectionSeason.objects.get_or_create(
+    def _resolve_frequency_season(self, actor, row):
+        """Return ``(season, created)`` for ``row`` under its own policy.
+
+        An existing season only needs read authorization; a new season needs
+        the independent ``add_collectionseason`` capability, stays private
+        and is owned by the acting user. A season won by a concurrent
+        inserter falls back to its read authorization, not to a creation
+        audit.
+        """
+        season = CollectionSeason.objects.filter(
             distribution=row["distribution"],
             first_timestep=row["first_timestep"],
             last_timestep=row["last_timestep"],
+        ).first()
+        if season is not None:
+            validate_references(actor, season)
+            return season, False
+        actor = authorize_create(actor, CollectionSeason)
+        season, created = CollectionSeason.objects.get_or_create(
+            distribution=row["distribution"],
+            first_timestep=row["first_timestep"],
+            last_timestep=row["last_timestep"],
+            defaults={
+                "owner": actor,
+                "publication_status": CollectionSeason.STATUS_PRIVATE,
+            },
         )
-        return season
+        if not created:
+            validate_references(actor, season)
+        return season, created
 
     def _create_collection_frequency(self, actor, data):
         frequency = CollectionFrequency.objects.create(
@@ -817,21 +756,32 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             description=data.get("description", ""),
         )
         count_options = []
+        created_seasons = {}
         for row in data.get("rows", []):
-            season = self._get_or_create_frequency_season(row)
-            count_options.append(
-                CollectionCountOptions.objects.create(
-                    frequency=frequency,
-                    season=season,
-                    standard=row.get("standard"),
-                    option_1=row.get("option_1"),
-                    option_2=row.get("option_2"),
-                    option_3=row.get("option_3"),
-                    owner=actor,
-                    publication_status=CollectionCountOptions.STATUS_PRIVATE,
-                )
+            validate_references(
+                actor,
+                [
+                    row["distribution"],
+                    row["first_timestep"],
+                    row["last_timestep"],
+                ],
             )
-        return frequency, count_options
+            season, season_created = self._resolve_frequency_season(actor, row)
+            if season_created:
+                created_seasons.setdefault(season.pk, season)
+            actor = authorize_create(actor, CollectionCountOptions)
+            count_options_row = CollectionCountOptions.objects.create(
+                frequency=frequency,
+                season=season,
+                standard=row.get("standard"),
+                option_1=row.get("option_1"),
+                option_2=row.get("option_2"),
+                option_3=row.get("option_3"),
+                owner=actor,
+                publication_status=CollectionCountOptions.STATUS_PRIVATE,
+            )
+            count_options.append(count_options_row)
+        return frequency, count_options, list(created_seasons.values())
 
     @staticmethod
     def _submittable_frequency_rows(actor, frequency):
@@ -855,21 +805,60 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     )
     def create_collection_frequency(self, request, *args, **kwargs):
         actor = self._require_authenticated_actor(request)
-        self._require_add_permission_for_model(actor, CollectionFrequency)
+        self._require_create_capability(actor, "create_collection_frequency")
 
         serializer = CollectionFrequencyMutationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
         with transaction.atomic():
-            frequency = self._existing_mutation_frequency(actor, data["canonical_name"])
+            actor = _fresh_actor(request.user)
+            actor = authorize_create(actor, CollectionFrequency)
+            frequency = visible_queryset(
+                actor,
+                CollectionFrequency.objects.filter(
+                    name__iexact=data["canonical_name"]
+                ).order_by("pk"),
+            ).first()
             created = frequency is None
             count_options = []
+            created_seasons = []
             if created:
-                frequency, count_options = self._create_collection_frequency(
-                    actor, data
+                frequency, count_options, created_seasons = (
+                    self._create_collection_frequency(actor, data)
                 )
+                actor = _fresh_actor(request.user)
+                actor = authorize_create(actor, CollectionFrequency)
+                for row in data.get("rows", []):
+                    validate_references(
+                        actor,
+                        [
+                            row["distribution"],
+                            row["first_timestep"],
+                            row["last_timestep"],
+                        ],
+                    )
+                validate_references(
+                    actor,
+                    [row_obj.season for row_obj in count_options],
+                )
+                for _count_options_row in count_options:
+                    actor = authorize_create(actor, CollectionCountOptions)
+                for _season in created_seasons:
+                    actor = authorize_create(actor, CollectionSeason)
+                record_creation(actor, frequency)
+                for season in created_seasons:
+                    record_creation(actor, season)
+                for count_options_row in count_options:
+                    record_creation(actor, count_options_row)
             else:
+                frequency = _lock_instance(frequency)
+                actor = _fresh_actor(request.user)
+                actor = authorize_create(actor, CollectionFrequency)
+                if not decide(actor, "read", frequency).allowed:
+                    raise PermissionDenied(
+                        "You do not have permission to inspect this frequency."
+                    )
                 count_options = self._submittable_frequency_rows(actor, frequency)
 
             submitted = False
@@ -987,228 +976,13 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         )
         return Response({"results": serializer.data})
 
-    @action(
-        detail=False,
-        methods=["post"],
-        permission_classes=[permissions.IsAuthenticated],
-        url_path="property-value/create",
-        url_name="property-value-create",
-    )
-    def create_collection_property_value(self, request, *args, **kwargs):
-        actor = self._require_authenticated_actor(request)
-        self._require_add_permission_for_model(actor, CollectionPropertyValue)
-
-        serializer = CollectionPropertyValueMutationSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        target_collection = data["collection"]
-        self._require_can_add_property(request, target_collection)
-        anchor_collection = target_collection.version_anchor or target_collection
-
-        with transaction.atomic():
-            importer = CollectionImporter(
-                owner=actor,
-                publication_status=(
-                    "review" if data.get("submit_for_review", True) else "private"
-                ),
-            )
-            importer._load_lookups()
-            prop = importer._properties.get(data["property_id"])
-            unit = importer._units.get(data["unit_name"])
-            if prop is None:
-                return Response(
-                    {"detail": f"Property id={data['property_id']} not found."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if unit is None:
-                return Response(
-                    {"detail": f"Unit '{data['unit_name']}' not found."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            existing_cpv = (
-                CollectionPropertyValue.objects.filter(
-                    collection=anchor_collection,
-                    property=prop,
-                    unit=unit,
-                    year=data["year"],
-                )
-                .order_by("pk")
-                .first()
-            )
-
-            cpv_stats = {
-                "cpv_created": 0,
-                "cpv_unchanged": 0,
-                "cpv_skipped": 0,
-                "flyers_created": 0,
-                "warnings": [],
-            }
-            importer._import_property_value(
-                anchor_collection,
-                {
-                    "property_id": data["property_id"],
-                    "unit_name": data["unit_name"],
-                    "year": data["year"],
-                    "average": data["average"],
-                    "standard_deviation": data.get("standard_deviation"),
-                    "flyer_urls": data.get("flyer_urls", []),
-                },
-                cpv_stats,
-                record={},
-            )
-
-            cpv = (
-                existing_cpv
-                or CollectionPropertyValue.objects.filter(
-                    collection=anchor_collection,
-                    property=prop,
-                    unit=unit,
-                    year=data["year"],
-                    owner=actor,
-                )
-                .order_by("-pk")
-                .first()
-            )
-            if cpv is None:
-                return Response(
-                    {"detail": "CollectionPropertyValue could not be created."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            self._attach_sources_and_flyers_to_property_value(
-                cpv,
-                sources=data.get("sources", []),
-                flyer_urls=[],
-            )
-            submitted = bool(
-                data.get("submit_for_review", True)
-                and cpv.publication_status == cpv.STATUS_REVIEW
-            )
-
-        response_payload = self._serialize_user_created_object_response(
-            cpv,
-            submitted,
-            detail_url_name="collectionpropertyvalue-detail",
-        )
-        response_payload.update(cpv_stats)
-        response_payload.update(
-            {
-                "collection_id": target_collection.pk,
-                "anchor_collection_id": anchor_collection.pk,
-                "is_derived": cpv.is_derived,
-            }
-        )
-        return Response(response_payload, status=status.HTTP_201_CREATED)
-
-    @action(
-        detail=False,
-        methods=["post"],
-        permission_classes=[permissions.IsAuthenticated],
-        url_path="aggregated-property-value/create",
-        url_name="aggregated-property-value-create",
-    )
-    def create_aggregated_collection_property_value(self, request, *args, **kwargs):
-        actor = self._require_authenticated_actor(request)
-        self._require_add_permission_for_model(actor, AggregatedCollectionPropertyValue)
-
-        serializer = AggregatedCollectionPropertyValueMutationSerializer(
-            data=request.data
-        )
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        collections = list(data["collections"])
-        if not collections:
-            return Response(
-                {"detail": "At least one collection is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        for collection in collections:
-            self._require_can_add_property(request, collection)
-
-        importer = CollectionImporter(
-            owner=actor,
-            publication_status=(
-                "review" if data.get("submit_for_review", True) else "private"
-            ),
-        )
-        importer._load_lookups()
-        prop = importer._properties.get(data["property_id"])
-        unit = importer._units.get(data["unit_name"])
-        if prop is None:
-            return Response(
-                {"detail": f"Property id={data['property_id']} not found."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if unit is None:
-            return Response(
-                {"detail": f"Unit '{data['unit_name']}' not found."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        requested_collection_ids = sorted(collection.pk for collection in collections)
-
-        with transaction.atomic():
-            # The dedup key spans the collections M2M, so no unique constraint
-            # can enforce it; serialize find-or-create per owner instead.
-            get_user_model().objects.select_for_update().filter(pk=actor.pk).exists()
-            existing_acpv = None
-            for candidate in AggregatedCollectionPropertyValue.objects.filter(
-                owner=actor,
-                property=prop,
-                unit=unit,
-                year=data["year"],
-            ).prefetch_related("collections"):
-                candidate_ids = sorted(
-                    collection.pk for collection in candidate.collections.all()
-                )
-                if candidate_ids == requested_collection_ids:
-                    existing_acpv = candidate
-                    break
-
-            if existing_acpv is None:
-                acpv = AggregatedCollectionPropertyValue.objects.create(
-                    name=f"Aggregated {prop.name} {data['year']}",
-                    owner=actor,
-                    publication_status="private",
-                    property=prop,
-                    unit=unit,
-                    year=data["year"],
-                    average=data["average"],
-                    standard_deviation=data.get("standard_deviation"),
-                )
-                acpv.collections.set(collections)
-                created = True
-            else:
-                acpv = existing_acpv
-                created = False
-
-            self._attach_sources_and_flyers_to_property_value(
-                acpv,
-                sources=data.get("sources", []),
-                flyer_urls=data.get("flyer_urls", []),
-            )
-            submitted = self._submit_object_for_review_if_requested(
-                request,
-                acpv,
-                submit_for_review=data.get("submit_for_review", True),
-            )
-
-        response_payload = self._serialize_user_created_object_response(
-            acpv,
-            submitted,
-            detail_url_name="aggregatedcollectionpropertyvalue-detail",
-        )
-        response_payload.update(
-            {
-                "created": created,
-                "skipped": not created,
-                "collection_ids": requested_collection_ids,
-            }
-        )
-        return Response(response_payload, status=status.HTTP_201_CREATED)
+    # The ``create_collection_property_value`` and
+    # ``create_aggregated_collection_property_value`` HTTP entry points are
+    # intentionally removed: the trusted ``CollectionImporter`` matches
+    # existing values by collection/property/unit/year without ownership or
+    # editability checks and attaches sources to them directly — the same
+    # ungoverned writes that disabled ``bulk_import``. They stay disabled
+    # until those writes route through the central write services.
 
     @action(
         detail=False,
@@ -1219,7 +993,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     def create_collection(self, request, *args, **kwargs):
         """Create a collection from a programmatic payload and optionally submit it."""
         actor = self._require_authenticated_actor(request)
-        self._require_add_permission_for_model(actor, Collection)
+        self._require_create_capability(actor, "create_collection")
         serializer = CollectionMutationCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -1227,6 +1001,9 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         forbidden_materials = list(data.get("forbidden_materials", []))
 
         with transaction.atomic():
+            actor = _fresh_actor(request.user)
+            actor = authorize_create(actor, Collection)
+            validate_references(actor, data)
             collection = Collection.objects.create(
                 name="",
                 owner=actor,
@@ -1248,6 +1025,8 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                     "required_bin_capacity_reference"
                 ),
                 description=data.get("description", ""),
+                access_control_bp=data.get("access_control_bp"),
+                access_control_pap=data.get("access_control_pap"),
             )
             if allowed_materials:
                 collection.allowed_materials.set(allowed_materials)
@@ -1258,8 +1037,16 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 collection,
                 sources=data.get("sources", []),
                 flyer_urls=data.get("flyer_urls", []),
-                actor=self._require_authenticated_actor(request),
+                actor=actor,
             )
+            actor = _fresh_actor(request.user)
+            actor = authorize_create(actor, Collection)
+            validate_references(actor, data)
+            validate_references(
+                actor,
+                list(collection.sources.all()) + list(collection.flyers.all()),
+            )
+            record_creation(actor, collection)
             submitted = self._submit_for_review_if_requested(
                 request,
                 collection,
@@ -1282,74 +1069,85 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     def create_new_version(self, request, pk=None):
         """Create a new collection version from an existing predecessor."""
         actor = self._require_authenticated_actor(request)
-        self._require_add_permission_for_model(actor, Collection)
-        predecessor = (
-            self._new_version_predecessor_queryset(request.user)
-            .filter(pk=pk)
-            .select_related(
-                "owner",
-                "catchment",
-                "collector",
-                "collection_system",
-                "waste_category",
-                "frequency",
-                "fee_system",
-                "bin_configuration",
-            )
-            .prefetch_related(
-                "allowed_materials",
-                "forbidden_materials",
-                "sources",
-                "flyers",
-            )
-            .first()
-        )
-        if predecessor is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
-        serializer = CollectionMutationVersionSerializer(
-            data=request.data,
-            context={"predecessor": predecessor},
-        )
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        default_waste_category = predecessor.effective_waste_category
-        default_allowed = list(predecessor.effective_allowed_materials)
-        default_forbidden = list(predecessor.effective_forbidden_materials)
-
-        waste_category = data.get(
-            "waste_category",
-            default_waste_category,
-        )
-        if waste_category is None:
-            return Response(
-                {
-                    "detail": "waste_category is required when the predecessor has no waste_category."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        allowed_materials = list(data.get("allowed_materials", default_allowed))
-        forbidden_materials = list(data.get("forbidden_materials", default_forbidden))
+        predecessor = Collection.objects.filter(pk=pk).first()
 
         with transaction.atomic():
+            if predecessor is None:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            predecessor = _lock_instance(predecessor)
+            actor = _fresh_actor(request.user)
+            if not decide(actor, "read", predecessor).allowed:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            decision = decide(actor, "new_version", predecessor)
+            if not decision.allowed:
+                raise PermissionDenied(
+                    "You do not have permission to create a new version of this collection."
+                )
+
+            serializer = CollectionMutationVersionSerializer(
+                data=request.data,
+                context={"predecessor": predecessor},
+            )
+            serializer.is_valid(raise_exception=True)
+            data = serializer.validated_data
+
+            waste_category = data.get(
+                "waste_category",
+                predecessor.effective_waste_category,
+            )
+            if waste_category is None:
+                return Response(
+                    {
+                        "detail": "waste_category is required when the predecessor has no waste_category."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            allowed_materials = list(
+                data.get(
+                    "allowed_materials",
+                    predecessor.effective_allowed_materials,
+                )
+            )
+            forbidden_materials = list(
+                data.get(
+                    "forbidden_materials",
+                    predecessor.effective_forbidden_materials,
+                )
+            )
+            resolved = {
+                "catchment": data.get("catchment", predecessor.catchment),
+                "collector": data.get("collector", predecessor.collector),
+                "collection_system": data.get(
+                    "collection_system", predecessor.collection_system
+                ),
+                "waste_category": waste_category,
+                "frequency": data.get("frequency", predecessor.frequency),
+                "fee_system": data.get("fee_system", predecessor.fee_system),
+                "bin_configuration": data.get(
+                    "bin_configuration", predecessor.bin_configuration
+                ),
+                "allowed_materials": allowed_materials,
+                "forbidden_materials": forbidden_materials,
+            }
+            if "sources" in data:
+                resolved["sources"] = list(data["sources"])
+            if "flyer_urls" in data:
+                resolved["flyer_urls"] = list(data["flyer_urls"])
+            validate_references(actor, resolved)
+            actor = authorize_create(actor, Collection)
+
             collection = Collection.objects.create(
                 name="",
                 owner=actor,
                 publication_status=Collection.STATUS_PRIVATE,
-                catchment=data.get("catchment", predecessor.catchment),
-                collector=data.get("collector", predecessor.collector),
-                collection_system=data.get(
-                    "collection_system",
-                    predecessor.collection_system,
-                ),
-                waste_category=waste_category,
-                frequency=data.get("frequency", predecessor.frequency),
-                fee_system=data.get("fee_system", predecessor.fee_system),
-                bin_configuration=data.get(
-                    "bin_configuration", predecessor.bin_configuration
-                ),
+                catchment=resolved["catchment"],
+                collector=resolved["collector"],
+                collection_system=resolved["collection_system"],
+                waste_category=resolved["waste_category"],
+                frequency=resolved["frequency"],
+                fee_system=resolved["fee_system"],
+                bin_configuration=resolved["bin_configuration"],
                 established=data.get("established", predecessor.established),
                 valid_from=data["valid_from"],
                 valid_until=data.get("valid_until"),
@@ -1366,23 +1164,49 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                     predecessor.required_bin_capacity_reference,
                 ),
                 description=data.get("description", predecessor.description or ""),
+                access_control_bp=data.get(
+                    "access_control_bp", predecessor.access_control_bp
+                ),
+                access_control_pap=data.get(
+                    "access_control_pap", predecessor.access_control_pap
+                ),
             )
-            collection.allowed_materials.set(allowed_materials)
-            collection.forbidden_materials.set(forbidden_materials)
+            collection.allowed_materials.set(resolved["allowed_materials"])
+            collection.forbidden_materials.set(resolved["forbidden_materials"])
             collection.add_predecessor(predecessor)
 
-            default_sources = list(predecessor.sources.all())
-            default_flyer_urls = list(
-                predecessor.flyers.exclude(url__isnull=True)
-                .exclude(url="")
-                .values_list("url", flat=True)
-            )
+            default_sources = [
+                source
+                for source in predecessor.sources.all()
+                if decide(actor, "read", source).allowed
+            ]
+            default_flyer_urls = [
+                flyer.url
+                for flyer in predecessor.flyers.exclude(url__isnull=True).exclude(
+                    url=""
+                )
+                if decide(actor, "read", flyer).allowed
+            ]
             self._attach_sources_and_flyers(
                 collection,
                 sources=data.get("sources", default_sources),
                 flyer_urls=data.get("flyer_urls", default_flyer_urls),
-                actor=self._require_authenticated_actor(request),
+                actor=actor,
             )
+            actor = _fresh_actor(request.user)
+            actor = authorize_create(actor, Collection)
+            if not decide(actor, "read", predecessor).allowed:
+                raise NotFound()
+            if not decide(actor, "new_version", predecessor).allowed:
+                raise PermissionDenied(
+                    "You do not have permission to create a new version of this collection."
+                )
+            validate_references(actor, resolved)
+            validate_references(
+                actor,
+                list(collection.sources.all()) + list(collection.flyers.all()),
+            )
+            record_creation(actor, collection)
             submitted = self._submit_for_review_if_requested(
                 request,
                 collection,
@@ -1399,87 +1223,12 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             status=status.HTTP_201_CREATED,
         )
 
-    @action(
-        detail=False,
-        methods=["post"],
-        permission_classes=[permissions.IsAuthenticated],
-        url_path="import",
-    )
-    def bulk_import(self, request, *args, **kwargs):
-        """Bulk-import waste collection records from a JSON array.
-
-        Accepts a JSON body with a top-level ``records`` list.  Each element
-        follows the ``CollectionImportRecordSerializer`` schema.
-
-        Optional top-level fields:
-
-        - ``dry_run`` (bool, default false) – validate and report without writing.
-        - ``publication_status`` (str, default ``"private"``) – status to assign
-          to newly created records.
-
-        Returns a summary dict with created/skipped counts and any warnings.
-
-        Only staff users may call this endpoint.
-        """
-        if not request.user.is_staff:
-            return Response(
-                {"detail": "Only staff users may import collection records."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        payload = request.data
-        if not isinstance(payload, dict):
-            return Response(
-                {"detail": "Request body must be a JSON object."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        records_raw = payload.get("records")
-        if not isinstance(records_raw, list):
-            return Response(
-                {"detail": "'records' must be a JSON array."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        dry_run = payload.get("dry_run", False)
-        if not isinstance(dry_run, bool):
-            return Response(
-                {"detail": "'dry_run' must be a boolean."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        create_collectors = payload.get("create_collectors", False)
-        if not isinstance(create_collectors, bool):
-            return Response(
-                {"detail": "'create_collectors' must be a boolean."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        pub_status = payload.get("publication_status", "private")
-        valid_statuses = ("private", "review")
-        if pub_status not in valid_statuses:
-            return Response(
-                {"detail": f"'publication_status' must be one of {valid_statuses}."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Validate all records up-front; collect per-record errors
-        serializer = CollectionImportRecordSerializer(data=records_raw, many=True)
-        if not serializer.is_valid():
-            return Response(
-                {"detail": "Validation failed.", "errors": serializer.errors},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        importer = CollectionImporter(
-            owner=request.user,
-            publication_status=pub_status,
-            create_collectors=create_collectors,
-        )
-        stats = importer.run(serializer.validated_data, dry_run=dry_run)
-
-        http_status = status.HTTP_200_OK if dry_run else status.HTTP_201_CREATED
-        return Response({"dry_run": dry_run, "stats": stats}, status=http_status)
+    # The ``bulk_import`` HTTP entry point is intentionally removed: the
+    # trusted ``CollectionImporter`` performs writes on existing records that
+    # the ``add_collection`` capability cannot authorize (re-owning collections
+    # and property values, deleting generated values, mutating frozen
+    # predecessors, ungoverned review submission). It stays disabled until
+    # those operations route through governed persistence.
 
     @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
     def summaries(self, request, *args, **kwargs):
