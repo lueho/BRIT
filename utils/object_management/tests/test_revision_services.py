@@ -8,14 +8,17 @@ deterministic concurrency boundary.
 
 import threading
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import connection
-from django.forms.models import inlineformset_factory
+from django.db import connection, transaction
+from django.db.models.signals import post_save
+from django.forms.models import inlineformset_factory, modelform_factory
 from django.test import TestCase, TransactionTestCase
+from django.urls import reverse
 
 from bibliography.models import Author, Source, SourceAuthor
 from maps.models import (
@@ -28,6 +31,7 @@ from maps.models import (
 )
 from materials.models import (
     AnalyticalMethod,
+    ComponentMeasurement,
     Composition,
     Material,
     MaterialComponent,
@@ -35,7 +39,9 @@ from materials.models import (
     MaterialProperty,
     MaterialPropertyValue,
     Sample,
+    add_default_composition,
 )
+from materials.serializers import ComponentMeasurementWriteSerializer
 from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
     Collection,
@@ -57,6 +63,7 @@ from ..services import (
     save_evidence_formset_rows,
     validate_reassignment,
 )
+from ..viewsets import UserCreatedObjectViewSet
 
 
 def _perm(model, codename):
@@ -854,6 +861,441 @@ class OwnedChildApprovalRaceTests(TransactionTestCase):
         self.assertEqual(self.link.position, 2)
 
 
+class _RaceMeasurementViewSet(UserCreatedObjectViewSet):
+    queryset = ComponentMeasurement.objects.all()
+    serializer_class = ComponentMeasurementWriteSerializer
+
+
+class CreateApprovalRaceTests(TransactionTestCase):
+    """Create-versus-approval TOCTOU boundary on the shared create path.
+
+    A create authorized against an editable parent must re-decide on the
+    locked parent row. The approval thread holds the parent's row lock and
+    waits until the creator thread is actually attempting that lock; it then
+    runs a real ``perform_transition`` approval and commits. The creator's
+    ``select_for_update`` returns the now-published row, the re-run create
+    decision fails closed, and no row or audit side-effect persists.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username="car-owner")
+        self.owner.user_permissions.add(
+            _perm(ComponentMeasurement, "add_componentmeasurement"),
+            _perm(Sample, "change_sample"),
+        )
+        self.moderator = User.objects.create_user(username="car-moderator")
+        self.moderator.user_permissions.add(_perm(Sample, "can_moderate_sample"))
+        self.material = Material.objects.create(
+            name="Race material",
+            owner=self.owner,
+            publication_status="published",
+        )
+        # Sample.approve() refuses while the auto-created default composition
+        # still lacks component measurements; the race fixture needs an
+        # approvable parent, so the composition signal is skipped entirely.
+        post_save.disconnect(add_default_composition, sender=Sample)
+        try:
+            self.sample = Sample.objects.create(
+                name="Race sample",
+                material=self.material,
+                owner=self.owner,
+                standalone=True,
+                publication_status="review",
+            )
+        finally:
+            post_save.connect(add_default_composition, sender=Sample)
+        self.group = MaterialComponentGroup.objects.create(
+            name="Race group",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.component = MaterialComponent.objects.create(
+            name="Race component",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.unit = Unit.objects.create(
+            name="g/kg",
+            symbol="g/kg",
+            owner=self.owner,
+            publication_status="published",
+        )
+
+    def test_concurrent_approval_makes_create_fail_closed(self):
+        approve_locked = threading.Event()
+        create_attempted = threading.Event()
+        results = {}
+        errors = {}
+
+        real_lock = services._lock_instance
+
+        def signaling_lock(obj):
+            create_attempted.set()
+            return real_lock(obj)
+
+        def approver():
+            with transaction.atomic():
+                services._lock_instance(self.sample)
+                approve_locked.set()
+                create_attempted.wait(timeout=10)
+                perform_transition(
+                    self.moderator,
+                    self.sample,
+                    "approve",
+                    expected_revision=self.sample.content_revision,
+                )
+
+        def creator():
+            serializer = ComponentMeasurementWriteSerializer(
+                data={
+                    "sample": self.sample.pk,
+                    "group": self.group.pk,
+                    "component": self.component.pk,
+                    "unit": self.unit.pk,
+                    "average": "10.0",
+                }
+            )
+            if not serializer.is_valid():
+                raise AssertionError(serializer.errors)
+            view = _RaceMeasurementViewSet()
+            view.request = SimpleNamespace(user=self.owner)
+            view.kwargs = {}
+            with patch.object(services, "_lock_instance", side_effect=signaling_lock):
+                view.perform_create(serializer)
+
+        def run(fn, key):
+            import traceback
+
+            try:
+                fn()
+            except PermissionDenied as exc:
+                results[key] = (exc, traceback.format_exc())
+            except Exception as exc:  # pragma: no cover
+                errors[key] = (exc, traceback.format_exc())
+            finally:
+                connection.close()
+
+        t_approve = threading.Thread(target=lambda: run(approver, "approver"))
+        t_approve.start()
+        self.assertTrue(approve_locked.wait(timeout=10))
+
+        t_create = threading.Thread(target=lambda: run(creator, "creator"))
+        t_create.start()
+        t_approve.join(timeout=15)
+        t_create.join(timeout=15)
+
+        self.assertFalse(t_approve.is_alive() or t_create.is_alive())
+        self.assertFalse(errors, errors)
+        denial = results.get("creator")
+        self.assertIsNotNone(denial, "create unexpectedly succeeded")
+        exc, tb = denial
+        self.assertIsInstance(exc, PermissionDenied, tb)
+
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.publication_status, "published")
+        self.assertFalse(ComponentMeasurement.objects.exists())
+        self.assertFalse(
+            ReviewAction.objects.filter(action=ReviewAction.ACTION_CREATED).exists()
+        )
+
+
+class CreateActorDeactivationRaceTests(TransactionTestCase):
+    """Create-versus-deactivation TOCTOU boundary on the shared create path.
+
+    The actor refresh inside ``authorize_create`` must run after every
+    potentially blocking ``select_for_update`` parent lock: while the
+    creator thread waits on a parent row locked by a concurrent
+    transaction, the account is deactivated. The create must then decide
+    on the fresh ``is_active`` state and fail closed — no row and no audit
+    event may persist.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username="cad-owner")
+        self.owner.user_permissions.add(
+            _perm(ComponentMeasurement, "add_componentmeasurement"),
+            _perm(Sample, "change_sample"),
+        )
+        self.material = Material.objects.create(
+            name="Deactivation material",
+            owner=self.owner,
+            publication_status="published",
+        )
+        post_save.disconnect(add_default_composition, sender=Sample)
+        try:
+            self.sample = Sample.objects.create(
+                name="Deactivation sample",
+                material=self.material,
+                owner=self.owner,
+                standalone=True,
+                publication_status="review",
+            )
+        finally:
+            post_save.connect(add_default_composition, sender=Sample)
+        self.group = MaterialComponentGroup.objects.create(
+            name="Deactivation group",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.component = MaterialComponent.objects.create(
+            name="Deactivation component",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.unit = Unit.objects.create(
+            name="g/kg",
+            symbol="g/kg",
+            owner=self.owner,
+            publication_status="published",
+        )
+
+    def test_deactivation_while_blocked_on_parent_lock_denies_create(self):
+        parent_locked = threading.Event()
+        create_attempted = threading.Event()
+        release = threading.Event()
+        results = {}
+        errors = {}
+
+        real_lock = services._lock_instance
+
+        def signaling_lock(obj):
+            create_attempted.set()
+            return real_lock(obj)
+
+        def blocker():
+            with transaction.atomic():
+                services._lock_instance(self.sample)
+                parent_locked.set()
+                release.wait(timeout=10)
+
+        def creator():
+            serializer = ComponentMeasurementWriteSerializer(
+                data={
+                    "sample": self.sample.pk,
+                    "group": self.group.pk,
+                    "component": self.component.pk,
+                    "unit": self.unit.pk,
+                    "average": "10.0",
+                }
+            )
+            if not serializer.is_valid():
+                raise AssertionError(serializer.errors)
+            view = _RaceMeasurementViewSet()
+            view.request = SimpleNamespace(user=self.owner)
+            view.kwargs = {}
+            with patch.object(services, "_lock_instance", side_effect=signaling_lock):
+                view.perform_create(serializer)
+
+        def run(fn, key):
+            import traceback
+
+            try:
+                fn()
+            except PermissionDenied as exc:
+                results[key] = (exc, traceback.format_exc())
+            except Exception as exc:  # pragma: no cover
+                errors[key] = (exc, traceback.format_exc())
+            finally:
+                connection.close()
+
+        t_block = threading.Thread(target=lambda: run(blocker, "blocker"))
+        t_block.start()
+        self.assertTrue(parent_locked.wait(timeout=10))
+
+        t_create = threading.Thread(target=lambda: run(creator, "creator"))
+        t_create.start()
+        self.assertTrue(create_attempted.wait(timeout=10))
+
+        User.objects.filter(pk=self.owner.pk).update(is_active=False)
+        release.set()
+        t_block.join(timeout=15)
+        t_create.join(timeout=15)
+
+        self.assertFalse(t_block.is_alive() or t_create.is_alive())
+        self.assertFalse(errors, errors)
+        denial = results.get("creator")
+        self.assertIsNotNone(denial, "create unexpectedly succeeded")
+        exc, tb = denial
+        self.assertIsInstance(exc, PermissionDenied, tb)
+
+        self.assertFalse(ComponentMeasurement.objects.exists())
+        self.assertFalse(
+            ReviewAction.objects.filter(action=ReviewAction.ACTION_CREATED).exists()
+        )
+
+
+class MutationActorDeactivationRaceTests(TransactionTestCase):
+    """Deactivation-during-lock-wait races on mutation boundaries.
+
+    Every governed write boundary must re-read its actor after the last
+    potentially blocking ``select_for_update``: while the boundary thread
+    waits on a row lock held by a concurrent transaction, the account is
+    deactivated. The post-lock ``decide`` must see the fresh ``is_active``
+    state and fail closed — no write, no revision bump, no audit event.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username="dau-owner")
+        self.owner.user_permissions.add(
+            _perm(Property, "add_property"),
+            _perm(Property, "change_property"),
+        )
+        self.editor = User.objects.create_user(username="dau-editor")
+        self.editor.user_permissions.add(_perm(Property, "change_property"))
+        self.moderator = User.objects.create_user(username="dau-moderator")
+        self.moderator.user_permissions.add(_perm(Property, "can_moderate_property"))
+        self.prop = Property.objects.create(
+            name="Deactivation raced",
+            owner=self.owner,
+            publication_status="private",
+        )
+
+    def _race(self, holder, attempt):
+        """Run ``attempt`` while ``holder`` owns the prop row lock.
+
+        ``holder(lock_held, release)`` acquires the row lock and blocks
+        until released; ``attempt()`` runs the boundary under test with a
+        signaling ``_lock_instance`` patch so the main thread knows when
+        the boundary actually issues its lock attempt. Returns
+        ``(results, errors)``; a denied attempt lands in ``results``.
+        """
+        lock_held = threading.Event()
+        attempted = threading.Event()
+        release = threading.Event()
+        results = {}
+        errors = {}
+
+        real_lock = services._lock_instance
+
+        def signaling_lock(obj):
+            attempted.set()
+            return real_lock(obj)
+
+        def run(fn, key):
+            import traceback
+
+            try:
+                fn()
+            except PermissionDenied as exc:
+                results[key] = (exc, traceback.format_exc())
+            except Exception as exc:  # pragma: no cover
+                errors[key] = (exc, traceback.format_exc())
+            finally:
+                connection.close()
+
+        t_hold = threading.Thread(
+            target=lambda: run(lambda: holder(lock_held, release), "holder")
+        )
+        t_hold.start()
+        self.assertTrue(lock_held.wait(timeout=10))
+
+        t_attempt = threading.Thread(
+            target=lambda: run(
+                lambda: self._attempt(signaling_lock, attempt), "attempt"
+            )
+        )
+        t_attempt.start()
+        self.assertTrue(attempted.wait(timeout=10))
+        return results, errors, release, (t_hold, t_attempt)
+
+    @staticmethod
+    def _attempt(signaling_lock, attempt):
+        with patch.object(services, "_lock_instance", side_effect=signaling_lock):
+            attempt()
+
+    def test_deactivation_while_blocked_on_lock_denies_update(self):
+        self.prop.add_editor(self.editor, granted_by=self.owner)
+
+        def holder(lock_held, release):
+            with content_mutation(self.owner, self.prop, action="edit") as prop:
+                prop.description = "holder edit"
+                prop.save()
+                lock_held.set()
+                release.wait(timeout=10)
+
+        def attempt():
+            with content_mutation(self.editor, self.prop, action="edit") as prop:
+                prop.name = "deactivated write"
+                prop.save()
+
+        results, errors, release, threads = self._race(holder, attempt)
+        User.objects.filter(pk=self.editor.pk).update(is_active=False)
+        release.set()
+        for thread in threads:
+            thread.join(timeout=15)
+
+        self.assertFalse(any(t.is_alive() for t in threads))
+        self.assertFalse(errors, errors)
+        denial = results.get("attempt")
+        self.assertIsNotNone(denial, "update unexpectedly succeeded")
+        exc, tb = denial
+        self.assertIsInstance(exc, PermissionDenied, tb)
+
+        fresh = Property.objects.get(pk=self.prop.pk)
+        self.assertEqual(fresh.name, "Deactivation raced")
+        self.assertEqual(fresh.description, "holder edit")
+        self.assertEqual(fresh.content_revision, 2)
+        events = _actions_for(fresh, "edited")
+        self.assertEqual(events.count(), 1)
+        self.assertEqual(events.get().user, self.owner)
+
+    def test_deactivation_while_blocked_on_lock_denies_transition(self):
+        perform_transition(self.owner, self.prop, "submit")
+
+        def holder(lock_held, release):
+            with transaction.atomic():
+                services._lock_instance(self.prop)
+                lock_held.set()
+                release.wait(timeout=10)
+
+        def attempt():
+            perform_transition(
+                self.moderator, self.prop, "approve", expected_revision=1
+            )
+
+        results, errors, release, threads = self._race(holder, attempt)
+        User.objects.filter(pk=self.moderator.pk).update(is_active=False)
+        release.set()
+        for thread in threads:
+            thread.join(timeout=15)
+
+        self.assertFalse(any(t.is_alive() for t in threads))
+        self.assertFalse(errors, errors)
+        denial = results.get("attempt")
+        self.assertIsNotNone(denial, "approval unexpectedly succeeded")
+        exc, tb = denial
+        self.assertIsInstance(exc, PermissionDenied, tb)
+
+        fresh = Property.objects.get(pk=self.prop.pk)
+        self.assertEqual(fresh.publication_status, "review")
+        self.assertEqual(fresh.content_revision, 1)
+        self.assertFalse(_actions_for(fresh, "approved").exists())
+
+    def test_deactivation_while_blocked_on_lock_denies_comment(self):
+        def holder(lock_held, release):
+            with transaction.atomic():
+                services._lock_instance(self.prop)
+                lock_held.set()
+                release.wait(timeout=10)
+
+        def attempt():
+            record_comment(self.owner, self.prop, "blocked comment")
+
+        results, errors, release, threads = self._race(holder, attempt)
+        User.objects.filter(pk=self.owner.pk).update(is_active=False)
+        release.set()
+        for thread in threads:
+            thread.join(timeout=15)
+
+        self.assertFalse(any(t.is_alive() for t in threads))
+        self.assertFalse(errors, errors)
+        denial = results.get("attempt")
+        self.assertIsNotNone(denial, "comment unexpectedly succeeded")
+        exc, tb = denial
+        self.assertIsInstance(exc, PermissionDenied, tb)
+        self.assertFalse(_actions_for(self.prop, ReviewAction.ACTION_COMMENT).exists())
+
+
 class OwnedParentResolutionTests(TestCase):
     """Owned children must re-resolve their stored parent under the root lock."""
 
@@ -957,6 +1399,33 @@ class LockedTargetInvariantTests(RevisionServiceBase):
         self.prop.refresh_from_db()
         self.assertEqual(self.prop.name, "Rev Test Property")
         self.assertEqual(self.prop.content_revision, 1)
+
+    def test_narrow_form_preserves_concurrent_field_change(self):
+        from django.http import HttpResponse
+
+        from utils.object_management.views import _perform_bound_update
+
+        narrow_form_class = modelform_factory(Property, fields=["name"])
+        stale = Property.objects.get(pk=self.prop.pk)
+        form = narrow_form_class({"name": "Posted"}, instance=stale)
+        self.assertTrue(form.is_valid())
+        Property.objects.filter(pk=self.prop.pk).update(description="concurrent edit")
+
+        def fake_super(bound_form):
+            view.object = bound_form.save()
+            return HttpResponse()
+
+        view = SimpleNamespace(
+            object=stale,
+            request=SimpleNamespace(user=self.owner),
+            _call_super_form_valid=fake_super,
+        )
+        response = _perform_bound_update(view, form)
+        self.assertIsNotNone(response)
+        fresh = Property.objects.get(pk=self.prop.pk)
+        self.assertEqual(fresh.description, "concurrent edit")
+        self.assertEqual(fresh.name, "Posted")
+        self.assertEqual(fresh.content_revision, 2)
 
 
 class EvidenceFormsetCreationTests(RevisionServiceBase):
@@ -1073,6 +1542,51 @@ class ReassignmentLockTests(RevisionServiceBase):
         self.assertEqual(self.composition.sample_id, self.sample_b.pk)
         self.assertEqual(self.sample_a.content_revision, 2)
         self.assertEqual(self.sample_b.content_revision, 2)
+        self.assertEqual(_actions_for(self.sample_a, "edited").count(), 1)
+        self.assertEqual(_actions_for(self.sample_b, "edited").count(), 1)
+
+    def test_drf_update_moves_owned_child_between_editable_roots(self):
+        from rest_framework import serializers
+
+        from utils.object_management.viewsets import perform_policy_update
+
+        class CompositionSampleSerializer(serializers.ModelSerializer):
+            class Meta:
+                model = Composition
+                fields = ["sample"]
+
+        serializer = CompositionSampleSerializer(
+            self.composition, data={"sample": self.sample_b.pk}, partial=True
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        view = SimpleNamespace(request=SimpleNamespace(user=self.owner))
+        perform_policy_update(view, serializer)
+        self.composition.refresh_from_db()
+        self.assertEqual(self.composition.sample_id, self.sample_b.pk)
+        self.assertEqual(_actions_for(self.sample_a, "edited").count(), 1)
+        self.assertEqual(_actions_for(self.sample_b, "edited").count(), 1)
+
+    def test_html_update_moves_owned_child_between_editable_roots(self):
+        from django.http import HttpResponse
+
+        from utils.object_management.views import _perform_bound_update
+
+        form_class = modelform_factory(Composition, fields=["sample"])
+        form = form_class({"sample": self.sample_b.pk}, instance=self.composition)
+        self.assertTrue(form.is_valid(), form.errors)
+
+        def fake_super(bound_form):
+            view.object = bound_form.save()
+            return HttpResponse()
+
+        view = SimpleNamespace(
+            object=self.composition,
+            request=SimpleNamespace(user=self.owner),
+            _call_super_form_valid=fake_super,
+        )
+        _perform_bound_update(view, form)
+        self.composition.refresh_from_db()
+        self.assertEqual(self.composition.sample_id, self.sample_b.pk)
         self.assertEqual(_actions_for(self.sample_a, "edited").count(), 1)
         self.assertEqual(_actions_for(self.sample_b, "edited").count(), 1)
 
@@ -1471,3 +1985,91 @@ class OwnedMtiFacetTests(TestCase):
         nuts.refresh_from_db()
         self.assertEqual(nuts.name, "N renamed")
         self.assertEqual(nuts.content_revision, 2)
+
+
+class TransitionCascadeTests(RevisionServiceBase):
+    def setUp(self):
+        super().setUp()
+        self.moderator.user_permissions.add(_perm(Source, "can_moderate_source"))
+        self.source = Source.objects.create(
+            title="Cascading Source", owner=self.owner, publication_status="private"
+        )
+        self.author = Author.objects.create(
+            last_names="Cascade", owner=self.owner, publication_status="private"
+        )
+        SourceAuthor.objects.create(source=self.source, author=self.author, position=1)
+
+    def test_submit_and_approve_cascade_to_linked_authors(self):
+        perform_transition(self.owner, self.source, "submit", cascade=True)
+        self.author.refresh_from_db()
+        self.assertEqual(self.author.publication_status, "review")
+
+        self.source.refresh_from_db()
+        perform_transition(
+            self.moderator,
+            self.source,
+            "approve",
+            expected_revision=self.source.content_revision,
+            cascade=True,
+        )
+        self.source.refresh_from_db()
+        self.author.refresh_from_db()
+        self.assertEqual(self.source.publication_status, "published")
+        self.assertEqual(self.author.publication_status, "published")
+        self.assertEqual(self.author.approved_by, self.moderator)
+
+    def test_withdraw_cascades_to_linked_authors(self):
+        perform_transition(self.owner, self.source, "submit", cascade=True)
+        perform_transition(self.owner, self.source, "withdraw", cascade=True)
+        self.author.refresh_from_db()
+        self.assertEqual(self.author.publication_status, "private")
+
+    def test_expected_cascade_failure_is_logged_and_transition_kept(self):
+        with (
+            self.assertLogs(
+                "utils.object_management.services", level="WARNING"
+            ) as logs,
+            patch.object(
+                Source,
+                "cascade_review_action",
+                side_effect=ValidationError("cascade broke"),
+            ),
+        ):
+            perform_transition(self.owner, self.source, "submit", cascade=True)
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.publication_status, "review")
+        self.assertIn("Review action cascade failed", logs.output[0])
+
+    def test_unexpected_cascade_failure_rolls_back_transition(self):
+        with (
+            patch.object(
+                Source, "cascade_review_action", side_effect=RuntimeError("boom")
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            perform_transition(self.owner, self.source, "submit", cascade=True)
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.publication_status, "private")
+        self.assertFalse(_actions_for(self.source, "submitted").exists())
+
+    def test_service_does_not_cascade_unless_requested(self):
+        perform_transition(self.owner, self.source, "submit")
+        self.author.refresh_from_db()
+        self.assertEqual(self.author.publication_status, "private")
+
+    def test_html_review_action_cascades_to_linked_authors(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse(
+                "object_management:submit_for_review",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(Source).pk,
+                    "object_id": self.source.pk,
+                },
+            )
+        )
+        self.assertEqual(response.status_code, 302)
+        self.source.refresh_from_db()
+        self.author.refresh_from_db()
+        self.assertEqual(self.source.publication_status, "review")
+        self.assertEqual(self.author.publication_status, "review")

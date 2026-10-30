@@ -4,10 +4,12 @@
   <h5 class="modal-title">{% trans "Approve item" %}</h5>
   <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans "Close" %}"></button>
 </div>
+{% if expected_revision_bound %}
 <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}">
   <div class="modal-body">
     {% csrf_token %}
     {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+    <input type="hidden" name="expected_revision" value="{{ expected_revision }}">
     <p class="mb-3">{% trans "Are you sure you want to approve this?" %}</p>
     {% if cascade_author_count %}
       <div class="alert alert-info mb-3">
@@ -15,6 +17,7 @@
         {{ cascade_author_count }} linked author{{ cascade_author_count|pluralize }} will also be published.
       </div>
     {% endif %}
+    <p class="text-muted small mb-3">{% blocktrans %}Approving revision {{ expected_revision }} exactly as inspected.{% endblocktrans %}</p>
     <div class="mb-3">
       <label for="approve-comment-textarea-{{ object.id }}" class="form-label">{% trans "Review comment (optional)" %}</label>
       <textarea class="form-control" id="approve-comment-textarea-{{ object.id }}" name="comment" rows="3" placeholder="{% trans "Add a short note (optional)" %}"></textarea>
@@ -27,3 +30,14 @@
     </button>
   </div>
 </form>
+{% else %}
+<div class="modal-body">
+  <div class="alert alert-warning mb-0">
+    <i class="fas fa-exclamation-triangle"></i>
+    {% trans "This approval is not bound to an inspected revision. Open the review page for this item and approve it from there so the exact inspected version is confirmed." %}
+  </div>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Close" %}</button>
+</div>
+{% endif %}

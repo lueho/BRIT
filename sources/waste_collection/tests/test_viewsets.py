@@ -206,6 +206,68 @@ class CollectionViewSetTestCase(APITestCase):
         denied = self.client.get(url, {"scope": "private"}, REMOTE_ADDR="10.9.8.1")
         self.assertIn(denied.status_code, (401, 403))
 
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-archived-default",
+            },
+            "geojson": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-archived-data",
+                "TIMEOUT": 86400,
+            },
+        }
+    )
+    def test_scope_free_geojson_excludes_archived_and_shares_published_cache(self):
+        archived = self._create_collection(
+            name="Archived Collection",
+            owner=self.regular_user,
+            publication_status=UserCreatedObject.STATUS_ARCHIVED,
+        )
+        url = reverse("api-waste-collection-geojson")
+
+        def feature_ids(response):
+            if response.streaming:
+                payload = json.loads(b"".join(response.streaming_content))
+            else:
+                payload = response.json()
+            return {feature["properties"]["id"] for feature in payload["features"]}
+
+        default = self.client.get(url, REMOTE_ADDR="10.9.8.3")
+        published = self.client.get(url, {"scope": "published"}, REMOTE_ADDR="10.9.8.3")
+
+        self.assertEqual(default.status_code, 200)
+        self.assertEqual(published.status_code, 200)
+        self.assertNotIn(archived.pk, feature_ids(default))
+        self.assertNotIn(archived.pk, feature_ids(published))
+        self.assertEqual(published["X-Cache-Status"], "HIT")
+
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-warmup-default",
+            },
+            "geojson": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "rendered-collection-warmup-data",
+                "TIMEOUT": 86400,
+            },
+        }
+    )
+    def test_anonymous_geojson_reads_warmed_cache(self):
+        from sources.waste_collection.tasks import warm_collection_geojson_cache
+
+        result = warm_collection_geojson_cache.apply().get()
+        self.assertEqual(result["status"], "success")
+
+        response = self.client.get(
+            reverse("api-waste-collection-geojson"), REMOTE_ADDR="10.9.8.4"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Cache-Status"], "HIT")
+
     def test_geojson_endpoint_with_published_scope(self):
         """Should return only published collections for 'published' scope."""
         self.client.force_login(self.regular_user)
@@ -1067,6 +1129,11 @@ class CollectionReviewActionApiTestCase(APITestCase):
         cls.owner = User.objects.create_user(username="owner")
         cls.other_owner = User.objects.create_user(username="other-owner")
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
+        # Review actions require the explicit moderation capability; the
+        # staff flag alone grants nothing.
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="can_moderate_collection")
+        )
 
         cls.catchment = CollectionCatchment.objects.create(name="Test Catchment")
         cls.collector = Collector.objects.create(name="Test Collector")
@@ -1170,7 +1237,9 @@ class CollectionReviewActionApiTestCase(APITestCase):
 
         self.client.force_login(self.staff)
         url = reverse("api-waste-collection-approve", kwargs={"pk": collection.pk})
-        response = self.client.post(url)
+        response = self.client.post(
+            url, {"expected_revision": collection.content_revision}
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         collection.refresh_from_db()
@@ -1974,6 +2043,8 @@ class CollectionMutationApiTestCase(APITestCase):
         )
 
     def test_update_endpoint_denies_non_owner(self):
+        # A private collection is invisible to non-owners: the update
+        # endpoint must not leak its existence with a 403.
         self.client.force_login(self.other_user)
 
         response = self.client.post(
@@ -1996,7 +2067,7 @@ class CollectionMutationApiTestCase(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_endpoint_rejects_identity_mismatch(self):
         self.client.force_login(self.owner)

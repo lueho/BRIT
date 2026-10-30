@@ -16,15 +16,20 @@ Authorization itself is never duplicated here: every boundary delegates to
 from __future__ import annotations
 
 import contextvars
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import router, transaction
-from django.db.models import ForeignKey, Max, Model
+from django.core.exceptions import (
+    ObjectDoesNotExist,
+    PermissionDenied,
+    ValidationError,
+)
+from django.db import DatabaseError, router, transaction
+from django.db.models import ForeignKey, Max, Model, QuerySet
 from django.db.models.deletion import Collector
 from django.forms.models import construct_instance
 from django.utils import timezone
@@ -36,6 +41,7 @@ from .registry import (
     KIND_OWNED,
     KIND_REVIEWABLE,
     OWNED_CHILDREN,
+    allows_unattached_create,
     generated_profile,
     generated_source,
     model_policy,
@@ -68,6 +74,8 @@ _AUDIT_FIELD_NAMES = frozenset(
         "evaluation_status",
     }
 )
+
+logger = logging.getLogger(__name__)
 
 _TRANSITION_METHODS = {
     "submit": ("submit_for_review", ReviewAction.ACTION_SUBMITTED),
@@ -112,6 +120,139 @@ def _norm(value):
     if hasattr(value, "ewkt"):
         return value.ewkt
     return value
+
+
+def authorize_create(actor, model, *, parent=None):
+    """Authoritative ``create`` authorization inside the write boundary.
+
+    Resolves the registered policy, enforces the declared ``parent_path``
+    context, and locks every declared parent row via ``select_for_update``
+    in deterministic storage order — a stale permission cache, a vanished,
+    unsaved, or wrongly typed parent, or a parent lifecycle transition
+    committed since any advisory check can never authorize a write. The
+    actor is re-read through ``_fresh_actor`` only after every potentially
+    blocking lock is held, so a deactivation committed while this boundary
+    waited can never authorize a write either. Returns the fresh actor for
+    owner attribution and audit writes.
+
+    Locking the parents serializes creates against concurrent review
+    transitions on the same rows (the same ``_storage_key`` ordering
+    ``content_mutation`` uses, so no deadlock cycle is possible): an
+    approval that commits first is re-decided against the fresh locked row,
+    and one that arrives later waits until this boundary commits. Callers
+    must therefore invoke this inside the atomic write boundary that
+    persists the object so the locks are held through the save.
+
+    Callers must only route registered models here; unregistered non-UCO
+    persistence stays on the plain adapter path.
+    """
+    policy = model_policy(model)
+    if policy is None:
+        raise PermissionDenied("unsupported_model")
+    if policy.parent_path is not None:
+        if parent is None and allows_unattached_create(model):
+            pass  # optional direct-FK parent legitimately omitted
+        else:
+            try:
+                members = (
+                    (parent,) if isinstance(parent, Model) else tuple(parent or ())
+                )
+            except TypeError:
+                raise PermissionDenied("invalid_parent") from None
+            if not members:
+                raise PermissionDenied("Creation requires a valid parent context.")
+            expected = root_model(model, policy.parent_path)
+            for candidate in members:
+                pk = getattr(candidate, "pk", None)
+                if (
+                    expected is None
+                    or not isinstance(candidate, expected)
+                    or pk is None
+                ):
+                    raise PermissionDenied("invalid_parent")
+            locked = {}
+            for candidate in sorted(members, key=_storage_key):
+                key = _storage_key(candidate)
+                if key in locked:
+                    continue
+                try:
+                    locked[key] = _lock_instance(candidate)
+                except ObjectDoesNotExist:
+                    raise PermissionDenied("invalid_parent") from None
+            fresh = [locked[_storage_key(candidate)] for candidate in members]
+            parent = fresh[0] if isinstance(parent, Model) else tuple(fresh)
+    actor = _fresh_actor(actor)
+    decision = decide(actor, "create", model, parent=parent)
+    if not decision.allowed:
+        raise PermissionDenied(decision.reason)
+    return actor
+
+
+def validate_references(actor, validated_data):
+    """Require read access on every referenced record in validated data.
+
+    Traverses model instances, dicts, and list/tuple/queryset values: a
+    ``UserCreatedObject`` or explicitly policy-registered instance is
+    re-fetched via ``_base_manager`` — a stale instance whose access was
+    revoked, an unsaved row, or a deleted row fails closed with
+    ``PermissionDenied`` — and then must satisfy ``decide(actor, "read")``.
+    Scalar and unregistered non-UCO values pass through. Foreign keys are
+    enforced on the resolved instances, never inferred from raw ids.
+    """
+
+    def visit(value):
+        if isinstance(value, dict):
+            for item in value.values():
+                visit(item)
+        elif isinstance(value, (list, tuple, QuerySet)):
+            for item in value:
+                visit(item)
+        elif isinstance(value, Model) and (
+            isinstance(value, UserCreatedObject)
+            or model_policy(type(value)) is not None
+        ):
+            fresh = type(value)._base_manager.filter(pk=value.pk).first()
+            if fresh is None:
+                raise PermissionDenied("inaccessible_reference")
+            if not decide(actor, "read", fresh).allowed:
+                raise PermissionDenied("inaccessible_reference")
+
+    if isinstance(validated_data, dict):
+        for item in validated_data.values():
+            visit(item)
+    else:
+        visit(validated_data)
+
+
+def validate_created_parent(obj, *, parent):
+    """Assert the persisted row's declared parents equal the authorized
+    context.
+
+    Runs after actual persistence inside the same atomic write: a serializer
+    or form that stored a different parent than the authorized one fails
+    closed and rolls the whole write back. Identity uses the ``_storage_key``
+    normalization so proxy/MTI aliases cannot fake a match.
+    """
+    policy = model_policy(type(obj))
+    if policy is None or policy.parent_path is None:
+        return
+    if getattr(obj, "pk", None) is None:
+        return  # advisory preflight path; nothing persisted to compare
+    persisted = type(obj)._base_manager.filter(pk=obj.pk).first()
+    if persisted is None:
+        raise PermissionDenied("invalid_parent")
+    if parent is None:
+        if not allows_unattached_create(type(obj)):
+            raise PermissionDenied("invalid_parent")
+        fk_field = type(obj)._meta.get_field(policy.parent_path)
+        if getattr(persisted, fk_field.attname) is not None:
+            raise PermissionDenied("invalid_parent")
+        return
+    actual = {_storage_key(p) for p in resolve_parents(persisted, policy.parent_path)}
+    members = (parent,) if isinstance(parent, Model) else tuple(parent)
+    expected = {_storage_key(p) for p in members}
+    if not actual or actual != expected:
+        raise PermissionDenied("invalid_parent")
 
 
 def _row_snapshot(obj):
@@ -470,7 +611,10 @@ def content_mutation(
     is a reassignment: every affected root (stored parent, proposed
     parents, and the record's own root for independent evidence) is locked
     in deterministic storage order, re-checked, and audited while the locks
-    remain held through the callback.
+    remain held through the callback. The actor is re-read through
+    ``_fresh_actor`` only after every potentially blocking lock is held,
+    so a deactivation committed while this boundary waited on a row lock
+    can never authorize the write.
 
     On clean exit the persisted scalar, owned-row, and M2M state of each
     tracked root is compared; a meaningful change bumps ``content_revision``
@@ -489,7 +633,6 @@ def content_mutation(
     if moving and (policy.parent_path is None or action != "edit"):
         raise ValidationError("invalid_parent")
 
-    actor = _fresh_actor(actor)
     active_roots = _ACTIVE_MUTATION_ROOTS.get() or {}
 
     with transaction.atomic():
@@ -551,6 +694,10 @@ def content_mutation(
                     "The stored parent changed while acquiring locks."
                 )
 
+        # Re-read the actor only after every potentially blocking lock is
+        # held so a deactivation committed while this boundary waited can
+        # never authorize the write.
+        actor = _fresh_actor(actor)
         if moving:
             locked_proposed = [
                 locked_roots[_storage_key(candidate)] for candidate in proposed
@@ -698,8 +845,38 @@ def _validate_comment_watermark(current, expected):
     return watermark
 
 
+_CASCADE_EXCEPTIONS = (AttributeError, TypeError, ValidationError, DatabaseError)
+
+
+def run_review_cascade(obj, action_name, actor, previous_status):
+    """Apply the model's ``cascade_review_action`` to linked records.
+
+    Runs in a savepoint inside the transition transaction so an expected
+    cascade failure is logged and rolled back without undoing the primary
+    transition; unexpected errors propagate and abort the whole transition.
+    """
+    handler = getattr(obj, "cascade_review_action", None)
+    if not callable(handler):
+        return
+    try:
+        with transaction.atomic():
+            handler(
+                action_name=action_name,
+                actor=actor,
+                previous_status=previous_status,
+            )
+    except _CASCADE_EXCEPTIONS as exc:
+        logger.warning("Review action cascade failed for %s: %s", obj, exc)
+
+
 def perform_transition(
-    actor, target, action: str, *, expected_revision=None, comment: str = ""
+    actor,
+    target,
+    action: str,
+    *,
+    expected_revision=None,
+    comment: str = "",
+    cascade: bool = False,
 ):
     """Apply a named review transition under the root lock.
 
@@ -707,7 +884,9 @@ def perform_transition(
     requires the caller's inspected ``content_revision`` and excludes the
     owner and every recorded contributor of the current candidate. The
     model's own transition method performs domain validation; the resulting
-    audit event is written in the same transaction.
+    audit event is written in the same transaction. The actor is re-read
+    only after the root lock is held, so a deactivation committed while
+    this boundary waited can never authorize the transition.
     """
     if action not in _TRANSITION_METHODS:
         raise ValidationError(f"Unsupported transition '{action}'.")
@@ -719,12 +898,13 @@ def perform_transition(
     if policy is None or policy.kind != KIND_REVIEWABLE:
         raise PermissionDenied("unsupported_model")
 
-    actor = _fresh_actor(actor)
     with transaction.atomic():
         fresh = _lock_instance(target)
+        actor = _fresh_actor(actor)
         decision = decide(actor, action, fresh)
         if not decision.allowed:
             raise PermissionDenied(decision.reason)
+        previous_status = fresh.publication_status
         bound_revision = _validate_expected_revision(
             fresh.content_revision, expected_revision, required=action == "approve"
         )
@@ -735,6 +915,8 @@ def perform_transition(
             transition(user=actor)
         else:
             transition()
+        if cascade:
+            run_review_cascade(fresh, method_name, actor, previous_status)
         if review_action is not None:
             _record_event(
                 fresh,
@@ -754,7 +936,9 @@ def record_comment(actor, target, comment, *, expected_revision=None):
     the current one; older watermarks are retained, absent watermarks stay
     unbound (``content_revision`` null). Comments never bump the revision.
     Comments on a generated projection bind the source evidence thread and
-    the source revision — there is no separate projection approval.
+    the source revision — there is no separate projection approval. The
+    actor is re-read only after the root lock is held, so a deactivation
+    committed while this boundary waited can never record a comment.
     """
     record = record_policy(target)
     if record is not None and record.kind == KIND_GENERATED:
@@ -765,9 +949,9 @@ def record_comment(actor, target, comment, *, expected_revision=None):
     policy = model_policy(type(target))
     if policy is None or policy.kind != KIND_REVIEWABLE:
         raise PermissionDenied("unsupported_model")
-    actor = _fresh_actor(actor)
     with transaction.atomic():
         fresh = _lock_instance(target)
+        actor = _fresh_actor(actor)
         decision = decide(actor, "comment_on_review", fresh)
         if not decision.allowed:
             raise PermissionDenied(decision.reason)
@@ -829,9 +1013,11 @@ def save_evidence_formset_rows(actor, formset, parent) -> None:
 
     Each changed row is its own registry root: edits/deletes run inside a
     ``content_mutation`` on the evidence record itself and creations are
-    recorded with ``record_creation`` — never as edits of the parent. The
-    caller is expected to hold an outer ``transaction.atomic`` batch and to
-    have validated the formset already.
+    authorized through ``authorize_create`` — locking and re-deciding
+    against the declared parent inside the write boundary — then recorded
+    with ``record_creation``. Never as edits of the parent. The caller is
+    expected to hold an outer ``transaction.atomic`` batch and to have
+    validated the formset already.
     """
     actor = _fresh_actor(actor)
     for form in formset.forms:
@@ -855,9 +1041,7 @@ def save_evidence_formset_rows(actor, formset, parent) -> None:
                 resolve_create_parent(model_policy(type(instance)), instance, data)
                 or parent
             )
-            decision = decide(actor, "create", type(instance), parent=create_parent)
-            if not decision.allowed:
-                raise PermissionDenied(decision.reason)
+            actor = authorize_create(actor, type(instance), parent=create_parent)
             if isinstance(instance, UserCreatedObject):
                 instance.owner = actor
                 instance.publication_status = UserCreatedObject.STATUS_PRIVATE

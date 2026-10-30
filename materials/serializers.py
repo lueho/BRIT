@@ -15,6 +15,7 @@ from bibliography.serializers import SourceAbbreviationSerializer
 from distributions.models import TemporalDistribution
 from maps.models import Location, Region
 from utils.object_management.permissions import filter_queryset_for_user
+from utils.object_management.policy import editable_queryset
 from utils.properties.serializers import NumericMeasurementSerializerMixin
 
 from .composition_normalization import get_sample_normalized_compositions
@@ -516,11 +517,7 @@ def _request_user(context):
 
 
 def _editable_by(queryset, user):
-    if getattr(user, "is_staff", False):
-        return queryset.all()
-    if getattr(user, "is_authenticated", False):
-        return queryset.editable_by_user(user)
-    return queryset.none()
+    return editable_queryset(user, queryset)
 
 
 def _validate_related_pks(value, queryset, message):
@@ -535,7 +532,29 @@ def _update_m2m_preserving_locked(manager, new_members, editable):
     manager.add(*locked)
 
 
-class SampleGroupWriteSerializer(ModelSerializer):
+class EditableMembershipWriteMixin:
+    """Re-run the declared membership validator inside ``save``.
+
+    Initial serializer validation is advisory: the related edit capability
+    can be revoked between that pass and the shared write boundary, so the
+    write re-checks the already-typed value against the current actor's
+    editable scope before any scalar or M2M persistence.
+    """
+
+    editable_membership_field = None
+
+    def save(self, **kwargs):
+        field = self.editable_membership_field
+        merged = {**self.validated_data, **kwargs}
+        if field and field in merged:
+            validator = getattr(self, f"validate_{field}")
+            validator(merged[field])
+        return super().save(**kwargs)
+
+
+class SampleGroupWriteSerializer(EditableMembershipWriteMixin, ModelSerializer):
+    editable_membership_field = "samples"
+
     sources = PrimaryKeyRelatedField(
         many=True,
         queryset=Source.objects.all(),
@@ -598,7 +617,9 @@ class SampleGroupWriteSerializer(ModelSerializer):
         )
 
 
-class SampleWriteSerializer(ModelSerializer):
+class SampleWriteSerializer(EditableMembershipWriteMixin, ModelSerializer):
+    editable_membership_field = "sample_groups"
+
     # sources is a M2M field without blank=True on the model; make it optional
     # in the API so callers can add sources later.
     sources = PrimaryKeyRelatedField(

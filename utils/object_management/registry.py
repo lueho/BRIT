@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 
 from django.apps import apps
+from django.core.exceptions import FieldDoesNotExist
+from django.db.models import ForeignKey
 
 KIND_REVIEWABLE = "reviewable"
 KIND_OWNED = "owned"
@@ -91,6 +93,17 @@ CURATED_MODELS = frozenset(
     }
 )
 
+# Owned children whose runtime relation/column configuration additionally
+# requires explicit application administration on every mutation — including
+# create, edit, delete, reassignment, and editable-scope listing. Ordinary
+# owned children not listed here remain governed solely by parent authority.
+ADMINISTRATOR_MANAGED_CHILDREN = frozenset(
+    {
+        "maps.geodatasetcolumnpolicy",
+        "maps.geodatasetruntimeconfiguration",
+    }
+)
+
 OWNED_CHILDREN = {
     "bibliography.sourceauthor": "source",
     "closecycle.showcasematerial": "showcase",
@@ -178,6 +191,17 @@ def model_policy(model):
     return MODEL_POLICIES.get(label)
 
 
+def administrator_managed(model):
+    """Whether writes to ``model`` additionally require ``actor.admin``.
+
+    Parent authority, lifecycle state, and capability checks still apply; the
+    administrator requirement is strictly additive.
+    """
+    meta = getattr(model, "_meta", None)
+    label = getattr(meta, "label_lower", None) if meta is not None else None
+    return label in ADMINISTRATOR_MANAGED_CHILDREN
+
+
 def generated_profile(model):
     """Return the declared ``(marker, pointer)`` generated profile or None."""
     meta = getattr(model, "_meta", None)
@@ -233,6 +257,26 @@ def review_target(obj):
     return obj
 
 
+def allows_unattached_create(model):
+    """Whether a registered model may be created without a resolved parent.
+
+    True only for ``KIND_REVIEWABLE`` policies whose ``parent_path`` is a
+    single direct nullable ``ForeignKey``. Owned children, M2M/``__`` paths,
+    required FKs and unresolved fields all fail closed.
+    """
+    policy = model_policy(model)
+    if policy is None or policy.kind != KIND_REVIEWABLE:
+        return False
+    parent_path = policy.parent_path
+    if not parent_path or "__" in parent_path:
+        return False
+    try:
+        field = model._meta.get_field(parent_path)
+    except FieldDoesNotExist:
+        return False
+    return isinstance(field, ForeignKey) and bool(field.null)
+
+
 def root_model(model, parent_path):
     current = model
     for part in parent_path.split("__"):
@@ -253,6 +297,26 @@ def resolve_parent(instance, parent_path):
         if current is None or getattr(current, "pk", None) is None:
             return None
     return current
+
+
+def declared_parent_changed(instance, parent_path, new_parent):
+    """Whether ``new_parent`` re-targets ``instance`` away from its stored parent.
+
+    The stored row is re-read because form validation already copies the
+    posted parent onto the in-memory instance.
+    """
+    if instance.pk is not None:
+        stored = type(instance)._base_manager.filter(pk=instance.pk).first()
+        if stored is not None:
+            instance = stored
+    if isinstance(new_parent, (list, tuple)):
+        new_keys = sorted(getattr(p, "pk", None) for p in new_parent)
+        old_keys = sorted(p.pk for p in resolve_parents(instance, parent_path))
+        return new_keys != old_keys
+    old_parent = resolve_parent(instance, parent_path)
+    if old_parent is None:
+        return True
+    return getattr(new_parent, "pk", None) != old_parent.pk
 
 
 def resolve_parents(instance, parent_path):

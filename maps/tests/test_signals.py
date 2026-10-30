@@ -28,7 +28,12 @@ class RegionAttributeGeoJSONCacheInvalidationTests(SimpleTestCase):
 
         self.assertEqual(
             geojson_cache.delete.call_args_list,
-            [call("region_geojson:id:123"), call("region_geojson:id:123")],
+            [
+                call("region_geojson:id:123"),
+                call("authz-v1:region_geojson:id:123"),
+                call("region_geojson:id:123"),
+                call("authz-v1:region_geojson:id:123"),
+            ],
         )
         self.assertEqual(
             clear_pattern.call_args_list,
@@ -53,7 +58,12 @@ class RegionAttributeGeoJSONCacheInvalidationTests(SimpleTestCase):
 
         self.assertEqual(
             geojson_cache.delete.call_args_list,
-            [call("region_geojson:id:123"), call("region_geojson:id:123")],
+            [
+                call("region_geojson:id:123"),
+                call("authz-v1:region_geojson:id:123"),
+                call("region_geojson:id:123"),
+                call("authz-v1:region_geojson:id:123"),
+            ],
         )
         self.assertEqual(
             clear_pattern.call_args_list,

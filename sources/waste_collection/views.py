@@ -512,6 +512,10 @@ class WasteFlyerPrivateFilterView(PrivateObjectFilterView):
 
 
 class WasteFlyerCreateView(SourceCreateView):
+    # The policy model must be WasteFlyer: inheriting ``model = Source``
+    # would authorize creates against ``bibliography.add_source`` instead of
+    # the declared ``waste_collection.add_wasteflyer``.
+    model = WasteFlyer
     form_class = WasteFlyerModelForm
     success_url = reverse_lazy("wasteflyer-list")
     permission_required = "waste_collection.add_wasteflyer"
@@ -1796,7 +1800,10 @@ class CollectionCatchmentAddAggregatedPropertyView(
 
 class SelectNewlyCreatedObjectModelSelectOptionsView(OwnedObjectModelSelectOptionsView):
     def get_selected_object(self):
-        qs = self.model.objects.filter(owner=self.request.user)
+        user = self.request.user
+        if not getattr(user, "is_authenticated", False):
+            return None
+        qs = self.model.objects.filter(owner=user)
         created_at = qs.aggregate(max_created_at=Max("created_at"))["max_created_at"]
         if created_at is None:
             return None

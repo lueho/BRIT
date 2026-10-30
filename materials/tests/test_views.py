@@ -28,6 +28,7 @@ from utils.object_management.models import (
     ReviewAction,
     UserCreatedObject,
 )
+from utils.object_management.services import run_review_cascade
 from utils.object_management.views import SubmitForReviewView
 from utils.properties.models import Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
@@ -378,14 +379,16 @@ class AnalyticalMethodReviewCascadeTest(TestCase):
         )
 
     def _run_action(self, obj, action_attr_name, hook_status):
-        """Run a review action's cascade hook the way the view layer does."""
+        """Run the model cascade the way the shared transition service does."""
         request = self.factory.post("/")
         request.user = self.owner
         view = SubmitForReviewView()
         view.request = request
         view.object = obj
         view.action_attr_name = action_attr_name
-        view.post_action_hook(request, hook_status)
+        run_review_cascade(
+            view.object, view.action_attr_name, request.user, hook_status
+        )
 
     def _assert_statuses(self, expected):
         """Refresh each source and assert its publication status."""
@@ -764,11 +767,49 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
             average=123.312,
             standard_deviation=0.1337,
         )
+        # A clean, owner-owned parent for the add-property denial regression
+        # below: the route needs parent edit (change_sample), which this
+        # owner intentionally lacks.
+        cls.sample = Sample.objects.create(
+            owner=cls.owner,
+            name="Owner Sample",
+            material=material,
+        )
+        cls.owner.user_permissions.add(
+            Permission.objects.get(codename="add_materialpropertyvalue")
+        )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse(self.url_name, kwargs={"pk": self.value.pk})
         response = self.client.get(url)
         self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+
+    def test_owner_without_change_sample_gets_403(self):
+        """Ownership plus the child-add capability is not enough: the owner
+        must retain change_sample for the add-property routes."""
+        change_sample = Permission.objects.get(
+            codename="change_sample",
+            content_type__app_label="materials",
+        )
+        self.owner.groups.clear()
+        owner = get_user_model().objects.get(pk=self.owner.pk)
+        owner.user_permissions.remove(change_sample)
+        owner = get_user_model().objects.get(pk=self.owner.pk)
+        self.assertFalse(owner.has_perm("materials.change_sample"))
+        self.assertTrue(owner.has_perm("materials.add_materialpropertyvalue"))
+        url = reverse("sample-add-property", kwargs={"pk": self.sample.pk})
+        revision_before = self.sample.content_revision
+        self.client.force_login(owner)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+        response = self.client.post(url, data={})
+        self.assertEqual(response.status_code, 403)
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.content_revision, revision_before)
+        self.assertFalse(
+            MaterialPropertyValue.objects.filter(sample=self.sample).exists()
+        )
+        self.assertFalse(ReviewAction.objects.exists())
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -873,7 +914,8 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.owner.user_permissions.add(
-            Permission.objects.get(codename="change_materialpropertyvalue")
+            Permission.objects.get(codename="change_materialpropertyvalue"),
+            Permission.objects.get(codename="change_sample"),
         )
         cls.unit = Unit.objects.create(name="mg/L", owner=cls.owner)
         cls.default_basis = MaterialComponent.objects.create(
@@ -1097,7 +1139,7 @@ class MaterialPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class MaterialPropertyValueCreateAndDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = "add_materialpropertyvalue"
+    member_permissions = ("add_materialpropertyvalue", "change_sample")
 
     @classmethod
     def setUpTestData(cls):
@@ -1161,6 +1203,38 @@ class MaterialPropertyValueCreateAndDetailViewTestCase(ViewWithPermissionsTestCa
         self.assertEqual(value.sample, self.sample)
         self.assertIn(value, self.sample.property_values.all())
 
+    def test_create_view_denies_owner_without_change_sample(self):
+        """Child-add capability and ownership alone are insufficient: the
+        actor must still be able to edit the parent sample."""
+        change_sample = Permission.objects.get(
+            codename="change_sample",
+            content_type__app_label="materials",
+        )
+        self.member.groups.clear()
+        member = get_user_model().objects.get(pk=self.member.pk)
+        self.assertTrue(member.has_perm("materials.add_materialpropertyvalue"))
+        member.user_permissions.remove(change_sample)
+        member = get_user_model().objects.get(pk=self.member.pk)
+        self.assertFalse(member.has_perm("materials.change_sample"))
+        self.assertTrue(member.has_perm("materials.add_materialpropertyvalue"))
+        count_before = self.sample.property_values.count()
+        self.client.force_login(member)
+        response = self.client.post(
+            f"{reverse('materialpropertyvalue-create')}?sample={self.sample.pk}",
+            data={
+                "property": self.property.pk,
+                "basis_component": self.default_basis.pk,
+                "unit": self.unit.pk,
+                "analytical_method": "",
+                "sources": [],
+                "average": "18.25",
+                "standard_deviation": "0.75",
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.sample.property_values.count(), count_before)
+        self.assertFalse(ReviewAction.objects.exists())
+
     def test_create_view_redirects_to_next_url(self):
         self.client.force_login(self.member)
         next_url = (
@@ -1223,7 +1297,8 @@ class ComponentMeasurementUpdateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.owner.user_permissions.add(
-            Permission.objects.get(codename="change_componentmeasurement")
+            Permission.objects.get(codename="change_componentmeasurement"),
+            Permission.objects.get(codename="change_sample"),
         )
         cls.unit = Unit.objects.filter(name="%").first()
         if cls.unit is None:
@@ -1403,7 +1478,7 @@ class ComponentMeasurementUpdateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class ComponentMeasurementCreateAndDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = "add_componentmeasurement"
+    member_permissions = ("add_componentmeasurement", "change_sample")
 
     @classmethod
     def setUpTestData(cls):
@@ -1480,6 +1555,40 @@ class ComponentMeasurementCreateAndDetailViewTestCase(ViewWithPermissionsTestCas
             response,
             f"{reverse('componentmeasurement-create')}?sample={self.sample.pk}&amp;next=",
         )
+
+    def test_create_view_denies_owner_without_change_sample(self):
+        """Child-add capability and ownership alone are insufficient: the
+        actor must still be able to edit the parent sample."""
+        change_sample = Permission.objects.get(
+            codename="change_sample",
+            content_type__app_label="materials",
+        )
+        self.member.groups.clear()
+        member = get_user_model().objects.get(pk=self.member.pk)
+        member.user_permissions.remove(change_sample)
+        member = get_user_model().objects.get(pk=self.member.pk)
+        self.assertFalse(member.has_perm("materials.change_sample"))
+        self.assertTrue(member.has_perm("materials.add_componentmeasurement"))
+        count_before = self.sample.component_measurements.count()
+        self.client.force_login(member)
+        response = self.client.post(
+            f"{reverse('componentmeasurement-create')}?sample={self.sample.pk}",
+            data={
+                "group": self.group.pk,
+                "component": self.component.pk,
+                "basis_component": "",
+                "analytical_method": "",
+                "sources": [],
+                "unit": self.unit.pk,
+                "average": "18.25",
+                "standard_deviation": "0.75",
+                "sample_size": "3",
+                "comment": "Created from dedicated route",
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.sample.component_measurements.count(), count_before)
+        self.assertFalse(ReviewAction.objects.exists())
 
     def test_create_view_creates_measurement_for_related_sample_and_redirects(self):
         self.client.force_login(self.member)
@@ -1602,7 +1711,7 @@ class ComponentMeasurementCreateAndDetailViewTestCase(ViewWithPermissionsTestCas
 
 
 class ComponentMeasurementModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = "delete_componentmeasurement"
+    member_permissions = ("delete_componentmeasurement", "change_sample")
     url_name = "componentmeasurement-delete-modal"
 
     @classmethod
@@ -1937,6 +2046,20 @@ class SampleSeriesCRUDViewsTestCase(
         )
         return {"material": material}
 
+    # Deleting a series NULLs the series FK on its auto-created member
+    # samples — a write on reviewable rows the delete boundary forbids.
+    # The deletion tests therefore detach the members first.
+    def _detach_series_samples(self):
+        self.unpublished_object.samples.all().delete()
+
+    def test_delete_view_post_unpublished_as_owner(self):
+        self._detach_series_samples()
+        super().test_delete_view_post_unpublished_as_owner()
+
+    def test_delete_view_post_unpublished_as_staff_user(self):
+        self._detach_series_samples()
+        super().test_delete_view_post_unpublished_as_staff_user()
+
 
 # ----------- Sample Series Utilities ----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -1967,9 +2090,51 @@ class SampleSeriesCreateDuplicateViewTestCase(
             )
         }
 
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        # Duplicating a series requires the model add capability.
+        cls.owner_user.user_permissions.add(
+            Permission.objects.get(codename="add_sampleseries")
+        )
+
     def get_update_success_url(self, pk=None):
         duplicate = SampleSeries.objects.exclude(pk=pk).latest("pk")
         return duplicate.get_absolute_url()
+
+    # The update endpoint of this class is the duplicate form: duplicating a
+    # published series is a legitimate copy action (read + add capability),
+    # not an edit of a frozen record, so the generic published-edit denials
+    # do not apply here.
+    def test_update_view_get_published_as_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_update_url(self.published_object.pk))
+        self.assertEqual(response.status_code, 200)
+
+    def test_update_view_post_published_as_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.post(
+            self.get_update_url(self.published_object.pk),
+            self.compile_update_post_data(),
+        )
+        self.assertRedirects(
+            response, self.get_update_success_url(pk=self.published_object.pk)
+        )
+
+    def test_update_view_get_published_as_staff_user(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.get(self.get_update_url(self.published_object.pk))
+        self.assertEqual(response.status_code, 200)
+
+    def test_update_view_post_published_as_staff_user(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.post(
+            self.get_update_url(self.published_object.pk),
+            self.compile_update_post_data(),
+        )
+        self.assertRedirects(
+            response, self.get_update_success_url(pk=self.published_object.pk)
+        )
 
     def test_post_leaves_original_untouched_and_redirects_to_duplicate(self):
         original = SampleSeries.objects.get(pk=self.unpublished_object.pk)
@@ -2831,6 +2996,22 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         )
         self.assertContains(response, self.get_delete_url(self.unpublished_object.pk))
 
+    # Deleting a sample cascades to its independent-evidence rows
+    # (property values, component measurements) — rows the delete boundary
+    # refuses to remove implicitly. The deletion tests therefore clear them
+    # first so the sample itself is a legal delete target.
+    def _clear_sample_evidence(self):
+        self.unpublished_object.property_values.all().delete()
+        self.unpublished_object.component_measurements.all().delete()
+
+    def test_delete_view_post_unpublished_as_owner(self):
+        self._clear_sample_evidence()
+        super().test_delete_view_post_unpublished_as_owner()
+
+    def test_delete_view_post_unpublished_as_staff_user(self):
+        self._clear_sample_evidence()
+        super().test_delete_view_post_unpublished_as_staff_user()
+
     @classmethod
     def create_related_objects(cls):
         substrate_category, _ = MaterialCategory.objects.get_or_create(
@@ -3412,6 +3593,57 @@ class SampleMaintenanceViewsTestCase(TestCase):
         self.sample.refresh_from_db()
         self.assertEqual(self.sample.name, "Pilot sample")
 
+    def test_section_save_bumps_content_revision_and_writes_audit_event(self):
+        revision = self.sample.content_revision
+        response = self.client.post(
+            self.section_url("overview"),
+            {
+                "name": "Renamed sample",
+                "material": str(self.substrate.pk),
+                "description": "New description",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.content_revision, revision + 1)
+        event = ReviewAction.objects.get(
+            content_type=ContentType.objects.get_for_model(Sample),
+            object_id=self.sample.pk,
+            action=ReviewAction.ACTION_EDITED,
+        )
+        self.assertEqual(event.user, self.owner)
+        self.assertEqual(event.content_revision, self.sample.content_revision)
+        self.assertIn("name", event.changed_fields)
+
+    def test_denied_post_lock_decision_rolls_back_section_save(self):
+        from utils.object_management.policy import Decision
+
+        revision = self.sample.content_revision
+        with patch(
+            "utils.object_management.services.decide",
+            side_effect=lambda *args, **kwargs: Decision(False, "immutable_state"),
+        ):
+            response = self.client.post(
+                self.section_url("overview"),
+                {
+                    "name": "Must not save",
+                    "material": str(self.substrate.pk),
+                    "description": "Must not save",
+                },
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+        self.assertEqual(response.status_code, 403)
+        self.sample.refresh_from_db()
+        self.assertEqual(self.sample.name, "Pilot sample")
+        self.assertEqual(self.sample.content_revision, revision)
+        self.assertFalse(
+            ReviewAction.objects.filter(
+                object_id=self.sample.pk, action=ReviewAction.ACTION_EDITED
+            ).exists()
+        )
+
 
 class SampleDetailAttributionTestCase(ViewWithPermissionsTestCase):
     """Sample detail attribution: bibliography authors, not the owner."""
@@ -3480,6 +3712,9 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
                 codename__in=[
                     "add_sample",
                     "change_sample",
+                    "add_componentmeasurement",
+                    "change_componentmeasurement",
+                    "delete_componentmeasurement",
                     "add_materialpropertyvalue",
                 ],
             )
@@ -3996,6 +4231,48 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         value = self.sample.property_values.get()
         self.assertEqual(value.comment, "calculated; C approximated as OM/1.8")
 
+    def test_properties_post_records_creation_audit_on_evidence_row(self):
+        response = self.client.post(
+            self.section_url("properties"),
+            self.property_formset(
+                [
+                    {
+                        "property": str(self.property.pk),
+                        "average": "312.5",
+                        "unit": str(self.unit.pk),
+                    }
+                ]
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["saved"])
+        value = self.sample.property_values.get()
+        event = ReviewAction.objects.get(
+            content_type=ContentType.objects.get_for_model(MaterialPropertyValue),
+            object_id=value.pk,
+            action=ReviewAction.ACTION_CREATED,
+        )
+        self.assertEqual(event.user, self.owner)
+        self.assertEqual(event.content_revision, value.content_revision)
+
+    def test_denied_boundary_rolls_back_measurement_rows(self):
+        from utils.object_management.policy import Decision
+
+        with patch(
+            "utils.object_management.services.decide",
+            side_effect=lambda *args, **kwargs: Decision(False, "invalid_state"),
+        ):
+            response = self.client.post(
+                self.section_url("measurements"),
+                self.measurement_formset(
+                    [self.measurement_row(component=str(self.moisture.pk))]
+                ),
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.sample.component_measurements.count(), 1)
+
 
 # ----------- Sample utilities -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -4014,6 +4291,12 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
             defaults={"name": "Can add material property value"},
         )
         cls.owner.user_permissions.add(permission)
+        cls.owner.user_permissions.add(
+            Permission.objects.get(
+                codename="change_sample",
+                content_type__app_label="materials",
+            )
+        )
         material = Material.objects.create(name="Test Material")
         series = SampleSeries.objects.create(
             owner=cls.owner, name="Test Series", material=material
@@ -4223,6 +4506,12 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
             defaults={"name": "Can add material property value"},
         )
         cls.owner.user_permissions.add(permission)
+        cls.owner.user_permissions.add(
+            Permission.objects.get(
+                codename="change_sample",
+                content_type__app_label="materials",
+            )
+        )
         material = Material.objects.create(name="Test Material")
         series = SampleSeries.objects.create(
             owner=cls.owner, name="Test Series", material=material
@@ -4392,7 +4681,9 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
             timestep=timestep,
         )
         cls.sample.owner.user_permissions.add(
-            Permission.objects.get(codename="change_sample")
+            Permission.objects.get(codename="change_sample"),
+            Permission.objects.get(codename="add_sample"),
+            Permission.objects.get(codename="change_samplegroup"),
         )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -4590,6 +4881,21 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
     def setUpTestData(cls):
         super().setUpTestData()
         cls.m2m_objects = cls.create_m2m_objects()
+        # Compositions are owned children: every write on them is authorized
+        # through edit access on the parent sample, so all actors that
+        # legitimately mutate compositions need the parent change capability.
+        change_sample = Permission.objects.get(codename="change_sample")
+        cls.owner_user.user_permissions.add(change_sample)
+        cls.staff_user.user_permissions.add(change_sample)
+        cls.user_with_add_perm.user_permissions.add(change_sample)
+        # The add-only actor also needs at least one editable parent for the
+        # create form to be reachable at all.
+        cls.add_perm_sample = Sample.objects.create(
+            owner=cls.user_with_add_perm,
+            name="Add perm actor's own sample",
+            material=cls.related_objects["unpublished_sample"].material,
+            standalone=True,
+        )
 
     @classmethod
     def create_related_objects(cls):
@@ -4605,7 +4911,9 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
             name="Private Test Sample",
             material=material,
         )
-        group = MaterialComponentGroup.objects.create(name="Test Group")
+        group = MaterialComponentGroup.objects.create(
+            name="Test Group", publication_status="published"
+        )
         return {
             "published_sample": published_sample,
             "unpublished_sample": unpublished_sample,
@@ -4638,8 +4946,12 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
     @classmethod
     def create_m2m_objects(cls):
-        component_1 = MaterialComponent.objects.create(name="Test Component 1")
-        component_2 = MaterialComponent.objects.create(name="Test Component 2")
+        component_1 = MaterialComponent.objects.create(
+            name="Test Component 1", publication_status="published"
+        )
+        component_2 = MaterialComponent.objects.create(
+            name="Test Component 2", publication_status="published"
+        )
         return {"components": {"component_1": component_1, "component_2": component_2}}
 
     def related_objects_post_data(self):
@@ -4697,6 +5009,67 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
         )
 
         self.assertRedirects(response, next_url)
+
+    def test_update_view_reparents_composition_for_editor_with_grants(self):
+        """Reparenting an owned child re-checks both parents: an editor with
+        grants on the source and target samples may move a composition."""
+        editor = User.objects.create_user(username="composition-reparent-editor")
+        editor.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="materials",
+                codename__in=("change_sample", "change_composition"),
+            )
+        )
+        editor.groups.clear()
+        source = self.related_objects["unpublished_sample"]
+        target = Sample.objects.create(
+            owner=self.owner_user,
+            name="Reparent target sample",
+            material=source.material,
+            standalone=True,
+        )
+        source.add_editor(editor, granted_by=self.owner_user)
+        target.add_editor(editor, granted_by=self.owner_user)
+        self.client.force_login(editor)
+
+        data = self.related_objects_post_data()
+        data["sample"] = target.pk
+        response = self.client.post(
+            self.get_update_url(self.unpublished_object.pk), data
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.unpublished_object.refresh_from_db()
+        self.assertEqual(self.unpublished_object.sample, target)
+
+    def test_update_view_denies_reparent_to_ungranted_sample(self):
+        editor = User.objects.create_user(username="composition-reparent-denied-editor")
+        editor.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="materials",
+                codename__in=("change_sample", "change_composition"),
+            )
+        )
+        editor.groups.clear()
+        source = self.related_objects["unpublished_sample"]
+        target = Sample.objects.create(
+            owner=self.owner_user,
+            name="Ungranted reparent target sample",
+            material=source.material,
+            standalone=True,
+        )
+        source.add_editor(editor, granted_by=self.owner_user)
+        self.client.force_login(editor)
+
+        data = self.related_objects_post_data()
+        data["sample"] = target.pk
+        response = self.client.post(
+            self.get_update_url(self.unpublished_object.pk), data
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.unpublished_object.refresh_from_db()
+        self.assertEqual(self.unpublished_object.sample, source)
 
     def test_delete_view_redirects_to_next_url(self):
         self.client.force_login(self.owner_user)
@@ -4995,7 +5368,7 @@ class SeasonalVariationStandaloneSampleTestCase(ViewWithPermissionsTestCase):
 
 
 class ComponentOrderUpViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = "change_composition"
+    member_permissions = ("change_composition", "change_sample")
 
     @classmethod
     def setUpTestData(cls):
@@ -5106,7 +5479,7 @@ class ComponentOrderUpViewTestCase(ViewWithPermissionsTestCase):
 
 
 class ComponentOrderDownViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = "change_composition"
+    member_permissions = ("change_composition", "change_sample")
 
     @classmethod
     def setUpTestData(cls):
@@ -5180,7 +5553,7 @@ class ComponentOrderDownViewTestCase(ViewWithPermissionsTestCase):
 
 
 class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = "change_composition"
+    member_permissions = ("change_composition", "change_sample")
 
     @classmethod
     def setUpTestData(cls):
@@ -5492,15 +5865,21 @@ class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
 
 
 class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = "add_composition"
+    member_permissions = ("add_composition", "change_sample")
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
         material = Material.objects.create(name="Test Material for Sample Composition")
         cls.component_group = MaterialComponentGroup.objects.create(
-            name="Test Group for Sample Composition"
+            name="Test Group for Sample Composition",
+            publication_status="published",
         )
+        # The posted ``fractions_of`` reference must be readable by the
+        # member; the shared default component is private ownerless data.
+        cls.default_component = MaterialComponent.objects.default()
+        cls.default_component.publication_status = "published"
+        cls.default_component.save(update_fields=["publication_status"])
         series = SampleSeries.objects.create(
             owner=cls.member, name="Test Series", material=material
         )
@@ -5658,6 +6037,42 @@ class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
             ).exists()
         )
 
+    def test_post_http_302_for_editor_with_grant(self):
+        """An editor with a direct grant on the sample may add compositions:
+        owned children resolve through parent edit, not sample ownership."""
+        editor = User.objects.create_user(username="sample-composition-editor")
+        editor.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="materials",
+                codename__in=("change_sample", "change_composition"),
+            )
+        )
+        editor.groups.clear()
+        self.other_users_sample.add_editor(editor, granted_by=self.owner)
+        self.client.force_login(editor)
+
+        response = self.client.post(
+            reverse(
+                "sample-add-composition",
+                kwargs={"pk": self.other_users_sample.pk},
+            ),
+            {
+                "sample": self.other_users_sample.pk,
+                "group": self.component_group.pk,
+                "fractions_of": MaterialComponent.objects.default().pk,
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.other_users_sample.pk}),
+        )
+        self.assertTrue(
+            Composition.objects.filter(
+                sample=self.other_users_sample, group=self.component_group
+            ).exists()
+        )
+
 
 class SampleDetailPresentationMixin:
     """Shared fixtures for the sample-detail and list-presentation tests."""
@@ -5761,6 +6176,11 @@ class EmptyStateViewsTestCase(SampleDetailPresentationMixin, TestCase):
         self.assertIn("getElementById('bulk-access-toolbar')", content)
 
     def test_material_review_list_renders_filter_context_for_staff(self):
+        # The review queue requires the moderation capability; the staff
+        # flag alone grants nothing.
+        self.staff_user.user_permissions.add(
+            Permission.objects.get(codename="can_moderate_material")
+        )
         Material.objects.create(
             name="Review Material",
             type="material",
@@ -5884,6 +6304,10 @@ class EmptyStateViewsTestCase(SampleDetailPresentationMixin, TestCase):
             defaults={"name": "Can add composition"},
         )
         self.regular_user.user_permissions.add(composition_permission)
+        # The edit affordances require parent edit on the private sample.
+        self.regular_user.user_permissions.add(
+            Permission.objects.get(codename="change_sample")
+        )
         sample.compositions.all().delete()
 
         self.client.force_login(self.regular_user)
@@ -6146,6 +6570,10 @@ class SampleDetailV2PresentationTestCase(SampleDetailPresentationMixin, TestCase
 
     def test_v2_edit_mode_offers_delete_in_actions_menu(self):
         sample, owner = self._create_v2_owner_sample("V2 Delete", "private")
+        owner.user_permissions.add(
+            Permission.objects.get(codename="change_sample"),
+            Permission.objects.get(codename="delete_sample"),
+        )
         self.client.force_login(owner)
         response = self.client.get(
             reverse("sample-detail", kwargs={"pk": sample.pk})
@@ -6325,6 +6753,12 @@ class SampleDetailV2PresentationTestCase(SampleDetailPresentationMixin, TestCase
 
     def test_v2_uses_single_contextual_edit_mode_action(self):
         sample = self._create_v2_public_sample_with_metadata()
+        # Edit mode is only offered on editable (non-frozen) samples.
+        sample.publication_status = "private"
+        sample.save(update_fields=["publication_status"])
+        self.staff_user.user_permissions.add(
+            Permission.objects.get(codename="change_sample")
+        )
         self.client.force_login(self.staff_user)
 
         explore_response = self.client.get(
@@ -6348,6 +6782,11 @@ class SampleDetailV2PresentationTestCase(SampleDetailPresentationMixin, TestCase
 
     def test_sample_toolbar_separates_navigation_status_and_actions(self):
         sample = self._create_v2_public_sample_with_metadata()
+        sample.publication_status = "private"
+        sample.save(update_fields=["publication_status"])
+        self.staff_user.user_permissions.add(
+            Permission.objects.get(codename="change_sample")
+        )
         self.client.force_login(self.staff_user)
 
         response = self.client.get(reverse("sample-detail", kwargs={"pk": sample.pk}))
@@ -6368,6 +6807,11 @@ class SampleDetailV2PresentationTestCase(SampleDetailPresentationMixin, TestCase
 
     def test_sample_toolbar_edit_state_is_not_styled_as_a_button(self):
         sample = self._create_v2_public_sample_with_metadata()
+        sample.publication_status = "private"
+        sample.save(update_fields=["publication_status"])
+        self.staff_user.user_permissions.add(
+            Permission.objects.get(codename="change_sample")
+        )
         self.client.force_login(self.staff_user)
 
         response = self.client.get(
@@ -6513,6 +6957,9 @@ class SampleDetailV2PresentationTestCase(SampleDetailPresentationMixin, TestCase
     def test_v2_edit_mode_completeness_links_respect_section_permissions(self):
         """Checks whose target section the user cannot edit stay plain text."""
         sample, owner = self._create_v2_owner_sample("Check Perms", "private")
+        # Edit mode needs the model change capability; the targeted section
+        # permissions are exercised separately below.
+        owner.user_permissions.add(Permission.objects.get(codename="change_sample"))
         # A property value without analytical method makes the "Methods
         # complete" check fail and point at the gated "properties" section.
         MaterialPropertyValue.objects.create(
@@ -6616,9 +7063,13 @@ class SampleDetailV2PresentationTestCase(SampleDetailPresentationMixin, TestCase
 
     def test_v2_edit_mode_exposes_composition_creation_actions(self):
         sample, _group = self._create_sample_with_composition_and_property()
+        # Data-management actions exist only on editable (non-frozen) samples.
+        sample.publication_status = "private"
+        sample.save(update_fields=["publication_status"])
         for model, codename in (
             (ComponentMeasurement, "add_componentmeasurement"),
             (Composition, "add_composition"),
+            (Sample, "change_sample"),
         ):
             permission, _ = Permission.objects.get_or_create(
                 codename=codename,
@@ -6657,8 +7108,12 @@ class SampleDetailV2PresentationTestCase(SampleDetailPresentationMixin, TestCase
             200,
         )
 
-    def test_v2_superuser_can_add_data_to_published_sample(self):
+    def test_v2_superuser_can_add_data_to_private_sample(self):
         sample, _group = self._create_sample_with_composition_and_property()
+        # Published samples are frozen for everyone — the data affordances
+        # live on editable (private) samples even for administrators.
+        sample.publication_status = "private"
+        sample.save(update_fields=["publication_status"])
         superuser = User.objects.create_superuser(
             username="sample-superuser",
         )
@@ -6676,6 +7131,10 @@ class SampleDetailV2PresentationTestCase(SampleDetailPresentationMixin, TestCase
 
     def test_v2_edit_mode_exposes_all_sample_data_management_actions(self):
         sample, group = self._create_sample_with_composition_and_property()
+        # Frozen records offer no write affordances; flip the fixtures to
+        # private so the staff owner may manage them.
+        sample.publication_status = "private"
+        sample.save(update_fields=["publication_status"])
         setting = Composition.objects.create(
             owner=self.staff_user,
             sample=sample,
@@ -6683,6 +7142,12 @@ class SampleDetailV2PresentationTestCase(SampleDetailPresentationMixin, TestCase
             fractions_of=MaterialComponent.objects.default(),
         )
         prop = sample.property_values.get()
+        prop.publication_status = "private"
+        prop.save(update_fields=["publication_status"])
+        self.staff_user.user_permissions.add(
+            Permission.objects.get(codename="change_sample"),
+            Permission.objects.get(codename="delete_materialpropertyvalue"),
+        )
         self.client.force_login(self.staff_user)
 
         response = self.client.get(
@@ -6721,6 +7186,12 @@ class SampleDetailV2PresentationTestCase(SampleDetailPresentationMixin, TestCase
 
     def test_v2_modal_actions_are_wired_as_modal_links(self):
         sample = self._create_v2_public_sample_with_metadata()
+        sample.publication_status = "private"
+        sample.save(update_fields=["publication_status"])
+        self.staff_user.user_permissions.add(
+            Permission.objects.get(codename="change_sample"),
+            Permission.objects.get(codename="delete_sample"),
+        )
         self.client.force_login(self.staff_user)
 
         response = self.client.get(
@@ -7163,6 +7634,9 @@ class SampleDetailV2PresentationTestCase(SampleDetailPresentationMixin, TestCase
             material=Material.objects.create(name="Test Material", type="material"),
             owner=self.regular_user,
             publication_status="private",
+        )
+        self.regular_user.user_permissions.add(
+            Permission.objects.get(codename="change_sample")
         )
 
         self.client.force_login(self.regular_user)
@@ -7937,7 +8411,10 @@ class MaterialsReviewWorkflowTests(TestCase):
             },
         )
         with mute_signals(post_save, pre_save):
-            response = self.client.post(url)
+            response = self.client.post(
+                url,
+                {"expected_revision": self.review_sample.content_revision},
+            )
         self.assertEqual(response.status_code, 302)
         self.review_sample.refresh_from_db()
         self.assertEqual(
@@ -8058,7 +8535,9 @@ class MaterialsReviewWorkflowTests(TestCase):
             },
         )
         with mute_signals(post_save, pre_save):
-            response = self.client.post(url)
+            response = self.client.post(
+                url, {"expected_revision": sample.content_revision}
+            )
         self.assertEqual(response.status_code, 302)
         sample.refresh_from_db()
         self.assertEqual(sample.publication_status, UserCreatedObject.STATUS_PUBLISHED)
@@ -8419,6 +8898,9 @@ class MaterialsReviewDashboardTests(TestCase):
             defaults={"name": "Can moderate samples"},
         )
         cls.moderator.user_permissions.add(perm)
+        # The staff flag alone does not enter the review queue; this persona
+        # needs the moderation capability like any other reviewer.
+        cls.staff.user_permissions.add(perm)
 
         with mute_signals(post_save, pre_save):
             cls.material = Material.objects.create(
@@ -8542,7 +9024,7 @@ class ReviewActionLoggingTests(TestCase):
             },
         )
         with mute_signals(post_save, pre_save):
-            self.client.post(url)
+            self.client.post(url, {"expected_revision": self.sample.content_revision})
 
         logs = ReviewAction.for_object(self.sample)
         self.assertTrue(logs.filter(action=ReviewAction.ACTION_APPROVED).exists())
@@ -10008,7 +10490,11 @@ class SampleGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
 
 class SampleGroupDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ("view_samplegroup", "change_samplegroup")
+    member_permissions = (
+        "view_samplegroup",
+        "change_samplegroup",
+        "change_sample",
+    )
 
     @classmethod
     def setUpTestData(cls):
@@ -10209,6 +10695,31 @@ class SampleGroupDetailViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
         ids = [item["id"] for item in response.json()["results"]]
         self.assertIn(own_sample.pk, ids)
+        self.assertNotIn(self.published_sample.pk, ids)
+
+    def test_editable_sample_autocomplete_denies_bypass_for_staff(self):
+        """The staff flag alone widens nothing: a staff user with neither
+        capability nor grants gets an empty editable autocomplete, while an
+        owner with the change capability sees own private editable rows."""
+        staff = User.objects.create_user(username="autocomplete-staff", is_staff=True)
+        self.client.force_login(staff)
+
+        response = self.client.get(
+            reverse("sample-autocomplete-editable"), {"q": "sample"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([item["id"] for item in response.json()["results"]], [])
+
+        self.owner.user_permissions.add(
+            Permission.objects.get(codename="change_sample")
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("sample-autocomplete-editable"), {"q": "sample"}
+        )
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(self.private_sample.pk, ids)
         self.assertNotIn(self.published_sample.pk, ids)
 
     def test_editable_group_autocomplete_excludes_other_users_published_group(
