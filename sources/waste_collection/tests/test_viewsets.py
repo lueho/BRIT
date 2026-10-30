@@ -15,7 +15,7 @@ from django.core.management import call_command
 from django.db import connection
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.request import Request
@@ -1773,11 +1773,22 @@ class CollectionMutationApiTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("valid_until", response.data)
 
-    def test_property_value_create_allows_non_owner_on_published_collection(self):
-        self.client.force_login(self.other_user)
+    def test_property_value_create_endpoint_is_disabled(self):
+        """The property-value create HTTP entry point is disabled.
 
+        The trusted ``CollectionImporter`` matches existing values by
+        collection/property/unit/year without ownership or editability
+        checks and attaches sources to them directly, so the route is
+        removed until those writes route through governed persistence —
+        the same reason ``bulk_import`` is disabled. No value may be
+        created or matched.
+        """
+        with self.assertRaises(NoReverseMatch):
+            reverse("api-waste-collection-property-value-create")
+
+        self.client.force_login(self.other_user)
         response = self.client.post(
-            reverse("api-waste-collection-property-value-create"),
+            "/waste_collection/api/collection/property-value/create/",
             {
                 "collection": self.predecessor.pk,
                 "property_id": self.property.pk,
@@ -1789,122 +1800,27 @@ class CollectionMutationApiTestCase(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        cpv = CollectionPropertyValue.objects.get(pk=response.data["id"])
-        self.assertEqual(cpv.collection, self.predecessor)
-        self.assertEqual(cpv.owner, self.other_user)
-
-    def test_property_value_create_existing_value_returns_unchanged(self):
-        self.client.force_login(self.other_user)
-        cpv = CollectionPropertyValue.objects.create(
-            collection=self.predecessor,
-            property=self.property,
-            unit=self.unit,
-            owner=self.other_user,
-            publication_status="private",
-            year=2025,
-            average=42.0,
-        )
-
-        response = self.client.post(
-            reverse("api-waste-collection-property-value-create"),
-            {
-                "collection": self.predecessor.pk,
-                "property_id": self.property.pk,
-                "unit_name": self.unit.name,
-                "year": 2025,
-                "average": 42.0,
-                "submit_for_review": False,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["id"], cpv.pk)
-        self.assertEqual(response.data["cpv_unchanged"], 1)
-        self.assertEqual(
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(
             CollectionPropertyValue.objects.filter(
                 collection=self.predecessor,
                 property=self.property,
                 unit=self.unit,
                 year=2025,
-            ).count(),
-            1,
+            ).exists()
         )
 
-    def _login_aggregated_property_value_author(self):
+    def test_aggregated_property_value_create_endpoint_is_disabled(self):
+        """The aggregated property-value create HTTP entry point is disabled
+        for the same ungoverned importer writes."""
+        with self.assertRaises(NoReverseMatch):
+            reverse("api-waste-collection-aggregated-property-value-create")
+
         self.client.force_login(self.other_user)
-
-    def _aggregated_property_value_payload(self):
-        return {
-            "collections": [self.predecessor.pk],
-            "property_id": self.property.pk,
-            "unit_name": self.unit.name,
-            "year": 2025,
-            "average": 42.0,
-            "submit_for_review": False,
-        }
-
-    def test_aggregated_property_value_create_reuses_existing_value(self):
-        self._login_aggregated_property_value_author()
-        url = reverse("api-waste-collection-aggregated-property-value-create")
-
-        first = self.client.post(
-            url, self._aggregated_property_value_payload(), format="json"
-        )
-        second = self.client.post(
-            url, self._aggregated_property_value_payload(), format="json"
-        )
-
-        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(first.data["created"])
-        self.assertEqual(second.status_code, status.HTTP_201_CREATED)
-        self.assertFalse(second.data["created"])
-        self.assertEqual(second.data["id"], first.data["id"])
-        self.assertEqual(
-            AggregatedCollectionPropertyValue.objects.filter(
-                owner=self.other_user, property=self.property, unit=self.unit, year=2025
-            ).count(),
-            1,
-        )
-
-    def test_aggregated_property_value_create_locks_owner_before_lookup(self):
-        self._login_aggregated_property_value_author()
-        acpv_table = AggregatedCollectionPropertyValue._meta.db_table
-        user_table = User._meta.db_table
-
-        with CaptureQueriesContext(connection) as captured:
-            response = self.client.post(
-                reverse("api-waste-collection-aggregated-property-value-create"),
-                self._aggregated_property_value_payload(),
-                format="json",
-            )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        sqls = [query["sql"] for query in captured.captured_queries]
-        lock_index = next(
-            (
-                index
-                for index, sql in enumerate(sqls)
-                if f'FROM "{user_table}"' in sql and "FOR UPDATE" in sql
-            ),
-            None,
-        )
-        lookup_index = next(
-            index
-            for index, sql in enumerate(sqls)
-            if sql.startswith("SELECT") and f'FROM "{acpv_table}"' in sql
-        )
-        self.assertIsNotNone(lock_index)
-        self.assertLess(lock_index, lookup_index)
-
-    def test_property_value_create_denies_non_owner_on_private_collection(self):
-        self.client.force_login(self.other_user)
-
         response = self.client.post(
-            reverse("api-waste-collection-property-value-create"),
+            "/waste_collection/api/collection/aggregated-property-value/create/",
             {
-                "collection": self.private_predecessor.pk,
+                "collections": [self.predecessor.pk],
                 "property_id": self.property.pk,
                 "unit_name": self.unit.name,
                 "year": 2025,
@@ -1914,7 +1830,15 @@ class CollectionMutationApiTestCase(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(
+            AggregatedCollectionPropertyValue.objects.filter(
+                owner=self.other_user,
+                property=self.property,
+                unit=self.unit,
+                year=2025,
+            ).exists()
+        )
 
     def test_create_frequency_endpoint_requires_add_permission(self):
         user = User.objects.create_user(username="agent-no-frequency-perm")
