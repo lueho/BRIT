@@ -555,6 +555,8 @@ class SourcesFieldMixin:
         # Capture data BEFORE calling super().__init__ (parent consumes it)
         data = kwargs.get("data")
 
+        request = kwargs.get("request")
+
         # DON'T pop 'request' if another mixin already handles it
         # Check if PopRequestMixin or UserCreatedObjectFormMixin is in the MRO
         has_request_handler = any(
@@ -585,6 +587,22 @@ class SourcesFieldMixin:
             sources_field.widget = SourceListWidget(
                 autocomplete_url="source-autocomplete", label_field="label"
             )
+
+        if isinstance(sources_field.widget, SourceListWidget):
+            from django.apps import apps
+
+            from utils.object_management.policy import decide
+
+            # Resolve models lazily: utils (L0) must not statically import
+            # bibliography (L1). Source comes from the injected field.
+            author_model = apps.get_model("bibliography", "Author")
+            user = getattr(request or getattr(self, "request", None), "user", None)
+            sources_field.widget.can_create_source = decide(
+                user, "create", source_model
+            ).allowed
+            sources_field.widget.can_create_author = decide(
+                user, "create", author_model
+            ).allowed
 
         # Populate queryset with assigned + submitted sources for validation
         # Permission check happens in UserCreatedObjectFormMixin.clean()

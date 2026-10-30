@@ -1,5 +1,7 @@
 from collections import OrderedDict
 
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import (
     CharField,
@@ -15,14 +17,11 @@ from .models import (
     LETTERLESS_ORGANIZATION_NAME_MESSAGE,
     LETTERLESS_SURNAME_MESSAGE,
     Author,
-    AuthorCreationDenied,
     Licence,
     Source,
-    SourceAuthor,
     author_name_has_letter,
-    find_or_create_author,
-    normalize_author_name_part,
 )
+from .services import create_source_with_authors
 from .utils import DOI_FORMAT_MESSAGE, DOI_PATTERN, normalize_doi
 
 
@@ -161,79 +160,20 @@ class SourceCreateSerializer(ModelSerializer):
             raise ValidationError(DOI_FORMAT_MESSAGE)
         return doi
 
-    def _resolve_authors(self, owner, authors_data):
-        authors = []
-        author_ids = set()
-
-        for author_data in authors_data:
-            raw_author_id = author_data.get("id")
-            author = None
-            if raw_author_id not in (None, ""):
-                try:
-                    author = Author.objects.get(pk=int(raw_author_id))
-                except (Author.DoesNotExist, TypeError, ValueError) as exc:
-                    raise ValidationError(
-                        {"authors": [f"Author id {raw_author_id} does not exist."]}
-                    ) from exc
-            else:
-                first_names = normalize_author_name_part(author_data.get("first_names"))
-                last_names = normalize_author_name_part(author_data.get("last_names"))
-                author_type = author_data.get("author_type", "person")
-                organization_name = normalize_author_name_part(
-                    author_data.get("organization_name")
-                )
-                organization_abbreviation = normalize_author_name_part(
-                    author_data.get("organization_abbreviation")
-                )
-                try:
-                    author, _ = find_or_create_author(
-                        owner,
-                        filters={
-                            "author_type": author_type,
-                            "first_names__iexact": first_names,
-                            "last_names__iexact": last_names,
-                            "organization_name__iexact": organization_name,
-                        },
-                        create_kwargs={
-                            "first_names": first_names,
-                            "last_names": last_names,
-                            "author_type": author_type,
-                            "organization_name": organization_name,
-                            "organization_abbreviation": organization_abbreviation,
-                        },
-                    )
-                except AuthorCreationDenied as exc:
-                    raise PermissionDenied(
-                        "You need permission to create authors for source creation."
-                    ) from exc
-
-            if author.pk not in author_ids:
-                authors.append(author)
-                author_ids.add(author.pk)
-
-        return authors
-
     def create(self, validated_data):
         authors_data = validated_data.pop("authors", [])
-        owner = getattr(self.context.get("request"), "user", None)
-        authors = self._resolve_authors(owner, authors_data)
-        source = Source.objects.create(
-            owner=owner,
-            type=validated_data.pop("type", Source._meta.get_field("type").default),
-            **validated_data,
-        )
-        for position, author in enumerate(authors, start=1):
-            SourceAuthor.objects.create(
-                source=source,
-                author=author,
-                position=position,
-            )
-        return source
+        actor = getattr(self.context.get("request"), "user", None)
+        try:
+            return create_source_with_authors(actor, dict(validated_data), authors_data)
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages) from exc
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc)) from exc
 
 
 class SourceModelSerializer(ModelSerializer):
-    authors = AuthorModelSerializer(many=True)
-    licence = LicenceModelSerializer()
+    authors = AuthorModelSerializer(many=True, read_only=True)
+    licence = LicenceModelSerializer(read_only=True)
 
     class Meta:
         model = Source
@@ -261,37 +201,6 @@ class SourceModelSerializer(ModelSerializer):
             "last_accessed",
         ]
         read_only_fields = ["url_valid", "url_checked", "doi", "last_accessed"]
-
-    def create(self, validated_data):
-        authors_data = validated_data.pop("authors")
-        licence_data = validated_data.pop("licence")
-        licence = Licence.objects.create(**licence_data)
-        source = Source.objects.create(licence=licence, **validated_data)
-        for position, author_data in enumerate(authors_data):
-            author, _ = Author.objects.get_or_create(**author_data)
-            SourceAuthor.objects.create(
-                source=source, author=author, position=position + 1
-            )
-        return source
-
-    def update(self, instance, validated_data):
-        authors_data = validated_data.pop("authors")
-        licence_data = validated_data.pop("licence")
-
-        Licence.objects.filter(id=instance.licence.id).update(**licence_data)
-
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-
-        instance.authors.clear()
-        for position, author_data in enumerate(authors_data):
-            author, _ = Author.objects.get_or_create(**author_data)
-            SourceAuthor.objects.create(
-                source=instance, author=author, position=position + 1
-            )
-
-        return instance
 
 
 class HyperlinkedLicenceSerializer(HyperlinkedModelSerializer):

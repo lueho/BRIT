@@ -1,4 +1,4 @@
-from django.core.exceptions import ValidationError
+from django.core.exceptions import NON_FIELD_ERRORS, PermissionDenied, ValidationError
 from django.db import transaction
 from django.forms import BaseInlineFormSet, CharField, DateInput, Textarea
 from django.utils import timezone
@@ -10,21 +10,14 @@ from utils.forms import (
     SimpleForm,
     SimpleModelForm,
 )
+from utils.object_management.policy import visible_queryset
 
 from .bibtex import (
     BibtexArticleParseError,
     parse_bibtex_article_entries,
 )
-from .models import (
-    Author,
-    AuthorCreationDenied,
-    Licence,
-    Source,
-    SourceAuthor,
-    author_name_has_letter,
-    find_or_create_author,
-    normalize_author_name_part,
-)
+from .models import Author, Licence, Source, SourceAuthor, author_name_has_letter
+from .services import AUTHOR_ADD_DENIED_MESSAGE, create_source_with_authors
 
 
 class AuthorModelForm(SimpleModelForm):
@@ -120,10 +113,10 @@ class SourceBibtexArticleImportForm(SimpleForm):
         return bibtex_entry
 
     def create_source(self, *, owner):
-        sources = self.create_sources(owner=owner)
-        if len(sources) != 1:
+        parsed_entries = getattr(self, "parsed_entries", None)
+        if parsed_entries is not None and len(parsed_entries) != 1:
             raise ValueError("The BibTeX import form contains multiple entries.")
-        return sources[0]
+        return self.create_sources(owner=owner)[0]
 
     def create_sources(self, *, owner):
         parsed_entries = getattr(self, "parsed_entries", None)
@@ -143,95 +136,66 @@ class SourceBibtexArticleImportForm(SimpleForm):
         return sources
 
     def _create_source_from_parsed_entry(self, *, owner, parsed_entry):
-        authors = self._resolve_authors(
-            owner=owner,
-            parsed_authors=parsed_entry["authors"],
-        )
-
-        source = Source.objects.create(
-            owner=owner,
-            type="article",
-            citation_key="",
-            publisher=parsed_entry["publisher"],
-            title=parsed_entry["title"],
-            journal=parsed_entry["journal"],
-            volume=parsed_entry["volume"],
-            number=parsed_entry["number"],
-            eid=parsed_entry["eid"],
-            pages=parsed_entry["pages"],
-            month=parsed_entry["month"],
-            year=parsed_entry["year"],
-            abstract=parsed_entry["abstract"],
-            url=parsed_entry["url"],
-            doi=parsed_entry["doi"],
-        )
-        for position, author in enumerate(authors, start=1):
-            SourceAuthor.objects.create(
-                source=source,
-                author=author,
-                position=position,
-            )
-        source.update_abbreviation()
-
-        return source
-
-    def _resolve_authors(self, *, owner, parsed_authors):
-        authors = []
-        author_ids = set()
-
-        for parsed_author in parsed_authors:
-            author_type = parsed_author.get("author_type", "person")
-            first_names = normalize_author_name_part(parsed_author.get("first_names"))
-            last_names = normalize_author_name_part(parsed_author.get("last_names"))
-            organization_name = normalize_author_name_part(
-                parsed_author.get("organization_name")
-            )
-            suffix = normalize_author_name_part(parsed_author.get("suffix"))
-            if author_type == "organization":
-                if not author_name_has_letter(organization_name):
-                    continue
-                first_names = ""
-                last_names = ""
-                suffix = ""
-            elif not author_name_has_letter(last_names):
-                continue
-
-            if author_type == "organization":
-                filters = {
-                    "author_type": author_type,
-                    "organization_name__iexact": organization_name,
-                }
-            else:
-                filters = {
-                    "author_type": author_type,
-                    "first_names__iexact": first_names,
-                    "last_names__iexact": last_names,
-                }
-            if suffix:
-                filters["suffix__iexact"] = suffix
-
-            try:
-                author, _ = find_or_create_author(
-                    owner,
-                    filters=filters,
-                    create_kwargs={
-                        "author_type": author_type,
-                        "first_names": first_names,
-                        "last_names": last_names,
-                        "organization_name": organization_name,
-                        "suffix": suffix,
-                    },
-                )
-            except AuthorCreationDenied as exc:
+        authors_data = [
+            parsed_author
+            for parsed_author in parsed_entry["authors"]
+            if self._parsed_author_is_usable(parsed_author)
+        ]
+        source_data = {
+            "type": "article",
+            "citation_key": "",
+            "publisher": parsed_entry["publisher"],
+            "title": parsed_entry["title"],
+            "journal": parsed_entry["journal"],
+            "volume": parsed_entry["volume"],
+            "number": parsed_entry["number"],
+            "eid": parsed_entry["eid"],
+            "pages": parsed_entry["pages"],
+            "month": parsed_entry["month"],
+            "year": parsed_entry["year"],
+            "abstract": parsed_entry["abstract"],
+            "url": parsed_entry["url"],
+            "doi": parsed_entry["doi"],
+        }
+        try:
+            source = create_source_with_authors(owner, source_data, authors_data)
+        except PermissionDenied as exc:
+            if str(exc) == AUTHOR_ADD_DENIED_MESSAGE:
                 raise ValidationError(
                     "You need permission to create missing authors from BibTeX imports."
                 ) from exc
+            raise ValidationError(str(exc)) from exc
+        except ValidationError as exc:
+            raise ValidationError(
+                [
+                    f'Entry "{parsed_entry["title"]}": {message}'
+                    for message in self._flatten_validation_messages(exc)
+                ]
+            ) from exc
+        source.update_abbreviation()
+        return source
 
-            if author.pk not in author_ids:
-                authors.append(author)
-                author_ids.add(author.pk)
+    @staticmethod
+    def _flatten_validation_messages(exc):
+        if not hasattr(exc, "error_dict"):
+            return exc.messages
+        messages = []
+        for field, field_messages in exc.message_dict.items():
+            for message in field_messages:
+                if field == NON_FIELD_ERRORS:
+                    messages.append(message)
+                else:
+                    label = Source._meta.get_field(field).verbose_name
+                    messages.append(f"{label}: {message}")
+        return messages
 
-        return authors
+    @staticmethod
+    def _parsed_author_is_usable(parsed_author):
+        if parsed_author.get("author_type", "person") == "organization":
+            name = " ".join(str(parsed_author.get("organization_name") or "").split())
+            return author_name_has_letter(name)
+        last_names = " ".join(str(parsed_author.get("last_names") or "").split())
+        return author_name_has_letter(last_names)
 
 
 class SourceAuthorForm(SimpleModelForm):
@@ -242,6 +206,11 @@ class SourceAuthorForm(SimpleModelForm):
         ),
         label="Author",
     )
+
+    def __init__(self, *args, request=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        user = getattr(request, "user", None)
+        self.fields["author"].queryset = visible_queryset(user, Author.objects.all())
 
     class Meta:
         model = SourceAuthor
