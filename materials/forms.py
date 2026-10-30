@@ -435,12 +435,11 @@ class MaterialPropertyValueModelForm(
             )
         return cleaned_data
 
-    def save(self, commit=True):
-        value = super().save(commit=commit)
-        if value.property_id and value.unit_id:
-            if not value.property.allowed_units.filter(pk=value.unit_id).exists():
-                value.property.allowed_units.add(value.unit)
-        return value
+    # ``allowed_units`` is governed content of the MaterialProperty root:
+    # it is established only when editing the property itself through its
+    # own governed update boundary. Saving a property value must not mutate
+    # the property as a hidden side effect — ``clean()`` still rejects units
+    # outside a configured allow-list.
 
 
 class MaterialPropertyValueModalModelForm(
@@ -616,8 +615,8 @@ class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["distribution"].queryset = TemporalDistribution.objects.difference(
-            self.instance.temporal_distributions.all()
+        self.fields["distribution"].queryset = TemporalDistribution.objects.exclude(
+            pk__in=self.instance.temporal_distributions.values("pk")
         )
 
 

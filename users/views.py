@@ -2,7 +2,11 @@ import logging
 import smtplib
 
 from django.contrib import messages
-from django.contrib.auth.mixins import AccessMixin, LoginRequiredMixin
+from django.contrib.auth.mixins import (
+    AccessMixin,
+    LoginRequiredMixin,
+    UserPassesTestMixin,
+)
 from django.contrib.auth.models import User
 from django.contrib.sites.shortcuts import get_current_site
 from django.db import transaction
@@ -20,6 +24,7 @@ from registration.backends.default.views import (
 )
 
 from utils.modal import BSModalLoginView
+from utils.object_management.policy import is_admin
 
 from .forms import CustomAuthenticationForm
 from .models import UserProfile
@@ -103,11 +108,23 @@ class ResendActivationView(BaseResendActivationView):
             return self.form_invalid(form)
 
 
-class UserDeleteView(LoginRequiredMixin, DeleteView):
+class UserDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    """Delete a user account.
+
+    Accounts are administrative records: only the account holder or an
+    object administrator (``object_management.administer_objects`` /
+    superuser per ``policy.is_admin``) may delete one. Previously any
+    authenticated user could delete any account by pk.
+    """
+
     model = User
     template_name = "modal_user_delete.html"
     success_message = "Successfully deleted."
     success_url = reverse_lazy("home")
+
+    def test_func(self):
+        user = self.request.user
+        return user.pk == self.kwargs.get("pk") or is_admin(user)
 
 
 class UserProfileView(LoginRequiredMixin, TemplateView):

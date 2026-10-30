@@ -1,5 +1,4 @@
 from crispy_forms.helper import FormHelper
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -34,6 +33,7 @@ from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.modal import is_ajax
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.object_management.views import (
+    CreateUserObjectMixin,
     PrivateObjectFilterView,
     PublishedObjectFilterView,
     UserCreatedObjectAutocompleteView,
@@ -133,7 +133,16 @@ class GreenhouseModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Greenhouse
 
 
-class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateWithInlinesView):
+class GreenhouseGrowthCycleCreateView(CreateUserObjectMixin, CreateWithInlinesView):
+    """Inline growth-cycle create bound to the posted greenhouse.
+
+    The cycle is an owned child of its ``greenhouse``: the bound create
+    adapter resolves the parent from the validated form, locks it under
+    ``content_mutation``, and re-decides the owned-child create inside the
+    write boundary. The advisory gate requires at least one editable
+    greenhouse.
+    """
+
     model = GreenhouseGrowthCycle
     inlines = [
         GrowthTimestepInline,
@@ -144,6 +153,20 @@ class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateWithInlinesView)
         "group_settings",
     )
     template_name = "greenhouses/growth_cycle_inline_create.html"
+
+    def forms_valid(self, form, inlines):
+        # extra_views persists inline formsets after ``form_valid`` returns —
+        # outside the bound create. Stash them so the timestep rows save
+        # inside the same mutation boundary on the greenhouse root.
+        self._inlines = inlines
+        return self.form_valid(form)
+
+    def _call_super_form_valid(self, form):
+        response = super()._call_super_form_valid(form)
+        for formset in self._inlines:
+            formset.instance = self.object
+            formset.save()
+        return response
 
     def get_success_url(self):
         return self.object.get_absolute_url()

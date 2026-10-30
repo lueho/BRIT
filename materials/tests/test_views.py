@@ -199,13 +199,16 @@ class SampleSubstrateMaterialAutocompleteViewTestCase(TestCase):
 
 
 class SampleSubstrateMaterialQuickCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ["add_material"]
+    # Reusing an existing material attaches the substrate category through
+    # the governed edit boundary, so members hold the change capability too.
+    member_permissions = ["add_material", "change_material"]
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
         cls.substrate_category, _ = MaterialCategory.objects.get_or_create(
-            name=get_sample_substrate_category_name()
+            name=get_sample_substrate_category_name(),
+            defaults={"publication_status": "published"},
         )
 
     def test_post_redirects_anonymous_user_to_login(self):

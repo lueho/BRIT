@@ -4,11 +4,7 @@ from collections import defaultdict
 from decimal import Decimal
 from urllib.parse import parse_qsl, urlsplit
 
-from django.contrib.auth.mixins import (
-    LoginRequiredMixin,
-    PermissionRequiredMixin,
-    UserPassesTestMixin,
-)
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 from django.db.models import BooleanField, ExpressionWrapper, F, Q
@@ -447,12 +443,14 @@ class SampleFilterSubstrateMaterialAutocompleteView(UserCreatedObjectAutocomplet
         ).distinct()
 
 
-class SampleSubstrateMaterialQuickCreateView(
-    LoginRequiredMixin, PermissionRequiredMixin, View
-):
-    """Create a substrate material directly from the sample form autocomplete."""
+class SampleSubstrateMaterialQuickCreateView(LoginRequiredMixin, View):
+    """Create a substrate material directly from the sample form autocomplete.
 
-    permission_required = "materials.add_material"
+    New materials are persisted inside the authorized create boundary
+    (``authorize_create`` + reference validation + ``created`` audit). When
+    an existing owner material is reused, attaching the substrate category
+    is a content edit and runs inside ``content_mutation`` on that root.
+    """
 
     def get_owner_material(self, name):
         return Material.objects.filter(
@@ -496,14 +494,33 @@ class SampleSubstrateMaterialQuickCreateView(
         if material is None:
             try:
                 with transaction.atomic():
-                    material = Material.objects.create(owner=request.user, name=name)
+                    actor = authorize_create(request.user, Material)
+                    validate_references(actor, {"categories": [substrate_category]})
+                    material = Material.objects.create(owner=actor, name=name)
+                    material.categories.add(substrate_category)
+                    record_creation(actor, material)
                 created = True
             except IntegrityError:
                 material = self.get_owner_material(name)
                 if material is None:
                     raise
+            except PermissionDenied as exc:
+                return JsonResponse({"error": str(exc)}, status=403)
 
-        material.categories.add(substrate_category)
+        if (
+            not created
+            and not material.categories.filter(pk=substrate_category.pk).exists()
+        ):
+            try:
+                with content_mutation(
+                    request.user, material, action="edit"
+                ) as locked_material:
+                    validate_references(
+                        request.user, {"categories": [substrate_category]}
+                    )
+                    locked_material.categories.add(substrate_category)
+            except PermissionDenied as exc:
+                return JsonResponse({"error": str(exc)}, status=403)
 
         return JsonResponse(
             {
@@ -1189,13 +1206,32 @@ class SampleSeriesCreateDuplicateView(
     template_name = "materials/sampleseries_duplicate_form.html"
 
     def form_valid(self, form):
-        self.object = self.object.duplicate(
-            creator=self.request.user,
-            samples=filter_queryset_for_user(
-                self.object.samples.all(), self.request.user
-            ),
-            **form.cleaned_data,
-        )
+        # The advisory ``new_version`` decision ran in test_func; here the
+        # source row is locked and both the duplicate eligibility and the
+        # new root's create capability are re-decided inside the write
+        # boundary before ``duplicate()`` persists the whole tree.
+        with transaction.atomic():
+            source = SampleSeries._base_manager.select_for_update().get(
+                pk=self.object.pk
+            )
+            actor = authorize_create(self.request.user, SampleSeries)
+            decision = decide(actor, "new_version", source)
+            if not decision.allowed:
+                raise PermissionDenied(decision.reason)
+            validate_references(actor, form.cleaned_data)
+            self.object = source.duplicate(
+                creator=actor,
+                samples=filter_queryset_for_user(source.samples.all(), actor),
+                **form.cleaned_data,
+            )
+            record_creation(actor, self.object)
+            for sample in self.object.samples.all():
+                record_creation(actor, sample)
+                for child in (
+                    *sample.property_values.all(),
+                    *sample.component_measurements.all(),
+                ):
+                    record_creation(actor, child)
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -1204,7 +1240,18 @@ class SampleSeriesModalAddDistributionView(UserCreatedObjectModalUpdateView):
     form_class = SampleSeriesAddTemporalDistributionModalModelForm
 
     def form_valid(self, form):
-        self.object.temporal_distributions.add(form.cleaned_data["distribution"])
+        # Attaching a distribution edits the series root (the M2M edge is
+        # part of its tracked content); the referenced distribution needs
+        # read access, validated inside the locked boundary.
+        distribution = form.cleaned_data["distribution"]
+        with content_mutation(
+            self.request.user, self.object, action="edit"
+        ) as locked_series:
+            validate_references(self.request.user, {"distribution": distribution})
+            if not locked_series.temporal_distributions.filter(
+                pk=distribution.pk
+            ).exists():
+                locked_series.temporal_distributions.add(distribution)
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -2171,10 +2218,25 @@ class SampleCreateDuplicateView(DuplicateFormContextMixin, UserCreatedObjectUpda
         return initial
 
     def form_valid(self, form):
-        self.object = self.object.duplicate(
-            creator=self.request.user, **form.cleaned_data
-        )
-        self.new_object = self.object
+        # The advisory ``new_version`` decision ran in test_func; here the
+        # source row is locked and both the duplicate eligibility and the
+        # new root's create capability are re-decided inside the write
+        # boundary before ``duplicate()`` persists the whole tree.
+        with transaction.atomic():
+            source = Sample._base_manager.select_for_update().get(pk=self.object.pk)
+            actor = authorize_create(self.request.user, Sample)
+            decision = decide(actor, "new_version", source)
+            if not decision.allowed:
+                raise PermissionDenied(decision.reason)
+            validate_references(actor, form.cleaned_data)
+            self.object = source.duplicate(creator=actor, **form.cleaned_data)
+            self.new_object = self.object
+            record_creation(actor, self.object)
+            for child in (
+                *self.object.property_values.all(),
+                *self.object.component_measurements.all(),
+            ):
+                record_creation(actor, child)
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
@@ -2257,9 +2319,10 @@ class CompositionModalDeleteView(UserCreatedObjectModalDeleteView):
 
 
 class CompositionOrderUpView(UserOwnsObjectMixin, SingleObjectMixin, RedirectView):
+    # State-changing GET is retained intentionally; HTTP-method hardening
+    # (POST + CSRF) is tracked as a separate concern.
     model = Composition
     object = None
-    permission_required = "materials.change_composition"
 
     def get_redirect_url(self, *args, **kwargs):
         next_url = get_safe_next_url(self.request)
@@ -2269,14 +2332,19 @@ class CompositionOrderUpView(UserOwnsObjectMixin, SingleObjectMixin, RedirectVie
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
-        self.object.order_up()
+        # Composition is an owned child of the sample; reordering edits
+        # sibling rows, so the governed boundary wraps the sample root and
+        # its snapshot captures both changed compositions.
+        with content_mutation(request.user, self.object.sample, action="edit"):
+            self.object.order_up()
         return super().get(request, *args, **kwargs)
 
 
 class CompositionOrderDownView(UserOwnsObjectMixin, SingleObjectMixin, RedirectView):
+    # State-changing GET is retained intentionally; HTTP-method hardening
+    # (POST + CSRF) is tracked as a separate concern.
     model = Composition
     object = None
-    permission_required = "materials.change_composition"
 
     def get_redirect_url(self, *args, **kwargs):
         next_url = get_safe_next_url(self.request)
@@ -2286,7 +2354,8 @@ class CompositionOrderDownView(UserOwnsObjectMixin, SingleObjectMixin, RedirectV
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
-        self.object.order_down()
+        with content_mutation(request.user, self.object.sample, action="edit"):
+            self.object.order_down()
         return super().get(request, *args, **kwargs)
 
 
@@ -2361,12 +2430,20 @@ class _DerivedCompositionOrderView(
 
 class DerivedCompositionOrderUpView(_DerivedCompositionOrderView):
     def get(self, request, *args, **kwargs):
+        # State-changing GET is retained intentionally; HTTP-method
+        # hardening (POST + CSRF) is tracked as a separate concern. The
+        # settings bootstrap creates owned Composition children and the
+        # reorder edits sibling rows — both inside one governed mutation
+        # on the sample root so creation authorization, revision bump,
+        # and audit apply.
         sample = self.get_sample()
         group = self.get_group()
-        composition_settings_by_group = ensure_derived_composition_settings(
-            sample, request.user
-        )
-        composition_settings_by_group[group.pk].order_up()
+        with content_mutation(request.user, sample, action="edit") as locked_sample:
+            actor = authorize_create(request.user, Composition, parent=locked_sample)
+            composition_settings_by_group = ensure_derived_composition_settings(
+                locked_sample, actor
+            )
+            composition_settings_by_group[group.pk].order_up()
         return super().get(request, *args, **kwargs)
 
 
@@ -2374,10 +2451,12 @@ class DerivedCompositionOrderDownView(_DerivedCompositionOrderView):
     def get(self, request, *args, **kwargs):
         sample = self.get_sample()
         group = self.get_group()
-        composition_settings_by_group = ensure_derived_composition_settings(
-            sample, request.user
-        )
-        composition_settings_by_group[group.pk].order_down()
+        with content_mutation(request.user, sample, action="edit") as locked_sample:
+            actor = authorize_create(request.user, Composition, parent=locked_sample)
+            composition_settings_by_group = ensure_derived_composition_settings(
+                locked_sample, actor
+            )
+            composition_settings_by_group[group.pk].order_down()
         return super().get(request, *args, **kwargs)
 
 
