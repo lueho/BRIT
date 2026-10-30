@@ -3246,7 +3246,10 @@ class CollectionWasteSamplesViewTestCase(
         )
         cls.unpublished_object.samples.add(
             Sample.objects.create(
-                name="Test Sample 1", material=material, series=series
+                name="Test Sample 1",
+                material=material,
+                series=series,
+                publication_status="published",
             )
         )
         cls.sample = Sample.objects.create(
