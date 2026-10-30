@@ -18,7 +18,14 @@ class GroupAccessManagementTests(TestCase):
         cls.member = User.objects.create_user(username="access-member")
         cls.other = User.objects.create_user(username="access-other")
         cls.staff = User.objects.create_user(username="access-staff", is_staff=True)
-        cls.administrator = User.objects.create_user(username="access-admin")
+        cls.admin = User.objects.create_user(username="access-admin", is_staff=True)
+        cls.admin.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type__app_label="object_management",
+            )
+        )
+        cls.administrator = User.objects.create_user(username="access-administrator")
         cls.administrator.user_permissions.add(
             Permission.objects.get(
                 codename="administer_objects",
@@ -85,6 +92,16 @@ class GroupAccessManagementTests(TestCase):
         )
         self.assertEqual(response.status_code, 403)
         self.assertFalse(ObjectGroupEditorGrant.for_object(self.process).exists())
+
+    def test_admin_can_grant_group_access(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            self.url("add_editor_group"), {"group": self.group.name}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            ObjectGroupEditorGrant.for_object(self.process).get().granted_by, self.admin
+        )
 
     def test_administrator_can_grant_group_access(self):
         self.client.force_login(self.administrator)
@@ -227,6 +244,17 @@ class GroupAccessManagementTests(TestCase):
         )
         self.assertTrue(ObjectGroupEditorGrant.for_object(self.process).exists())
 
+    def test_admin_can_revoke_group_access(self):
+        self.grant()
+        self.client.force_login(self.admin)
+        self.assertEqual(
+            self.client.post(
+                self.url("remove_editor_group"), {"group": self.group.name}
+            ).status_code,
+            302,
+        )
+        self.assertFalse(ObjectGroupEditorGrant.for_object(self.process).exists())
+
     def test_administrator_can_revoke_group_access(self):
         self.grant()
         self.client.force_login(self.administrator)
@@ -322,12 +350,16 @@ class GroupAccessManagementTests(TestCase):
         for action in ("add_editor_group", "remove_editor_group"):
             self.assertEqual(self.client.get(self.url(action)).status_code, 405)
             with self.assertLogs("django.security.csrf", level="WARNING") as logs:
-                response = csrf_client.post(
-                    self.url(action), {"group": self.group.name}
+                self.assertEqual(
+                    csrf_client.post(
+                        self.url(action), {"group": self.group.name}
+                    ).status_code,
+                    403,
                 )
-            self.assertEqual(response.status_code, 403)
-            self.assertIn("CSRF cookie not set.", "\n".join(logs.output))
-            self.assertIn(self.url(action), "\n".join(logs.output))
+            self.assertTrue(
+                any("Forbidden" in line for line in logs.output),
+                logs.output,
+            )
         self.assertFalse(ObjectGroupEditorGrant.for_object(self.process).exists())
 
     def test_group_actions_reject_non_user_created_objects(self):

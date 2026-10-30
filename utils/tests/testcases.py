@@ -6,7 +6,12 @@ from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from utils.object_management.models import User
+from utils.object_management.models import User, _default_owner_username
+
+
+def ensure_test_default_owner():
+    """Provision the identity used by ownerless model/form construction."""
+    return User.objects.get_or_create(username=_default_owner_username())[0]
 
 
 class UserLoginTestCase(TestCase):
@@ -37,7 +42,10 @@ class ViewWithPermissionsTestCase(UserLoginTestCase):
         cls.member = User.objects.create(username="member")
         cls.staff = User.objects.create(username="staff", is_staff=True)
         cls.staff.user_permissions.add(
-            Permission.objects.get(codename="administer_objects")
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type__app_label="object_management",
+            )
         )
         if cls.member_permissions:
             if isinstance(cls.member_permissions, str):
@@ -193,6 +201,7 @@ class AbstractTestCases:
 
         @classmethod
         def setUpTestData(cls):
+            ensure_test_default_owner()
             cls.owner_user = User.objects.create(username="owner")
             cls.non_owner_user = User.objects.create(username="non_owner")
             cls.staff_user = User.objects.create(username="staff", is_staff=True)
@@ -211,7 +220,10 @@ class AbstractTestCases:
                 delete_perm = Permission.objects.get(codename=f"delete_{model_name}")
                 cls.owner_user.user_permissions.add(change_perm, delete_perm)
 
-                admin_perm = Permission.objects.get(codename="administer_objects")
+                admin_perm = Permission.objects.get(
+                    codename="administer_objects",
+                    content_type__app_label="object_management",
+                )
                 cls.staff_user.user_permissions.add(
                     admin_perm, add_perm, change_perm, delete_perm
                 )

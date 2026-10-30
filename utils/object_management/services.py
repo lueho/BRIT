@@ -22,6 +22,7 @@ from contextlib import contextmanager
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import (
     ObjectDoesNotExist,
@@ -1110,3 +1111,75 @@ def authorize_url_check_job(user, task_id):
     if target is None or not decide(user, "read", target).allowed:
         raise PermissionDenied("URL check target is no longer accessible.")
     return target
+
+
+_ACCESS_CHANGE_ACTIONS = frozenset(
+    {
+        "add_editor",
+        "remove_editor",
+        "add_editor_group",
+        "remove_editor_group",
+        "transfer_ownership",
+    }
+)
+
+
+def perform_access_change(actor, target, action, recipient):
+    """Apply one sharing mutation on ``target`` inside a locked boundary.
+
+    Accepted ``action`` strings are exactly ``add_editor``, ``remove_editor``,
+    ``add_editor_group``, ``remove_editor_group``, and ``transfer_ownership``;
+    anything else is a ``ValidationError`` before any write. Only reviewable
+    roots participate — owned children and generated projections cannot gain
+    independently governed grants. The actor is re-read after the row lock is
+    acquired and the canonical ``transfer_ownership``/``manage_editors``
+    decision is authoritative; advisory view checks are not. The recipient is
+    freshly reloaded and must be a persisted row of the type the action
+    requires (``User`` for editor/transfer actions, ``Group`` for group
+    actions). The model-level helpers on the locked object then perform the
+    write with the fresh actor recorded as grantor/initiator; the freshly
+    locked target is returned.
+    """
+    if action not in _ACCESS_CHANGE_ACTIONS:
+        raise ValidationError(f"Unknown access action: {action!r}.")
+    policy = record_policy(target)
+    if policy is None or policy.kind != KIND_REVIEWABLE:
+        raise ValidationError(
+            "Sharing applies only to independently reviewable records."
+        )
+    group_action = action in ("add_editor_group", "remove_editor_group")
+    expected_model = Group if group_action else get_user_model()
+    if (
+        not isinstance(recipient, expected_model)
+        or getattr(recipient, "pk", None) is None
+    ):
+        raise ValidationError("Invalid recipient for this access action.")
+
+    with transaction.atomic():
+        locked = _lock_instance(target)
+        locked_policy = record_policy(locked)
+        if locked_policy is None or locked_policy.kind != KIND_REVIEWABLE:
+            raise ValidationError(
+                "Sharing applies only to independently reviewable records."
+            )
+        fresh_actor = _fresh_actor(actor)
+        decision_action = (
+            "transfer_ownership" if action == "transfer_ownership" else "manage_editors"
+        )
+        if not decide(fresh_actor, decision_action, locked).allowed:
+            raise PermissionDenied("You don't have permission to change sharing.")
+        fresh_recipient = expected_model._base_manager.filter(pk=recipient.pk).first()
+        if fresh_recipient is None:
+            raise ValidationError("The selected recipient no longer exists.")
+        if group_action:
+            if action == "add_editor_group":
+                locked.add_editor_group(fresh_recipient, granted_by=fresh_actor)
+            else:
+                locked.remove_editor_group(fresh_recipient)
+        elif action == "add_editor":
+            locked.add_editor(fresh_recipient, granted_by=fresh_actor)
+        elif action == "remove_editor":
+            locked.remove_editor(fresh_recipient)
+        else:
+            locked.transfer_ownership(fresh_recipient, initiator=fresh_actor)
+        return locked

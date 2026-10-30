@@ -8862,12 +8862,12 @@ class SampleSeriesDetailTemplateReviewUITests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Submit for review")
 
-    def test_review_series_shows_review_view_link_for_owner(self):
+    def test_review_series_shows_review_activity_link_for_owner(self):
         self.client.force_login(self.owner)
         url = reverse("sampleseries-detail", kwargs={"pk": self.review_series.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Review view")
+        self.assertContains(response, "Review activity")
 
     def test_series_detail_extends_detail_v2(self):
         self.client.force_login(self.owner)

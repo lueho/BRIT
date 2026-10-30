@@ -8,6 +8,7 @@ from django.urls import reverse
 
 from materials.models import Material
 from processes.models import Process, ProcessCategory
+from utils.tests.testcases import ensure_test_default_owner
 
 from ..models import ObjectGroupEditorGrant
 from ..permissions import (
@@ -137,6 +138,26 @@ class GroupEditorGrantTests(TestCase):
             )
         )
 
+    def test_group_editor_keeps_existing_edit_access_with_capability(self):
+        # A group grant alone never confers the model change capability:
+        # the member keeps edit access only through their own permission.
+        self.group.permissions.clear()
+        self.member.user_permissions.add(
+            Permission.objects.get(
+                content_type=ContentType.objects.get_for_model(type(self.process)),
+                codename="change_process",
+            )
+        )
+        self.member.save()
+        member = User.objects.get(pk=self.member.pk)
+        request = SimpleNamespace(user=member, method="PATCH", data={"name": "Changed"})
+        self.assertTrue(get_object_policy(member, self.process)["can_edit"])
+        self.assertTrue(
+            UserCreatedObjectPermission().has_object_permission(
+                request, None, self.process
+            )
+        )
+
     def test_staff_group_editor_without_change_permission_is_denied(self):
         """Staff status alone does not preserve edit access once the group
         loses the change capability."""
@@ -226,6 +247,7 @@ class GroupEditorGrantTests(TestCase):
 class SingleGroupWorkshopJourneyTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.owner = User.objects.create_user(username="workshop-contributor")
         cls.participant = User.objects.create_user(username="single-group-participant")
         cls.group = Group.objects.create(name="single-workshop-group")

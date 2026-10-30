@@ -47,11 +47,11 @@
                     </a>
                     <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
                        role="button"
-                       title="Show only my items"
+                       title="Show my workspace records"
                        aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
                        {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
                        href="{{ private_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
-                      Mine
+                      Workspace
                     </a>
                     {% if user|can_moderate:object_list.model and review_representation_url %}
                       <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
@@ -77,6 +77,9 @@
           </div>
         </div>
         <div class="card-body">
+          {% if list_type == 'private' and user.is_authenticated %}
+            {% include "includes/workspace_nav.html" %}
+          {% endif %}
           {% block list_card_body %}
             {% block list_result_count %}
               {% if page_obj %}
@@ -122,8 +125,8 @@
                       {% block list_table_row %}
                         <tr tabindex="0"
                             role="link"
-                            onclick="window.location='{% detail_or_review_url object use_back=True %}'"
-                            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.location='{% detail_or_review_url object use_back=True %}'}">
+                            onclick="if(!event.target.closest('a,button,input,select,textarea,label,form,.dropdown-menu,[data-bs-toggle]')){window.location='{% detail_or_review_url object use_back=True %}'}"
+                            onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();window.location='{% detail_or_review_url object use_back=True %}'}">
                           {% include "object_management/bulk_select_td.html" %}
                           <td data-label="Name" class="ps-3">
                             <a href="{% detail_or_review_url object use_back=True %}"
@@ -270,7 +273,8 @@
                      tabindex="0">
                   {% block options_pane_body %}
                     {% block list_card_footer_create_link %}
-                      {% if create_permission in perms or user.is_staff %}
+                      {% model_creation_policy object_list.model as create_policy %}
+                      {% if create_policy.allowed %}
                         <a class="btn btn-success w-100 mb-2"
                            href="{{ object_list.model.create_url }}"
                            aria-label="Create new {{ object_list.model.get_verbose_name }}">
