@@ -1,15 +1,18 @@
 import json
 from datetime import datetime
 from decimal import Decimal
+from io import StringIO
 from unittest.mock import patch
 from urllib.parse import quote
 from uuid import uuid4
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.db import connection
 from django.db.models.signals import post_save, pre_save
 from django.template.loader import render_to_string
@@ -34,6 +37,7 @@ from utils.properties.models import Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
 from ..composition_normalization import get_sample_normalized_compositions
+from ..forms import AddCompositionModalForm
 from ..models import (
     AnalyticalMethod,
     ComponentMeasurement,
@@ -57,6 +61,7 @@ from ..models import (
 from ..serializers import SampleAPISerializer, SampleModelSerializer
 from ..views import (
     DETAIL_RELATED_LIMIT,
+    AddCompositionView,
     SampleDetailView,
     SampleSubstrateMaterialQuickCreateView,
 )
@@ -5829,13 +5834,28 @@ class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
 
 
 class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ("add_composition", "change_sample")
+    """Manifest-provisioned access to the series composition attach view.
+
+    The member holds only the ``registered`` role: ``add_composition`` is
+    deliberately absent from the role manifest because Composition is an
+    owned child of Sample, so the object-level create decision on each
+    sample is the sole gate.
+    """
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        call_command("sync_roles", "--apply", stdout=StringIO(), stderr=StringIO())
+        cls.member.groups.add(Group.objects.get(name="registered"))
         material = Material.objects.create(name="Test Material")
-        cls.component_group = MaterialComponentGroup.objects.create(name="Test Group")
+        cls.component_group = MaterialComponentGroup.objects.create(
+            name="Test Group", publication_status="published"
+        )
+        # The shared default component is private ownerless data; only a
+        # readable reference may be submitted.
+        cls.default_component = MaterialComponent.objects.default()
+        cls.default_component.publication_status = "published"
+        cls.default_component.save(update_fields=["publication_status"])
         cls.series = SampleSeries.objects.create(
             owner=cls.member, name="Test Series", material=material
         )
@@ -5882,7 +5902,7 @@ class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             "group": self.component_group.pk,
-            "fractions_of": MaterialComponent.objects.default().pk,
+            "fractions_of": self.default_component.pk,
         }
         response = self.client.post(
             reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk}), data
@@ -5895,7 +5915,7 @@ class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             "group": self.component_group.pk,
-            "fractions_of": MaterialComponent.objects.default().pk,
+            "fractions_of": self.default_component.pk,
         }
         self.client.post(
             reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk}), data
@@ -5914,7 +5934,7 @@ class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             "group": self.component_group.pk,
-            "fractions_of": MaterialComponent.objects.default().pk,
+            "fractions_of": self.default_component.pk,
         }
 
         response = self.client.post(
@@ -5931,6 +5951,91 @@ class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
         self.assertFalse(
             Composition.objects.filter(
                 group=self.component_group, sample=foreign_sample
+            ).exists()
+        )
+
+    def test_get_does_not_list_foreign_private_groups(self):
+        """Unreadable private groups must not leak their name as a choice."""
+        MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Foreign Private Group",
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Foreign Private Group")
+
+    def test_post_rejects_foreign_private_group(self):
+        """A submitted foreign private group is not a valid form choice."""
+        foreign_group = MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Foreign Private Group",
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk}),
+            {
+                "group": foreign_group.pk,
+                "fractions_of": self.default_component.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("group", response.context["form"].errors)
+        self.assertFalse(
+            Composition.objects.filter(
+                group=foreign_group, sample__series=self.series
+            ).exists()
+        )
+
+    def test_write_boundary_revalidates_reference_read_access(self):
+        """References are re-decided inside the locked write transaction so a
+        stale or forged cleaned_data can never link an unreadable record."""
+        foreign_group = MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Foreign Private Group",
+            publication_status="private",
+        )
+        request = RequestFactory().post(
+            reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk})
+        )
+        request.user = self.member
+        view = AddCompositionView()
+        view.request = request
+        view.kwargs = {"pk": self.series.pk}
+        view.object = self.series
+        form = AddCompositionModalForm(instance=self.series)
+        form.cleaned_data = {
+            "group": foreign_group,
+            "fractions_of": self.default_component,
+        }
+
+        with self.assertRaises(PermissionDenied):
+            view.form_valid(form)
+        self.assertFalse(
+            Composition.objects.filter(
+                group=foreign_group, sample__series=self.series
+            ).exists()
+        )
+
+    def test_post_denied_for_staff_without_object_access(self):
+        """The Django staff flag alone grants no write access."""
+        bare_staff = User.objects.create_user(username="bare-staff", is_staff=True)
+        self.client.force_login(bare_staff)
+        response = self.client.post(
+            reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk}),
+            {
+                "group": self.component_group.pk,
+                "fractions_of": self.default_component.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Composition.objects.filter(
+                group=self.component_group, sample__series=self.series
             ).exists()
         )
 
