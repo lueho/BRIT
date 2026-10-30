@@ -1095,14 +1095,19 @@ class AddCompositionModalForm(ModalModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["group"].queryset = MaterialComponentGroup.objects.exclude(
-            id__in=self.instance.blocked_ids
+        user = getattr(getattr(self, "request", None), "user", None)
+        self.fields["group"].queryset = filter_queryset_for_user(
+            MaterialComponentGroup.objects.exclude(id__in=self.instance.blocked_ids),
+            user,
         )
-        self.fields["fractions_of"].queryset = MaterialComponent.objects.filter(
-            id__in=[
-                *self.instance.components.values_list("id", flat=True),
-                MaterialComponent.objects.default().id,
-            ]
+        self.fields["fractions_of"].queryset = filter_queryset_for_user(
+            MaterialComponent.objects.filter(
+                id__in=[
+                    *self.instance.components.values_list("id", flat=True),
+                    MaterialComponent.objects.default().id,
+                ]
+            ),
+            user,
         )
         self.fields["fractions_of"].empty_label = None
 

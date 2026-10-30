@@ -45,7 +45,11 @@ from utils.object_management.permissions import (
     visible_related_object,
 )
 from utils.object_management.policy import decide
-from utils.object_management.services import authorize_create, content_mutation
+from utils.object_management.services import (
+    authorize_create,
+    content_mutation,
+    validate_references,
+)
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -2129,7 +2133,6 @@ class EditableSampleAutoCompleteView(EditableAutocompleteMixin, SampleAutocomple
 
 class SampleAddCompositionView(SampleBoundCreateMixin, UserCreatedObjectCreateView):
     form_class = SampleAddCompositionForm
-    permission_required = "materials.add_composition"
     sample_url_kwarg = "pk"
 
     def get_initial(self):
@@ -2381,7 +2384,6 @@ class DerivedCompositionOrderDownView(_DerivedCompositionOrderView):
 
 
 class AddCompositionView(
-    PermissionRequiredMixin,
     UserPassesTestMixin,
     NextOrSuccessUrlMixin,
     BSModalUpdateView,
@@ -2389,7 +2391,6 @@ class AddCompositionView(
     model = SampleSeries
     form_class = AddCompositionModalForm
     template_name = "modal_form.html"
-    permission_required = "materials.add_composition"
     success_message = "Composition successfully added."
 
     def test_func(self):
@@ -2429,6 +2430,7 @@ class AddCompositionView(
                     actor = authorize_create(
                         self.request.user, Composition, parent=locked_sample
                     )
+                    validate_references(actor, form.cleaned_data)
                     Composition.objects.create(
                         owner=actor,
                         group=form.cleaned_data["group"],
