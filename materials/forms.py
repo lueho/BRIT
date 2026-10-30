@@ -1057,7 +1057,7 @@ class CompositionModalModelForm(ModalModelFormMixin, CompositionModelForm):
     pass
 
 
-class SampleAddCompositionForm(SimpleModelForm):
+class SampleAddCompositionForm(UserCreatedObjectFormMixin, SimpleModelForm):
     sample = ModelChoiceField(queryset=Sample.objects.none())
 
     class Meta:
@@ -1067,17 +1067,21 @@ class SampleAddCompositionForm(SimpleModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         sample = kwargs["initial"].get("sample")
+        user = getattr(getattr(self, "request", None), "user", None)
         self.fields["sample"].queryset = Sample.objects.filter(id=sample.id)
         self.fields["sample"].empty_label = None
-        self.fields["group"].queryset = MaterialComponentGroup.objects.exclude(
-            id__in=sample.group_ids
+        self.fields["group"].queryset = filter_queryset_for_user(
+            MaterialComponentGroup.objects.exclude(id__in=sample.group_ids), user
         )
         self.fields["group"].empty_label = None
-        self.fields["fractions_of"].queryset = MaterialComponent.objects.filter(
-            id__in=[
-                *sample.components.values_list("id", flat=True),
-                MaterialComponent.objects.default().id,
-            ]
+        self.fields["fractions_of"].queryset = filter_queryset_for_user(
+            MaterialComponent.objects.filter(
+                id__in=[
+                    *sample.components.values_list("id", flat=True),
+                    MaterialComponent.objects.default().id,
+                ]
+            ),
+            user,
         )
         self.fields["fractions_of"].empty_label = None
 

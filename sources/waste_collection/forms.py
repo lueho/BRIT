@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Div, Field, Layout, Row
 from django.core.exceptions import ValidationError
@@ -810,10 +808,6 @@ class CollectionModelForm(
         instance.waste_category = data["waste_category"]
         if commit:
             instance.save()
-            for predecessor in instance.predecessors.all():
-                valid_until = instance.valid_from - timedelta(days=1)
-                predecessor.valid_until = valid_until
-                predecessor.save(update_fields=["valid_until", "lastmodified_at"])
             self.save_m2m()
             return instance
         else:

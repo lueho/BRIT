@@ -5222,6 +5222,140 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class AddSeasonalVariationViewTestCase(ViewWithPermissionsTestCase):
+    """The seasonal-variation attach view governs the actual SampleSeries
+    mutation and the created timestep samples, not the composition that
+    merely addresses the series."""
+
+    member_permissions = ("change_sampleseries", "add_sample")
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        material = Material.objects.create(owner=cls.member, name="Test Material")
+        group = MaterialComponentGroup.objects.create(
+            owner=cls.member, name="Test Group"
+        )
+        cls.series = SampleSeries.objects.create(
+            owner=cls.member, name="Test Series", material=material
+        )
+        sample = Sample.objects.get(
+            series=cls.series, timestep=Timestep.objects.default()
+        )
+        cls.composition = Composition.objects.create(
+            owner=cls.member,
+            sample=sample,
+            group=group,
+            fractions_of=MaterialComponent.objects.default(),
+        )
+        cls.distribution = TemporalDistribution.objects.create(
+            owner=cls.member,
+            name="Seasonal",
+            publication_status="published",
+        )
+        cls.timestep_1 = Timestep.objects.create(
+            owner=cls.member, name="Spring", distribution=cls.distribution
+        )
+        cls.timestep_2 = Timestep.objects.create(
+            owner=cls.member, name="Autumn", distribution=cls.distribution
+        )
+
+    def get_url(self):
+        return reverse("add_seasonal_variation", kwargs={"pk": self.composition.pk})
+
+    def post_data(self, distribution=None):
+        return {"temporal_distribution": (distribution or self.distribution).pk}
+
+    def test_post_anonymous_redirects_to_login(self):
+        url = self.get_url()
+        response = self.client.post(url, self.post_data())
+        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertNotIn(self.distribution, self.series.temporal_distributions.all())
+
+    def test_post_denied_for_outsider_and_creates_nothing(self):
+        self.client.force_login(self.outsider)
+        sample_count = self.series.samples.count()
+
+        response = self.client.post(self.get_url(), self.post_data())
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn(self.distribution, self.series.temporal_distributions.all())
+        self.assertEqual(self.series.samples.count(), sample_count)
+
+    def test_post_denied_for_sample_editor_without_series_access(self):
+        """Edit access on the addressed sample must not mutate the
+        independently governed series: denied, no rows."""
+        sample_editor = User.objects.create(username="sample-only-editor")
+        sample_editor.user_permissions.add(
+            Permission.objects.get(codename="change_sample"),
+            Permission.objects.get(codename="add_sample"),
+        )
+        self.composition.sample.add_editor(sample_editor, granted_by=self.member)
+        sample_count = self.series.samples.count()
+        self.client.force_login(sample_editor)
+
+        response = self.client.post(self.get_url(), self.post_data())
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn(self.distribution, self.series.temporal_distributions.all())
+        self.assertEqual(self.series.samples.count(), sample_count)
+
+    def test_post_denied_for_frozen_series(self):
+        """A published series is immutable — even for its owner."""
+        self.series.publication_status = "published"
+        self.series.save(update_fields=["publication_status"])
+        sample_count = self.series.samples.count()
+        self.client.force_login(self.member)
+
+        response = self.client.post(self.get_url(), self.post_data())
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn(self.distribution, self.series.temporal_distributions.all())
+        self.assertEqual(self.series.samples.count(), sample_count)
+
+    def test_post_denied_for_foreign_private_distribution(self):
+        """A forged reference to an unreadable private distribution is
+        re-decided inside the locked write boundary and denied."""
+        foreign_distribution = TemporalDistribution.objects.create(
+            owner=self.owner,
+            name="Foreign Private Distribution",
+            publication_status="private",
+        )
+        sample_count = self.series.samples.count()
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            self.get_url(), self.post_data(distribution=foreign_distribution)
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn(foreign_distribution, self.series.temporal_distributions.all())
+        self.assertEqual(self.series.samples.count(), sample_count)
+
+    def test_post_authorized_creates_samples_and_audit(self):
+        self.client.force_login(self.member)
+        series_revision = self.series.content_revision
+
+        response = self.client.post(self.get_url(), self.post_data())
+
+        self.assertRedirects(response, self.composition.get_absolute_url())
+        self.assertIn(self.distribution, self.series.temporal_distributions.all())
+        for timestep in (self.timestep_1, self.timestep_2):
+            sample = Sample.objects.get(series=self.series, timestep=timestep)
+            self.assertEqual(sample.owner, self.member)
+        self.series.refresh_from_db()
+        self.assertEqual(self.series.content_revision, series_revision + 1)
+        content_type = ContentType.objects.get_for_model(SampleSeries)
+        self.assertTrue(
+            ReviewAction.objects.filter(
+                content_type=content_type,
+                object_id=self.series.pk,
+                action=ReviewAction.ACTION_EDITED,
+                user=self.member,
+            ).exists()
+        )
+
+
 class RemoveSeasonalVariationViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ("change_sampleseries", "delete_sample")
 
@@ -6247,6 +6381,42 @@ class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
             Composition.objects.filter(
                 sample=self.other_users_sample, group=self.component_group
             ).exists()
+        )
+
+    def test_get_does_not_list_foreign_private_groups(self):
+        """Unreadable private groups must not leak their name as a choice."""
+        MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Foreign Private Group",
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("sample-add-composition", kwargs={"pk": self.sample.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Foreign Private Group")
+
+    def test_post_rejects_foreign_private_group(self):
+        """A submitted foreign private group is not a valid form choice."""
+        foreign_group = MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Foreign Private Group",
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("sample-add-composition", kwargs={"pk": self.sample.pk}),
+            {
+                "sample": self.sample.pk,
+                "group": foreign_group.pk,
+                "fractions_of": MaterialComponent.objects.default().pk,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("group", response.context["form"].errors)
+        self.assertFalse(
+            Composition.objects.filter(group=foreign_group, sample=self.sample).exists()
         )
 
 
