@@ -612,7 +612,10 @@ def content_mutation(
     is a reassignment: every affected root (stored parent, proposed
     parents, and the record's own root for independent evidence) is locked
     in deterministic storage order, re-checked, and audited while the locks
-    remain held through the callback.
+    remain held through the callback. The actor is re-read through
+    ``_fresh_actor`` only after every potentially blocking lock is held,
+    so a deactivation committed while this boundary waited on a row lock
+    can never authorize the write.
 
     On clean exit the persisted scalar, owned-row, and M2M state of each
     tracked root is compared; a meaningful change bumps ``content_revision``
@@ -692,7 +695,9 @@ def content_mutation(
                     "The stored parent changed while acquiring locks."
                 )
 
-        # Refresh after all potentially blocking locks, including owned rows.
+        # Re-read the actor only after every potentially blocking lock is
+        # held so a deactivation committed while this boundary waited can
+        # never authorize the write.
         actor = _fresh_actor(actor)
         if moving:
             locked_proposed = [
@@ -880,7 +885,9 @@ def perform_transition(
     requires the caller's inspected ``content_revision`` and excludes the
     owner and every recorded contributor of the current candidate. The
     model's own transition method performs domain validation; the resulting
-    audit event is written in the same transaction.
+    audit event is written in the same transaction. The actor is re-read
+    only after the root lock is held, so a deactivation committed while
+    this boundary waited can never authorize the transition.
     """
     if action not in _TRANSITION_METHODS:
         raise ValidationError(f"Unsupported transition '{action}'.")
@@ -931,7 +938,9 @@ def record_comment(actor, target, comment, *, expected_revision=None):
     the current one; older watermarks are retained, absent watermarks stay
     unbound (``content_revision`` null). Comments never bump the revision.
     Comments on a generated projection bind the source evidence thread and
-    the source revision — there is no separate projection approval.
+    the source revision — there is no separate projection approval. The
+    actor is re-read only after the root lock is held, so a deactivation
+    committed while this boundary waited can never record a comment.
     """
     record = record_policy(target)
     if record is not None and record.kind == KIND_GENERATED:
