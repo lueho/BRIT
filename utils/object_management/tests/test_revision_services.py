@@ -1126,6 +1126,178 @@ class CreateActorDeactivationRaceTests(TransactionTestCase):
         )
 
 
+class MutationActorDeactivationRaceTests(TransactionTestCase):
+    """Deactivation-during-lock-wait races on mutation boundaries.
+
+    Every governed write boundary must re-read its actor after the last
+    potentially blocking ``select_for_update``: while the boundary thread
+    waits on a row lock held by a concurrent transaction, the account is
+    deactivated. The post-lock ``decide`` must see the fresh ``is_active``
+    state and fail closed — no write, no revision bump, no audit event.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username="dau-owner")
+        self.owner.user_permissions.add(
+            _perm(Property, "add_property"),
+            _perm(Property, "change_property"),
+        )
+        self.editor = User.objects.create_user(username="dau-editor")
+        self.editor.user_permissions.add(_perm(Property, "change_property"))
+        self.moderator = User.objects.create_user(username="dau-moderator")
+        self.moderator.user_permissions.add(_perm(Property, "can_moderate_property"))
+        self.prop = Property.objects.create(
+            name="Deactivation raced",
+            owner=self.owner,
+            publication_status="private",
+        )
+
+    def _race(self, holder, attempt):
+        """Run ``attempt`` while ``holder`` owns the prop row lock.
+
+        ``holder(lock_held, release)`` acquires the row lock and blocks
+        until released; ``attempt()`` runs the boundary under test with a
+        signaling ``_lock_instance`` patch so the main thread knows when
+        the boundary actually issues its lock attempt. Returns
+        ``(results, errors)``; a denied attempt lands in ``results``.
+        """
+        lock_held = threading.Event()
+        attempted = threading.Event()
+        release = threading.Event()
+        results = {}
+        errors = {}
+
+        real_lock = services._lock_instance
+
+        def signaling_lock(obj):
+            attempted.set()
+            return real_lock(obj)
+
+        def run(fn, key):
+            import traceback
+
+            try:
+                fn()
+            except PermissionDenied as exc:
+                results[key] = (exc, traceback.format_exc())
+            except Exception as exc:  # pragma: no cover
+                errors[key] = (exc, traceback.format_exc())
+            finally:
+                connection.close()
+
+        t_hold = threading.Thread(
+            target=lambda: run(lambda: holder(lock_held, release), "holder")
+        )
+        t_hold.start()
+        self.assertTrue(lock_held.wait(timeout=10))
+
+        t_attempt = threading.Thread(
+            target=lambda: run(
+                lambda: self._attempt(signaling_lock, attempt), "attempt"
+            )
+        )
+        t_attempt.start()
+        self.assertTrue(attempted.wait(timeout=10))
+        return results, errors, release, (t_hold, t_attempt)
+
+    @staticmethod
+    def _attempt(signaling_lock, attempt):
+        with patch.object(services, "_lock_instance", side_effect=signaling_lock):
+            attempt()
+
+    def test_deactivation_while_blocked_on_lock_denies_update(self):
+        self.prop.add_editor(self.editor, granted_by=self.owner)
+
+        def holder(lock_held, release):
+            with content_mutation(self.owner, self.prop, action="edit") as prop:
+                prop.description = "holder edit"
+                prop.save()
+                lock_held.set()
+                release.wait(timeout=10)
+
+        def attempt():
+            with content_mutation(self.editor, self.prop, action="edit") as prop:
+                prop.name = "deactivated write"
+                prop.save()
+
+        results, errors, release, threads = self._race(holder, attempt)
+        User.objects.filter(pk=self.editor.pk).update(is_active=False)
+        release.set()
+        for thread in threads:
+            thread.join(timeout=15)
+
+        self.assertFalse(any(t.is_alive() for t in threads))
+        self.assertFalse(errors, errors)
+        denial = results.get("attempt")
+        self.assertIsNotNone(denial, "update unexpectedly succeeded")
+        exc, tb = denial
+        self.assertIsInstance(exc, PermissionDenied, tb)
+
+        fresh = Property.objects.get(pk=self.prop.pk)
+        self.assertEqual(fresh.name, "Deactivation raced")
+        self.assertEqual(fresh.description, "holder edit")
+        self.assertEqual(fresh.content_revision, 2)
+        events = _actions_for(fresh, "edited")
+        self.assertEqual(events.count(), 1)
+        self.assertEqual(events.get().user, self.owner)
+
+    def test_deactivation_while_blocked_on_lock_denies_transition(self):
+        perform_transition(self.owner, self.prop, "submit")
+
+        def holder(lock_held, release):
+            with transaction.atomic():
+                services._lock_instance(self.prop)
+                lock_held.set()
+                release.wait(timeout=10)
+
+        def attempt():
+            perform_transition(
+                self.moderator, self.prop, "approve", expected_revision=1
+            )
+
+        results, errors, release, threads = self._race(holder, attempt)
+        User.objects.filter(pk=self.moderator.pk).update(is_active=False)
+        release.set()
+        for thread in threads:
+            thread.join(timeout=15)
+
+        self.assertFalse(any(t.is_alive() for t in threads))
+        self.assertFalse(errors, errors)
+        denial = results.get("attempt")
+        self.assertIsNotNone(denial, "approval unexpectedly succeeded")
+        exc, tb = denial
+        self.assertIsInstance(exc, PermissionDenied, tb)
+
+        fresh = Property.objects.get(pk=self.prop.pk)
+        self.assertEqual(fresh.publication_status, "review")
+        self.assertEqual(fresh.content_revision, 1)
+        self.assertFalse(_actions_for(fresh, "approved").exists())
+
+    def test_deactivation_while_blocked_on_lock_denies_comment(self):
+        def holder(lock_held, release):
+            with transaction.atomic():
+                services._lock_instance(self.prop)
+                lock_held.set()
+                release.wait(timeout=10)
+
+        def attempt():
+            record_comment(self.owner, self.prop, "blocked comment")
+
+        results, errors, release, threads = self._race(holder, attempt)
+        User.objects.filter(pk=self.owner.pk).update(is_active=False)
+        release.set()
+        for thread in threads:
+            thread.join(timeout=15)
+
+        self.assertFalse(any(t.is_alive() for t in threads))
+        self.assertFalse(errors, errors)
+        denial = results.get("attempt")
+        self.assertIsNotNone(denial, "comment unexpectedly succeeded")
+        exc, tb = denial
+        self.assertIsInstance(exc, PermissionDenied, tb)
+        self.assertFalse(_actions_for(self.prop, ReviewAction.ACTION_COMMENT).exists())
+
+
 class OwnedParentResolutionTests(TestCase):
     """Owned children must re-resolve their stored parent under the root lock."""
 
