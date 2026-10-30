@@ -1,4 +1,3 @@
-import hashlib
 import json
 import logging
 from datetime import date, timedelta
@@ -12,7 +11,7 @@ from django.contrib.auth.mixins import (
     UserPassesTestMixin,
 )
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, Max, Min, Prefetch, Q
+from django.db.models import Max, Prefetch
 from django.forms.models import model_to_dict
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -30,6 +29,7 @@ from bibliography.views import (
     SourceModalDetailView,
 )
 from maps.filters import CatchmentFilterSet
+from maps.utils import compute_collection_dataset_version
 from maps.views import (
     CatchmentCreateView,
     CatchmentDetailView,
@@ -2024,11 +2024,9 @@ class SoilcomDatasetVersionMixin:
     Provides a stable dataset version (dv) string for caching purposes.
 
     The dv changes only when data visible for the current map scope changes.
-    It's computed from a scope-appropriate queryset using:
-    - COUNT(*)
-    - MAX(lastmodified_at)
-    - MIN(id)
-    - MAX(id)
+    It delegates to ``compute_collection_dataset_version`` so the page-level
+    signature tracks the same centrally scoped queryset
+    (``scope_queryset``) that the features layer and cache warm-up task use.
 
     The dv is then exposed to templates via context as "dataset_version".
     """
@@ -2043,43 +2041,9 @@ class SoilcomDatasetVersionMixin:
             or "published"
         )
 
-    def _dv_queryset(self):
-        scope = self.get_dv_scope()
-        user = getattr(self.request, "user", None)
-        qs = Collection.objects.all()
-
-        if scope == "published":
-            qs = qs.filter(publication_status="published")
-        elif scope == "private":
-            if user and user.is_authenticated and not user.is_staff:
-                qs = qs.filter(owner=user)
-            else:
-                # Staff users on private scope: default to all (matches current staff behavior)
-                qs = qs
-        elif scope == "review":
-            if user and user.is_authenticated and not user.is_staff:
-                qs = qs.filter(Q(owner=user) | Q(publication_status="review"))
-            else:
-                # Staff: restrict dv to items in review to reflect the view's intent
-                qs = qs.filter(publication_status="review")
-        return qs
-
     def get_dataset_version(self) -> str:
-        qs = self._dv_queryset()
-        agg = qs.aggregate(
-            cnt=Count("pk"),
-            max_mod=Max("lastmodified_at"),
-            min_id=Min("pk"),
-            max_id=Max("pk"),
-        )
-        scope = self.get_dv_scope()
-        cnt = agg.get("cnt") or 0
-        max_mod = agg.get("max_mod")
-        ts = int(max_mod.timestamp()) if max_mod else 0
-        min_id = agg.get("min_id") or 0
-        max_id = agg.get("max_id") or 0
-        base = f"{scope}:{cnt}:{ts}:{min_id}:{max_id}"
-        return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
+        user = getattr(self.request, "user", None)
+        return compute_collection_dataset_version(self.get_dv_scope(), user)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)

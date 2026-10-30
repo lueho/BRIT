@@ -193,7 +193,14 @@ class ModalLoginRequiredMessage(TemplateView):
 
 
 class UserAutocompleteView(AutocompleteModelView):
-    """Autocomplete view for User model, used in review dashboard filters."""
+    """Autocomplete view for the User model, used in review dashboard filters.
+
+    Enumerating active usernames is deliberate here: moderators resolve
+    submitters in the review queue's "Submitted by" filter. Upstream
+    ``AutocompleteModelView`` defaults to ``allow_anonymous = False``, so
+    the endpoint stays authenticated-only — it is not a public user
+    directory.
+    """
 
     model = User
     search_lookups = [
