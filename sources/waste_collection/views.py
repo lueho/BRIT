@@ -1157,18 +1157,22 @@ class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
 
     def post(self, request, *args, **kwargs):
         form = self.get_form()
-        formset = self.get_formset()
+        self._formset = self.get_formset()
 
-        if form.is_valid() and formset.is_valid():
-            form.instance.owner = self.request.user
-            self.object = form.save()
-            # Update formset's parent_object so it can set the M2M relationship
-            formset.parent_object = self.object
-            formset.save()
-            return HttpResponseRedirect(self.get_success_url())
+        if form.is_valid() and self._formset.is_valid():
+            return self.form_valid(form)
         else:
-            context = self.get_context_data(form=form, formset=formset)
+            context = self.get_context_data(form=form, formset=self._formset)
             return self.render_to_response(context)
+
+    def _call_super_form_valid(self, form):
+        response = super()._call_super_form_valid(form)
+        # The flyer formset writes inside the same atomic create boundary:
+        # the persisted object is the M2M target and a formset failure
+        # rolls the whole create back.
+        self._formset.parent_object = self.object
+        self._formset.save()
+        return response
 
 
 class CollectionCopyView(CollectionCreateView):
@@ -1261,19 +1265,21 @@ class CollectionCreateNewVersionView(CollectionCopyView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = self.get_formset()
+        self._formset = self.get_formset()
 
-        if form.is_valid() and formset.is_valid():
-            form.instance.owner = self.request.user
+        if form.is_valid() and self._formset.is_valid():
             self.predecessor = self.get_object()
-            self.object = form.save()
-            self.object.add_predecessor(self.predecessor)
-            formset.parent_object = self.object
-            formset.save()
-            return HttpResponseRedirect(self.get_success_url())
+            return self.form_valid(form)
         else:
-            context = self.get_context_data(form=form, formset=formset)
+            context = self.get_context_data(form=form, formset=self._formset)
             return self.render_to_response(context)
+
+    def _call_super_form_valid(self, form):
+        response = super()._call_super_form_valid(form)
+        self.object.add_predecessor(self.predecessor)
+        self._formset.parent_object = self.object
+        self._formset.save()
+        return response
 
 
 class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
@@ -1700,15 +1706,22 @@ class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = self.get_formset()
+        self._formset = self.get_formset()
 
-        if form.is_valid() and formset.is_valid():
-            form.save()
-            formset.save()
-            return HttpResponseRedirect(self.get_success_url())
+        if form.is_valid() and self._formset.is_valid():
+            return self.form_valid(form)
         else:
-            context = self.get_context_data(form=form, formset=formset)
+            context = self.get_context_data(form=form, formset=self._formset)
             return self.render_to_response(context)
+
+    def _call_super_form_valid(self, form):
+        response = super()._call_super_form_valid(form)
+        # The flyer formset writes inside the same locked update boundary:
+        # the freshly locked object is the M2M target so the content
+        # snapshot captures flyer changes for revision and audit.
+        self._formset.parent_object = self.object
+        self._formset.save()
+        return response
 
 
 class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):

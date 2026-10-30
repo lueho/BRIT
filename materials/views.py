@@ -48,6 +48,7 @@ from utils.object_management.policy import decide
 from utils.object_management.services import (
     authorize_create,
     content_mutation,
+    record_creation,
     validate_references,
 )
 from utils.object_management.views import (
@@ -2444,7 +2445,7 @@ class AddCompositionView(
 
 
 class AddSeasonalVariationView(
-    LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalFormView
+    LoginRequiredMixin, UserPassesTestMixin, NextOrSuccessUrlMixin, BSModalFormView
 ):
     form_class = AddSeasonalVariationForm
     template_name = "modal_form.html"
@@ -2454,6 +2455,24 @@ class AddSeasonalVariationView(
         return get_object_or_404(
             Composition, pk=self.kwargs.get("pk"), sample__series__isnull=False
         )
+
+    def test_func(self):
+        """Advisory write gate mirroring the governed boundary in
+        ``form_valid``.
+
+        Adding a seasonal distribution edits the owning ``SampleSeries``
+        (its ``temporal_distributions`` membership) — a reviewable root of
+        its own — and creates one ``Sample`` root per timestep, so the
+        series edit decision is the gate; ``form_valid`` re-decides inside
+        the authorized mutation boundary under row locks.
+        """
+        try:
+            composition = self.get_object()
+        except Http404:
+            raise
+        except Exception:
+            return False
+        return decide(self.request.user, "edit", composition.sample.series).allowed
 
     def get_form(self, **kwargs):
         form = super().get_form(**kwargs)
@@ -2475,9 +2494,26 @@ class AddSeasonalVariationView(
         return context
 
     def form_valid(self, form):
-        self.get_object().add_temporal_distribution(
-            form.cleaned_data["temporal_distribution"]
-        )
+        composition = self.get_object()
+        distribution = form.cleaned_data["temporal_distribution"]
+        with transaction.atomic():
+            with content_mutation(
+                self.request.user, composition.sample.series, action="edit"
+            ) as locked_series:
+                actor = authorize_create(self.request.user, Sample)
+                validate_references(actor, form.cleaned_data)
+                if not locked_series.temporal_distributions.filter(
+                    pk=distribution.pk
+                ).exists():
+                    locked_series.temporal_distributions.add(distribution)
+                for timestep in distribution.timestep_set.order_by("pk"):
+                    sample = Sample.objects.create(
+                        owner=actor,
+                        material=locked_series.material,
+                        series=locked_series,
+                        timestep=timestep,
+                    )
+                    record_creation(actor, sample)
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):

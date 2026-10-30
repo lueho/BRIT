@@ -7158,8 +7158,9 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
         cls.collection.allowed_materials.add(cls.allowed_material)
         cls.collection.predecessors.add(cls.predecessor)
 
-    def test_predecessor_valid_until_updated_on_form_save(self):
-        """Verify predecessors' valid_until is updated when form is saved."""
+    def test_predecessor_valid_until_untouched_by_form_save(self):
+        """Ordinary form saves never write predecessor state: ``valid_until``
+        closes only inside the governed approve operation."""
         self.assertIsNone(self.predecessor.valid_until)
 
         form_data = {
@@ -7180,7 +7181,7 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
         form.save()
 
         self.predecessor.refresh_from_db()
-        self.assertEqual(self.predecessor.valid_until, date(2024, 5, 31))
+        self.assertIsNone(self.predecessor.valid_until)
 
     @patch("sources.waste_collection.signals.clear_geojson_cache_pattern")
     def test_predecessor_save_minimizes_cache_invalidation(self, mock_clear):

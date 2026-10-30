@@ -12,6 +12,7 @@ from sources.waste_collection.models import (
     Collection,
     CollectionCatchment,
     CollectionSystem,
+    Collector,
     WasteCategory,
 )
 from utils.object_management import services as om_services
@@ -619,4 +620,59 @@ class CollectionApproveHttpTests(TestCase):
             self._events(predecessor)
             .filter(action=ReviewAction.ACTION_ARCHIVED)
             .exists()
+        )
+
+    def test_html_update_invalidates_inspected_approval_revision(self):
+        """An edit through the HTML update path bumps ``content_revision``:
+        a revision the moderator inspected before the edit can no longer
+        satisfy the approval contract — the stale approve is denied."""
+        candidate = self._collection("Candidate", self.owner, "review")
+        inspected = candidate.content_revision
+        # The moderator verifiably inspected the current revision.
+        record_comment(
+            self.moderator,
+            candidate,
+            "inspected",
+            expected_revision=inspected,
+        )
+        collector = Collector.objects.create(
+            name="Update Collector", publication_status="published"
+        )
+        self.owner.user_permissions.add(
+            Permission.objects.get(codename="change_collection")
+        )
+
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("collection-update", kwargs={"pk": candidate.pk}),
+            data={
+                "catchment": self.catchment.pk,
+                "collector": collector.pk,
+                "collection_system": self.system.pk,
+                "waste_category": self.category.pk,
+                "valid_from": "2020-01-01",
+                "description": "edited after inspection",
+                "form-TOTAL_FORMS": "0",
+                "form-INITIAL_FORMS": "0",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.content_revision, inspected + 1)
+
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self._approve_url(candidate),
+            data={"expected_revision": inspected},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(
+            "The record changed since it was inspected. "
+            "Reload the review page and approve again.",
+            [str(m) for m in get_messages(response.wsgi_request)],
+        )
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.publication_status, "review")
+        self.assertFalse(
+            self._events(candidate).filter(action=ReviewAction.ACTION_APPROVED).exists()
         )

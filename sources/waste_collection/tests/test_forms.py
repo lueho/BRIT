@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from unittest.mock import patch
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.db.models import signals
 from django.forms import formset_factory
 from django.http import QueryDict
@@ -13,6 +13,7 @@ from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from utils.object_management.models import get_default_owner
+from utils.object_management.services import perform_transition
 
 from ..forms import (
     AggregatedCollectionPropertyValueModelForm,
@@ -643,11 +644,9 @@ class CollectionModelFormTestCase(TestCase):
 
         self.assertEqual(instance.description, "First comment\nSecond comment")
 
-    def test_on_change_of_valid_from_date_predecessors_valid_until_date_is_updated(
-        self,
-    ):
-        form = CollectionModelForm(
-            instance=self.collection,
+    def _valid_collection_form(self, instance):
+        return CollectionModelForm(
+            instance=instance,
             data=dict_to_querydict(
                 {
                     "catchment": self.catchment.id,
@@ -670,12 +669,60 @@ class CollectionModelFormTestCase(TestCase):
                 }
             ),
         )
+
+    def test_form_save_leaves_predecessor_valid_until_for_governed_approve(self):
+        """Predecessor validity changes only through the governed approve
+        operation: an ordinary form save on the successor must leave the
+        published predecessor's ``valid_until`` untouched; the governed
+        approve then closes it at the successor's ``valid_from``."""
+        self.collection.publication_status = "review"
+        self.collection.save(update_fields=["publication_status"])
+        moderator = User.objects.create(username="collection-moderator")
+        moderator.user_permissions.add(
+            Permission.objects.get(codename="can_moderate_collection")
+        )
+
+        form = self._valid_collection_form(self.collection)
         self.assertTrue(form.is_valid())
         form.save()
+
+        self.predecessor_collection_1.refresh_from_db()
+        self.predecessor_collection_2.refresh_from_db()
+        self.assertIsNone(self.predecessor_collection_1.valid_until)
+        self.assertIsNone(self.predecessor_collection_2.valid_until)
+
+        perform_transition(
+            moderator,
+            self.collection,
+            "approve",
+            expected_revision=self.collection.content_revision,
+        )
+
         self.predecessor_collection_1.refresh_from_db()
         self.predecessor_collection_2.refresh_from_db()
         self.assertEqual(self.predecessor_collection_1.valid_until, date(2022, 12, 31))
         self.assertEqual(self.predecessor_collection_2.valid_until, date(2022, 12, 31))
+
+    def test_form_save_cannot_mutate_foreign_private_predecessor(self):
+        """A forged predecessor link gains no write channel: form.save()
+        never touches predecessor rows, published or not."""
+        foreign_predecessor = Collection.objects.create(
+            catchment=self.catchment,
+            collector=self.collector,
+            collection_system=self.collection_system,
+            waste_category=self.waste_category,
+            frequency=self.frequency,
+            valid_from=date(2020, 1, 1),
+            publication_status="private",
+        )
+        self.collection.predecessors.add(foreign_predecessor)
+
+        form = self._valid_collection_form(self.collection)
+        self.assertTrue(form.is_valid())
+        form.save()
+
+        foreign_predecessor.refresh_from_db()
+        self.assertIsNone(foreign_predecessor.valid_until)
 
     def test_required_bin_capacity_field_present_and_valid(self):
         form = CollectionModelForm()
