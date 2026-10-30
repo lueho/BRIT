@@ -12,8 +12,11 @@ from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import (
+    Composition,
     Material,
     MaterialComponent,
+    MaterialComponentGroup,
+    Sample,
     SampleSeries,
 )
 from sources.greenhouses.models import (
@@ -97,6 +100,85 @@ class UpdateGreenhouseGrowthCycleValuesBoundaryTestCase(ViewWithPermissionsTestC
         )
         self.cycle.refresh_from_db()
         self.assertEqual(self.cycle.owner, self.owner)
+
+
+class GreenhouseGrowthCycleCreateInlineBoundaryTestCase(ViewWithPermissionsTestCase):
+    """The inline create route previously had no permission check at all.
+    The bound create adapter resolves the posted ``greenhouse`` as the
+    owned-child parent, locks it, and re-decides the create inside the
+    write boundary; the inline timestep rows save inside it too."""
+
+    member_permissions = "change_greenhouse"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.greenhouse = Greenhouse.objects.create(
+            owner=cls.member, name="GW Greenhouse", publication_status="private"
+        )
+        cls.foreign_greenhouse = Greenhouse.objects.create(
+            owner=cls.owner, name="Foreign", publication_status="private"
+        )
+        material = Material.objects.create(name="GW Material")
+        residue = SampleSeries.objects.create(
+            owner=cls.member, name="GW Residue", material=material
+        )
+        cls.culture = Culture.objects.create(
+            owner=cls.member, name="GW Crop", residue=residue
+        )
+        sample = Sample.objects.create(
+            owner=cls.member, name="GW Sample", material=material
+        )
+        group = MaterialComponentGroup.objects.create(name="GW Group")
+        cls.group_settings = Composition.objects.create(
+            owner=cls.member, sample=sample, group=group
+        )
+
+    def post_data(self, greenhouse=None):
+        return {
+            "culture": self.culture.pk,
+            "greenhouse": (greenhouse or self.greenhouse).pk,
+            "group_settings": self.group_settings.pk,
+            "growthtimestepset_set-TOTAL_FORMS": "0",
+            "growthtimestepset_set-INITIAL_FORMS": "0",
+            "growthtimestepset_set-MIN_NUM_FORMS": "0",
+            "growthtimestepset_set-MAX_NUM_FORMS": "1000",
+        }
+
+    def url(self):
+        return reverse("growth_cycle_create_inline")
+
+    def test_post_denied_for_outsider_creates_nothing(self):
+        self.client.force_login(self.outsider)
+        revision = _revision(self.greenhouse)
+        response = self.client.post(self.url(), self.post_data())
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(GreenhouseGrowthCycle.objects.exists())
+        self.assertEqual(_revision(self.greenhouse), revision)
+
+    def test_post_denied_on_foreign_greenhouse(self):
+        self.client.force_login(self.member)
+        revision = _revision(self.foreign_greenhouse)
+        response = self.client.post(
+            self.url(), self.post_data(greenhouse=self.foreign_greenhouse)
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(GreenhouseGrowthCycle.objects.exists())
+        self.assertEqual(_revision(self.foreign_greenhouse), revision)
+
+    def test_post_authorized_creates_cycle_inside_parent_boundary(self):
+        self.client.force_login(self.member)
+        revision = _revision(self.greenhouse)
+        response = self.client.post(self.url(), self.post_data())
+        self.assertEqual(response.status_code, 302)
+        cycle = GreenhouseGrowthCycle.objects.get(greenhouse=self.greenhouse)
+        self.assertEqual(cycle.owner, self.member)
+        self.assertEqual(_revision(self.greenhouse), revision + 1)
+        self.assertTrue(
+            _events_for(self.greenhouse)
+            .filter(action=ReviewAction.ACTION_EDITED, user=self.member)
+            .exists()
+        )
 
 
 class GrowthCycleModalCreateBoundaryTestCase(ViewWithPermissionsTestCase):
