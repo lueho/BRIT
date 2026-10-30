@@ -2,9 +2,9 @@
 
 > **Staging note:** This guide describes the target contract during the draft
 > authorization migration tracked in #614. Workspace/sharing surfaces are
-> implemented in Part 7a; remaining review navigation, domain/admin adapters,
-> generated provenance and release verification are tracked separately. Do
-> not treat this guide as deployment approval.
+> implemented in Part 7a, and the shared review workspace in Part 7b.
+> Domain/admin adapters, generated provenance and browser/release verification
+> remain tracked separately. Do not treat this guide as deployment approval.
 
 The normative rules behind this page are defined in
 [Security & Permission Validation](../02_developer_guide/security_permission_validation.md).
@@ -57,3 +57,31 @@ Owners (and application administrators) decide when a record is submitted for
 review. Editor grants let recipients edit the record while it is editable;
 review transitions are separately authorized and a record's lifecycle is
 never changed by sharing actions.
+
+### Review workspace
+
+Moderators — users holding a model's moderation permission, or application
+administrators — work from the review dashboard, which shows **pending
+review** items by default. A separate **Declined** review-state filter exposes
+declined follow-up history. A declined record cannot be approved until its
+owner or an application administrator resubmits it to review. Your own
+submissions never appear in either queue. The owner and recorded content
+contributors cannot approve the candidate; non-owner contributors with
+moderation rights may still reject it.
+
+- Meaningful edits while a record is in review keep it in review and bump
+  its content revision; prior comments and review history survive.
+- The review page always shows the current content revision, and the Approve
+  control binds the revision it was rendered for. If the record changed
+  after the page loaded, the stale approval fails safely — reload the review
+  page to approve the current candidate.
+- From list rows, **Review for approval** opens the review page for
+  inspection before any decision; there is no one-click list approval.
+- Withdrawal to private removes moderator-only access, without deleting
+  history for the owner and other authorized participants.
+- Application administrator access requires the explicit administration
+  capability or active superuser status. Staff status alone grants no review
+  or sharing powers.
+
+Domain-specific review integration, admin adapters, generated-provenance
+surfaces, and final browser/release verification remain separate work.

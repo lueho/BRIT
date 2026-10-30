@@ -448,6 +448,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                 "title": "Content Review Dashboard",
                 "list_type": "review",
                 "header": "Content Review Dashboard",
+                "review_scope": self.request.GET.get("scope", "review"),
                 "review_items": page_obj.object_list,
                 "object_list": page_obj.object_list,  # For template compatibility
                 "page_obj": page_obj,
@@ -500,7 +501,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
     def get_success_url(self):
         """Resolve redirect target using the shared redirect resolver."""
         obj = self.get_object()
-        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        next_url = get_safe_next_url(self.request)
 
         resolver = self.get_redirect_resolver(obj)
         default_url = obj.get_absolute_url()
@@ -510,7 +511,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
 
     def get_failure_url(self):
         obj = self.get_object()
-        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        next_url = get_safe_next_url(self.request)
         default_url = obj.get_absolute_url()
 
         if next_url and self._is_review_detail_url(next_url, obj):
@@ -734,7 +735,7 @@ class WithdrawFromReviewView(BaseReviewActionView):
 
     def get_success_url(self):
         obj = getattr(self, "object", None)
-        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        next_url = get_safe_next_url(self.request)
 
         if obj and next_url:
             try:
@@ -791,7 +792,7 @@ class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Pass through 'next' if provided in the opener link; templates will append it to the form action
-        context["next_url"] = self.request.GET.get("next")
+        context["next_url"] = get_safe_next_url(self.request)
         obj = context.get("object")
         action = getattr(self, "action_attr_name", None)
         if obj is not None and action and hasattr(obj, "affected_author_count"):
