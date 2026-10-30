@@ -2601,6 +2601,50 @@ class UserCreatedObjectCreateWithInlinesView(
 ):
     formset_helper_class = DynamicTableInlineFormSetHelper
 
+    def forms_valid(self, form, inlines):
+        """Stash the validated inline formsets so the governed write persists
+        them inside the bound create boundary.
+
+        ``extra_views`` saves each formset after ``form_valid`` returns —
+        outside the boundary that authorizes, persists and audits the new
+        row. Routing through ``self.form_valid`` lets
+        ``_call_super_form_valid`` save the formsets while the atomic write
+        and any parent locks are still held, so a denied create leaves no
+        inline rows and the creation audit covers them.
+        """
+        self._pending_inline_formsets = list(inlines)
+        return self.form_valid(form)
+
+    def _call_super_form_valid(self, form):
+        # ``CreateUserObjectMixin`` owns the governed ``form_valid`` wrapper,
+        # so the ungoverned save is reached through its
+        # ``_call_super_form_valid`` — calling ``super().form_valid`` here
+        # would re-enter the bound create recursively.
+        response = super()._call_super_form_valid(form)
+        self._save_pending_inlines()
+        return response
+
+    def _save_pending_inlines(self):
+        """Persist stashed inline formsets against the saved object.
+
+        On the governed path this runs inside the bound create so child
+        rows join the same atomic write and roll back with it. On the
+        non-governed fallback the same ordering as ``extra_views``
+        (form first, then formsets) is preserved.
+        """
+        for formset in getattr(self, "_pending_inline_formsets", None) or ():
+            formset.instance = self.object
+            formset.save()
+        self._pending_inline_formsets = []
+
+    def form_valid(self, form):
+        response = _perform_bound_create(self, form)
+        if response is not None:
+            return response
+        response = super()._call_super_form_valid(form)
+        self._save_pending_inlines()
+        return response
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         model = _get_breadcrumb_model(self)
