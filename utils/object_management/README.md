@@ -2,6 +2,8 @@
 
 This package provides the core infrastructure for managing user-created objects in BRIT, including base models, views, permissions, and the review workflow.
 
+> **Migration status — legacy runtime reference:** The permission provisioning and action summaries below describe the pre-migration implementation at the start of the authorization review stack, not the target authorization rules. Later stacked parts migrate these paths incrementally. Follow the [canonical authorization contract](../../docs/02_developer_guide/security_permission_validation.md); staff status alone must not grant application moderation. Update or replace each legacy summary with its runtime migration rather than copying it into new code.
+
 ## Table of Contents
 
 - [Base Models](#base-models)
@@ -35,7 +37,7 @@ Base model for globally accessible objects that don't require ownership tracking
 
 BRIT uses a centralized permission system for `UserCreatedObject` models with automatic permission creation and management.
 
-### Automatic Permission Creation
+### Automatic Permission Creation (legacy runtime)
 
 **How it works:**
 
@@ -137,7 +139,7 @@ The signal creates all `can_moderate_<model>` permissions during test database s
 
 ## Review Workflow
 
-> Canonical policy source: `docs/02_developer_guide/security_permission_validation.md`
+> Canonical policy source: [security_permission_validation.md](../../docs/02_developer_guide/security_permission_validation.md)
 
 ### States
 
@@ -149,7 +151,9 @@ Objects can be in one of five publication states:
 4. **declined**: Rejected by moderators with feedback
 5. **archived**: No longer active but preserved
 
-### Actions
+### Legacy action checks (pre-migration)
+
+The staff entries in this table describe legacy checks only. They are not permissions promised by the target contract: `is_staff` means Django-admin eligibility, while application administration/moderation uses explicit capabilities. This table must be replaced when the action adapters migrate.
 
 | Action | Who can perform | State transition |
 |--------|----------------|------------------|
