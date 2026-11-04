@@ -402,6 +402,28 @@ class GeoDatasetImportRunTestCase(TestCase):
             run.source_configuration["endpoint_url"], "https://example.test/wfs"
         )
 
+    def test_unlinked_failed_run_instance_delete_protected(self):
+        run = self.make_run()
+        run.status = GeoDatasetImportRun.Status.FAILED
+        run.finished_at = timezone.now()
+        run.error_message = "upstream timeout"
+        run.save()
+        with self.assertRaises(ProtectedError), transaction.atomic():
+            run.delete()
+        self.assertTrue(GeoDatasetImportRun.objects.filter(pk=run.pk).exists())
+
+    def test_unlinked_run_queryset_delete_protected(self):
+        running = self.make_run()
+        failed = self.make_run()
+        failed.status = GeoDatasetImportRun.Status.FAILED
+        failed.finished_at = timezone.now()
+        failed.error_message = "upstream timeout"
+        failed.save()
+        pks = [running.pk, failed.pk]
+        with self.assertRaises(ProtectedError), transaction.atomic():
+            GeoDatasetImportRun.objects.filter(pk__in=pks).delete()
+        self.assertEqual(GeoDatasetImportRun.objects.filter(pk__in=pks).count(), 2)
+
     def test_source_deletion_protected_once_run_exists(self):
         self.make_run()
         with self.assertRaises(ProtectedError):
