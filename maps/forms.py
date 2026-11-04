@@ -2,6 +2,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.gis.forms import MultiPolygonField
+from django.db import transaction
 from django.db.models import Subquery
 from django.forms import (
     BaseFormSet,
@@ -47,6 +48,7 @@ from .models import (
     GeoDataset,
     GeoDatasetColumnPolicy,
     GeoDatasetRuntimeConfiguration,
+    GeoDatasetSnapshot,
     GeoPolygon,
     LauRegion,
     Location,
@@ -166,6 +168,18 @@ class GeoDataSetModelForm(
             else "",
         )
 
+        if (
+            self.instance
+            and self.instance.pk
+            and GeoDatasetSnapshot.objects.filter(dataset_id=self.instance.pk).exists()
+        ):
+            for field_name in (
+                "model_name",
+                *GeoDatasetRuntimeConfiguration.IDENTITY_FIELDS,
+            ):
+                if field_name != "dataset" and field_name in self.fields:
+                    self.fields[field_name].disabled = True
+
     @staticmethod
     def _parse_column_names(raw_value):
         column_names = []
@@ -178,6 +192,7 @@ class GeoDataSetModelForm(
                     column_names.append(column_name)
         return column_names
 
+    @transaction.atomic
     def save(self, commit=True):
         instance = super().save(commit=commit)
         runtime_configuration, _ = GeoDatasetRuntimeConfiguration.objects.get_or_create(
