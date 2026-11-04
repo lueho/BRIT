@@ -1364,8 +1364,6 @@ class CollectionCreateNewVersionView(CollectionCopyView):
     def _call_super_form_valid(self, form):
         response = super()._call_super_form_valid(form)
         self.object.add_predecessor(self.predecessor)
-        self._formset.parent_object = self.object
-        self._formset.save()
         return response
 
 
