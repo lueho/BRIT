@@ -175,7 +175,7 @@ class Layer(models.Model):
     sample_series = models.ForeignKey(
         SampleSeries, on_delete=models.SET_NULL, blank=True, null=True
     )
-    algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE)
+    algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.PROTECT)
     layer_fields = models.ManyToManyField(LayerField)
     staged = models.BooleanField(default=False)
 

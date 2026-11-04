@@ -315,7 +315,7 @@ class ScenarioStatus(models.Model):
         InventoryAlgorithm,
         blank=True,
         null=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
     )
     failure_message = models.TextField(blank=True)
 
@@ -855,7 +855,7 @@ class ScenarioInventoryConfiguration(models.Model):
     )
     geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)
     inventory_algorithm = models.ForeignKey(
-        InventoryAlgorithm, on_delete=models.CASCADE
+        InventoryAlgorithm, on_delete=models.PROTECT
     )
     inventory_parameter = models.ForeignKey(
         InventoryAlgorithmParameter, on_delete=models.CASCADE, null=True
@@ -906,6 +906,6 @@ def propagate_parameter_value_change_to_scenarios(sender, instance, created, **k
 class RunningTask(models.Model):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
     algorithm = models.ForeignKey(
-        InventoryAlgorithm, on_delete=models.CASCADE, null=True
+        InventoryAlgorithm, on_delete=models.PROTECT, null=True
     )
     uuid = models.UUIDField(primary_key=False)
