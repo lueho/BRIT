@@ -343,6 +343,87 @@ class GeoDatasetImportRunTestCase(TestCase):
         self.assertEqual(run.status, GeoDatasetImportRun.Status.SUCCEEDED)
         self.assertEqual(run.error_message, "")
 
+    def test_keyed_fresh_instance_cannot_overwrite_finished_run(self):
+        run = self.make_run()
+        run.status = GeoDatasetImportRun.Status.SUCCEEDED
+        run.finished_at = timezone.now()
+        run.save()
+        other_source = GeoDatasetSource.objects.create(
+            slug="other-source",
+            name="Other source",
+            endpoint_url="https://other.test/wfs",
+            feature_type="other:features",
+            bibliography_source=self.bibliography_source,
+            attribution="Other provider",
+            license_url="https://other.test/license",
+        )
+        replacement = GeoDatasetImportRun(pk=run.pk, source=other_source)
+        self.assertTrue(replacement._state.adding)
+
+        with self.assertRaises(ValidationError) as ctx, transaction.atomic():
+            replacement.save()
+
+        self.assertIn("source_id", ctx.exception.message_dict)
+        run.refresh_from_db()
+        self.assertEqual(run.source, self.source)
+        self.assertEqual(run.status, GeoDatasetImportRun.Status.SUCCEEDED)
+        self.assertEqual(
+            run.source_configuration["endpoint_url"], "https://example.test/wfs"
+        )
+
+    def test_keyed_fresh_instance_cannot_overwrite_running_provenance(self):
+        run = self.make_run(extraction_specification={"layer": "a"})
+        replacement = GeoDatasetImportRun(
+            pk=run.pk,
+            source=self.source,
+            started_at=run.started_at,
+            extraction_specification={"layer": "b"},
+        )
+
+        with self.assertRaises(ValidationError) as ctx, transaction.atomic():
+            replacement.save()
+
+        self.assertIn("extraction_specification", ctx.exception.message_dict)
+        run.refresh_from_db()
+        self.assertEqual(run.extraction_specification, {"layer": "a"})
+
+    def test_keyed_fresh_instance_with_unused_pk_is_inserted(self):
+        unused_pk = (
+            GeoDatasetImportRun.objects.order_by("-pk")
+            .values_list("pk", flat=True)
+            .first()
+            or 0
+        ) + 1000
+        run = GeoDatasetImportRun(pk=unused_pk, source=self.source)
+        run.save()
+        run.refresh_from_db()
+        self.assertEqual(run.pk, unused_pk)
+        self.assertEqual(
+            run.source_configuration["endpoint_url"], "https://example.test/wfs"
+        )
+
+    def test_unlinked_failed_run_instance_delete_protected(self):
+        run = self.make_run()
+        run.status = GeoDatasetImportRun.Status.FAILED
+        run.finished_at = timezone.now()
+        run.error_message = "upstream timeout"
+        run.save()
+        with self.assertRaises(ProtectedError), transaction.atomic():
+            run.delete()
+        self.assertTrue(GeoDatasetImportRun.objects.filter(pk=run.pk).exists())
+
+    def test_unlinked_run_queryset_delete_protected(self):
+        running = self.make_run()
+        failed = self.make_run()
+        failed.status = GeoDatasetImportRun.Status.FAILED
+        failed.finished_at = timezone.now()
+        failed.error_message = "upstream timeout"
+        failed.save()
+        pks = [running.pk, failed.pk]
+        with self.assertRaises(ProtectedError), transaction.atomic():
+            GeoDatasetImportRun.objects.filter(pk__in=pks).delete()
+        self.assertEqual(GeoDatasetImportRun.objects.filter(pk__in=pks).count(), 2)
+
     def test_source_deletion_protected_once_run_exists(self):
         self.make_run()
         with self.assertRaises(ProtectedError):
@@ -520,6 +601,35 @@ class GeoDatasetSnapshotTestCase(TestCase):
         snapshot.import_run = self.make_succeeded_run()
         with self.assertRaises(ValidationError):
             snapshot.save()
+
+    def test_keyed_fresh_instance_cannot_replace_snapshot_links(self):
+        snapshot = self.make_snapshot()
+        original_dataset_id = snapshot.dataset_id
+        original_run_id = snapshot.import_run_id
+        replacement = GeoDatasetSnapshot(
+            pk=snapshot.pk,
+            dataset=self.make_dataset(name="Replacement"),
+            import_run=self.make_succeeded_run(),
+        )
+        self.assertTrue(replacement._state.adding)
+
+        with self.assertRaises(ValidationError) as ctx, transaction.atomic():
+            replacement.save()
+
+        self.assertIn("dataset_id", ctx.exception.message_dict)
+        self.assertIn("import_run_id", ctx.exception.message_dict)
+        snapshot.refresh_from_db()
+        self.assertEqual(snapshot.dataset_id, original_dataset_id)
+        self.assertEqual(snapshot.import_run_id, original_run_id)
+
+    def test_keyed_fresh_instance_with_unchanged_links_is_allowed(self):
+        snapshot = self.make_snapshot()
+        GeoDatasetSnapshot(
+            pk=snapshot.pk,
+            dataset_id=snapshot.dataset_id,
+            import_run_id=snapshot.import_run_id,
+        ).save()
+        self.assertEqual(GeoDatasetSnapshot.objects.filter(pk=snapshot.pk).count(), 1)
 
     def test_run_deletion_protected_once_snapshot_exists(self):
         snapshot = self.make_snapshot()

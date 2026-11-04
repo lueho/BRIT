@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from .models import (
     Catchment,
+    GeoDatasetImportRun,
     GeoDatasetRuntimeConfiguration,
     GeoDatasetSnapshot,
     GeoPolygon,
@@ -260,6 +261,15 @@ def protect_geodataset_snapshot(sender, instance, **kwargs):
     raise ProtectedError(
         "GeoDatasetSnapshot records cannot be deleted; "
         "register a new snapshot instead.",
+        {instance},
+    )
+
+
+@receiver(pre_delete, sender=GeoDatasetImportRun)
+def protect_geodataset_import_run(sender, instance, **kwargs):
+    raise ProtectedError(
+        "GeoDatasetImportRun records cannot be deleted; "
+        "they are the durable provenance history of their source.",
         {instance},
     )
 
