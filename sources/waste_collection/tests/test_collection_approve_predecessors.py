@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser, Permission, User
@@ -88,6 +88,11 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
         predecessor.refresh_from_db()
         self.assertEqual(candidate.publication_status, "published")
         self.assertEqual(predecessor.publication_status, "archived")
+        # Validity closes on the archived row inside the same atomic
+        # approval.
+        self.assertEqual(
+            predecessor.valid_until, candidate.valid_from - timedelta(days=1)
+        )
 
         archived_events = self._review_events(predecessor, ReviewAction.ACTION_ARCHIVED)
         self.assertEqual(archived_events.count(), 1)
@@ -125,11 +130,16 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
         )
 
     def test_unpublished_predecessors_are_never_archived(self):
-        for status in ("private", "review", "declined"):
+        for status in ("private", "review", "declined", "archived"):
             with self.subTest(status=status):
                 predecessor = self._collection(
                     f"{status} pred", self.other_owner, status
                 )
+                predecessor.valid_until = date(2030, 12, 31)
+                predecessor.save(update_fields=["valid_until"])
+                predecessor_revision = predecessor.content_revision
+                predecessor_lastmodified = predecessor.lastmodified_at
+                predecessor_events = self._review_events(predecessor).count()
                 candidate = self._collection(
                     f"Candidate {status}", self.owner, "review"
                 )
@@ -147,11 +157,15 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
                 predecessor.refresh_from_db()
                 self.assertEqual(candidate.publication_status, "published")
                 self.assertEqual(predecessor.publication_status, status)
+                # The approval must not mutate an unarchived predecessor at
+                # all: validity, revision, modification timestamp, and audit
+                # history all stay exactly as they were.
+                self.assertEqual(predecessor.valid_until, date(2030, 12, 31))
+                self.assertEqual(predecessor.content_revision, predecessor_revision)
+                self.assertEqual(predecessor.lastmodified_at, predecessor_lastmodified)
                 self.assertEqual(
-                    self._review_events(
-                        predecessor, ReviewAction.ACTION_ARCHIVED
-                    ).count(),
-                    0,
+                    self._review_events(predecessor).count(),
+                    predecessor_events,
                 )
 
     def test_foreign_private_predecessor_stays_private(self):
@@ -205,6 +219,9 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
         predecessor.refresh_from_db()
         self.assertEqual(candidate.publication_status, "review")
         self.assertEqual(predecessor.publication_status, "published")
+        # The failed archive must not leave a half-closed validity window
+        # on the predecessor either.
+        self.assertIsNone(predecessor.valid_until)
 
     def test_multi_predecessor_rollback_on_second_archive_failure(self):
         """A later archive-event failure rolls back already-applied earlier
@@ -226,6 +243,8 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
         candidate_rev = candidate.content_revision
         pred1_rev = pred1.content_revision
         pred2_rev = pred2.content_revision
+        pred1_valid_until = pred1.valid_until
+        pred1_lastmodified = pred1.lastmodified_at
 
         attempts = []
         real_record_event = om_services._record_event
@@ -261,6 +280,10 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
         ):
             obj.refresh_from_db()
             self.assertEqual(obj.publication_status, expected)
+        # Pred1's governed archive + validity closure already ran before
+        # pred2's failure — the rollback restores its validity fields too.
+        self.assertEqual(pred1.valid_until, pred1_valid_until)
+        self.assertEqual(pred1.lastmodified_at, pred1_lastmodified)
         # No new approved or archived events anywhere.
         self.assertFalse(
             self._review_events(candidate)

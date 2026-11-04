@@ -929,23 +929,20 @@ class Collection(NamedUserCreatedObject):
             super().approve(user=user)
 
             for predecessor in predecessors:
-                # Close the predecessor's validity where this version's
-                # period starts. The rows are already locked inside this
-                # governed transition — ordinary edits of the successor
-                # must never write predecessor state before approval.
+                # Only published predecessors archive (archived is public
+                # data); the governed transition runs BEFORE closing
+                # validity so a denied archive rolls everything back.
+                if predecessor.publication_status != self.STATUS_PUBLISHED:
+                    continue
+                locked = perform_transition(
+                    user,
+                    predecessor,
+                    "archive",
+                    expected_revision=predecessor.content_revision,
+                )
                 if self.valid_from is not None:
-                    predecessor.valid_until = self.valid_from - timedelta(days=1)
-                    predecessor.save(update_fields=["valid_until", "lastmodified_at"])
-                # Archive only published predecessors — archived records are
-                # public historical data, so an unpublished predecessor must
-                # never be forced public here.
-                if predecessor.publication_status == self.STATUS_PUBLISHED:
-                    perform_transition(
-                        user,
-                        predecessor,
-                        "archive",
-                        expected_revision=predecessor.content_revision,
-                    )
+                    locked.valid_until = self.valid_from - timedelta(days=1)
+                    locked.save(update_fields=["valid_until", "lastmodified_at"])
 
     @classmethod
     def public_map_url(cls):

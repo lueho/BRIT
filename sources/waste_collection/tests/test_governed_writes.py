@@ -7,11 +7,14 @@ plain save (reparent, cross-object delete, M2M edges) additionally assert the
 specific boundary semantics.
 """
 
+import io
+from contextlib import redirect_stdout
 from datetime import date
 from unittest.mock import patch
 
-from django.contrib.auth.models import Permission, User
+from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
+from django.core.management import call_command
 from django.db.models import signals
 from django.http import QueryDict
 from django.test import TestCase
@@ -24,13 +27,16 @@ from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
     Collection,
     CollectionCatchment,
+    CollectionCountOptions,
     CollectionFrequency,
     CollectionPropertyValue,
+    CollectionSeason,
     CollectionSystem,
     WasteCategory,
     WasteFlyer,
 )
 from sources.waste_collection.tasks import check_wasteflyer_urls
+from utils.object_management import services as om_services
 from utils.object_management.models import ReviewAction
 from utils.properties.models import Property, Unit
 from utils.tests.testcases import ViewWithPermissionsTestCase
@@ -107,7 +113,11 @@ class FrequencyCreateBoundaryTestCase(
     """FrequencyCreateView.post must persist the form + season formset
     inside the bound create adapter (authorize + atomic + audit)."""
 
-    member_permissions = "add_collectionfrequency"
+    member_permissions = (
+        "add_collectionfrequency",
+        "add_collectionseason",
+        "add_collectioncountoptions",
+    )
     url_name = "collectionfrequency-create"
 
     @classmethod
@@ -121,6 +131,11 @@ class FrequencyCreateBoundaryTestCase(
         cls.june = Timestep.objects.get(distribution=cls.distribution, name="June")
         cls.december = Timestep.objects.get(
             distribution=cls.distribution, name="December"
+        )
+        cls.distribution.publication_status = "published"
+        cls.distribution.save(update_fields=["publication_status"])
+        Timestep.objects.filter(distribution=cls.distribution).update(
+            publication_status="published"
         )
 
     def post_data(self):
@@ -170,6 +185,111 @@ class FrequencyCreateBoundaryTestCase(
             .filter(action=ReviewAction.ACTION_CREATED, user=self.member)
             .exists()
         )
+        # The season/options children are actor-owned private rows with
+        # their own creation audits.
+        season = CollectionSeason.objects.get(
+            first_timestep=self.january, last_timestep=self.may
+        )
+        self.assertEqual(season.owner, self.member)
+        self.assertEqual(season.publication_status, "private")
+        self.assertTrue(
+            _events_for(season)
+            .filter(action=ReviewAction.ACTION_CREATED, user=self.member)
+            .exists()
+        )
+        options = CollectionCountOptions.objects.get(frequency=frequency, season=season)
+        self.assertEqual(options.owner, self.member)
+        self.assertEqual(options.publication_status, "private")
+        self.assertTrue(
+            _events_for(options)
+            .filter(action=ReviewAction.ACTION_CREATED, user=self.member)
+            .exists()
+        )
+
+    def test_post_without_season_create_capability_denies_with_rollback(self):
+        self.member.user_permissions.remove(
+            Permission.objects.get(codename="add_collectionseason")
+        )
+        self.client.force_login(User.objects.get(pk=self.member.pk))
+        response = self.client.post(reverse(self.url_name), self.post_data())
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            CollectionFrequency.objects.filter(name="Boundary Frequency").exists()
+        )
+        self.assertFalse(
+            CollectionSeason.objects.filter(last_timestep=self.may).exists()
+        )
+
+    def test_post_without_count_options_create_capability_denies_with_rollback(
+        self,
+    ):
+        self.member.user_permissions.remove(
+            Permission.objects.get(codename="add_collectioncountoptions")
+        )
+        self.client.force_login(User.objects.get(pk=self.member.pk))
+        response = self.client.post(reverse(self.url_name), self.post_data())
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            CollectionFrequency.objects.filter(name="Boundary Frequency").exists()
+        )
+        self.assertFalse(
+            CollectionSeason.objects.filter(last_timestep=self.may).exists()
+        )
+
+    def test_post_foreign_private_season_match_denies_with_rollback(self):
+        # A private season owned by someone else must not be silently
+        # reused: validate_references fails closed and rolls the root
+        # creation back.
+        CollectionSeason.objects.create(
+            owner=self.outsider,
+            distribution=self.distribution,
+            first_timestep=self.january,
+            last_timestep=self.may,
+            publication_status="private",
+        )
+        season_count = CollectionSeason.objects.count()
+        self.client.force_login(self.member)
+        response = self.client.post(reverse(self.url_name), self.post_data())
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            CollectionFrequency.objects.filter(name="Boundary Frequency").exists()
+        )
+        self.assertEqual(CollectionSeason.objects.count(), season_count)
+
+    def test_post_preserves_unrelated_foreign_and_published_seasons(self):
+        # Unreferenced seasons — including a foreign private row the actor
+        # cannot see — are never touched by the schedule write.
+        foreign = CollectionSeason.objects.create(
+            owner=self.outsider,
+            distribution=self.distribution,
+            first_timestep=self.january,
+            last_timestep=self.june,
+            publication_status="private",
+        )
+        unreferenced = CollectionSeason.objects.create(
+            owner=self.owner,
+            distribution=self.distribution,
+            first_timestep=self.june,
+            last_timestep=self.december,
+            publication_status="published",
+        )
+        foreign_revision = foreign.content_revision
+        unreferenced_revision = unreferenced.content_revision
+        self.client.force_login(self.member)
+        # Post only row 0 so both fixtures stay unreferenced by the
+        # schedule and the positive path remains authorized.
+        data = self.post_data()
+        data["form-TOTAL_FORMS"] = "1"
+        response = self.client.post(reverse(self.url_name), data)
+        self.assertEqual(response.status_code, 302)
+        foreign.refresh_from_db()
+        unreferenced.refresh_from_db()
+        self.assertEqual(foreign.publication_status, "private")
+        self.assertEqual(foreign.owner, self.outsider)
+        self.assertEqual(foreign.content_revision, foreign_revision)
+        self.assertEqual(unreferenced.content_revision, unreferenced_revision)
+        self.assertFalse(_events_for(foreign).exists())
+        self.assertFalse(_events_for(unreferenced).exists())
 
 
 class FrequencyUpdateBoundaryTestCase(
@@ -192,11 +312,29 @@ class FrequencyUpdateBoundaryTestCase(
         cls.december = Timestep.objects.get(
             distribution=cls.distribution, name="December"
         )
+        cls.distribution.publication_status = "published"
+        cls.distribution.save(update_fields=["publication_status"])
+        Timestep.objects.filter(distribution=cls.distribution).update(
+            publication_status="published"
+        )
+        cls.whole_year, _ = CollectionSeason.objects.get_or_create(
+            distribution=cls.distribution,
+            first_timestep=cls.january,
+            last_timestep=cls.december,
+            defaults={"publication_status": "published"},
+        )
+        if cls.whole_year.publication_status != "published":
+            cls.whole_year.publication_status = "published"
+            cls.whole_year.save(update_fields=["publication_status"])
         cls.frequency = CollectionFrequency.objects.create(
             name="Owned Frequency", owner=cls.owner, type="Fixed-Seasonal"
         )
         cls.owner.user_permissions.add(
-            Permission.objects.get(codename="change_collectionfrequency")
+            Permission.objects.get(codename="change_collectionfrequency"),
+            Permission.objects.get(codename="add_collectionseason"),
+            Permission.objects.get(codename="add_collectioncountoptions"),
+            Permission.objects.get(codename="change_collectioncountoptions"),
+            Permission.objects.get(codename="delete_collectioncountoptions"),
         )
 
     def post_data(self, name="Owned Frequency edited"):
@@ -250,11 +388,142 @@ class FrequencyUpdateBoundaryTestCase(
             .exists()
         )
 
+    def test_post_owned_options_change_bumps_revision_and_audits(self):
+        season, _ = CollectionSeason.objects.get_or_create(
+            distribution=self.distribution,
+            first_timestep=self.january,
+            last_timestep=self.december,
+            defaults={
+                "owner": self.owner,
+                "publication_status": "published",
+            },
+        )
+        if season.publication_status != "published":
+            season.publication_status = "published"
+            season.save(update_fields=["publication_status"])
+        options = CollectionCountOptions.objects.create(
+            owner=self.owner,
+            frequency=self.frequency,
+            season=season,
+            standard=60,
+            publication_status="private",
+        )
+        options_revision = options.content_revision
+        self.client.force_login(self.owner)
+        data = self.post_data(name="Owned Frequency edited")
+        data["form-0-standard"] = 75
+        response = self.client.post(
+            reverse(self.url_name, kwargs={"pk": self.frequency.pk}), data
+        )
+        self.assertEqual(response.status_code, 302)
+        options.refresh_from_db()
+        self.assertEqual(options.standard, 75)
+        self.assertEqual(options.content_revision, options_revision + 1)
+        self.assertTrue(
+            _events_for(options)
+            .filter(action=ReviewAction.ACTION_EDITED, user=self.owner)
+            .exists()
+        )
+
+    def test_post_foreign_private_season_match_denies_full_rollback(self):
+        foreign_season, _ = CollectionSeason.objects.get_or_create(
+            distribution=self.distribution,
+            first_timestep=self.january,
+            last_timestep=self.december,
+        )
+        foreign_season.owner = self.outsider
+        foreign_season.publication_status = "private"
+        foreign_season.save(update_fields=["owner", "publication_status"])
+        revision = _revision(self.frequency)
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse(self.url_name, kwargs={"pk": self.frequency.pk}),
+            self.post_data(),
+        )
+        self.assertEqual(response.status_code, 403)
+        self.frequency.refresh_from_db()
+        self.assertEqual(self.frequency.name, "Owned Frequency")
+        self.assertEqual(_revision(self.frequency), revision)
+        self.assertFalse(
+            _events_for(self.frequency)
+            .filter(action=ReviewAction.ACTION_EDITED)
+            .exists()
+        )
+
+    def test_post_changed_foreign_count_options_denies_full_rollback(self):
+        season, _ = CollectionSeason.objects.get_or_create(
+            distribution=self.distribution,
+            first_timestep=self.january,
+            last_timestep=self.december,
+            defaults={
+                "owner": self.owner,
+                "publication_status": "published",
+            },
+        )
+        if season.publication_status != "published":
+            season.publication_status = "published"
+            season.save(update_fields=["publication_status"])
+        options = CollectionCountOptions.objects.create(
+            owner=self.outsider,
+            frequency=self.frequency,
+            season=season,
+            standard=60,
+            publication_status="published",
+        )
+        options_revision = options.content_revision
+        revision = _revision(self.frequency)
+        self.client.force_login(self.owner)
+        data = self.post_data(name="Owned Frequency edited")
+        data["form-0-standard"] = 75
+        response = self.client.post(
+            reverse(self.url_name, kwargs={"pk": self.frequency.pk}), data
+        )
+        self.assertEqual(response.status_code, 403)
+        self.frequency.refresh_from_db()
+        options.refresh_from_db()
+        self.assertEqual(self.frequency.name, "Owned Frequency")
+        self.assertEqual(options.standard, 60)
+        self.assertEqual(_revision(self.frequency), revision)
+        self.assertEqual(options.content_revision, options_revision)
+
+    def test_post_removed_foreign_count_options_denies_full_rollback(self):
+        march = Timestep.objects.get(distribution=self.distribution, name="March")
+        detached_season, _ = CollectionSeason.objects.get_or_create(
+            distribution=self.distribution,
+            first_timestep=self.january,
+            last_timestep=march,
+            defaults={
+                "owner": self.owner,
+                "publication_status": "published",
+            },
+        )
+        if detached_season.publication_status != "published":
+            detached_season.publication_status = "published"
+            detached_season.save(update_fields=["publication_status"])
+        options = CollectionCountOptions.objects.create(
+            owner=self.outsider,
+            frequency=self.frequency,
+            season=detached_season,
+            standard=30,
+            publication_status="published",
+        )
+        revision = _revision(self.frequency)
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse(self.url_name, kwargs={"pk": self.frequency.pk}),
+            self.post_data(),
+        )
+        self.assertEqual(response.status_code, 403)
+        self.frequency.refresh_from_db()
+        self.assertEqual(self.frequency.name, "Owned Frequency")
+        self.assertEqual(_revision(self.frequency), revision)
+        self.assertTrue(CollectionCountOptions.objects.filter(pk=options.pk).exists())
+
 
 class CollectionPropertyValueCreateBoundaryTestCase(
     ViewWithPermissionsTestCase, GovernedWriteFixtures
 ):
-    member_permissions = "add_collectionpropertyvalue"
+    member_permissions = ("add_collectionpropertyvalue", "add_wasteflyer")
     url_name = "collectionpropertyvalue-create"
 
     @classmethod
@@ -321,11 +590,94 @@ class CollectionPropertyValueCreateBoundaryTestCase(
         self.assertEqual(cpv.owner, self.member)
         flyer = WasteFlyer.objects.get(url="http://example.com/cpv-flyer.pdf")
         self.assertIn(flyer, cpv.sources.all())
+        # The resolved flyer is actor-owned/private with its own creation
+        # audit — not silently adopted under someone else's authority.
+        self.assertEqual(flyer.owner, self.member)
+        self.assertEqual(flyer.publication_status, "private")
+        self.assertTrue(
+            _events_for(flyer)
+            .filter(action=ReviewAction.ACTION_CREATED, user=self.member)
+            .exists()
+        )
         self.assertTrue(
             _events_for(cpv)
             .filter(action=ReviewAction.ACTION_CREATED, user=self.member)
             .exists()
         )
+
+    def test_post_foreign_private_flyer_url_denies_with_full_rollback(self):
+        foreign_flyer = WasteFlyer.objects.create(
+            url="http://example.com/foreign.pdf",
+            owner=self.outsider,
+            publication_status="private",
+        )
+        flyer_events = _events_for(foreign_flyer).count()
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse(self.url_name),
+            self.post_data(
+                **{
+                    "form-TOTAL_FORMS": "1",
+                    "form-0-url": foreign_flyer.url,
+                }
+            ),
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(property=self.prop).exists()
+        )
+        self.assertEqual(WasteFlyer.objects.count(), 1)
+        self.assertEqual(_events_for(foreign_flyer).count(), flyer_events)
+
+    def test_post_new_flyer_url_without_add_wasteflyer_denies(self):
+        self.member.user_permissions.remove(
+            Permission.objects.get(codename="add_wasteflyer")
+        )
+        self.client.force_login(User.objects.get(pk=self.member.pk))
+        audits_before = ReviewAction.objects.count()
+        response = self.client.post(
+            reverse(self.url_name),
+            self.post_data(
+                **{
+                    "form-TOTAL_FORMS": "1",
+                    "form-0-url": "http://example.com/new-flyer.pdf",
+                }
+            ),
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(property=self.prop).exists()
+        )
+        self.assertFalse(WasteFlyer.objects.exists())
+        self.assertEqual(ReviewAction.objects.count(), audits_before)
+
+    def test_post_existing_readable_flyer_url_attaches_without_create_cap(self):
+        existing = WasteFlyer.objects.create(
+            url="http://example.com/readable.pdf",
+            owner=self.outsider,
+            publication_status="published",
+        )
+        existing_events = _events_for(existing).count()
+        self.member.user_permissions.remove(
+            Permission.objects.get(codename="add_wasteflyer")
+        )
+        self.client.force_login(User.objects.get(pk=self.member.pk))
+        response = self.client.post(
+            reverse(self.url_name),
+            self.post_data(
+                **{
+                    "form-TOTAL_FORMS": "1",
+                    "form-0-url": existing.url,
+                }
+            ),
+        )
+        self.assertEqual(response.status_code, 302)
+        cpv = CollectionPropertyValue.objects.get(
+            collection=self.collection, property=self.prop, year=2022
+        )
+        self.assertIn(existing, cpv.sources.all())
+        self.assertEqual(WasteFlyer.objects.count(), 1)
+        self.assertEqual(_events_for(existing).count(), existing_events)
 
 
 class CollectionPropertyValueUpdateBoundaryTestCase(
@@ -475,6 +827,124 @@ class CollectionPropertyValueModalDeleteBoundaryTestCase(
             ).exists()
         )
 
+    def test_primary_delete_failure_rolls_back_twin_deletion(self):
+        # The twin's own governed delete runs first inside the shared
+        # transaction: at the moment the primary delete fails, the twin is
+        # already gone with its delete audit written — yet the rolled-back
+        # request must restore both rows and the audit state.
+        real_delete = CollectionPropertyValue.delete
+        calls = []
+
+        def flaky_delete(instance, *args, **kwargs):
+            calls.append(instance.pk)
+            if len(calls) == 1:
+                return real_delete(instance, *args, **kwargs)
+            assert not CollectionPropertyValue.objects.filter(
+                pk=self.anchor_value.pk
+            ).exists()
+            assert (
+                _events_for(self.anchor_value)
+                .filter(action=ReviewAction.ACTION_DELETED)
+                .exists()
+            )
+            raise RuntimeError("primary delete failed")
+
+        self.client.force_login(self.owner)
+        audits_before = ReviewAction.objects.count()
+        anchor_revision = self.anchor_value.content_revision
+        child_revision = self.child_value.content_revision
+        anchor_average = self.anchor_value.average
+        child_average = self.child_value.average
+        with (
+            patch.object(CollectionPropertyValue, "delete", flaky_delete),
+            self.assertLogs("django.request", level="ERROR") as logs,
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse(
+                    "collectionpropertyvalue-delete-modal",
+                    kwargs={"pk": self.child_value.pk},
+                )
+            )
+        self.assertTrue(any("primary delete failed" in line for line in logs.output))
+        self.assertEqual(calls, [self.anchor_value.pk, self.child_value.pk])
+        self.assertCountEqual(
+            list(
+                CollectionPropertyValue.objects.filter(
+                    pk__in=[self.child_value.pk, self.anchor_value.pk]
+                ).values_list("pk", flat=True)
+            ),
+            [self.anchor_value.pk, self.child_value.pk],
+        )
+        self.anchor_value.refresh_from_db()
+        self.child_value.refresh_from_db()
+        self.assertEqual(self.anchor_value.average, anchor_average)
+        self.assertEqual(self.child_value.average, child_average)
+        self.assertEqual(self.anchor_value.content_revision, anchor_revision)
+        self.assertEqual(self.child_value.content_revision, child_revision)
+        self.assertEqual(ReviewAction.objects.count(), audits_before)
+
+    def test_primary_audit_failure_after_both_deletes_rolls_back(self):
+        # Even when BOTH physical deletions already ran, a failure writing
+        # the primary's delete audit still rolls everything back.
+        real_record_event = om_services._record_event
+        seen = {}
+
+        def flaky_event(obj, actor, action, **kwargs):
+            object_id = kwargs.get("object_id", getattr(obj, "pk", None))
+            if (
+                action == ReviewAction.ACTION_DELETED
+                and object_id == self.child_value.pk
+            ):
+                seen["anchor_gone"] = not CollectionPropertyValue.objects.filter(
+                    pk=self.anchor_value.pk
+                ).exists()
+                seen["child_gone"] = not CollectionPropertyValue.objects.filter(
+                    pk=self.child_value.pk
+                ).exists()
+                seen["anchor_audit"] = (
+                    _events_for(self.anchor_value)
+                    .filter(action=ReviewAction.ACTION_DELETED)
+                    .exists()
+                )
+                raise RuntimeError("primary audit failed")
+            return real_record_event(obj, actor, action, **kwargs)
+
+        self.client.force_login(self.owner)
+        audits_before = ReviewAction.objects.count()
+        with (
+            patch(
+                "utils.object_management.services._record_event",
+                side_effect=flaky_event,
+            ),
+            self.assertLogs("django.request", level="ERROR") as logs,
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                reverse(
+                    "collectionpropertyvalue-delete-modal",
+                    kwargs={"pk": self.child_value.pk},
+                )
+            )
+        self.assertTrue(any("primary audit failed" in line for line in logs.output))
+        self.assertEqual(
+            seen,
+            {
+                "anchor_gone": True,
+                "child_gone": True,
+                "anchor_audit": True,
+            },
+        )
+        self.assertCountEqual(
+            list(
+                CollectionPropertyValue.objects.filter(
+                    pk__in=[self.child_value.pk, self.anchor_value.pk]
+                ).values_list("pk", flat=True)
+            ),
+            [self.anchor_value.pk, self.child_value.pk],
+        )
+        self.assertEqual(ReviewAction.objects.count(), audits_before)
+
     def test_published_twin_denies_the_whole_delete(self):
         self.anchor_value.publication_status = "published"
         self.anchor_value.save(update_fields=["publication_status"])
@@ -500,6 +970,7 @@ class AggregatedCollectionPropertyValueBoundaryTestCase(
     member_permissions = (
         "add_aggregatedcollectionpropertyvalue",
         "change_aggregatedcollectionpropertyvalue",
+        "add_wasteflyer",
     )
 
     @classmethod
@@ -580,6 +1051,62 @@ class AggregatedCollectionPropertyValueBoundaryTestCase(
             .filter(action=ReviewAction.ACTION_CREATED, user=self.member)
             .exists()
         )
+
+    def test_create_foreign_private_flyer_url_denies_full_rollback(self):
+        foreign_flyer = WasteFlyer.objects.create(
+            url="http://example.com/acpv-foreign.pdf",
+            owner=self.outsider,
+            publication_status="private",
+        )
+        flyer_events = _events_for(foreign_flyer).count()
+        self.client.force_login(self.member)
+        audits_before = ReviewAction.objects.count()
+        response = self.client.post(
+            reverse("aggregatedcollectionpropertyvalue-create"),
+            self.post_data(
+                **{
+                    "form-TOTAL_FORMS": "1",
+                    "form-0-url": foreign_flyer.url,
+                }
+            ),
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            AggregatedCollectionPropertyValue.objects.filter(
+                property=self.prop, year=2021
+            )
+            .exclude(pk=self.acpv.pk)
+            .exists()
+        )
+        self.assertEqual(WasteFlyer.objects.count(), 1)
+        self.assertEqual(_events_for(foreign_flyer).count(), flyer_events)
+        self.assertEqual(ReviewAction.objects.count(), audits_before)
+
+    def test_create_new_flyer_url_without_add_wasteflyer_denies(self):
+        self.member.user_permissions.remove(
+            Permission.objects.get(codename="add_wasteflyer")
+        )
+        self.client.force_login(User.objects.get(pk=self.member.pk))
+        audits_before = ReviewAction.objects.count()
+        response = self.client.post(
+            reverse("aggregatedcollectionpropertyvalue-create"),
+            self.post_data(
+                **{
+                    "form-TOTAL_FORMS": "1",
+                    "form-0-url": "http://example.com/acpv-new.pdf",
+                }
+            ),
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            AggregatedCollectionPropertyValue.objects.filter(
+                property=self.prop, year=2021
+            )
+            .exclude(pk=self.acpv.pk)
+            .exists()
+        )
+        self.assertFalse(WasteFlyer.objects.exists())
+        self.assertEqual(ReviewAction.objects.count(), audits_before)
 
     def test_update_denied_for_member_without_object_access(self):
         self.client.force_login(self.member)
@@ -940,3 +1467,84 @@ class WasteFlyerListCheckUrlsScopingTestCase(TestCase):
     def test_anonymous_user_schedules_only_public_flyers(self, mock_chord):
         scheduled = self._scheduled_ids(mock_chord, QueryDict("", mutable=True), None)
         self.assertEqual(scheduled, [self.public_flyer.pk])
+
+
+class FrequencyProvisionedRoleEndToEndTestCase(TestCase):
+    """End-to-end frequency create/update through the governed schedule
+    write by a user whose capabilities come from the manifest-provisioned
+    ``editors`` role — not a hand-assembled permission list."""
+
+    @classmethod
+    def setUpTestData(cls):
+        with redirect_stdout(io.StringIO()):
+            call_command("sync_roles", "--apply")
+        cls.distribution = TemporalDistribution.objects.get(name="Months of the year")
+        cls.distribution.publication_status = "published"
+        cls.distribution.save(update_fields=["publication_status"])
+        Timestep.objects.filter(distribution=cls.distribution).update(
+            publication_status="published"
+        )
+        cls.january = Timestep.objects.get(
+            distribution=cls.distribution, name="January"
+        )
+        cls.may = Timestep.objects.get(distribution=cls.distribution, name="May")
+        cls.june = Timestep.objects.get(distribution=cls.distribution, name="June")
+        cls.december = Timestep.objects.get(
+            distribution=cls.distribution, name="December"
+        )
+        cls.editor = User.objects.create(username="role-editor")
+        cls.editor.groups.add(Group.objects.get(name="editors"))
+
+    def schedule_data(self, name, **overrides):
+        data = {
+            "name": name,
+            "type": "Fixed-Seasonal",
+            "form-INITIAL_FORMS": "0",
+            "form-TOTAL_FORMS": "2",
+            "form-0-distribution": self.distribution.pk,
+            "form-0-first_timestep": self.january.pk,
+            "form-0-last_timestep": self.may.pk,
+            "form-0-standard": 150,
+            "form-1-distribution": self.distribution.pk,
+            "form-1-first_timestep": self.june.pk,
+            "form-1-last_timestep": self.december.pk,
+            "form-1-standard": 200,
+        }
+        data.update(overrides)
+        return data
+
+    def test_editor_role_creates_and_updates_frequency_schedule(self):
+        self.client.force_login(self.editor)
+        response = self.client.post(
+            reverse("collectionfrequency-create"), self.schedule_data("Role Frequency")
+        )
+        self.assertEqual(response.status_code, 302)
+        frequency = CollectionFrequency.objects.get(name="Role Frequency")
+        self.assertEqual(frequency.owner, self.editor)
+        season = CollectionSeason.objects.get(
+            first_timestep=self.january, last_timestep=self.may
+        )
+        options = CollectionCountOptions.objects.get(frequency=frequency, season=season)
+        self.assertTrue(
+            _events_for(season)
+            .filter(action=ReviewAction.ACTION_CREATED, user=self.editor)
+            .exists()
+        )
+        self.assertTrue(
+            _events_for(options)
+            .filter(action=ReviewAction.ACTION_CREATED, user=self.editor)
+            .exists()
+        )
+
+        response = self.client.post(
+            reverse("collectionfrequency-update", kwargs={"pk": frequency.pk}),
+            self.schedule_data("Role Frequency", **{"form-0-standard": 175}),
+        )
+        self.assertEqual(response.status_code, 302)
+        options.refresh_from_db()
+        self.assertEqual(options.standard, 175)
+        self.assertTrue(
+            _events_for(options)
+            .filter(action=ReviewAction.ACTION_EDITED, user=self.editor)
+            .exists()
+        )

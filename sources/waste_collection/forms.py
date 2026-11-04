@@ -1,6 +1,7 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Div, Field, Layout, Row
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Case, Value, When
 from django.db.models import IntegerField as DBIntegerField
 from django.forms import (
@@ -38,16 +39,19 @@ from sources.waste_collection.models import (
     AggregatedCollectionPropertyValue,
     BinConfiguration,
     Collection,
-    CollectionCountOptions,
     CollectionFrequency,
     CollectionPropertyValue,
-    CollectionSeason,
     CollectionSystem,
     Collector,
     FeeSystem,
     WasteCategory,
     WasteComponent,
     WasteFlyer,
+)
+from sources.waste_collection.services import (
+    resolve_flyer,
+    resolve_frequency_season,
+    save_frequency_schedule,
 )
 from sources.waste_collection.tasks import cleanup_orphaned_waste_flyers
 from utils.crispy_fields import ForeignkeyField
@@ -255,6 +259,7 @@ class CollectionSeasonForm(SimpleForm):
         )
 
     def __init__(self, *args, **kwargs):
+        self.actor = kwargs.pop("actor", None)
         super().__init__(*args, **kwargs)
         self.fields["distribution"].queryset = TemporalDistribution.objects.filter(
             name="Months of the year", owner=get_default_owner()
@@ -314,19 +319,24 @@ class CollectionSeasonForm(SimpleForm):
                 )
         return cleaned_data
 
-    def save(self):
-        if not self.cleaned_data:
+    def save(self, commit=True):
+        if not commit or not self.cleaned_data:
             return None
 
-        self.instance, _ = CollectionSeason.objects.get_or_create(
-            distribution=self.cleaned_data["distribution"],
-            first_timestep=self.cleaned_data["first_timestep"],
-            last_timestep=self.cleaned_data["last_timestep"],
-        )
+        self.instance, _ = resolve_frequency_season(self.actor, self.cleaned_data)
         return self.instance
 
 
 class CollectionSeasonFormSet(M2MInlineFormSet):
+    def __init__(self, *args, **kwargs):
+        self.actor = kwargs.pop("actor", None)
+        super().__init__(*args, **kwargs)
+
+    def get_form_kwargs(self, index):
+        kwargs = super().get_form_kwargs(index)
+        kwargs["actor"] = self.actor
+        return kwargs
+
     def clean(self):
         for i, _form in enumerate(self.forms):
             if (
@@ -342,33 +352,13 @@ class CollectionSeasonFormSet(M2MInlineFormSet):
                 )
 
     def save(self, commit=True):
-        child_objects = super().save(commit=commit)
-
-        for form in self.forms:
-            if not form.cleaned_data:
-                continue
-            options = CollectionCountOptions.objects.get(
-                frequency=self.parent_object, season=form.instance
-            )
-            options.standard = form.cleaned_data["standard"]
-            options.option_1 = form.cleaned_data["option_1"]
-            options.option_2 = form.cleaned_data["option_2"]
-            options.option_3 = form.cleaned_data["option_3"]
-            options.save()
-
-        default_distribution = TemporalDistribution.objects.get(
-            name="Months of the year", owner=get_default_owner()
+        if not commit:
+            return []
+        return save_frequency_schedule(
+            self.actor,
+            self.parent_object,
+            CollectionFrequencyScheduleService.rows_from_formset(self),
         )
-        CollectionSeason.objects.exclude(
-            distribution=default_distribution,
-            first_timestep=Timestep.objects.get(
-                distribution=default_distribution, name="January"
-            ),
-            last_timestep=Timestep.objects.get(
-                distribution=default_distribution, name="December"
-            ),
-        ).filter(collectionfrequency=None).delete()
-        return child_objects
 
 
 class WasteFlyerModelForm(SimpleModelForm):
@@ -377,18 +367,15 @@ class WasteFlyerModelForm(SimpleModelForm):
         fields = ("url",)
         labels = {"url": "URL"}
 
+    def __init__(self, *args, **kwargs):
+        self.actor = kwargs.pop("actor", None)
+        super().__init__(*args, **kwargs)
+
     def save(self, commit=True):
         if commit:
-            defaults = {
-                "owner": self.instance.owner,
-                "title": "Waste flyer",
-                "abbreviation": "WasteFlyer",
-            }
             url = self.cleaned_data.get("url")
             if url:
-                instance, _ = WasteFlyer.objects.get_or_create_by_url(
-                    url=self.cleaned_data["url"], defaults=defaults
-                )
+                instance, _ = resolve_flyer(self.actor, url)
                 return instance
         else:
             return super().save(commit=False)
@@ -410,10 +397,19 @@ class WasteFlyerFormSetHelper(DynamicTableInlineFormSetHelper):
 
 class WasteFlyerFormSet(M2MInlineFormSet):
     def __init__(self, *args, **kwargs):
-        self.owner = kwargs.pop("owner", get_default_owner())
+        # Actor authority is explicit: callers that omit ``owner`` get a
+        # fail-closed ``None``, never an implicit default-owner identity.
+        self.owner = kwargs.pop("owner", None)
         super().__init__(*args, **kwargs)
 
+    def get_form_kwargs(self, index):
+        kwargs = super().get_form_kwargs(index)
+        kwargs["actor"] = self.owner
+        return kwargs
+
     def save(self, commit=True):
+        if not commit:
+            return []
         parent_object = getattr(self, "parent_object", None)
         relation_field_name = getattr(self, "relation_field_name", None)
         existing_ids: set[int] = set()
@@ -422,15 +418,14 @@ class WasteFlyerFormSet(M2MInlineFormSet):
                 getattr(parent_object, relation_field_name).values_list("id", flat=True)
             )
 
-        for form in self.forms:
-            if not getattr(form.instance, "owner", None):
-                form.instance.owner = self.owner
-
         child_objects = super().save(commit=commit)
         new_ids = {obj.id for obj in child_objects if obj and obj.id}
         flyers_changed = existing_ids != new_ids
-        if commit and flyers_changed:
-            cleanup_orphaned_waste_flyers.delay()
+        if flyers_changed:
+            # Defer orphan cleanup until the enclosing write commits so a
+            # denied or rolled-back formset cannot enqueue removal work for
+            # flyers that are still referenced.
+            transaction.on_commit(cleanup_orphaned_waste_flyers.delay)
 
         return child_objects
 

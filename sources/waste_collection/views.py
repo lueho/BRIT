@@ -11,6 +11,7 @@ from django.contrib.auth.mixins import (
     UserPassesTestMixin,
 )
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.db.models import Max, Prefetch
 from django.forms.models import model_to_dict
 from django.http import HttpResponse, HttpResponseRedirect
@@ -522,6 +523,14 @@ class WasteFlyerCreateView(SourceCreateView):
     form_class = WasteFlyerModelForm
     success_url = reverse_lazy("wasteflyer-list")
     permission_required = "waste_collection.add_wasteflyer"
+    # URL-only resolve/create: no author-row editing contract — an existing
+    # readable flyer must not gain SourceAuthor rows through this view.
+    inlines = []
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["actor"] = self.request.user
+        return kwargs
 
     def form_valid(self, form):
         form.instance.type = "waste_flyer"
@@ -532,6 +541,11 @@ class WasteFlyerModalCreateView(SourceModalCreateView):
     form_class = WasteFlyerModalModelForm
     success_url = reverse_lazy("wasteflyer-list")
     permission_required = "waste_collection.add_wasteflyer"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["actor"] = self.request.user
+        return kwargs
 
     def form_valid(self, form):
         form.instance.type = "waste_flyer"
@@ -654,6 +668,10 @@ class FrequencyScheduleMixin:
         if getattr(self, "object", None):
             return CollectionFrequencyScheduleService.rows_from_frequency(self.object)
         return [self._whole_year_initial()]
+
+    def get_formset_kwargs(self, **kwargs):
+        kwargs["actor"] = self.request.user
+        return super().get_formset_kwargs(**kwargs)
 
     def _apply_schedule_metadata(self, form, formset):
         rows = CollectionFrequencyScheduleService.rows_from_formset(formset)
@@ -917,6 +935,7 @@ class CollectionPropertyValueUpdateView(
 class CollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = CollectionPropertyValue
 
+    @transaction.atomic
     def form_valid(self, form):
         # Ensure we delete the anchor record for the same (property, unit, year)
         # when the user deletes a CPV on a non-anchor collection. The anchor
@@ -937,7 +956,10 @@ class CollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
             except CollectionPropertyValue.DoesNotExist:
                 anchor_value = None
 
-        # Delete anchor first if it is distinct from the current object
+        # Delete anchor first if it is distinct from the current object.
+        # The shared method-level transaction keeps the twin's governed
+        # delete and the primary delete atomic: a primary failure rolls
+        # back the twin's already-audited removal too.
         if anchor_value and anchor_value.pk != self.object.pk:
             with content_mutation(
                 self.request.user, anchor_value, action="delete"

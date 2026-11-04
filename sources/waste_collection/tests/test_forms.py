@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission, User
+from django.core.exceptions import PermissionDenied
 from django.db.models import signals
 from django.forms import formset_factory
 from django.http import QueryDict
@@ -12,7 +13,7 @@ from factory.django import mute_signals
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
-from utils.object_management.models import get_default_owner
+from utils.object_management.models import ReviewAction, get_default_owner
 from utils.object_management.services import perform_transition
 
 from ..forms import (
@@ -102,6 +103,26 @@ class CollectionSeasonFormSetTestCase(TestCase):
             distribution=cls.distribution,
             first_timestep=cls.january,
             last_timestep=cls.december,
+            defaults={"publication_status": "published"},
+        )
+        if cls.whole_year.publication_status != "published":
+            cls.whole_year.publication_status = "published"
+            cls.whole_year.save(update_fields=["publication_status"])
+        cls.distribution.publication_status = "published"
+        cls.distribution.save(update_fields=["publication_status"])
+        Timestep.objects.filter(distribution=cls.distribution).update(
+            publication_status="published"
+        )
+        cls.user = User.objects.create(username="schedule-editor")
+        cls.user.user_permissions.add(
+            Permission.objects.get(
+                codename="add_collectionseason",
+                content_type__app_label="waste_collection",
+            ),
+            Permission.objects.get(
+                codename="add_collectioncountoptions",
+                content_type__app_label="waste_collection",
+            ),
         )
 
     def test_formset_creates_new_seasons_if_not_existing(self):
@@ -123,9 +144,14 @@ class CollectionSeasonFormSetTestCase(TestCase):
         }
         FormSet = formset_factory(CollectionSeasonForm, formset=CollectionSeasonFormSet)
         frequency = CollectionFrequency.objects.create(
-            name="Test Frequency", type="Fixed"
+            name="Test Frequency", type="Fixed", owner=self.user
         )
-        formset = FormSet(data, parent_object=frequency, relation_field_name="seasons")
+        formset = FormSet(
+            data,
+            parent_object=frequency,
+            relation_field_name="seasons",
+            actor=self.user,
+        )
         self.assertTrue(formset.is_valid())
         formset.save()
         CollectionSeason.objects.get(
@@ -152,9 +178,14 @@ class CollectionSeasonFormSetTestCase(TestCase):
         }
         FormSet = formset_factory(CollectionSeasonForm, formset=CollectionSeasonFormSet)
         frequency = CollectionFrequency.objects.create(
-            name="Test Frequency", type="Fixed"
+            name="Test Frequency", type="Fixed", owner=self.user
         )
-        formset = FormSet(data, parent_object=frequency, relation_field_name="seasons")
+        formset = FormSet(
+            data,
+            parent_object=frequency,
+            relation_field_name="seasons",
+            actor=self.user,
+        )
         self.assertTrue(formset.is_valid())
         formset.save()
         self.assertEqual(self.distribution, self.whole_year.distribution)
@@ -199,7 +230,19 @@ class CollectionSeasonFormSetTestCase(TestCase):
             "The seasons must not overlap and must be given in order.",
         )
 
-    def test_cleanup_after_save_does_not_delete_default_season(self):
+    def test_save_preserves_unrelated_unused_seasons(self):
+        # The governed schedule write touches only the seasons referenced by
+        # the posted rows — the old global sweep that deleted every
+        # unreferenced non-default season is gone, so both the default
+        # season and an unrelated foreign private season survive.
+        other_owner = User.objects.create(username="season-owner")
+        foreign_season = CollectionSeason.objects.create(
+            owner=other_owner,
+            distribution=self.distribution,
+            first_timestep=self.november,
+            last_timestep=self.february,
+            publication_status="private",
+        )
         data = {
             "form-INITIAL_FORMS": 1,
             "form-TOTAL_FORMS": 2,
@@ -212,9 +255,14 @@ class CollectionSeasonFormSetTestCase(TestCase):
         }
         FormSet = formset_factory(CollectionSeasonForm, formset=CollectionSeasonFormSet)
         frequency = CollectionFrequency.objects.create(
-            name="Test Frequency", type="Fixed"
+            name="Test Frequency", type="Fixed", owner=self.user
         )
-        formset = FormSet(data, parent_object=frequency, relation_field_name="seasons")
+        formset = FormSet(
+            data,
+            parent_object=frequency,
+            relation_field_name="seasons",
+            actor=self.user,
+        )
         formset.is_valid()
         self.assertTrue(formset.is_valid())
         formset.save()
@@ -222,6 +270,52 @@ class CollectionSeasonFormSetTestCase(TestCase):
             distribution=self.distribution,
             first_timestep=self.january,
             last_timestep=self.december,
+        )
+        foreign_season.refresh_from_db()
+        self.assertEqual(foreign_season.owner, other_owner)
+        self.assertEqual(foreign_season.publication_status, "private")
+
+    def test_season_form_commit_false_persists_nothing(self):
+        form = CollectionSeasonForm(
+            {
+                "distribution": self.distribution.pk,
+                "first_timestep": self.february.pk,
+                "last_timestep": self.april.pk,
+            },
+            actor=self.user,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertIsNone(form.save(commit=False))
+        self.assertFalse(
+            CollectionSeason.objects.filter(
+                first_timestep=self.february, last_timestep=self.april
+            ).exists()
+        )
+
+    def test_season_create_audit_failure_persists_nothing(self):
+        # The governed season create and its audit are one atomic unit: a
+        # record_creation failure must not leave the season behind.
+        form = CollectionSeasonForm(
+            {
+                "distribution": self.distribution.pk,
+                "first_timestep": self.february.pk,
+                "last_timestep": self.april.pk,
+            },
+            actor=self.user,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        with (
+            patch(
+                "sources.waste_collection.services.record_creation",
+                side_effect=RuntimeError("audit transport failed"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            form.save()
+        self.assertFalse(
+            CollectionSeason.objects.filter(
+                first_timestep=self.february, last_timestep=self.april
+            ).exists()
         )
 
     def test_formset_saves_collection_count_options(self):
@@ -238,13 +332,18 @@ class CollectionSeasonFormSetTestCase(TestCase):
         }
         FormSet = formset_factory(CollectionSeasonForm, formset=CollectionSeasonFormSet)
         frequency = CollectionFrequency.objects.create(
-            name="Test Frequency", type="Fixed"
+            name="Test Frequency", type="Fixed", owner=self.user
         )
-        formset = FormSet(data, parent_object=frequency, relation_field_name="seasons")
+        formset = FormSet(
+            data,
+            parent_object=frequency,
+            relation_field_name="seasons",
+            actor=self.user,
+        )
         self.assertTrue(formset.is_valid())
         formset.save()
         options = CollectionCountOptions.objects.get(
-            frequency=frequency, season=formset.forms[0].instance
+            frequency=frequency, season=self.whole_year
         )
         self.assertEqual(100, options.standard)
         self.assertEqual(150, options.option_1)
@@ -1062,9 +1161,22 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         with mute_signals(signals.post_save):
-            cls.flyer_1 = WasteFlyer.objects.create(url="https://www.test-flyers.org")
-            cls.flyer_2 = WasteFlyer.objects.create(url="https://www.best-flyers.org")
-            cls.flyer_3 = WasteFlyer.objects.create(url="https://www.rest-flyers.org")
+            cls.flyer_1 = WasteFlyer.objects.create(
+                url="https://www.test-flyers.org", publication_status="published"
+            )
+            cls.flyer_2 = WasteFlyer.objects.create(
+                url="https://www.best-flyers.org", publication_status="published"
+            )
+            cls.flyer_3 = WasteFlyer.objects.create(
+                url="https://www.rest-flyers.org", publication_status="published"
+            )
+        cls.user = User.objects.create(username="flyer-editor")
+        cls.user.user_permissions.add(
+            Permission.objects.get(
+                codename="add_wasteflyer",
+                content_type__app_label="waste_collection",
+            )
+        )
         CollectionCatchment.objects.create(name="Catchment")
         collector = Collector.objects.create(name="Collector")
         cls.collection_system = CollectionSystem.objects.create(name="System")
@@ -1102,6 +1214,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             parent_object=self.collection,
             initial=initial_urls,
             relation_field_name="flyers",
+            owner=self.user,
         )
         displayed_urls = [form.initial for form in formset]
         self.assertListEqual(initial_urls, displayed_urls)
@@ -1119,7 +1232,10 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             WasteFlyerModelForm, formset=WasteFlyerFormSet
         )
         formset = WasteFlyerModelFormSet(
-            parent_object=self.collection, data=data, relation_field_name="flyers"
+            parent_object=self.collection,
+            data=data,
+            relation_field_name="flyers",
+            owner=self.user,
         )
         self.assertTrue(formset.is_valid())
         formset.save()
@@ -1127,19 +1243,97 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             WasteFlyer.objects.get(url=url["url"])
         self.assertEqual(len(initial_urls), self.collection.flyers.count())
 
+    def test_nonempty_rows_without_actor_are_denied(self):
+        # Omitting owner/actor fails closed: no flyer, no relation change,
+        # no audit — never an implicit default-owner write.
+        data = {
+            "form-INITIAL_FORMS": 1,
+            "form-TOTAL_FORMS": 1,
+            "form-0-url": "https://www.new-flyer.org",
+        }
+        WasteFlyerModelFormSet = formset_factory(
+            WasteFlyerModelForm, formset=WasteFlyerFormSet
+        )
+        formset = WasteFlyerModelFormSet(
+            data, parent_object=self.collection, relation_field_name="flyers"
+        )
+        self.assertTrue(formset.is_valid())
+        flyers_before = set(self.collection.flyers.values_list("pk", flat=True))
+        audits_before = ReviewAction.objects.count()
+        with self.assertRaises(PermissionDenied):
+            formset.save()
+        self.assertFalse(
+            WasteFlyer.objects.filter(url="https://www.new-flyer.org").exists()
+        )
+        self.assertEqual(
+            set(self.collection.flyers.values_list("pk", flat=True)), flyers_before
+        )
+        self.assertEqual(ReviewAction.objects.count(), audits_before)
+
+    def test_blank_rows_without_actor_are_harmless(self):
+        data = {"form-INITIAL_FORMS": 1, "form-TOTAL_FORMS": 1, "form-0-url": ""}
+        WasteFlyerModelFormSet = formset_factory(
+            WasteFlyerModelForm, formset=WasteFlyerFormSet
+        )
+        formset = WasteFlyerModelFormSet(
+            data, parent_object=self.collection, relation_field_name="flyers"
+        )
+        self.assertTrue(formset.is_valid())
+        self.assertEqual(formset.save(), [])
+
+    def test_form_commit_false_persists_nothing(self):
+        form = WasteFlyerModelForm(
+            {"url": "https://www.uncommitted-flyer.org"}, actor=self.user
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save(commit=False)
+        self.assertFalse(
+            WasteFlyer.objects.filter(url="https://www.uncommitted-flyer.org").exists()
+        )
+
+    def test_formset_commit_false_persists_nothing_and_relations(self):
+        data = {
+            "form-INITIAL_FORMS": 1,
+            "form-TOTAL_FORMS": 2,
+            "form-0-url": self.flyer_1.url,
+            "form-1-url": "https://www.uncommitted-flyer.org",
+        }
+        WasteFlyerModelFormSet = formset_factory(
+            WasteFlyerModelForm, formset=WasteFlyerFormSet
+        )
+        formset = WasteFlyerModelFormSet(
+            data,
+            parent_object=self.collection,
+            relation_field_name="flyers",
+            owner=self.user,
+        )
+        self.assertTrue(formset.is_valid())
+        flyers_before = set(self.collection.flyers.values_list("pk", flat=True))
+        formset.save(commit=False)
+        self.assertFalse(
+            WasteFlyer.objects.filter(url="https://www.uncommitted-flyer.org").exists()
+        )
+        self.assertEqual(
+            set(self.collection.flyers.values_list("pk", flat=True)), flyers_before
+        )
+
     def test_empty_url_field_is_ignored(self):
         data = {"form-INITIAL_FORMS": 1, "form-TOTAL_FORMS": 1, "form-0-url": ""}
         WasteFlyerModelFormSet = formset_factory(
             WasteFlyerModelForm, formset=WasteFlyerFormSet, extra=0
         )
         formset = WasteFlyerModelFormSet(
-            data, parent_object=self.collection, relation_field_name="flyers"
+            data,
+            parent_object=self.collection,
+            relation_field_name="flyers",
+            owner=self.user,
         )
         self.assertTrue(formset.is_valid())
         with patch(
             "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
         ) as mock_cleanup:
-            formset.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                formset.save()
         mock_cleanup.assert_called_once()
         WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
@@ -1162,7 +1356,10 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             WasteFlyerModelForm, formset=WasteFlyerFormSet
         )
         formset = WasteFlyerModelFormSet(
-            data, parent_object=self.collection, relation_field_name="flyers"
+            data,
+            parent_object=self.collection,
+            relation_field_name="flyers",
+            owner=self.user,
         )
         self.assertTrue(formset.is_valid())
         with (
@@ -1171,7 +1368,8 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
                 "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
             ) as mock_cleanup,
         ):
-            formset.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                formset.save()
         mock_cleanup.assert_called_once()
         WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
@@ -1181,8 +1379,10 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
     def test_duplicate_existing_flyer_url_is_reused_without_error(self):
         duplicate_url = "https://www.duplicate-flyers.org"
         with mute_signals(signals.post_save):
-            first_duplicate = WasteFlyer.objects.create(url=duplicate_url)
-            WasteFlyer.objects.create(url=duplicate_url)
+            first_duplicate = WasteFlyer.objects.create(
+                url=duplicate_url, publication_status="published"
+            )
+            WasteFlyer.objects.create(url=duplicate_url, publication_status="published")
 
         initial_urls = [{"url": flyer.url} for flyer in self.collection.flyers.all()]
         data = {
@@ -1197,14 +1397,18 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             WasteFlyerModelForm, formset=WasteFlyerFormSet
         )
         formset = WasteFlyerModelFormSet(
-            parent_object=self.collection, data=data, relation_field_name="flyers"
+            parent_object=self.collection,
+            data=data,
+            relation_field_name="flyers",
+            owner=self.user,
         )
 
         self.assertTrue(formset.is_valid())
         with patch(
             "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
         ) as mock_cleanup:
-            formset.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                formset.save()
 
         mock_cleanup.assert_called_once()
         self.assertEqual(self.collection.flyers.filter(url=duplicate_url).count(), 1)
@@ -1227,14 +1431,18 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             WasteFlyerModelForm, formset=WasteFlyerFormSet
         )
         formset = WasteFlyerModelFormSet(
-            data, parent_object=self.collection, relation_field_name="flyers"
+            data,
+            parent_object=self.collection,
+            relation_field_name="flyers",
+            owner=self.user,
         )
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
         with patch(
             "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
         ) as mock_cleanup:
-            formset.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                formset.save()
         mock_cleanup.assert_called_once()
         WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
@@ -1254,14 +1462,18 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             WasteFlyerModelForm, formset=WasteFlyerFormSet
         )
         formset = WasteFlyerModelFormSet(
-            data, parent_object=self.collection, relation_field_name="flyers"
+            data,
+            parent_object=self.collection,
+            relation_field_name="flyers",
+            owner=self.user,
         )
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
         with patch(
             "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
         ) as mock_cleanup:
-            formset.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                formset.save()
         mock_cleanup.assert_called_once()
         WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
@@ -1282,7 +1494,10 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             "form-1-url": url,
         }
         formset = WasteFlyerModelFormSet(
-            data, parent_object=self.collection, relation_field_name="flyers"
+            data,
+            parent_object=self.collection,
+            relation_field_name="flyers",
+            owner=self.user,
         )
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
@@ -1292,7 +1507,8 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
                 "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
             ) as mock_cleanup,
         ):
-            formset.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                formset.save()
         mock_cleanup.assert_called_once()
         WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
@@ -1329,13 +1545,17 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             WasteFlyerModelForm, formset=WasteFlyerFormSet
         )
         formset = WasteFlyerModelFormSet(
-            data, parent_object=self.collection, relation_field_name="flyers"
+            data,
+            parent_object=self.collection,
+            relation_field_name="flyers",
+            owner=self.user,
         )
         self.assertTrue(formset.is_valid())
         with patch(
             "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
         ) as mock_cleanup:
-            formset.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                formset.save()
         mock_cleanup.assert_called_once()
         WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
@@ -1379,13 +1599,17 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             WasteFlyerModelForm, formset=WasteFlyerFormSet
         )
         formset = WasteFlyerModelFormSet(
-            data, parent_object=self.collection, relation_field_name="flyers"
+            data,
+            parent_object=self.collection,
+            relation_field_name="flyers",
+            owner=self.user,
         )
         self.assertTrue(formset.is_valid())
         with patch(
             "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
         ) as mock_cleanup:
-            formset.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                formset.save()
         mock_cleanup.assert_called_once()
         WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
@@ -1413,13 +1637,17 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             WasteFlyerModelForm, formset=WasteFlyerFormSet
         )
         formset = WasteFlyerModelFormSet(
-            data, parent_object=self.collection, relation_field_name="flyers"
+            data,
+            parent_object=self.collection,
+            relation_field_name="flyers",
+            owner=self.user,
         )
         self.assertTrue(formset.is_valid())
         with patch(
             "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
         ) as mock_cleanup:
-            formset.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                formset.save()
         mock_cleanup.assert_called_once()
         WasteFlyer.objects.update(created_at=timezone.now() - timedelta(days=8))
         cleanup_orphaned_waste_flyers()
