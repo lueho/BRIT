@@ -291,6 +291,49 @@ class FrequencyCreateBoundaryTestCase(
         self.assertFalse(_events_for(foreign).exists())
         self.assertFalse(_events_for(unreferenced).exists())
 
+    def test_season_created_concurrently_is_reused_not_duplicated(self):
+        # Another request inserts the same season key after this request's
+        # lookup missed it; the resolver must reuse that row instead of
+        # failing the whole frequency write on the unique key.
+        from sources.waste_collection import services as wc_services
+
+        real_authorize_create = wc_services.authorize_create
+        competing = {}
+
+        def authorize_then_race(actor, model):
+            if model is CollectionSeason and not competing:
+                competing["season"] = CollectionSeason.objects.create(
+                    owner=self.owner,
+                    distribution=self.distribution,
+                    first_timestep=self.january,
+                    last_timestep=self.may,
+                    publication_status="published",
+                )
+            return real_authorize_create(actor, model)
+
+        self.client.force_login(self.member)
+        data = self.post_data()
+        data["form-TOTAL_FORMS"] = "1"
+        with patch.object(
+            wc_services, "authorize_create", side_effect=authorize_then_race
+        ):
+            response = self.client.post(reverse(self.url_name), data)
+        self.assertEqual(response.status_code, 302)
+        frequency = CollectionFrequency.objects.get(name="Boundary Frequency")
+        self.assertEqual(
+            list(
+                CollectionCountOptions.objects.filter(frequency=frequency).values_list(
+                    "season_id", flat=True
+                )
+            ),
+            [competing["season"].pk],
+        )
+        self.assertFalse(
+            _events_for(competing["season"])
+            .filter(action=ReviewAction.ACTION_CREATED)
+            .exists()
+        )
+
 
 class FrequencyUpdateBoundaryTestCase(
     ViewWithPermissionsTestCase, GovernedWriteFixtures
@@ -1478,12 +1521,8 @@ class FrequencyProvisionedRoleEndToEndTestCase(TestCase):
     def setUpTestData(cls):
         with redirect_stdout(io.StringIO()):
             call_command("sync_roles", "--apply")
+        # Use the shared defaults exactly as ``ensure_initial_data`` seeds them.
         cls.distribution = TemporalDistribution.objects.get(name="Months of the year")
-        cls.distribution.publication_status = "published"
-        cls.distribution.save(update_fields=["publication_status"])
-        Timestep.objects.filter(distribution=cls.distribution).update(
-            publication_status="published"
-        )
         cls.january = Timestep.objects.get(
             distribution=cls.distribution, name="January"
         )
