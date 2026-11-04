@@ -199,11 +199,10 @@ def get_default_unit_pk():
     """
     Fetch the PK of the default 'No unit' Unit.
     """
-    unit = Unit.objects.get(
+    return Unit.objects.values_list("pk", flat=True).get(
         owner=get_default_owner(),
         name=getattr(settings, "DEFAULT_NO_UNIT_NAME", "No unit"),
     )
-    return unit.pk
 
 
 class Property(PropertyBase):
