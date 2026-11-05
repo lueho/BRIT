@@ -1,4 +1,5 @@
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.exceptions import ImproperlyConfigured
@@ -367,8 +368,15 @@ class SotasenGrassToProteinLocalRelationTestCase(TestCase):
         scenario.set_status(ScenarioStatus.Status.RUNNING)
 
         execution = scenario.inventory_execution_plan()[0]
-        success = run_inventory_algorithm.run(algorithm.pk, **execution["kwargs"])
-        finalize_inventory.run([success], scenario.pk, [[algorithm.pk, feedstock.pk]])
+        run_id = uuid4()
+        scenario.scenariostatus.run_id = run_id
+        scenario.scenariostatus.save(update_fields=["run_id"])
+        success = run_inventory_algorithm.run(
+            algorithm.pk, run_id=str(run_id), **execution["kwargs"]
+        )
+        finalize_inventory.run(
+            [success], scenario.pk, str(run_id), [[algorithm.pk, feedstock.pk]]
+        )
 
         scenario.scenariostatus.refresh_from_db()
         self.assertEqual(scenario.status, ScenarioStatus.Status.FINISHED)
