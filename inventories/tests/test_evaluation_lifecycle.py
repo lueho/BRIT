@@ -27,6 +27,7 @@ from layer_manager.models import Layer
 from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material, SampleSeries
 from utils.object_management.models import ReviewAction
+from utils.object_management.services import content_mutation
 
 User = get_user_model()
 RUN_ID = uuid.uuid4()
@@ -166,6 +167,47 @@ class ConfigInvalidationTestCase(LifecycleFixtures, TestCase):
         self.assertIsNone(st.run_id)
         self.assertFalse(RunningTask.objects.filter(pk=rt.pk).exists())
         self.assertFalse(Layer.all_objects.filter(pk=staged.pk).exists())
+
+    def test_scenario_input_edit_from_failed_cleans_state(self):
+        st, rt = self._make_failed()
+        self._staged_layer()
+        live = self._layer()
+        self.scenario.refresh_from_db()
+        self.assertEqual(
+            self.scenario.scenariostatus.status, ScenarioStatus.Status.FAILED
+        )
+        self.scenario.catchment = None
+        with patch(
+            "inventories.models.AsyncResult", side_effect=_backend(states.SUCCESS)
+        ):
+            self.scenario.save(update_fields=["catchment"])
+        self.assertEqual(
+            self.scenario.scenariostatus.status, ScenarioStatus.Status.CHANGED
+        )
+        st.refresh_from_db()
+        self.assertEqual(st.status, ScenarioStatus.Status.CHANGED)
+        self.assertIsNone(st.run_id)
+        self.assertIsNone(st.failed_algorithm_id)
+        self.assertEqual(st.failure_message, "")
+        self.assertFalse(RunningTask.objects.filter(scenario=self.scenario).exists())
+        self.assertFalse(
+            Layer.all_objects.filter(scenario=self.scenario, staged=True).exists()
+        )
+        self.assertTrue(Layer.objects.filter(pk=live.pk).exists())
+        self.scenario.refresh_from_db()
+        self.assertIsNone(self.scenario.catchment_id)
+
+    def test_missing_status_row_blocks_input_save(self):
+        st, rt = self._make_failed()
+        before = Scenario.objects.filter(pk=self.scenario.pk).values().get()
+        st.delete()
+        self.scenario.catchment = None
+        with self.assertRaises(BlockedRunningScenario):
+            self.scenario.save(update_fields=["catchment"])
+        self.assertEqual(
+            Scenario.objects.filter(pk=self.scenario.pk).values().get(), before
+        )
+        self.assertFalse(ScenarioStatus.objects.filter(scenario=self.scenario).exists())
 
     def test_config_queryset_delete_invalidates(self):
         st, rt = self._make_failed()
@@ -326,6 +368,46 @@ class HTTPConflictBoundaryTestCase(LifecycleFixtures, TestCase):
         c = Client()
         c.force_login(self.owner)
         return c
+
+    def test_content_mutation_edit_from_failed_invalidates(self):
+        st, rt = self._make_failed()
+        self._staged_layer()
+        live = self._layer()
+        self.owner.user_permissions.add(
+            Permission.objects.get(codename="change_scenario")
+        )
+        revision = self.scenario.content_revision
+        with (
+            patch(
+                "inventories.models.AsyncResult",
+                side_effect=_backend(states.SUCCESS),
+            ),
+            content_mutation(self.owner, self.scenario, action="edit") as locked,
+        ):
+            self.assertEqual(locked.scenariostatus.status, ScenarioStatus.Status.FAILED)
+            locked.catchment = None
+            locked.save(update_fields=["catchment"])
+            self.assertEqual(
+                locked.scenariostatus.status, ScenarioStatus.Status.CHANGED
+            )
+        st.refresh_from_db()
+        self.assertEqual(st.status, ScenarioStatus.Status.CHANGED)
+        self.assertIsNone(st.run_id)
+        self.assertIsNone(st.failed_algorithm_id)
+        self.assertEqual(st.failure_message, "")
+        self.assertFalse(RunningTask.objects.filter(scenario=self.scenario).exists())
+        self.assertFalse(
+            Layer.all_objects.filter(scenario=self.scenario, staged=True).exists()
+        )
+        self.assertTrue(Layer.objects.filter(pk=live.pk).exists())
+        self.scenario.refresh_from_db()
+        self.assertIsNone(self.scenario.catchment_id)
+        self.assertEqual(self.scenario.content_revision, revision + 1)
+        events = list(_events_for(self.scenario))
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].action, ReviewAction.ACTION_EDITED)
+        self.assertEqual(events[0].user_id, self.owner.pk)
+        self.assertEqual(events[0].content_revision, revision + 1)
 
     def test_remove_settled_failed_302_one_audit(self):
         st, rt = self._make_failed()

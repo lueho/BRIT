@@ -839,7 +839,10 @@ def manage_scenario_status(sender, instance, created, **kwargs):
     if created:
         ScenarioStatus.objects.create(scenario=instance)
     elif getattr(instance, "_evaluation_inputs_changed", True):
-        instance.set_status(ScenarioStatus.Status.CHANGED)
+        evaluation = _invalidate_evaluation(instance.pk)
+        if evaluation is None:
+            raise BlockedRunningScenario
+        instance.scenariostatus = evaluation
 
 
 class ScenarioInventoryConfiguration(models.Model):
@@ -981,7 +984,11 @@ def _evaluation_input_locked(scenario_id):
 
 
 def _invalidate_evaluation(scenario_id):
-    """Quiescent input change: clear settled markers/staging, mark CHANGED."""
+    """Quiescent input change: clear settled markers/staging, mark CHANGED.
+
+    Returns the locked status for the caller to cache, or None when the
+    scenario/status row is gone.
+    """
     with locked_scenario_evaluation(scenario_id) as locked:
         if locked is None:
             return
