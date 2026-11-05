@@ -773,7 +773,7 @@ class ScenarioRemoveInventoryAlgorithmView(
     algorithm = None
     feedstock = None
 
-    def get(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         self.scenario = get_object_or_404(Scenario, id=self.kwargs.get("scenario_pk"))
         self.algorithm = get_object_or_404(
             InventoryAlgorithm, id=self.kwargs.get("algorithm_pk")

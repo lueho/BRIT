@@ -85,7 +85,10 @@
               {% if policy.can_edit %}
                 <div class="sri-inventory-actions">
                   <a class="sdv2-btn sdv2-btn-sm" href="{% url 'scenario-update-config' object.pk inventory.feedstock.pk inventory.algorithm.pk %}"><i class="fas fa-pen-to-square" aria-hidden="true"></i> Edit</a>
-                  <a class="sdv2-btn sdv2-btn-sm sdv2-btn-ghost" href="{% url 'scenario-remove-algorithm' object.pk inventory.feedstock.pk inventory.algorithm.pk %}"><i class="fas fa-trash" aria-hidden="true"></i> Remove</a>
+                  <form method="post" action="{% url 'scenario-remove-algorithm' object.pk inventory.feedstock.pk inventory.algorithm.pk %}" class="m-0">
+                    {% csrf_token %}
+                    <button type="submit" class="sdv2-btn sdv2-btn-sm sdv2-btn-ghost"><i class="fas fa-trash" aria-hidden="true"></i> Remove</button>
+                  </form>
                 </div>
               {% endif %}
             </header>
