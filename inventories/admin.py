@@ -27,7 +27,7 @@ class InventoryAlgorithmAdmin(admin.ModelAdmin):
 
     @staticmethod
     def geodataset_link(obj):
-        url = reverse("admin:inventories_geodataset_change", args=(obj.geodataset.id,))
+        url = reverse("admin:maps_geodataset_change", args=(obj.geodataset.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.geodataset.name)
 
 

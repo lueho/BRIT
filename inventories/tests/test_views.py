@@ -2024,7 +2024,13 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
                 "algorithm_pk": self.algorithm.pk,
             },
         )
-        self.assertEqual(self.client.get(url).status_code, 404)
+        with self.assertLogs("django.request", "WARNING") as logs:
+            response = self.client.post(url)
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(
+            any("Not Found" in line and url in line for line in logs.output),
+            logs.output,
+        )
 
     def test_remove_view_unknown_algorithm_returns_404(self):
         url = reverse(
@@ -2035,8 +2041,30 @@ class ScenarioConfigurationObjectLookupTests(TestCase):
                 "algorithm_pk": 999999,
             },
         )
-        response = self.client.get(url)
+        with self.assertLogs("django.request", "WARNING") as logs:
+            response = self.client.post(url)
         self.assertEqual(response.status_code, 404)
+        self.assertTrue(
+            any("Not Found" in line and url in line for line in logs.output),
+            logs.output,
+        )
+
+    def test_remove_view_unknown_feedstock_returns_404(self):
+        url = reverse(
+            "scenario-remove-algorithm",
+            kwargs={
+                "scenario_pk": self.scenario.pk,
+                "feedstock_pk": 999999,
+                "algorithm_pk": self.algorithm.pk,
+            },
+        )
+        with self.assertLogs("django.request", "WARNING") as logs:
+            response = self.client.post(url)
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(
+            any("Not Found" in line and url in line for line in logs.output),
+            logs.output,
+        )
 
     # --- ScenarioResultDetailMapView ---
 

@@ -7,8 +7,13 @@ the scenario, so denied actors write nothing and allowed writes bump the
 scenario revision and record the audit event.
 """
 
+import re
+
+from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.test import Client, override_settings
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution
@@ -221,20 +226,37 @@ class ScenarioRemoveInventoryAlgorithmBoundaryTestCase(
             },
         )
 
-    def test_get_denied_for_member_without_object_access(self):
+    def _snapshot(self):
+        """Every field/row the boundary must leave untouched."""
+        return {
+            "scenario": type(self.scenario)
+            ._base_manager.filter(pk=self.scenario.pk)
+            .values()
+            .get(),
+            "configs": list(
+                ScenarioInventoryConfiguration.objects.filter(scenario=self.scenario)
+                .order_by("pk")
+                .values()
+            ),
+            "events": list(_events_for(self.scenario).order_by("pk").values()),
+        }
+
+    def test_post_denied_for_member_without_object_access(self):
         self.client.force_login(self.member)
-        revision = _revision(self.scenario)
-        response = self.client.get(self.url())
+        before = self._snapshot()
+        with self.assertLogs("django.request", "WARNING") as logs:
+            response = self.client.post(self.url())
         self.assertEqual(response.status_code, 403)
+        self.assertTrue(any("Forbidden" in line for line in logs.output), logs.output)
         self.assertTrue(
             ScenarioInventoryConfiguration.objects.filter(pk=self.config.pk).exists()
         )
-        self.assertEqual(_revision(self.scenario), revision)
+        self.assertEqual(self._snapshot(), before)
 
-    def test_get_authorized_removes_config_with_revision_and_audit(self):
+    def test_post_authorized_removes_config_with_revision_and_audit(self):
         self.client.force_login(self.owner)
         revision = _revision(self.scenario)
-        response = self.client.get(self.url())
+        response = self.client.post(self.url())
         self.assertEqual(response.status_code, 302)
         self.assertFalse(
             ScenarioInventoryConfiguration.objects.filter(pk=self.config.pk).exists()
@@ -245,6 +267,125 @@ class ScenarioRemoveInventoryAlgorithmBoundaryTestCase(
             .filter(action=ReviewAction.ACTION_EDITED, user=self.owner)
             .exists()
         )
+
+    def test_get_authorized_returns_405_without_mutation(self):
+        self.client.force_login(self.owner)
+        before = self._snapshot()
+        with self.assertLogs("django.request", "WARNING") as logs:
+            response = self.client.get(self.url())
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(
+            any(
+                "Method Not Allowed" in line and self.url() in line
+                for line in logs.output
+            ),
+            logs.output,
+        )
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(pk=self.config.pk).exists()
+        )
+        self.assertEqual(self._snapshot(), before)
+
+    def test_post_denied_for_outsider(self):
+        self.client.force_login(self.outsider)
+        before = self._snapshot()
+        with self.assertLogs("django.request", "WARNING") as logs:
+            response = self.client.post(self.url())
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(any("Forbidden" in line for line in logs.output), logs.output)
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(pk=self.config.pk).exists()
+        )
+        self.assertEqual(self._snapshot(), before)
+
+    def test_post_denied_for_owner_without_change_capability(self):
+        self.owner.user_permissions.clear()
+        self.owner.groups.clear()
+        owner = get_user_model().objects.get(pk=self.owner.pk)
+        self.assertFalse(owner.has_perm("inventories.change_scenario"))
+        self.client.force_login(owner)
+        before = self._snapshot()
+        with self.assertLogs("django.request", "WARNING") as logs:
+            response = self.client.post(self.url())
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(any("Forbidden" in line for line in logs.output), logs.output)
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(pk=self.config.pk).exists()
+        )
+        self.assertEqual(self._snapshot(), before)
+
+    # testrunner strips CsrfViewMiddleware; inject it here so the enforcement
+    # path is the production-real one, not a skipped check.
+    @override_settings(
+        MIDDLEWARE=[
+            *settings.MIDDLEWARE,
+            "django.middleware.csrf.CsrfViewMiddleware",
+        ]
+    )
+    def test_post_requires_csrf_token(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.owner)
+        detail = reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+        bootstrap = client.get(detail)
+        self.assertEqual(bootstrap.status_code, 200)
+        self.assertIn(settings.CSRF_COOKIE_NAME, client.cookies)
+        before = self._snapshot()
+        with self.assertLogs("django.security.csrf", "WARNING") as logs:
+            response = client.post(self.url())
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(any("Forbidden" in line for line in logs.output), logs.output)
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(pk=self.config.pk).exists()
+        )
+        self.assertEqual(self._snapshot(), before)
+
+    # testrunner strips CsrfViewMiddleware; inject it here so the valid-token
+    # path exercises the production middleware, not a skipped check.
+    @override_settings(
+        MIDDLEWARE=[
+            *settings.MIDDLEWARE,
+            "django.middleware.csrf.CsrfViewMiddleware",
+        ]
+    )
+    def test_post_with_valid_csrf_removes_config_with_revision_and_audit(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.owner)
+        detail = reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+        bootstrap = client.get(detail)
+        self.assertEqual(bootstrap.status_code, 200)
+        self.assertIn(settings.CSRF_COOKIE_NAME, client.cookies)
+        token = client.cookies[settings.CSRF_COOKIE_NAME].value
+        revision = _revision(self.scenario)
+        response = client.post(self.url(), {"csrfmiddlewaretoken": token})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(pk=self.config.pk).exists()
+        )
+        self.assertEqual(_revision(self.scenario), revision + 1)
+        new_events = list(
+            _events_for(self.scenario).filter(action=ReviewAction.ACTION_EDITED)
+        )
+        self.assertEqual(len(new_events), 1)
+        self.assertEqual(new_events[0].user_id, self.owner.pk)
+        self.assertEqual(new_events[0].content_revision, revision + 1)
+
+    def test_scenario_detail_remove_control_is_post_form(self):
+        self.client.force_login(self.owner)
+        detail = reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+        response = self.client.get(detail)
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertNotIn(f'href="{self.url()}"', html)
+        match = re.search(
+            rf'<form[^>]*action="{re.escape(self.url())}"[^>]*>(.*?)</form>',
+            html,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match, "remove form missing")
+        tag = match.group(0)
+        self.assertIn('method="post"', match.group(0)[: match.group(0).index(">")])
+        self.assertIn("csrfmiddlewaretoken", tag)
+        self.assertIn('type="submit"', tag)
 
 
 class SeasonalDistributionCreateBoundaryTestCase(ViewWithPermissionsTestCase):
