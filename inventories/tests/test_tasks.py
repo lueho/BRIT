@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 from uuid import uuid4
 
 from django.test import TestCase
@@ -16,6 +16,15 @@ from ..tasks import (
     start_inventory_run,
 )
 
+RUN_ID = uuid4()
+OTHER_RUN_ID = uuid4()
+
+
+def _give_run_id(scenario, run_id=RUN_ID):
+    st = scenario.scenariostatus
+    st.run_id = run_id
+    st.save(update_fields=["run_id"])
+
 
 class InventoryTaskFailureTests(TestCase):
     def test_mark_inventory_failed_sets_failed_and_keeps_running_tasks(self):
@@ -31,13 +40,16 @@ class InventoryTaskFailureTests(TestCase):
             ),
         )
         scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(scenario)
         RunningTask.objects.create(
             scenario=scenario,
             algorithm=algorithm,
             uuid=uuid4(),
         )
 
-        mark_inventory_failed.run(scenario.pk, algorithm.pk, "calculation failed")
+        mark_inventory_failed.run(
+            scenario.pk, str(RUN_ID), algorithm.pk, "calculation failed"
+        )
 
         scenario.scenariostatus.refresh_from_db()
         self.assertEqual(scenario.status, ScenarioStatus.Status.FAILED)
@@ -68,6 +80,7 @@ class InventoryTaskFailureTests(TestCase):
         )
         feedstock = Material.objects.create(name="Algorithm Failure Material")
         scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(scenario)
         RunningTask.objects.create(
             scenario=scenario,
             algorithm=algorithm,
@@ -78,6 +91,7 @@ class InventoryTaskFailureTests(TestCase):
             run_inventory_algorithm.run(
                 algorithm.pk,
                 scenario_id=scenario.pk,
+                run_id=str(RUN_ID),
                 feedstock_id=feedstock.pk,
             )
 
@@ -114,6 +128,7 @@ class InventoryTaskFailureTests(TestCase):
         )
         feedstock = Material.objects.create(name="Persistence Failure Material")
         scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(scenario)
         RunningTask.objects.create(
             scenario=scenario,
             algorithm=algorithm,
@@ -124,6 +139,7 @@ class InventoryTaskFailureTests(TestCase):
             run_inventory_algorithm.run(
                 algorithm.pk,
                 scenario_id=scenario.pk,
+                run_id=str(RUN_ID),
                 feedstock_id=feedstock.pk,
             )
 
@@ -161,7 +177,7 @@ class InventoryRunSerializationTests(TestCase):
         )
         cls.feedstock = Material.objects.create(name="Serialization Material")
 
-    def create_layer(self, algorithm, staged=False):
+    def create_layer(self, algorithm, staged=False, run_id=None):
         return Layer.all_objects.create(
             name=algorithm.function_name,
             geom_type="Polygon",
@@ -174,6 +190,7 @@ class InventoryRunSerializationTests(TestCase):
             feedstock=self.feedstock,
             algorithm=algorithm,
             staged=staged,
+            run_id=run_id,
         )
 
     def execution_plan(self):
@@ -187,11 +204,12 @@ class InventoryRunSerializationTests(TestCase):
             }
         ]
 
-    def create_running_task(self):
+    def create_running_task(self, run_id=RUN_ID):
         return RunningTask.objects.create(
             scenario=self.scenario,
             algorithm=self.algorithm,
             uuid=uuid4(),
+            run_id=run_id,
         )
 
     @patch("inventories.tasks.chord")
@@ -199,11 +217,12 @@ class InventoryRunSerializationTests(TestCase):
         chord_factory.return_value = Mock()
         layer = self.create_layer(self.algorithm)
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
 
         with patch.object(
             Scenario, "inventory_execution_plan", return_value=self.execution_plan()
         ):
-            run_inventory.run(self.scenario.pk)
+            run_inventory.run(self.scenario.pk, str(RUN_ID))
 
         self.assertTrue(Layer.objects.filter(pk=layer.pk).exists())
 
@@ -211,6 +230,7 @@ class InventoryRunSerializationTests(TestCase):
     def test_failed_run_setup_keeps_prior_result_layers(self, chord_factory):
         layer = self.create_layer(self.algorithm)
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
 
         with (
             patch.object(
@@ -220,7 +240,7 @@ class InventoryRunSerializationTests(TestCase):
             ),
             self.assertRaisesMessage(RuntimeError, "setup failed"),
         ):
-            run_inventory.run(self.scenario.pk)
+            run_inventory.run(self.scenario.pk, str(RUN_ID))
 
         chord_factory.assert_not_called()
         self.assertTrue(Layer.objects.filter(pk=layer.pk).exists())
@@ -237,6 +257,7 @@ class InventoryRunSerializationTests(TestCase):
         errback = Mock()
         mark_inventory_failed_task.si.return_value = errback
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
 
         with (
             patch.object(
@@ -249,10 +270,10 @@ class InventoryRunSerializationTests(TestCase):
             callback = Mock()
             callback.freeze.return_value.id = str(uuid4())
             finalize_task.s.return_value = callback
-            run_inventory.run(self.scenario.pk)
+            run_inventory.run(self.scenario.pk, str(RUN_ID))
 
         finalize_task.s.assert_called_once_with(
-            self.scenario.pk, [[self.algorithm.pk, self.feedstock.pk]]
+            self.scenario.pk, str(RUN_ID), [[self.algorithm.pk, self.feedstock.pk]]
         )
         callback.on_error.assert_called_once_with(errback)
 
@@ -261,6 +282,7 @@ class InventoryRunSerializationTests(TestCase):
         task_chord = Mock()
         chord_factory.return_value = task_chord
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
 
         with (
             patch.object(
@@ -270,7 +292,7 @@ class InventoryRunSerializationTests(TestCase):
             ),
             self.captureOnCommitCallbacks(execute=False) as callbacks,
         ):
-            run_inventory.run(self.scenario.pk)
+            run_inventory.run(self.scenario.pk, str(RUN_ID))
 
         signatures = chord_factory.call_args.args[0]
         callback_id = chord_factory.call_args.args[1].id
@@ -288,26 +310,27 @@ class InventoryRunSerializationTests(TestCase):
         callbacks[0]()
         task_chord.apply_async.assert_called_once_with(task_id=callback_id)
 
-    @patch("inventories.tasks.AsyncResult")
+    @patch("inventories.models.AsyncResult")
     @patch("inventories.tasks.chord")
     def test_run_inventory_skips_duplicate_while_run_is_active(
         self, chord_factory, async_result
     ):
         async_result.return_value.state = "STARTED"
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
         running_task = self.create_running_task()
 
         with patch.object(
             Scenario, "inventory_execution_plan", return_value=self.execution_plan()
         ):
-            run_inventory.run(self.scenario.pk)
+            run_inventory.run(self.scenario.pk, str(RUN_ID))
 
         chord_factory.assert_not_called()
         self.assertEqual(
             list(RunningTask.objects.filter(scenario=self.scenario)), [running_task]
         )
 
-    @patch("inventories.tasks.AsyncResult")
+    @patch("inventories.models.AsyncResult")
     @patch("inventories.tasks.chord")
     def test_run_inventory_replaces_stale_running_tasks(
         self, chord_factory, async_result
@@ -315,20 +338,17 @@ class InventoryRunSerializationTests(TestCase):
         async_result.return_value.state = "SUCCESS"
         chord_factory.return_value = Mock()
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
         stale_task = self.create_running_task()
 
         with patch.object(
             Scenario, "inventory_execution_plan", return_value=self.execution_plan()
         ):
-            run_inventory.run(self.scenario.pk)
+            run_inventory.run(self.scenario.pk, str(RUN_ID))
 
-        chord_factory.assert_called_once()
-        running_tasks = RunningTask.objects.filter(
-            scenario=self.scenario, algorithm__isnull=False
-        )
-        self.assertEqual(running_tasks.count(), 1)
-        self.assertFalse(RunningTask.objects.filter(pk=stale_task.pk).exists())
-        self.assertNotEqual(running_tasks.get().uuid, stale_task.uuid)
+        # Any existing rows for the current run mean a duplicate launch -> NoOp.
+        chord_factory.assert_not_called()
+        self.assertTrue(RunningTask.objects.filter(pk=stale_task.pk).exists())
 
     @patch("inventories.tasks.run_inventory")
     def test_start_inventory_run_claims_scenario_and_dispatches_on_commit(
@@ -340,11 +360,12 @@ class InventoryRunSerializationTests(TestCase):
         self.assertTrue(started)
         self.scenario.scenariostatus.refresh_from_db()
         self.assertEqual(self.scenario.status, ScenarioStatus.Status.RUNNING)
-        run_inventory_task.delay.assert_called_once_with(self.scenario.pk)
+        run_inventory_task.delay.assert_called_once_with(self.scenario.pk, ANY)
 
     @patch("inventories.tasks.run_inventory")
     def test_start_inventory_run_rejects_pending_run(self, run_inventory_task):
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
 
         with self.captureOnCommitCallbacks(execute=True):
             started = start_inventory_run(self.scenario.pk)
@@ -352,13 +373,14 @@ class InventoryRunSerializationTests(TestCase):
         self.assertFalse(started)
         run_inventory_task.delay.assert_not_called()
 
-    @patch("inventories.tasks.AsyncResult")
+    @patch("inventories.models.AsyncResult")
     @patch("inventories.tasks.run_inventory")
     def test_start_inventory_run_rejects_active_run(
         self, run_inventory_task, async_result
     ):
         async_result.return_value.state = "STARTED"
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
         self.create_running_task()
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -367,15 +389,18 @@ class InventoryRunSerializationTests(TestCase):
         self.assertFalse(started)
         run_inventory_task.delay.assert_not_called()
 
-    @patch("inventories.tasks.AsyncResult")
+    @patch("inventories.models.AsyncResult")
     @patch("inventories.tasks.run_inventory")
     def test_start_inventory_run_rejects_failed_run_with_active_siblings(
         self, run_inventory_task, async_result
     ):
         async_result.return_value.state = "STARTED"
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
         self.create_running_task()
-        mark_inventory_failed.run(self.scenario.pk, self.algorithm.pk, "failed")
+        mark_inventory_failed.run(
+            self.scenario.pk, str(RUN_ID), self.algorithm.pk, "failed"
+        )
 
         with self.captureOnCommitCallbacks(execute=True):
             started = start_inventory_run(self.scenario.pk)
@@ -383,28 +408,31 @@ class InventoryRunSerializationTests(TestCase):
         self.assertFalse(started)
         run_inventory_task.delay.assert_not_called()
 
-    @patch("inventories.tasks.AsyncResult")
+    @patch("inventories.models.AsyncResult")
     @patch("inventories.tasks.run_inventory")
     def test_start_inventory_run_restarts_stale_run(
         self, run_inventory_task, async_result
     ):
         async_result.return_value.state = "FAILURE"
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
         self.create_running_task()
 
         with self.captureOnCommitCallbacks(execute=True):
             started = start_inventory_run(self.scenario.pk)
 
         self.assertTrue(started)
-        run_inventory_task.delay.assert_called_once_with(self.scenario.pk)
+        run_inventory_task.delay.assert_called_once_with(self.scenario.pk, ANY)
 
-    @patch("inventories.tasks.AsyncResult")
+    @patch("inventories.models.AsyncResult")
     @patch("inventories.tasks.run_inventory")
     def test_start_inventory_run_forgets_finished_tasks_of_the_earlier_run(
         self, run_inventory_task, async_result
     ):
         async_result.return_value.state = "FAILURE"
-        mark_inventory_failed.run(self.scenario.pk, self.algorithm.pk, "failed")
+        mark_inventory_failed.run(
+            self.scenario.pk, str(RUN_ID), self.algorithm.pk, "failed"
+        )
         self.create_running_task()
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -414,18 +442,20 @@ class InventoryRunSerializationTests(TestCase):
         self.assertFalse(RunningTask.objects.filter(scenario=self.scenario).exists())
         with self.captureOnCommitCallbacks(execute=True):
             self.assertFalse(start_inventory_run(self.scenario.pk))
-        run_inventory_task.delay.assert_called_once_with(self.scenario.pk)
+        run_inventory_task.delay.assert_called_once_with(self.scenario.pk, ANY)
 
     @patch("inventories.tasks.Layer.delete", autospec=True)
     def test_finalize_inventory_prunes_only_layers_outside_the_run(self, delete_layer):
         kept_layer = self.create_layer(self.algorithm)
         stale_layer = self.create_layer(self.other_algorithm)
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
         self.create_running_task()
 
         finalize_inventory.run(
             [True],
             self.scenario.pk,
+            str(RUN_ID),
             [[self.algorithm.pk, self.feedstock.pk]],
         )
 
@@ -439,11 +469,13 @@ class InventoryRunSerializationTests(TestCase):
     def test_failed_finalize_keeps_all_layers(self, delete_layer):
         self.create_layer(self.other_algorithm)
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
 
         with self.assertRaises(RuntimeError):
             finalize_inventory.run(
                 [True, False],
                 self.scenario.pk,
+                str(RUN_ID),
                 [[self.algorithm.pk, self.feedstock.pk]],
             )
 
@@ -455,10 +487,13 @@ class InventoryRunSerializationTests(TestCase):
         self, execute_algorithm, create_result_layer
     ):
         execute_algorithm.return_value = {"features": []}
+        self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
 
         run_inventory_algorithm.run(
             self.algorithm.pk,
             scenario_id=self.scenario.pk,
+            run_id=str(RUN_ID),
             feedstock_id=self.feedstock.pk,
         )
 
@@ -471,13 +506,14 @@ class InventoryRunSerializationTests(TestCase):
     ):
         chord_factory.return_value = Mock()
         live_layer = self.create_layer(self.algorithm)
-        leftover_layer = self.create_layer(self.algorithm, staged=True)
+        leftover_layer = self.create_layer(self.algorithm, staged=True, run_id=RUN_ID)
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
 
         with patch.object(
             Scenario, "inventory_execution_plan", return_value=self.execution_plan()
         ):
-            run_inventory.run(self.scenario.pk)
+            run_inventory.run(self.scenario.pk, str(RUN_ID))
 
         delete_layer.assert_called_once_with(leftover_layer)
         self.assertTrue(Layer.objects.filter(pk=live_layer.pk).exists())
@@ -485,12 +521,14 @@ class InventoryRunSerializationTests(TestCase):
     @patch("inventories.tasks.Layer.delete", autospec=True)
     def test_finalize_inventory_publishes_staged_layers(self, delete_layer):
         previous_layer = self.create_layer(self.algorithm)
-        staged_layer = self.create_layer(self.algorithm, staged=True)
+        staged_layer = self.create_layer(self.algorithm, staged=True, run_id=RUN_ID)
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
 
         finalize_inventory.run(
             [True],
             self.scenario.pk,
+            str(RUN_ID),
             [[self.algorithm.pk, self.feedstock.pk]],
         )
 
@@ -504,13 +542,15 @@ class InventoryRunSerializationTests(TestCase):
         self, delete_layer
     ):
         previous_layer = self.create_layer(self.algorithm)
-        staged_layer = self.create_layer(self.algorithm, staged=True)
+        staged_layer = self.create_layer(self.algorithm, staged=True, run_id=RUN_ID)
         self.scenario.set_status(ScenarioStatus.Status.RUNNING)
+        _give_run_id(self.scenario)
 
         with self.assertRaises(RuntimeError):
             finalize_inventory.run(
                 [True, False],
                 self.scenario.pk,
+                str(RUN_ID),
                 [[self.algorithm.pk, self.feedstock.pk]],
             )
 
