@@ -93,15 +93,17 @@ def resolve_frequency_season(actor, row):
             )
         except CollectionSeason.DoesNotExist:
             actor = authorize_create(actor, CollectionSeason)
-            season = CollectionSeason.objects.create(
-                owner=actor,
+            # A concurrent request may insert the same key after the miss
+            # above; get_or_create reuses its row instead of failing.
+            season, created = CollectionSeason.objects.get_or_create(
                 distribution=row["distribution"],
                 first_timestep=row["first_timestep"],
                 last_timestep=row["last_timestep"],
-                publication_status="private",
+                defaults={"owner": actor, "publication_status": "private"},
             )
-            record_creation(actor, season)
-            return season, True
+            if created:
+                record_creation(actor, season)
+                return season, True
         validate_references(actor, season)
         return season, False
 

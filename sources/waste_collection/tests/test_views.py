@@ -3122,6 +3122,31 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 302)
 
+    def test_post_saves_flyer_formset_once(self):
+        self.client.force_login(self.member)
+        data = {
+            "catchment": self.catchment.id,
+            "collector": self.collector.id,
+            "collection_system": self.collection_system.id,
+            "waste_category": self.waste_category.id,
+            "participation_policy": "VOLUNTARY",
+            "frequency": self.frequency.id,
+            "valid_from": date(2022, 1, 1),
+            "description": "Single flyer save",
+            "reviewed_predecessor_evidence": "on",
+            "form-INITIAL_FORMS": "0",
+            "form-TOTAL_FORMS": "0",
+        }
+        with patch.object(
+            WasteFlyerFormSet, "save", autospec=True, return_value=[]
+        ) as mock_save:
+            response = self.client.post(
+                reverse(self.url_name, kwargs={"pk": self.collection.id}),
+                data=data,
+            )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(mock_save.call_count, 1)
+
 
 # ----------- Collection utils -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------

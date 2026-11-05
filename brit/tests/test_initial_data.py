@@ -241,10 +241,17 @@ class FullInitialDataSeedingTests(TestCase):
         december = Timestep.objects.get(
             owner=owner, distribution=months, name="December"
         )
-        Period.objects.get(
+        full_year = Period.objects.get(
             distribution=months,
             first_timestep=january,
             last_timestep=december,
+        )
+        self.assertEqual(months.publication_status, "published")
+        self.assertEqual(full_year.publication_status, "published")
+        self.assertFalse(
+            Timestep.objects.filter(distribution=months)
+            .exclude(publication_status="published")
+            .exists()
         )
 
         MaterialComponentGroup.objects.get(name="Total Material")
