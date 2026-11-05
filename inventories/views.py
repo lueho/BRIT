@@ -53,7 +53,7 @@ from utils.object_management.views import (
 from utils.views import BreadcrumbContextMixin, build_breadcrumb_context
 
 from .evaluations import ScenarioResult
-from .exceptions import InvalidParameterValue
+from .exceptions import BlockedRunningScenario, InvalidParameterValue
 from .filters import ScenarioFilterSet
 from .forms import (
     ScenarioInventoryConfigurationAddForm,
@@ -266,12 +266,24 @@ class ScenarioDetailView(ScenarioMapMixin, UserCreatedObjectDetailView):
         return redirect("scenario-result", scenario.id)
 
 
-class ScenarioUpdateView(UserCreatedObjectUpdateView):
+class ScenarioEvaluationConflictMixin:
+    """Active-evaluation guards map to 409 instead of propagating 500s."""
+
+    def dispatch(self, request, *args, **kwargs):
+        try:
+            return super().dispatch(request, *args, **kwargs)
+        except BlockedRunningScenario:
+            return HttpResponse("Evaluation is still in progress.", status=409)
+
+
+class ScenarioUpdateView(ScenarioEvaluationConflictMixin, UserCreatedObjectUpdateView):
     model = Scenario
     form_class = ScenarioModelForm
 
 
-class ScenarioModalDeleteView(UserCreatedObjectModalDeleteView):
+class ScenarioModalDeleteView(
+    ScenarioEvaluationConflictMixin, UserCreatedObjectModalDeleteView
+):
     model = Scenario
 
 
@@ -430,7 +442,7 @@ def get_evaluation_status(request, task_id=None):
     return JsonResponse(result, status=200)
 
 
-class ScenarioEditPermissionMixin:
+class ScenarioEditPermissionMixin(ScenarioEvaluationConflictMixin):
     """test_func delegating to the central ``edit`` decision on the scenario
     named by ``scenario_kwarg``."""
 
