@@ -54,7 +54,14 @@ def ensure_initial_data(stdout=None):
     )
 
     CollectionSeason.objects.get_or_create(
-        distribution=distribution, first_timestep=january, last_timestep=december
+        distribution=distribution,
+        first_timestep=january,
+        last_timestep=december,
+        defaults={
+            "publication_status": "published",
+            "approved_at": timezone.now(),
+            "approved_by": owner,
+        },
     )
 
     for method_name in (
