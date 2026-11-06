@@ -88,6 +88,23 @@ writer migrations, plus final browser and release verification, remain separate
 work. The source-bound generated collection-value contract is described below;
 the legacy-data and activation gates are not covered by it.
 
+## Programmatic collection creation
+
+The collection API endpoints for creating records and new versions apply the
+same capability, sharing and lifecycle rules described above: you need the
+collection create capability, every referenced record must be readable by
+you, and `submit_for_review` produces a response that matches the stored
+review state. Creating a collection frequency or season requires that model's
+own create capability; reusing an existing readable frequency still requires
+the frequency create capability on the endpoint itself, while reusing an
+existing readable season needs only read access.
+
+Bulk-import and direct collection-property-value creation endpoints remain
+disabled because the trusted legacy importer's remaining writes do not yet use
+shared governed persistence. This includes the aggregated-value endpoint.
+Administrator status does not make these ungoverned writes legitimate; the
+internal importer is not a supported API bypass.
+
 ## Generated collection values
 
 Values marked as derived are calculated projections, not separate submissions
