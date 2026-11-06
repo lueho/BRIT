@@ -26,6 +26,7 @@ from sources.waste_collection.geojson import (
     exclude_published_predecessors,
 )
 from sources.waste_collection.models import WasteFlyer
+from utils.object_management.permissions import filter_queryset_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +145,10 @@ def check_wasteflyer_urls(self, params, user_id=None):
     request = SimpleNamespace(user=user)
 
     qs = WasteFlyerFilter(params, queryset=WasteFlyer.objects.all(), request=request).qs
+    # The bulk check writes on behalf of ``user``: scope the matched flyers
+    # to what that user may read so forged filter params cannot schedule
+    # writes on invisible records.
+    qs = filter_queryset_for_user(qs, user)
     signatures = []
     for flyer in qs:
         signatures.append(check_wasteflyer_url.s(flyer.pk))

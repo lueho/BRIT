@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser, Permission, User
@@ -12,6 +12,7 @@ from sources.waste_collection.models import (
     Collection,
     CollectionCatchment,
     CollectionSystem,
+    Collector,
     WasteCategory,
 )
 from utils.object_management import services as om_services
@@ -87,6 +88,11 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
         predecessor.refresh_from_db()
         self.assertEqual(candidate.publication_status, "published")
         self.assertEqual(predecessor.publication_status, "archived")
+        # Validity closes on the archived row inside the same atomic
+        # approval.
+        self.assertEqual(
+            predecessor.valid_until, candidate.valid_from - timedelta(days=1)
+        )
 
         archived_events = self._review_events(predecessor, ReviewAction.ACTION_ARCHIVED)
         self.assertEqual(archived_events.count(), 1)
@@ -124,11 +130,16 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
         )
 
     def test_unpublished_predecessors_are_never_archived(self):
-        for status in ("private", "review", "declined"):
+        for status in ("private", "review", "declined", "archived"):
             with self.subTest(status=status):
                 predecessor = self._collection(
                     f"{status} pred", self.other_owner, status
                 )
+                predecessor.valid_until = date(2030, 12, 31)
+                predecessor.save(update_fields=["valid_until"])
+                predecessor_revision = predecessor.content_revision
+                predecessor_lastmodified = predecessor.lastmodified_at
+                predecessor_events = self._review_events(predecessor).count()
                 candidate = self._collection(
                     f"Candidate {status}", self.owner, "review"
                 )
@@ -146,11 +157,15 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
                 predecessor.refresh_from_db()
                 self.assertEqual(candidate.publication_status, "published")
                 self.assertEqual(predecessor.publication_status, status)
+                # The approval must not mutate an unarchived predecessor at
+                # all: validity, revision, modification timestamp, and audit
+                # history all stay exactly as they were.
+                self.assertEqual(predecessor.valid_until, date(2030, 12, 31))
+                self.assertEqual(predecessor.content_revision, predecessor_revision)
+                self.assertEqual(predecessor.lastmodified_at, predecessor_lastmodified)
                 self.assertEqual(
-                    self._review_events(
-                        predecessor, ReviewAction.ACTION_ARCHIVED
-                    ).count(),
-                    0,
+                    self._review_events(predecessor).count(),
+                    predecessor_events,
                 )
 
     def test_foreign_private_predecessor_stays_private(self):
@@ -204,6 +219,9 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
         predecessor.refresh_from_db()
         self.assertEqual(candidate.publication_status, "review")
         self.assertEqual(predecessor.publication_status, "published")
+        # The failed archive must not leave a half-closed validity window
+        # on the predecessor either.
+        self.assertIsNone(predecessor.valid_until)
 
     def test_multi_predecessor_rollback_on_second_archive_failure(self):
         """A later archive-event failure rolls back already-applied earlier
@@ -225,6 +243,8 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
         candidate_rev = candidate.content_revision
         pred1_rev = pred1.content_revision
         pred2_rev = pred2.content_revision
+        pred1_valid_until = pred1.valid_until
+        pred1_lastmodified = pred1.lastmodified_at
 
         attempts = []
         real_record_event = om_services._record_event
@@ -260,6 +280,10 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
         ):
             obj.refresh_from_db()
             self.assertEqual(obj.publication_status, expected)
+        # Pred1's governed archive + validity closure already ran before
+        # pred2's failure — the rollback restores its validity fields too.
+        self.assertEqual(pred1.valid_until, pred1_valid_until)
+        self.assertEqual(pred1.lastmodified_at, pred1_lastmodified)
         # No new approved or archived events anywhere.
         self.assertFalse(
             self._review_events(candidate)
@@ -316,6 +340,103 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
             self._review_events(candidate, ReviewAction.ACTION_APPROVED).count(),
             0,
         )
+
+    def test_approve_preserves_predecessor_validity_gap(self):
+        predecessor = self._collection(
+            "Bounded pred", self.owner, "published", valid_from=date(2020, 1, 1)
+        )
+        predecessor.valid_until = date(2021, 12, 31)
+        predecessor.save(update_fields=["valid_until"])
+        candidate = self._collection(
+            "Candidate", self.owner, "review", valid_from=date(2024, 1, 1)
+        )
+        candidate.predecessors.add(predecessor)
+        predecessor_revision = predecessor.content_revision
+
+        candidate.refresh_from_db()
+        perform_transition(
+            self.moderator,
+            candidate,
+            "approve",
+            expected_revision=candidate.content_revision,
+        )
+
+        candidate.refresh_from_db()
+        predecessor.refresh_from_db()
+        self.assertEqual(candidate.publication_status, "published")
+        self.assertEqual(predecessor.publication_status, "archived")
+        self.assertEqual(predecessor.valid_until, date(2021, 12, 31))
+        self.assertTrue(decide(AnonymousUser(), "read", predecessor).allowed)
+        archived_events = self._review_events(predecessor, ReviewAction.ACTION_ARCHIVED)
+        self.assertEqual(archived_events.count(), 1)
+        event = archived_events.get()
+        self.assertEqual(event.user, self.moderator)
+        self.assertEqual(event.content_revision, predecessor_revision)
+
+    def test_approve_clamps_predecessor_overlap_only(self):
+        for index, end in enumerate(
+            (None, date(2023, 12, 31), date(2024, 1, 1), date(2025, 1, 1))
+        ):
+            with self.subTest(predecessor_end=end):
+                predecessor = self._collection(
+                    f"Clamped pred {index}",
+                    self.owner,
+                    "published",
+                    valid_from=date(2020, 1, 1),
+                )
+                if end is not None:
+                    predecessor.valid_until = end
+                    predecessor.save(update_fields=["valid_until"])
+                candidate = self._collection(
+                    f"Candidate {index}",
+                    self.owner,
+                    "review",
+                    valid_from=date(2024, 1, 1),
+                )
+                candidate.predecessors.add(predecessor)
+                predecessor_revision = predecessor.content_revision
+
+                candidate.refresh_from_db()
+                perform_transition(
+                    self.moderator,
+                    candidate,
+                    "approve",
+                    expected_revision=candidate.content_revision,
+                )
+
+                predecessor.refresh_from_db()
+                self.assertEqual(predecessor.publication_status, "archived")
+                self.assertEqual(predecessor.valid_until, date(2023, 12, 31))
+                archived_events = self._review_events(
+                    predecessor, ReviewAction.ACTION_ARCHIVED
+                )
+                self.assertEqual(archived_events.count(), 1)
+                self.assertEqual(
+                    archived_events.get().content_revision, predecessor_revision
+                )
+
+    def test_direct_approve_preserves_predecessor_validity_gap(self):
+        predecessor = self._collection(
+            "Bounded pred", self.owner, "published", valid_from=date(2020, 1, 1)
+        )
+        predecessor.valid_until = date(2021, 12, 31)
+        predecessor.save(update_fields=["valid_until"])
+        candidate = self._collection(
+            "Candidate", self.owner, "review", valid_from=date(2024, 1, 1)
+        )
+        candidate.predecessors.add(predecessor)
+        predecessor_revision = predecessor.content_revision
+
+        candidate.approve(user=self.moderator)
+
+        candidate.refresh_from_db()
+        predecessor.refresh_from_db()
+        self.assertEqual(candidate.publication_status, "published")
+        self.assertEqual(predecessor.publication_status, "archived")
+        self.assertEqual(predecessor.valid_until, date(2021, 12, 31))
+        archived_events = self._review_events(predecessor, ReviewAction.ACTION_ARCHIVED)
+        self.assertEqual(archived_events.count(), 1)
+        self.assertEqual(archived_events.get().content_revision, predecessor_revision)
 
     def test_approve_without_user_is_rejected(self):
         published = self._collection("Published pred", self.owner, "published")
@@ -619,4 +740,59 @@ class CollectionApproveHttpTests(TestCase):
             self._events(predecessor)
             .filter(action=ReviewAction.ACTION_ARCHIVED)
             .exists()
+        )
+
+    def test_html_update_invalidates_inspected_approval_revision(self):
+        """An edit through the HTML update path bumps ``content_revision``:
+        a revision the moderator inspected before the edit can no longer
+        satisfy the approval contract — the stale approve is denied."""
+        candidate = self._collection("Candidate", self.owner, "review")
+        inspected = candidate.content_revision
+        # The moderator verifiably inspected the current revision.
+        record_comment(
+            self.moderator,
+            candidate,
+            "inspected",
+            expected_revision=inspected,
+        )
+        collector = Collector.objects.create(
+            name="Update Collector", publication_status="published"
+        )
+        self.owner.user_permissions.add(
+            Permission.objects.get(codename="change_collection")
+        )
+
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("collection-update", kwargs={"pk": candidate.pk}),
+            data={
+                "catchment": self.catchment.pk,
+                "collector": collector.pk,
+                "collection_system": self.system.pk,
+                "waste_category": self.category.pk,
+                "valid_from": "2020-01-01",
+                "description": "edited after inspection",
+                "form-TOTAL_FORMS": "0",
+                "form-INITIAL_FORMS": "0",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.content_revision, inspected + 1)
+
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self._approve_url(candidate),
+            data={"expected_revision": inspected},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(
+            "The record changed since it was inspected. "
+            "Reload the review page and approve again.",
+            [str(m) for m in get_messages(response.wsgi_request)],
+        )
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.publication_status, "review")
+        self.assertFalse(
+            self._events(candidate).filter(action=ReviewAction.ACTION_APPROVED).exists()
         )

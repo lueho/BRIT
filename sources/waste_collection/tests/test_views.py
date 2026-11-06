@@ -28,7 +28,7 @@ from django.utils import timezone
 from factory.django import mute_signals
 from openpyxl import load_workbook
 
-from bibliography.models import Source
+from bibliography.models import Author, Source, SourceAuthor
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import (
     GeoDataset,
@@ -545,6 +545,72 @@ class WasteFlyerCRUDViewsTestCase(
             ).exists()
         )
 
+    def test_create_existing_readable_url_reuses_without_audit_or_author(self):
+        # URL-only resolve: a readable existing flyer is attached without a
+        # creation audit and without accepting forged SourceAuthor rows
+        # (the view exposes no inline at all).
+        existing = WasteFlyer.objects.create(
+            url="https://www.existing-flyer.org",
+            owner=self.non_owner_user,
+            publication_status="published",
+        )
+        author = Author.objects.create(
+            last_names="Test Author", publication_status="published"
+        )
+        flyer_events = ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(WasteFlyer),
+            object_id=existing.pk,
+        ).count()
+        authors_before = SourceAuthor.objects.count()
+        audits_before = ReviewAction.objects.count()
+        self.client.force_login(self.user_with_add_perm)
+        response = self.client.post(
+            reverse("wasteflyer-create"),
+            {
+                "url": existing.url,
+                "sourceauthors-TOTAL_FORMS": "1",
+                "sourceauthors-INITIAL_FORMS": "0",
+                "sourceauthors-0-id": "",
+                "sourceauthors-0-source": "",
+                "sourceauthors-0-author": str(author.pk),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        existing.refresh_from_db()
+        self.assertEqual(existing.owner, self.non_owner_user)
+        self.assertEqual(
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(WasteFlyer),
+                object_id=existing.pk,
+            ).count(),
+            flyer_events,
+        )
+        self.assertEqual(SourceAuthor.objects.count(), authors_before)
+        self.assertEqual(ReviewAction.objects.count(), audits_before)
+
+    def test_modal_create_existing_readable_url_reuses_without_audit(self):
+        existing = WasteFlyer.objects.create(
+            url="https://www.modal-existing-flyer.org",
+            owner=self.non_owner_user,
+            publication_status="published",
+        )
+        flyer_events = ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(WasteFlyer),
+            object_id=existing.pk,
+        ).count()
+        self.client.force_login(self.user_with_add_perm)
+        response = self.client.post(
+            reverse("wasteflyer-create-modal"), {"url": existing.url}
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(WasteFlyer),
+                object_id=existing.pk,
+            ).count(),
+            flyer_events,
+        )
+
     @patch("sources.waste_collection.views.check_wasteflyer_url")
     def test_check_url_view_dispatches_wasteflyer_task(self, mock_task):
         mock_task.delay.return_value.task_id = "fake-task-id"
@@ -595,28 +661,64 @@ class CollectionFrequencyCRUDViewsTestCase(
     def setUpTestData(cls):
         super().setUpTestData()
         cls.distribution = TemporalDistribution.objects.get(name="Months of the year")
+        cls.distribution.publication_status = "published"
+        cls.distribution.save(update_fields=["publication_status"])
+        Timestep.objects.filter(distribution=cls.distribution).update(
+            publication_status="published"
+        )
         cls.january = Timestep.objects.get(name="January")
         cls.may = Timestep.objects.get(name="May")
         cls.june = Timestep.objects.get(name="June")
         cls.december = Timestep.objects.get(name="December")
-        season_1 = CollectionSeason.objects.create(
+        season_1, _ = CollectionSeason.objects.get_or_create(
             distribution=cls.distribution,
             first_timestep=cls.january,
             last_timestep=cls.may,
+            defaults={"publication_status": "published"},
         )
-        season_2 = CollectionSeason.objects.create(
+        if season_1.publication_status != "published":
+            season_1.publication_status = "published"
+            season_1.save(update_fields=["publication_status"])
+        season_2, _ = CollectionSeason.objects.get_or_create(
             distribution=cls.distribution,
             first_timestep=cls.june,
             last_timestep=cls.december,
+            defaults={"publication_status": "published"},
         )
+        if season_2.publication_status != "published":
+            season_2.publication_status = "published"
+            season_2.save(update_fields=["publication_status"])
         cls.options_1 = CollectionCountOptions.objects.create(
+            owner=cls.owner_user,
             frequency=cls.unpublished_object,
             season=season_1,
             standard=100,
             option_1=150,
         )
         cls.options_2 = CollectionCountOptions.objects.create(
-            frequency=cls.unpublished_object, season=season_2, standard=150
+            owner=cls.owner_user,
+            frequency=cls.unpublished_object,
+            season=season_2,
+            standard=150,
+        )
+        # The schedule write resolves/creates seasons and mutates the
+        # count-options rows through the shared boundary, so the actors
+        # need the real child capabilities for the legitimate workflow.
+        cls.owner_user.user_permissions.add(
+            Permission.objects.get(codename="add_collectionseason"),
+            Permission.objects.get(codename="add_collectioncountoptions"),
+            Permission.objects.get(codename="change_collectioncountoptions"),
+            Permission.objects.get(codename="delete_collectioncountoptions"),
+        )
+        cls.user_with_add_perm.user_permissions.add(
+            Permission.objects.get(codename="add_collectionseason"),
+            Permission.objects.get(codename="add_collectioncountoptions"),
+        )
+        cls.staff_user.user_permissions.add(
+            Permission.objects.get(codename="add_collectionseason"),
+            Permission.objects.get(codename="add_collectioncountoptions"),
+            Permission.objects.get(codename="change_collectioncountoptions"),
+            Permission.objects.get(codename="delete_collectioncountoptions"),
         )
 
     def related_objects_post_data(self):
@@ -817,6 +919,13 @@ class CollectionPropertyValueCRUDViewsTestCase(
 
     create_object_data = {"average": 123.5, "standard_deviation": 12.54, "year": 2025}
     update_object_data = {"average": 456.7, "standard_deviation": 23.45, "year": 2025}
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.owner_user.user_permissions.add(
+            Permission.objects.get(codename="add_wasteflyer")
+        )
 
     @classmethod
     def create_related_objects(cls):
@@ -1068,6 +1177,9 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
         ]
         cls.published_object.collections.set(cls.related_collections)
         cls.unpublished_object.collections.set(cls.related_collections)
+        cls.owner_user.user_permissions.add(
+            Permission.objects.get(codename="add_wasteflyer")
+        )
 
     @classmethod
     def create_related_objects(cls):
@@ -1578,11 +1690,18 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         super().setUpTestData()
         with mute_signals(signals.post_save):
             cls.flyer = WasteFlyer.objects.create(
-                abbreviation="WasteFlyer123", url="https://www.test-flyer.org"
+                abbreviation="WasteFlyer123",
+                url="https://www.test-flyer.org",
+                publication_status="published",
             )
             cls.flyer2 = WasteFlyer.objects.create(
-                abbreviation="WasteFlyer234", url="https://www.rest-flyer.org"
+                abbreviation="WasteFlyer234",
+                url="https://www.rest-flyer.org",
+                publication_status="published",
             )
+        cls.owner_user.user_permissions.add(
+            Permission.objects.get(codename="add_wasteflyer")
+        )
         cls.unpublished_object.flyers.add(cls.flyer)
         cls.unpublished_object.flyers.add(cls.flyer2)
         cls.published_object.flyers.add(cls.flyer)
@@ -2169,6 +2288,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             patch(
                 "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
             ) as mock_cleanup,
+            self.captureOnCommitCallbacks(execute=True),
         ):
             response = self.client.post(
                 self.get_update_url(self.unpublished_object.pk), data=data
@@ -2186,6 +2306,148 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             self.unpublished_object.flyers.all(),
         )
         self.assertEqual(WasteFlyer.objects.count(), 2)
+
+    def _update_post_data(self, **overrides):
+        data = {
+            "catchment": self.unpublished_object.catchment.id,
+            "collector": self.unpublished_object.collector.id,
+            "collection_system": self.unpublished_object.collection_system.id,
+            "waste_category": self.unpublished_object.waste_category.id,
+            "participation_policy": "VOLUNTARY",
+            "allowed_materials": [
+                m.id for m in self.unpublished_object.allowed_materials.all()
+            ],
+            "forbidden_materials": [
+                m.id for m in self.unpublished_object.forbidden_materials.all()
+            ],
+            "frequency": self.related_objects["frequency"].id,
+            "valid_from": date(2020, 1, 1),
+            "description": "Changed description",
+            "form-INITIAL_FORMS": "2",
+            "form-TOTAL_FORMS": "2",
+            "form-0-url": "https://www.test-flyer.org",
+            "form-1-url": "https://www.rest-flyer.org",
+        }
+        data.update(overrides)
+        return data
+
+    def test_update_foreign_private_flyer_url_denies_full_rollback(self):
+        foreign_flyer = WasteFlyer.objects.create(
+            url="https://www.foreign-flyer.org",
+            owner=self.non_owner_user,
+            publication_status="private",
+        )
+        self.client.force_login(self.owner_user)
+        revision = self.unpublished_object.content_revision
+        description = self.unpublished_object.description
+        flyers_before = set(self.unpublished_object.flyers.values_list("pk", flat=True))
+        audits_before = ReviewAction.objects.count()
+        with patch(
+            "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
+        ) as mock_cleanup:
+            response = self.client.post(
+                self.get_update_url(self.unpublished_object.pk),
+                data=self._update_post_data(**{"form-1-url": foreign_flyer.url}),
+            )
+        self.assertEqual(response.status_code, 403)
+        self.unpublished_object.refresh_from_db()
+        self.assertEqual(self.unpublished_object.description, description)
+        self.assertEqual(self.unpublished_object.content_revision, revision)
+        self.assertEqual(
+            set(self.unpublished_object.flyers.values_list("pk", flat=True)),
+            flyers_before,
+        )
+        self.assertEqual(WasteFlyer.objects.count(), 3)
+        self.assertEqual(ReviewAction.objects.count(), audits_before)
+        mock_cleanup.assert_not_called()
+
+    def test_update_new_flyer_url_without_add_wasteflyer_denies_rollback(self):
+        self.owner_user.user_permissions.remove(
+            Permission.objects.get(codename="add_wasteflyer")
+        )
+        self.client.force_login(User.objects.get(pk=self.owner_user.pk))
+        revision = self.unpublished_object.content_revision
+        description = self.unpublished_object.description
+        flyers_before = set(self.unpublished_object.flyers.values_list("pk", flat=True))
+        audits_before = ReviewAction.objects.count()
+        with patch(
+            "sources.waste_collection.forms.cleanup_orphaned_waste_flyers.delay"
+        ) as mock_cleanup:
+            response = self.client.post(
+                self.get_update_url(self.unpublished_object.pk),
+                data=self._update_post_data(
+                    **{"form-1-url": "https://www.new-flyer.org"}
+                ),
+            )
+        self.assertEqual(response.status_code, 403)
+        self.unpublished_object.refresh_from_db()
+        self.assertEqual(self.unpublished_object.description, description)
+        self.assertEqual(self.unpublished_object.content_revision, revision)
+        self.assertEqual(
+            set(self.unpublished_object.flyers.values_list("pk", flat=True)),
+            flyers_before,
+        )
+        self.assertFalse(
+            WasteFlyer.objects.filter(url="https://www.new-flyer.org").exists()
+        )
+        self.assertEqual(ReviewAction.objects.count(), audits_before)
+        mock_cleanup.assert_not_called()
+
+    def test_create_foreign_private_flyer_url_denies_full_rollback(self):
+        foreign_flyer = WasteFlyer.objects.create(
+            url="https://www.foreign-flyer.org",
+            owner=self.non_owner_user,
+            publication_status="private",
+        )
+        flyer_events = ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(WasteFlyer),
+            object_id=foreign_flyer.pk,
+        ).count()
+        self.client.force_login(self.user_with_add_perm)
+        data = self.create_object_data.copy()
+        data.update(self.related_objects_post_data())
+        data.update(
+            {
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "0",
+                "form-0-url": foreign_flyer.url,
+            }
+        )
+        audits_before = ReviewAction.objects.count()
+        collections_before = Collection.objects.count()
+        response = self.client.post(self.get_create_url(), data)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Collection.objects.count(), collections_before)
+        self.assertEqual(WasteFlyer.objects.count(), 3)
+        self.assertEqual(
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(WasteFlyer),
+                object_id=foreign_flyer.pk,
+            ).count(),
+            flyer_events,
+        )
+        self.assertEqual(ReviewAction.objects.count(), audits_before)
+
+    def test_create_new_flyer_url_without_add_wasteflyer_denies(self):
+        self.client.force_login(self.user_with_add_perm)
+        data = self.create_object_data.copy()
+        data.update(self.related_objects_post_data())
+        data.update(
+            {
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "0",
+                "form-0-url": "https://www.new-flyer.org",
+            }
+        )
+        audits_before = ReviewAction.objects.count()
+        collections_before = Collection.objects.count()
+        response = self.client.post(self.get_create_url(), data)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Collection.objects.count(), collections_before)
+        self.assertFalse(
+            WasteFlyer.objects.filter(url="https://www.new-flyer.org").exists()
+        )
+        self.assertEqual(ReviewAction.objects.count(), audits_before)
 
     def test_create_view_ignores_missing_region_id_and_collector(self):
         self.client.force_login(self.user_with_add_perm)
@@ -2740,6 +3002,17 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             description="Private predecessor",
             publication_status="private",
         )
+        cls.archived_collection = Collection.objects.create(
+            name="archived-predecessor",
+            owner=cls.member,
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
+            waste_category=waste_category,
+            frequency=cls.frequency,
+            description="Archived predecessor",
+            publication_status="archived",
+        )
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(
@@ -2802,6 +3075,23 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_get_http_200_for_editor_with_grant_on_private_predecessor(self):
+        """An editor grant on the predecessor satisfies ``new_version``."""
+        self.private_collection.add_editor(self.member, granted_by=self.owner)
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": self.private_collection.id})
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_403_for_owner_of_archived_predecessor(self):
+        """Archived predecessors are frozen: even their owner is denied."""
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": self.archived_collection.id})
+        )
+        self.assertEqual(response.status_code, 403)
+
     def test_post_http_302_redirect_for_member(self):
         self.client.force_login(self.member)
         data = {
@@ -2829,6 +3119,31 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             reverse(self.url_name, kwargs={"pk": self.collection.id}), data=data
         )
         self.assertEqual(response.status_code, 302)
+
+    def test_post_saves_flyer_formset_once(self):
+        self.client.force_login(self.member)
+        data = {
+            "catchment": self.catchment.id,
+            "collector": self.collector.id,
+            "collection_system": self.collection_system.id,
+            "waste_category": self.waste_category.id,
+            "participation_policy": "VOLUNTARY",
+            "frequency": self.frequency.id,
+            "valid_from": date(2022, 1, 1),
+            "description": "Single flyer save",
+            "reviewed_predecessor_evidence": "on",
+            "form-INITIAL_FORMS": "0",
+            "form-TOTAL_FORMS": "0",
+        }
+        with patch.object(
+            WasteFlyerFormSet, "save", autospec=True, return_value=[]
+        ) as mock_save:
+            response = self.client.post(
+                reverse(self.url_name, kwargs={"pk": self.collection.id}),
+                data=data,
+            )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(mock_save.call_count, 1)
 
 
 # ----------- Collection utils -----------------------------------------------------------------------------------------
@@ -3216,7 +3531,10 @@ class CollectionWasteSamplesViewTestCase(
         )
         cls.unpublished_object.samples.add(
             Sample.objects.create(
-                name="Test Sample 1", material=material, series=series
+                name="Test Sample 1",
+                material=material,
+                series=series,
+                publication_status="published",
             )
         )
         cls.sample = Sample.objects.create(
@@ -4759,9 +5077,20 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.staff = User.objects.create(username="reviewer", is_staff=True)
-        cls.staff.user_permissions.add(
-            Permission.objects.get(codename="can_moderate_collection")
-        )
+        # Review evidence is governed per model: staff status alone does not
+        # inherit CPV/ACPV moderation, so each capability is granted
+        # explicitly.
+        for model in (
+            Collection,
+            CollectionPropertyValue,
+            AggregatedCollectionPropertyValue,
+        ):
+            cls.staff.user_permissions.add(
+                Permission.objects.get(
+                    codename=f"can_moderate_{model._meta.model_name}",
+                    content_type=ContentType.objects.get_for_model(model),
+                )
+            )
         cls.predecessor_owner = User.objects.create(username="predecessor-owner")
 
         cls.catchment = CollectionCatchment.objects.create(name="RC")
@@ -4969,6 +5298,32 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
         body = response.content.decode()
         self.assertIn("45.7 ± 1.2 ReviewRoundedUnit (", body)
         self.assertNotIn("45.67 ± 1.24 ReviewRoundedUnit (", body)
+
+    def test_review_preview_collection_only_moderator_sees_published(self):
+        """Collection moderation does not broaden independent evidence access."""
+        collection_only = User.objects.create(
+            username="collection-only-reviewer", is_staff=True
+        )
+        collection_only.user_permissions.add(
+            Permission.objects.get(
+                codename="can_moderate_collection",
+                content_type=ContentType.objects.get_for_model(Collection),
+            )
+        )
+        self.client.force_login(collection_only)
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": self.ct_id,
+                "object_id": self.collection.pk,
+            },
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        cpvs = response.context["collection_property_values"]
+        self.assertEqual([v.pk for v in cpvs], [self.cpv_published.pk])
+        agg_vals = response.context["aggregated_collection_property_values"]
+        self.assertEqual([v.pk for v in agg_vals], [self.agg_published.pk])
 
 
 class WasteAtlasMapViewTestBase(TestCase):
@@ -7130,8 +7485,9 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
         cls.collection.allowed_materials.add(cls.allowed_material)
         cls.collection.predecessors.add(cls.predecessor)
 
-    def test_predecessor_valid_until_updated_on_form_save(self):
-        """Verify predecessors' valid_until is updated when form is saved."""
+    def test_predecessor_valid_until_untouched_by_form_save(self):
+        """Ordinary form saves never write predecessor state: ``valid_until``
+        closes only inside the governed approve operation."""
         self.assertIsNone(self.predecessor.valid_until)
 
         form_data = {
@@ -7152,7 +7508,7 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
         form.save()
 
         self.predecessor.refresh_from_db()
-        self.assertEqual(self.predecessor.valid_until, date(2024, 5, 31))
+        self.assertIsNone(self.predecessor.valid_until)
 
     @patch("sources.waste_collection.signals.clear_geojson_cache_pattern")
     def test_predecessor_save_minimizes_cache_invalidation(self, mock_clear):

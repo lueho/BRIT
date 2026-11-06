@@ -4,7 +4,7 @@ from django.db import connection, models
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
-from inventories.models import InventoryAlgorithm, Scenario
+from inventories.models import InventoryAlgorithm, Scenario, is_current_inventory_run
 from materials.models import Material, MaterialComponent, SampleSeries
 
 from .exceptions import InvalidGeometryType, NoFeaturesProvided, TableAlreadyExists
@@ -175,9 +175,10 @@ class Layer(models.Model):
     sample_series = models.ForeignKey(
         SampleSeries, on_delete=models.SET_NULL, blank=True, null=True
     )
-    algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE)
+    algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.PROTECT)
     layer_fields = models.ManyToManyField(LayerField)
     staged = models.BooleanField(default=False)
+    run_id = models.UUIDField(null=True, blank=True, db_index=True)
 
     objects = LayerManager()
     all_objects = AllLayersManager()
@@ -348,6 +349,8 @@ class Layer(models.Model):
             self.scenario == kwargs["scenario"],
             self.algorithm == kwargs["algorithm"],
             fields == kwargs["fields"],
+            (self.run_id is None and kwargs.get("run_id") is None)
+            or is_current_inventory_run(self, kwargs.get("run_id")),
         ]
         return all(comparisons)
 

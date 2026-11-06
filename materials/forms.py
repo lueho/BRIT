@@ -435,12 +435,11 @@ class MaterialPropertyValueModelForm(
             )
         return cleaned_data
 
-    def save(self, commit=True):
-        value = super().save(commit=commit)
-        if value.property_id and value.unit_id:
-            if not value.property.allowed_units.filter(pk=value.unit_id).exists():
-                value.property.allowed_units.add(value.unit)
-        return value
+    # ``allowed_units`` is governed content of the MaterialProperty root:
+    # it is established only when editing the property itself through its
+    # own governed update boundary. Saving a property value must not mutate
+    # the property as a hidden side effect — ``clean()`` still rejects units
+    # outside a configured allow-list.
 
 
 class MaterialPropertyValueModalModelForm(
@@ -616,8 +615,8 @@ class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["distribution"].queryset = TemporalDistribution.objects.difference(
-            self.instance.temporal_distributions.all()
+        self.fields["distribution"].queryset = TemporalDistribution.objects.exclude(
+            pk__in=self.instance.temporal_distributions.values("pk")
         )
 
 
@@ -1057,7 +1056,7 @@ class CompositionModalModelForm(ModalModelFormMixin, CompositionModelForm):
     pass
 
 
-class SampleAddCompositionForm(SimpleModelForm):
+class SampleAddCompositionForm(UserCreatedObjectFormMixin, SimpleModelForm):
     sample = ModelChoiceField(queryset=Sample.objects.none())
 
     class Meta:
@@ -1067,17 +1066,21 @@ class SampleAddCompositionForm(SimpleModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         sample = kwargs["initial"].get("sample")
+        user = getattr(getattr(self, "request", None), "user", None)
         self.fields["sample"].queryset = Sample.objects.filter(id=sample.id)
         self.fields["sample"].empty_label = None
-        self.fields["group"].queryset = MaterialComponentGroup.objects.exclude(
-            id__in=sample.group_ids
+        self.fields["group"].queryset = filter_queryset_for_user(
+            MaterialComponentGroup.objects.exclude(id__in=sample.group_ids), user
         )
         self.fields["group"].empty_label = None
-        self.fields["fractions_of"].queryset = MaterialComponent.objects.filter(
-            id__in=[
-                *sample.components.values_list("id", flat=True),
-                MaterialComponent.objects.default().id,
-            ]
+        self.fields["fractions_of"].queryset = filter_queryset_for_user(
+            MaterialComponent.objects.filter(
+                id__in=[
+                    *sample.components.values_list("id", flat=True),
+                    MaterialComponent.objects.default().id,
+                ]
+            ),
+            user,
         )
         self.fields["fractions_of"].empty_label = None
 
@@ -1095,14 +1098,19 @@ class AddCompositionModalForm(ModalModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["group"].queryset = MaterialComponentGroup.objects.exclude(
-            id__in=self.instance.blocked_ids
+        user = getattr(getattr(self, "request", None), "user", None)
+        self.fields["group"].queryset = filter_queryset_for_user(
+            MaterialComponentGroup.objects.exclude(id__in=self.instance.blocked_ids),
+            user,
         )
-        self.fields["fractions_of"].queryset = MaterialComponent.objects.filter(
-            id__in=[
-                *self.instance.components.values_list("id", flat=True),
-                MaterialComponent.objects.default().id,
-            ]
+        self.fields["fractions_of"].queryset = filter_queryset_for_user(
+            MaterialComponent.objects.filter(
+                id__in=[
+                    *self.instance.components.values_list("id", flat=True),
+                    MaterialComponent.objects.default().id,
+                ]
+            ),
+            user,
         )
         self.fields["fractions_of"].empty_label = None
 

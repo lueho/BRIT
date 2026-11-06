@@ -3,6 +3,8 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import Permission
 from django.db.models.signals import post_save
+from django.http import QueryDict
+from django.test import TestCase
 from django.urls import reverse
 from django.utils.html import escape
 from factory.django import mute_signals
@@ -15,6 +17,7 @@ from utils.tests.testcases import (
 )
 
 from ..models import Author, Licence, Source, SourceAuthor, check_url_valid
+from ..tasks import check_source_urls
 
 
 def setUpModule():
@@ -915,17 +918,29 @@ class LicenceReviewListRegressionTest(ViewWithPermissionsTestCase):
 
 
 class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ["can_moderate_source"]
+    """The check-url gate is the central ``check_url`` decision: active actor
+    + ``change_source`` capability + read access on the target. The staff
+    flag alone no longer opens it."""
+
+    member_permissions = ["can_moderate_source", "change_source"]
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        cls.owner.user_permissions.add(Permission.objects.get(codename="change_source"))
         with mute_signals(post_save):
             cls.source = Source.objects.create(
                 title="Test Source from the Web",
                 abbreviation="WORKING",
                 url="https://httpbin.org/status/200",
                 owner=cls.owner,
+            )
+            cls.review_source = Source.objects.create(
+                title="Source under review",
+                abbreviation="INREVIEW",
+                url="https://httpbin.org/status/200",
+                owner=cls.outsider,
+                publication_status="review",
             )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -945,26 +960,62 @@ class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 403)
 
-    def test_get_http_200_ok_for_owner(self):
+    @patch("bibliography.views.check_source_url")
+    def test_get_http_200_ok_for_owner(self, mock_task):
+        mock_task.delay.return_value.task_id = "task-id"
         self.client.force_login(self.owner)
         response = self.client.get(
             reverse("source-check-url", kwargs={"pk": self.source.pk})
         )
         self.assertEqual(200, response.status_code)
+        mock_task.delay.assert_called_once_with(self.source.pk)
 
-    def test_get_http_200_ok_for_staff(self):
+    @patch("bibliography.views.check_source_url")
+    def test_get_http_200_ok_for_staff_with_change_permission(self, mock_task):
+        """Administrators still need the model capability; with it, admin
+        read access covers another owner's private source."""
+        mock_task.delay.return_value.task_id = "task-id"
+        self.staff.user_permissions.add(
+            Permission.objects.get(codename="change_source")
+        )
         self.client.force_login(self.staff)
         response = self.client.get(
             reverse("source-check-url", kwargs={"pk": self.source.pk})
         )
         self.assertEqual(200, response.status_code)
+        mock_task.delay.assert_called_once_with(self.source.pk)
 
-    def test_get_http_200_ok_for_moderator(self):
+    @patch("bibliography.views.check_source_url")
+    def test_get_http_403_for_staff_without_change_permission(self, mock_task):
+        """is_staff/administration alone never was a capability: without
+        change_source the central decision denies."""
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse("source-check-url", kwargs={"pk": self.source.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+        mock_task.delay.assert_not_called()
+
+    @patch("bibliography.views.check_source_url")
+    def test_get_http_403_for_moderator_on_private_source(self, mock_task):
+        """A moderator holding change_source still needs read access; a
+        foreign private source stays invisible."""
         self.client.force_login(self.member)
         response = self.client.get(
             reverse("source-check-url", kwargs={"pk": self.source.pk})
         )
+        self.assertEqual(response.status_code, 403)
+        mock_task.delay.assert_not_called()
+
+    @patch("bibliography.views.check_source_url")
+    def test_get_http_200_ok_for_moderator_on_review_source(self, mock_task):
+        mock_task.delay.return_value.task_id = "task-id"
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("source-check-url", kwargs={"pk": self.review_source.pk})
+        )
         self.assertEqual(200, response.status_code)
+        mock_task.delay.assert_called_once_with(self.review_source.pk)
 
     def test_get_http_404_for_nonexistent_source(self):
         self.client.force_login(self.owner)
@@ -1153,7 +1204,63 @@ class SourceListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(request_url)
         self.assertEqual(200, response.status_code)
         mock_delay.assert_called_once()
+        params, user_id = mock_delay.call_args.args
+        self.assertEqual(user_id, self.member.pk)
+        self.assertNotIn("page", params)
         self.assertEqual(response.json()["task_id"], "scheduler-task-id")
+
+
+class SourceListCheckUrlsScopingTestCase(TestCase):
+    """The bulk URL check must schedule signatures only for sources the
+    requesting user may read — forged filter params cannot reach invisible
+    private records."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user("source_task_owner")
+        self.other_owner = User.objects.create_user("source_task_other")
+        with mute_signals(post_save):
+            self.own_source = Source.objects.create(
+                owner=self.owner,
+                title="Own private source",
+                abbreviation="OWN",
+                publication_status="private",
+            )
+            self.foreign_source = Source.objects.create(
+                owner=self.other_owner,
+                title="Foreign private source",
+                abbreviation="FRN",
+                publication_status="private",
+            )
+            self.public_source = Source.objects.create(
+                owner=self.other_owner,
+                title="Published source",
+                abbreviation="PUB",
+                publication_status="published",
+            )
+
+    def _scheduled_ids(self, mock_chord, params, user_id):
+        captured = {}
+
+        def fake_chord(header):
+            captured["header"] = header
+            return lambda _: type("task", (object,), {"task_id": "cb-id"})()
+
+        mock_chord.side_effect = fake_chord
+        check_source_urls.run(params, user_id)
+        return sorted(signature.args[0] for signature in captured["header"])
+
+    @patch("bibliography.tasks.chord")
+    def test_unscoped_params_never_schedule_foreign_private_sources(self, mock_chord):
+        scheduled = self._scheduled_ids(
+            mock_chord, QueryDict("", mutable=True), self.owner.pk
+        )
+        self.assertEqual(scheduled, sorted([self.own_source.pk, self.public_source.pk]))
+        self.assertNotIn(self.foreign_source.pk, scheduled)
+
+    @patch("bibliography.tasks.chord")
+    def test_anonymous_user_schedules_only_public_sources(self, mock_chord):
+        scheduled = self._scheduled_ids(mock_chord, QueryDict("", mutable=True), None)
+        self.assertEqual(scheduled, [self.public_source.pk])
 
 
 class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):

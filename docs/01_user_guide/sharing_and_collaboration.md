@@ -83,5 +83,27 @@ moderation rights may still reject it.
   capability or active superuser status. Staff status alone grants no review
   or sharing powers.
 
-Domain-specific review integration, admin adapters, generated-provenance
-surfaces, and final browser/release verification remain separate work.
+Domain-specific review integration and admin adapters for the remaining
+writer migrations, plus final browser and release verification, remain separate
+work. The source-bound generated collection-value contract is described below;
+the legacy-data and activation gates are not covered by it.
+
+## Generated collection values
+
+Values marked as derived are calculated projections, not separate submissions
+for approval. Their detail page identifies them as read-only and links to the
+raw source evidence. The source owner, permissions, sharing and lifecycle govern
+access. Copied projection metadata or an editor grant on the projection cannot
+give someone access to a private source.
+
+To correct or review a calculated value, open its raw source. Editing still
+requires permission and an editable source state; published and archived source
+content remains immutable. Administrators cannot edit, delete, share or approve
+the generated projection directly. Review activity and comments belong to the
+source thread and inspected source revision, not a separate projection review.
+
+Readable direct measurements take precedence over calculated copies for the same
+collection, quantity, unit and year. An unreadable measurement cannot suppress a
+calculated value you are allowed to read. Older generated values without a
+verified source link are withheld pending an approved provenance audit; they
+are not silently assigned a source or an approval history.

@@ -4,7 +4,6 @@ from urllib.parse import urlparse
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.core.exceptions import BadRequest
-from django.db import transaction
 from django.db.models import Q, Subquery, Value
 from django.db.models.functions import Coalesce, NullIf
 from django.forms import formset_factory
@@ -40,6 +39,11 @@ from maps.serializers import (
 from utils.forms import TomSelectFormsetHelper
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.object_management.policy import decide, is_admin
+from utils.object_management.services import (
+    authorize_create,
+    record_creation,
+    validate_references,
+)
 from utils.object_management.views import (
     CreateUserObjectMixin,
     OwnedObjectModelSelectOptionsView,
@@ -1189,7 +1193,10 @@ class RegionDetailView(MapMixin, UserCreatedObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["region_attribute_values"] = (
-            RegionAttributeValue.objects.filter(region=self.object)
+            filter_queryset_for_user(
+                RegionAttributeValue.objects.filter(region=self.object),
+                self.request.user,
+            )
             .select_related("property", "unit")
             .order_by("property__name", "-date")
         )
@@ -1246,7 +1253,10 @@ class CatchmentDetailView(MapMixin, UserCreatedObjectDetailView):
         region = self.object.region
         if region is not None:
             context["region_attribute_values"] = (
-                RegionAttributeValue.objects.filter(region=region)
+                filter_queryset_for_user(
+                    RegionAttributeValue.objects.filter(region=region),
+                    self.request.user,
+                )
                 .select_related("property", "unit")
                 .order_by("property__name", "-date")
             )
@@ -1326,8 +1336,12 @@ class CatchmentCreateMergeLauView(UserCreatedObjectCreateView):
         return GeoPolygon.objects.create(geom=new_geom)
 
     def get_region(self):
+        # Called inside the authorized write boundary: owner and audit are
+        # attributed to the fresh actor returned by ``authorize_create``.
         region = Region.objects.create(
-            name=self.get_region_name(), borders=self.create_region_borders()
+            name=self.get_region_name(),
+            borders=self.create_region_borders(),
+            owner=self.request.user,
         )
         region.composed_of.set(self.get_member_regions())
         return region
@@ -1348,11 +1362,23 @@ class CatchmentCreateMergeLauView(UserCreatedObjectCreateView):
             for message in error.messages:
                 form.add_error(None, message)
             return self.form_invalid(form)
-        with transaction.atomic():
-            response = super().form_valid(form)
-            self.object.region = self.get_region()
-            self.object.type = "custom"
-            self.object.save()
+        return super().form_valid(form)
+
+    def _call_super_form_valid(self, form):
+        # Runs inside the bound create's atomic boundary. The sibling
+        # Region (plus its GeoPolygon borders and ``composed_of`` edges)
+        # and the catchment linkage used to be written after the boundary
+        # with no owner or audit; they are now authorized, referenced, and
+        # persisted inside it.
+        response = super()._call_super_form_valid(form)
+        actor = authorize_create(self.request.user, Region)
+        self.request.user = actor
+        validate_references(actor, {"composed_of": self.get_member_regions()})
+        region = self.get_region()
+        record_creation(actor, region)
+        self.object.region = region
+        self.object.type = "custom"
+        self.object.save(update_fields=("region", "type"))
         return response
 
 

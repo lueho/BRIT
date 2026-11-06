@@ -1,4 +1,3 @@
-import hashlib
 import json
 import logging
 from datetime import date, timedelta
@@ -12,7 +11,8 @@ from django.contrib.auth.mixins import (
     UserPassesTestMixin,
 )
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, Max, Min, Prefetch, Q
+from django.db import transaction
+from django.db.models import Case, IntegerField, Max, Prefetch, Value, When
 from django.forms.models import model_to_dict
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -30,6 +30,7 @@ from bibliography.views import (
     SourceModalDetailView,
 )
 from maps.filters import CatchmentFilterSet
+from maps.utils import compute_collection_dataset_version
 from maps.views import (
     CatchmentCreateView,
     CatchmentDetailView,
@@ -95,13 +96,18 @@ from sources.waste_collection.models import (
     WasteComponent,
     WasteFlyer,
 )
+from sources.waste_collection.projection_queries import preferred_measurement_queryset
 from sources.waste_collection.tasks import check_wasteflyer_url, check_wasteflyer_urls
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.forms import M2MInlineFormSetMixin
 from utils.object_management.models import ReviewAction
-from utils.object_management.permissions import (
-    filter_queryset_for_user,
-    get_object_policy,
+from utils.object_management.permissions import filter_queryset_for_user
+from utils.object_management.policy import decide, publication_states_queryset
+from utils.object_management.registry import generated_source
+from utils.object_management.services import (
+    _fresh_actor,
+    content_mutation,
+    validate_references,
 )
 from utils.object_management.views import (
     ApproveItemModalView,
@@ -519,6 +525,14 @@ class WasteFlyerCreateView(SourceCreateView):
     form_class = WasteFlyerModelForm
     success_url = reverse_lazy("wasteflyer-list")
     permission_required = "waste_collection.add_wasteflyer"
+    # URL-only resolve/create: no author-row editing contract — an existing
+    # readable flyer must not gain SourceAuthor rows through this view.
+    inlines = []
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["actor"] = self.request.user
+        return kwargs
 
     def form_valid(self, form):
         form.instance.type = "waste_flyer"
@@ -529,6 +543,11 @@ class WasteFlyerModalCreateView(SourceModalCreateView):
     form_class = WasteFlyerModalModelForm
     success_url = reverse_lazy("wasteflyer-list")
     permission_required = "waste_collection.add_wasteflyer"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["actor"] = self.request.user
+        return kwargs
 
     def form_valid(self, form):
         form.instance.type = "waste_flyer"
@@ -558,16 +577,13 @@ class WasteFlyerModalDeleteView(SourceModalDeleteView):
 
 class WasteFlyerCheckUrlView(SourceCheckUrlView):
     model = WasteFlyer
-    permission_required = "waste_collection.change_wasteflyer"
 
     def get(self, request, *args, **kwargs):
         self.object = get_object_or_404(self.model, pk=kwargs.get("pk"))
-        policy = get_object_policy(request.user, self.object, request=request)
-        if not (
-            policy.get("is_owner")
-            or policy.get("is_staff")
-            or policy.get("is_moderator")
-        ):
+        # Central gate: active actor + change_wasteflyer capability + read
+        # access on the target. url_valid/url_checked are audit-exempt, so no
+        # content boundary is needed — but the decision itself is not.
+        if not decide(request.user, "check_url", self.object).allowed:
             raise PermissionDenied
 
         task = check_wasteflyer_url.delay(self.object.pk)
@@ -655,6 +671,10 @@ class FrequencyScheduleMixin:
             return CollectionFrequencyScheduleService.rows_from_frequency(self.object)
         return [self._whole_year_initial()]
 
+    def get_formset_kwargs(self, **kwargs):
+        kwargs["actor"] = self.request.user
+        return super().get_formset_kwargs(**kwargs)
+
     def _apply_schedule_metadata(self, form, formset):
         rows = CollectionFrequencyScheduleService.rows_from_formset(formset)
         frequency_type = CollectionFrequencyScheduleService.frequency_type(rows)
@@ -681,19 +701,23 @@ class FrequencyCreateView(
 
     def post(self, request, *args, **kwargs):
         form = self.get_form()
-        formset = self.get_formset()
+        self._formset = self.get_formset()
 
-        if form.is_valid() and formset.is_valid():
-            form.instance.owner = self.request.user
-            self._apply_schedule_metadata(form, formset)
-            self.object = form.save()
-            # Update formset's parent_object so it can set the M2M relationship
-            formset.parent_object = self.object
-            formset.save()
-            return HttpResponseRedirect(self.get_success_url())
+        if form.is_valid() and self._formset.is_valid():
+            return self.form_valid(form)
         else:
-            context = self.get_context_data(form=form, formset=formset)
+            context = self.get_context_data(form=form, formset=self._formset)
             return self.render_to_response(context)
+
+    def _call_super_form_valid(self, form):
+        # Schedule metadata and the season formset write inside the bound
+        # create adapter's atomic write: a formset failure rolls the whole
+        # create back and owner/status stay boundary-assigned.
+        self._apply_schedule_metadata(form, self._formset)
+        response = super()._call_super_form_valid(form)
+        self._formset.parent_object = self.object
+        self._formset.save()
+        return response
 
 
 class FrequencyDetailView(UserCreatedObjectDetailView):
@@ -720,16 +744,23 @@ class FrequencyUpdateView(
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = self.get_formset()
+        self._formset = self.get_formset()
 
-        if form.is_valid() and formset.is_valid():
-            self._apply_schedule_metadata(form, formset)
-            form.save()
-            formset.save()
-            return HttpResponseRedirect(self.get_success_url())
+        if form.is_valid() and self._formset.is_valid():
+            return self.form_valid(form)
         else:
-            context = self.get_context_data(form=form, formset=formset)
+            context = self.get_context_data(form=form, formset=self._formset)
             return self.render_to_response(context)
+
+    def _call_super_form_valid(self, form):
+        # Schedule metadata and the season formset write inside the locked
+        # update boundary: the freshly locked object is the M2M target so the
+        # content snapshot captures schedule changes for revision and audit.
+        self._apply_schedule_metadata(form, self._formset)
+        response = super()._call_super_form_valid(form)
+        self._formset.parent_object = self.object
+        self._formset.save()
+        return response
 
 
 class FrequencyModalUpdateView(UserCreatedObjectModalUpdateView):
@@ -776,18 +807,23 @@ class CollectionPropertyValueCreateView(
 
     def post(self, request, *args, **kwargs):
         form = self.get_form()
-        formset = self.get_formset()
+        self._formset = self.get_formset()
 
-        if form.is_valid() and formset.is_valid():
-            return self.forms_valid(form, formset)
+        if form.is_valid() and self._formset.is_valid():
+            return self.forms_valid(form, self._formset)
         else:
-            return self.forms_invalid(form, formset)
+            return self.forms_invalid(form, self._formset)
 
     def forms_valid(self, form, formset):
-        form.instance.owner = self.request.user
-        self.object = form.save()
-        preserve_bibliographic_sources_through_formset(self.object, formset)
-        return HttpResponseRedirect(self.get_success_url())
+        return self.form_valid(form)
+
+    def _call_super_form_valid(self, form):
+        response = super()._call_super_form_valid(form)
+        # The sources formset writes inside the same atomic create boundary:
+        # the persisted object is the M2M target and a formset failure rolls
+        # the whole create back.
+        preserve_bibliographic_sources_through_formset(self.object, self._formset)
+        return response
 
     def forms_invalid(self, form, formset):
         context = self.get_context_data(form=form, formset=formset)
@@ -800,6 +836,7 @@ class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(_cpv_collection_chain_context(self.object, self.request.user))
+        context["generated_value_source"] = generated_source(self.object)
         return context
 
 
@@ -857,22 +894,40 @@ class CollectionPropertyValueUpdateView(
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = self.get_formset()
+        self._formset = self.get_formset()
 
-        if form.is_valid() and formset.is_valid():
-            return self.forms_valid(form, formset)
+        if form.is_valid() and self._formset.is_valid():
+            return self.forms_valid(form, self._formset)
         else:
-            return self.forms_invalid(form, formset)
+            return self.forms_invalid(form, self._formset)
 
     def forms_valid(self, form, formset):
+        """Declare the canonical chain anchor as the parent up front.
+
+        A posted non-anchor collection resolves to its chain anchor, so the
+        bound update treats the move as an authorized reassignment
+        (``proposed_parent``/``decide_reassign``) instead of a silent field
+        overwrite inside the boundary.
+        """
         instance = form.instance
         anchor = instance.collection.version_anchor if instance.collection else None
         if anchor and instance.collection_id != anchor.pk:
-            instance.collection = anchor
+            form.cleaned_data["collection"] = anchor
+            if "collection" not in form.changed_data:
+                form.changed_data.append("collection")
+        return self.form_valid(form)
 
-        self.object = form.save()
-        preserve_bibliographic_sources_through_formset(self.object, formset)
-        return HttpResponseRedirect(self.get_success_url())
+    def _call_super_form_valid(self, form):
+        # The bound update re-cleans the raw posted parent; re-anchor the
+        # locked instance to the parent the reassignment authorized before
+        # the row and its sources formset are persisted in the same write.
+        posted_collection = form.cleaned_data.get("collection")
+        anchor = posted_collection.version_anchor if posted_collection else None
+        if anchor is not None:
+            form.instance.collection = anchor
+        response = super()._call_super_form_valid(form)
+        preserve_bibliographic_sources_through_formset(self.object, self._formset)
+        return response
 
     def forms_invalid(self, form, formset):
         return self.render_to_response(
@@ -883,9 +938,13 @@ class CollectionPropertyValueUpdateView(
 class CollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = CollectionPropertyValue
 
+    @transaction.atomic
     def form_valid(self, form):
         # Ensure we delete the anchor record for the same (property, unit, year)
-        # when the user deletes a CPV on a non-anchor collection.
+        # when the user deletes a CPV on a non-anchor collection. The anchor
+        # twin is a different governed record: its deletion runs through its
+        # own delete boundary (decide + lock + audit) before the primary
+        # delete proceeds, so a denied twin removes nothing.
         self.object = self.get_object()
         anchor = self.object.collection.version_anchor
         anchor_value = None
@@ -900,9 +959,15 @@ class CollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
             except CollectionPropertyValue.DoesNotExist:
                 anchor_value = None
 
-        # Delete anchor first if it is distinct from the current object
+        # Delete anchor first if it is distinct from the current object.
+        # The shared method-level transaction keeps the twin's governed
+        # delete and the primary delete atomic: a primary failure rolls
+        # back the twin's already-audited removal too.
         if anchor_value and anchor_value.pk != self.object.pk:
-            anchor_value.delete()
+            with content_mutation(
+                self.request.user, anchor_value, action="delete"
+            ) as locked_twin:
+                locked_twin.delete()
 
         return super().form_valid(form)
 
@@ -938,6 +1003,27 @@ class AggregatedCollectionPropertyValueCreateView(
             kwargs.update({"owner": self.request.user})
         return super().get_formset_kwargs(**kwargs)
 
+    def post(self, request, *args, **kwargs):
+        form = self.get_form()
+        self._formset = self.get_formset()
+
+        # Legacy callers post no flyer formset management data at all; the
+        # formset only participates when it was actually submitted.
+        formset_ok = "form-TOTAL_FORMS" not in request.POST or self._formset.is_valid()
+        if form.is_valid() and formset_ok:
+            return self.form_valid(form)
+        else:
+            context = self.get_context_data(form=form, formset=self._formset)
+            return self.render_to_response(context)
+
+    def _call_super_form_valid(self, form):
+        response = super()._call_super_form_valid(form)
+        # Same compound-write contract as the per-collection sibling: the
+        # sources formset persists inside the bound create's atomic write.
+        if "form-TOTAL_FORMS" in self.request.POST:
+            preserve_bibliographic_sources_through_formset(self.object, self._formset)
+        return response
+
 
 class AggregatedCollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = AggregatedCollectionPropertyValue
@@ -968,16 +1054,21 @@ class AggregatedCollectionPropertyValueUpdateView(
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = self.get_formset()
+        self._formset = self.get_formset()
 
-        if form.is_valid() and formset.is_valid():
-            self.object = form.save()
-            preserve_bibliographic_sources_through_formset(self.object, formset)
-            return HttpResponseRedirect(self.get_success_url())
+        if form.is_valid() and self._formset.is_valid():
+            return self.form_valid(form)
         else:
             return self.render_to_response(
-                self.get_context_data(form=form, formset=formset)
+                self.get_context_data(form=form, formset=self._formset)
             )
+
+    def _call_super_form_valid(self, form):
+        response = super()._call_super_form_valid(form)
+        # The sources formset writes inside the locked update boundary so the
+        # revision and audit event cover the whole compound change.
+        preserve_bibliographic_sources_through_formset(self.object, self._formset)
+        return response
 
 
 class AggregatedCollectionPropertyValueModalDeleteView(
@@ -1156,18 +1247,22 @@ class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
 
     def post(self, request, *args, **kwargs):
         form = self.get_form()
-        formset = self.get_formset()
+        self._formset = self.get_formset()
 
-        if form.is_valid() and formset.is_valid():
-            form.instance.owner = self.request.user
-            self.object = form.save()
-            # Update formset's parent_object so it can set the M2M relationship
-            formset.parent_object = self.object
-            formset.save()
-            return HttpResponseRedirect(self.get_success_url())
+        if form.is_valid() and self._formset.is_valid():
+            return self.form_valid(form)
         else:
-            context = self.get_context_data(form=form, formset=formset)
+            context = self.get_context_data(form=form, formset=self._formset)
             return self.render_to_response(context)
+
+    def _call_super_form_valid(self, form):
+        response = super()._call_super_form_valid(form)
+        # The flyer formset writes inside the same atomic create boundary:
+        # the persisted object is the M2M target and a formset failure
+        # rolls the whole create back.
+        self._formset.parent_object = self.object
+        self._formset.save()
+        return response
 
 
 class CollectionCopyView(CollectionCreateView):
@@ -1214,21 +1309,16 @@ class CollectionCreateNewVersionView(CollectionCopyView):
     predecessor = None
 
     def has_permission(self):
-        """Require add permission and published-or-own predecessor access."""
+        """Require add permission plus the central ``new_version`` decision."""
         if not super().has_permission():
             return False
-
-        user = getattr(self.request, "user", None)
 
         try:
             predecessor = self.get_object()
         except Exception:
             return False
 
-        return (
-            predecessor.publication_status == Collection.STATUS_PUBLISHED
-            or predecessor.owner_id == user.id
-        )
+        return decide(self.request.user, "new_version", predecessor).allowed
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -1265,19 +1355,19 @@ class CollectionCreateNewVersionView(CollectionCopyView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = self.get_formset()
+        self._formset = self.get_formset()
 
-        if form.is_valid() and formset.is_valid():
-            form.instance.owner = self.request.user
+        if form.is_valid() and self._formset.is_valid():
             self.predecessor = self.get_object()
-            self.object = form.save()
-            self.object.add_predecessor(self.predecessor)
-            formset.parent_object = self.object
-            formset.save()
-            return HttpResponseRedirect(self.get_success_url())
+            return self.form_valid(form)
         else:
-            context = self.get_context_data(form=form, formset=formset)
+            context = self.get_context_data(form=form, formset=self._formset)
             return self.render_to_response(context)
+
+    def _call_super_form_valid(self, form):
+        response = super()._call_super_form_valid(form)
+        self.object.add_predecessor(self.predecessor)
+        return response
 
 
 class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
@@ -1506,6 +1596,7 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
         """Add collection property values for review preview."""
         obj = self.object
         review_context = {}
+        actor = getattr(self.request, "user", None)
 
         # For review preview, show CPVs with status in {published, review},
         # preferring review over published for the same (property, unit, year) key
@@ -1513,21 +1604,26 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
             if hasattr(obj, "all_versions") and hasattr(
                 obj, "_deduplicate_property_values"
             ):
-                from django.db.models import Case, IntegerField, Value, When
-
-                cpv_qs = (
-                    CollectionPropertyValue.objects.filter(
-                        collection__in=obj.all_versions(),
-                        publication_status__in=["published", "review"],
+                cpv_qs = preferred_measurement_queryset(
+                    publication_states_queryset(
+                        actor,
+                        CollectionPropertyValue.objects.filter(
+                            collection__in=obj.all_versions(),
+                        ),
+                        ["published", "review"],
                     )
-                    .select_related("property", "unit", "collection", "owner")
-                    .prefetch_related("sources")
                 )
+                cpv_qs = cpv_qs.select_related(
+                    "property", "unit", "collection", "owner"
+                ).prefetch_related("sources")
+                review_ids = publication_states_queryset(
+                    actor, cpv_qs, ["review"]
+                ).values("pk")
 
                 # Order by property/unit/year, then prefer review (0) over published (1)
                 cpv_qs = cpv_qs.annotate(
                     review_order=Case(
-                        When(publication_status="review", then=Value(0)),
+                        When(pk__in=review_ids, then=Value(0)),
                         default=Value(1),
                         output_field=IntegerField(),
                     )
@@ -1550,14 +1646,15 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
         # Same logic for aggregated property values
         try:
             if hasattr(obj, "all_versions"):
-                from django.db.models import Case, IntegerField, Value, When
-
-                agg_qs = (
+                agg_qs = publication_states_queryset(
+                    actor,
                     AggregatedCollectionPropertyValue.objects.filter(
-                        collections__in=obj.all_versions(),
-                        publication_status__in=["published", "review"],
-                    )
-                    .select_related("property", "unit", "owner")
+                        collections__in=obj.all_versions()
+                    ),
+                    ["published", "review"],
+                )
+                agg_qs = (
+                    agg_qs.select_related("property", "unit", "owner")
                     .prefetch_related("collections", "sources")
                     .distinct()
                 )
@@ -1704,15 +1801,22 @@ class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
-        formset = self.get_formset()
+        self._formset = self.get_formset()
 
-        if form.is_valid() and formset.is_valid():
-            form.save()
-            formset.save()
-            return HttpResponseRedirect(self.get_success_url())
+        if form.is_valid() and self._formset.is_valid():
+            return self.form_valid(form)
         else:
-            context = self.get_context_data(form=form, formset=formset)
+            context = self.get_context_data(form=form, formset=self._formset)
             return self.render_to_response(context)
+
+    def _call_super_form_valid(self, form):
+        response = super()._call_super_form_valid(form)
+        # The flyer formset writes inside the same locked update boundary:
+        # the freshly locked object is the M2M target so the content
+        # snapshot captures flyer changes for revision and audit.
+        self._formset.parent_object = self.object
+        self._formset.save()
+        return response
 
 
 class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -1753,15 +1857,17 @@ class CollectionAddPropertyValueView(
             self.parent_collection = Collection.objects.get(pk=self.kwargs.get("pk"))
         except Collection.DoesNotExist:
             return False
-        policy = get_object_policy(
-            self.request.user, self.parent_collection, request=self.request
-        )
-        if not policy.get("can_add_property"):
-            return False
         self.anchor_collection = (
             self.parent_collection.version_anchor or self.parent_collection
         )
-        return True
+        # Central decision for attaching a CPV to a collection — the same
+        # attached-create decision the boundary re-decides under row locks.
+        return decide(
+            self.request.user,
+            "create",
+            CollectionPropertyValue,
+            parent=self.parent_collection,
+        ).allowed
 
     def get_initial(self):
         initial = super().get_initial()
@@ -1784,8 +1890,10 @@ class CollectionAddPropertyValueView(
                 anchor = parent.version_anchor or parent
             except Collection.DoesNotExist as err:
                 raise PermissionDenied("Invalid parent collection.") from err
+        # Resolve the create parent before the boundary runs so
+        # ``authorize_create`` and ``validate_created_parent`` see the anchor.
         form.instance.collection = anchor
-        return super().forms_valid(form, formset)
+        return self.form_valid(form)
 
 
 class CollectionCatchmentAddAggregatedPropertyView(
@@ -1858,21 +1966,33 @@ class CollectionWasteSamplesView(UserCreatedObjectUpdateView):
         action = self.request.POST.get("submit")
         sample = form.cleaned_data["sample"]
 
-        if action == "Add":
-            if self.object.samples.filter(pk=sample.pk).exists():
-                messages.info(
-                    self.request, "Sample is already linked to this collection."
-                )
-            else:
-                self.object.samples.add(sample)
-                messages.success(self.request, "Sample linked to collection.")
+        # The M2M change is a content edit on the Collection root: lock it,
+        # re-decide edit access, re-validate the submitted reference, and let
+        # the snapshot diff record revision and audit for the add/remove.
+        with content_mutation(
+            self.request.user, self.object, action="edit"
+        ) as locked_collection:
+            actor = _fresh_actor(self.request.user)
+            validate_references(actor, form.cleaned_data)
+            self.object = locked_collection
 
-        elif action == "Remove":
-            if self.object.samples.filter(pk=sample.pk).exists():
-                self.object.samples.remove(sample)
-                messages.success(self.request, "Sample removed from collection.")
-            else:
-                messages.info(self.request, "Sample is not linked to this collection.")
+            if action == "Add":
+                if locked_collection.samples.filter(pk=sample.pk).exists():
+                    messages.info(
+                        self.request, "Sample is already linked to this collection."
+                    )
+                else:
+                    locked_collection.samples.add(sample)
+                    messages.success(self.request, "Sample linked to collection.")
+
+            elif action == "Remove":
+                if locked_collection.samples.filter(pk=sample.pk).exists():
+                    locked_collection.samples.remove(sample)
+                    messages.success(self.request, "Sample removed from collection.")
+                else:
+                    messages.info(
+                        self.request, "Sample is not linked to this collection."
+                    )
 
         return HttpResponseRedirect(self.get_success_url())
 
@@ -1902,10 +2022,22 @@ class CollectionPredecessorsView(UserCreatedObjectUpdateView):
         return super().get_context_data(**kwargs)
 
     def form_valid(self, form):
-        if self.request.POST["submit"] == "Add":
-            self.object.predecessors.add(form.cleaned_data["predecessor"])
-        if self.request.POST["submit"] == "Remove":
-            self.object.predecessors.remove(form.cleaned_data["predecessor"])
+        # Same governed contract as the samples view: the predecessor edge is
+        # a content edit on this Collection, so the M2M write runs under the
+        # locked root with the submitted reference re-validated. Collection
+        # declares no parent_path, so no reassign-level decision exists for
+        # the edge — edit on this root plus read on the linked row govern.
+        with content_mutation(
+            self.request.user, self.object, action="edit"
+        ) as locked_collection:
+            actor = _fresh_actor(self.request.user)
+            validate_references(actor, form.cleaned_data)
+            self.object = locked_collection
+
+            if self.request.POST["submit"] == "Add":
+                locked_collection.predecessors.add(form.cleaned_data["predecessor"])
+            if self.request.POST["submit"] == "Remove":
+                locked_collection.predecessors.remove(form.cleaned_data["predecessor"])
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -1922,11 +2054,9 @@ class SoilcomDatasetVersionMixin:
     Provides a stable dataset version (dv) string for caching purposes.
 
     The dv changes only when data visible for the current map scope changes.
-    It's computed from a scope-appropriate queryset using:
-    - COUNT(*)
-    - MAX(lastmodified_at)
-    - MIN(id)
-    - MAX(id)
+    It delegates to ``compute_collection_dataset_version`` so the page-level
+    signature tracks the same centrally scoped queryset
+    (``scope_queryset``) that the features layer and cache warm-up task use.
 
     The dv is then exposed to templates via context as "dataset_version".
     """
@@ -1941,43 +2071,9 @@ class SoilcomDatasetVersionMixin:
             or "published"
         )
 
-    def _dv_queryset(self):
-        scope = self.get_dv_scope()
-        user = getattr(self.request, "user", None)
-        qs = Collection.objects.all()
-
-        if scope == "published":
-            qs = qs.filter(publication_status="published")
-        elif scope == "private":
-            if user and user.is_authenticated and not user.is_staff:
-                qs = qs.filter(owner=user)
-            else:
-                # Staff users on private scope: default to all (matches current staff behavior)
-                qs = qs
-        elif scope == "review":
-            if user and user.is_authenticated and not user.is_staff:
-                qs = qs.filter(Q(owner=user) | Q(publication_status="review"))
-            else:
-                # Staff: restrict dv to items in review to reflect the view's intent
-                qs = qs.filter(publication_status="review")
-        return qs
-
     def get_dataset_version(self) -> str:
-        qs = self._dv_queryset()
-        agg = qs.aggregate(
-            cnt=Count("pk"),
-            max_mod=Max("lastmodified_at"),
-            min_id=Min("pk"),
-            max_id=Max("pk"),
-        )
-        scope = self.get_dv_scope()
-        cnt = agg.get("cnt") or 0
-        max_mod = agg.get("max_mod")
-        ts = int(max_mod.timestamp()) if max_mod else 0
-        min_id = agg.get("min_id") or 0
-        max_id = agg.get("max_id") or 0
-        base = f"{scope}:{cnt}:{ts}:{min_id}:{max_id}"
-        return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
+        user = getattr(self.request, "user", None)
+        return compute_collection_dataset_version(self.get_dv_scope(), user)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)

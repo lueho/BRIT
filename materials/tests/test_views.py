@@ -1,15 +1,18 @@
 import json
 from datetime import datetime
 from decimal import Decimal
+from io import StringIO
 from unittest.mock import patch
 from urllib.parse import quote
 from uuid import uuid4
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.db import connection
 from django.db.models.signals import post_save, pre_save
 from django.template.loader import render_to_string
@@ -34,6 +37,7 @@ from utils.properties.models import Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
 from ..composition_normalization import get_sample_normalized_compositions
+from ..forms import AddCompositionModalForm
 from ..models import (
     AnalyticalMethod,
     ComponentMeasurement,
@@ -57,6 +61,7 @@ from ..models import (
 from ..serializers import SampleAPISerializer, SampleModelSerializer
 from ..views import (
     DETAIL_RELATED_LIMIT,
+    AddCompositionView,
     SampleDetailView,
     SampleSubstrateMaterialQuickCreateView,
 )
@@ -194,13 +199,16 @@ class SampleSubstrateMaterialAutocompleteViewTestCase(TestCase):
 
 
 class SampleSubstrateMaterialQuickCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ["add_material"]
+    # Reusing an existing material attaches the substrate category through
+    # the governed edit boundary, so members hold the change capability too.
+    member_permissions = ["add_material", "change_material"]
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
         cls.substrate_category, _ = MaterialCategory.objects.get_or_create(
-            name=get_sample_substrate_category_name()
+            name=get_sample_substrate_category_name(),
+            defaults={"publication_status": "published"},
         )
 
     def test_post_redirects_anonymous_user_to_login(self):
@@ -5217,8 +5225,142 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class AddSeasonalVariationViewTestCase(ViewWithPermissionsTestCase):
+    """The seasonal-variation attach view governs the actual SampleSeries
+    mutation and the created timestep samples, not the composition that
+    merely addresses the series."""
+
+    member_permissions = ("change_sampleseries", "add_sample")
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        material = Material.objects.create(owner=cls.member, name="Test Material")
+        group = MaterialComponentGroup.objects.create(
+            owner=cls.member, name="Test Group"
+        )
+        cls.series = SampleSeries.objects.create(
+            owner=cls.member, name="Test Series", material=material
+        )
+        sample = Sample.objects.get(
+            series=cls.series, timestep=Timestep.objects.default()
+        )
+        cls.composition = Composition.objects.create(
+            owner=cls.member,
+            sample=sample,
+            group=group,
+            fractions_of=MaterialComponent.objects.default(),
+        )
+        cls.distribution = TemporalDistribution.objects.create(
+            owner=cls.member,
+            name="Seasonal",
+            publication_status="published",
+        )
+        cls.timestep_1 = Timestep.objects.create(
+            owner=cls.member, name="Spring", distribution=cls.distribution
+        )
+        cls.timestep_2 = Timestep.objects.create(
+            owner=cls.member, name="Autumn", distribution=cls.distribution
+        )
+
+    def get_url(self):
+        return reverse("add_seasonal_variation", kwargs={"pk": self.composition.pk})
+
+    def post_data(self, distribution=None):
+        return {"temporal_distribution": (distribution or self.distribution).pk}
+
+    def test_post_anonymous_redirects_to_login(self):
+        url = self.get_url()
+        response = self.client.post(url, self.post_data())
+        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertNotIn(self.distribution, self.series.temporal_distributions.all())
+
+    def test_post_denied_for_outsider_and_creates_nothing(self):
+        self.client.force_login(self.outsider)
+        sample_count = self.series.samples.count()
+
+        response = self.client.post(self.get_url(), self.post_data())
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn(self.distribution, self.series.temporal_distributions.all())
+        self.assertEqual(self.series.samples.count(), sample_count)
+
+    def test_post_denied_for_sample_editor_without_series_access(self):
+        """Edit access on the addressed sample must not mutate the
+        independently governed series: denied, no rows."""
+        sample_editor = User.objects.create(username="sample-only-editor")
+        sample_editor.user_permissions.add(
+            Permission.objects.get(codename="change_sample"),
+            Permission.objects.get(codename="add_sample"),
+        )
+        self.composition.sample.add_editor(sample_editor, granted_by=self.member)
+        sample_count = self.series.samples.count()
+        self.client.force_login(sample_editor)
+
+        response = self.client.post(self.get_url(), self.post_data())
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn(self.distribution, self.series.temporal_distributions.all())
+        self.assertEqual(self.series.samples.count(), sample_count)
+
+    def test_post_denied_for_frozen_series(self):
+        """A published series is immutable — even for its owner."""
+        self.series.publication_status = "published"
+        self.series.save(update_fields=["publication_status"])
+        sample_count = self.series.samples.count()
+        self.client.force_login(self.member)
+
+        response = self.client.post(self.get_url(), self.post_data())
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn(self.distribution, self.series.temporal_distributions.all())
+        self.assertEqual(self.series.samples.count(), sample_count)
+
+    def test_post_denied_for_foreign_private_distribution(self):
+        """A forged reference to an unreadable private distribution is
+        re-decided inside the locked write boundary and denied."""
+        foreign_distribution = TemporalDistribution.objects.create(
+            owner=self.owner,
+            name="Foreign Private Distribution",
+            publication_status="private",
+        )
+        sample_count = self.series.samples.count()
+        self.client.force_login(self.member)
+
+        response = self.client.post(
+            self.get_url(), self.post_data(distribution=foreign_distribution)
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn(foreign_distribution, self.series.temporal_distributions.all())
+        self.assertEqual(self.series.samples.count(), sample_count)
+
+    def test_post_authorized_creates_samples_and_audit(self):
+        self.client.force_login(self.member)
+        series_revision = self.series.content_revision
+
+        response = self.client.post(self.get_url(), self.post_data())
+
+        self.assertRedirects(response, self.composition.get_absolute_url())
+        self.assertIn(self.distribution, self.series.temporal_distributions.all())
+        for timestep in (self.timestep_1, self.timestep_2):
+            sample = Sample.objects.get(series=self.series, timestep=timestep)
+            self.assertEqual(sample.owner, self.member)
+        self.series.refresh_from_db()
+        self.assertEqual(self.series.content_revision, series_revision + 1)
+        content_type = ContentType.objects.get_for_model(SampleSeries)
+        self.assertTrue(
+            ReviewAction.objects.filter(
+                content_type=content_type,
+                object_id=self.series.pk,
+                action=ReviewAction.ACTION_EDITED,
+                user=self.member,
+            ).exists()
+        )
+
+
 class RemoveSeasonalVariationViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = "change_composition"
+    member_permissions = ("change_sampleseries", "delete_sample")
 
     @classmethod
     def setUpTestData(cls):
@@ -5318,6 +5460,46 @@ class RemoveSeasonalVariationViewTestCase(ViewWithPermissionsTestCase):
             self.composition.sample.series.temporal_distributions.all(),
         )
         self.assertTrue(Composition.objects.filter(pk=self.composition.pk).exists())
+
+    def test_post_anonymous_redirects_to_login(self):
+        url = self.get_url()
+
+        response = self.client.post(url)
+
+        self.assertRedirects(response, f"{reverse('auth_login')}?next={url}")
+        self.assertIn(
+            self.distribution,
+            self.composition.sample.series.temporal_distributions.all(),
+        )
+
+    def test_post_denied_for_outsider_and_preserves_rows(self):
+        """A user without edit access deletes nothing and unlinks nothing."""
+        self.client.force_login(self.outsider)
+        series = self.composition.sample.series
+        sample_count = series.samples.count()
+
+        response = self.client.post(self.get_url())
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(series.samples.count(), sample_count)
+        self.assertIn(self.distribution, series.temporal_distributions.all())
+
+    def test_post_denied_for_series_editor_without_delete_sample(self):
+        """Edit access on the series alone cannot delete timestep samples."""
+        series = self.composition.sample.series
+        editor = User.objects.create(username="series-editor")
+        editor.user_permissions.add(
+            Permission.objects.get(codename="change_sampleseries")
+        )
+        series.add_editor(editor, granted_by=self.member)
+        sample_count = series.samples.count()
+        self.client.force_login(editor)
+
+        response = self.client.post(self.get_url())
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(series.samples.count(), sample_count)
+        self.assertIn(self.distribution, series.temporal_distributions.all())
 
 
 class SeasonalVariationStandaloneSampleTestCase(ViewWithPermissionsTestCase):
@@ -5789,13 +5971,28 @@ class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
 
 
 class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = "add_composition"
+    """Manifest-provisioned access to the series composition attach view.
+
+    The member holds only the ``registered`` role: ``add_composition`` is
+    deliberately absent from the role manifest because Composition is an
+    owned child of Sample, so the object-level create decision on each
+    sample is the sole gate.
+    """
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        call_command("sync_roles", "--apply", stdout=StringIO(), stderr=StringIO())
+        cls.member.groups.add(Group.objects.get(name="registered"))
         material = Material.objects.create(name="Test Material")
-        cls.component_group = MaterialComponentGroup.objects.create(name="Test Group")
+        cls.component_group = MaterialComponentGroup.objects.create(
+            name="Test Group", publication_status="published"
+        )
+        # The shared default component is private ownerless data; only a
+        # readable reference may be submitted.
+        cls.default_component = MaterialComponent.objects.default()
+        cls.default_component.publication_status = "published"
+        cls.default_component.save(update_fields=["publication_status"])
         cls.series = SampleSeries.objects.create(
             owner=cls.member, name="Test Series", material=material
         )
@@ -5842,7 +6039,7 @@ class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             "group": self.component_group.pk,
-            "fractions_of": MaterialComponent.objects.default().pk,
+            "fractions_of": self.default_component.pk,
         }
         response = self.client.post(
             reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk}), data
@@ -5855,13 +6052,129 @@ class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             "group": self.component_group.pk,
-            "fractions_of": MaterialComponent.objects.default().pk,
+            "fractions_of": self.default_component.pk,
         }
         self.client.post(
             reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk}), data
         )
         for sample in self.series.samples.all():
             Composition.objects.get(sample=sample, group=self.component_group)
+
+    def test_post_denied_when_a_series_sample_is_not_editable(self):
+        """One non-editable sample in the series fails the whole write."""
+        foreign_sample = Sample.objects.create(
+            owner=self.owner,
+            name="Foreign sample",
+            series=self.series,
+            material=self.series.material,
+        )
+        self.client.force_login(self.member)
+        data = {
+            "group": self.component_group.pk,
+            "fractions_of": self.default_component.pk,
+        }
+
+        response = self.client.post(
+            reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk}),
+            data,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Composition.objects.filter(
+                group=self.component_group, sample__series=self.series
+            ).exists()
+        )
+        self.assertFalse(
+            Composition.objects.filter(
+                group=self.component_group, sample=foreign_sample
+            ).exists()
+        )
+
+    def test_get_does_not_list_foreign_private_groups(self):
+        """Unreadable private groups must not leak their name as a choice."""
+        MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Foreign Private Group",
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Foreign Private Group")
+
+    def test_post_rejects_foreign_private_group(self):
+        """A submitted foreign private group is not a valid form choice."""
+        foreign_group = MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Foreign Private Group",
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk}),
+            {
+                "group": foreign_group.pk,
+                "fractions_of": self.default_component.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("group", response.context["form"].errors)
+        self.assertFalse(
+            Composition.objects.filter(
+                group=foreign_group, sample__series=self.series
+            ).exists()
+        )
+
+    def test_write_boundary_revalidates_reference_read_access(self):
+        """References are re-decided inside the locked write transaction so a
+        stale or forged cleaned_data can never link an unreadable record."""
+        foreign_group = MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Foreign Private Group",
+            publication_status="private",
+        )
+        request = RequestFactory().post(
+            reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk})
+        )
+        request.user = self.member
+        view = AddCompositionView()
+        view.request = request
+        view.kwargs = {"pk": self.series.pk}
+        view.object = self.series
+        form = AddCompositionModalForm(instance=self.series)
+        form.cleaned_data = {
+            "group": foreign_group,
+            "fractions_of": self.default_component,
+        }
+
+        with self.assertRaises(PermissionDenied):
+            view.form_valid(form)
+        self.assertFalse(
+            Composition.objects.filter(
+                group=foreign_group, sample__series=self.series
+            ).exists()
+        )
+
+    def test_post_denied_for_staff_without_object_access(self):
+        """The Django staff flag alone grants no write access."""
+        bare_staff = User.objects.create_user(username="bare-staff", is_staff=True)
+        self.client.force_login(bare_staff)
+        response = self.client.post(
+            reverse("sampleseries-add-composition", kwargs={"pk": self.series.pk}),
+            {
+                "group": self.component_group.pk,
+                "fractions_of": self.default_component.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Composition.objects.filter(
+                group=self.component_group, sample__series=self.series
+            ).exists()
+        )
 
 
 class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
@@ -6071,6 +6384,42 @@ class SampleAddCompositionViewTestCase(ViewWithPermissionsTestCase):
             Composition.objects.filter(
                 sample=self.other_users_sample, group=self.component_group
             ).exists()
+        )
+
+    def test_get_does_not_list_foreign_private_groups(self):
+        """Unreadable private groups must not leak their name as a choice."""
+        MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Foreign Private Group",
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse("sample-add-composition", kwargs={"pk": self.sample.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Foreign Private Group")
+
+    def test_post_rejects_foreign_private_group(self):
+        """A submitted foreign private group is not a valid form choice."""
+        foreign_group = MaterialComponentGroup.objects.create(
+            owner=self.owner,
+            name="Foreign Private Group",
+            publication_status="private",
+        )
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse("sample-add-composition", kwargs={"pk": self.sample.pk}),
+            {
+                "sample": self.sample.pk,
+                "group": foreign_group.pk,
+                "fractions_of": MaterialComponent.objects.default().pk,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("group", response.context["form"].errors)
+        self.assertFalse(
+            Composition.objects.filter(group=foreign_group, sample=self.sample).exists()
         )
 
 

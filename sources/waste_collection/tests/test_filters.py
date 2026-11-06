@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q, signals
 from django.test import RequestFactory, TestCase
 from django.utils import timezone
@@ -114,13 +115,13 @@ class CollectionsPerYearFilterTestCase(TestCase):
         )
 
         continuous_frequency = CollectionFrequency.objects.create(
-            name="Continuous Frequency"
+            name="Continuous Frequency", publication_status="published"
         )
         seasonal_frequency = CollectionFrequency.objects.create(
-            name="Seasonal Frequency"
+            name="Seasonal Frequency", publication_status="published"
         )
         uncountable_frequency = CollectionFrequency.objects.create(
-            name="Frequency Without Count Options"
+            name="Frequency Without Count Options", publication_status="published"
         )
 
         CollectionCountOptions.objects.create(
@@ -182,25 +183,51 @@ class CollectionsPerYearFilterTestCase(TestCase):
 class ConnectionRateFilterTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.collection1 = Collection.objects.create(name="Collection 1")
-        cls.collection2 = Collection.objects.create(name="Collection 2")
-        cls.collection3 = Collection.objects.create(name="Collection 3")
-        cls.collection4 = Collection.objects.create(name="Collection 4")
-        cls.collection5 = Collection.objects.create(name="Collection 5")
+        cls.collection1 = Collection.objects.create(
+            name="Collection 1", publication_status="published"
+        )
+        cls.collection2 = Collection.objects.create(
+            name="Collection 2", publication_status="published"
+        )
+        cls.collection3 = Collection.objects.create(
+            name="Collection 3", publication_status="published"
+        )
+        cls.collection4 = Collection.objects.create(
+            name="Collection 4", publication_status="published"
+        )
+        cls.collection5 = Collection.objects.create(
+            name="Collection 5", publication_status="published"
+        )
 
         # Add connection rate properties to collections
         prop = Property.objects.create(name="Connection rate")
         CollectionPropertyValue.objects.create(
-            collection=cls.collection1, property=prop, year=2022, average=50
+            collection=cls.collection1,
+            property=prop,
+            year=2022,
+            average=50,
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
-            collection=cls.collection2, property=prop, year=2022, average=75
+            collection=cls.collection2,
+            property=prop,
+            year=2022,
+            average=75,
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
-            collection=cls.collection3, property=prop, year=2022, average=25
+            collection=cls.collection3,
+            property=prop,
+            year=2022,
+            average=25,
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
-            collection=cls.collection4, property=prop, year=2022, average=0
+            collection=cls.collection4,
+            property=prop,
+            year=2022,
+            average=0,
+            publication_status="published",
         )
 
     def test_filter_by_connection_rate(self):
@@ -235,21 +262,41 @@ class ConnectionRateFilterTestCase(TestCase):
 class SpecWasteCollectedFilterTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.collection1 = Collection.objects.create(name="Collection 1")
-        cls.collection2 = Collection.objects.create(name="Collection 2")
-        cls.collection3 = Collection.objects.create(name="Collection 3")
-        cls.collection4 = Collection.objects.create(name="Collection 4")
+        cls.collection1 = Collection.objects.create(
+            name="Collection 1", publication_status="published"
+        )
+        cls.collection2 = Collection.objects.create(
+            name="Collection 2", publication_status="published"
+        )
+        cls.collection3 = Collection.objects.create(
+            name="Collection 3", publication_status="published"
+        )
+        cls.collection4 = Collection.objects.create(
+            name="Collection 4", publication_status="published"
+        )
 
         # Add spec waste collected properties to collections
         prop = Property.objects.create(name="specific waste collected")
         CollectionPropertyValue.objects.create(
-            collection=cls.collection1, property=prop, year=2022, average=100
+            collection=cls.collection1,
+            property=prop,
+            year=2022,
+            average=100,
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
-            collection=cls.collection2, property=prop, year=2021, average=200
+            collection=cls.collection2,
+            property=prop,
+            year=2021,
+            average=200,
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
-            collection=cls.collection3, property=prop, year=2019, average=300
+            collection=cls.collection3,
+            property=prop,
+            year=2019,
+            average=300,
+            publication_status="published",
         )
 
     def test_filter_by_spec_waste_collected(self):
@@ -281,6 +328,7 @@ class CollectionFilterMetadataTestCase(TestCase):
         cls.owner = User.objects.create_user(username="filter-metadata-owner")
         cls.collection = Collection.objects.create(
             owner=cls.owner,
+            publication_status="published",
             required_bin_capacity=Decimal("120.5"),
             min_bin_size=Decimal("240.5"),
         )
@@ -357,6 +405,11 @@ class CollectionFilterMetadataTestCase(TestCase):
                 self.assertEqual(widget.attrs["data-range_max"], maximum)
 
     def test_slider_initialization_uses_three_aggregate_queries(self):
+        # The data-query budget excludes immutable policy-metadata warmup.
+        ContentType.objects.get_for_models(
+            Collection, CollectionPropertyValue, CollectionFrequency
+        )
+        self.owner.get_all_permissions()
         with self.assertNumQueries(3):
             filters = self.get_filters({"scope": "published"})
             self.assert_maxima(
@@ -478,7 +531,8 @@ class CollectionFilterMetadataTestCase(TestCase):
 
 class CollectionFilterMetadataEmptyTestCase(TestCase):
     def test_empty_property_and_bin_tables_use_defaults(self):
-        with self.assertNumQueries(3):
+        # Empty collection/evidence aggregates need no SQL; only frequency remains.
+        with self.assertNumQueries(1):
             filters = CollectionFilterSet(
                 data={"scope": "published"}, queryset=Collection.objects.none()
             )
@@ -519,7 +573,7 @@ class CollectionFilterTestCase(TestCase):
             last_timestep=cls.december,
         )
         cls.not_seasonal_frequency = CollectionFrequency.objects.create(
-            name="Non-Seasonal Test Frequency"
+            name="Non-Seasonal Test Frequency", publication_status="published"
         )
         CollectionCountOptions.objects.create(
             frequency=cls.not_seasonal_frequency,
@@ -528,7 +582,7 @@ class CollectionFilterTestCase(TestCase):
             option_1=70,
         )
         cls.seasonal_frequency = CollectionFrequency.objects.create(
-            name="Seasonal Test Frequency"
+            name="Seasonal Test Frequency", publication_status="published"
         )
         CollectionCountOptions.objects.create(
             frequency=cls.seasonal_frequency, season=first_half_year, standard=35
@@ -548,7 +602,9 @@ class CollectionFilterTestCase(TestCase):
         cls.unrelated_catchment = CollectionCatchment.objects.create(
             name="Unrelated Test Catchment", type="administrative"
         )
-        fixed_once_per_week = CollectionFrequency.objects.create(type="Fixed")
+        fixed_once_per_week = CollectionFrequency.objects.create(
+            type="Fixed", publication_status="published"
+        )
         CollectionCountOptions.objects.create(
             frequency=fixed_once_per_week, season=whole_year, standard=52
         )
@@ -620,12 +676,14 @@ class CollectionFilterTestCase(TestCase):
             property=prop_connection_rate,
             year=2022,
             average=70,
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             collection=cls.collection2,
             property=prop_connection_rate,
             year=2021,
             average=30,
+            publication_status="published",
         )
 
         # Add specific waste collected properties
@@ -637,18 +695,21 @@ class CollectionFilterTestCase(TestCase):
             collection=cls.collection1,
             year=2022,
             average=100,
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             property=prop_spec_waste_collected,
             collection=cls.collection1,
             year=2021,
             average=150,
+            publication_status="published",
         )
         CollectionPropertyValue.objects.create(
             property=prop_spec_waste_collected,
             collection=cls.collection2,
             year=2022,
             average=200,
+            publication_status="published",
         )
 
     def setUp(self):

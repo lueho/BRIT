@@ -622,6 +622,21 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     update_object_data = {"name": "Updated Test Catchment"}
 
     @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        # The merge-LAU flow creates a sibling Region root inside the
+        # catchment's create boundary, so successful personas additionally
+        # hold ``add_region``.
+        add_region = Permission.objects.get(codename="add_region")
+        for user in (
+            cls.owner_user,
+            cls.non_owner_user,
+            cls.staff_user,
+            cls.user_with_add_perm,
+        ):
+            user.user_permissions.add(add_region)
+
+    @classmethod
     def create_related_objects(cls):
         return {
             "region": Region.objects.create(

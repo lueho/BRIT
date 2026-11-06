@@ -54,6 +54,7 @@ from sources.waste_collection.models import (
     CollectionPropertyValue,
     Collector,
 )
+from sources.waste_collection.projection_queries import preferred_measurement_queryset
 from utils.object_management.policy import (
     PUBLIC_READ_STATES,
     is_admin,
@@ -213,11 +214,10 @@ def _property_value_q(user=None):
     """Q for CPV evidence: independently authorized values whose collection
     is itself generally readable (not merely selected-scope)."""
     _normalized, actor = _effective_scope(user)
-    return Q(
-        pk__in=_supporting_queryset(CollectionPropertyValue, user).values_list(
-            "pk", flat=True
-        )
-    ) & Q(
+    measurements = preferred_measurement_queryset(
+        _supporting_queryset(CollectionPropertyValue, user)
+    )
+    return Q(pk__in=measurements.values_list("pk", flat=True)) & Q(
         collection_id__in=visible_queryset(actor, Collection.objects.all()).values_list(
             "pk", flat=True
         )
