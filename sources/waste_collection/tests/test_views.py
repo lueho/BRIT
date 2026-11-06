@@ -5077,9 +5077,20 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.staff = User.objects.create(username="reviewer", is_staff=True)
-        cls.staff.user_permissions.add(
-            Permission.objects.get(codename="can_moderate_collection")
-        )
+        # Review evidence is governed per model: staff status alone does not
+        # inherit CPV/ACPV moderation, so each capability is granted
+        # explicitly.
+        for model in (
+            Collection,
+            CollectionPropertyValue,
+            AggregatedCollectionPropertyValue,
+        ):
+            cls.staff.user_permissions.add(
+                Permission.objects.get(
+                    codename=f"can_moderate_{model._meta.model_name}",
+                    content_type=ContentType.objects.get_for_model(model),
+                )
+            )
         cls.predecessor_owner = User.objects.create(username="predecessor-owner")
 
         cls.catchment = CollectionCatchment.objects.create(name="RC")
@@ -5287,6 +5298,32 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
         body = response.content.decode()
         self.assertIn("45.7 ± 1.2 ReviewRoundedUnit (", body)
         self.assertNotIn("45.67 ± 1.24 ReviewRoundedUnit (", body)
+
+    def test_review_preview_collection_only_moderator_sees_published(self):
+        """Collection moderation does not broaden independent evidence access."""
+        collection_only = User.objects.create(
+            username="collection-only-reviewer", is_staff=True
+        )
+        collection_only.user_permissions.add(
+            Permission.objects.get(
+                codename="can_moderate_collection",
+                content_type=ContentType.objects.get_for_model(Collection),
+            )
+        )
+        self.client.force_login(collection_only)
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": self.ct_id,
+                "object_id": self.collection.pk,
+            },
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        cpvs = response.context["collection_property_values"]
+        self.assertEqual([v.pk for v in cpvs], [self.cpv_published.pk])
+        agg_vals = response.context["aggregated_collection_property_values"]
+        self.assertEqual([v.pk for v in agg_vals], [self.agg_published.pk])
 
 
 class WasteAtlasMapViewTestBase(TestCase):
