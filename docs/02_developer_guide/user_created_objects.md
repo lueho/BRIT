@@ -198,3 +198,38 @@ When permission behavior changes, update all three together:
 1. Implementation (`permissions.py` and call sites)
 2. Regression tests
 3. Canonical doc: `security_permission_validation.md`
+
+## Source-bound collection projections
+
+*Part 10 draft runtime checkpoint - not a deployment claim.*
+
+The earlier checkpoints' generated-activation gaps are historical. CPVs now
+declare a mixed record profile: raw rows remain independent evidence, while
+`is_derived=True` rows are generated projections with an explicit `derived_from`
+source. The generated registry entry delegates read, export and review activity
+to that validated raw source. Projection owner/status copies and projection-only
+grants never widen access. Shared policy adapters deny standalone projection
+mutations, including for administrators. Review dispatch and comments resolve
+to the source thread.
+
+Producer runs lock and reload the raw source, then maintain only the explicitly
+linked output - one projection per raw source. They never adopt or delete
+unlinked legacy or manual rows by resemblance; a missing link fails closed.
+Readable direct measurements take precedence over projections for the same
+collection, quantity, unit and year, and precedence is authorized before the
+comparison so an unreadable measurement cannot suppress a projection the actor
+may read. Projection listing, display context and export resolve the source
+thread, ownership and lifecycle; export stays actor-aware. The numerical
+formulas, exact-year annual-average resolver and JSON provenance are unchanged
+and there is no independent approval path.
+
+`--dry-run` writes nothing; a real run applies each per-source change in its own
+transaction without an outer rollback that could swallow the cleanup of a failed
+later source. The overrides map is compatibility metadata only - it never grants
+read or write rights. No persistent backfill or production activation is
+approved without a separately reviewed legacy-data treatment.
+
+The old global-per-key generated code cannot coexist with the per-source
+contract plus legacy duplicates, and the reverse migration can fail on the old
+uniqueness when linked rows exist. A rollback therefore requires a matched
+backup and code under a write pause - it is not a code-only rollback.

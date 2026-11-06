@@ -159,6 +159,10 @@ class ReviewContextAPIView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        target = review_target(obj)
+        if target is None:
+            raise PermissionDenied("No verified review target is available.")
+
         include_history = _to_bool(request.query_params.get("include_history", True))
 
         raw_history_limit = request.query_params.get("history_limit", 15)
@@ -171,18 +175,16 @@ class ReviewContextAPIView(APIView):
             )
 
         context = build_review_context(
-            obj,
+            target,
             include_history=include_history,
             history_limit=max(1, min(history_limit, 50)),
         )
-        context.update(
-            get_review_update_context(request.user, review_target(obj) or obj)
-        )
+        context.update(get_review_update_context(request.user, target))
 
         return Response(
             {
-                "content_type_id": content_type_id,
-                "object_id": object_id,
+                "content_type_id": ContentType.objects.get_for_model(target).pk,
+                "object_id": target.pk,
                 "context": context,
             },
             status=status.HTTP_200_OK,

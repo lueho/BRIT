@@ -32,12 +32,14 @@ from sources.waste_collection.models import (
     WasteComponent,
     WasteFlyer,
 )
+from sources.waste_collection.projection_queries import visible_measurement_queryset
 from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
 from utils.filters import (
     NullableRangeFilter,
     UserCreatedObjectScopedFilterSet,
 )
 from utils.object_management.permissions import (
+    apply_scope_filter,
     filter_queryset_for_user,
 )
 from utils.widgets import NullableRangeSliderWidget
@@ -249,9 +251,10 @@ class CollectionsPerYearFilter(NullableRangeFilter):
         )
 
     def apply_range(self, qs, value_slice: slice, include_nulls: bool):
-        freqs = CollectionFrequency.objects.annotate(
-            collection_count=Sum("collectioncountoptions__standard")
-        )
+        request = getattr(getattr(self, "parent", None), "request", None)
+        freqs = filter_queryset_for_user(
+            CollectionFrequency.objects.all(), getattr(request, "user", None)
+        ).annotate(collection_count=Sum("collectioncountoptions__standard"))
         filtered = qs.filter(
             frequency__in=freqs.filter(
                 collection_count__gte=value_slice.start,
@@ -259,12 +262,9 @@ class CollectionsPerYearFilter(NullableRangeFilter):
             )
         )
         if include_nulls:
-            # A frequency without collection count options yields no countable
-            # value, so those collections count as null just like collections
-            # without any frequency at all.
-            filtered = filtered | qs.filter(
-                Q(frequency__isnull=True)
-                | Q(frequency__in=freqs.filter(collection_count__isnull=True))
+            # Missing, unreadable, or uncountable frequencies are unknown.
+            filtered = filtered | qs.exclude(
+                frequency__in=freqs.filter(collection_count__isnull=False)
             )
         return filtered
 
@@ -298,13 +298,16 @@ class NullableCollectionPropertyValueRangeFilter(NullableRangeFilter):
         )
 
     def apply_range(self, qs, value_slice: slice, include_nulls: bool):
+        request = getattr(getattr(self, "parent", None), "request", None)
+        measurements = visible_measurement_queryset(
+            getattr(request, "user", None),
+            CollectionPropertyValue.objects.filter(property__name=self.property_name),
+        )
         qs = qs.annotate(
             **{
                 "avg_value": Avg(
                     "collectionpropertyvalue__average",
-                    filter=Q(
-                        collectionpropertyvalue__property__name=self.property_name
-                    ),
+                    filter=Q(collectionpropertyvalue__pk__in=measurements.values("pk")),
                 )
             }
         )
@@ -527,25 +530,36 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
             name: self.filters[name]
             for name in ("connection_rate", "spec_waste_collected")
         }
-        maxima = CollectionPropertyValue.objects.filter(
-            property__name__in=[
-                filter_.property_name for filter_ in property_filters.values()
-            ]
-        ).aggregate(
+        actor = getattr(self.request, "user", None)
+        collections = apply_scope_filter(
+            self.queryset, self.data.get("scope"), user=actor
+        )
+        measurements = visible_measurement_queryset(
+            actor,
+            CollectionPropertyValue.objects.filter(
+                collection__in=collections,
+                property__name__in=[
+                    filter_.property_name for filter_ in property_filters.values()
+                ],
+            ),
+        )
+        maxima = measurements.aggregate(
             **{
                 name: Max("average", filter=Q(property__name=filter_.property_name))
                 for name, filter_ in property_filters.items()
             }
         )
         maxima.update(
-            Collection.objects.aggregate(
+            collections.aggregate(
                 required_bin_capacity=Max("required_bin_capacity"),
                 min_bin_size=Max("min_bin_size"),
             )
         )
-        maxima["collections_per_year"] = CollectionFrequency.objects.annotate(
-            collection_count=Sum("collectioncountoptions__standard")
-        ).aggregate(maximum=Max("collection_count"))["maximum"]
+        maxima["collections_per_year"] = (
+            filter_queryset_for_user(CollectionFrequency.objects.all(), actor)
+            .annotate(collection_count=Sum("collectioncountoptions__standard"))
+            .aggregate(maximum=Max("collection_count"))["maximum"]
+        )
         for name, maximum in maxima.items():
             filter_ = self.filters[name]
             filter_.set_min_max(maximum)

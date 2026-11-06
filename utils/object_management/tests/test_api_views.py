@@ -697,8 +697,8 @@ class ReviewContextCPVEnrichmentTests(TestCase):
         self.assertEqual(ctx["parent_collection"]["id"], self.collection.id)
         self.assertEqual(ctx["parent_collection"]["name"], str(self.collection))
 
-    def test_context_excludes_timeline_for_derived_cpv(self):
-        """Derived CPVs do not get a value_timeline in the context."""
+    def test_context_denies_an_unlinked_legacy_projection(self):
+        """Unverified generated metadata is not an independent review context."""
         derived_cpv = CollectionPropertyValue.objects.create(
             collection=self.collection,
             property=self.prop,
@@ -720,10 +720,62 @@ class ReviewContextCPVEnrichmentTests(TestCase):
 
         response = self.client.get(url)
 
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn("context", response.json())
+
+    def test_linked_projection_context_is_the_source_context_and_history(self):
+        copied_owner = User.objects.create_user(username="cpv-copied-owner")
+        projection = CollectionPropertyValue.objects.create(
+            collection=self.collection,
+            property=self.prop,
+            unit=self.unit,
+            year=2021,
+            average=50.0,
+            owner=copied_owner,
+            is_derived=True,
+            derived_from=self.cpv_2021,
+            publication_status="published",
+            content_revision=99,
+        )
+        ReviewAction.objects.create(
+            content_type_id=self.cpv_ct_id,
+            object_id=self.cpv_2021.pk,
+            user=self.moderator,
+            action=ReviewAction.ACTION_COMMENT,
+            content_revision=self.cpv_2021.content_revision,
+            comment="Source review history",
+        )
+        ReviewAction.objects.create(
+            content_type_id=self.cpv_ct_id,
+            object_id=projection.pk,
+            user=copied_owner,
+            action=ReviewAction.ACTION_COMMENT,
+            comment="Unverified legacy projection history",
+        )
+        self.client.force_login(self.moderator)
+        source_response = self.client.get(
+            reverse(
+                "object_management:api_review_context",
+                kwargs={
+                    "content_type_id": self.cpv_ct_id,
+                    "object_id": self.cpv_2021.pk,
+                },
+            )
+        )
+        response = self.client.get(
+            reverse(
+                "object_management:api_review_context",
+                kwargs={
+                    "content_type_id": self.cpv_ct_id,
+                    "object_id": projection.pk,
+                },
+            )
+        )
+        self.assertEqual(source_response.status_code, 200)
         self.assertEqual(response.status_code, 200)
-        ctx = response.json()["context"]
-        self.assertNotIn("value_timeline", ctx)
-        self.assertIn("parent_collection", ctx)
+        self.assertEqual(response.json()["object_id"], self.cpv_2021.pk)
+        self.assertEqual(response.json(), source_response.json())
+        self.assertNotContains(response, "Unverified legacy projection history")
 
     def test_context_does_not_include_cpv_review_guidance(self):
         """CPV context payload contains only domain data; guidance is assembled by MCP."""

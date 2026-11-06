@@ -25,8 +25,11 @@ from utils.object_management.models import (
     get_default_owner,
 )
 from utils.object_management.permissions import filter_queryset_for_user
+from utils.object_management.policy import publication_states_queryset, scope_queryset
 from utils.object_management.services import perform_transition
 from utils.properties.models import PropertyValue
+
+from .projection_queries import visible_measurement_queryset
 
 logger = logging.getLogger(__name__)
 
@@ -694,23 +697,27 @@ class Collection(NamedUserCreatedObject):
             .prefetch_related("sources")
         )
 
-        qs = filter_queryset_for_user(qs, user)
+        qs = visible_measurement_queryset(user, qs)
 
         published_status = getattr(
             CollectionPropertyValue, "STATUS_PUBLISHED", "published"
         )
         user_id = getattr(user, "id", None)
+        owned_ids = scope_queryset(user, qs, "owned").values("pk")
+        published_ids = publication_states_queryset(
+            user, qs, [published_status]
+        ).values("pk")
 
         return qs.annotate(
             owner_order=Case(
-                When(owner_id=user_id, then=Value(0)),
+                When(pk__in=owned_ids, then=Value(0)),
                 default=Value(1),
                 output_field=IntegerField(),
             )
             if user_id
             else Value(1),
             publication_order=Case(
-                When(publication_status=published_status, then=Value(0)),
+                When(pk__in=published_ids, then=Value(0)),
                 default=Value(1),
                 output_field=IntegerField(),
             ),
@@ -995,6 +1002,18 @@ class CollectionPropertyValue(PropertyValue):
         default=False,
         help_text="True when this value was computed from another property (e.g. total ↔ specific via population).",
     )
+    derived_from = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        related_name="generated_values",
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=(
+            "The raw source value this generated projection is derived from. "
+            "Server-controlled; set only by the derivation pipeline."
+        ),
+    )
 
     def get_breadcrumb_object_label(self):
         label = f"{self.property}: {self.display_average}"
@@ -1020,14 +1039,13 @@ class CollectionPropertyValue(PropertyValue):
     class Meta(PropertyValue.Meta):
         constraints = [
             models.UniqueConstraint(
-                fields=["collection", "property", "year"],
-                condition=Q(is_derived=True),
-                name="soilcom_unique_derived_cpv_per_key",
+                fields=["derived_from"],
+                condition=Q(is_derived=True, derived_from__isnull=False),
+                name="wc_unique_generated_cpv_source",
             ),
-            models.UniqueConstraint(
-                fields=["collection", "property"],
-                condition=Q(is_derived=True, year__isnull=True),
-                name="soilcom_unique_derived_cpv_per_key_null_year",
+            models.CheckConstraint(
+                condition=Q(is_derived=True) | Q(derived_from__isnull=True),
+                name="soilcom_cpv_raw_without_source_pointer",
             ),
             models.UniqueConstraint(
                 fields=["collection", "property", "year", "unit"],

@@ -12,7 +12,7 @@ from django.contrib.auth.mixins import (
 )
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Max, Prefetch
+from django.db.models import Case, IntegerField, Max, Prefetch, Value, When
 from django.forms.models import model_to_dict
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -96,12 +96,14 @@ from sources.waste_collection.models import (
     WasteComponent,
     WasteFlyer,
 )
+from sources.waste_collection.projection_queries import preferred_measurement_queryset
 from sources.waste_collection.tasks import check_wasteflyer_url, check_wasteflyer_urls
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.forms import M2MInlineFormSetMixin
 from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import filter_queryset_for_user
-from utils.object_management.policy import decide
+from utils.object_management.policy import decide, publication_states_queryset
+from utils.object_management.registry import generated_source
 from utils.object_management.services import (
     _fresh_actor,
     content_mutation,
@@ -834,6 +836,7 @@ class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(_cpv_collection_chain_context(self.object, self.request.user))
+        context["generated_value_source"] = generated_source(self.object)
         return context
 
 
@@ -1593,6 +1596,7 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
         """Add collection property values for review preview."""
         obj = self.object
         review_context = {}
+        actor = getattr(self.request, "user", None)
 
         # For review preview, show CPVs with status in {published, review},
         # preferring review over published for the same (property, unit, year) key
@@ -1600,21 +1604,26 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
             if hasattr(obj, "all_versions") and hasattr(
                 obj, "_deduplicate_property_values"
             ):
-                from django.db.models import Case, IntegerField, Value, When
-
-                cpv_qs = (
-                    CollectionPropertyValue.objects.filter(
-                        collection__in=obj.all_versions(),
-                        publication_status__in=["published", "review"],
+                cpv_qs = preferred_measurement_queryset(
+                    publication_states_queryset(
+                        actor,
+                        CollectionPropertyValue.objects.filter(
+                            collection__in=obj.all_versions(),
+                        ),
+                        ["published", "review"],
                     )
-                    .select_related("property", "unit", "collection", "owner")
-                    .prefetch_related("sources")
                 )
+                cpv_qs = cpv_qs.select_related(
+                    "property", "unit", "collection", "owner"
+                ).prefetch_related("sources")
+                review_ids = publication_states_queryset(
+                    actor, cpv_qs, ["review"]
+                ).values("pk")
 
                 # Order by property/unit/year, then prefer review (0) over published (1)
                 cpv_qs = cpv_qs.annotate(
                     review_order=Case(
-                        When(publication_status="review", then=Value(0)),
+                        When(pk__in=review_ids, then=Value(0)),
                         default=Value(1),
                         output_field=IntegerField(),
                     )
@@ -1637,14 +1646,15 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
         # Same logic for aggregated property values
         try:
             if hasattr(obj, "all_versions"):
-                from django.db.models import Case, IntegerField, Value, When
-
-                agg_qs = (
+                agg_qs = publication_states_queryset(
+                    actor,
                     AggregatedCollectionPropertyValue.objects.filter(
-                        collections__in=obj.all_versions(),
-                        publication_status__in=["published", "review"],
-                    )
-                    .select_related("property", "unit", "owner")
+                        collections__in=obj.all_versions()
+                    ),
+                    ["published", "review"],
+                )
+                agg_qs = (
+                    agg_qs.select_related("property", "unit", "owner")
                     .prefetch_related("collections", "sources")
                     .distinct()
                 )

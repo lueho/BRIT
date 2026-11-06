@@ -24,6 +24,7 @@ from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
 )
+from utils.object_management.registry import review_target
 from utils.properties.models import Property
 from utils.serializers import FieldLabelModelSerializer, SimplifiedGeometryMixin
 
@@ -591,9 +592,10 @@ class CollectionFlatSerializer(
         return properties
 
     def get_user(self):
-        return (
-            getattr(self.context.get("request"), "user", None) if self.context else None
-        )
+        request = self.context.get("request")
+        if request is not None:
+            return getattr(request, "user", None)
+        return self.context.get("user")
 
     region_attribute_names = ("Population", "Population density")
 
@@ -934,7 +936,13 @@ class CollectionPropertyValueSerializer(serializers.ModelSerializer):
     property_name = serializers.CharField(source="property.name", read_only=True)
     unit_name = serializers.CharField(source="unit.name", read_only=True)
     unit_symbol = serializers.CharField(source="unit.symbol", read_only=True)
-    publication_status = serializers.CharField(read_only=True)
+    publication_status = serializers.SerializerMethodField()
+    derived_from = serializers.IntegerField(
+        source="derived_from_id", read_only=True, allow_null=True
+    )
+
+    def get_publication_status(self, obj):
+        return getattr(review_target(obj), "publication_status", None)
 
     class Meta:
         model = models.CollectionPropertyValue
@@ -949,8 +957,10 @@ class CollectionPropertyValueSerializer(serializers.ModelSerializer):
             "average",
             "standard_deviation",
             "is_derived",
+            "derived_from",
             "publication_status",
         )
+        read_only_fields = fields
 
 
 class CollectionImportRecordSerializer(serializers.Serializer):
