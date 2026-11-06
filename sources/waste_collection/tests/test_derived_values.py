@@ -15,6 +15,7 @@ from maps.population.models import (
     PopulationObservation,
 )
 from utils.properties.models import Property, Unit
+from utils.tests.testcases import ensure_test_default_owner
 
 from ..derived_values import (
     backfill_derived_values,
@@ -58,6 +59,7 @@ from ..waste_atlas.viewsets import (
 class DerivedValuesTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
+        ensure_test_default_owner()
         cls.property_specific = Property.objects.create(
             name="specific waste collected [test]"
         )
@@ -137,7 +139,7 @@ class DerivedValuesTestCase(TestCase):
         CollectionPropertyValue.objects.bulk_create([cpv])
         return cpv
 
-    def test_create_or_update_removes_stale_derived_when_manual_exists(self):
+    def test_create_or_update_preserves_projection_when_manual_exists(self):
         collection, _catchment = self._create_collection("stale", population=2000)
 
         specific = self._bulk_create_cpv(
@@ -151,7 +153,7 @@ class DerivedValuesTestCase(TestCase):
             is_derived=False,
         )
 
-        _derived, action = create_or_update_derived_cpv(specific)
+        first, action = create_or_update_derived_cpv(specific)
         self.assertEqual(action, "created")
         self.assertTrue(
             CollectionPropertyValue.objects.filter(
@@ -162,7 +164,7 @@ class DerivedValuesTestCase(TestCase):
             ).exists()
         )
 
-        self._bulk_create_cpv(
+        manual = self._bulk_create_cpv(
             name="manual total",
             collection=collection,
             property=self.property_total,
@@ -173,16 +175,14 @@ class DerivedValuesTestCase(TestCase):
             is_derived=False,
         )
 
-        _derived, action = create_or_update_derived_cpv(specific)
-        self.assertEqual(action, "skipped")
-        self.assertFalse(
-            CollectionPropertyValue.objects.filter(
-                collection=collection,
-                property=self.property_total,
-                year=2024,
-                is_derived=True,
-            ).exists()
-        )
+        regenerated, action = create_or_update_derived_cpv(specific)
+        self.assertEqual(action, "updated")
+        self.assertEqual(regenerated.pk, first.pk)
+        self.assertEqual(regenerated.derived_from_id, specific.pk)
+        self.assertEqual(regenerated.average, 20.0)
+        manual.refresh_from_db()
+        self.assertFalse(manual.is_derived)
+        self.assertEqual(manual.average, 25)
 
     def test_backfill_counts_created_updated_and_skipped(self):
         collection_with_population, _ = self._create_collection(
@@ -202,7 +202,7 @@ class DerivedValuesTestCase(TestCase):
             publication_status="published",
             is_derived=False,
         )
-        self._bulk_create_cpv(
+        update_source = self._bulk_create_cpv(
             name="update-source",
             collection=collection_with_population,
             property=self.property_specific,
@@ -221,9 +221,10 @@ class DerivedValuesTestCase(TestCase):
             average=20,
             publication_status="private",
             is_derived=True,
+            derived_from=update_source,
         )
         self._bulk_create_cpv(
-            name="skip-manual-specific",
+            name="no-pop-specific-2026",
             collection=collection_with_population,
             property=self.property_specific,
             unit=self.unit_specific,
@@ -883,8 +884,10 @@ class DerivedValuesTestCase(TestCase):
             publication_status="private",
             is_derived=False,
         )
-        _derived, action = create_or_update_derived_cpv(specific)
-        self.assertEqual(action, "skipped")
+        first, action = create_or_update_derived_cpv(specific)
+        self.assertEqual(action, "created")
+        self.assertEqual(first.derived_from_id, specific.pk)
+        self.assertEqual(first.average, 20.0)
         manual.refresh_from_db()
         self.assertEqual(manual.average, 25)
 
@@ -964,7 +967,7 @@ class DerivedValuesTestCase(TestCase):
             snapshot["source_cpv"],
             {
                 "id": specific.pk,
-                "average": str(specific.average),
+                "average": "10.0",
                 "unit_id": self.unit_specific.pk,
             },
         )
@@ -1007,7 +1010,7 @@ class DerivedValuesTestCase(TestCase):
         self.assertEqual(entry["source_status"], "provisional")
         self.assertEqual(entry["flags"], "p")
 
-    def test_policy_frozen_derived_not_regenerated_after_population_change(self):
+    def test_copied_projection_status_does_not_freeze_regeneration(self):
         for frozen in ("published", "archived"):
             with self.subTest(status=frozen):
                 collection, _ = self._create_collection(
@@ -1040,14 +1043,17 @@ class DerivedValuesTestCase(TestCase):
                 obs.value = Decimal("3000")
                 obs.save()
                 _d, action = create_or_update_derived_cpv(specific)
-                self.assertEqual(action, "skipped")
+                self.assertEqual(action, "updated")
+                self.assertEqual(_d.pk, derived.pk)
                 derived.refresh_from_db()
-                self.assertEqual(derived.description, generated_description)
-                self.assertEqual(derived.approved_at, stamp)
-                self.assertEqual(derived.average, 20.0)
+                self.assertNotEqual(derived.description, generated_description)
+                self.assertEqual(derived.publication_status, "private")
+                self.assertIsNone(derived.approved_at)
+                self.assertIsNone(derived.approved_by_id)
+                self.assertEqual(derived.average, 30.0)
                 snapshot = json.loads(derived.description)
                 self.assertEqual(
-                    Decimal(snapshot["population"]["value"]), Decimal("2000")
+                    Decimal(snapshot["population"]["value"]), Decimal("3000")
                 )
 
     def test_policy_private_review_derived_updates_on_regeneration(self):
@@ -1081,8 +1087,8 @@ class DerivedValuesTestCase(TestCase):
                 derived.refresh_from_db()
                 self.assertEqual(derived.average, 30.0)
 
-    def test_backfill_dry_run_skips_frozen_derived_like_real_run(self):
-        for frozen in ("published", "archived"):
+    def test_backfill_updates_linked_outputs_despite_copied_status(self):
+        for expected_updated, frozen in enumerate(("published", "archived"), start=1):
             with self.subTest(status=frozen):
                 collection, _ = self._create_collection(
                     f"frozen-dry-{frozen}", population=None
@@ -1109,11 +1115,14 @@ class DerivedValuesTestCase(TestCase):
                     publication_status=frozen, approved_at=timezone.now()
                 )
                 dry_stats = backfill_derived_values(dry_run=True)
-                self.assertEqual(dry_stats["updated"], 0, dry_stats)
+                self.assertEqual(
+                    dry_stats,
+                    {"created": 0, "updated": expected_updated, "skipped": 0},
+                )
                 write_stats = backfill_derived_values(dry_run=False)
                 self.assertEqual(dry_stats, write_stats)
 
-    def test_policy_published_derived_survives_source_delete(self):
+    def test_copied_published_status_does_not_preserve_deleted_projection(self):
         collection, _ = self._create_collection("pub-del", population=None)
         self._avg_observation(collection.catchment.region, 2024, "2000")
         specific = self._bulk_create_cpv(
@@ -1132,8 +1141,9 @@ class DerivedValuesTestCase(TestCase):
             publication_status="published", approved_at=timezone.now()
         )
         deleted = delete_derived_cpv(specific)
-        self.assertEqual(deleted, 0)
-        self.assertTrue(CollectionPropertyValue.objects.filter(pk=derived.pk).exists())
+        self.assertEqual(deleted, 1)
+        self.assertFalse(CollectionPropertyValue.objects.filter(pk=derived.pk).exists())
+        self.assertTrue(CollectionPropertyValue.objects.filter(pk=specific.pk).exists())
 
     def test_atlas_fallback_uses_average_not_stock_or_legacy(self):
         collection, catchment = self._create_collection(
@@ -1262,9 +1272,9 @@ class DerivedValuesTestCase(TestCase):
         row = next(r for r in data if r["catchment_id"] == catchment.pk)
         self.assertIsNone(row["amount"])
 
-    def test_backfill_preview_counts_match_write_for_frozen_counterparts(self):
-        """Dry-run classifies frozen/editable/manual counterparts like writes."""
-        collection, _ = self._create_collection("bf-frozen", population=1000)
+    def test_backfill_preview_matches_per_source_writes_without_claiming_legacy(self):
+        """Preview and writes agree without adopting or changing legacy rows."""
+        collection, _ = self._create_collection("bf-legacy", population=1000)
         region = collection.catchment.region
         for year in (2025, 2026, 2027, 2028, 2029):
             self._avg_population(region, year, 1000)
@@ -1281,12 +1291,16 @@ class DerivedValuesTestCase(TestCase):
                 is_derived=False,
             )
 
-        source(2024)  # created
-        source(2025)  # editable private counterpart -> updated
-        source(2026, status="review")  # editable review counterpart -> updated
-        source(2027)  # published counterpart -> skipped
-        source(2028)  # archived counterpart -> skipped
-        self._bulk_create_cpv(  # manual counterpart -> skipped
+        sources = {
+            2024: source(2024),
+            2025: source(2025),
+            2026: source(2026, status="review"),
+            2027: source(2027),
+            2028: source(2028),
+            2029: source(2029),
+            2030: source(2030),
+        }
+        manual = self._bulk_create_cpv(
             name="manual-total-2029",
             collection=collection,
             property=self.property_total,
@@ -1296,73 +1310,86 @@ class DerivedValuesTestCase(TestCase):
             publication_status="published",
             is_derived=False,
         )
-        source(2029)
-        source(2030)  # no population -> skipped
-
-        stamp = timezone.now()
-        for year, frozen_status in ((2025, "private"), (2026, "review")):
+        for year, status in ((2025, "private"), (2026, "review")):
             self._bulk_create_cpv(
-                name=f"derived-total-{year}",
+                name=f"legacy-total-{year}",
                 collection=collection,
                 property=self.property_total,
                 unit=self.unit_total,
                 year=year,
                 average=99.0,
-                publication_status=frozen_status,
+                publication_status=status,
                 is_derived=True,
             )
-        for year, frozen_status in ((2027, "published"), (2028, "archived")):
+        stamp = timezone.now()
+        for year, status in ((2027, "published"), (2028, "archived")):
             self._bulk_create_cpv(
-                name=f"frozen-total-{year}",
+                name=f"legacy-total-{year}",
                 collection=collection,
                 property=self.property_total,
                 unit=self.unit_total,
                 year=year,
                 average=50.0,
-                publication_status=frozen_status,
+                publication_status=status,
                 is_derived=True,
-                description=f"frozen snapshot {year}",
+                description=f"legacy snapshot {year}",
+                approved_at=stamp,
             )
-        CollectionPropertyValue.objects.filter(
-            name__in=["frozen-total-2027", "frozen-total-2028"]
-        ).update(approved_at=stamp)
-
-        snapshot_before = list(
-            CollectionPropertyValue.objects.order_by("pk").values_list(
-                "pk",
-                "average",
-                "description",
-                "publication_status",
-                "approved_at",
-                "submitted_at",
-            )
+        snapshot_fields = (
+            "pk",
+            "average",
+            "description",
+            "publication_status",
+            "approved_at",
+            "approved_by_id",
+            "submitted_at",
+            "owner_id",
+            "unit_id",
+            "property_id",
+            "year",
+            "derived_from_id",
+            "is_derived",
+        )
+        before = list(
+            CollectionPropertyValue.objects.order_by("pk").values_list(*snapshot_fields)
         )
         dry_stats = backfill_derived_values(dry_run=True)
-        snapshot_after_preview = list(
-            CollectionPropertyValue.objects.order_by("pk").values_list(
-                "pk",
-                "average",
-                "description",
-                "publication_status",
-                "approved_at",
-                "submitted_at",
-            )
+        self.assertEqual(
+            list(
+                CollectionPropertyValue.objects.order_by("pk").values_list(
+                    *snapshot_fields
+                )
+            ),
+            before,
         )
-        self.assertEqual(snapshot_after_preview, snapshot_before)
+        self.assertEqual(dry_stats, {"created": 7, "updated": 0, "skipped": 1})
 
-        write_stats = backfill_derived_values(dry_run=False)
-        self.assertEqual(dry_stats, write_stats)
-        self.assertEqual(dry_stats, {"created": 1, "updated": 2, "skipped": 5})
-        for year in (2025, 2026):
-            editable = CollectionPropertyValue.objects.get(
-                collection=collection,
-                property=self.property_total,
-                year=year,
-                is_derived=True,
-            )
-            self.assertEqual(editable.average, 10.0)
-        for year in (2027, 2028):
-            frozen = CollectionPropertyValue.objects.get(name=f"frozen-total-{year}")
-            self.assertEqual(frozen.description, f"frozen snapshot {year}")
-            self.assertEqual(frozen.average, 50.0)
-            self.assertEqual(frozen.approved_at, stamp)
+        write_stats = backfill_derived_values()
+        self.assertEqual(write_stats, {"created": 7, "updated": 0, "skipped": 1})
+        self.assertEqual(
+            list(
+                CollectionPropertyValue.objects.filter(
+                    pk__in=[row[0] for row in before]
+                )
+                .order_by("pk")
+                .values_list(*snapshot_fields)
+            ),
+            before,
+        )
+        self.assertEqual(
+            CollectionPropertyValue.objects.filter(
+                is_derived=True, derived_from__isnull=True
+            ).count(),
+            4,
+        )
+        for year in (2024, 2025, 2026, 2027, 2028, 2029):
+            output = sources[year].generated_values.get()
+            self.assertEqual(output.average, 10.0)
+            self.assertEqual(output.property_id, self.property_total.pk)
+            self.assertEqual(output.unit_id, self.unit_total.pk)
+            self.assertEqual(output.year, year)
+        reverse_output = manual.generated_values.get()
+        self.assertEqual(reverse_output.average, 30.0)
+        self.assertEqual(reverse_output.property_id, self.property_specific.pk)
+        self.assertEqual(reverse_output.unit_id, self.unit_specific.pk)
+        self.assertFalse(sources[2030].generated_values.exists())

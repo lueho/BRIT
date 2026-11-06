@@ -137,7 +137,7 @@ class RevisionMigrationGraphTests(SimpleTestCase):
         ),
         "waste_collection": (
             "waste_collection",
-            "0012_alter_collection_options",
+            "0013_collectionpropertyvalue_derived_from",
         ),
         "object_management": ("object_management", "0009_alter_reviewaction_action"),
     }

@@ -1,14 +1,14 @@
-"""Management command to backfill derived CollectionPropertyValue records.
+"""Refresh source-linked, read-only collection projections.
 
-Creates the counterpart (specific ↔ total waste collected) for every
-existing non-derived CPV where the counterpart does not yet exist as a
-manual entry.
+Each convertible raw CPV owns its generated counterpart. Manual evidence and
+unlinked legacy generated rows are never adopted or deleted by resemblance.
+Owner/status overrides copy compatibility metadata only; source evidence
+still governs access and review.
 
 Usage::
 
     docker compose exec web python manage.py backfill_derived_cpv
     docker compose exec web python manage.py backfill_derived_cpv --dry-run
-    docker compose exec web python manage.py backfill_derived_cpv --owner admin --publication-status published
 """
 
 from django.contrib.auth import get_user_model
@@ -22,7 +22,7 @@ _VALID_STATUSES = ("private", "review", "published", "declined", "archived")
 
 
 class Command(BaseCommand):
-    help = "Backfill derived CollectionPropertyValue records (specific ↔ total waste collected)."
+    help = "Backfill source-linked, read-only collection projections."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -34,16 +34,16 @@ class Command(BaseCommand):
             "--owner",
             type=str,
             default=None,
-            help="Username to set as owner of created/updated derived records. "
-            "Defaults to the source value's owner.",
+            help="Copy this username into projection compatibility metadata. "
+            "Defaults to the source owner; does not grant access.",
         )
         parser.add_argument(
             "--publication-status",
             type=str,
             default=None,
             choices=_VALID_STATUSES,
-            help="Publication status for created/updated derived records. "
-            "Defaults to the source value's publication status.",
+            help="Copy this status into projection compatibility metadata. "
+            "Defaults to the source status; does not publish or approve evidence.",
         )
 
     def handle(self, *args, **options):
