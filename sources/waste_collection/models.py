@@ -1008,7 +1008,9 @@ class Collection(NamedUserCreatedObject):
                     "archive",
                     expected_revision=predecessor.content_revision,
                 )
-                if self.valid_from is not None:
+                if self.valid_from is not None and (
+                    locked.valid_until is None or locked.valid_until >= self.valid_from
+                ):
                     locked.valid_until = self.valid_from - timedelta(days=1)
                     locked.save(update_fields=["valid_until", "lastmodified_at"])
 

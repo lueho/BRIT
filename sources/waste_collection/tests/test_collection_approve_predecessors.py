@@ -341,6 +341,103 @@ class CollectionApprovePredecessorArchivalTests(TestCase):
             0,
         )
 
+    def test_approve_preserves_predecessor_validity_gap(self):
+        predecessor = self._collection(
+            "Bounded pred", self.owner, "published", valid_from=date(2020, 1, 1)
+        )
+        predecessor.valid_until = date(2021, 12, 31)
+        predecessor.save(update_fields=["valid_until"])
+        candidate = self._collection(
+            "Candidate", self.owner, "review", valid_from=date(2024, 1, 1)
+        )
+        candidate.predecessors.add(predecessor)
+        predecessor_revision = predecessor.content_revision
+
+        candidate.refresh_from_db()
+        perform_transition(
+            self.moderator,
+            candidate,
+            "approve",
+            expected_revision=candidate.content_revision,
+        )
+
+        candidate.refresh_from_db()
+        predecessor.refresh_from_db()
+        self.assertEqual(candidate.publication_status, "published")
+        self.assertEqual(predecessor.publication_status, "archived")
+        self.assertEqual(predecessor.valid_until, date(2021, 12, 31))
+        self.assertTrue(decide(AnonymousUser(), "read", predecessor).allowed)
+        archived_events = self._review_events(predecessor, ReviewAction.ACTION_ARCHIVED)
+        self.assertEqual(archived_events.count(), 1)
+        event = archived_events.get()
+        self.assertEqual(event.user, self.moderator)
+        self.assertEqual(event.content_revision, predecessor_revision)
+
+    def test_approve_clamps_predecessor_overlap_only(self):
+        for index, end in enumerate(
+            (None, date(2023, 12, 31), date(2024, 1, 1), date(2025, 1, 1))
+        ):
+            with self.subTest(predecessor_end=end):
+                predecessor = self._collection(
+                    f"Clamped pred {index}",
+                    self.owner,
+                    "published",
+                    valid_from=date(2020, 1, 1),
+                )
+                if end is not None:
+                    predecessor.valid_until = end
+                    predecessor.save(update_fields=["valid_until"])
+                candidate = self._collection(
+                    f"Candidate {index}",
+                    self.owner,
+                    "review",
+                    valid_from=date(2024, 1, 1),
+                )
+                candidate.predecessors.add(predecessor)
+                predecessor_revision = predecessor.content_revision
+
+                candidate.refresh_from_db()
+                perform_transition(
+                    self.moderator,
+                    candidate,
+                    "approve",
+                    expected_revision=candidate.content_revision,
+                )
+
+                predecessor.refresh_from_db()
+                self.assertEqual(predecessor.publication_status, "archived")
+                self.assertEqual(predecessor.valid_until, date(2023, 12, 31))
+                archived_events = self._review_events(
+                    predecessor, ReviewAction.ACTION_ARCHIVED
+                )
+                self.assertEqual(archived_events.count(), 1)
+                self.assertEqual(
+                    archived_events.get().content_revision, predecessor_revision
+                )
+
+    def test_direct_approve_preserves_predecessor_validity_gap(self):
+        predecessor = self._collection(
+            "Bounded pred", self.owner, "published", valid_from=date(2020, 1, 1)
+        )
+        predecessor.valid_until = date(2021, 12, 31)
+        predecessor.save(update_fields=["valid_until"])
+        candidate = self._collection(
+            "Candidate", self.owner, "review", valid_from=date(2024, 1, 1)
+        )
+        candidate.predecessors.add(predecessor)
+        predecessor_revision = predecessor.content_revision
+
+        candidate.approve(user=self.moderator)
+
+        candidate.refresh_from_db()
+        predecessor.refresh_from_db()
+        self.assertEqual(candidate.publication_status, "published")
+        self.assertEqual(predecessor.publication_status, "archived")
+        self.assertEqual(predecessor.valid_until, date(2021, 12, 31))
+        archived_events = self._review_events(predecessor, ReviewAction.ACTION_ARCHIVED)
+        self.assertEqual(archived_events.count(), 1)
+        self.assertEqual(archived_events.get().content_revision, predecessor_revision)
+
     def test_approve_without_user_is_rejected(self):
         published = self._collection("Published pred", self.owner, "published")
         candidate = self._collection("Candidate", self.owner, "review")
