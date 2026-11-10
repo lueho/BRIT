@@ -8,6 +8,10 @@ from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.sessions.backends.db import SessionStore
 from django.test import RequestFactory, TestCase
 
+from materials.filters import MaterialListFilter
+from materials.models import Material
+
+from ..generic_tasks import export_user_created_object_to_file
 from ..views import (
     SESSION_KEY,
     ExportModalView,
@@ -87,11 +91,11 @@ class FilteredListFileExportViewTests(TestCase):
         self.assertEqual(result.get("some_filter"), ["value"])
         self.assertNotIn("list_type", result)
 
-    def test_get_filter_params_ignores_scope_when_list_type_is_used(self):
-        """Scope must be dropped to avoid double scope filtering in async export tasks."""
+    def test_get_filter_params_preserves_explicit_scope_with_list_type(self):
+        """Explicit scope narrows the base list_type rather than being dropped."""
         params = {
             "list_type": ["private"],
-            "scope": ["private"],
+            "scope": ["published"],
             "some_filter": ["value"],
         }
         request = self._make_request()
@@ -99,7 +103,7 @@ class FilteredListFileExportViewTests(TestCase):
 
         result = view_instance.get_filter_params(request, params.copy())
 
-        self.assertNotIn("scope", result)
+        self.assertEqual(result.get("scope"), ["published"])
         self.assertNotIn("owner", result)
         self.assertEqual(result.get("some_filter"), ["value"])
 
@@ -475,3 +479,141 @@ class FilteredListFileExportProgressViewTests(TestCase):
         self.assertIn("error", data["details"])
         self.assertIn("Something broke", data["details"]["error"])
         self.assertEqual(request.session.get(SESSION_KEY, []), [])
+
+
+class ExportScopeNarrowingIntegrationTests(TestCase):
+    """End-to-end: base list_type intersects explicit scope on export."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_user("export-scope-alice")
+        cls.bob = User.objects.create_user("export-scope-bob")
+        cls.a_pub = Material.objects.create(
+            name="AlicePublished", owner=cls.alice, publication_status="published"
+        )
+        cls.b_pub = Material.objects.create(
+            name="BobPublished", owner=cls.bob, publication_status="published"
+        )
+        cls.a_priv = Material.objects.create(
+            name="AlicePrivate", owner=cls.alice, publication_status="private"
+        )
+        cls.b_priv = Material.objects.create(
+            name="BobPrivate", owner=cls.bob, publication_status="private"
+        )
+        cls.spec = SimpleNamespace(
+            model=Material,
+            filterset=MaterialListFilter,
+            serializer=lambda objs, context=None, **kw: SimpleNamespace(
+                data=[
+                    {
+                        "pk": o.pk,
+                        "user": context["user"].pk,
+                    }
+                    for o in objs
+                ]
+            ),
+            renderers={"csv": MagicMock(), "xlsx": MagicMock()},
+        )
+
+    def _request(self, user, path):
+        request = RequestFactory().get(path)
+        request.user = user
+        request.session = SessionStore()
+        return request
+
+    def _run(self, base_list_type, scope, fmt):
+        qs = f"list_type={base_list_type}&format={fmt}"
+        if scope is not None:
+            qs += f"&scope={scope}"
+        request = self._request(self.alice, f"/collections/user/?{qs}")
+
+        class ScopeNarrowingView(GenericUserCreatedObjectExportView):
+            model_label = "materials.Material"
+            include_row_count_estimate = True
+
+        task_self = SimpleNamespace(
+            request=SimpleNamespace(id=f"scope-task-{base_list_type}-{scope}-{fmt}"),
+            update_state=MagicMock(),
+        )
+        captured = {}
+
+        def fake_write(file_name, data, renderer_class):
+            captured["rows"] = data
+            captured["count"] = len(data)
+            return f"https://storage.test/{file_name}"
+
+        original_run = export_user_created_object_to_file.run.__func__
+
+        def dispatch_export(model_label, file_format, query_params, context):
+            captured["fmt"] = file_format
+            captured["query_params"] = query_params
+            captured["user_id"] = context["user_id"]
+            original_run(task_self, model_label, file_format, query_params, context)
+            return SimpleNamespace(task_id=task_self.request.id)
+
+        with (
+            patch(
+                "utils.file_export.export_registry.get_export_spec",
+                return_value=self.spec,
+            ),
+            patch(
+                "utils.file_export.generic_tasks.get_export_spec",
+                return_value=self.spec,
+            ),
+            patch(
+                "utils.file_export.storages.write_file_for_download",
+                side_effect=fake_write,
+            ),
+            patch(
+                "utils.file_export.storages.get_file_export_storage",
+                return_value=MagicMock(**{"size.return_value": 0}),
+            ),
+            patch.object(
+                export_user_created_object_to_file,
+                "delay",
+                side_effect=dispatch_export,
+            ),
+        ):
+            response = ScopeNarrowingView.as_view()(request)
+        return response, captured
+
+    def _assert_case(self, base, scope, expected_pks):
+        for fmt in ("csv", "xlsx"):
+            with self.subTest(base=base, scope=scope, fmt=fmt):
+                response, captured = self._run(base, scope, fmt)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(captured["fmt"], fmt)
+                self.assertEqual({r["pk"] for r in captured["rows"]}, expected_pks)
+                self.assertEqual(captured["count"], len(expected_pks))
+                body = json.loads(response.content)
+                self.assertEqual(body["row_count"], len(expected_pks))
+                if expected_pks:
+                    self.assertEqual(
+                        {r["user"] for r in captured["rows"]}, {self.alice.pk}
+                    )
+                self.assertEqual(captured["user_id"], self.alice.pk)
+                if scope is not None:
+                    self.assertEqual(captured["query_params"].get("scope"), [scope])
+                else:
+                    self.assertNotIn("scope", captured["query_params"])
+
+    def test_published_base_owned_scope(self):
+        self._assert_case("published", "owned", {self.a_pub.pk})
+
+    def test_private_base_published_scope(self):
+        self._assert_case("private", "published", {self.a_pub.pk})
+
+    def test_private_base_owned_scope(self):
+        self._assert_case("private", "owned", {self.a_pub.pk, self.a_priv.pk})
+
+    def test_published_base_private_scope(self):
+        self._assert_case("published", "private", {self.a_pub.pk})
+
+    def test_unknown_scope_fails_closed(self):
+        self._assert_case("private", "not-a-scope", set())
+
+    def test_private_base_no_scope(self):
+        self._assert_case("private", None, {self.a_pub.pk, self.a_priv.pk})
+
+    def test_published_base_no_scope(self):
+        self._assert_case("published", None, {self.a_pub.pk, self.b_pub.pk})
