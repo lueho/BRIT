@@ -13,7 +13,7 @@ from functools import lru_cache
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db import transaction
+from django.db import router, transaction
 from django.db.models import Q
 
 from maps.models import RegionProperty
@@ -395,21 +395,19 @@ def _calculation_description(cpv, population, *, from_specific):
     )
 
 
-def _linked_generated_qs(cpv):
+def _linked_generated_qs(cpv, *, using=None):
     """Select only generated outputs explicitly bound to this source."""
-    return CollectionPropertyValue.objects.filter(
+    if using is None:
+        using = cpv._state.db or router.db_for_write(
+            CollectionPropertyValue, instance=cpv
+        )
+    return CollectionPropertyValue.objects.using(using).filter(
         is_derived=True, derived_from_id=cpv.pk
     )
 
 
-def _write_locked_projection(source, *, owner, publication_status):
-    """Compute and persist using a source already locked by the caller."""
-    result = _compute_counterpart_value(source)
-    if result is None:
-        _linked_generated_qs(source).delete()
-        return None, "skipped"
-
-    target_property_id, target_unit_id, computed_avg, population = result
+def _projection_metadata(source, *, owner=None, publication_status=None):
+    """Compatibility metadata copied from the source; never governance."""
     effective_status = (
         source.publication_status if publication_status is None else publication_status
     )
@@ -424,8 +422,28 @@ def _write_locked_projection(source, *, owner, publication_status):
         approved_by = source.approved_by
     elif effective_status != CollectionPropertyValue.STATUS_REVIEW:
         submitted_at = None
+    return {
+        "owner_id": source.owner_id if owner is None else owner.pk,
+        "publication_status": effective_status,
+        "submitted_at": submitted_at,
+        "approved_at": approved_at,
+        "approved_by_id": approved_by.pk if approved_by is not None else None,
+    }
 
-    derived, created = CollectionPropertyValue.objects.update_or_create(
+
+def _write_locked_projection(source, *, owner, publication_status, using=None):
+    """Compute and persist using a source already locked by the caller."""
+    result = _compute_counterpart_value(source)
+    if result is None:
+        _linked_generated_qs(source, using=using).delete()
+        return None, "skipped"
+
+    target_property_id, target_unit_id, computed_avg, population = result
+    metadata = _projection_metadata(
+        source, owner=owner, publication_status=publication_status
+    )
+
+    derived, created = CollectionPropertyValue.objects.using(using).update_or_create(
         derived_from=source,
         is_derived=True,
         defaults={
@@ -442,46 +460,71 @@ def _write_locked_projection(source, *, owner, publication_status):
                 == get_derived_value_config().specific_property_id,
             ),
             "unit_id": target_unit_id,
-            "owner_id": source.owner_id if owner is None else owner.pk,
-            "publication_status": effective_status,
-            "submitted_at": submitted_at,
-            "approved_at": approved_at,
-            "approved_by": approved_by,
+            **metadata,
         },
     )
     return derived, "created" if created else "updated"
 
 
-def create_or_update_derived_cpv(cpv, *, owner=None, publication_status=None):
+def create_or_update_derived_cpv(
+    cpv, *, owner=None, publication_status=None, previous_inputs=None
+):
     """Maintain one output from the freshly locked raw source.
 
     Metadata overrides are compatibility copies, never independent governance.
     Manual evidence and unlinked legacy outputs are not cleanup candidates.
+    When ``previous_inputs`` is supplied by the source save signal and the
+    persisted input fields are unchanged, only the copied lifecycle metadata
+    on an explicitly linked output is refreshed; the stored number,
+    provenance and citations are preserved without recomputation.
     """
     if not isinstance(cpv, CollectionPropertyValue) or cpv.pk is None:
         return None, "skipped"
 
+    using = cpv._state.db or router.db_for_write(CollectionPropertyValue, instance=cpv)
     failure = None
     outcome = (None, "skipped")
-    with transaction.atomic():
+    with transaction.atomic(using=using):
         source = (
-            CollectionPropertyValue.objects.select_for_update(no_key=True)
+            CollectionPropertyValue.objects.using(using)
+            .select_for_update(no_key=True)
             .filter(pk=cpv.pk)
             .first()
         )
         if source is None or source.is_derived:
             return None, "skipped"
+        if previous_inputs is not None and tuple(
+            getattr(source, field)
+            for field in CollectionPropertyValue._DERIVED_INPUT_FIELDS
+        ) == tuple(
+            previous_inputs[field]
+            for field in CollectionPropertyValue._DERIVED_INPUT_FIELDS
+        ):
+            linked = _linked_generated_qs(source, using=using).first()
+            if linked is not None:
+                CollectionPropertyValue.objects.using(using).filter(
+                    pk=linked.pk
+                ).update(
+                    **_projection_metadata(
+                        source,
+                        owner=owner,
+                        publication_status=publication_status,
+                    )
+                )
+                linked.refresh_from_db(using=using)
+                return linked, "updated"
         try:
-            with transaction.atomic():
+            with transaction.atomic(using=using):
                 outcome = _write_locked_projection(
                     source,
                     owner=owner,
                     publication_status=publication_status,
+                    using=using,
                 )
         except Exception as exc:
             # Roll back partial output writes, then invalidate under the same
             # raw lock. Late cleanup must not delete a newer worker's output.
-            _linked_generated_qs(source).delete()
+            _linked_generated_qs(source, using=using).delete()
             failure = exc
     if failure is not None:
         raise failure
