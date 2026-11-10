@@ -122,11 +122,6 @@ class FilteredListFileExportView(LoginRequiredMixin, View):
         """
         params.pop("page", None)
         list_type = params.pop("list_type", ["published"])[0]
-        # Scope is already resolved by list_type/context. Keeping both can make
-        # filtersets with request-dependent scope handlers collapse to an empty
-        # queryset in async exports where no request object is available.
-        params.pop("scope", None)
-
         params.update(build_scope_filter_params(list_type, request.user))
         return params
 
@@ -216,6 +211,10 @@ class GenericUserCreatedObjectExportView(FilteredListFileExportView):
             base_qs = apply_scope_filter(visible_qs, list_type, user=self.request.user)
         else:
             base_qs = spec.model.objects.all()
+        if has_publication_status and "scope" in qdict:
+            base_qs = apply_scope_filter(
+                base_qs, qdict["scope"], user=self.request.user
+            )
 
         return spec.filterset(qdict, queryset=base_qs, request=self.request).qs.count()
 
