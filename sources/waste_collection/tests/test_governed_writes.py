@@ -21,6 +21,7 @@ from django.test import TestCase
 from django.urls import reverse
 from factory.django import mute_signals
 
+from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, Sample, SampleSeries
 from sources.waste_collection.models import (
@@ -773,6 +774,103 @@ class CollectionPropertyValueUpdateBoundaryTestCase(
         self.assertEqual(self.cpv.average, 5)
         self.assertEqual(_revision(self.cpv), revision)
 
+    def test_get_includes_only_flyer_rows_for_mixed_sources(self):
+        report = Source.objects.create(
+            type="report",
+            title="generic",
+            url="https://example.com/generic-report.pdf",
+            owner=self.owner,
+            publication_status="published",
+        )
+        flyer = WasteFlyer.objects.create(
+            url="https://example.com/real-flyer.pdf",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.cpv.sources.add(report)
+        self.cpv.sources.add(flyer)
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("collectionpropertyvalue-update", kwargs={"pk": self.cpv.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        initial_urls = [row.get("url") for row in response.context["formset"].initial]
+        self.assertEqual(initial_urls, [flyer.url])
+        self.assertIn(report, self.cpv.sources.all())
+
+    def test_post_metadata_only_preserves_generic_source_without_new_flyer(
+        self,
+    ):
+        report = Source.objects.create(
+            type="report",
+            title="generic",
+            url="https://example.com/generic-report.pdf",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.cpv.sources.add(report)
+        self.cpv.collection = self.root
+        self.cpv.save()
+        report_before = {
+            f: getattr(report, f)
+            for f in ("type", "publication_status", "owner_id", "url", "title")
+        }
+        self.assertFalse(self.owner.has_perm("waste_collection.add_wasteflyer"))
+        revision = _revision(self.cpv)
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("collectionpropertyvalue-update", kwargs={"pk": self.cpv.pk})
+        )
+        total = response.context["formset"].total_form_count()
+        prefix = response.context["formset"].prefix
+        data = {
+            "collection": self.cpv.collection_id,
+            "property": self.prop.pk,
+            "unit": self.unit.pk,
+            "year": 2020,
+            "average": 5,
+            "standard_deviation": "1",
+            "sources": [report.pk],
+            f"{prefix}-TOTAL_FORMS": str(total),
+            f"{prefix}-INITIAL_FORMS": str(len(response.context["formset"].initial)),
+            f"{prefix}-MIN_NUM_FORMS": "0",
+            f"{prefix}-MAX_NUM_FORMS": "1000",
+        }
+        for i, row in enumerate(response.context["formset"].initial):
+            data[f"{prefix}-{i}-url"] = row.get("url", "")
+        data["expected_revision"] = revision
+        response = self.client.post(
+            reverse("collectionpropertyvalue-update", kwargs={"pk": self.cpv.pk}),
+            data,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.cpv.refresh_from_db()
+        self.assertEqual(self.cpv.average, 5)
+        self.assertEqual(self.cpv.standard_deviation, 1)
+        self.assertEqual(_revision(self.cpv), revision + 1)
+        event = ReviewAction.objects.get(
+            content_type=ContentType.objects.get_for_model(CollectionPropertyValue),
+            object_id=self.cpv.pk,
+            action="edited",
+        )
+        self.assertEqual(event.user_id, self.owner.pk)
+        self.assertEqual(event.content_revision, revision + 1)
+        self.assertQuerySetEqual(self.cpv.sources.all(), [report])
+        report.refresh_from_db()
+        self.assertEqual(
+            {
+                f: getattr(report, f)
+                for f in ("type", "publication_status", "owner_id", "url", "title")
+            },
+            report_before,
+        )
+        self.assertEqual(
+            list(Source.objects.filter(url=report.url).values_list("pk", flat=True)),
+            [report.pk],
+        )
+        report.refresh_from_db()
+        self.assertEqual(report.type, "report")
+
     def test_update_reanchors_through_authorized_reassignment(self):
         """Posting a non-anchor parent moves the row to its chain anchor via
         decide_reassign — locked roots, revision bump, audit."""
@@ -1063,6 +1161,110 @@ class AggregatedCollectionPropertyValueBoundaryTestCase(
             AggregatedCollectionPropertyValue.objects.filter(
                 property=self.prop, year=2021, average=9
             ).exists()
+        )
+
+    def test_get_includes_only_flyer_rows_for_mixed_sources_acpv(self):
+        report = Source.objects.create(
+            type="report",
+            title="generic",
+            url="https://example.com/acpv-report.pdf",
+            owner=self.owner,
+            publication_status="published",
+        )
+        flyer = WasteFlyer.objects.create(
+            url="https://example.com/acpv-flyer.pdf",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.acpv.sources.add(report)
+        self.acpv.sources.add(flyer)
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(
+                "aggregatedcollectionpropertyvalue-update",
+                kwargs={"pk": self.acpv.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        initial_urls = [row.get("url") for row in response.context["formset"].initial]
+        self.assertEqual(initial_urls, [flyer.url])
+        self.assertIn(report, self.acpv.sources.all())
+
+    def test_post_metadata_only_preserves_generic_source_without_new_flyer_acpv(
+        self,
+    ):
+        report = Source.objects.create(
+            type="report",
+            title="generic",
+            url="https://example.com/acpv-report.pdf",
+            owner=self.owner,
+            publication_status="published",
+        )
+        self.acpv.sources.add(report)
+        report_before = {
+            f: getattr(report, f)
+            for f in ("type", "publication_status", "owner_id", "url", "title")
+        }
+        self.assertFalse(self.owner.has_perm("waste_collection.add_wasteflyer"))
+        revision = _revision(self.acpv)
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(
+                "aggregatedcollectionpropertyvalue-update",
+                kwargs={"pk": self.acpv.pk},
+            )
+        )
+        total = response.context["formset"].total_form_count()
+        prefix = response.context["formset"].prefix
+        data = {
+            "collections": [self.collection.pk],
+            "property": self.prop.pk,
+            "unit": self.unit.pk,
+            "year": 2021,
+            "average": 7,
+            "standard_deviation": "1",
+            "sources": [report.pk],
+            f"{prefix}-TOTAL_FORMS": str(total),
+            f"{prefix}-INITIAL_FORMS": str(len(response.context["formset"].initial)),
+            f"{prefix}-MIN_NUM_FORMS": "0",
+            f"{prefix}-MAX_NUM_FORMS": "1000",
+        }
+        for i, row in enumerate(response.context["formset"].initial):
+            data[f"{prefix}-{i}-url"] = row.get("url", "")
+        data["expected_revision"] = revision
+        response = self.client.post(
+            reverse(
+                "aggregatedcollectionpropertyvalue-update",
+                kwargs={"pk": self.acpv.pk},
+            ),
+            data,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.acpv.refresh_from_db()
+        self.assertEqual(self.acpv.average, 7)
+        self.assertEqual(self.acpv.standard_deviation, 1)
+        self.assertEqual(_revision(self.acpv), revision + 1)
+        event = ReviewAction.objects.get(
+            content_type=ContentType.objects.get_for_model(
+                AggregatedCollectionPropertyValue
+            ),
+            object_id=self.acpv.pk,
+            action="edited",
+        )
+        self.assertEqual(event.user_id, self.owner.pk)
+        self.assertEqual(event.content_revision, revision + 1)
+        self.assertQuerySetEqual(self.acpv.sources.all(), [report])
+        report.refresh_from_db()
+        self.assertEqual(
+            {
+                f: getattr(report, f)
+                for f in ("type", "publication_status", "owner_id", "url", "title")
+            },
+            report_before,
+        )
+        self.assertEqual(
+            list(Source.objects.filter(url=report.url).values_list("pk", flat=True)),
+            [report.pk],
         )
 
     def test_create_authorized_persists_parent_and_sources_inside_boundary(

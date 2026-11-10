@@ -249,6 +249,15 @@ class M2MInlineFormSetMixin:
     def get_formset_initial(self):
         if self.object:
             related_objects = getattr(self.object, self.relation_field_name).all()
+            if self.formset_model is not None:
+                # The formset resolves rows through the configured typed
+                # manager; initial rows outside that domain would otherwise be
+                # re-created under a different type on save.
+                related_objects = related_objects.filter(
+                    pk__in=self.formset_model._default_manager.using(
+                        related_objects.db
+                    ).values("pk")
+                )
             return [
                 {
                     name: getattr(obj, name)
