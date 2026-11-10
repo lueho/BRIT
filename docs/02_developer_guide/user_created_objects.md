@@ -201,8 +201,14 @@ mutations, including for administrators. Review dispatch and comments resolve
 to the source thread.
 
 Producer runs lock and reload the raw source, then maintain only the explicitly
-linked output - one projection per raw source. They never adopt or delete
-unlinked legacy or manual rows by resemblance; a missing link fails closed.
+linked output - one projection per raw source. Automatic metadata-only source
+saves preserve the linked number, provenance and citations while refreshing the
+copied lifecycle metadata; a persisted change to any input field
+(collection/year/property/unit/average) still recomputes or invalidates, and
+explicit generator or backfill calls always force recomputation. Population
+refresh uses the explicit rebuild path, not an automatic population fallback.
+They never adopt or delete unlinked legacy or manual rows by resemblance; a
+missing link fails closed.
 Readable direct measurements take precedence over projections for the same
 collection, quantity, unit and year, and precedence is authorized before the
 comparison so an unreadable measurement cannot suppress a projection the actor

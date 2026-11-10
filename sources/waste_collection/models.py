@@ -6,7 +6,7 @@ import celery
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
-from django.db import models, transaction
+from django.db import models, router, transaction
 from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
 from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
@@ -1082,6 +1082,42 @@ class CollectionPropertyValue(PropertyValue):
             "Server-controlled; set only by the derivation pipeline."
         ),
     )
+
+    # Persisted input fields decisive for whether a linked projection must be
+    # recomputed. Compared against the freshly persisted row under the source
+    # lock, not against unsaved in-memory values.
+    _DERIVED_INPUT_FIELDS = (
+        "collection_id",
+        "year",
+        "property_id",
+        "unit_id",
+        "average",
+        "is_derived",
+    )
+
+    def save(self, *args, **kwargs):
+        using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+        kwargs["using"] = using
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and not update_fields:
+            return
+        if self.is_derived:
+            return super().save(*args, **kwargs)
+        with transaction.atomic(using=using):
+            previous = None
+            if self.pk is not None:
+                previous = (
+                    CollectionPropertyValue.objects.using(using)
+                    .select_for_update(no_key=True)
+                    .filter(pk=self.pk)
+                    .values(*self._DERIVED_INPUT_FIELDS)
+                    .first()
+                )
+            self._derived_previous_inputs = previous
+            try:
+                return super().save(*args, **kwargs)
+            finally:
+                del self._derived_previous_inputs
 
     def get_breadcrumb_object_label(self):
         label = f"{self.property}: {self.display_average}"

@@ -155,12 +155,16 @@ def invalidate_collection_geojson_cache(sender, instance, **kwargs):
 
 def sync_derived_cpv_on_save(sender, instance, **kwargs):
     """Maintain or invalidate only this source's explicitly linked output."""
-    if instance.is_derived:
+    if instance.is_derived or kwargs.get("raw"):
         return
     try:
         # Run for all raw saves: changing away from a convertible property
         # must invalidate the old linked output too.
-        create_or_update_derived_cpv(instance)
+        previous = getattr(instance, "_derived_previous_inputs", None)
+        if previous is not None:
+            create_or_update_derived_cpv(instance, previous_inputs=previous)
+        else:
+            create_or_update_derived_cpv(instance)
     except ImproperlyConfigured as exc:
         logger.debug(
             "Skipping derived CPV sync for CollectionPropertyValue id=%s: %s",

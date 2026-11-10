@@ -6,9 +6,10 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser, User
-from django.db import transaction
+from django.db import router, transaction
 from django.test import TestCase
 
+from bibliography.models import Source
 from maps.models import Region, RegionAttributeValue, RegionProperty
 from maps.population.models import (
     GeographicScope,
@@ -30,7 +31,8 @@ from sources.waste_collection.models import (
     WasteCategory,
 )
 from sources.waste_collection.signals import sync_derived_cpv_on_save
-from utils.object_management.policy import visible_queryset
+from utils.object_management.policy import decide, visible_queryset
+from utils.object_management.services import perform_transition
 from utils.properties.models import Property, Unit
 from utils.tests.testcases import ensure_test_default_owner
 
@@ -500,3 +502,300 @@ class GeneratedPipelineNumericalTests(TestCase):
         source.refresh_from_db()
         self.assertEqual(source.property_id, other_property.pk)
         self.assertEqual(source.average, 150)
+
+    # -- Source-save preservation: metadata-only saves must not delete a
+    # linked output when the input cannot currently be recomputed ----------
+
+    def _linked_output(self, source, average="300"):
+        source = CollectionPropertyValue.objects.get(pk=source.pk)
+        generated, action = create_or_update_derived_cpv(source)
+        self.assertIn(action, {"created", "updated"})
+        self.assertEqual(Decimal(str(generated.average)), Decimal(average))
+        return generated
+
+    def test_metadata_save_preserves_link_without_population(self):
+        source = self._raw(self.specific, self.specific_unit, "150")
+        generated = self._linked_output(source)
+        description_before = generated.description
+        revision_before = generated.content_revision
+        self.population_observation.delete()
+
+        source.refresh_from_db()
+        source.description = "metadata only"
+        source.save(update_fields=["description"])
+
+        self.assertTrue(
+            CollectionPropertyValue.objects.filter(pk=generated.pk).exists()
+        )
+        generated.refresh_from_db()
+        self.assertEqual(generated.derived_from_id, source.pk)
+        self.assertEqual(generated.average, Decimal("300"))
+        self.assertEqual(generated.description, description_before)
+        self.assertEqual(generated.content_revision, revision_before)
+
+    def test_full_save_and_noop_update_fields_preserve_link(self):
+        source = self._raw(self.specific, self.specific_unit, "150")
+        generated = self._linked_output(source)
+        self.population_observation.delete()
+
+        source.refresh_from_db()
+        source.description = "full save metadata"
+        source.save()
+        self.assertTrue(
+            CollectionPropertyValue.objects.filter(pk=generated.pk).exists()
+        )
+
+        # Unchanged full save: every field identical, no recompute.
+        source.refresh_from_db()
+        source.save()
+        self.assertTrue(
+            CollectionPropertyValue.objects.filter(pk=generated.pk).exists()
+        )
+
+        source.refresh_from_db()
+        source.save(update_fields=["average"])
+        generated.refresh_from_db()
+        self.assertEqual(generated.average, Decimal("300"))
+        self.assertEqual(generated.derived_from_id, source.pk)
+
+    def test_stale_inmemory_average_partial_save_preserves_link(self):
+        source = self._raw(self.specific, self.specific_unit, "150")
+        generated = self._linked_output(source)
+        self.population_observation.delete()
+
+        source.average = Decimal("999")  # stale in-memory, never persisted
+        source.description = "stale average excluded"
+        source.save(update_fields=["description"])
+
+        source.refresh_from_db()
+        self.assertEqual(source.average, Decimal("150"))
+        generated.refresh_from_db()
+        self.assertEqual(generated.average, Decimal("300"))
+        self.assertEqual(generated.derived_from_id, source.pk)
+
+    def test_status_change_refreshes_copied_metadata_without_recompute(self):
+        source = self._raw(self.specific, self.specific_unit, "150", state="private")
+        generated = self._linked_output(source)
+        self.population_observation.delete()
+        qs = CollectionPropertyValue.objects.filter(pk=generated.pk)
+
+        # Private source -> anonymous cannot see the projection either.
+        self.assertFalse(visible_queryset(AnonymousUser(), qs).exists())
+        self.assertFalse(decide(AnonymousUser(), "export", generated).allowed)
+
+        source.refresh_from_db()
+        source.publication_status = "published"
+        source.save(update_fields=["publication_status"])
+
+        generated.refresh_from_db()
+        self.assertEqual(generated.average, Decimal("300"))
+        self.assertEqual(generated.publication_status, "published")
+        self.assertTrue(visible_queryset(AnonymousUser(), qs).exists())
+        self.assertTrue(decide(AnonymousUser(), "read", generated).allowed)
+        self.assertTrue(decide(AnonymousUser(), "export", generated).allowed)
+        # Copied metadata is still not a governance surface: the projection
+        # itself remains read-only for the source owner.
+        self.assertFalse(decide(self.owner, "edit", generated).allowed)
+
+        source.refresh_from_db()
+        source.publication_status = "declined"
+        source.save(update_fields=["publication_status"])
+        generated.refresh_from_db()
+        self.assertEqual(generated.publication_status, "declined")
+        self.assertIsNone(generated.approved_at)
+        self.assertIsNone(generated.approved_by_id)
+        self.assertIsNone(generated.submitted_at)
+        self.assertEqual(generated.average, Decimal("300"))
+        self.assertFalse(visible_queryset(AnonymousUser(), qs).exists())
+        self.assertFalse(decide(AnonymousUser(), "read", generated).allowed)
+        self.assertFalse(decide(AnonymousUser(), "export", generated).allowed)
+
+    def test_governed_transition_refreshes_metadata_without_recompute(self):
+        source = self._raw(self.specific, self.specific_unit, "150", state="private")
+        generated = self._linked_output(source)
+        self.population_observation.delete()
+        perform_transition(
+            self.owner,
+            source,
+            "submit",
+            expected_revision=source.content_revision,
+        )
+
+        source.refresh_from_db()
+        self.assertEqual(source.publication_status, "review")
+        generated.refresh_from_db()
+        self.assertEqual(generated.publication_status, "review")
+        self.assertEqual(generated.average, Decimal("300"))
+        self.assertFalse(decide(AnonymousUser(), "read", generated).allowed)
+        self.assertFalse(decide(AnonymousUser(), "export", generated).allowed)
+
+    def test_owner_and_source_links_preserved_on_metadata_save(self):
+        source = self._raw(self.specific, self.specific_unit, "150")
+        generated = self._linked_output(source)
+        ref = Source.objects.create(
+            abbreviation="SYNTH-24",
+            title="Synthetic reference",
+            type="officialStatistics",
+            publication_status="published",
+            owner=self.owner,
+        )
+        generated.sources.add(ref)
+        before = CollectionPropertyValue.objects.values(
+            "average",
+            "description",
+            "content_revision",
+            "created_at",
+            "lastmodified_at",
+        ).get(pk=generated.pk)
+        self.population_observation.delete()
+
+        source.refresh_from_db()
+        source.owner = self.stranger
+        source.save(update_fields=["owner"])
+
+        generated.refresh_from_db()
+        self.assertEqual(generated.owner_id, self.stranger.pk)
+        self.assertFalse(decide(self.owner, "read", generated).allowed)
+        self.assertTrue(decide(self.stranger, "read", generated).allowed)
+        self.assertFalse(decide(self.stranger, "edit", generated).allowed)
+        after = CollectionPropertyValue.objects.values(
+            "average",
+            "description",
+            "content_revision",
+            "created_at",
+            "lastmodified_at",
+        ).get(pk=generated.pk)
+        self.assertEqual(after, before)
+        self.assertEqual(list(generated.sources.values_list("pk", flat=True)), [ref.pk])
+
+    def test_input_change_to_year_or_unit_also_invalidates(self):
+        for field, value in (("year", 2023), ("unit_id", self.total_unit.pk)):
+            with self.subTest(field=field):
+                if not PopulationObservation.objects.filter(
+                    pk=self.population_observation.pk
+                ).exists():
+                    self.population_observation.pk = None
+                    self.population_observation.save(force_insert=True)
+                source = self._raw(self.specific, self.specific_unit, "150")
+                generated = self._linked_output(source)
+                self.population_observation.delete()
+                source.refresh_from_db()
+                setattr(source, field, value)
+                source.save(update_fields=[field])
+                self.assertFalse(
+                    CollectionPropertyValue.objects.filter(pk=generated.pk).exists()
+                )
+
+    def test_real_input_change_invalidates_only_its_output(self):
+        source = self._raw(self.specific, self.specific_unit, "150")
+        generated = self._linked_output(source)
+        other = self._raw(self.specific, self.specific_unit, "100")
+        other_output = self._linked_output(other, "200")
+        self.population_observation.delete()
+
+        source.refresh_from_db()
+        source.average = Decimal("175")
+        source.save(update_fields=["average"])
+
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(pk=generated.pk).exists()
+        )
+        self.assertTrue(
+            CollectionPropertyValue.objects.filter(pk=other_output.pk).exists()
+        )
+
+    def test_input_change_recomputes_with_population(self):
+        source = self._raw(self.specific, self.specific_unit, "150")
+        generated = self._linked_output(source)
+
+        source.refresh_from_db()
+        source.average = Decimal("175")
+        source.save(update_fields=["average"])
+
+        generated.refresh_from_db()
+        self.assertEqual(generated.average, Decimal("350"))
+        self.assertEqual(generated.derived_from_id, source.pk)
+
+    def test_direct_generator_still_invalidates_without_population(self):
+        source = self._raw(self.specific, self.specific_unit, "150")
+        generated = self._linked_output(source)
+        self.population_observation.delete()
+
+        source.refresh_from_db()
+        generated_result, action = create_or_update_derived_cpv(source)
+
+        self.assertEqual((generated_result, action), (None, "skipped"))
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(pk=generated.pk).exists()
+        )
+
+    def test_signal_failure_rolls_back_source_and_output(self):
+        source = self._raw(self.specific, self.specific_unit, "150")
+        generated = self._linked_output(source)
+        source.refresh_from_db()
+        before = (source.average, generated.average)
+
+        with (
+            patch(
+                "sources.waste_collection.derived_values._write_locked_projection",
+                side_effect=RuntimeError("synthetic signal failure"),
+            ),
+            self.assertLogs("sources.waste_collection.signals", level="ERROR") as logs,
+            self.assertRaises(RuntimeError),
+        ):
+            source.average = Decimal("175")
+            source.save(update_fields=["average"])
+
+        self.assertTrue(
+            any("Failed to sync derived CPV" in line for line in logs.output)
+        )
+        source.refresh_from_db()
+        self.assertEqual(source.average, before[0])
+        generated.refresh_from_db()
+        self.assertEqual(generated.average, before[1])
+        self.assertEqual(generated.derived_from_id, source.pk)
+
+    def test_new_raw_signal_failure_leaves_nothing_committed(self):
+        """A failed save on an unsaved raw row commits no row and no output."""
+        count_before = CollectionPropertyValue.objects.count()
+        source = CollectionPropertyValue(
+            collection=self.collection,
+            property=self.specific,
+            unit=self.specific_unit,
+            average=Decimal("175"),
+            year=2024,
+            owner=self.owner,
+            publication_status="private",
+            is_derived=False,
+        )
+        with (
+            patch(
+                "sources.waste_collection.derived_values._write_locked_projection",
+                side_effect=RuntimeError("synthetic signal failure"),
+            ),
+            self.assertLogs("sources.waste_collection.signals", level="ERROR") as logs,
+            self.assertRaises(RuntimeError),
+        ):
+            source.save()
+        self.assertTrue(
+            any("Failed to sync derived CPV" in line for line in logs.output)
+        )
+        self.assertEqual(CollectionPropertyValue.objects.count(), count_before)
+        self.assertFalse(CollectionPropertyValue.objects.filter(pk=source.pk).exists())
+        self.assertFalse(
+            CollectionPropertyValue.objects.filter(is_derived=True).exists()
+        )
+
+    def test_save_resolves_write_alias_from_the_loaded_instance(self):
+        source = self._raw(self.specific, self.specific_unit, "150")
+        seen = []
+        real = router.db_for_write
+
+        def wrapped(model, **hints):
+            seen.append(hints.get("instance"))
+            return real(model, **hints)
+
+        with patch("django.db.router.db_for_write", side_effect=wrapped):
+            source.description = "alias check"
+            source.save(update_fields=["description"])
+        self.assertIn(source, seen)
