@@ -4,14 +4,23 @@
 {% load process_navigation %}
 {% block title %}BRIT | Process Categories{% endblock %}
 {% block content %}
-  {% process_discovery_nav "categories" %}
   <div class="row">
     <div class="col-lg-8">
       <div class="card shadow mb-3">
         <div class="card-header bg-body-tertiary border-bottom-0 py-3">
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
             <h5 class="mb-0">Process categories</h5>
-            <form method="get" class="d-flex gap-2" role="search">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+              {% process_discovery_nav "categories" %}
+              {% if explorer_url %}
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="{{ explorer_url }}"
+                   title="Open Explorer">
+                  <i class="fas fa-table-cells-large"></i> Explorer
+                </a>
+              {% endif %}
+            </div>
+            <form method="get" class="d-flex gap-2 w-100" role="search">
               <input type="hidden" name="scope" value="{{ discovery_scope }}">
               {% process_filter_params as filter_params %}
               {% for key, values in filter_params.lists %}
@@ -27,13 +36,6 @@
                      aria-label="Search categories by name">
               <button type="submit" class="btn btn-sm btn-primary">Search</button>
             </form>
-            {% if explorer_url %}
-              <a class="btn btn-sm btn-outline-secondary"
-                 href="{{ explorer_url }}"
-                 title="Open Explorer">
-                <i class="fas fa-table-cells-large"></i> Explorer
-              </a>
-            {% endif %}
           </div>
         </div>
         <div class="card-body">

@@ -10,7 +10,6 @@
 {% endblock title %}
 
 {% block list_intro %}
-    {% process_discovery_nav "processes" %}
     <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
          role="region"
          aria-label="Module introduction">
@@ -39,6 +38,7 @@
 {% endblock list_card_header %}
 
 {% block list_primary_actions %}
+    {% process_discovery_nav "processes" %}
     {% if create_permission in perms or user.is_staff %}
         <a class="btn btn-primary btn-sm"
            href="{% url 'processes:process-create' %}">
