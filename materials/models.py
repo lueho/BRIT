@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import connection, models, transaction
 from django.db.models import Case, F, Max, Q, When
 from django.db.models.functions import Lower
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.utils import dateformat, timezone
 
@@ -1652,6 +1652,30 @@ class ComponentMeasurement(
 
     def __str__(self):
         return f"Raw measurement of {self.component.name} for sample {self.sample.name}"
+
+
+def sync_composition_basis(sample_id, group_id):
+    """Point the group's composition settings at the basis its measurements share."""
+    bases = set(
+        ComponentMeasurement.objects.filter(sample_id=sample_id, group_id=group_id)
+        .exclude(component=MaterialComponent.objects.other())
+        .exclude(component__is_aggregate=True)
+        .values_list("basis_component_id", flat=True)
+    )
+    if len(bases) != 1 or None in bases:
+        return
+    basis_id = bases.pop()
+    Composition.objects.filter(sample_id=sample_id, group_id=group_id).exclude(
+        fractions_of_id=basis_id
+    ).update(fractions_of_id=basis_id)
+
+
+@receiver(post_save, sender=ComponentMeasurement)
+@receiver(post_delete, sender=ComponentMeasurement)
+def sync_composition_basis_with_measurements(sender, instance, **kwargs):
+    if kwargs.get("raw"):
+        return
+    sync_composition_basis(instance.sample_id, instance.group_id)
 
 
 @receiver(pre_save, sender=Composition)

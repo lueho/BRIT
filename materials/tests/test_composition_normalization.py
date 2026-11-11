@@ -428,15 +428,86 @@ class SampleCompositionNormalizationTestCase(TestCase):
         sample, group = self._sample_with_group("Basis Mismatch")
         dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
         fm = MaterialComponent.objects.create(name="Fresh matter", owner=self.owner)
-        Composition.objects.create(
-            sample=sample, group=group, fractions_of=fm, owner=self.owner
+        setting = Composition.objects.create(
+            sample=sample, group=group, fractions_of=dm, owner=self.owner
         )
         self._measure(sample, group, "Carbon", "40", basis=dm)
+        setting.fractions_of = fm
+        setting.save()
 
         composition = get_sample_normalized_compositions(sample)[0]
 
         self.assertEqual(composition["shares"], [])
         self.assertEqual(composition["warning_codes"], ["configured_basis_mismatch"])
+
+    def test_changing_measurement_basis_updates_composition_basis(self):
+        sample, group = self._sample_with_group("Basis Change")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        fm = MaterialComponent.objects.create(name="Fresh matter", owner=self.owner)
+        Composition.objects.create(
+            sample=sample, group=group, fractions_of=dm, owner=self.owner
+        )
+        measurement = self._measure(
+            sample, group, "Dry matter content", "15.68", basis=dm
+        )
+
+        measurement.basis_component = fm
+        measurement.save()
+
+        composition = get_sample_normalized_compositions(sample)[0]
+        other = MaterialComponent.objects.other()
+        self.assertEqual(composition["normalization_status"], "normalized")
+        self.assertEqual(composition["fractions_of"], fm.pk)
+        self.assertEqual(
+            [(share["component"], share["percent"]) for share in composition["shares"]],
+            [(measurement.component_id, 15.7), (other.pk, 84.3)],
+        )
+
+    def test_new_measurement_basis_replaces_default_composition_basis(self):
+        sample, group = self._sample_with_group("Default Basis")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        Composition.objects.create(
+            sample=sample,
+            group=group,
+            fractions_of=MaterialComponent.objects.default(),
+            owner=self.owner,
+        )
+        self._measure(sample, group, "Carbon", "40", basis=dm)
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(composition["normalization_status"], "normalized")
+        self.assertEqual(composition["fractions_of"], dm.pk)
+
+    def test_mixed_measurement_bases_keep_composition_basis(self):
+        sample, group = self._sample_with_group("Mixed Keep Basis")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        fm = MaterialComponent.objects.create(name="Fresh matter", owner=self.owner)
+        setting = Composition.objects.create(
+            sample=sample, group=group, fractions_of=dm, owner=self.owner
+        )
+        self._measure(sample, group, "Carbon", "40", basis=dm)
+        self._measure(sample, group, "Nitrogen", "10", basis=fm)
+
+        setting.refresh_from_db()
+        self.assertEqual(setting.fractions_of_id, dm.pk)
+
+    def test_deleting_mismatched_measurement_restores_composition_basis(self):
+        sample, group = self._sample_with_group("Delete Mismatch")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        fm = MaterialComponent.objects.create(name="Fresh matter", owner=self.owner)
+        setting = Composition.objects.create(
+            sample=sample, group=group, fractions_of=fm, owner=self.owner
+        )
+        nitrogen = self._measure(sample, group, "Nitrogen", "10", basis=fm)
+        self._measure(sample, group, "Carbon", "40", basis=dm)
+        setting.refresh_from_db()
+        self.assertEqual(setting.fractions_of_id, fm.pk)
+
+        nitrogen.delete()
+
+        setting.refresh_from_db()
+        self.assertEqual(setting.fractions_of_id, dm.pk)
 
     def test_repeated_component_observations_are_blocked(self):
         sample, group = self._sample_with_group("Repeated Component")
