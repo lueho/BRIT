@@ -1654,8 +1654,19 @@ class ComponentMeasurement(
         return f"Raw measurement of {self.component.name} for sample {self.sample.name}"
 
 
-def sync_composition_basis(sample_id, group_id):
-    """Point the group's composition settings at the basis its measurements share."""
+def sync_composition_basis(sample_id, group_id, actor):
+    """Point the group's composition settings at the basis its measurements share.
+
+    Only applies when ``actor`` may manage the sample's data, the same gate
+    that guards editing the composition settings directly.
+    """
+    from utils.object_management.permissions import get_object_policy
+
+    sample = Sample.objects.filter(pk=sample_id).first()
+    if sample is None or actor is None:
+        return
+    if not get_object_policy(actor, sample)["can_manage_samples"]:
+        return
     bases = set(
         ComponentMeasurement.objects.filter(sample_id=sample_id, group_id=group_id)
         .exclude(component=MaterialComponent.objects.other())
@@ -1698,14 +1709,14 @@ def sync_composition_basis_after_save(sender, instance, raw=False, **kwargs):
     current = tuple(getattr(instance, field) for field in _COMPOSITION_BASIS_INPUTS)
     if previous == current:
         return
-    sync_composition_basis(instance.sample_id, instance.group_id)
+    sync_composition_basis(instance.sample_id, instance.group_id, instance.owner)
     if previous is not None and previous[:2] != current[:2]:
-        sync_composition_basis(*previous[:2])
+        sync_composition_basis(*previous[:2], instance.owner)
 
 
 @receiver(post_delete, sender=ComponentMeasurement)
 def sync_composition_basis_after_delete(sender, instance, **kwargs):
-    sync_composition_basis(instance.sample_id, instance.group_id)
+    sync_composition_basis(instance.sample_id, instance.group_id, instance.owner)
 
 
 @receiver(pre_save, sender=Composition)
