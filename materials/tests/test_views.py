@@ -4531,6 +4531,24 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         self.assertIn("material", response.context["form"].errors)
         self.assertFalse(Sample.objects.filter(name="No Material Copy").exists())
 
+    def test_post_copies_selected_sources(self):
+        sample = self._create_standalone_sample_with_non_substrate_material()
+        kept = Source.objects.create(title="Kept source", owner=sample.owner)
+        dropped = Source.objects.create(title="Dropped source", owner=sample.owner)
+        sample.sources.add(kept, dropped)
+        self.client.force_login(sample.owner)
+        self.client.post(
+            reverse("sample-duplicate", kwargs={"pk": sample.pk}),
+            {
+                "name": "Sourced Copy",
+                "material": sample.material.pk,
+                "standalone": "on",
+                "sources": [kept.pk],
+            },
+        )
+        duplicate = Sample.objects.get(name="Sourced Copy")
+        self.assertCountEqual(duplicate.sources.all(), [kept])
+
     def test_post_with_changed_date_precision_is_copied(self):
         sample = self._create_standalone_sample_with_non_substrate_material()
         self.client.force_login(sample.owner)
