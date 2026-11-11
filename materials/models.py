@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import connection, models, transaction
 from django.db.models import Case, F, Max, Q, When
 from django.db.models.functions import Lower
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.utils import dateformat, timezone
 
@@ -1653,6 +1653,71 @@ class ComponentMeasurement(
 
     def __str__(self):
         return f"Raw measurement of {self.component.name} for sample {self.sample.name}"
+
+
+def sync_composition_basis(sample_id, group_id, actor):
+    """Point the group's composition settings at the basis its measurements share.
+
+    Only applies when ``actor`` may manage the sample's data, the same gate
+    that guards editing the composition settings directly.
+    """
+    from utils.object_management.permissions import get_object_policy
+
+    sample = Sample.objects.filter(pk=sample_id).first()
+    if sample is None or actor is None:
+        return
+    if not get_object_policy(actor, sample)["can_manage_samples"]:
+        return
+    bases = set(
+        ComponentMeasurement.objects.filter(sample_id=sample_id, group_id=group_id)
+        .exclude(component=MaterialComponent.objects.other())
+        .exclude(component__is_aggregate=True)
+        .values_list("basis_component_id", flat=True)
+    )
+    if len(bases) != 1 or None in bases:
+        return
+    basis_id = bases.pop()
+    Composition.objects.filter(sample_id=sample_id, group_id=group_id).exclude(
+        fractions_of_id=basis_id
+    ).update(fractions_of_id=basis_id)
+
+
+_COMPOSITION_BASIS_INPUTS = (
+    "sample_id",
+    "group_id",
+    "component_id",
+    "basis_component_id",
+)
+
+
+@receiver(pre_save, sender=ComponentMeasurement)
+def remember_composition_basis_inputs(sender, instance, raw=False, **kwargs):
+    instance._persisted_basis_inputs = None
+    if raw or instance.pk is None:
+        return
+    instance._persisted_basis_inputs = (
+        ComponentMeasurement.objects.filter(pk=instance.pk)
+        .values_list(*_COMPOSITION_BASIS_INPUTS)
+        .first()
+    )
+
+
+@receiver(post_save, sender=ComponentMeasurement)
+def sync_composition_basis_after_save(sender, instance, raw=False, **kwargs):
+    if raw:
+        return
+    previous = getattr(instance, "_persisted_basis_inputs", None)
+    current = tuple(getattr(instance, field) for field in _COMPOSITION_BASIS_INPUTS)
+    if previous == current:
+        return
+    sync_composition_basis(instance.sample_id, instance.group_id, instance.owner)
+    if previous is not None and previous[:2] != current[:2]:
+        sync_composition_basis(*previous[:2], instance.owner)
+
+
+@receiver(post_delete, sender=ComponentMeasurement)
+def sync_composition_basis_after_delete(sender, instance, **kwargs):
+    sync_composition_basis(instance.sample_id, instance.group_id, instance.owner)
 
 
 @receiver(pre_save, sender=Composition)
