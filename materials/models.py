@@ -1670,11 +1670,41 @@ def sync_composition_basis(sample_id, group_id):
     ).update(fractions_of_id=basis_id)
 
 
-@receiver(post_save, sender=ComponentMeasurement)
-@receiver(post_delete, sender=ComponentMeasurement)
-def sync_composition_basis_with_measurements(sender, instance, **kwargs):
-    if kwargs.get("raw"):
+_COMPOSITION_BASIS_INPUTS = (
+    "sample_id",
+    "group_id",
+    "component_id",
+    "basis_component_id",
+)
+
+
+@receiver(pre_save, sender=ComponentMeasurement)
+def remember_composition_basis_inputs(sender, instance, raw=False, **kwargs):
+    instance._persisted_basis_inputs = None
+    if raw or instance.pk is None:
         return
+    instance._persisted_basis_inputs = (
+        ComponentMeasurement.objects.filter(pk=instance.pk)
+        .values_list(*_COMPOSITION_BASIS_INPUTS)
+        .first()
+    )
+
+
+@receiver(post_save, sender=ComponentMeasurement)
+def sync_composition_basis_after_save(sender, instance, raw=False, **kwargs):
+    if raw:
+        return
+    previous = getattr(instance, "_persisted_basis_inputs", None)
+    current = tuple(getattr(instance, field) for field in _COMPOSITION_BASIS_INPUTS)
+    if previous == current:
+        return
+    sync_composition_basis(instance.sample_id, instance.group_id)
+    if previous is not None and previous[:2] != current[:2]:
+        sync_composition_basis(*previous[:2])
+
+
+@receiver(post_delete, sender=ComponentMeasurement)
+def sync_composition_basis_after_delete(sender, instance, **kwargs):
     sync_composition_basis(instance.sample_id, instance.group_id)
 
 

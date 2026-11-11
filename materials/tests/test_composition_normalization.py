@@ -492,6 +492,42 @@ class SampleCompositionNormalizationTestCase(TestCase):
         setting.refresh_from_db()
         self.assertEqual(setting.fractions_of_id, dm.pk)
 
+    def test_unrelated_measurement_edit_keeps_explicit_composition_basis(self):
+        sample, group = self._sample_with_group("Explicit Basis")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        fm = MaterialComponent.objects.create(name="Fresh matter", owner=self.owner)
+        setting = Composition.objects.create(
+            sample=sample, group=group, fractions_of=dm, owner=self.owner
+        )
+        measurement = self._measure(sample, group, "Carbon", "40", basis=dm)
+        setting.fractions_of = fm
+        setting.save()
+
+        measurement.average = Decimal("41")
+        measurement.save()
+
+        setting.refresh_from_db()
+        self.assertEqual(setting.fractions_of_id, fm.pk)
+
+    def test_moving_measurement_resyncs_former_group(self):
+        sample, group = self._sample_with_group("Move Source")
+        target_group = MaterialComponentGroup.objects.create(
+            name="Move Target Group", publication_status="published", owner=self.owner
+        )
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        fm = MaterialComponent.objects.create(name="Fresh matter", owner=self.owner)
+        setting = Composition.objects.create(
+            sample=sample, group=group, fractions_of=fm, owner=self.owner
+        )
+        nitrogen = self._measure(sample, group, "Nitrogen", "10", basis=fm)
+        self._measure(sample, group, "Carbon", "40", basis=dm)
+
+        nitrogen.group = target_group
+        nitrogen.save()
+
+        setting.refresh_from_db()
+        self.assertEqual(setting.fractions_of_id, dm.pk)
+
     def test_deleting_mismatched_measurement_restores_composition_basis(self):
         sample, group = self._sample_with_group("Delete Mismatch")
         dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
