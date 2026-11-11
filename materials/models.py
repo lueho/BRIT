@@ -1330,6 +1330,7 @@ class Sample(NamedUserCreatedObject):
             duplicate.sample_groups.set(
                 kwargs.get("sample_groups", self.sample_groups.all())
             )
+            duplicate.sources.set(kwargs.get("sources", self.sources.all()))
 
             for composition in self.compositions.all():
                 composition.duplicate(creator, sample=duplicate)

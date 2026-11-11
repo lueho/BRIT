@@ -4475,6 +4475,95 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         duplicate = Sample.objects.get(name="Test Sample Duplicate")
         self.assertCountEqual(duplicate.sample_groups.all(), [group])
 
+    def _create_standalone_sample_with_non_substrate_material(self):
+        material = Material.objects.create(name="Legacy Bioresource Material")
+        return Sample.objects.create(
+            name="Standalone Sample",
+            material=material,
+            standalone=True,
+            owner=self.sample.owner,
+        )
+
+    def test_get_preselects_original_references_with_search_endpoint(self):
+        sample = self._create_standalone_sample_with_non_substrate_material()
+        self.client.force_login(sample.owner)
+        response = self.client.get(
+            reverse("sample-duplicate", kwargs={"pk": sample.pk})
+        )
+        self.assertContains(
+            response,
+            f'<option value="{sample.material.pk}" selected>'
+            f"{sample.material.name}</option>",
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'data-autocomplete-url="'
+            f'{reverse("sample-substrate-material-autocomplete")}"',
+        )
+        self.assertContains(response, f'href="{sample.get_absolute_url()}"')
+
+    def test_post_unchanged_form_keeps_original_material(self):
+        sample = self._create_standalone_sample_with_non_substrate_material()
+        self.client.force_login(sample.owner)
+        url = reverse("sample-duplicate", kwargs={"pk": sample.pk})
+        form = self.client.get(url).context["form"]
+        data = {
+            name: value
+            for name, value in ((field.html_name, field.value()) for field in form)
+            if value not in (None, "", [], False)
+        }
+        response = self.client.post(url, data)
+        duplicate = Sample.objects.get(name="Standalone Sample (copy)")
+        self.assertRedirects(
+            response, duplicate.get_absolute_url(), fetch_redirect_response=False
+        )
+        self.assertEqual(duplicate.material, sample.material)
+
+    def test_post_without_material_shows_form_error(self):
+        sample = self._create_standalone_sample_with_non_substrate_material()
+        self.client.force_login(sample.owner)
+        response = self.client.post(
+            reverse("sample-duplicate", kwargs={"pk": sample.pk}),
+            {"name": "No Material Copy", "standalone": "on"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("material", response.context["form"].errors)
+        self.assertFalse(Sample.objects.filter(name="No Material Copy").exists())
+
+    def test_post_copies_selected_sources(self):
+        sample = self._create_standalone_sample_with_non_substrate_material()
+        kept = Source.objects.create(title="Kept source", owner=sample.owner)
+        dropped = Source.objects.create(title="Dropped source", owner=sample.owner)
+        sample.sources.add(kept, dropped)
+        self.client.force_login(sample.owner)
+        self.client.post(
+            reverse("sample-duplicate", kwargs={"pk": sample.pk}),
+            {
+                "name": "Sourced Copy",
+                "material": sample.material.pk,
+                "standalone": "on",
+                "sources": [kept.pk],
+            },
+        )
+        duplicate = Sample.objects.get(name="Sourced Copy")
+        self.assertCountEqual(duplicate.sources.all(), [kept])
+
+    def test_post_with_changed_date_precision_is_copied(self):
+        sample = self._create_standalone_sample_with_non_substrate_material()
+        self.client.force_login(sample.owner)
+        self.client.post(
+            reverse("sample-duplicate", kwargs={"pk": sample.pk}),
+            {
+                "name": "Dated Copy",
+                "material": sample.material.pk,
+                "standalone": "on",
+                "datetime": "2024",
+            },
+        )
+        duplicate = Sample.objects.get(name="Dated Copy")
+        self.assertEqual(duplicate.datetime_precision, "year")
+
     def _create_published_sample(self):
         Material.objects.filter(pk=self.material.pk).update(
             publication_status="published"

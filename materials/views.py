@@ -111,7 +111,6 @@ from .forms import (
     SampleGroupModelForm,
     SampleMaintenanceForm,
     SampleModalModelForm,
-    SampleModelForm,
     SampleQuickCreateForm,
     SampleSectionFormSet,
     SampleSeriesAddTemporalDistributionModalModelForm,
@@ -2157,7 +2156,8 @@ class SampleModalAddPropertyView(
 
 class SampleCreateDuplicateView(DuplicateFormContextMixin, UserCreatedObjectUpdateView):
     model = Sample
-    form_class = SampleModelForm
+    form_class = SampleMaintenanceForm
+    template_name = "materials/sample_form.html"
     object = None
     object_policy_action = "duplicate"
 
@@ -2171,9 +2171,16 @@ class SampleCreateDuplicateView(DuplicateFormContextMixin, UserCreatedObjectUpda
         initial["name"] = f"{self.object.name} (copy)"
         return initial
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["cancel_url"] = self.get_object().get_absolute_url()
+        return context
+
     def form_valid(self, form):
         self.object = self.object.duplicate(
-            creator=self.request.user, **form.cleaned_data
+            creator=self.request.user,
+            datetime_precision=form.instance.datetime_precision,
+            **form.cleaned_data,
         )
         self.new_object = self.object
         return HttpResponseRedirect(self.get_success_url())
