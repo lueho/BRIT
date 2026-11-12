@@ -1,12 +1,12 @@
 from django.contrib import admin
 
-from utils.object_management.admin import NamedUserCreatedObjectAdmin
+from utils.object_management.admin import NamedUserCreatedObjectAdmin, PolicyAdminMixin
 
 from .models import Property, Unit
 
 
 @admin.register(Unit)
-class UnitAdmin(NamedUserCreatedObjectAdmin):
+class UnitAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     list_display = (
         "name",
         "dimensionless",
@@ -18,5 +18,5 @@ class UnitAdmin(NamedUserCreatedObjectAdmin):
 
 
 @admin.register(Property)
-class PropertyAdmin(NamedUserCreatedObjectAdmin):
+class PropertyAdmin(PolicyAdminMixin, NamedUserCreatedObjectAdmin):
     filter_horizontal = ("allowed_units",)

@@ -119,6 +119,7 @@ OWNED_CHILDREN = {
     "maps.georeferencednutsregion": "nutsregion_ptr",
     "maps.georeferencedregion": "region_ptr",
     "materials.composition": "sample",
+    "materials.sampleauthor": "sample",
     "materials.sampleexternalrecord": "sample",
     "processes.processauthor": "process",
     "processes.processinforesource": "process",

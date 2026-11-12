@@ -57,11 +57,11 @@ class CatchmentRevisionValidityTests(TestCase):
     def test_geometry_has_a_spatial_index(self):
         self.assertTrue(CatchmentRevision._meta.get_field("geom").spatial_index)
 
-    def test_admin_exposes_review_and_approval_workflow(self):
+    def test_admin_exposes_submit_not_bulk_approve(self):
         model_admin = CatchmentRevisionModelAdmin(CatchmentRevision, AdminSite())
 
         self.assertIn("submit_selected_for_review", model_admin.actions)
-        self.assertIn("approve_selected", model_admin.actions)
+        self.assertNotIn("approve_selected", model_admin.actions)
 
     def test_admin_locks_immutable_fields_of_published_revisions(self):
         model_admin = CatchmentRevisionModelAdmin(CatchmentRevision, AdminSite())

@@ -26,6 +26,7 @@ from utils.object_management.models import (
     ReviewAction,
 )
 from utils.object_management.services import record_comment
+from utils.tests.testcases import ensure_test_default_owner
 
 from .. import services as services_module
 from ..forms import SourceAuthorForm, SourceBibtexArticleImportForm
@@ -56,6 +57,7 @@ class InlinePolicyFixture(TestCase):
     @classmethod
     def setUpTestData(cls):
         call_command("sync_roles", "--apply", stdout=io.StringIO())
+        ensure_test_default_owner()
         cls.registered = Group.objects.get(name="registered")
 
     def setUp(self):

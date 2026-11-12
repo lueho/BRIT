@@ -11,6 +11,34 @@ The **authoritative policy tables and state diagrams** live in:
 
 To avoid drift, keep policy details in that one canonical page.
 
+## Django admin migration (Part 8 draft)
+
+Governed registrations now use `PolicyAdminMixin` in
+`utils/object_management/admin.py`. Reads delegate to `visible_queryset`;
+writes use the shared decisions and atomic mutation/creation services.
+The adapter refreshes actor/site eligibility after blocking locks and again
+at persistence hooks. Model, M2M and owned-inline changes share the root's
+revision and roll back together if authorization or audit persistence fails.
+
+`PolicyOwnedInlineMixin` resolves the registry's declared parent path.
+It does not grant independent child permissions or support independent
+evidence as an owned inline. Existing child IDs must belong to the declared
+parent; structural reparenting is not an ordinary form edit. Governed FK/M2M
+choices and submitted references use current read authorization.
+
+The standard `delete_selected` action identifier is retained, but invokes the
+policy implementation. Confirmation previews use the service's cascade check
+before related objects are formatted; confirmed deletes reauthorize each
+record and report actual results. `ReviewActionAdmin` is read-only and
+participant-scoped, with full history available to application administrators.
+Review approvals remain in the revision-bound application workspace.
+
+This is an adapter checkpoint, not deployment readiness. Domain-specific
+validation, generated-projection activation, browser verification, the earlier
+bibliography layering issue and coordinated release hardening remain open in
+[#614](https://github.com/lueho/BRIT/pull/614). Legacy notes below are not an
+alternative policy. User instructions: [admin workflows](../01_user_guide/admin_workflows.md).
+
 ## Permission architecture at a glance
 
 | Concern | Primary helper/component | File |
