@@ -901,6 +901,7 @@ def perform_transition(
 
     with transaction.atomic():
         fresh = _lock_instance(target)
+        fresh._lock_review_dependencies(action)
         actor = _fresh_actor(actor)
         decision = decide(actor, action, fresh)
         if not decision.allowed:

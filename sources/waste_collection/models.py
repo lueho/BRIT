@@ -25,6 +25,7 @@ from utils.object_management.models import (
     get_default_owner,
 )
 from utils.object_management.permissions import filter_queryset_for_user
+from utils.object_management.services import perform_transition
 from utils.properties.models import PropertyValue
 
 logger = logging.getLogger(__name__)
@@ -935,6 +936,32 @@ class Collection(NamedUserCreatedObject):
         self.validate_review_readiness()
         return super().submit_for_review()
 
+    def _lock_predecessors(self):
+        """Lock every predecessor row in deterministic order.
+
+        Returns the freshly locked rows; the caller must hold the enclosing
+        transaction.
+        """
+        return list(self.predecessors.order_by("pk").select_for_update())
+
+    def _has_published_descendant(self):
+        """Return whether any later version in the chain is published."""
+        visited = {self.pk}
+        frontier = [self.pk]
+        while frontier:
+            successors = Collection.objects.filter(predecessors__in=frontier).exclude(
+                pk__in=visited
+            )
+            if successors.filter(publication_status=self.STATUS_PUBLISHED).exists():
+                return True
+            frontier = list(successors.values_list("pk", flat=True).distinct())
+            visited.update(frontier)
+        return False
+
+    def _lock_review_dependencies(self, action):
+        if action == "approve":
+            self._lock_predecessors()
+
     def approve(self, user=None):
         """
         Publish the collection and archive predecessors, with concurrency check.
@@ -947,11 +974,10 @@ class Collection(NamedUserCreatedObject):
         """
 
         with transaction.atomic():
-            # Acquire row-level locks on predecessors deterministically to avoid races
-            locked_predecessors_qs = self.predecessors.order_by(
-                "pk"
-            ).select_for_update()
-            predecessors = list(locked_predecessors_qs)
+            # Lock self, then predecessors, in the same order as governed
+            # approval so the successor checks below see committed versions.
+            list(Collection.objects.select_for_update().filter(pk=self.pk))
+            predecessors = self._lock_predecessors()
 
             # Re-check after acquiring locks: ensure no other published successor exists
             for predecessor in predecessors:
@@ -963,13 +989,24 @@ class Collection(NamedUserCreatedObject):
                         "Another version based on this predecessor has already been published."
                     )
 
+            if self._has_published_descendant():
+                raise ValidationError(
+                    "A newer version of this collection has already been published."
+                )
+
             super().approve(user=user)
 
-            # Archive all predecessors after publishing self
+            # Archive only published predecessors — archived records are
+            # public historical data, so an unpublished predecessor must
+            # never be forced public here.
             for predecessor in predecessors:
-                if predecessor.publication_status != "archived":
-                    predecessor.publication_status = "archived"
-                    predecessor.save(update_fields=["publication_status"])
+                if predecessor.publication_status == self.STATUS_PUBLISHED:
+                    perform_transition(
+                        user,
+                        predecessor,
+                        "archive",
+                        expected_revision=predecessor.content_revision,
+                    )
 
     @classmethod
     def public_map_url(cls):

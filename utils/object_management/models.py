@@ -548,6 +548,16 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
             self.save(update_fields=["publication_status", "submitted_at"])
         # TODO: Implement notification to moderators
 
+    def _lock_review_dependencies(self, action):
+        """Acquire additional domain transition locks before actor refresh.
+
+        Called inside the governing transaction, BEFORE the fresh-actor and
+        authorization checks, so domain dependencies are locked while
+        authority is still being established — never after the decision.
+        Base implementation acquires nothing.
+        """
+        return
+
     def approve(self, user=None):
         """
         Approve this object, transitioning from review to published.
