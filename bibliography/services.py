@@ -283,8 +283,15 @@ def create_source_with_authors(actor, source_data: dict, authors_data: list) -> 
             actor, {"licence": source.licence, "authors": list(authors)}
         )
         source.save()
+        provided_key = cleaned.get("citation_key")
         for position, author in enumerate(authors, start=1):
             SourceAuthor.objects.create(source=source, author=author, position=position)
+        if provided_key:
+            if source.citation_key != provided_key:
+                source.citation_key = provided_key
+                source.save(update_fields=["citation_key"])
+        else:
+            source.update_abbreviation()
         record_creation(actor, source)
     return source
 
