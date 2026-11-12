@@ -87,9 +87,9 @@ class ShowcaseThemeContextTest(TestCase):
 
         with connection.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO closecycle_showcase (name, owner_id, publication_status, created_at, lastmodified_at) "
-                "VALUES (%s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING theme",
-                ["Older writer compatibility", self.owner.pk, "published"],
+                "INSERT INTO closecycle_showcase (name, owner_id, publication_status, content_revision, created_at, lastmodified_at) "
+                "VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING theme",
+                ["Older writer compatibility", self.owner.pk, "published", 1],
             )
             self.assertEqual("", cursor.fetchone()[0])
 
