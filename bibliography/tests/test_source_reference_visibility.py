@@ -145,6 +145,24 @@ class SourceReferenceVisibilityTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self._assert_references(response.data, [self.a_pub], None)
 
+    def test_private_reference_api_details_deny_anonymous_readers(self):
+        for name, pk in (
+            ("api-author-detail", self.a_own.pk),
+            ("api-author-detail", self.a_for.pk),
+            ("api-licence-detail", self.lic_priv.pk),
+        ):
+            url = reverse(name, args=[pk])
+            with self.subTest(url=url):
+                with self.assertLogs("django.request", level="WARNING") as logs:
+                    response = self.client.get(url)
+                self.assertEqual(response.status_code, 404)
+                self.assertTrue(
+                    any(f"Not Found: {url}" in line for line in logs.output)
+                )
+        response = self.client.get(reverse("api-source-detail", args=[self.source.pk]))
+        self.assertEqual(response.status_code, 200)
+        self._assert_references(response.data, [self.a_pub], None)
+
     def test_both_serializers_keep_independent_read_scope(self):
         before = self._snapshot()
         for actor, authors, licence in (
