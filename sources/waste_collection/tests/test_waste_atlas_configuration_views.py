@@ -3,7 +3,7 @@ import re
 from copy import deepcopy
 from urllib.parse import parse_qs, urlencode, urlsplit
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.test import TestCase
 from django.urls import reverse
 
@@ -17,6 +17,13 @@ from sources.waste_collection.waste_atlas.pages import MAP_PAGES
 class WasteAtlasMapConfigurationViewsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
+        cls.admin = User.objects.create_user(
+            username="atlas-config-admin",
+            password="secret",
+        )
+        cls.admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.staff = User.objects.create_user(
             username="atlas-config-staff",
             is_staff=True,
@@ -72,10 +79,10 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         data.update(overrides)
         return data
 
-    def test_staff_can_hide_categories_that_are_absent_from_the_map(self):
+    def test_admin_can_hide_categories_that_are_absent_from_the_map(self):
         config = self._configuration()
         original = deepcopy(config.configuration)
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
 
         response = self.client.post(
             reverse("waste-atlas-map-configuration-update", args=[config.key]),
@@ -115,7 +122,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertIsNotNone(match)
         return json.loads(match.group(1))
 
-    def test_configuration_list_requires_staff(self):
+    def test_configuration_list_requires_admin(self):
         url = reverse("waste-atlas-map-configuration-list")
 
         anonymous_response = self.client.get(url)
@@ -125,10 +132,18 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         regular_response = self.client.get(url)
         self.assertEqual(regular_response.status_code, 403)
 
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
         staff_response = self.client.get(url)
         self.assertEqual(staff_response.status_code, 200)
         self.assertContains(staff_response, "collection_system")
+
+    def test_staff_only_user_cannot_update_configuration(self):
+        url = reverse(
+            "waste-atlas-map-configuration-update",
+            args=["collection_system"],
+        )
+        self.client.force_login(self.staff)
+        self.assertEqual(self.client.get(url).status_code, 403)
 
     def test_non_staff_user_cannot_update_configuration(self):
         config = self._configuration()
@@ -147,7 +162,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         config.refresh_from_db()
         self.assertEqual(config.configuration, original)
 
-    def test_staff_update_is_per_configuration_and_reaches_preview_and_export(self):
+    def test_admin_update_is_per_configuration_and_reaches_preview_and_export(self):
         config = self._configuration()
         map_url = f"{reverse('waste-atlas-germany-collection-system-map')}?year=2023"
         untouched = WasteAtlasMapConfiguration.objects.create(
@@ -159,7 +174,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         )
         original = deepcopy(config.configuration)
         untouched_original = deepcopy(untouched.configuration)
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
 
         response = self.client.post(
             reverse("waste-atlas-map-configuration-update", args=[config.key]),
@@ -306,7 +321,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         config = self._configuration()
         map_url = reverse("waste-atlas-germany-collection-system-map")
         original = deepcopy(config.configuration)
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
 
         response = self.client.post(
             reverse("waste-atlas-map-configuration-update", args=[config.key]),
@@ -342,7 +357,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
     def test_blank_export_text_uses_preview_text_fallback(self):
         config = self._configuration()
         original = deepcopy(config.configuration)
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
 
         response = self.client.post(
             reverse("waste-atlas-map-configuration-update", args=[config.key]),
@@ -365,7 +380,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             "Shared category name",
         )
 
-    def test_staff_navigation_and_map_page_link_to_configuration_editor(self):
+    def test_admin_navigation_and_map_page_link_to_configuration_editor(self):
         config_list_url = reverse("waste-atlas-map-configuration-list")
         config_edit_url = reverse(
             "waste-atlas-map-configuration-update",
@@ -379,7 +394,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         self.assertNotContains(regular_response, config_list_url)
         self.assertNotContains(regular_response, config_edit_url)
 
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
         staff_response = self.client.get(
             reverse("waste-atlas-germany-collection-system-map")
         )
@@ -392,7 +407,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
     def test_unsafe_return_url_is_replaced_with_a_configuration_map(self):
         config = self._configuration()
         original = deepcopy(config.configuration)
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
 
         response = self.client.post(
             reverse("waste-atlas-map-configuration-update", args=[config.key]),
@@ -415,7 +430,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
     def test_duplicate_category_positions_are_rejected(self):
         config = self._configuration()
         original = deepcopy(config.configuration)
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
 
         response = self.client.post(
             reverse("waste-atlas-map-configuration-update", args=[config.key]),
@@ -444,7 +459,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         )
         original = deepcopy(config.configuration)
         stored_values = [category["value"] for category in original["categories"]]
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
 
         form_response = self.client.get(
             reverse("waste-atlas-map-configuration-update", args=[config.key])
@@ -498,7 +513,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
         configuration.pop("legendCategoryOrder", None)
         config.configuration = configuration
         config.save(update_fields=["configuration"])
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
 
         response = self.client.get(
             reverse("waste-atlas-map-configuration-update", args=[config.key])
@@ -531,7 +546,7 @@ class WasteAtlasMapConfigurationViewsTestCase(TestCase):
             },
         )
         original = deepcopy(config.configuration)
-        self.client.force_login(self.staff)
+        self.client.force_login(self.admin)
 
         response = self.client.post(
             reverse("waste-atlas-map-configuration-update", args=[config.key]),

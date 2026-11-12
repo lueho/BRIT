@@ -250,6 +250,12 @@ var WasteAtlasChoropleth = (function () {
    * Build the conflict-aid API URL for the current selection/theme.
    * Returns null when the map config does not opt into the conflict aid.
    */
+  function _resolvedScope(cfg) {
+    // Only an absent scope falls back to the public historical default;
+    // an explicit blank stays blank so it fails closed downstream.
+    return cfg.scope == null ? 'historical' : cfg.scope;
+  }
+
   function _conflictUrlFor(cfg, country, year, fromYear) {
     if (!cfg.conflictUrl || !cfg.conflictTheme) return null;
     if (cfg.changeMode || fromYear) return null; // not meaningful for diffs
@@ -257,7 +263,7 @@ var WasteAtlasChoropleth = (function () {
       'theme=' + encodeURIComponent(cfg.conflictTheme),
       'country=' + encodeURIComponent(country || cfg.country || 'DE'),
       'year=' + encodeURIComponent(year || cfg.year),
-      'scope=' + encodeURIComponent(cfg.scope || 'published')
+      'scope=' + encodeURIComponent(_resolvedScope(cfg))
     ];
     if (cfg.nutsPrefix) {
       params.push('nuts_prefix=' + encodeURIComponent(cfg.nutsPrefix));
@@ -468,7 +474,7 @@ var WasteAtlasChoropleth = (function () {
 
   function _fetchAll(cfg) {
     var base = '/waste_collection/waste-atlas/api/';
-    var scopeSuffix = '&scope=' + encodeURIComponent(cfg.scope || 'published');
+    var scopeSuffix = '&scope=' + encodeURIComponent(_resolvedScope(cfg));
     var nutsSuffix = cfg.nutsPrefix ? '&nuts_prefix=' + encodeURIComponent(cfg.nutsPrefix) : '';
     var collectionYear = cfg.collectionYear || cfg.year;
     var collectionYearSuffix = cfg.collectionYear ? '&collection_year=' + encodeURIComponent(cfg.collectionYear) : '';
@@ -803,7 +809,7 @@ var WasteAtlasChoropleth = (function () {
     if (country) params += '&country=' + encodeURIComponent(country);
     if (nutsPrefix) params += '&nuts_prefix=' + encodeURIComponent(nutsPrefix);
     if (nutsLevel) params += '&nuts_level=' + encodeURIComponent(nutsLevel);
-    if (scope) params += '&scope=' + encodeURIComponent(scope);
+    if (scope != null) params += '&scope=' + encodeURIComponent(scope);
     return params;
   }
 
@@ -858,6 +864,10 @@ var WasteAtlasChoropleth = (function () {
 
     function selectedFromYear() {
       return fromYearSelect ? parseInt(fromYearSelect.value, 10) || 2023 : null;
+    }
+
+    function selectedScope() {
+      return scopeSelect ? scopeSelect.value : _resolvedScope(options);
     }
 
     function previousChangeYear(year) {
@@ -980,7 +990,7 @@ var WasteAtlasChoropleth = (function () {
       var params = options.useChangeUrls
         ? 'year=' + encodeURIComponent(year)
         : 'from_year=' + encodeURIComponent(fromYear || previousChangeYear(year)) + '&to_year=' + encodeURIComponent(year);
-      btnToggleChange.href = url + '?' + params + '&scope=' + encodeURIComponent(scopeSelect ? scopeSelect.value : 'published');
+      btnToggleChange.href = url + '?' + params + '&scope=' + encodeURIComponent(selectedScope());
       btnToggleChange.classList.remove('d-none');
     }
 
@@ -1021,7 +1031,7 @@ var WasteAtlasChoropleth = (function () {
       var year = selectedYear();
       var fromYear = selectedFromYear();
       var country = selectedRegion();
-      var navigationTarget = _selectorNavigationTarget(url, year, fromYear, country, scopeSelect && scopeSelect.value);
+      var navigationTarget = _selectorNavigationTarget(url, year, fromYear, country, selectedScope());
       if (navigationTarget && !disableNavigation) {
         window.location.href = navigationTarget;
         return;
@@ -3710,7 +3720,7 @@ var WasteAtlasChoropleth = (function () {
 
     function load(country, year, preserveScope, fromYear, replaceUrl, selectorUrl) {
       var scopeSelect = document.getElementById('sel-scope');
-      var scope = scopeSelect ? scopeSelect.value : cfg.scope || 'published';
+      var scope = scopeSelect ? scopeSelect.value : _resolvedScope(cfg);
       if (replaceUrl) _replaceSelectorUrl(selectorUrl, year, fromYear, country, scope);
       _show(loadingEl);
       if (btnSVG) btnSVG.disabled = true;
@@ -3795,7 +3805,7 @@ var WasteAtlasChoropleth = (function () {
 
     initSelectorControls(function (country, year, _preserveScope, fromYear, replaceUrl, selectorUrl) {
       load(country, year, true, fromYear, replaceUrl, selectorUrl);
-    }, { useChangeUrls: !!cfg.changeMode });
+    }, { useChangeUrls: !!cfg.changeMode, scope: cfg.scope });
 
     var atlasControls = document.getElementById('atlas-controls');
     var atlasToggleMount = document.getElementById('atlas-map-tools') || atlasControls;
@@ -4269,7 +4279,8 @@ var WasteAtlasChoropleth = (function () {
     selection: {
       configForSelection: _configForSelection,
       queryString: _selectorQueryString,
-      regionFromSelect: _regionFromSelect
+      regionFromSelect: _regionFromSelect,
+      resolvedScope: _resolvedScope
     },
     // Appearance of the aggregated-value markers, shared by the screen and the
     // export; exposed for tests and callers that draw their own legend swatch.

@@ -25,5 +25,11 @@
       </div>
 {% endblock atlas_workspace %}
 {% block atlas_page_javascript %}
-   <script nonce="{{ csp_nonce }}">WasteAtlasChoropleth.initSelectorControls(null, { useChangeUrls: true });</script>
+   {{ atlas_selector_options|json_script:"atlas-selector-options" }}
+   <script nonce="{{ csp_nonce }}">
+      WasteAtlasChoropleth.initSelectorControls(
+         null,
+         JSON.parse(document.getElementById("atlas-selector-options").textContent)
+      );
+   </script>
 {% endblock atlas_page_javascript %}
