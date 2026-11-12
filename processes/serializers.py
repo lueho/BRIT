@@ -255,7 +255,9 @@ class ProcessListSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerializ
     def get_sources(self, obj):
         visible = self._visible_pks(Source)
         return SourceModelSerializer(
-            [s for s in obj.sources.all() if s.pk in visible], many=True
+            [s for s in obj.sources.all() if s.pk in visible],
+            many=True,
+            context=self.context,
         ).data
 
 
@@ -322,7 +324,9 @@ class ProcessDetailSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerial
     def get_sources(self, obj):
         visible = self._visible_pks(Source)
         return SourceModelSerializer(
-            [s for s in obj.sources.all() if s.pk in visible], many=True
+            [s for s in obj.sources.all() if s.pk in visible],
+            many=True,
+            context=self.context,
         ).data
 
     def get_process_materials(self, obj):
