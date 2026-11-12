@@ -17,6 +17,11 @@ class CollectionCountOptionsReviewDetailTests(TestCase):
     def setUpTestData(cls):
         cls.owner = User.objects.create(username="count-options-owner")
         cls.staff = User.objects.create(username="count-options-staff", is_staff=True)
+        # The staff persona acts as administrator: the staff flag alone does
+        # not open the review surface.
+        cls.staff.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         cls.moderator = User.objects.create(username="count-options-moderator")
         cls.outsider = User.objects.create(username="count-options-outsider")
         content_type = ContentType.objects.get_for_model(CollectionCountOptions)

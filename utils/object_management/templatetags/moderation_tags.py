@@ -4,8 +4,6 @@ from importlib import import_module
 from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
 from django import template
-from django.apps import apps
-from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.urls import reverse
@@ -225,12 +223,6 @@ def _safe_policy_fallback(user, obj, review_mode=False):
     except Exception:
         pass
 
-    export_list_type = (
-        "published"
-        if (is_published or is_archived)
-        else ("private" if (is_owner or is_staff) else None)
-    )
-
     has_review_feedback = bool(is_owner and getattr(obj, "has_review_feedback", False))
     review_feedback_label = "Review feedback" if is_declined else "Review activity"
 
@@ -238,13 +230,18 @@ def _safe_policy_fallback(user, obj, review_mode=False):
         "is_authenticated": is_authenticated,
         "is_owner": is_owner,
         "is_staff": is_staff,
+        "is_admin": False,
         "is_moderator": False,
+        "is_editor": False,
         "is_private": is_private,
         "is_in_review": is_in_review,
         "is_published": is_published,
         "is_declined": is_declined,
         "is_archived": is_archived,
-        # Conservative defaults for actions
+        "has_change_permission": False,
+        "has_update_url": False,
+        "has_delete_url": False,
+        "can_read": False,
         "can_edit": False,
         "can_manage_samples": False,
         "can_add_property": False,
@@ -258,15 +255,14 @@ def _safe_policy_fallback(user, obj, review_mode=False):
         "can_reject": False,
         "can_transfer_ownership": False,
         "can_manage_editors": False,
-        "is_editor": False,
-        "can_export": (is_published or is_archived)
-        or (is_authenticated and (is_owner or is_staff)),
-        "export_list_type": export_list_type,
+        "can_view_review_activity": False,
+        "can_comment_on_review": False,
+        "can_export": False,
+        "export_list_type": None,
         "has_review_feedback": has_review_feedback,
         "review_feedback_label": review_feedback_label,
-        "can_view_review_feedback": bool(
-            is_owner and (is_declined or has_review_feedback) and not bool(review_mode)
-        ),
+        "can_view_review_feedback": False,
+        "reason_codes": {},
         # Fallback marker
         "fallback": True,
     }
@@ -291,22 +287,21 @@ def can_moderate(user, obj):
             ...
         {% endif %}
 
-    Delegates to `UserCreatedObjectPermission.is_moderator` to keep parity
-    with backend checks. Falls back to staff on unexpected errors.
+    Delegates to the shared policy helpers; the raw ``is_staff`` flag alone
+    never implies moderation rights.
     """
     logger = logging.getLogger(__name__)
     try:
         # Local import to avoid app loading issues
-        from utils.object_management.permissions import UserCreatedObjectPermission
+        from utils.object_management.permissions import user_is_moderator_for_model
 
         if not user or not getattr(user, "is_authenticated", False):
             return False
-        if getattr(user, "is_staff", False):
-            return True
-        return UserCreatedObjectPermission().is_moderator(user, obj)
+        model = obj if isinstance(obj, type) else obj.__class__
+        return user_is_moderator_for_model(user, model)
     except Exception:
         logger.exception("Error in can_moderate templatetag", exc_info=True)
-        return bool(getattr(user, "is_staff", False))
+        return False
 
 
 @register.simple_tag(takes_context=True)
@@ -322,46 +317,17 @@ def object_policy(context, obj, review_mode=False):
     to hide owner-only feedback hints.
     """
     logger = logging.getLogger(__name__)
+    request = context.get("request")
+    user = getattr(request, "user", None) or context.get("user")
     try:
-        request = context.get("request")
-        user = getattr(request, "user", None) or context.get("user")
         # Local import to avoid circular imports at app load
         from utils.object_management.permissions import (
             get_object_policy as _get_object_policy,
         )
 
-        result = _get_object_policy(user, obj, request=request, review_mode=review_mode)
-        return result
+        return _get_object_policy(user, obj, request=request, review_mode=review_mode)
     except Exception:
         logger.exception("object_policy tag failed", exc_info=True)
-        # Fall back safely for staff/owners/debug contexts without exposing internals
-        try:
-            request = context.get("request")
-            user = getattr(request, "user", None)
-            # Reveal to staff
-            if (
-                user is not None
-                and getattr(user, "is_authenticated", False)
-                and getattr(user, "is_staff", False)
-            ):
-                return _safe_policy_fallback(user, obj, review_mode)
-            # Reveal to owner of the object as well (helps debugging private pages)
-            try:
-                if user is not None and getattr(user, "is_authenticated", False):
-                    owner_id = getattr(obj, "owner_id", None)
-                    if owner_id == getattr(user, "id", None):
-                        return _safe_policy_fallback(user, obj, review_mode)
-            except Exception:
-                pass
-        except Exception:
-            pass
-        try:
-            if getattr(settings, "DEBUG", False):
-                # In debug, still return fallback without leaking exception details
-                return _safe_policy_fallback(user, obj, review_mode)
-        except Exception:
-            pass
-        # Last resort: minimal fallback without error message
         return _safe_policy_fallback(user, obj, review_mode)
 
 
@@ -384,10 +350,10 @@ def detail_or_review_url(context, obj, use_back=False):
     """
     Return the URL that should be used to view the object in list/filter UIs.
 
-    If the object's publication status is 'review' (or obj.is_in_review is True)
-    and the current user is allowed to access the review UI for this object
-    (staff or per‑model moderator and NOT the owner), return the review view URL
-    with a ?next=<current_path> parameter so that actions can navigate back.
+    If the object's publication status is 'review' or 'declined' and the
+    shared policy grants the current user ``view_review_activity`` on it,
+    return the review view URL with a ?next=<current_path> parameter so that
+    actions can navigate back.
 
     Otherwise, return the object's regular absolute URL.
     """
@@ -415,7 +381,6 @@ def detail_or_review_url(context, obj, use_back=False):
     except Exception:
         in_review = False
 
-    # Owners of declined items should be redirected to the review feedback view
     try:
         is_declined = getattr(obj, "is_declined", None)
         if is_declined is None:
@@ -423,32 +388,15 @@ def detail_or_review_url(context, obj, use_back=False):
     except Exception:
         is_declined = False
 
-    if is_declined and user and getattr(user, "is_authenticated", False):
-        owner_id = getattr(obj, "owner_id", None)
-        if owner_id == getattr(user, "id", None):
-            try:
-                ct = ContentType.objects.get_for_model(obj.__class__)
-                review_url = reverse(
-                    "object_management:review_item_detail",
-                    kwargs={"content_type_id": ct.id, "object_id": obj.pk},
-                )
-                next_param = ""
-                try:
-                    if request is not None:
-                        next_param = f"?next={quote(path_without_return_params(request), safe='')}"
-                except Exception:  # pragma: no cover - defensive
-                    next_param = ""
-                return f"{review_url}{next_param}"
-            except Exception as e:  # pragma: no cover - defensive
-                logger.warning(
-                    "detail_or_review_url: failed building owner review URL: %s", e
-                )
-
-    # Owners of items currently in review should be redirected to the review view so they can comment
     try:
-        if in_review and user and getattr(user, "is_authenticated", False):
-            owner_id = getattr(obj, "owner_id", None)
-            if owner_id == getattr(user, "id", None):
+        if (
+            (in_review or is_declined)
+            and user
+            and getattr(user, "is_authenticated", False)
+        ):
+            from utils.object_management.policy import decide as _decide
+
+            if _decide(user, "view_review_activity", obj).allowed:
                 try:
                     ct = ContentType.objects.get_for_model(obj.__class__)
                     review_url = reverse(
@@ -464,91 +412,31 @@ def detail_or_review_url(context, obj, use_back=False):
                     return f"{review_url}{next_param}"
                 except Exception as e:  # pragma: no cover - defensive
                     logger.warning(
-                        "detail_or_review_url: failed building owner-in-review URL: %s",
-                        e,
+                        "detail_or_review_url: failed building review URL: %s", e
                     )
     except Exception:
         pass
 
-    if not in_review:
-        # Optionally include ?back=<current_path> for detail pages coming from lists
-        if use_back and request is not None:
-            try:
-                return f"{absolute_url}?back={quote(path_without_return_params(request), safe='')}"
-            except Exception:  # pragma: no cover - defensive
-                return absolute_url
-        return absolute_url
-
-    # Only allow redirect to review view for moderators/staff who are not the owner
-    try:
-        owner_id = getattr(obj, "owner_id", None)
-        is_owner = bool(
-            user
-            and getattr(user, "is_authenticated", False)
-            and owner_id == getattr(user, "id", None)
-        )
-        is_staff = bool(getattr(user, "is_staff", False))
-
-        # Local import to avoid circulars
-        from utils.object_management.permissions import UserCreatedObjectPermission
-
-        is_moderator = False
-        if user and getattr(user, "is_authenticated", False):
-            try:
-                is_moderator = is_staff or UserCreatedObjectPermission().is_moderator(
-                    user, obj
-                )
-            except Exception:
-                is_moderator = is_staff
-
-        if (
-            user
-            and getattr(user, "is_authenticated", False)
-            and (is_moderator and not is_owner)
-        ):
-            try:
-                ct = ContentType.objects.get_for_model(obj.__class__)
-                review_url = reverse(
-                    "object_management:review_item_detail",
-                    kwargs={"content_type_id": ct.id, "object_id": obj.pk},
-                )
-                next_param = ""
-                try:
-                    if request is not None:
-                        next_param = f"?next={quote(path_without_return_params(request), safe='')}"
-                except Exception:  # pragma: no cover - defensive
-                    next_param = ""
-                return f"{review_url}{next_param}"
-            except Exception as e:  # pragma: no cover - defensive
-                logger.warning(
-                    "detail_or_review_url: failed building review URL: %s", e
-                )
-                return absolute_url
-        else:
-            # Not eligible for review view; optionally add back param
-            if use_back and request is not None:
-                try:
-                    return f"{absolute_url}?back={quote(path_without_return_params(request), safe='')}"
-                except Exception:  # pragma: no cover - defensive
-                    return absolute_url
+    if use_back and request is not None:
+        try:
+            return f"{absolute_url}?back={quote(path_without_return_params(request), safe='')}"
+        except Exception:  # pragma: no cover - defensive
             return absolute_url
-    except Exception:  # pragma: no cover - defensive
-        return absolute_url
+    return absolute_url
 
 
 @register.simple_tag
 def is_moderator_for_any_model(user):
-    """Check if user has moderation permissions for any UserCreatedObject model.
+    """Check if user can moderate any registered reviewable model.
 
-    Returns True if the user is staff or has can_moderate_* permission for any model.
-    Results are cached for 10 minutes to reduce database load.
+    True for administrators and holders of any ``can_moderate_*`` permission;
+    the raw ``is_staff`` flag alone grants nothing. Results are cached for
+    20 minutes to reduce database load.
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
-
-    # Staff users are always moderators
-    if getattr(user, "is_staff", False):
-        return True
+    if not getattr(user, "is_active", True):
+        return False
 
     # Use cache to avoid repeated permission checks
     cache_key = f"is_moderator_any_model_{user.id}"
@@ -557,17 +445,16 @@ def is_moderator_for_any_model(user):
         return cached_result
 
     try:
-        from utils.object_management.models import UserCreatedObject
+        from utils.object_management.permissions import user_is_moderator_for_model
+        from utils.object_management.registry import (
+            KIND_REVIEWABLE,
+            registered_models,
+        )
 
-        for model in apps.get_models():
-            if issubclass(model, UserCreatedObject) and not model._meta.abstract:
-                perm_codename = f"can_moderate_{model._meta.model_name}"
-                full_perm = f"{model._meta.app_label}.{perm_codename}"
-                if user.has_perm(full_perm):
-                    # Cache the positive result for 20 minutes. Permission and
-                    # review-status signals clear this cache when needed.
-                    cache.set(cache_key, True, 1200)
-                    return True
+        for model in registered_models(kind=KIND_REVIEWABLE):
+            if model is not None and user_is_moderator_for_model(user, model):
+                cache.set(cache_key, True, 1200)
+                return True
     except Exception:
         # If something goes wrong, fail closed
         return False
@@ -576,6 +463,27 @@ def is_moderator_for_any_model(user):
     # signals clear this cache when needed.
     cache.set(cache_key, False, 1200)
     return False
+
+
+@register.simple_tag(takes_context=True)
+def model_creation_policy(context, model, parent=None):
+    """Return the policy ``Decision`` for creating ``model``.
+
+    Usage:
+        {% model_creation_policy field.field.queryset.model as create_policy %}
+        {% if create_policy.allowed %} ... {% endif %}
+    """
+    from utils.object_management.policy import Decision, decide
+
+    request = context.get("request")
+    user = getattr(request, "user", None)
+    try:
+        return decide(user, "create", model, parent=parent)
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "model_creation_policy tag failed", exc_info=True
+        )
+        return Decision(False, "error")
 
 
 @register.simple_tag

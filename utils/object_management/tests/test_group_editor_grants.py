@@ -137,14 +137,16 @@ class GroupEditorGrantTests(TestCase):
             )
         )
 
-    def test_staff_group_editor_keeps_existing_edit_access(self):
+    def test_staff_group_editor_without_change_permission_is_denied(self):
+        """Staff status alone does not preserve edit access once the group
+        loses the change capability."""
         self.group.permissions.clear()
         self.member.is_staff = True
         self.member.save()
         member = User.objects.get(pk=self.member.pk)
         request = SimpleNamespace(user=member, method="PATCH", data={"name": "Changed"})
-        self.assertTrue(get_object_policy(member, self.process)["can_edit"])
-        self.assertTrue(
+        self.assertFalse(get_object_policy(member, self.process)["can_edit"])
+        self.assertFalse(
             UserCreatedObjectPermission().has_object_permission(
                 request, None, self.process
             )

@@ -24,7 +24,8 @@ from django.core.exceptions import (
 )
 from django.core.paginator import Paginator
 from django.db import DatabaseError, transaction
-from django.db.models import QuerySet
+from django.db.models import Model, QuerySet
+from django.forms.models import BaseModelForm, construct_instance
 from django.http import (
     Http404,
     HttpResponse,
@@ -52,11 +53,6 @@ from utils.modal import (
     BSModalUpdateView,
 )
 from utils.object_management.filters import ReviewDashboardFilterSet
-from utils.object_management.helpers import (
-    create_review_action,
-    create_review_action_safely,
-    invoke_cascade_handler,
-)
 from utils.object_management.models import (
     ReviewAction,
     ReviewNotificationMute,
@@ -71,7 +67,34 @@ from utils.object_management.permissions import (
     get_object_policy,
     user_is_moderator_for_model,
 )
+from utils.object_management.policy import (
+    decide,
+    editable_queryset,
+    is_active_actor,
+    visible_queryset,
+)
+from utils.object_management.registry import (
+    KIND_OWNED,
+    KIND_REVIEWABLE,
+    declared_parent_changed,
+    model_policy,
+    resolve_create_parent,
+    review_target,
+    root_model,
+)
 from utils.object_management.review_hooks import get_breadcrumb_module
+from utils.object_management.services import (
+    _fresh_actor,
+    authorize_create,
+    content_mutation,
+    is_independent_evidence_model,
+    perform_transition,
+    record_comment,
+    record_creation,
+    save_evidence_formset_rows,
+    validate_created_parent,
+    validate_references,
+)
 from utils.views import get_safe_next_url
 
 from ..forms import (
@@ -86,11 +109,6 @@ from ..views import (
     NextOrSuccessUrlMixin,
     NoFormTagMixin,
     build_breadcrumb_context,
-)
-from .access import (
-    CreateUserObjectMixin,
-    UserCreatedObjectReadAccessMixin,
-    UserCreatedObjectWriteAccessMixin,
 )
 from .redirects import ReviewActionRedirectResolver
 from .review_queue import ReviewItemCollector
@@ -589,6 +607,18 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
             return f"{object_name} has been {action_message}."
         return f"{object_name} has been updated."
 
+    _TRANSITION_FOR_METHOD = {
+        "submit_for_review": "submit",
+        "register_for_review": "submit",
+        "withdraw_from_review": "withdraw",
+        "approve": "approve",
+        "reject": "reject",
+        "archive": "archive",
+    }
+
+    def _get_expected_revision(self, request):
+        return request.POST.get("expected_revision") or None
+
     def handle_review_action_post(self, request, *args, **kwargs):
         """Shared POST flow for all review actions."""
         # Resolve object for both modal and non-modal views
@@ -608,23 +638,18 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
             previous_status = getattr(self.object, "publication_status", None)
             if not self.action_attr_name:
                 raise ImproperlyConfigured("action_attr_name must be set on the view")
-            action_callable = getattr(self.object, self.action_attr_name, None)
-            if not callable(action_callable):
+            policy_action = self._TRANSITION_FOR_METHOD.get(self.action_attr_name)
+            if policy_action is None:
                 raise ImproperlyConfigured(
                     f"Object has no callable '{self.action_attr_name}' method"
                 )
-            action_kwargs = dict(self.get_action_kwargs(request, self.object) or {})
-            if self.action_attr_name == "approve" and "user" not in action_kwargs:
-                action_kwargs["user"] = request.user
-            action_callable(**action_kwargs)
-
-            # Log review action
-            create_review_action_safely(
-                self.object,
+            self.object = perform_transition(
                 request.user,
-                self.review_action,
-                comment,
-                exceptions=DatabaseError,
+                self.object,
+                policy_action,
+                expected_revision=self._get_expected_revision(request),
+                comment=comment,
+                cascade=True,
             )
 
             # Success message
@@ -655,18 +680,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
             request: The HTTP request
             previous_status: The object's publication_status before the action
         """
-        obj = getattr(self, "object", None)
-        action_name = getattr(self, "action_attr_name", None)
-        if not obj or not action_name:
-            return
-
-        invoke_cascade_handler(
-            obj,
-            action_name,
-            actor=getattr(request, "user", None),
-            previous_status=previous_status,
-            exceptions=(AttributeError, TypeError, ValidationError, DatabaseError),
-        )
+        return
 
     # Default POST handler for all review action views (modal and non‑modal)
     def post(self, request, *args, **kwargs):  # type: ignore[override]
@@ -775,23 +789,33 @@ class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
         context = super().get_context_data(**kwargs)
         # Pass through 'next' if provided in the opener link; templates will append it to the form action
         context["next_url"] = self.request.GET.get("next")
-        # If the object supports cascade review actions, expose the affected
-        # author count so the modal can show a notice.
         obj = context.get("object")
-        if obj is not None and hasattr(obj, "affected_author_count"):
-            action = getattr(self, "action_attr_name", None)
-            if action:
-                try:
-                    context["cascade_author_count"] = obj.affected_author_count(action)
-                except (
-                    AttributeError,
-                    TypeError,
-                    FieldDoesNotExist,
-                    FieldError,
-                    DatabaseError,
-                ):
-                    context["cascade_author_count"] = 0
+        action = getattr(self, "action_attr_name", None)
+        if obj is not None and action and hasattr(obj, "affected_author_count"):
+            try:
+                context["cascade_author_count"] = obj.affected_author_count(action)
+            except (
+                AttributeError,
+                TypeError,
+                FieldDoesNotExist,
+                FieldError,
+                DatabaseError,
+            ):
+                context["cascade_author_count"] = 0
+        expected = self._parse_revision_param(self.request.GET.get("expected_revision"))
+        context["expected_revision"] = expected
+        context["expected_revision_bound"] = expected is not None
         return context
+
+    @staticmethod
+    def _parse_revision_param(raw):
+        if raw in (None, ""):
+            return None
+        try:
+            value = int(str(raw).strip())
+        except (TypeError, ValueError):
+            return None
+        return value if value >= 0 else None
 
     def post(self, request, *args, **kwargs):  # type: ignore[override]
         """Preflight handling for django-bootstrap-modal-forms.
@@ -974,14 +998,7 @@ class TransferOwnershipView(BaseObjectAccessActionView):
             f"to {new_owner.username}.",
         )
         success_url = self.get_success_url()
-        policy = get_object_policy(request.user, obj, request=request)
-        if not (
-            policy["is_published"]
-            or policy["is_owner"]
-            or policy["is_editor"]
-            or policy["is_staff"]
-            or policy["is_moderator"]
-        ):
+        if not decide(request.user, "read", obj).allowed:
             # The former owner may no longer read the object; avoid a 403 by
             # falling back to the model's private list, or the start page as
             # a last resort.
@@ -1259,6 +1276,27 @@ class BulkManageAccessView(LoginRequiredMixin, View):
         return "/"
 
 
+class UserOwnsObjectMixin(UserPassesTestMixin):
+    """Content-action adapter requiring edit access on the resolved object.
+
+    Owned children delegate to their reviewable root through the core
+    decision, so editors and lifecycle rules apply uniformly.
+    """
+
+    def test_func(self):
+        try:
+            obj = self.get_object()
+        except Http404:
+            # Propagate 404 so DetailView handles nonexistent objects correctly
+            raise
+        except ObjectDoesNotExist as err:
+            # Normalize model DoesNotExist to Http404
+            raise Http404 from err
+        except Exception:
+            return False
+        return decide(self.request.user, "edit", obj).allowed
+
+
 class UserCreatedObjectListMixin:
     paginate_by = 10
     header = None
@@ -1323,8 +1361,18 @@ class UserCreatedObjectListMixin:
         if owner_field is not None:
             queryset = queryset.select_related("owner")
 
-        if self.list_type in {"published", "private", "review", "declined", "archived"}:
+        if self.list_type in {
+            "published",
+            "private",
+            "owned",
+            "shared",
+            "review",
+            "declined",
+            "archived",
+        }:
             queryset = apply_scope_filter(queryset, self.list_type, user=user)
+        elif self.list_type is not None:
+            queryset = queryset.none()
         else:
             queryset = filter_queryset_for_user(queryset, user)
 
@@ -1570,7 +1618,16 @@ class AddReviewCommentView(BaseReviewActionView):
             messages.error(request, "Comment cannot be empty.")
             return HttpResponseRedirect(self.get_success_url())
 
-        create_review_action(obj, request.user, ReviewAction.ACTION_COMMENT, message)
+        try:
+            record_comment(
+                request.user,
+                obj,
+                message,
+                expected_revision=request.POST.get("expected_revision") or None,
+            )
+        except ValidationError as e:
+            messages.error(request, self._format_action_error(e))
+            return HttpResponseRedirect(self.get_failure_url())
 
         messages.success(request, "Comment added.")
         return HttpResponseRedirect(self.get_success_url())
@@ -1767,6 +1824,302 @@ class RequestAwareFormMixin:
         return kwargs
 
 
+class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
+    """
+    A Mixin to control read access via the shared authorization policy.
+
+    Delegates to ``policy.decide(user, "read", obj)``: published objects are
+    publicly readable and archived objects are public frozen historical data;
+    private/review/declined objects require the applicable object-level
+    access.
+    """
+
+    publication_status_field = "publication_status"
+    owner_field = "owner"
+    published_status = "published"
+    permission_denied_message = "You do not have permission to access this object."
+
+    def test_func(self):
+        try:
+            obj = self.get_object()
+        except Http404:
+            # Ensure missing objects yield 404 rather than permission redirect
+            raise
+        except ObjectDoesNotExist as err:
+            # Normalize model-specific DoesNotExist to Http404
+            raise Http404 from err
+        except Exception:
+            return False
+
+        if (
+            not hasattr(obj, self.publication_status_field)
+            or not hasattr(obj, self.owner_field)
+        ) and model_policy(type(obj)) is None:
+            raise ImproperlyConfigured(
+                f"The model {obj.__class__.__name__} must have '{self.publication_status_field}' and '{self.owner_field}' fields."
+            )
+
+        return decide(self.request.user, "read", obj).allowed
+
+
+class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
+    """
+    A Mixin to control write access via the shared authorization policy.
+
+    ``object_policy_action`` selects the policy action: ``edit``, ``delete``,
+    or ``duplicate`` (mapped onto ``new_version``).
+    """
+
+    publication_status_field = "publication_status"
+    owner_field = "owner"
+    published_status = "published"
+    permission_denied_message = "You do not have permission to access this object."
+    object_policy_action = "edit"
+
+    _POLICY_ACTION_MAP = {
+        "edit": "edit",
+        "delete": "delete",
+        "duplicate": "new_version",
+    }
+
+    def test_func(self):
+        user = self.request.user
+
+        if not user.is_authenticated:
+            return False
+
+        try:
+            obj = self.get_object()
+        except Http404:
+            # For write operations on nonexistent objects, propagate 404
+            raise
+        except ObjectDoesNotExist as err:
+            raise Http404 from err
+        except Exception:
+            return False
+
+        if (
+            not hasattr(obj, self.publication_status_field)
+            or not hasattr(obj, self.owner_field)
+        ) and model_policy(type(obj)) is None:
+            raise ImproperlyConfigured(
+                f"The model {obj.__class__.__name__} must have '{self.publication_status_field}' and '{self.owner_field}' fields."
+            )
+
+        action = self._POLICY_ACTION_MAP.get(self.object_policy_action)
+        if action is None:
+            raise ImproperlyConfigured(
+                f"Unknown object_policy_action '{self.object_policy_action}'."
+            )
+        return decide(user, action, obj).allowed
+
+
+class PolicyPermissionRequiredMixin(PermissionRequiredMixin):
+    """Bridge named model actions to the shared authorization policy.
+
+    Resolves the target model from ``policy_model``, the view's ``model``, or
+    the form's ``_meta.model`` and delegates to ``policy.decide``. Views serving
+    models outside the policy registry keep their ``permission_required``
+    enforcement.
+    """
+
+    policy_model = None
+    policy_action = "create"
+
+    def get_policy_model(self):
+        if self.policy_model is not None:
+            return self.policy_model
+        model = getattr(self, "model", None)
+        if model is not None:
+            return model
+        form_class = getattr(self, "form_class", None)
+        form_meta = getattr(form_class, "_meta", None)
+        return getattr(form_meta, "model", None)
+
+    def get_policy_parent(self):
+        """Return the persisted parent for owned-child creates, if any."""
+        return None
+
+    def _resolve_create_parent(self, form):
+        model = self.get_policy_model()
+        if model is None:
+            return None, None
+        policy = model_policy(model)
+        if policy is None or policy.parent_path is None:
+            return policy, None
+        parent = self.get_policy_parent()
+        if parent is None:
+            parent = resolve_create_parent(
+                policy,
+                instance=getattr(form, "instance", None),
+                validated_data=getattr(form, "cleaned_data", None),
+            )
+        return policy, parent
+
+    def _enforce_policy_create(self, form, parent=None):
+        """Authoritative create authorization inside the write boundary.
+
+        Delegates to ``services.authorize_create`` with the resolved parent
+        context so the actor and every declared parent row are re-read at the
+        boundary — a capability or context revoked after any advisory check
+        can never slip a write through. Unregistered ``UserCreatedObject``
+        models deny; unregistered non-UCO models keep their plain behavior.
+        Returns the fresh actor for owner attribution and audit writes.
+        """
+        model = self.get_policy_model()
+        if model is None:
+            return None
+        policy = model_policy(model)
+        if policy is None:
+            if issubclass(model, UserCreatedObject):
+                raise PermissionDenied("Unregistered model cannot be created.")
+            return None
+        if parent is None and policy.parent_path is not None:
+            policy, parent = self._resolve_create_parent(form)
+        return authorize_create(self.request.user, model, parent=parent)
+
+    def has_permission(self):
+        model = self.get_policy_model()
+        if model is None:
+            return super().has_permission()
+        policy = model_policy(model)
+        if policy is None:
+            if issubclass(model, UserCreatedObject):
+                return False
+            return super().has_permission()
+        parent = self.get_policy_parent()
+        if policy.kind == KIND_OWNED and parent is None:
+            if not is_active_actor(self.request.user):
+                return False
+            root = root_model(model, policy.parent_path)
+            if root is None:
+                return False
+            return editable_queryset(
+                self.request.user, root._base_manager.all()
+            ).exists()
+        return decide(
+            self.request.user,
+            self.policy_action,
+            model,
+            parent=parent,
+        ).allowed
+
+
+def _perform_bound_update(view, form):
+    """Persist a bound update inside the shared mutation boundary.
+
+    Independent-evidence rows re-targeted at a different parent are moved
+    under the ``proposed_parent`` protocol: all affected roots stay locked
+    through the write. The validated form is re-bound to the locked fresh
+    instance via ``construct_instance``, so only the form's declared fields
+    are written and protected or out-of-section state can never be reverted
+    by a stale pre-loaded instance.
+    """
+    obj = getattr(view, "object", None)
+    policy = model_policy(type(obj)) if isinstance(obj, Model) else None
+    if policy is None and not isinstance(obj, UserCreatedObject):
+        return None
+    proposed_parent = None
+    if (
+        policy is not None
+        and policy.kind in (KIND_REVIEWABLE, KIND_OWNED)
+        and policy.parent_path is not None
+    ):
+        parent_field = policy.parent_path.split("__")[0]
+        if parent_field in getattr(form, "changed_data", []):
+            new_parent = resolve_create_parent(
+                policy, validated_data=getattr(form, "cleaned_data", None)
+            )
+            if new_parent is None:
+                raise ValidationError("invalid_parent")
+            if declared_parent_changed(obj, policy.parent_path, new_parent):
+                proposed_parent = new_parent
+    with content_mutation(
+        view.request.user, obj, action="edit", proposed_parent=proposed_parent
+    ) as fresh:
+        # Revalidate against the freshly read actor on the same request
+        # object so form clean hooks that check the requester never run on
+        # a stale permission cache.
+        view.request.user = _fresh_actor(view.request.user)
+        if isinstance(form, BaseModelForm):
+            form.instance = fresh
+            # Re-run validation against the locked instance so clean_* hooks
+            # that write non-declared attributes (e.g. datetime_precision)
+            # apply to the row that is actually saved.
+            form.full_clean()
+            if form.errors:
+                return view.form_invalid(form)
+            construct_instance(form, fresh)
+            validate_references(view.request.user, getattr(form, "cleaned_data", None))
+        view.object = fresh
+        return view._call_super_form_valid(form)
+
+
+def _perform_bound_create(view, form):
+    """Persist a bound create inside the shared mutation boundary.
+
+    Reviewable roots get a ``created`` audit event after full persistence;
+    owned children are written inside a ``content_mutation`` on their
+    resolved parent so the parent's snapshot captures the new row.
+    """
+    instance = form.instance
+    model = view.get_policy_model() or (
+        type(instance) if isinstance(instance, Model) else None
+    )
+    policy = model_policy(model) if model is not None else None
+    if policy is None and not isinstance(instance, UserCreatedObject):
+        return None
+    if isinstance(instance, UserCreatedObject):
+        instance.owner = view.request.user
+        instance.publication_status = UserCreatedObject.STATUS_PRIVATE
+    policy, parent = view._resolve_create_parent(form)
+    if policy is not None and policy.kind == KIND_OWNED and parent is not None:
+        with content_mutation(
+            view.request.user, parent, action="edit"
+        ) as locked_parent:
+            actor = view._enforce_policy_create(form, parent=locked_parent)
+            view.request.user = actor
+            validate_references(actor, getattr(form, "cleaned_data", None))
+            if isinstance(instance, UserCreatedObject):
+                instance.owner = actor
+                instance.publication_status = UserCreatedObject.STATUS_PRIVATE
+            response = view._call_super_form_valid(form)
+            validate_created_parent(instance, parent=locked_parent)
+            return response
+    with transaction.atomic():
+        actor = view._enforce_policy_create(form, parent=parent)
+        if actor is not None:
+            view.request.user = actor
+        validate_references(
+            actor or view.request.user, getattr(form, "cleaned_data", None)
+        )
+        response = view._call_super_form_valid(form)
+        validate_created_parent(instance, parent=parent)
+        if isinstance(instance, UserCreatedObject):
+            record_creation(actor or view.request.user, instance)
+    return response
+
+
+class CreateUserObjectMixin(PolicyPermissionRequiredMixin, NextOrSuccessUrlMixin):
+    def get_policy_model(self):
+        model = getattr(self, "model", None)
+        if model is not None:
+            return model
+        queryset = getattr(self, "queryset", None)
+        if queryset is not None:
+            return queryset.model
+        return super().get_policy_model()
+
+    def _call_super_form_valid(self, form):
+        return super().form_valid(form)
+
+    def form_valid(self, form):
+        response = _perform_bound_create(self, form)
+        if response is not None:
+            return response
+        return super().form_valid(form)
+
+
 class UserCreatedObjectCreateView(
     RequestAwareFormMixin,
     CreateUserObjectMixin,
@@ -1808,16 +2161,11 @@ class UserCreatedObjectCreateView(
         return template_names
 
 
-class UserCreatedObjectModalCreateView(PermissionRequiredMixin, BSModalCreateView):
+class UserCreatedObjectModalCreateView(
+    PolicyPermissionRequiredMixin, BSModalCreateView
+):
     template_name = "modal_form.html"
     object = None
-
-    def has_permission(self):
-        # Staff users can always create objects
-        if self.request.user.is_staff:
-            return True
-        # For non-staff users, use the default permission check
-        return super().has_permission()
 
     def get_form_kwargs(self):
         """Pass request to form - required by bootstrap_modal_forms and our custom mixins."""
@@ -1857,8 +2205,13 @@ class UserCreatedObjectModalCreateView(PermissionRequiredMixin, BSModalCreateVie
             return f"{model_name} created successfully."
         return "Object created successfully."
 
+    def _call_super_form_valid(self, form):
+        return super().form_valid(form)
+
     def form_valid(self, form):
-        form.instance.owner = self.request.user
+        response = _perform_bound_create(self, form)
+        if response is not None:
+            return response
         return super().form_valid(form)
 
 
@@ -1898,16 +2251,20 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
         # moderation metadata (reviewer names, actions, comments) that must not
         # leak to arbitrary readers of a published object.
         policy = get_object_policy(request.user, obj, request=request)
-        show_panel = request.GET.get("review") is not None and (
-            policy["is_owner"] or policy["is_editor"] or policy["is_moderator"]
+        show_panel = (
+            request.GET.get("review") is not None and policy["can_view_review_activity"]
         )
 
         logs = []
         if show_panel:
-            try:
-                logs = list(ReviewAction.for_object(obj).select_related("user"))
-            except (DatabaseError, FieldError, AttributeError):
-                logs = []
+            log_target = review_target(obj)
+            if log_target is not None:
+                try:
+                    logs = list(
+                        ReviewAction.for_object(log_target).select_related("user")
+                    )
+                except (DatabaseError, FieldError, AttributeError):
+                    logs = []
 
         context.update(
             {
@@ -1982,28 +2339,20 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         ReviewItemDetailView._model_view_registry[model_class] = cls
 
     def test_func(self):
-        """Allow access for staff, moderators, and owners.
+        """Allow access to anyone with review-activity rights on the object.
 
-        This overrides the default read-access mixin so that non-staff moderators who
-        hold the dynamic per-model permission (can_moderate_<model>) may access the
-        review detail view. Owners are permitted to access the review view for any
-        of their objects to see review history and activity.
+        Delegates to the shared ``view_review_activity`` decision: owners,
+        editors, administrators, and moderators with read access.
         """
         user = getattr(self, "request", None) and self.request.user
         if not user or not getattr(user, "is_authenticated", False):
             return False
 
-        obj = self.get_object()
-        policy = get_object_policy(user, obj, request=self.request)
-
-        if policy["is_owner"]:
-            return True
-
-        return user_is_moderator_for_model(user, obj.__class__)
+        return decide(user, "view_review_activity", self.get_object()).allowed
 
     def dispatch(self, request, *args, **kwargs):
         """
-        Authorize review details for moderators/staff and for owners.
+        Authorize review details via the shared ``view_review_activity`` decision.
 
         Delegation order:
         1. Resolve object from content type/object id.
@@ -2011,10 +2360,9 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         3. If a specialized class is registered, call that class via `as_view()` and
            return its response.
         4. Otherwise execute base authorization and rendering.
-
-        Owners can access the review page for any of their objects to see review
-        history and activity, regardless of publication status.
         """
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
         obj = self.get_object()
         model_class = obj.__class__
 
@@ -2025,14 +2373,24 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             specialized_view = specialized_view_class.as_view()
             return specialized_view(request, *args, **kwargs)
 
-        # Standard authorization checks
-        policy = get_object_policy(request.user, obj, request=request)
-
-        if policy["is_owner"]:
-            return super().dispatch(request, *args, **kwargs)
-
-        if not user_is_moderator_for_model(request.user, obj.__class__):
-            return self.handle_no_permission()
+        if not decide(request.user, "view_review_activity", obj).allowed:
+            raise PermissionDenied(
+                "You do not have permission to access the review details page."
+            )
+        target = review_target(obj)
+        if target is not None and target.pk != obj.pk:
+            # A generated projection has no independent approval surface;
+            # review activity lives on its source evidence.
+            source_ct = ContentType.objects.get_for_model(type(target))
+            return HttpResponseRedirect(
+                reverse(
+                    "object_management:review_item_detail",
+                    kwargs={
+                        "content_type_id": source_ct.pk,
+                        "object_id": target.pk,
+                    },
+                )
+            )
         return super().dispatch(request, *args, **kwargs)
 
     def _resolve_base_template(self):
@@ -2201,6 +2559,15 @@ class UserCreatedObjectUpdateView(
     NextOrSuccessUrlMixin,
     UpdateView,
 ):
+    def _call_super_form_valid(self, form):
+        return super().form_valid(form)
+
+    def form_valid(self, form):
+        response = _perform_bound_update(self, form)
+        if response is not None:
+            return response
+        return super().form_valid(form)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         verbose_name = self.object._meta.verbose_name
@@ -2233,6 +2600,50 @@ class UserCreatedObjectCreateWithInlinesView(
     RequestAwareFormMixin, CreateUserObjectMixin, CreateWithInlinesView
 ):
     formset_helper_class = DynamicTableInlineFormSetHelper
+
+    def forms_valid(self, form, inlines):
+        """Stash the validated inline formsets so the governed write persists
+        them inside the bound create boundary.
+
+        ``extra_views`` saves each formset after ``form_valid`` returns —
+        outside the boundary that authorizes, persists and audits the new
+        row. Routing through ``self.form_valid`` lets
+        ``_call_super_form_valid`` save the formsets while the atomic write
+        and any parent locks are still held, so a denied create leaves no
+        inline rows and the creation audit covers them.
+        """
+        self._pending_inline_formsets = list(inlines)
+        return self.form_valid(form)
+
+    def _call_super_form_valid(self, form):
+        # ``CreateUserObjectMixin`` owns the governed ``form_valid`` wrapper,
+        # so the ungoverned save is reached through its
+        # ``_call_super_form_valid`` — calling ``super().form_valid`` here
+        # would re-enter the bound create recursively.
+        response = super()._call_super_form_valid(form)
+        self._save_pending_inlines()
+        return response
+
+    def _save_pending_inlines(self):
+        """Persist stashed inline formsets against the saved object.
+
+        On the governed path this runs inside the bound create so child
+        rows join the same atomic write and roll back with it. On the
+        non-governed fallback the same ordering as ``extra_views``
+        (form first, then formsets) is preserved.
+        """
+        for formset in getattr(self, "_pending_inline_formsets", None) or ():
+            formset.instance = self.object
+            formset.save()
+        self._pending_inline_formsets = []
+
+    def form_valid(self, form):
+        response = _perform_bound_create(self, form)
+        if response is not None:
+            return response
+        response = super()._call_super_form_valid(form)
+        self._save_pending_inlines()
+        return response
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -2271,6 +2682,45 @@ class UserCreatedObjectUpdateWithInlinesView(
 ):
     formset_helper_class = DynamicTableInlineFormSetHelper
 
+    def forms_valid(self, form, inlines):
+        """Stash the validated inline formsets so the governed write persists
+        them inside the ``content_mutation`` boundary.
+
+        ``extra_views`` saves each formset after ``form_valid`` returns —
+        outside the boundary that locks, re-checks, snapshots and audits the
+        root. Routing through ``self.form_valid`` lets
+        ``_call_super_form_valid`` save the formsets against the locked
+        instance while the root lock and atomic block are still held.
+        """
+        self._pending_inline_formsets = list(inlines)
+        return self.form_valid(form)
+
+    def _call_super_form_valid(self, form):
+        response = super().form_valid(form)
+        self._save_pending_inlines()
+        return response
+
+    def _save_pending_inlines(self):
+        """Persist stashed inline formsets against the saved object.
+
+        On the governed path this runs inside ``content_mutation`` so child
+        rows join the root snapshot diff and roll back with it. On the
+        non-governed fallback the same ordering as ``extra_views``
+        (form first, then formsets) is preserved.
+        """
+        for formset in getattr(self, "_pending_inline_formsets", None) or ():
+            formset.instance = self.object
+            formset.save()
+        self._pending_inline_formsets = []
+
+    def form_valid(self, form):
+        response = _perform_bound_update(self, form)
+        if response is not None:
+            return response
+        response = super().form_valid(form)
+        self._save_pending_inlines()
+        return response
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         verbose_name = self.object._meta.verbose_name
@@ -2305,6 +2755,15 @@ class UserCreatedObjectModalUpdateView(
 ):
     template_name = "modal_form.html"
     success_message = "Successfully updated."
+
+    def _call_super_form_valid(self, form):
+        return super().form_valid(form)
+
+    def form_valid(self, form):
+        response = _perform_bound_update(self, form)
+        if response is not None:
+            return response
+        return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -2354,7 +2813,7 @@ class UserCreatedObjectModalArchiveView(
 
     def form_valid(self, form):
         success_url = self.get_success_url()
-        self.object.archive()
+        perform_transition(self.request.user, self.object, "archive")
         return HttpResponseRedirect(success_url)
 
 
@@ -2364,6 +2823,18 @@ class UserCreatedObjectModalDeleteView(
     object_policy_action = "delete"
     template_name = "modal_delete.html"
     success_message = "Successfully deleted."
+
+    def form_valid(self, form):
+        if isinstance(self.object, UserCreatedObject) or (
+            isinstance(self.object, Model)
+            and model_policy(type(self.object)) is not None
+        ):
+            with content_mutation(
+                self.request.user, self.object, action="delete"
+            ) as locked:
+                self.object = locked
+                return super().form_valid(form)
+        return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -2507,13 +2978,47 @@ class WorkspaceSectionUpdateMixin:
             )
         return super().render_to_response(context, **response_kwargs)
 
+    def _section_writes_governed_root(self):
+        """Whether saving this section mutates governed root content.
+
+        Sections declaring root ``fields`` or formsets of owned children
+        write through the root's ``content_mutation`` boundary — the
+        post-lock lifecycle re-check, protected-metadata enforcement,
+        ``content_revision`` bump, and audit event all apply, and the
+        root snapshot captures owned-child row changes. Sections
+        carrying only independent-evidence or unregistered formsets
+        leave the root untouched; each evidence row runs its own
+        boundary inside ``save_evidence_formset_rows``.
+        """
+        if self.section.get("fields"):
+            return True
+        return any(
+            (policy := model_policy(inline.model)) is not None
+            and policy.kind == KIND_OWNED
+            for inline in self.get_inlines()
+        )
+
+    def _call_super_form_valid(self, form):
+        return self._save_section_response(form)
+
     def form_valid(self, form):
         validity = [inline.is_valid() for inline in self.get_inlines()]
         if not all(validity):
             return self.form_invalid(form)
+        if self._section_writes_governed_root():
+            response = _perform_bound_update(self, form)
+            if response is not None:
+                return response
+        return self._save_section_response(form)
+
+    def _save_section_response(self, form):
         self.object = form.save()
         for inline in self.get_inlines():
-            inline.save()
+            inline.instance = self.object
+            if is_independent_evidence_model(inline.model):
+                save_evidence_formset_rows(self.request.user, inline, self.object)
+            else:
+                inline.save()
         message = "Saved privately." if self.object.is_private else "Changes saved."
         if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return JsonResponse(self.get_section_saved_payload(message))
@@ -2542,10 +3047,23 @@ class WorkspaceSectionUpdateMixin:
         return f"{self.object.get_absolute_url()}?mode=edit"
 
 
-class OwnedObjectModelSelectOptionsView(
-    PermissionRequiredMixin, ModelSelectOptionsView
-):
-    pass
+class OwnedObjectModelSelectOptionsView(ModelSelectOptionsView):
+    """Post-create option refresh scoped by the shared read policy.
+
+    Options are the records the request user may currently read
+    (published/owned/granted); no separate model view permission is required
+    on top of the create affordance that triggered the refresh.
+    """
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if queryset is None:
+            return queryset
+        if model_policy(queryset.model) is None:
+            if issubclass(queryset.model, UserCreatedObject):
+                return queryset.none()
+            return queryset
+        return visible_queryset(self.request.user, queryset)
 
 
 class UserCreatedObjectAutocompleteView(AutocompleteModelView):

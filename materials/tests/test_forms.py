@@ -14,6 +14,7 @@ from factory.django import mute_signals
 
 from maps.models import GeoPolygon, Location, Region
 from utils.forms import CreateEnabledTomSelectModelMultipleChoiceField
+from utils.object_management.models import ObjectEditorGrant
 from utils.properties.models import Unit
 
 from ..forms import (
@@ -733,6 +734,7 @@ class SampleGroupModelFormTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(username="group-form-owner")
+        cls.owner.user_permissions.add(Permission.objects.get(codename="change_sample"))
         cls.other = User.objects.create_user(username="group-form-other")
         cls.material = Material.objects.create(
             name="Group member material", owner=cls.owner
@@ -741,7 +743,7 @@ class SampleGroupModelFormTestCase(TestCase):
             name="Member one",
             material=cls.material,
             owner=cls.owner,
-            publication_status="published",
+            publication_status="private",
         )
         cls.sample2 = Sample.objects.create(
             name="Member two", material=cls.material, owner=cls.owner
@@ -840,17 +842,44 @@ class SampleGroupModelFormTestCase(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("samples", form.errors)
 
-    def test_staff_may_add_other_users_published_sample(self):
+    def test_admin_staff_may_add_other_users_private_sample(self):
         staff = User.objects.create_user(username="group-form-staff", is_staff=True)
+        staff.user_permissions.add(
+            Permission.objects.get(codename="administer_objects"),
+            Permission.objects.get(codename="change_sample"),
+        )
         data = QueryDict(mutable=True)
         data.update({"name": "Staff group", "kind": "study"})
-        data.setlist("samples", [str(self.foreign_published_sample.pk)])
+        data.setlist("samples", [str(self.foreign_private_sample.pk)])
         form = self._form(data=data, user=staff)
 
         self.assertTrue(form.is_valid(), form.errors)
         group = form.save()
 
-        self.assertCountEqual(group.samples.all(), [self.foreign_published_sample])
+        self.assertCountEqual(group.samples.all(), [self.foreign_private_sample])
+
+    def test_staff_editor_cannot_attach_foreign_published_sample(self):
+        """A staff user with a group editor grant and only the group change
+        capability gets no editable-sample choices and cannot submit a
+        foreign published sample."""
+        staff = User.objects.create_user(username="group-form-staff", is_staff=True)
+        staff.user_permissions.add(
+            Permission.objects.get(codename="change_samplegroup")
+        )
+        group = SampleGroup.objects.create(name="Staff group", owner=self.owner)
+        ObjectEditorGrant.objects.create(content_object=group, editor=staff)
+        staff = User.objects.get(pk=staff.pk)
+
+        form = self._form(user=staff, instance=group)
+        self.assertNotIn(self.foreign_published_sample, form.fields["samples"].queryset)
+
+        data = QueryDict(mutable=True)
+        data.update({"name": "Staff group", "kind": "study"})
+        data.setlist("samples", [str(self.foreign_published_sample.pk)])
+        bound = self._form(data=data, user=staff, instance=group)
+
+        self.assertFalse(bound.is_valid())
+        self.assertIn("samples", bound.errors)
 
     def test_update_preserves_members_editor_cannot_manage(self):
         group = SampleGroup.objects.create(name="Editable group", owner=self.owner)
@@ -881,6 +910,9 @@ class SampleModelFormSampleGroupsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.owner = User.objects.create_user(username="group-form-owner")
+        cls.owner.user_permissions.add(
+            Permission.objects.get(codename="change_samplegroup")
+        )
         cls.other = User.objects.create_user(username="group-form-other")
         cls.substrate_category, _ = MaterialCategory.objects.get_or_create(
             name=get_sample_substrate_category_name()
@@ -962,6 +994,31 @@ class SampleModelFormSampleGroupsTestCase(TestCase):
         queryset = form.fields["sample_groups"].queryset
         self.assertIn(self.group1, queryset)
         self.assertNotIn(self.inaccessible_group, queryset)
+
+    def test_staff_with_only_change_sample_cannot_add_foreign_group(self):
+        """A staff user holding only the sample change capability sees no
+        editable group choices and cannot attach a foreign group."""
+        staff = User.objects.create_user(username="group-form-staff", is_staff=True)
+        staff.user_permissions.add(Permission.objects.get(codename="change_sample"))
+        form = SampleModelForm(request=self._request(staff))
+
+        queryset = form.fields["sample_groups"].queryset
+        self.assertNotIn(self.group1, queryset)
+        self.assertNotIn(self.foreign_published_group, queryset)
+
+        data = QueryDict(mutable=True)
+        data.update(
+            {
+                "name": "Staff grouped sample",
+                "material": str(self.material.pk),
+                "standalone": "on",
+            }
+        )
+        data.setlist("sample_groups", [str(self.foreign_published_group.pk)])
+        bound = SampleModelForm(data=data, request=self._request(staff))
+
+        self.assertFalse(bound.is_valid())
+        self.assertIn("sample_groups", bound.errors)
 
     def test_visible_but_not_editable_groups_are_absent_from_choices(self):
         form = self._form(data=None)

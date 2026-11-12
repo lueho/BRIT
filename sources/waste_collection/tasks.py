@@ -13,6 +13,7 @@ from brit.celery import app
 from maps.db_functions import SimplifyPreserveTopology
 from maps.signals import get_geojson_cache
 from maps.utils import (
+    AUTHZ_GEOJSON_CACHE_PREFIX,
     build_collection_cache_key,
     cache_rendered_geojson,
     rendered_geojson_cache_key,
@@ -59,10 +60,12 @@ def warm_collection_geojson_cache(self):
         from sources.waste_collection.viewsets import CollectionViewSet
 
         base_key = build_collection_cache_key(scope="published")
+        # Anonymous requests read the audience-scoped namespace.
+        scoped_key = f"{AUTHZ_GEOJSON_CACHE_PREFIX}{base_key}"
         view = CollectionViewSet()
         aggregates = qs.aggregate(**view._version_aggregates())
         cache_key = rendered_geojson_cache_key(
-            base_key, view._version_token(aggregates)
+            scoped_key, view._version_token(aggregates)
         )
         cache = get_geojson_cache()
         timeout = getattr(settings, "GEOJSON_CACHE_TIMEOUT", 86400)
@@ -76,8 +79,9 @@ def warm_collection_geojson_cache(self):
             timeout=timeout,
             geometry_defer_field="catchment__region__borders__geom",
         )
-        cache.delete(base_key)
-        cache.delete(f"{base_key}:count")
+        for stale_key in (base_key, scoped_key):
+            cache.delete(stale_key)
+            cache.delete(f"{stale_key}:count")
         feature_count = 0 if cached else aggregates["cnt"] or 0
         logger.info(
             "Collection GeoJSON cache warmed: %d features, key=%s",

@@ -877,7 +877,6 @@ class MaterialPropertyAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class SampleBoundCreateMixin(UserPassesTestMixin):
     sample = None
-    sample_policy_key = None
     sample_query_param = "sample"
     sample_url_kwarg = None
 
@@ -903,8 +902,9 @@ class SampleBoundCreateMixin(UserPassesTestMixin):
         return self.sample
 
     def test_func(self):
-        policy = get_object_policy(self.request.user, self.sample, request=self.request)
-        return policy[self.sample_policy_key]
+        return can_add_data_to_sample(
+            self.request.user, self.get_policy_model(), self.sample, None
+        )
 
     def form_valid(self, form):
         form.instance.sample = self.sample
@@ -926,7 +926,6 @@ class MaterialPropertyValueCreateView(
     model = MaterialPropertyValue
     form_class = MaterialPropertyValueModelForm
     permission_required = "materials.add_materialpropertyvalue"
-    sample_policy_key = "can_add_property"
 
 
 class MaterialPropertyValueDetailView(
@@ -963,7 +962,6 @@ class ComponentMeasurementCreateView(
     model = ComponentMeasurement
     form_class = ComponentMeasurementModelForm
     permission_required = "materials.add_componentmeasurement"
-    sample_policy_key = "can_manage_samples"
 
 
 class ComponentMeasurementDetailView(
@@ -1305,8 +1303,6 @@ class EditableAutocompleteMixin:
 
     def hook_queryset(self, queryset):
         user = self.request.user
-        if user.is_staff:
-            return super().hook_queryset(queryset)
         return super().hook_queryset(queryset).editable_by_user(user)
 
 
@@ -2131,7 +2127,6 @@ class EditableSampleAutoCompleteView(EditableAutocompleteMixin, SampleAutocomple
 class SampleAddCompositionView(SampleBoundCreateMixin, UserCreatedObjectCreateView):
     form_class = SampleAddCompositionForm
     permission_required = "materials.add_composition"
-    sample_policy_key = "can_manage_samples"
     sample_url_kwarg = "pk"
 
     def get_initial(self):
@@ -2141,7 +2136,6 @@ class SampleAddCompositionView(SampleBoundCreateMixin, UserCreatedObjectCreateVi
 class SampleAddPropertyView(SampleBoundCreateMixin, UserCreatedObjectCreateView):
     form_class = MaterialPropertyValueModelForm
     permission_required = "materials.add_materialpropertyvalue"
-    sample_policy_key = "can_add_property"
     sample_url_kwarg = "pk"
 
 
@@ -2150,7 +2144,6 @@ class SampleModalAddPropertyView(
 ):
     form_class = MaterialPropertyValueModalModelForm
     permission_required = "materials.add_materialpropertyvalue"
-    sample_policy_key = "can_add_property"
     sample_url_kwarg = "pk"
 
 
@@ -2196,24 +2189,21 @@ class SampleCreateDuplicateView(DuplicateFormContextMixin, UserCreatedObjectUpda
 
 
 class SampleRelationMutationPermissionMixin:
-    sample_policy_key = None
-
     def form_valid(self, form):
         sample = form.cleaned_data["sample"]
         instance = form.instance
-        original_sample_id = None
+        stored = None
         if instance.pk is not None:
-            original_sample_id = (
-                instance.__class__._base_manager.filter(pk=instance.pk)
-                .values_list("sample_id", flat=True)
-                .get()
-            )
+            # Form validation already copied the posted parent onto the
+            # in-memory instance; the stored row still knows the source
+            # parent that reparenting must re-check.
+            stored = instance.__class__._base_manager.filter(pk=instance.pk).first()
         if not can_add_data_to_sample(
             self.request.user,
+            form._meta.model,
             sample,
-            original_sample_id,
-            self.sample_policy_key,
-            request=self.request,
+            stored.sample_id if stored is not None else None,
+            obj=stored if stored is not None else instance,
         ):
             raise PermissionDenied("You cannot add data to this sample.")
         return super().form_valid(form)
@@ -2224,7 +2214,6 @@ class CompositionCreateView(
 ):
     form_class = CompositionModelForm
     permission_required = "materials.add_composition"
-    sample_policy_key = "can_manage_samples"
 
 
 class CompositionModalCreateView(
@@ -2232,7 +2221,6 @@ class CompositionModalCreateView(
 ):
     form_class = CompositionModalModelForm
     permission_required = "materials.add_composition"
-    sample_policy_key = "can_manage_samples"
 
 
 class CompositionDetailView(UserCreatedObjectDetailView):
@@ -2253,7 +2241,6 @@ class CompositionUpdateView(
 ):
     model = Composition
     form_class = CompositionModelForm
-    sample_policy_key = "can_manage_samples"
 
 
 class CompositionModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -2359,9 +2346,12 @@ class _DerivedCompositionOrderView(
         return self.group
 
     def test_func(self):
-        sample = self.get_sample()
-        policy = get_object_policy(self.request.user, sample, request=self.request)
-        return policy["can_manage_samples"]
+        # The handlers create and reorder Composition rows on the sample —
+        # an owned-child mutation gated by parent edit, not a presentation
+        # affordance.
+        return can_add_data_to_sample(
+            self.request.user, Composition, self.get_sample(), None
+        )
 
     def get_redirect_url(self, *args, **kwargs):
         next_url = get_safe_next_url(self.request)

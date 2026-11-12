@@ -3,7 +3,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, Permission
 from django.contrib.gis.geos import GEOSGeometry, Point
 from django.db.models.signals import post_save
 from django.test import RequestFactory, TestCase, override_settings
@@ -938,6 +938,12 @@ class SampleGroupAPISerializerTestCase(TestCase):
         cls.owner = get_user_model().objects.create_user(
             username="group-serializer-owner"
         )
+        cls.owner.user_permissions.add(
+            *Permission.objects.filter(
+                codename__in=("change_sample", "change_samplegroup"),
+                content_type__app_label="materials",
+            )
+        )
         cls.material = Material.objects.create(name="Grouped material", owner=cls.owner)
         cls.sample = Sample.objects.create(
             name="Member sample",
@@ -1050,11 +1056,17 @@ class SampleGroupAPISerializerTestCase(TestCase):
         self.assertFalse(group.samples.exists())
 
     def test_write_sets_members_and_sources(self):
+        editable_sample = Sample.objects.create(
+            name="Editable member sample",
+            material=self.material,
+            owner=self.owner,
+            standalone=True,
+        )
         serializer = SampleGroupWriteSerializer(
             data={
                 "name": "Group with members",
                 "kind": "study",
-                "samples": [self.sample.pk],
+                "samples": [editable_sample.pk],
                 "sources": [self.source.pk],
             },
             context={"request": self._request(self.owner)},
@@ -1063,7 +1075,7 @@ class SampleGroupAPISerializerTestCase(TestCase):
         self.assertTrue(serializer.is_valid(), serializer.errors)
         group = serializer.save(owner=self.owner)
 
-        self.assertCountEqual(group.samples.all(), [self.sample])
+        self.assertCountEqual(group.samples.all(), [editable_sample])
         self.assertCountEqual(group.sources.all(), [self.source])
 
     def test_write_rejects_inaccessible_private_sample(self):
@@ -1112,7 +1124,10 @@ class SampleGroupAPISerializerTestCase(TestCase):
             publication_status="published",
         )
         own_sample = Sample.objects.create(
-            name="Own sample", material=self.material, owner=self.owner
+            name="Own sample",
+            material=self.material,
+            owner=self.owner,
+            standalone=True,
         )
         foreign_sample.sample_groups.add(self.group)
         serializer = SampleGroupWriteSerializer(
@@ -1125,7 +1140,12 @@ class SampleGroupAPISerializerTestCase(TestCase):
         self.assertTrue(serializer.is_valid(), serializer.errors)
         serializer.save()
 
-        self.assertCountEqual(self.group.samples.all(), [own_sample, foreign_sample])
+        # The frozen published fixture member is preserved alongside the
+        # foreign membership the editor cannot manage.
+        self.assertCountEqual(
+            self.group.samples.all(),
+            [own_sample, foreign_sample, self.sample],
+        )
 
     def test_write_rejects_inaccessible_private_source(self):
         with mute_signals(post_save):
@@ -1151,6 +1171,12 @@ class SampleGroupMembershipSerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.owner = get_user_model().objects.create_user(username="membership-owner")
+        cls.owner.user_permissions.add(
+            *Permission.objects.filter(
+                codename__in=("change_sample", "change_samplegroup"),
+                content_type__app_label="materials",
+            )
+        )
         cls.other = get_user_model().objects.create_user(username="membership-other")
         cls.material = Material.objects.create(
             name="Membership material", owner=cls.owner
@@ -1193,9 +1219,12 @@ class SampleGroupMembershipSerializerTestCase(TestCase):
         self.assertEqual(data["sample_groups"][0]["name"], "Accessible group")
 
     def test_sample_write_serializer_accepts_group_pks(self):
+        editable_group = SampleGroup.objects.create(
+            name="Editable group", kind="study", owner=self.owner
+        )
         serializer = SampleWriteSerializer(
             instance=self.sample,
-            data={"sample_groups": [self.group.pk]},
+            data={"sample_groups": [editable_group.pk]},
             partial=True,
             context={"request": self._request(self.owner)},
         )
@@ -1203,7 +1232,7 @@ class SampleGroupMembershipSerializerTestCase(TestCase):
         self.assertTrue(serializer.is_valid(), serializer.errors)
         serializer.save()
 
-        self.assertCountEqual(self.sample.sample_groups.all(), [self.group])
+        self.assertCountEqual(self.sample.sample_groups.all(), [editable_group])
 
     def test_serializer_without_request_hides_private_groups(self):
         self.sample.sample_groups.add(self.group, self.private_group)
@@ -1247,10 +1276,13 @@ class SampleGroupMembershipSerializerTestCase(TestCase):
         self.assertIn("sample_groups", serializer.errors)
 
     def test_sample_write_serializer_preserves_groups_editor_cannot_manage(self):
+        editable_group = SampleGroup.objects.create(
+            name="Editable group", kind="study", owner=self.owner
+        )
         self.sample.sample_groups.add(self.foreign_published_group)
         serializer = SampleWriteSerializer(
             instance=self.sample,
-            data={"sample_groups": [self.group.pk]},
+            data={"sample_groups": [editable_group.pk]},
             partial=True,
             context={"request": self._request(self.owner)},
         )
@@ -1260,7 +1292,7 @@ class SampleGroupMembershipSerializerTestCase(TestCase):
 
         self.assertCountEqual(
             self.sample.sample_groups.all(),
-            [self.group, self.foreign_published_group],
+            [editable_group, self.foreign_published_group],
         )
 
     def test_sample_write_serializer_accepts_editor_granted_group(self):

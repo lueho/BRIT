@@ -524,6 +524,214 @@ class SourceCRUDViewsTestCase(
         source = Source.objects.latest("pk")
         self.assertEqual(source.sourceauthors.count(), 0)
 
+    def test_create_source_with_inline_author_runs_in_create_boundary(self):
+        """A create posting an inline SourceAuthor row is a governed write:
+        the child row is persisted inside the bound create boundary, so a
+        single ``created`` audit event covers the whole compound write."""
+        from django.contrib.contenttypes.models import ContentType
+
+        from utils.object_management.models import ReviewAction
+
+        self.client.force_login(self.owner_user)
+        post_data = {
+            "title": "Inline governed source",
+            "citation_key": "IGS",
+            "type": "misc",
+            "url": "https://example.org/inline",
+            "sourceauthors-TOTAL_FORMS": 1,
+            "sourceauthors-INITIAL_FORMS": 0,
+            "sourceauthors-0-id": "",
+            "sourceauthors-0-source": "",
+            "sourceauthors-0-author": self.source_author_1.author.pk,
+        }
+        response = self.client.post(self.get_create_url(), post_data, follow=True)
+        self.assertEqual(response.status_code, 200)
+        source = Source.objects.get(citation_key="IGS")
+        self.assertEqual(source.sourceauthors.count(), 1)
+        self.assertEqual(source.content_revision, 1)
+        events = ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(Source),
+            object_id=source.pk,
+            action=ReviewAction.ACTION_CREATED,
+        )
+        self.assertEqual(events.count(), 1)
+        self.assertEqual(events.get().changed_fields, ["created"])
+
+    def test_create_source_denial_inside_boundary_rolls_back_inline_writes(self):
+        """A deactivation committed while the create boundary waited on the
+        actor denies the whole write: no source row, no inline rows and no
+        audit survive."""
+        from django.contrib.contenttypes.models import ContentType
+
+        from utils.object_management import services
+        from utils.object_management.models import ReviewAction
+
+        self.client.force_login(self.owner_user)
+        source_ct = ContentType.objects.get_for_model(Source)
+        baseline_authors = SourceAuthor.objects.count()
+        baseline_actions = ReviewAction.objects.filter(content_type=source_ct).count()
+        real_fresh_actor = services._fresh_actor
+
+        def deactivate_then_fresh_actor(user):
+            User.objects.filter(pk=user.pk).update(is_active=False)
+            return real_fresh_actor(user)
+
+        post_data = {
+            "title": "Denied source",
+            "citation_key": "DND",
+            "type": "misc",
+            "sourceauthors-TOTAL_FORMS": 1,
+            "sourceauthors-INITIAL_FORMS": 0,
+            "sourceauthors-0-id": "",
+            "sourceauthors-0-source": "",
+            "sourceauthors-0-author": self.source_author_1.author.pk,
+        }
+        with patch.object(
+            services, "_fresh_actor", side_effect=deactivate_then_fresh_actor
+        ):
+            response = self.client.post(self.get_create_url(), post_data)
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Source.objects.filter(citation_key="DND").exists())
+        self.assertEqual(SourceAuthor.objects.count(), baseline_authors)
+        self.assertEqual(
+            ReviewAction.objects.filter(content_type=source_ct).count(),
+            baseline_actions,
+        )
+
+    def test_create_source_inline_failure_rolls_back_parent_row_and_audit(self):
+        """If persisting a stashed inline formset fails inside the boundary,
+        the whole governed create rolls back: no source row and no
+        ``created`` audit event survive."""
+        from django.contrib.contenttypes.models import ContentType
+
+        from utils.object_management.models import ReviewAction
+
+        from ..forms import SourceAuthorFormSet
+
+        self.client.force_login(self.owner_user)
+        post_data = {
+            "title": "Rolled back source",
+            "citation_key": "RBS",
+            "type": "misc",
+            "sourceauthors-TOTAL_FORMS": 1,
+            "sourceauthors-INITIAL_FORMS": 0,
+            "sourceauthors-0-id": "",
+            "sourceauthors-0-source": "",
+            "sourceauthors-0-author": self.source_author_1.author.pk,
+        }
+        with (
+            patch.object(
+                SourceAuthorFormSet,
+                "save",
+                side_effect=RuntimeError("inline save failed"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(self.get_create_url(), post_data)
+        self.assertFalse(Source.objects.filter(citation_key="RBS").exists())
+        self.assertFalse(
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(Source),
+            ).exists()
+        )
+
+    def test_update_source_inline_only_change_runs_in_mutation_boundary(self):
+        """An update that only adds an inline SourceAuthor row is a governed
+        write: it runs inside the root's content_mutation boundary, so the
+        snapshot diff records the created child row, bumps
+        ``content_revision`` and writes one ``edited`` audit event."""
+        from django.contrib.contenttypes.models import ContentType
+        from django.utils import timezone
+
+        from utils.object_management.models import ReviewAction
+
+        source = Source.objects.create(
+            owner=self.owner_user,
+            publication_status="private",
+            title="Inline governed source",
+            citation_key="IGS",
+            type="misc",
+            url="https://example.org/inline",
+            last_accessed=timezone.now().date(),
+        )
+        self.assertEqual(source.content_revision, 1)
+        self.client.force_login(self.owner_user)
+        post_data = {
+            "title": source.title,
+            "citation_key": source.citation_key,
+            "type": source.type,
+            "url": source.url,
+            "sourceauthors-TOTAL_FORMS": 1,
+            "sourceauthors-INITIAL_FORMS": 0,
+            "sourceauthors-0-id": "",
+            "sourceauthors-0-source": "",
+            "sourceauthors-0-author": self.source_author_1.author.pk,
+        }
+        response = self.client.post(
+            self.get_update_url(source.pk), post_data, follow=True
+        )
+        self.assertEqual(response.status_code, 200)
+        source.refresh_from_db()
+        self.assertEqual(source.sourceauthors.count(), 1)
+        self.assertEqual(source.content_revision, 2)
+        events = ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(Source),
+            object_id=source.pk,
+            action=ReviewAction.ACTION_EDITED,
+        )
+        self.assertEqual(events.count(), 1)
+        link = source.sourceauthors.get()
+        self.assertIn(
+            f"bibliography.sourceauthor#{link.pk}:created",
+            events.get().changed_fields,
+        )
+
+    def test_update_source_post_lock_denial_rolls_back_inline_writes(self):
+        """A lifecycle change committed while the view waits on the row lock
+        denies the whole mutation: no form update, no inline rows, no audit."""
+        from django.contrib.contenttypes.models import ContentType
+
+        from utils.object_management import services
+        from utils.object_management.models import ReviewAction
+
+        source = Source.objects.create(
+            owner=self.owner_user,
+            publication_status="private",
+            title="Locked source",
+            citation_key="LCK",
+            type="misc",
+        )
+        self.client.force_login(self.owner_user)
+        real_lock = services._lock_instance
+
+        def publish_then_lock(obj):
+            Source.objects.filter(pk=source.pk).update(publication_status="published")
+            return real_lock(obj)
+
+        post_data = {
+            "title": "Changed title",
+            "citation_key": source.citation_key,
+            "type": source.type,
+            "sourceauthors-TOTAL_FORMS": 1,
+            "sourceauthors-INITIAL_FORMS": 0,
+            "sourceauthors-0-id": "",
+            "sourceauthors-0-source": "",
+            "sourceauthors-0-author": self.source_author_1.author.pk,
+        }
+        with patch.object(services, "_lock_instance", side_effect=publish_then_lock):
+            response = self.client.post(self.get_update_url(source.pk), post_data)
+        self.assertEqual(response.status_code, 403)
+        source.refresh_from_db()
+        self.assertEqual(source.title, "Locked source")
+        self.assertEqual(source.content_revision, 1)
+        self.assertFalse(SourceAuthor.objects.filter(source=source).exists())
+        self.assertFalse(
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(Source),
+                object_id=source.pk,
+            ).exists()
+        )
+
     def test_update_source_add_authors(self):
         """
         Test updating a Source that was created with no authors to add one or more authors.

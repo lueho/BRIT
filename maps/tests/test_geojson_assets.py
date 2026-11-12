@@ -25,7 +25,7 @@ from maps.tasks import (
     warm_all_geojson_caches,
     warm_static_region_geojson_assets,
 )
-from maps.utils import get_region_cache_key
+from maps.utils import AUTHZ_GEOJSON_CACHE_PREFIX, get_region_cache_key
 from maps.utils import iter_geojson_features as real_iter_geojson_features
 from maps.views import MapMixin
 from utils.tests.testrunner import serial_test
@@ -609,10 +609,16 @@ class StaticRegionGeoJSONWarmupTests(TransactionTestCase):
         plain_region = create_region(name="Plain region")
         warm_region_geojson_cache(limit=10)
         self.assertIsNone(
-            self.geojson_cache.get(get_region_cache_key(region_id=static_region.pk))
+            self.geojson_cache.get(
+                AUTHZ_GEOJSON_CACHE_PREFIX
+                + get_region_cache_key(region_id=static_region.pk)
+            )
         )
         self.assertIsNotNone(
-            self.geojson_cache.get(get_region_cache_key(region_id=plain_region.pk))
+            self.geojson_cache.get(
+                AUTHZ_GEOJSON_CACHE_PREFIX
+                + get_region_cache_key(region_id=plain_region.pk)
+            )
         )
 
     def test_static_warmup_builds_missing_asset_only_once(self):

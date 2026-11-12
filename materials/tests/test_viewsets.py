@@ -1,12 +1,15 @@
 import json
 from decimal import Decimal
+from unittest.mock import patch
 
+from django.contrib.auth.models import Permission, User
 from django.db.models.signals import post_save
 from django.urls import reverse
 from factory.django import mute_signals
 
 from bibliography.models import Source
 from maps.models import Location, Region
+from utils.object_management.models import ReviewAction
 from utils.properties.models import Unit
 from utils.tests.testcases import ViewSetWithPermissionsTestCase
 
@@ -25,8 +28,11 @@ from ..models import (
 from ..serializers import (
     CompositionAPISerializer,
     MaterialAPISerializer,
+    MaterialPropertyValueWriteSerializer,
     SampleAPISerializer,
+    SampleGroupWriteSerializer,
     SampleSeriesAPISerializer,
+    SampleWriteSerializer,
 )
 
 # ---------------------------------------------------------------------------
@@ -34,6 +40,18 @@ from ..serializers import (
 # ---------------------------------------------------------------------------
 
 JSON = "application/json"
+
+
+def _make_editor(username, *codenames):
+    """Create a user holding only the given direct materials permissions."""
+    user = User.objects.create_user(username=username)
+    user.user_permissions.add(
+        *Permission.objects.filter(
+            content_type__app_label="materials", codename__in=codenames
+        )
+    )
+    user.groups.clear()
+    return user
 
 
 class MaterialViewSetTestCase(ViewSetWithPermissionsTestCase):
@@ -106,14 +124,21 @@ class MaterialViewSetTestCase(ViewSetWithPermissionsTestCase):
         names = self._list_names(response)
         self.assertIn(self.private_material.name, names)
 
-    def test_get_list_returns_all_for_staff(self):
+    def test_get_list_returns_default_union_for_administrator(self):
         self.client.force_login(self.staff)
-        # Unrecognised scope falls back to filter_queryset_for_user, which returns
-        # the full queryset for staff users.
-        response = self.client.get(reverse("api-material-list") + "?scope=all")
+        response = self.client.get(reverse("api-material-list"))
         names = self._list_names(response)
         self.assertIn(self.published_material.name, names)
         self.assertIn(self.private_material.name, names)
+
+    def test_get_list_bogus_scope_returns_empty(self):
+        """Unknown scopes fail closed for every actor, including admins."""
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse("api-material-list") + "?scope=does-not-exist"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, [])
 
     # --- detail visibility ---
 
@@ -123,11 +148,11 @@ class MaterialViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_get_detail_http_401_for_anonymous_on_private(self):
+    def test_get_detail_http_404_for_anonymous_on_private(self):
         response = self.client.get(
             reverse("api-material-detail", kwargs={"pk": self.private_material.pk})
         )
-        self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(response.status_code, 404)
 
     def test_get_detail_http_200_ok_for_outsider_on_published(self):
         self.client.force_login(self.outsider)
@@ -136,12 +161,12 @@ class MaterialViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_get_detail_http_403_for_outsider_on_private(self):
+    def test_get_detail_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.get(
             reverse("api-material-detail", kwargs={"pk": self.private_material.pk})
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_get_detail_http_200_ok_for_owner_on_private(self):
         self.client.force_login(self.owner)
@@ -193,14 +218,14 @@ class MaterialViewSetTestCase(ViewSetWithPermissionsTestCase):
 
     # --- update ---
 
-    def test_patch_http_403_for_outsider_on_private(self):
+    def test_patch_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.patch(
             reverse("api-material-detail", kwargs={"pk": self.private_material.pk}),
             data=json.dumps({"name": "Hacked"}),
             content_type=JSON,
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_patch_http_200_for_owner_on_private(self):
         self.client.force_login(self.owner)
@@ -213,6 +238,21 @@ class MaterialViewSetTestCase(ViewSetWithPermissionsTestCase):
         self.private_material.refresh_from_db()
         self.assertEqual(self.private_material.name, "Updated Name")
 
+    def test_patch_http_403_for_owner_without_change_capability(self):
+        """Ownership alone does not permit writes: an owner stripped of every
+        direct and group capability is denied."""
+        self.owner.user_permissions.clear()
+        self.owner.groups.clear()
+        self.client.force_login(self.owner)
+        response = self.client.patch(
+            reverse("api-material-detail", kwargs={"pk": self.private_material.pk}),
+            data=json.dumps({"name": "Hacked"}),
+            content_type=JSON,
+        )
+        self.assertEqual(response.status_code, 403)
+        self.private_material.refresh_from_db()
+        self.assertEqual(self.private_material.name, "Private Material")
+
     def test_patch_http_403_for_owner_on_published(self):
         self.client.force_login(self.owner)
         response = self.client.patch(
@@ -224,12 +264,12 @@ class MaterialViewSetTestCase(ViewSetWithPermissionsTestCase):
 
     # --- delete ---
 
-    def test_delete_http_403_for_outsider_on_private(self):
+    def test_delete_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.delete(
             reverse("api-material-detail", kwargs={"pk": self.private_material.pk})
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_delete_http_204_for_owner_on_private(self):
         to_delete = Material.objects.create(
@@ -310,11 +350,11 @@ class SampleSeriesViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_get_detail_http_401_for_anonymous_on_private(self):
+    def test_get_detail_http_404_for_anonymous_on_private(self):
         response = self.client.get(
             reverse("api-sampleseries-detail", kwargs={"pk": self.private_series.pk})
         )
-        self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(response.status_code, 404)
 
     def test_get_detail_http_200_ok_for_outsider_on_published(self):
         self.client.force_login(self.outsider)
@@ -323,12 +363,12 @@ class SampleSeriesViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_get_detail_http_403_for_outsider_on_private(self):
+    def test_get_detail_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.get(
             reverse("api-sampleseries-detail", kwargs={"pk": self.private_series.pk})
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_get_detail_http_200_ok_for_owner_on_private(self):
         self.client.force_login(self.owner)
@@ -371,14 +411,14 @@ class SampleSeriesViewSetTestCase(ViewSetWithPermissionsTestCase):
 
     # --- update ---
 
-    def test_patch_http_403_for_outsider_on_private(self):
+    def test_patch_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.patch(
             reverse("api-sampleseries-detail", kwargs={"pk": self.private_series.pk}),
             data=json.dumps({"name": "Hacked"}),
             content_type=JSON,
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_patch_http_200_for_owner_on_private(self):
         self.client.force_login(self.owner)
@@ -393,13 +433,45 @@ class SampleSeriesViewSetTestCase(ViewSetWithPermissionsTestCase):
 
     # --- delete ---
 
-    def test_delete_http_204_for_owner_on_private(self):
+    def test_delete_http_403_for_owner_with_default_samples(self):
+        """The post_save default temporal distribution creates child Samples,
+        so deleting this series would cascade across independent reviewable
+        children and is denied."""
         to_delete = SampleSeries.objects.create(
             name="To Delete Series",
             material=self.material,
             owner=self.owner,
             publication_status="private",
         )
+        child_sample_ids = list(
+            Sample.objects.filter(series=to_delete).values_list("pk", flat=True)
+        )
+        self.assertTrue(child_sample_ids)
+        self.client.force_login(self.owner)
+        response = self.client.delete(
+            reverse("api-sampleseries-detail", kwargs={"pk": to_delete.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(SampleSeries.objects.filter(pk=to_delete.pk).exists())
+        self.assertEqual(
+            set(
+                Sample.objects.filter(pk__in=child_sample_ids).values_list(
+                    "pk", flat=True
+                )
+            ),
+            set(child_sample_ids),
+        )
+
+    def test_delete_http_204_for_owner_on_private(self):
+        """A bare series without independent child Samples is deletable."""
+        with mute_signals(post_save):
+            to_delete = SampleSeries.objects.create(
+                name="To Delete Series",
+                material=self.material,
+                owner=self.owner,
+                publication_status="private",
+            )
+        self.assertFalse(Sample.objects.filter(series=to_delete).exists())
         self.client.force_login(self.owner)
         response = self.client.delete(
             reverse("api-sampleseries-detail", kwargs={"pk": to_delete.pk})
@@ -483,11 +555,11 @@ class SampleViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_get_detail_http_401_for_anonymous_on_private(self):
+    def test_get_detail_http_404_for_anonymous_on_private(self):
         response = self.client.get(
             reverse("api-sample-detail", kwargs={"pk": self.private_sample.pk})
         )
-        self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(response.status_code, 404)
 
     def test_get_detail_http_200_ok_for_outsider_on_published(self):
         self.client.force_login(self.outsider)
@@ -496,12 +568,12 @@ class SampleViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_get_detail_http_403_for_outsider_on_private(self):
+    def test_get_detail_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.get(
             reverse("api-sample-detail", kwargs={"pk": self.private_sample.pk})
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_get_detail_http_200_ok_for_owner_on_private(self):
         self.client.force_login(self.owner)
@@ -543,21 +615,21 @@ class SampleViewSetTestCase(ViewSetWithPermissionsTestCase):
             ),
             content_type=JSON,
         )
-        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.status_code, 201)
         self.assertTrue(
             Sample.objects.filter(name="Member Sample", owner=self.member).exists()
         )
 
     # --- update ---
 
-    def test_patch_http_403_for_outsider_on_private(self):
+    def test_patch_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.patch(
             reverse("api-sample-detail", kwargs={"pk": self.private_sample.pk}),
             data=json.dumps({"name": "Hacked"}),
             content_type=JSON,
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_patch_http_200_for_owner_on_private(self):
         self.client.force_login(self.owner)
@@ -685,6 +757,7 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
         "add_composition",
         "change_composition",
         "delete_composition",
+        "change_sample",
     )
     material = None
     series = None
@@ -719,7 +792,9 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
             standalone=True,
             publication_status="private",
         )
-        cls.group = MaterialComponentGroup.objects.create(name="Test Component Group")
+        cls.group = MaterialComponentGroup.objects.create(
+            name="Test Component Group", publication_status="published"
+        )
         cls.published_composition = Composition.objects.create(
             name="Published Composition",
             sample=cls.sample,
@@ -727,10 +802,20 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
             owner=cls.owner,
             publication_status="published",
         )
+        cls.private_parent_sample = Sample.objects.create(
+            material=cls.material,
+            name="Private Parent Sample",
+            owner=cls.owner,
+            standalone=True,
+            publication_status="private",
+        )
+        cls.private_parent_group = MaterialComponentGroup.objects.create(
+            name="Private Parent Group", publication_status="published"
+        )
         cls.private_composition = Composition.objects.create(
             name="Private Composition",
-            sample=cls.sample,
-            group=cls.group,
+            sample=cls.private_parent_sample,
+            group=cls.private_parent_group,
             owner=cls.owner,
             publication_status="private",
         )
@@ -742,9 +827,20 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_get_list_count_for_anonymous_excludes_private(self):
+        visible_qs = Composition.objects.filter(sample=self.sample)
         response = self.client.get(reverse("api-composition-list"))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
+        payload = (
+            response.data["results"]
+            if isinstance(response.data, dict)
+            else response.data
+        )
+        # The API payload carries no id; the private row is distinguishable
+        # only via its dedicated group name.
+        self.assertEqual(len(payload), visible_qs.count())
+        group_names = {item["group"] for item in payload}
+        self.assertIn("Test Component Group", group_names)
+        self.assertNotIn("Private Parent Group", group_names)
 
     def test_get_list_http_200_ok_for_authenticated_user(self):
         self.client.force_login(self.outsider)
@@ -752,9 +848,21 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_get_list_count_for_outsider_excludes_private(self):
+        visible_qs = Composition.objects.filter(sample=self.sample)
         self.client.force_login(self.outsider)
         response = self.client.get(reverse("api-composition-list"))
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.status_code, 200)
+        payload = (
+            response.data["results"]
+            if isinstance(response.data, dict)
+            else response.data
+        )
+        # The API payload carries no id; the private row is distinguishable
+        # only via its dedicated group name.
+        self.assertEqual(len(payload), visible_qs.count())
+        group_names = {item["group"] for item in payload}
+        self.assertIn("Test Component Group", group_names)
+        self.assertNotIn("Private Parent Group", group_names)
 
     def test_get_list_count_for_owner_includes_private(self):
         self.client.force_login(self.owner)
@@ -762,6 +870,20 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
         # Owner sees at least both the published and private compositions created in
         # setUp. The signal-created default composition may add extra rows.
         self.assertGreaterEqual(len(response.data), 2)
+
+    def test_private_composition_stays_hidden_when_itself_published(self):
+        """Owned-child status is not authoritative for visibility: publishing
+        the private composition while its parent sample stays private must
+        not expose it."""
+        self.private_composition.publication_status = "published"
+        self.private_composition.save()
+        response = self.client.get(
+            reverse(
+                "api-composition-detail",
+                kwargs={"pk": self.private_composition.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 404)
 
     # --- detail visibility ---
 
@@ -773,13 +895,13 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_get_detail_http_401_for_anonymous_on_private(self):
+    def test_get_detail_http_404_for_anonymous_on_private(self):
         response = self.client.get(
             reverse(
                 "api-composition-detail", kwargs={"pk": self.private_composition.pk}
             )
         )
-        self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(response.status_code, 404)
 
     def test_get_detail_http_200_ok_for_outsider_on_published(self):
         self.client.force_login(self.outsider)
@@ -790,14 +912,14 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_get_detail_http_403_for_outsider_on_private(self):
+    def test_get_detail_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.get(
             reverse(
                 "api-composition-detail", kwargs={"pk": self.private_composition.pk}
             )
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_get_detail_http_200_ok_for_owner_on_private(self):
         self.client.force_login(self.owner)
@@ -889,7 +1011,7 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
 
     def test_post_http_201_for_member_with_add_permission(self):
         extra_group = MaterialComponentGroup.objects.create(
-            name="Extra Group For Composition"
+            name="Extra Group For Composition", publication_status="published"
         )
         self.client.force_login(self.member)
         response = self.client.post(
@@ -904,7 +1026,114 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
             ).exists()
         )
 
+    def test_post_http_201_for_editor_with_edit_grant_on_private_sample(self):
+        """Owned children resolve through parent edit: an editor with a
+        direct grant and ``change_sample`` may add compositions without
+        owning the sample or holding ``add_composition``."""
+        editor = _make_editor(
+            "composition-editor", "change_sample", "change_composition"
+        )
+        self.private_parent_sample.add_editor(editor, granted_by=self.owner)
+        extra_group = MaterialComponentGroup.objects.create(
+            name="Editor Composition Group", publication_status="published"
+        )
+        self.client.force_login(editor)
+
+        response = self.client.post(
+            reverse("api-composition-list"),
+            data=json.dumps(
+                {"sample": self.private_parent_sample.pk, "group": extra_group.pk}
+            ),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(
+            Composition.objects.filter(
+                sample=self.private_parent_sample,
+                group=extra_group,
+                owner=editor,
+            ).exists()
+        )
+
+    def test_post_http_403_for_sample_owner_without_change_sample(self):
+        """Ownership and add capability alone are not enough: the actor must
+        still be able to edit the parent sample."""
+        no_change_owner = _make_editor(
+            "no-change-owner", "add_composition", "change_composition"
+        )
+        sample = Sample.objects.create(
+            material=self.material,
+            name="No-change owner's sample",
+            owner=no_change_owner,
+            standalone=True,
+            publication_status="private",
+        )
+        extra_group = MaterialComponentGroup.objects.create(
+            name="No-change Group", publication_status="published"
+        )
+        self.client.force_login(no_change_owner)
+
+        response = self.client.post(
+            reverse("api-composition-list"),
+            data=json.dumps({"sample": sample.pk, "group": extra_group.pk}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Composition.objects.filter(sample=sample, group=extra_group).exists()
+        )
+
     # --- update ---
+
+    def test_patch_http_200_for_editor_reparenting_between_granted_samples(self):
+        """Reparenting an owned child re-checks both parents: an editor with
+        grants on the source and target samples may move a composition."""
+        editor = _make_editor("reparent-editor", "change_sample", "change_composition")
+        target_sample = Sample.objects.create(
+            material=self.material,
+            name="Reparent Target Sample",
+            owner=self.owner,
+            standalone=True,
+            publication_status="private",
+        )
+        self.private_parent_sample.add_editor(editor, granted_by=self.owner)
+        target_sample.add_editor(editor, granted_by=self.owner)
+        self.client.force_login(editor)
+
+        response = self.client.patch(
+            reverse(
+                "api-composition-detail",
+                kwargs={"pk": self.private_composition.pk},
+            ),
+            data=json.dumps({"sample": target_sample.pk}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.private_composition.refresh_from_db()
+        self.assertEqual(self.private_composition.sample, target_sample)
+
+    def test_patch_http_403_for_editor_reparenting_to_ungranted_sample(self):
+        editor = _make_editor(
+            "reparent-denied-editor", "change_sample", "change_composition"
+        )
+        self.private_parent_sample.add_editor(editor, granted_by=self.owner)
+        self.client.force_login(editor)
+
+        response = self.client.patch(
+            reverse(
+                "api-composition-detail",
+                kwargs={"pk": self.private_composition.pk},
+            ),
+            data=json.dumps({"sample": self.member_sample.pk}),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.private_composition.refresh_from_db()
+        self.assertEqual(self.private_composition.sample, self.private_parent_sample)
 
     def test_patch_http_403_when_owner_targets_another_users_sample(self):
         self.client.force_login(self.owner)
@@ -920,9 +1149,9 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
 
         self.assertEqual(response.status_code, 403)
         self.private_composition.refresh_from_db()
-        self.assertEqual(self.private_composition.sample, self.sample)
+        self.assertEqual(self.private_composition.sample, self.private_parent_sample)
 
-    def test_patch_http_403_for_outsider_on_private(self):
+    def test_patch_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.patch(
             reverse(
@@ -932,7 +1161,7 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
             data=json.dumps({"order": 50}),
             content_type=JSON,
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_patch_http_200_for_owner_on_private(self):
         self.client.force_login(self.owner)
@@ -951,6 +1180,7 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
 
 class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
     member_permissions = (
+        "change_sample",
         "view_componentmeasurement",
         "add_componentmeasurement",
         "change_componentmeasurement",
@@ -991,9 +1221,15 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
             standalone=True,
             publication_status="private",
         )
-        cls.group = MaterialComponentGroup.objects.create(name="CM Test Group")
-        cls.component = MaterialComponent.objects.create(name="CM Test Component")
-        cls.unit = Unit.objects.create(name="g/kg", symbol="g/kg")
+        cls.group = MaterialComponentGroup.objects.create(
+            name="CM Test Group", publication_status="published"
+        )
+        cls.component = MaterialComponent.objects.create(
+            name="CM Test Component", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="g/kg", symbol="g/kg", publication_status="published"
+        )
         cls.published_measurement = ComponentMeasurement.objects.create(
             sample=cls.sample,
             group=cls.group,
@@ -1050,7 +1286,7 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_get_detail_http_403_for_outsider_on_private(self):
+    def test_get_detail_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.get(
             reverse(
@@ -1058,7 +1294,7 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
                 kwargs={"pk": self.private_measurement.pk},
             )
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_get_detail_http_200_ok_for_owner_on_private(self):
         self.client.force_login(self.owner)
@@ -1132,6 +1368,72 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
             ).exists()
         )
 
+    def test_post_http_403_for_editor_without_add_permission(self):
+        """Independent evidence needs its own add capability: a parent edit
+        grant alone must not let an editor attach measurements."""
+        editor = _make_editor(
+            "cm-editor-no-add", "change_sample", "change_componentmeasurement"
+        )
+        self.member_sample.add_editor(editor, granted_by=self.member)
+        self.client.force_login(editor)
+
+        response = self.client.post(
+            reverse("api-componentmeasurement-list"),
+            data=json.dumps(
+                {
+                    "sample": self.member_sample.pk,
+                    "group": self.group.pk,
+                    "component": self.component.pk,
+                    "unit": self.unit.pk,
+                    "average": "7.5",
+                }
+            ),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            ComponentMeasurement.objects.filter(
+                sample=self.member_sample, owner=editor
+            ).exists()
+        )
+
+    def test_post_http_201_for_editor_with_add_permission_and_grant(self):
+        """With both the add capability and a parent edit grant, an editor
+        may attach independent evidence to a sample they do not own."""
+        editor = _make_editor(
+            "cm-editor",
+            "change_sample",
+            "add_componentmeasurement",
+            "change_componentmeasurement",
+        )
+        self.member_sample.add_editor(editor, granted_by=self.member)
+        self.client.force_login(editor)
+
+        response = self.client.post(
+            reverse("api-componentmeasurement-list"),
+            data=json.dumps(
+                {
+                    "sample": self.member_sample.pk,
+                    "group": self.group.pk,
+                    "component": self.component.pk,
+                    "unit": self.unit.pk,
+                    "average": "7.5",
+                }
+            ),
+            content_type=JSON,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(
+            ComponentMeasurement.objects.filter(
+                sample=self.member_sample,
+                component=self.component,
+                average=Decimal("7.5"),
+                owner=editor,
+            ).exists()
+        )
+
     # --- update ---
 
     def test_patch_http_403_when_owner_targets_another_users_sample(self):
@@ -1150,7 +1452,7 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
         self.private_measurement.refresh_from_db()
         self.assertEqual(self.private_measurement.sample, self.sample)
 
-    def test_patch_http_403_for_outsider_on_private(self):
+    def test_patch_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.patch(
             reverse(
@@ -1160,7 +1462,7 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
             data=json.dumps({"average": "99.0"}),
             content_type=JSON,
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_patch_http_200_for_owner_on_private(self):
         self.client.force_login(self.owner)
@@ -1198,6 +1500,7 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
 
 class MaterialPropertyValueViewSetTestCase(ViewSetWithPermissionsTestCase):
     member_permissions = (
+        "change_sample",
         "view_materialpropertyvalue",
         "add_materialpropertyvalue",
         "change_materialpropertyvalue",
@@ -1238,9 +1541,13 @@ class MaterialPropertyValueViewSetTestCase(ViewSetWithPermissionsTestCase):
             publication_status="private",
         )
         cls.prop = MaterialProperty.objects.create(
-            name="MPV Test Property", owner=cls.owner
+            name="MPV Test Property",
+            owner=cls.owner,
+            publication_status="published",
         )
-        cls.unit = Unit.objects.create(name="MPV Test Unit", symbol="mpvu")
+        cls.unit = Unit.objects.create(
+            name="MPV Test Unit", symbol="mpvu", publication_status="published"
+        )
         cls.published_value = MaterialPropertyValue.objects.create(
             sample=cls.sample,
             property=cls.prop,
@@ -1290,7 +1597,7 @@ class MaterialPropertyValueViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_get_detail_http_403_for_outsider_on_private(self):
+    def test_get_detail_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.get(
             reverse(
@@ -1298,7 +1605,7 @@ class MaterialPropertyValueViewSetTestCase(ViewSetWithPermissionsTestCase):
                 kwargs={"pk": self.private_value.pk},
             )
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_get_detail_http_200_ok_for_owner_on_private(self):
         self.client.force_login(self.owner)
@@ -1379,6 +1686,57 @@ class MaterialPropertyValueViewSetTestCase(ViewSetWithPermissionsTestCase):
             ).exists()
         )
 
+    def test_post_parent_swap_after_validation_rolls_back(self):
+        """A serializer persisting a different parent than the authorized
+        context is denied and rolled back entirely — both when a parent was
+        authorized and when the authorized context was legitimately absent."""
+        swapped = Sample.objects.create(
+            material=self.material,
+            name="Swapped Sample",
+            owner=self.member,
+            standalone=True,
+        )
+        original_create = MaterialPropertyValueWriteSerializer.create
+        executed = []
+
+        def poisoned_create(serializer, validated_data):
+            validated_data["sample"] = swapped
+            executed.append(True)
+            return original_create(serializer, validated_data)
+
+        self.client.force_login(self.member)
+        for payload in (
+            {
+                "sample": self.member_sample.pk,
+                "property": self.prop.pk,
+                "unit": self.unit.pk,
+                "average": "50.0",
+            },
+            {
+                "property": self.prop.pk,
+                "unit": self.unit.pk,
+                "average": "50.0",
+            },
+        ):
+            with self.subTest(sample_supplied="sample" in payload):
+                executed.clear()
+                with patch.object(
+                    MaterialPropertyValueWriteSerializer, "create", poisoned_create
+                ):
+                    response = self.client.post(
+                        reverse("api-materialpropertyvalue-list"),
+                        data=json.dumps(payload),
+                        content_type=JSON,
+                    )
+                self.assertTrue(executed, "poisoned create did not run")
+                self.assertEqual(response.status_code, 403)
+                self.assertFalse(
+                    MaterialPropertyValue.objects.filter(
+                        property=self.prop, owner=self.member
+                    ).exists()
+                )
+                self.assertFalse(ReviewAction.objects.exists())
+
     # --- update ---
 
     def test_patch_http_403_when_owner_targets_another_users_sample(self):
@@ -1436,6 +1794,7 @@ class SampleGroupViewSetTestCase(ViewSetWithPermissionsTestCase):
         "add_samplegroup",
         "change_samplegroup",
         "delete_samplegroup",
+        "change_sample",
     )
     published_group = None
     private_group = None
@@ -1534,18 +1893,18 @@ class SampleGroupViewSetTestCase(ViewSetWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_get_detail_http_401_for_anonymous_on_private(self):
+    def test_get_detail_http_404_for_anonymous_on_private(self):
         response = self.client.get(
             reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk})
         )
-        self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(response.status_code, 404)
 
-    def test_get_detail_http_403_for_outsider_on_private(self):
+    def test_get_detail_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.get(
             reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk})
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_get_detail_http_200_ok_for_owner_on_private(self):
         self.client.force_login(self.owner)
@@ -1621,14 +1980,14 @@ class SampleGroupViewSetTestCase(ViewSetWithPermissionsTestCase):
 
     # --- update ---
 
-    def test_patch_http_403_for_outsider_on_private(self):
+    def test_patch_http_404_for_outsider_on_private(self):
         self.client.force_login(self.outsider)
         response = self.client.patch(
             reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk}),
             data=json.dumps({"name": "Hacked"}),
             content_type=JSON,
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_patch_http_200_for_owner_on_private(self):
         self.client.force_login(self.owner)
@@ -1645,12 +2004,190 @@ class SampleGroupViewSetTestCase(ViewSetWithPermissionsTestCase):
         self.client.force_login(self.owner)
         response = self.client.patch(
             reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk}),
-            data=json.dumps({"samples": [self.published_sample.pk]}),
+            data=json.dumps({"samples": [self.private_sample.pk]}),
             content_type=JSON,
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertCountEqual(self.private_group.samples.all(), [self.published_sample])
+        self.assertCountEqual(self.private_group.samples.all(), [self.private_sample])
+
+    def test_patch_samples_rejects_uneditable_published_sample(self):
+        """A staff user without the change_sample capability must not bypass
+        edit-scope via the sample-group membership update: public readability
+        does not grant membership writes."""
+        staff = User.objects.create_user(username="staff-only", is_staff=True)
+        staff.user_permissions.add(
+            Permission.objects.get(
+                codename="change_samplegroup",
+                content_type__app_label="materials",
+            )
+        )
+        self.private_group.add_editor(staff, granted_by=self.owner)
+        revision_before = self.private_group.content_revision
+        self.client.force_login(staff)
+        response = self.client.patch(
+            reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk}),
+            data=json.dumps({"samples": [self.published_sample.pk]}),
+            content_type=JSON,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.private_group.refresh_from_db()
+        self.assertEqual(self.private_group.content_revision, revision_before)
+        self.assertNotIn(self.published_sample, self.private_group.samples.all())
+
+    def test_patch_samples_preserves_locked_membership(self):
+        """A staff-only grantee cannot detach memberships at all: both the
+        private and the published rows remain after clearing samples."""
+        staff = User.objects.create_user(username="staff-only", is_staff=True)
+        staff.user_permissions.add(
+            Permission.objects.get(
+                codename="change_samplegroup",
+                content_type__app_label="materials",
+            )
+        )
+        self.private_group.add_editor(staff, granted_by=self.owner)
+        self.published_sample.sample_groups.add(self.private_group)
+        self.private_sample.sample_groups.add(self.private_group)
+        self.client.force_login(staff)
+        response = self.client.patch(
+            reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk}),
+            data=json.dumps({"samples": []}),
+            content_type=JSON,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.private_group.refresh_from_db()
+        self.assertCountEqual(
+            self.private_group.samples.all(),
+            [self.published_sample, self.private_sample],
+        )
+
+    def test_patch_samples_rolls_back_when_change_sample_revoked_post_validation(
+        self,
+    ):
+        """If the actor's sample-edit capability is revoked after field
+        validation but before the write boundary, the whole PATCH must roll
+        back — serializer validation must not substitute for edit
+        authorization at write time."""
+        original_validate = SampleGroupWriteSerializer.validate_samples
+        executed = []
+        change_sample = Permission.objects.get(
+            codename="change_sample",
+            content_type__app_label="materials",
+        )
+
+        def revoke_after_validation(serializer, value):
+            result = original_validate(serializer, value)
+            executed.append(True)
+            # Revoke ONLY the direct change_sample permission: the actor's
+            # group memberships were stripped before the request, so this
+            # leaves them genuinely without the capability while ownership,
+            # the root change_samplegroup permission, active status and every
+            # other permission stay intact.
+            self.owner.user_permissions.remove(change_sample)
+            fresh = User.objects.get(pk=self.owner.pk)
+            self.assertFalse(
+                fresh.has_perm("materials.change_sample"),
+                "actor should have lost the direct change capability",
+            )
+            self.assertTrue(
+                fresh.has_perm("materials.change_samplegroup"),
+                "root write capability must remain",
+            )
+            self.assertTrue(fresh.is_active)
+            return result
+
+        # Remove group-derived capabilities: the registered role auto-joins
+        # new users, so only direct fixture permissions should remain.
+        self.owner.groups.clear()
+        self.owner = User.objects.get(pk=self.owner.pk)
+        revision_before = self.private_group.content_revision
+        self.assertTrue(self.owner.has_perm("materials.change_sample"))
+        self.client.force_login(self.owner)
+        with patch.object(
+            SampleGroupWriteSerializer, "validate_samples", revoke_after_validation
+        ):
+            response = self.client.patch(
+                reverse("api-samplegroup-detail", kwargs={"pk": self.private_group.pk}),
+                data=json.dumps(
+                    {"name": "Must roll back", "samples": [self.private_sample.pk]}
+                ),
+                content_type=JSON,
+            )
+        self.assertTrue(executed, "revoking validator did not run")
+        self.private_group.refresh_from_db()
+        mutation = (
+            f"name={self.private_group.name!r} "
+            f"revision={self.private_group.content_revision} "
+            f"members={list(self.private_group.samples.all())!r}"
+        )
+        self.assertEqual(response.status_code, 400, mutation)
+        self.assertEqual(self.private_group.name, "Private Group", mutation)
+        self.assertEqual(self.private_group.content_revision, revision_before, mutation)
+        self.assertNotIn(self.private_sample, self.private_group.samples.all())
+        self.assertFalse(ReviewAction.objects.filter(action="edited").exists())
+
+    def test_post_samples_rolls_back_when_change_sample_revoked_post_validation(
+        self,
+    ):
+        """The same mid-flight revocation must abort a create: no group, no
+        membership, no audit event."""
+        original_validate = SampleGroupWriteSerializer.validate_samples
+        executed = []
+        change_sample = Permission.objects.get(
+            codename="change_sample",
+            content_type__app_label="materials",
+        )
+
+        def revoke_after_validation(serializer, value):
+            result = original_validate(serializer, value)
+            executed.append(True)
+            self.member.user_permissions.remove(change_sample)
+            fresh = User.objects.get(pk=self.member.pk)
+            self.assertFalse(
+                fresh.has_perm("materials.change_sample"),
+                "actor should have lost the direct change capability",
+            )
+            self.assertTrue(
+                fresh.has_perm("materials.add_samplegroup"),
+                "root create capability must remain",
+            )
+            self.assertTrue(fresh.is_active)
+            return result
+
+        self.member.groups.clear()
+        self.member = User.objects.get(pk=self.member.pk)
+        member_sample = Sample.objects.create(
+            name="Member revoke sample",
+            material=self.material,
+            owner=self.member,
+            standalone=True,
+        )
+        self.assertTrue(self.member.has_perm("materials.add_samplegroup"))
+        self.assertTrue(self.member.has_perm("materials.change_sample"))
+        self.client.force_login(self.member)
+        with patch.object(
+            SampleGroupWriteSerializer, "validate_samples", revoke_after_validation
+        ):
+            response = self.client.post(
+                reverse("api-samplegroup-list"),
+                data=json.dumps(
+                    {
+                        "name": "Revoked membership group",
+                        "kind": "experiment",
+                        "samples": [member_sample.pk],
+                    }
+                ),
+                content_type=JSON,
+            )
+        self.assertTrue(executed, "revoking validator did not run")
+        persisted = SampleGroup.objects.filter(name="Revoked membership group").first()
+        mutation = (
+            f"group={persisted!r} "
+            f"members={list(persisted.samples.all()) if persisted else []!r}"
+        )
+        self.assertEqual(response.status_code, 400, mutation)
+        self.assertIsNone(persisted, mutation)
+        self.assertFalse(ReviewAction.objects.exists())
 
     def test_patch_samples_rejects_foreign_private_sample(self):
         self.client.force_login(self.owner)
@@ -1734,7 +2271,12 @@ class SampleGroupViewSetTestCase(ViewSetWithPermissionsTestCase):
 
 
 class SampleViewSetSampleGroupsTestCase(ViewSetWithPermissionsTestCase):
-    member_permissions = ("view_sample", "add_sample", "change_sample")
+    member_permissions = (
+        "view_sample",
+        "add_sample",
+        "change_sample",
+        "change_samplegroup",
+    )
 
     @classmethod
     def setUpTestData(cls):
@@ -1792,6 +2334,126 @@ class SampleViewSetSampleGroupsTestCase(ViewSetWithPermissionsTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertCountEqual(self.sample.sample_groups.all(), [self.group])
+
+    def test_patch_groups_rolls_back_when_change_group_revoked_post_validation(
+        self,
+    ):
+        """Revoking the group-edit capability after validation but before
+        the write boundary must roll the whole PATCH back."""
+        original_validate = SampleWriteSerializer.validate_sample_groups
+        executed = []
+        change_group = Permission.objects.get(
+            codename="change_samplegroup",
+            content_type__app_label="materials",
+        )
+
+        def revoke_after_validation(serializer, value):
+            result = original_validate(serializer, value)
+            executed.append(True)
+            self.owner.user_permissions.remove(change_group)
+            fresh = User.objects.get(pk=self.owner.pk)
+            self.assertFalse(
+                fresh.has_perm("materials.change_samplegroup"),
+                "actor should have lost the related change capability",
+            )
+            self.assertTrue(
+                fresh.has_perm("materials.change_sample"),
+                "root write capability must remain",
+            )
+            self.assertTrue(fresh.is_active)
+            return result
+
+        self.owner.groups.clear()
+        self.owner = User.objects.get(pk=self.owner.pk)
+        revision_before = self.sample.content_revision
+        self.assertTrue(self.owner.has_perm("materials.change_samplegroup"))
+        self.client.force_login(self.owner)
+        with patch.object(
+            SampleWriteSerializer, "validate_sample_groups", revoke_after_validation
+        ):
+            response = self.client.patch(
+                reverse("api-sample-detail", kwargs={"pk": self.sample.pk}),
+                data=json.dumps(
+                    {
+                        "name": "Must roll back",
+                        "sample_groups": [self.group.pk],
+                    }
+                ),
+                content_type=JSON,
+            )
+        self.assertTrue(executed, "revoking validator did not run")
+        self.sample.refresh_from_db()
+        mutation = (
+            f"name={self.sample.name!r} "
+            f"revision={self.sample.content_revision} "
+            f"groups={list(self.sample.sample_groups.all())!r}"
+        )
+        self.assertEqual(response.status_code, 400, mutation)
+        self.assertEqual(self.sample.name, "Group API Sample", mutation)
+        self.assertEqual(self.sample.content_revision, revision_before, mutation)
+        self.assertNotIn(self.group, self.sample.sample_groups.all())
+        self.assertFalse(ReviewAction.objects.filter(action="edited").exists())
+
+    def test_post_groups_rolls_back_when_change_group_revoked_post_validation(
+        self,
+    ):
+        """The same mid-flight revocation must abort a sample create: no
+        row, no membership, no audit."""
+        original_validate = SampleWriteSerializer.validate_sample_groups
+        executed = []
+        change_group = Permission.objects.get(
+            codename="change_samplegroup",
+            content_type__app_label="materials",
+        )
+
+        def revoke_after_validation(serializer, value):
+            result = original_validate(serializer, value)
+            executed.append(True)
+            self.member.user_permissions.remove(change_group)
+            fresh = User.objects.get(pk=self.member.pk)
+            self.assertFalse(
+                fresh.has_perm("materials.change_samplegroup"),
+                "actor should have lost the related change capability",
+            )
+            self.assertTrue(
+                fresh.has_perm("materials.add_sample"),
+                "root create capability must remain",
+            )
+            self.assertTrue(fresh.is_active)
+            return result
+
+        self.member.groups.clear()
+        self.member = User.objects.get(pk=self.member.pk)
+        member_group = SampleGroup.objects.create(
+            name="Member revoke group", kind="study", owner=self.member
+        )
+        self.assertTrue(self.member.has_perm("materials.add_sample"))
+        self.assertTrue(self.member.has_perm("materials.change_samplegroup"))
+        self.client.force_login(self.member)
+        with patch.object(
+            SampleWriteSerializer, "validate_sample_groups", revoke_after_validation
+        ):
+            response = self.client.post(
+                reverse("api-sample-list"),
+                data=json.dumps(
+                    {
+                        "name": "Revoked membership sample",
+                        "material": self.material.pk,
+                        "standalone": True,
+                        "sample_groups": [member_group.pk],
+                    }
+                ),
+                content_type=JSON,
+            )
+        self.assertTrue(executed, "revoking validator did not run")
+        persisted = Sample.objects.filter(name="Revoked membership sample").first()
+        mutation = (
+            f"sample={persisted!r} "
+            f"groups={list(persisted.sample_groups.all()) if persisted else []!r}"
+        )
+        self.assertEqual(response.status_code, 400, mutation)
+        self.assertIsNone(persisted, mutation)
+        self.assertFalse(ReviewAction.objects.exists())
 
     def test_sample_write_rejects_inaccessible_private_group(self):
         self.client.force_login(self.owner)

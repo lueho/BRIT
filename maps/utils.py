@@ -17,6 +17,8 @@ from django.utils import timezone
 from rest_framework.serializers import ReadOnlyField
 from rest_framework.utils.encoders import JSONEncoder
 
+from utils.object_management.policy import scope_queryset
+
 INITIALIZATION_DEPENDENCIES = ["object_management", "properties"]
 
 
@@ -217,25 +219,36 @@ def get_location_cache_key(location_id=None, filters=None):
 
 
 def get_region_cache_key(region_id=None, filters=None):
-    """Generate a cache key for Region GeoJSON data."""
+    """Generate a cache key for Region GeoJSON data.
+
+    An id-only key is kept only when no further filters accompany the id;
+    otherwise the remaining filters contribute a deterministic suffix so a
+    scoped request can never hit an unscoped payload.
+    """
+    filters_copy = filters.copy() if filters else {}
+    filters_copy.pop("id", None)
     if region_id:
         key = f"region_geojson:id:{region_id}"
+        if filters_copy:
+            key = f"{key}:filter:{_generate_filter_key_part(filters_copy)}"
     else:
-        # Remove 'id' from filters if present, as it's handled above
-        filters_copy = filters.copy() if filters else {}
-        filters_copy.pop("id", None)
         filter_part = _generate_filter_key_part(filters_copy)
         key = f"region_geojson:filter:{filter_part}"
     return key
 
 
 def get_catchment_cache_key(catchment_id=None, filters=None):
-    """Generate a cache key for Catchment GeoJSON data."""
+    """Generate a cache key for Catchment GeoJSON data.
+
+    Mirrors :func:`get_region_cache_key`: remaining filters extend the id key.
+    """
+    filters_copy = filters.copy() if filters else {}
+    filters_copy.pop("id", None)
     if catchment_id:
         key = f"catchment_geojson:id:{catchment_id}"
+        if filters_copy:
+            key = f"{key}:filter:{_generate_filter_key_part(filters_copy)}"
     else:
-        filters_copy = filters.copy() if filters else {}
-        filters_copy.pop("id", None)
         filter_part = _generate_filter_key_part(filters_copy)
         key = f"catchment_geojson:filter:{filter_part}"
     return key
@@ -306,20 +319,7 @@ def compute_collection_dataset_version(scope="published", user=None):
         base = f"{scope}:0:0:0:0"
         return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
 
-    qs = collection_model.objects.all()
-
-    if scope == "published":
-        qs = qs.filter(publication_status="published")
-    elif scope == "private":
-        if user and user.is_authenticated and not getattr(user, "is_staff", False):
-            qs = qs.filter(owner=user)
-    elif scope == "review":
-        from django.db.models import Q
-
-        if user and user.is_authenticated and not getattr(user, "is_staff", False):
-            qs = qs.filter(Q(owner=user) | Q(publication_status="review"))
-        else:
-            qs = qs.filter(publication_status="review")
+    qs = scope_queryset(user, collection_model.objects.all(), scope)
 
     agg = qs.aggregate(
         cnt=Count("pk"),
@@ -366,6 +366,9 @@ def build_collection_cache_key(
     # Build filter part
     filter_part = _generate_filter_key_part(filters)
     return f"collection_geojson:filter:{filter_part}:dv:{dv}"
+
+
+AUTHZ_GEOJSON_CACHE_PREFIX = "authz-v1:"
 
 
 def set_geojson_cache_payload(cache, cache_key, data, timeout=DEFAULT_TIMEOUT):

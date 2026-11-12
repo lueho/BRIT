@@ -39,8 +39,6 @@ from .serializers import (
 
 
 class SampleBoundMutationViewSetMixin:
-    sample_policy_key = None
-
     def _validate_target_sample(self, serializer):
         if "sample" not in serializer.validated_data:
             return
@@ -50,10 +48,10 @@ class SampleBoundMutationViewSetMixin:
         previous_sample_id = instance.sample_id if instance is not None else None
         if not can_add_data_to_sample(
             self.request.user,
+            serializer.Meta.model,
             sample,
             previous_sample_id,
-            self.sample_policy_key,
-            request=self.request,
+            obj=instance,
         ):
             raise PermissionDenied("You cannot add data to this sample.")
 
@@ -103,7 +101,6 @@ class CompositionViewSet(
     serializer_class = CompositionAPISerializer
     write_serializer_class = CompositionWriteSerializer
     filterset_class = CompositionFilterSet
-    sample_policy_key = "can_manage_samples"
 
 
 class ComponentMeasurementViewSet(
@@ -114,7 +111,6 @@ class ComponentMeasurementViewSet(
     queryset = ComponentMeasurement.objects.all()
     serializer_class = ComponentMeasurementReadSerializer
     write_serializer_class = ComponentMeasurementWriteSerializer
-    sample_policy_key = "can_manage_samples"
 
 
 class MaterialPropertyValueViewSet(
@@ -125,4 +121,3 @@ class MaterialPropertyValueViewSet(
     queryset = MaterialPropertyValue.objects.all()
     serializer_class = MaterialPropertyValueReadSerializer
     write_serializer_class = MaterialPropertyValueWriteSerializer
-    sample_policy_key = "can_add_property"

@@ -3,6 +3,7 @@ from unittest.mock import patch
 from urllib.parse import quote, unquote, urlencode
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.core.cache import cache
 from django.db.models.signals import post_save, pre_save
 from django.template import Context, Template
@@ -25,8 +26,14 @@ class PendingReviewSignalTagTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = get_user_model().objects.create_user(
-            username="moderation-tag-staff",
+            username="moderation-tag-moderator",
+            password="irrelevant",
             is_staff=True,
+        )
+        # Staff status alone grants nothing: moderation needs the explicit
+        # per-model capability from the role manifest.
+        cls.user.user_permissions.add(
+            Permission.objects.get(codename="can_moderate_collection")
         )
         cls.owner = get_user_model().objects.create_user(
             username="moderation-tag-owner",
@@ -67,7 +74,7 @@ class PendingReviewSignalTagTests(TestCase):
             is_published=False,
             is_archived=False,
         )
-        policy = {"is_owner": True, "is_moderator": False, "is_staff": False}
+        policy = {"can_view_review_activity": True}
         template = Template(
             '{% include "object_management/review_status_icon.html" with object=obj policy=policy %}'
         )

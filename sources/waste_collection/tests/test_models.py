@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from unittest.mock import patch
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import signals
@@ -707,12 +707,14 @@ class CollectionStatisticsAccessorsTestCase(TestCase):
         anon = self.root.aggregatedcollectionpropertyvalues_for_display(user=None)
         self.assertEqual([a.year for a in anon], [2021])
 
-        # Staff sees both, order by (property, unit, year, publication_order, -created_at, -pk)
-        class U:
-            is_staff = True
-            is_authenticated = True
+        # Administrators see both; the bare staff flag grants nothing, so a
+        # real administer_objects grant is required.
+        admin = User.objects.create_user(username="stats-admin")
+        admin.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
 
-        both = self.succ.aggregatedcollectionpropertyvalues_for_display(user=U())
+        both = self.succ.aggregatedcollectionpropertyvalues_for_display(user=admin)
         self.assertEqual({a.year for a in both}, {2020, 2021})
 
     def test_collectionpropertyvalues_for_display_published_tie_prefers_latest_version(

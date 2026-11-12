@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
@@ -24,6 +24,13 @@ class BulkManageAccessViewTests(TestCase):
             username="other",
         )
         cls.staff = User.objects.create_user(username="staff", is_staff=True)
+        cls.administrator = User.objects.create_user(username="administrator")
+        cls.administrator.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type__app_label="object_management",
+            )
+        )
         cls.collection_a = Collection.objects.create(
             name="Collection A",
             owner=cls.owner,
@@ -110,8 +117,23 @@ class BulkManageAccessViewTests(TestCase):
             self.foreign_collection.editors.filter(pk=self.editor.pk).exists()
         )
 
-    def test_staff_can_bulk_manage_foreign_objects(self):
+    def test_staff_cannot_bulk_manage_foreign_objects(self):
         self.client.force_login(self.staff)
+        response = self.client.post(
+            self.url,
+            {
+                "bulk_action": "add_editor",
+                "username": self.editor.username,
+                "items": [self._item(self.foreign_collection)],
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            self.foreign_collection.editors.filter(pk=self.editor.pk).exists()
+        )
+
+    def test_administrator_can_bulk_manage_foreign_objects(self):
+        self.client.force_login(self.administrator)
         response = self.client.post(
             self.url,
             {

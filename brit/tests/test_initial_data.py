@@ -5,7 +5,7 @@ from unittest import mock
 
 from cookie_consent.models import Cookie, CookieGroup
 from django.conf import settings
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import Group, Permission, User
 from django.core.management import CommandError, call_command
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
@@ -486,6 +486,9 @@ class FullInitialDataSeedingTests(TestCase):
     def test_frequency_create_view_initializes_full_year_formset(self):
         call_command("ensure_initial_data", stdout=io.StringIO())
         creator = User.objects.create(username="creator", is_staff=True)
+        creator.user_permissions.add(
+            Permission.objects.get(codename="add_collectionfrequency")
+        )
         self.client.force_login(creator)
 
         response = self.client.get(reverse("collectionfrequency-create"))
@@ -502,6 +505,9 @@ class FullInitialDataSeedingTests(TestCase):
             name="Months of the year", owner=other_owner
         )
         creator = User.objects.create(username="freq-creator", is_staff=True)
+        creator.user_permissions.add(
+            Permission.objects.get(codename="add_collectionfrequency")
+        )
         self.client.force_login(creator)
 
         response = self.client.get(reverse("collectionfrequency-create"))

@@ -66,9 +66,16 @@ class ReviewOwnerNotificationTests(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             return self.client.post(*args, **kwargs)
 
+    def _post_approve(self, obj=None):
+        target = obj or self.collection
+        return self._post(
+            self._action_url("approve_item", obj),
+            data={"expected_revision": target.content_revision},
+        )
+
     def test_approve_notifies_owner(self):
         self.client.force_login(self.moderator)
-        response = self._post(self._action_url("approve_item"))
+        response = self._post_approve()
         self.assertEqual(response.status_code, 302)
 
         self.assertEqual(len(mail.outbox), 1)
@@ -99,7 +106,7 @@ class ReviewOwnerNotificationTests(TestCase):
 
     def test_notification_contains_link_to_review_detail(self):
         self.client.force_login(self.moderator)
-        self._post(self._action_url("approve_item"))
+        self._post_approve()
 
         self.assertEqual(len(mail.outbox), 1)
         review_url = reverse(
@@ -130,7 +137,7 @@ class ReviewOwnerNotificationTests(TestCase):
             publication_status=UserCreatedObject.STATUS_REVIEW,
         )
         self.client.force_login(self.moderator)
-        response = self._post(self._action_url("approve_item", collection))
+        response = self._post_approve(collection)
         self.assertEqual(response.status_code, 302)
         self.assertEqual(len(mail.outbox), 0)
 
@@ -169,8 +176,9 @@ class ReviewOwnerNotificationTests(TestCase):
         new_owner = User.objects.create_user(
             username="newowner", email="newowner@example.com"
         )
-        self.owner.is_staff = True
-        self.owner.save(update_fields=["is_staff"])
+        self.owner.user_permissions.add(
+            Permission.objects.get(codename="administer_objects")
+        )
         self.client.force_login(self.moderator)
         with self.captureOnCommitCallbacks() as callbacks:
             response = self.client.post(self._action_url("reject_item"))
@@ -220,7 +228,7 @@ class ReviewOwnerNotificationTests(TestCase):
     @override_settings(SECURE_SSL_REDIRECT=True)
     def test_notification_links_use_https_when_ssl_redirect_enabled(self):
         self.client.force_login(self.moderator)
-        self._post(self._action_url("approve_item"))
+        self._post_approve()
 
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("https://", mail.outbox[0].body)
@@ -232,7 +240,7 @@ class ReviewOwnerNotificationTests(TestCase):
         with self.assertLogs(
             "utils.object_management.notifications", level="WARNING"
         ) as logs:
-            self._post(self._action_url("approve_item"))
+            self._post_approve()
 
         self.assertTrue(any("No Site row" in line for line in logs.output))
         self.assertEqual(len(mail.outbox), 1)
@@ -285,6 +293,13 @@ class ReviewNotificationTestBase(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             return self.client.post(*args, **kwargs)
 
+    def _post_approve(self, obj=None):
+        target = obj or self.collection
+        return self._post(
+            self._action_url("approve_item", obj),
+            data={"expected_revision": target.content_revision},
+        )
+
     def _add_comment(self, user, text, obj=None):
         """Record a past comment without triggering a notification."""
         with mute_signals(post_save):
@@ -320,7 +335,7 @@ class ReviewParticipantNotificationTests(ReviewNotificationTestBase):
     def test_status_change_notifies_past_commenter(self):
         self._add_comment(self.commenter, "Earlier feedback.")
         self.client.force_login(self.moderator)
-        response = self._post(self._action_url("approve_item"))
+        response = self._post_approve()
         self.assertEqual(response.status_code, 302)
 
         self.assertEqual(self._recipients(), {self.owner.email, self.commenter.email})
@@ -597,14 +612,31 @@ class ReviewNotificationOptOutTests(ReviewNotificationTestBase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(ReviewNotificationMute.objects.filter(user=self.owner).exists())
 
-    def test_staff_can_mute_own_subscription(self):
+    def test_staff_cannot_mute_own_subscription(self):
         staff = User.objects.create_user(
             username="staffer", email="staffer@example.com", is_staff=True
         )
         self.client.force_login(staff)
         response = self.client.post(self._mute_url())
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(ReviewNotificationMute.objects.filter(user=staff).exists())
+
+    def test_administrator_can_mute_own_subscription(self):
+        administrator = User.objects.create_user(
+            username="administrator", email="administrator@example.com"
+        )
+        administrator.user_permissions.add(
+            Permission.objects.get(
+                codename="administer_objects",
+                content_type__app_label="object_management",
+            )
+        )
+        self.client.force_login(administrator)
+        response = self.client.post(self._mute_url())
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(ReviewNotificationMute.objects.filter(user=staff).exists())
+        self.assertTrue(
+            ReviewNotificationMute.objects.filter(user=administrator).exists()
+        )
 
     def test_moderator_can_mute_own_subscription(self):
         self.client.force_login(self.moderator)

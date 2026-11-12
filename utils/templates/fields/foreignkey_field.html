@@ -1,4 +1,5 @@
 {% load crispy_forms_field %}
+{% load moderation_tags %}
 
 <div class="form-group {{ wrapper_class }}">
     <label for="{{ field.id_for_label }}">
@@ -8,17 +9,20 @@
     <div class="input-group">
         {% crispy_field field 'class' 'form-control' %}
 
-        <div class="input-group-append">
-            {% with create_url=field.field.queryset.model.modal_create_url %}
-                <a href="#"
-                   data-href="{{ create_url }}"
-                   class="btn btn-outline-secondary modal-fk-create"
-                   data-async-url="{{ field.field.queryset.model.options_list_url }}"
-                   data-for-field="#{{ field.id_for_label }}"
-                   data-select="#{{ field.auto_id }}">
-                    <i class="fas fa-plus"></i>
-                </a>
-            {% endwith %}
-        </div>
+        {% model_creation_policy field.field.queryset.model as create_policy %}
+        {% with create_url=field.field.queryset.model.modal_create_url options_url=field.field.queryset.model.options_list_url %}
+            {% if create_url and options_url and create_policy.allowed %}
+                <div class="input-group-append">
+                    <a href="#"
+                       data-href="{{ create_url }}"
+                       class="btn btn-outline-secondary modal-fk-create"
+                       data-async-url="{{ options_url }}"
+                       data-for-field="#{{ field.id_for_label }}"
+                       data-select="#{{ field.auto_id }}">
+                        <i class="fas fa-plus"></i>
+                    </a>
+                </div>
+            {% endif %}
+        {% endwith %}
     </div>
 </div>

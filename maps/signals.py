@@ -37,15 +37,23 @@ def clear_geojson_cache_pattern(pattern: str) -> None:
     """
     Clear cache keys matching the given pattern.
 
+    Clears both the legacy namespace and the ``authz-v1:`` namespace used for
+    anonymous payloads of policy-registered models.
+
     Uses the backend's ``delete_pattern`` when available (e.g. django-redis).
     For backends without pattern support (e.g. LocMemCache used in tests),
     falls back to ``cache.clear()`` which drops the entire cache namespace.
     """
+    from .utils import AUTHZ_GEOJSON_CACHE_PREFIX
+
     geojson_cache = get_geojson_cache()
     try:
         delete_pattern = getattr(geojson_cache, "delete_pattern", None)
         if callable(delete_pattern):
-            deleted_count = delete_pattern(pattern)
+            deleted_count = delete_pattern(pattern) or 0
+            deleted_count += (
+                delete_pattern(f"{AUTHZ_GEOJSON_CACHE_PREFIX}{pattern}") or 0
+            )
             logger.info(
                 f"Cleared {deleted_count} cache keys matching pattern: {pattern}"
             )
@@ -65,9 +73,15 @@ def clear_geojson_cache_pattern(pattern: str) -> None:
 def safe_cache_delete(cache, key: str) -> None:
     """
     Delete a single cache key and log any exceptions.
+
+    Also removes the ``authz-v1:`` namespaced copy used for anonymous payloads
+    of policy-registered models.
     """
+    from .utils import AUTHZ_GEOJSON_CACHE_PREFIX
+
     try:
         cache.delete(key)
+        cache.delete(f"{AUTHZ_GEOJSON_CACHE_PREFIX}{key}")
         logger.debug(f"Deleted cache key: {key}")
     except Exception as e:
         logger.exception(f"Error deleting cache key '{key}': {e}")

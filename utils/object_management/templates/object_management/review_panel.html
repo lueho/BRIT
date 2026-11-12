@@ -32,7 +32,9 @@
                       <span class="badge rounded-pill bg-body-secondary text-body me-2"><i class="fas fa-comment-dots me-1"></i> {{ log.get_action_display }}</span>
                     {% endif %}
                     <strong>{{ log.user }}</strong>
+                    {% if log.content_revision %}<small class="text-muted ms-1">rev {{ log.content_revision }}</small>{% endif %}
                     {% if log.comment %}<div class="mt-1">{{ log.comment|markdown_to_html }}</div>{% endif %}
+                    {% if log.changed_fields %}<div class="mt-1 small text-muted">{% trans "Changed:" %} {{ log.changed_fields|join:", " }}</div>{% endif %}
                   </div>
                   <small class="text-muted text-nowrap">{{ log.created_at|date:"Y-m-d H:i" }}</small>
                 </div>
@@ -68,7 +70,9 @@
                         <span class="badge rounded-pill bg-body-secondary text-body me-2"><i class="fas fa-comment-dots me-1"></i> {{ log.get_action_display }}</span>
                       {% endif %}
                       <strong>{{ log.user }}</strong>
+                      {% if log.content_revision %}<small class="text-muted ms-1">rev {{ log.content_revision }}</small>{% endif %}
                       {% if log.comment %}<div class="mt-1">{{ log.comment|markdown_to_html }}</div>{% endif %}
+                      {% if log.changed_fields %}<div class="mt-1 small text-muted">{% trans "Changed:" %} {{ log.changed_fields|join:", " }}</div>{% endif %}
                     </div>
                     <small class="text-muted text-nowrap">{{ log.created_at|date:"Y-m-d H:i" }}</small>
                   </div>
@@ -94,7 +98,7 @@
          role="toolbar"
          aria-label="Review actions">
       {# Single comment button using the shared message box #}
-      {% if policy.is_owner or policy.is_moderator or policy.is_staff %}
+      {% if policy.can_comment_on_review %}
         <form method="post"
               action="{% url 'object_management:add_review_comment' content_type_id=object|get_content_type_id object_id=object.id %}"
               class="m-0 btn-group align-items-center"
@@ -102,6 +106,7 @@
               onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request|path_without_return_params }}">
+          <input type="hidden" name="expected_revision" value="{{ object.content_revision }}">
           <input type="hidden" name="message" value="">
           <button class="btn btn-sm btn-outline-primary" type="submit">
             <i class="fas fa-paper-plane"></i> {% trans "Comment" %}
@@ -167,7 +172,7 @@
       {% if policy.is_in_review %}
         {% if policy.can_approve %}
           <a class="btn btn-sm btn-success modal-link"
-             href="{% url 'object_management:approve_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
+             href="{% url 'object_management:approve_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}&expected_revision={{ object.content_revision }}">
             <i class="fas fa-check"></i> {% trans "Approve" %}
           </a>
         {% endif %}

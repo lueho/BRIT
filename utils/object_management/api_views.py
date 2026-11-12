@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -10,12 +11,13 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .helpers import create_review_action
 from .models import ReviewAction
 from .permissions import UserCreatedObjectPermission
+from .registry import review_target
 from .review_context import build_review_context
 from .review_hooks import get_review_update_context
-from .review_queue import ReviewItemCollector
+from .services import last_reviewed_revision, record_comment
+from .views import ReviewDashboardView
 
 
 class ReviewQueueAPIView(APIView):
@@ -26,10 +28,12 @@ class ReviewQueueAPIView(APIView):
     def get(self, request):
         """List review queue items using existing dashboard logic."""
         django_request = getattr(request, "_request", request)
-        collector = ReviewItemCollector(
-            request.user, getattr(django_request, "GET", None), page_size=50
-        )
-        items = collector.collect()
+        dashboard_view = ReviewDashboardView()
+        dashboard_view.request = django_request
+        dashboard_view.paginate_by = 50
+        dashboard_view._available_models_cache = None
+
+        items = dashboard_view.collect_review_items()
         payload = [self._serialize_item(request.user, item) for item in items]
 
         return Response({"count": len(payload), "results": payload})
@@ -68,6 +72,8 @@ class ReviewQueueAPIView(APIView):
             "publication_status": getattr(item, "publication_status", None),
             "submitted_at": getattr(item, "submitted_at", None),
             "lastmodified_at": getattr(item, "lastmodified_at", None),
+            "content_revision": getattr(item, "content_revision", None),
+            "my_last_reviewed_revision": last_reviewed_revision(user, item),
             "my_last_comment_at": my_last_comment,
             "review_detail_url": review_detail_url,
         }
@@ -98,15 +104,30 @@ class AddReviewCommentAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        action = create_review_action(
-            obj, request.user, ReviewAction.ACTION_COMMENT, comment
-        )
+        try:
+            action = record_comment(
+                request.user,
+                obj,
+                comment,
+                expected_revision=request.data.get("expected_revision"),
+            )
+        except PermissionDenied as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        except ValidationError as e:
+            return Response(
+                {"detail": e.messages[0] if e.messages else str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         return Response(
             {
                 "id": action.id,
                 "action": action.action,
                 "comment": action.comment,
+                "content_revision": action.content_revision,
                 "user_id": action.user_id,
                 "created_at": action.created_at,
             },
@@ -152,7 +173,9 @@ class ReviewContextAPIView(APIView):
             include_history=include_history,
             history_limit=max(1, min(history_limit, 50)),
         )
-        context.update(get_review_update_context(request.user, obj))
+        context.update(
+            get_review_update_context(request.user, review_target(obj) or obj)
+        )
 
         return Response(
             {
