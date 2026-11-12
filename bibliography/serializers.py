@@ -1,5 +1,6 @@
 from collections import OrderedDict
 
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import PermissionDenied
@@ -12,6 +13,8 @@ from rest_framework.serializers import (
     SerializerMethodField,
     ValidationError,
 )
+
+from utils.object_management.policy import decide, visible_queryset
 
 from .models import (
     LETTERLESS_ORGANIZATION_NAME_MESSAGE,
@@ -171,9 +174,46 @@ class SourceCreateSerializer(ModelSerializer):
             raise PermissionDenied(str(exc)) from exc
 
 
+def _source_reader(context):
+    request = context.get("request")
+    return getattr(request, "user", None) or AnonymousUser()
+
+
+def _source_authors_for_reader(source, context):
+    readable_ids = (
+        visible_queryset(_source_reader(context), source.authors.all())
+        .order_by()
+        .values("pk")
+    )
+    return [
+        link.author
+        for link in source.ordered_authors().filter(author_id__in=readable_ids)
+    ]
+
+
+def _source_licence_for_reader(source, context):
+    obj = source.licence
+    if obj is not None and decide(_source_reader(context), "read", obj).allowed:
+        return obj
+    return None
+
+
 class SourceModelSerializer(ModelSerializer):
-    authors = AuthorModelSerializer(many=True, read_only=True)
-    licence = LicenceModelSerializer(read_only=True)
+    authors = SerializerMethodField()
+    licence = SerializerMethodField()
+
+    def get_authors(self, instance):
+        return AuthorModelSerializer(
+            _source_authors_for_reader(instance, self.context),
+            many=True,
+            context=self.context,
+        ).data
+
+    def get_licence(self, instance):
+        visible = _source_licence_for_reader(instance, self.context)
+        if visible is None:
+            return None
+        return LicenceModelSerializer(visible, context=self.context).data
 
     class Meta:
         model = Source
@@ -223,7 +263,7 @@ class HyperlinkedAuthorSerializer(HyperlinkedModelSerializer):
 
 class HyperlinkedSourceSerializer(HyperlinkedModelSerializer):
     authors = SerializerMethodField()
-    licence = HyperlinkedLicenceSerializer()
+    licence = SerializerMethodField()
     url_checked = SerializerMethodField()
     doi = SerializerMethodField()
     last_accessed = SerializerMethodField()
@@ -253,9 +293,15 @@ class HyperlinkedSourceSerializer(HyperlinkedModelSerializer):
             "last_accessed",
         )
 
+    def get_licence(self, instance):
+        visible = _source_licence_for_reader(instance, self.context)
+        if visible is None:
+            return None
+        return HyperlinkedLicenceSerializer(visible, context=self.context).data
+
     def get_authors(self, instance):
         return HyperlinkedAuthorSerializer(
-            instance.authors_ordered,
+            _source_authors_for_reader(instance, self.context),
             many=True,
             context=self.context,
         ).data

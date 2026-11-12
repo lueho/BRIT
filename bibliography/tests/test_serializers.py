@@ -359,10 +359,20 @@ class HyperlinkedSourceSerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.maxDiff = None
-        cls.author1 = Author.objects.create(first_names="One", last_names="Test Author")
-        cls.author2 = Author.objects.create(first_names="Two", last_names="Test Author")
+        cls.author1 = Author.objects.create(
+            first_names="One",
+            last_names="Test Author",
+            publication_status="published",
+        )
+        cls.author2 = Author.objects.create(
+            first_names="Two",
+            last_names="Test Author",
+            publication_status="published",
+        )
         licence = Licence.objects.create(
-            name="Test Licence", reference_url="https://www.licence.com"
+            name="Test Licence",
+            reference_url="https://www.licence.com",
+            publication_status="published",
         )
         with mute_signals(post_save):
             source = Source.objects.create(
