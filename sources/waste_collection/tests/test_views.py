@@ -6214,10 +6214,20 @@ class ApproveCascadeMixinTest(CollectionCascadeMixinTestCase):
 
 
 class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
-    """Test reject cascade via CollectionRejectItemView."""
+    """Rejecting a collection via CollectionRejectItemView leaves its
+    independently reviewed property values untouched."""
 
-    def test_reject_cascades_to_all_cpvs_in_review(self):
-        """Reject cascades to ALL CPVs in review, regardless of owner."""
+    def _reject(self, collection):
+        request = self.factory.post("/")
+        request.user = self.staff
+
+        view = CollectionRejectItemView()
+        view.request = request
+        view.object = collection
+        view.action_attr_name = "reject"
+        view.post_action_hook(request, "review")
+
+    def test_reject_does_not_decline_cpvs_in_review(self):
         collection = self._create_collection("C1", self.owner, status="review")
         cpv_owner = self._create_cpv(
             collection, self.prop1, self.unit1, self.owner, "review"
@@ -6226,43 +6236,25 @@ class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
             collection, self.prop2, self.unit2, self.other_owner, "review"
         )
 
-        request = self.factory.post("/")
-        request.user = self.staff
-
-        view = CollectionRejectItemView()
-        view.request = request
-        view.object = collection
-        view.action_attr_name = "reject"
-        view.post_action_hook(request, "review")
+        self._reject(collection)
 
         cpv_owner.refresh_from_db()
         cpv_other.refresh_from_db()
+        self.assertEqual(cpv_owner.publication_status, "review")
+        self.assertEqual(cpv_other.publication_status, "review")
 
-        # Both should be rejected
-        self.assertEqual(cpv_owner.publication_status, "declined")
-        self.assertEqual(cpv_other.publication_status, "declined")
-
-    def test_reject_cascades_to_acpvs(self):
-        """Reject cascades to aggregated property values."""
+    def test_reject_does_not_decline_acpvs_in_review(self):
         collection = self._create_collection("C1", self.owner, status="review")
         acpv = self._create_acpv(
-            [collection], self.prop1, self.unit1, self.owner, "review"
+            [collection], self.prop1, self.unit1, self.other_owner, "review"
         )
 
-        request = self.factory.post("/")
-        request.user = self.staff
-
-        view = CollectionRejectItemView()
-        view.request = request
-        view.object = collection
-        view.action_attr_name = "reject"
-        view.post_action_hook(request, "review")
+        self._reject(collection)
 
         acpv.refresh_from_db()
-        self.assertEqual(acpv.publication_status, "declined")
+        self.assertEqual(acpv.publication_status, "review")
 
-    def test_reject_cascades_across_version_chain(self):
-        """Reject cascades to CPVs on all versions."""
+    def test_reject_does_not_decline_cpvs_across_version_chain(self):
         v1 = self._create_collection("V1", self.owner, "published", date(2020, 1, 1))
         v2 = self._create_collection("V2", self.owner, "review", date(2021, 1, 1))
         v2.predecessors.add(v1)
@@ -6270,20 +6262,12 @@ class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
         cpv1 = self._create_cpv(v1, self.prop1, self.unit1, self.owner, "review")
         cpv2 = self._create_cpv(v2, self.prop1, self.unit1, self.owner, "review")
 
-        request = self.factory.post("/")
-        request.user = self.staff
-
-        view = CollectionRejectItemView()
-        view.request = request
-        view.object = v2
-        view.action_attr_name = "reject"
-        view.post_action_hook(request, "review")
+        self._reject(v2)
 
         cpv1.refresh_from_db()
         cpv2.refresh_from_db()
-
-        self.assertEqual(cpv1.publication_status, "declined")
-        self.assertEqual(cpv2.publication_status, "declined")
+        self.assertEqual(cpv1.publication_status, "review")
+        self.assertEqual(cpv2.publication_status, "review")
 
 
 class ReviewSubmissionConsistencyTests(TestCase):

@@ -1186,6 +1186,28 @@ class CollectionReviewActionApiTestCase(APITestCase):
         self.assertEqual(acpv_review.publication_status, "published")
         self.assertEqual(acpv_review.approved_by, self.staff)
 
+    def test_reject_does_not_decline_independent_property_values(self):
+        collection = self._create_collection(
+            "Collection Reject",
+            owner=self.owner,
+            publication_status="review",
+        )
+        cpv_other = self._create_cpv(collection, self.other_owner, "review")
+        acpv_other = self._create_acpv([collection], self.other_owner, "review")
+
+        self.client.force_login(self.staff)
+        url = reverse("api-waste-collection-reject", kwargs={"pk": collection.pk})
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        collection.refresh_from_db()
+        cpv_other.refresh_from_db()
+        acpv_other.refresh_from_db()
+
+        self.assertEqual(collection.publication_status, "declined")
+        self.assertEqual(cpv_other.publication_status, "review")
+        self.assertEqual(acpv_other.publication_status, "review")
+
 
 class CollectionImporterWorkflowTestCase(APITestCase):
     """Verify CollectionImporter uses the proper submit_for_review workflow.
