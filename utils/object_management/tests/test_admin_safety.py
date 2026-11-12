@@ -13,25 +13,30 @@ from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
 from django.core.management import call_command
+from django.db.models import Q
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from bibliography.models import Author, Licence, Source, SourceAuthor
-from distributions.models import TemporalDistribution, Timestep
+from distributions.models import Period, TemporalDistribution, Timestep
 from inventories.models import ScenarioInventoryConfiguration
 from materials.models import (
     Composition,
     Material,
     MaterialComponentGroup,
+    MaterialProperty,
+    MaterialPropertyValue,
     Sample,
     SampleAuthor,
 )
+from processes.models import Process, ProcessCategory
 from sources.greenhouses.models import (
     Greenhouse,
     GreenhouseGrowthCycle,
     GrowthShare,
     GrowthTimeStepSet,
 )
+from sources.waste_collection.models import CollectionPropertyValue
 from utils.object_management.admin import (
     PolicyAdminMixin,
     PolicyOwnedInlineMixin,
@@ -40,7 +45,12 @@ from utils.object_management.admin import (
 )
 from utils.object_management.models import ObjectEditorGrant, ReviewAction
 from utils.object_management.services import content_mutation, perform_transition
-from utils.object_management.tests.test_admin_persistence import _FormCollector
+from utils.object_management.tests.test_admin_persistence import (
+    PersistenceFixture,
+    _admin_url,
+    _FormCollector,
+)
+from utils.properties.models import Unit
 from utils.tests.testcases import ensure_test_default_owner
 
 
@@ -1308,3 +1318,325 @@ class SampleAuthorInlinePolicyTests(TestCase):
             ).exists()
         )
         self.assertFalse(LogEntry.objects.exists())
+
+
+class AdminReviewRegressionTests(PersistenceFixture):
+    """Regression coverage for the settled #708 admin-review findings."""
+
+    def setUp(self):
+        super().setUp()
+        self.owner.groups.clear()
+        self.foreign.groups.clear()
+
+    def _perm(self, model, codename):
+        return Permission.objects.get(
+            codename=codename,
+            content_type=ContentType.objects.get_for_model(model),
+        )
+
+    def test_mpv_nullable_sample_create_302(self):
+        prop = MaterialProperty.objects.create(
+            name="arr-prop", owner=self.owner, publication_status="published"
+        )
+        unit = Unit.objects.create(
+            name="arr-unit",
+            symbol="arr",
+            owner=self.owner,
+            publication_status="published",
+        )
+        prop.allowed_units.add(unit)
+        self.owner.user_permissions.add(
+            self._perm(MaterialPropertyValue, "add_materialpropertyvalue")
+        )
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            _admin_url(MaterialPropertyValue, "add"),
+            {
+                "property": prop.pk,
+                "unit": unit.pk,
+                "average": "1.5",
+                "standard_deviation": "0.0",
+                "sample": "",
+                "value_qualifier": "exact",
+                "_save": "Save",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        mpv = MaterialPropertyValue.objects.get(property=prop)
+        self.assertIsNone(mpv.sample)
+        self.assertEqual(mpv.owner, self.owner)
+        self.assertEqual(mpv.publication_status, "private")
+        self.assertEqual(mpv.content_revision, 1)
+        self.assertEqual(mpv.average, 1.5)
+        audits = ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(MaterialPropertyValue),
+            object_id=mpv.pk,
+        )
+        self.assertEqual(audits.count(), 1)
+        self.assertEqual(audits.first().action, ReviewAction.ACTION_CREATED)
+
+    def test_mpv_hook_attached_private_sample_denied(self):
+        prop = MaterialProperty.objects.create(
+            name="arr-prop2", owner=self.owner, publication_status="published"
+        )
+        unit = Unit.objects.create(
+            name="arr-unit2",
+            symbol="arr2",
+            owner=self.owner,
+            publication_status="published",
+        )
+        prop.allowed_units.add(unit)
+        foreign_material = Material.objects.create(
+            name="arr-fmat", owner=self.foreign, publication_status="private"
+        )
+        foreign_sample = Sample.objects.create(
+            name="foreign-sample",
+            material=foreign_material,
+            owner=self.foreign,
+            publication_status="private",
+            standalone=True,
+        )
+        self.owner.user_permissions.add(
+            self._perm(MaterialPropertyValue, "add_materialpropertyvalue")
+        )
+        self.client.force_login(self.owner)
+        real = admin.ModelAdmin.save_model
+        captured = {}
+
+        def hijack(model_admin, request, obj, form, change):
+            obj.sample = foreign_sample
+            result = real(model_admin, request, obj, form, change)
+            captured["pk"] = obj.pk
+            return result
+
+        with patch.object(
+            admin.ModelAdmin, "save_model", autospec=True, side_effect=hijack
+        ) as mocked:
+            with self.assertLogs("django.request", level="WARNING") as logs:
+                response = self.client.post(
+                    _admin_url(MaterialPropertyValue, "add"),
+                    {
+                        "property": prop.pk,
+                        "unit": unit.pk,
+                        "average": "1.5",
+                        "standard_deviation": "0.0",
+                        "sample": "",
+                        "value_qualifier": "exact",
+                        "_save": "Save",
+                    },
+                )
+        self.assertTrue(mocked.called)
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(any("invalid_parent" in m for m in logs.output))
+        attempted_pk = captured["pk"]
+        self.assertIsNotNone(attempted_pk)
+        self.assertFalse(MaterialPropertyValue.objects.filter(pk=attempted_pk).exists())
+        self.assertFalse(
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(MaterialPropertyValue),
+                object_id=attempted_pk,
+            ).exists()
+        )
+        self.assertFalse(MaterialPropertyValue.objects.filter(property=prop).exists())
+        foreign_sample.refresh_from_db()
+        self.assertEqual(foreign_sample.owner, self.foreign)
+        self.assertEqual(foreign_sample.publication_status, "private")
+
+    def test_required_parent_negative_direct_save(self):
+        self.owner.user_permissions.add(
+            self._perm(CollectionPropertyValue, "add_collectionpropertyvalue")
+        )
+        cpv_admin = admin.site._registry[CollectionPropertyValue]
+        obj = CollectionPropertyValue()
+        row_count = CollectionPropertyValue.objects.count()
+        audit_count = ReviewAction.objects.count()
+        request = RequestFactory().post(_admin_url(CollectionPropertyValue, "add"))
+        request.user = self.owner
+        with self.assertRaisesMessage(PermissionDenied, "invalid_parent"):
+            cpv_admin.save_model(
+                request,
+                obj,
+                SimpleNamespace(cleaned_data={"collection": None}),
+                change=False,
+            )
+        self.assertIsNone(obj.pk)
+        self.assertEqual(CollectionPropertyValue.objects.count(), row_count)
+        self.assertEqual(ReviewAction.objects.count(), audit_count)
+
+    def test_distribution_filter_scoped(self):
+        pub_dist = TemporalDistribution.objects.create(
+            name="pub-dist", owner=self.foreign, publication_status="published"
+        )
+        own_dist = TemporalDistribution.objects.create(
+            name="own-dist", owner=self.owner, publication_status="private"
+        )
+        foreign_dist = TemporalDistribution.objects.create(
+            name="foreign-dist", owner=self.foreign, publication_status="private"
+        )
+        Timestep.objects.create(
+            name="ts-pub",
+            owner=self.owner,
+            publication_status="published",
+            distribution=pub_dist,
+        )
+        Timestep.objects.create(
+            name="ts-own",
+            owner=self.owner,
+            publication_status="private",
+            distribution=own_dist,
+        )
+        Timestep.objects.create(
+            name="ts-foreign",
+            owner=self.foreign,
+            publication_status="private",
+            distribution=foreign_dist,
+        )
+        self.owner.user_permissions.add(self._perm(Timestep, "view_timestep"))
+        self.owner.user_permissions.add(self._perm(Period, "view_period"))
+        self.client.force_login(self.owner)
+        for model in (Timestep, Period):
+            resp = self.client.get(_admin_url(model, "changelist"))
+            self.assertEqual(resp.status_code, 200)
+            spec = next(
+                f
+                for f in resp.context["cl"].filter_specs
+                if getattr(f, "field_path", "") == "distribution"
+            )
+            ids = {c[0] for c in spec.lookup_choices}
+            self.assertIn(pub_dist.pk, ids)
+            self.assertIn(own_dist.pk, ids)
+            self.assertNotIn(foreign_dist.pk, ids)
+            self.assertNotIn("foreign-dist", resp.content.decode())
+        # row scope on the Timestep changelist
+        ts_ids = {
+            obj.pk
+            for obj in self.client.get(_admin_url(Timestep, "changelist"))
+            .context["cl"]
+            .result_list
+        }
+        ts_pub = Timestep.objects.get(name="ts-pub")
+        ts_own = Timestep.objects.get(name="ts-own")
+        ts_foreign = Timestep.objects.get(name="ts-foreign")
+        self.assertIn(ts_pub.pk, ts_ids)
+        self.assertIn(ts_own.pk, ts_ids)
+        self.assertNotIn(ts_foreign.pk, ts_ids)
+
+    def test_m2m_categories_filter_scoped(self):
+        pub_cat = ProcessCategory.objects.create(
+            name="pub-cat", owner=self.owner, publication_status="published"
+        )
+        own_cat = ProcessCategory.objects.create(
+            name="own-cat", owner=self.owner, publication_status="private"
+        )
+        foreign_cat = ProcessCategory.objects.create(
+            name="foreign-cat", owner=self.foreign, publication_status="private"
+        )
+        process = Process.objects.create(
+            name="proc", owner=self.owner, publication_status="published"
+        )
+        process.categories.add(pub_cat, own_cat, foreign_cat)
+        self.owner.user_permissions.add(self._perm(Process, "view_process"))
+        self.client.force_login(self.owner)
+        resp = self.client.get(_admin_url(Process, "changelist"))
+        self.assertEqual(resp.status_code, 200)
+        spec = next(
+            f
+            for f in resp.context["cl"].filter_specs
+            if getattr(f, "field_path", "") == "categories"
+        )
+        ids = {c[0] for c in spec.lookup_choices}
+        self.assertIn(pub_cat.pk, ids)
+        self.assertIn(own_cat.pk, ids)
+        self.assertNotIn(foreign_cat.pk, ids)
+        self.assertNotIn("foreign-cat", resp.content.decode())
+
+    def test_filter_preserves_field_constraint_and_ordering(self):
+        own_dist = TemporalDistribution.objects.create(
+            name="own-constrained",
+            owner=self.owner,
+            publication_status="private",
+        )
+        pub_dist = TemporalDistribution.objects.create(
+            name="pub-constrained",
+            owner=self.owner,
+            publication_status="published",
+        )
+        foreign_dist = TemporalDistribution.objects.create(
+            name="for-constrained",
+            owner=self.foreign,
+            publication_status="private",
+        )
+        self.owner.user_permissions.add(self._perm(Timestep, "view_timestep"))
+        request = RequestFactory().get(_admin_url(Timestep, "changelist"))
+        request.user = self.owner
+        model_admin = admin.site._registry[Timestep]
+        filter_class = next(
+            entry[1]
+            for entry in model_admin.get_list_filter(request)
+            if isinstance(entry, tuple) and entry[0] == "distribution"
+        )
+        dist_field = Timestep._meta.get_field("distribution")
+        for constraint in (
+            Q(pk=own_dist.pk),
+            {"pk": own_dist.pk},
+        ):
+            with self.subTest(constraint=constraint):
+                with patch.object(
+                    dist_field, "get_limit_choices_to", return_value=constraint
+                ):
+                    spec = filter_class(
+                        dist_field, request, {}, Timestep, model_admin, "distribution"
+                    )
+                    self.assertEqual(
+                        spec.lookup_choices, [(own_dist.pk, own_dist.name)]
+                    )
+        with (
+            patch.object(
+                dist_field,
+                "get_limit_choices_to",
+                return_value={"pk__in": [own_dist.pk, pub_dist.pk, foreign_dist.pk]},
+            ),
+            patch.object(
+                admin.site._registry[TemporalDistribution],
+                "get_ordering",
+                return_value=("-name",),
+            ),
+        ):
+            spec = filter_class(
+                dist_field, request, {}, Timestep, model_admin, "distribution"
+            )
+        self.assertEqual(
+            spec.lookup_choices,
+            [(pub_dist.pk, pub_dist.name), (own_dist.pk, own_dist.name)],
+        )
+
+    def test_source_delete_unregistered_child_green(self):
+        self.owner.user_permissions.add(self._perm(Source, "delete_source"))
+        author = Author.objects.create(
+            last_names="arr-author",
+            owner=self.owner,
+            publication_status="private",
+        )
+        source = Source.objects.create(
+            title="arr-src", owner=self.owner, publication_status="private"
+        )
+        link = SourceAuthor.objects.create(source=source, author=author, position=1)
+        self.assertFalse(self.owner.has_perm("bibliography.delete_sourceauthor"))
+        self.assertFalse(admin.site.is_registered(SourceAuthor))
+        self.client.force_login(self.owner)
+        resp = self.client.get(_admin_url(Source, "delete", source.pk))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context.get("perms_lacking"), set())
+        resp = self.client.post(
+            _admin_url(Source, "delete", source.pk), {"post": "yes"}
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Source.objects.filter(pk=source.pk).exists())
+        self.assertFalse(SourceAuthor.objects.filter(pk=link.pk).exists())
+        self.assertTrue(Author.objects.filter(pk=author.pk).exists())
+        audits = ReviewAction.objects.filter(
+            content_type=ContentType.objects.get_for_model(Source),
+            object_id=source.pk,
+        )
+        self.assertEqual(audits.count(), 1)
+        self.assertEqual(audits.first().action, ReviewAction.ACTION_DELETED)
