@@ -34,6 +34,7 @@ from operator import or_
 
 from django.apps import apps
 from django.contrib import admin, messages
+from django.contrib.admin.utils import get_fields_from_path
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied
 from django.db import transaction
@@ -56,6 +57,7 @@ from .registry import (
     KIND_REVIEWABLE,
     REVIEWABLE_MODELS,
     administrator_managed,
+    allows_unattached_create,
     model_policy,
     resolve_create_parent,
     root_model,
@@ -206,6 +208,21 @@ def _active_admin_actor(request, admin_site):
     return actor
 
 
+class PolicyRelatedFieldListFilter(admin.RelatedFieldListFilter):
+    """Scope a related-field filter's choices through the read policy."""
+
+    def field_choices(self, field, request, model_admin):
+        getter = getattr(field, "get_limit_choices_to", None)
+        original_limit = getter() if getter else field.limit_choices_to
+        queryset = field.related_model._default_manager.complex_filter(original_limit)
+        readable = visible_queryset(request.user, queryset).order_by()
+        return field.get_choices(
+            include_blank=False,
+            limit_choices_to={"pk__in": readable.values("pk")},
+            ordering=self.field_admin_ordering(field, request, model_admin),
+        )
+
+
 class PolicyAdminMixin:
     """Django admin adapter delegating object verbs to the policy core."""
 
@@ -325,6 +342,23 @@ class PolicyAdminMixin:
         if allowed is not None:
             return allowed
         return super().has_delete_permission(request, obj)
+
+    def get_list_filter(self, request):
+        filters = []
+        for entry in super().get_list_filter(request):
+            if not isinstance(entry, str):
+                filters.append(entry)
+                continue
+            field = get_fields_from_path(self.model, entry)[-1]
+            related = getattr(field, "related_model", None)
+            if related is not None and (
+                model_policy(related) is not None
+                or issubclass(related, UserCreatedObject)
+            ):
+                filters.append((entry, PolicyRelatedFieldListFilter))
+            else:
+                filters.append(entry)
+        return filters
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
@@ -653,8 +687,10 @@ class PolicyAdminMixin:
             # declared parent(s) from cleaned data; create authorization
             # uses the fresh actor and live parent via authorize_create.
             parent = self._validated_create_parent(policy, obj, form)
-            if policy.parent_path and (
-                parent is None or (isinstance(parent, list) and not parent)
+            if (
+                policy.parent_path
+                and not allows_unattached_create(model)
+                and (parent is None or (isinstance(parent, list) and not parent))
             ):
                 raise PermissionDenied("invalid_parent")
             actor = self._authorize_write(request, "create", parent=parent)
@@ -662,7 +698,12 @@ class PolicyAdminMixin:
             self._assign_server_metadata(request, obj)
             with transaction.atomic():
                 super().save_model(request, obj, form, change)
-                if parent is not None:
+                if parent is None:
+                    # Persisted-parent verification inside the atomic write:
+                    # a hook that attached an inaccessible parent must roll
+                    # the whole write back.
+                    validate_created_parent(obj, parent=None)
+                else:
                     # Many-valued parents (e.g. M2M ``collections``) are only
                     # written in ``save_related`` — defer the persisted-parent
                     # check so the whole compound write stays atomic.
