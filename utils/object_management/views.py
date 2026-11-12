@@ -405,7 +405,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         return self.collector.available_models()
 
     def collect_review_items(self) -> list[UserCreatedObject]:
-        """Return the unpaginated review queue (used by the JSON endpoint)."""
+        """Return the capped review queue preview (or all matches when filtered)."""
         return self.collector.collect(self.get_available_models())
 
     def get_queryset(self) -> QuerySet[UserCreatedObject]:
