@@ -1297,6 +1297,23 @@ class GeoDatasetSource(models.Model):
         return self.name
 
 
+def _lock_persisted_row(instance):
+    """Lock and return the stored row an explicit primary key would update.
+
+    Django updates an existing row whenever the primary key matches, even for
+    freshly constructed instances, so immutability guards must look the row
+    up instead of trusting ``_state.adding``.
+    """
+    if instance.pk is None:
+        return None
+    persisted = (
+        type(instance).objects.select_for_update().filter(pk=instance.pk).first()
+    )
+    if persisted is not None:
+        instance._state.adding = False
+    return persisted
+
+
 class GeoDatasetImportRun(models.Model):
     """Provenance record for one operator-recorded import of a source.
 
@@ -1403,13 +1420,13 @@ class GeoDatasetImportRun(models.Model):
 
     def save(self, *args, **kwargs):
         with transaction.atomic():
-            if self._state.adding:
+            persisted = _lock_persisted_row(self)
+            if persisted is None:
                 self._meta.get_field("source").clean(self.source_id, self)
                 self._capture_source_configuration()
-                self.full_clean()
             else:
-                self._validate_against_persisted_row()
-                self.full_clean()
+                self._validate_against_persisted_row(persisted)
+            self.full_clean()
             super().save(*args, **kwargs)
 
     def _capture_source_configuration(self):
@@ -1424,8 +1441,7 @@ class GeoDatasetImportRun(models.Model):
             "attribution": persisted_source.attribution,
         }
 
-    def _validate_against_persisted_row(self):
-        persisted = type(self).objects.select_for_update().get(pk=self.pk)
+    def _validate_against_persisted_row(self, persisted):
         if persisted.status in self.TERMINAL_STATUSES:
             locked_fields = (*self.PROVENANCE_FIELDS, *self.STATE_FIELDS)
             message = "A finished import run is immutable."
@@ -1501,14 +1517,13 @@ class GeoDatasetSnapshot(models.Model):
 
     def save(self, *args, **kwargs):
         with transaction.atomic():
-            persisted = None
-            if not self._state.adding:
-                persisted = type(self).objects.select_for_update().get(pk=self.pk)
+            persisted = _lock_persisted_row(self)
             _lock_geodataset_rows(
                 {self.dataset_id, getattr(persisted, "dataset_id", None)}
             )
             if persisted is not None:
                 self._validate_links_unchanged(persisted)
+                self.created_at = persisted.created_at
             self.full_clean()
             super().save(*args, **kwargs)
 
