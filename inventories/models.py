@@ -186,6 +186,12 @@ class InventoryAlgorithm(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        # Wrap the UPDATE in an atomic so the post-save guard's row locks stay
+        # held through the write and any invalidation rolls back atomically.
+        with transaction.atomic():
+            return super().save(*args, **kwargs)
+
 
 class InventoryAlgorithmParameter(models.Model):
     descriptive_name = models.CharField(max_length=56)
@@ -243,6 +249,12 @@ class InventoryAlgorithmParameterValue(models.Model):
         elif self.type == 2:
             return f"{self.name}"
         return self.name
+
+    def save(self, *args, **kwargs):
+        # Wrap the UPDATE in an atomic so the post-save guard and the
+        # parameter-default fanout stay inside one transaction.
+        with transaction.atomic():
+            return super().save(*args, **kwargs)
 
 
 @receiver(pre_save, sender=InventoryAlgorithmParameterValue)
@@ -881,8 +893,8 @@ class ScenarioInventoryConfiguration(models.Model):
 
 
 def _mark_referencing_scenarios_changed(model_class, instance):
-    """Set status to CHANGED for all scenarios that reference the given instance
-    through ScenarioInventoryConfiguration."""
+    """Invalidate all scenarios referencing the given instance through
+    ScenarioInventoryConfiguration, guarding against active evaluation work."""
     field_map = {
         InventoryAlgorithm: "inventory_algorithm",
         InventoryAlgorithmParameterValue: "inventory_value",
@@ -890,13 +902,17 @@ def _mark_referencing_scenarios_changed(model_class, instance):
     fk_field = field_map.get(model_class)
     if fk_field is None:
         return
-    scenario_ids = (
+    scenario_ids = list(
         ScenarioInventoryConfiguration.objects.filter(**{fk_field: instance})
         .values_list("scenario_id", flat=True)
         .distinct()
+        .order_by("scenario_id")
     )
-    for scenario in Scenario.objects.filter(id__in=scenario_ids):
-        scenario.set_status(ScenarioStatus.Status.CHANGED)
+    for scenario_id in scenario_ids:
+        if _evaluation_input_locked(scenario_id):
+            raise BlockedRunningScenario
+    for scenario_id in scenario_ids:
+        _invalidate_evaluation(scenario_id)
 
 
 @receiver(post_save, sender=InventoryAlgorithm)
