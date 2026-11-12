@@ -114,7 +114,6 @@ from .forms import (
     SampleGroupModelForm,
     SampleMaintenanceForm,
     SampleModalModelForm,
-    SampleModelForm,
     SampleQuickCreateForm,
     SampleSectionFormSet,
     SampleSeriesAddTemporalDistributionModalModelForm,
@@ -2203,7 +2202,8 @@ class SampleModalAddPropertyView(
 
 class SampleCreateDuplicateView(DuplicateFormContextMixin, UserCreatedObjectUpdateView):
     model = Sample
-    form_class = SampleModelForm
+    form_class = SampleMaintenanceForm
+    template_name = "materials/sample_form.html"
     object = None
     object_policy_action = "duplicate"
 
@@ -2217,6 +2217,11 @@ class SampleCreateDuplicateView(DuplicateFormContextMixin, UserCreatedObjectUpda
         initial["name"] = f"{self.object.name} (copy)"
         return initial
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["cancel_url"] = self.get_object().get_absolute_url()
+        return context
+
     def form_valid(self, form):
         # The advisory ``new_version`` decision ran in test_func; here the
         # source row is locked and both the duplicate eligibility and the
@@ -2229,7 +2234,11 @@ class SampleCreateDuplicateView(DuplicateFormContextMixin, UserCreatedObjectUpda
             if not decision.allowed:
                 raise PermissionDenied(decision.reason)
             validate_references(actor, form.cleaned_data)
-            self.object = source.duplicate(creator=actor, **form.cleaned_data)
+            self.object = source.duplicate(
+                creator=actor,
+                datetime_precision=form.instance.datetime_precision,
+                **form.cleaned_data,
+            )
             self.new_object = self.object
             record_creation(actor, self.object)
             for child in (
