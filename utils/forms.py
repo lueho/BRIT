@@ -18,6 +18,8 @@ from django_tomselect.forms import (
 
 from utils.modal import CreateUpdateAjaxMixin, PopRequestMixin
 
+from .object_management.permissions import filter_queryset_for_user
+from .object_management.services import is_independent_evidence_model
 from .widgets import (
     CreateEnabledTomSelectModelMultipleWidget,
     CreateEnabledTomSelectModelWidget,
@@ -835,6 +837,8 @@ def workspace_section_formsets(parent, section, request, formset_class=None):
         role = section.get("role")
         if role:
             queryset = queryset.filter(role=role)
+        if is_independent_evidence_model(model):
+            queryset = filter_queryset_for_user(queryset, request.user)
         relations = [
             field.name
             for field in model._meta.fields
