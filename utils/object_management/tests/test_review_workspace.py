@@ -207,6 +207,56 @@ class ReviewQueueScopeTests(ReviewWorkspaceFixture):
                 scope,
             )
 
+    def test_api_declined_scope_returns_full_uncapped_queue(self):
+        extra = AnalyticalMethod.objects.bulk_create(
+            AnalyticalMethod(
+                owner=self.owner,
+                name=f"declined-extra-{i}",
+                publication_status="declined",
+            )
+            for i in range(500)
+        )
+        AnalyticalMethod.objects.create(
+            owner=self.moderator,
+            name="moderator-own-declined",
+            publication_status="declined",
+        )
+        expected = {self.declined.pk, *(row.pk for row in extra)}
+        self.client.force_login(self.moderator)
+        response = self._queue("?scope=declined")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["count"], len(expected))
+        self.assertEqual(len(payload["results"]), len(expected))
+        self.assertEqual({item["object_id"] for item in payload["results"]}, expected)
+
+    def test_api_default_review_scope_returns_full_uncapped_queue(self):
+        extra = AnalyticalMethod.objects.bulk_create(
+            AnalyticalMethod(
+                owner=self.owner,
+                name=f"review-extra-{i}",
+                publication_status="review",
+            )
+            for i in range(499)
+        )
+        AnalyticalMethod.objects.create(
+            owner=self.moderator,
+            name="moderator-own-review",
+            publication_status="review",
+        )
+        expected = {
+            self.in_review.pk,
+            self.foreign_review.pk,
+            *(row.pk for row in extra),
+        }
+        self.client.force_login(self.moderator)
+        response = self._queue()
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["count"], len(expected))
+        self.assertEqual(len(payload["results"]), len(expected))
+        self.assertEqual({item["object_id"] for item in payload["results"]}, expected)
+
     def test_policy_inactive_actor_empty(self):
         self.assertFalse(
             reviewable_queryset(self.inactive, AnalyticalMethod.objects.all()).exists()
