@@ -7,6 +7,7 @@ from utils.object_management.permissions import user_is_moderator_for_model
 from ..models import Process
 from ..navigation import (
     PROCESS_SCOPES,
+    WORKSPACE_SUBSCOPES,
     categories_url,
     category_detail_url,
     category_process_list_url,
@@ -19,30 +20,34 @@ from ..navigation import (
 register = template.Library()
 
 
-def _authoritative_scope(context):
+def _authoritative_scope(context, nav_scope=None):
     """Return the list_type scope when the current page lists processes.
 
     On process lists the view's ``list_type`` is the authoritative scope; on
     category pages the same context variable would describe the category
-    management scope and must be ignored.
+    management scope and must be ignored. A workspace sub-scope (``owned``
+    or ``shared``) refines the private list and is kept.
     """
     object_list = context.get("object_list")
     if getattr(object_list, "model", None) is Process:
         list_type = context.get("list_type")
+        if list_type == "private" and nav_scope in WORKSPACE_SUBSCOPES:
+            return nav_scope
         if list_type in PROCESS_SCOPES:
             return list_type
     return None
 
 
+def _resolved_scope(context, nav):
+    return _authoritative_scope(context, nav["scope"]) or nav["scope"]
+
+
 def _nav_context(context, section):
     request = context.get("request")
     nav = discovery_context(request)
-    scope = _authoritative_scope(context) or nav["scope"]
+    scope = _resolved_scope(context, nav)
     filters = nav["filters"]
     user = getattr(request, "user", None)
-    process_scope_urls = {
-        item: process_scope_url(item, filters) for item in PROCESS_SCOPES
-    }
     if section == "processes" or request is None:
         scope_urls = {
             item: scope_switch_url(request, item, filters=filters)
@@ -61,8 +66,8 @@ def _nav_context(context, section):
         }
     return {
         "nav_section": section,
-        "nav_scope": scope,
-        "nav_processes_url": process_scope_urls[scope],
+        "nav_scope": "private" if scope in WORKSPACE_SUBSCOPES else scope,
+        "nav_processes_url": process_scope_url(scope, filters),
         "nav_categories_url": categories_url(scope, filters),
         "nav_scope_urls": scope_urls,
         "nav_show_scopes": section != "processes",
@@ -94,7 +99,7 @@ def process_category_filter_url(context, category):
     reset and previous category selections are replaced.
     """
     nav = discovery_context(context.get("request"))
-    scope = _authoritative_scope(context) or nav["scope"]
+    scope = _resolved_scope(context, nav)
     return category_process_list_url(category, scope, nav["filters"])
 
 
@@ -102,7 +107,7 @@ def process_category_filter_url(context, category):
 def process_category_about_url(context, category):
     """Category detail URL carrying the current process scope and filters."""
     nav = discovery_context(context.get("request"))
-    scope = _authoritative_scope(context) or nav["scope"]
+    scope = _resolved_scope(context, nav)
     return category_detail_url(category, scope, nav["filters"])
 
 
@@ -123,7 +128,7 @@ def process_filter_params(context):
 def process_categories_url(context):
     """Category catalogue URL for the current scope and filters."""
     nav = discovery_context(context.get("request"))
-    scope = _authoritative_scope(context) or nav["scope"]
+    scope = _resolved_scope(context, nav)
     return categories_url(scope, nav["filters"])
 
 

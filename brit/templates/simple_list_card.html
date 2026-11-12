@@ -71,11 +71,11 @@
                   </a>
                   <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
                      role="button"
-                     title="Show only my items"
+                     title="Show my workspace records"
                      aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
                      {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
                      href="{{ object_list.model.private_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
-                    Mine
+                    Workspace
                   </a>
                   {% if user|can_moderate:object_list.model and object_list.model.review_list_url %}
                     <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
@@ -100,6 +100,9 @@
           </div>
         </div>
         <div class="card-body overflow-auto">
+          {% if list_type == 'private' and user.is_authenticated %}
+            {% include "includes/workspace_nav.html" %}
+          {% endif %}
           {% block list_card_body %}
             {% block list_table %}
               <table class="table modern-table">
@@ -179,7 +182,8 @@
                    aria-labelledby="options-tab"
                    tabindex="0">
                 {% block list_card_footer_create_link %}
-                  {% if create_permission in perms or user.is_staff %}
+                  {% model_creation_policy object_list.model as create_policy %}
+                  {% if create_policy.allowed %}
                     <a class="btn btn-success w-100 mb-2"
                        href="{{ object_list.model.create_url }}"
                        aria-label="Create new {{ object_list.model.get_verbose_name }}">

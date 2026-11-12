@@ -48,6 +48,7 @@ from sources.waste_collection.models import (
     CollectionPropertyValue,
 )
 from utils.properties.models import Property, Unit
+from utils.tests.testcases import ensure_test_default_owner
 
 from .. import services
 from ..models import ReviewAction
@@ -84,6 +85,7 @@ def _actions_for(obj, action=None):
 
 class RevisionServiceBase(TestCase):
     def setUp(self):
+        ensure_test_default_owner()
         self.owner = User.objects.create_user(username="rev-owner")
         self.owner.user_permissions.add(
             _perm(Property, "add_property"),

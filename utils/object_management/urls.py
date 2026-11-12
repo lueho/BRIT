@@ -112,4 +112,9 @@ urlpatterns = [
         views.ManageAccessModalView.as_view(),
         name="manage_access_modal",
     ),
+    path(
+        "modal/your-access/<int:content_type_id>/<int:object_id>/",
+        views.YourAccessModalView.as_view(),
+        name="your_access_modal",
+    ),
 ]

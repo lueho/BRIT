@@ -1,0 +1,27 @@
+<div class="modal-header">
+  <h5 class="modal-title">Your access</h5>
+  <button type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"></button>
+</div>
+<div class="modal-body">
+  <p>
+    Access to this {{ object.verbose_name }} is owned by
+    <strong>{{ governance_object.owner.username }}</strong>.
+  </p>
+  {% if access_routes %}
+    <p>You can access this record through:</p>
+    <ul class="mb-3">
+      {% for route in access_routes %}<li>{{ route }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+  {% if edit_decision.allowed %}
+    <p class="mb-0">You may edit this record.</p>
+  {% else %}
+    <p class="mb-0 text-muted">{{ edit_explanation }}</p>
+  {% endif %}
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+</div>

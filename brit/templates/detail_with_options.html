@@ -34,24 +34,12 @@
                          title="{{ policy.review_feedback_label }}">
                         <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">{{ policy.review_feedback_label }}</span>
                       </a>
-                    {% else %}
-                      {% if policy.is_in_review %}
-                        {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
-                          <a class="btn btn-sm btn-outline-secondary"
-                             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
-                             title="Review view">
-                            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
-                          </a>
-                        {% endif %}
-                      {% elif policy.is_declined %}
-                        {% if policy.is_staff or policy.is_moderator %}
-                          <a class="btn btn-sm btn-outline-secondary"
-                             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
-                             title="Review view">
-                            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
-                          </a>
-                        {% endif %}
-                      {% endif %}
+                    {% elif policy.can_view_review_activity %}
+                      <a class="btn btn-sm btn-outline-secondary"
+                         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
+                         title="Review activity">
+                        <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review activity</span>
+                      </a>
                     {% endif %}
                   {% endblock detail_header_review_actions %}
                 {% endif %}
@@ -149,7 +137,7 @@
               {% block options_pane %}
                 {% object_policy object as policy %}
                 {% block options_primary_actions %}
-                  {# Generic Edit button: staff always; owners if not published; never when archived #}
+                  {# Editing follows the same capability as the write endpoint. #}
                   {% if policy.can_edit %}
                     {% if object.update_url %}
                       <a class="btn btn-outline-primary w-100 mb-2"
@@ -182,7 +170,7 @@
                 {% block options_secondary_actions %}
                 {% endblock options_secondary_actions %}
                 {% block options_review_actions %}
-                  {# Owner: show Submit for Review when the object is private #}
+                  {# Submission is a separate policy capability. #}
                   {% if policy.is_private and policy.can_submit_review %}
                     <form method="post"
                           action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}"
@@ -198,13 +186,11 @@
                        href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
                       <i class="fas fa-clipboard-check"></i> {{ policy.review_feedback_label }}
                     </a>
-                  {% elif policy.is_in_review and not review_mode %}
-                    {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
-                      <a class="btn btn-outline-secondary w-100 mb-2"
-                         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-                        <i class="fas fa-clipboard-check"></i> Review view
-                      </a>
-                    {% endif %}
+                  {% elif policy.can_view_review_activity and not review_mode %}
+                    <a class="btn btn-outline-secondary w-100 mb-2"
+                       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                      <i class="fas fa-clipboard-check"></i> Review activity
+                    </a>
                   {% endif %}
                 {% endblock options_review_actions %}
                 {% block options_export %}

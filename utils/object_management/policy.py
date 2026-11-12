@@ -153,6 +153,23 @@ def is_owner(user, obj):
     )
 
 
+def governance_object(obj):
+    """Return the record whose owner governs access to ``obj``.
+
+    Generated projections resolve to their validated source evidence and
+    owned children to their registered parent. ``None`` marks a generated
+    row whose source is missing or invalid.
+    """
+    policy = record_policy(obj)
+    if policy is not None and policy.kind == KIND_GENERATED:
+        return generated_source(obj)
+    if policy is not None and policy.kind == KIND_OWNED:
+        parent = resolve_parent(obj, policy.parent_path)
+        if parent is not None:
+            return parent
+    return obj
+
+
 def object_access_routes(user, obj):
     """Describe the actor's own access routes to ``obj``.
 
@@ -163,17 +180,11 @@ def object_access_routes(user, obj):
     """
     policy = record_policy(obj)
     generated = policy is not None and policy.kind == KIND_GENERATED
-    if generated:
-        source = generated_source(obj)
-        if source is None:
-            # Invalid provenance: copied owner/status metadata is not
-            # governance and every actor is denied — report no access route.
-            return ["generated value (read-only; invalid source)"]
-        obj = source
-    elif policy is not None and policy.kind == KIND_OWNED:
-        parent = resolve_parent(obj, policy.parent_path)
-        if parent is not None:
-            obj = parent
+    obj = governance_object(obj)
+    if obj is None:
+        # Invalid provenance: copied owner/status metadata is not
+        # governance and every actor is denied — report no access route.
+        return ["generated value (read-only; invalid source)"]
 
     public_routes = []
     if policy is not None and policy.kind == KIND_PUBLIC_CATALOGUE:

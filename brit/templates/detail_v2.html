@@ -18,8 +18,8 @@
 {% endblock style_sheets %}
 {% block content %}
   {% object_policy object as policy %}
-  <div class="sdv2" data-has-action-rail="{% if user.is_authenticated %}1{% else %}0{% endif %}">
-    {% if user.is_authenticated %}
+  <div class="sdv2" data-has-action-rail="{% if user.is_authenticated and user.is_active %}1{% else %}0{% endif %}">
+    {% if user.is_authenticated and user.is_active %}
       <section class="sdv2-rail" aria-label="{% block rail_aria_label %}Object toolbar{% endblock rail_aria_label %}">
         <div class="sdv2-rail-nav">{% block rail_nav %}{% include "includes/sdv2_context_nav.html" %}{% endblock rail_nav %}</div>
         <div class="sdv2-rail-workspace">
@@ -46,18 +46,16 @@
                    href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
                   <i class="fas fa-clipboard-check" aria-hidden="true"></i> {{ policy.review_feedback_label }}
                 </a>
-              {% elif policy.is_in_review and not review_mode %}
-                {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
-                  <a class="sdv2-btn sdv2-btn-ghost"
-                     href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-                    <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review view
-                  </a>
-                {% endif %}
+              {% elif policy.can_view_review_activity and not review_mode %}
+                <a class="sdv2-btn sdv2-btn-ghost"
+                   href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
+                  <i class="fas fa-clipboard-check" aria-hidden="true"></i> Review activity
+                </a>
               {% endif %}
             {% endblock detail_header_review_actions %}
             {% block rail_extra_actions %}{% endblock rail_extra_actions %}
             {% block rail_more_actions %}
-              {% if policy.can_edit or policy.can_manage_editors or policy.can_delete or policy.can_duplicate or policy.can_manage_samples or policy.can_add_property or policy.can_new_version or policy.can_archive or policy.can_export %}
+              {% if policy.can_read or policy.can_edit or policy.can_manage_editors or policy.can_delete or policy.can_duplicate or policy.can_manage_samples %}
                 <div class="dropdown sdv2-actions-menu">
                   <button class="sdv2-btn sdv2-actions-trigger"
                           type="button"
@@ -76,6 +74,13 @@
                           <a class="dropdown-item modal-link"
                              href="{% url 'object_management:manage_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
                             <i class="fas fa-fw fa-user-group me-2" aria-hidden="true"></i>Manage access
+                          </a>
+                        </li>
+                      {% elif policy.can_read and user.is_authenticated and user.is_active %}
+                        <li>
+                          <a class="dropdown-item modal-link"
+                             href="{% url 'object_management:your_access_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}">
+                            <i class="fas fa-fw fa-circle-info me-2" aria-hidden="true"></i>Your access
                           </a>
                         </li>
                       {% endif %}
