@@ -11,6 +11,7 @@ from rest_framework.test import APITestCase
 from maps.models import (
     LauRegion,
     NutsRegion,
+    NutsVintage,
     Region,
     RegionAttributeValue,
     RegionProperty,
@@ -266,6 +267,7 @@ class CollectionAnalysisApiTests(APITestCase):
         total = Property.objects.get_or_create(name="total waste collected")[0]
         unit = Unit.objects.get_or_create(name="%")[0]
         population = RegionProperty.objects.get_or_create(name="Population")[0]
+        NutsVintage.objects.get_or_create(year=2021, defaults={"is_current": True})
         nuts0 = NutsRegion.objects.create(
             name="Germany", country="DE", nuts_id="DE", levl_code=0
         )

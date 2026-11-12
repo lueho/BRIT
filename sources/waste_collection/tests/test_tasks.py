@@ -26,6 +26,7 @@ from sources.waste_collection.tasks import (
     cleanup_orphaned_waste_flyers,
     warm_collection_geojson_cache,
 )
+from utils.tests.testcases import ensure_test_default_owner
 
 from .test_views import (  # noqa: F401
     CheckWasteFlyerUrlsTestCase,
@@ -35,6 +36,9 @@ from .test_views import (  # noqa: F401
 
 class CleanupOrphanedWasteFlyersTestCase(TestCase):
     """Test cleanup_orphaned_waste_flyers task does not raise FieldError."""
+
+    def setUp(self):
+        ensure_test_default_owner()
 
     def _backdate(self, flyer, days=8):
         WasteFlyer.objects.filter(pk=flyer.pk).update(
@@ -156,6 +160,7 @@ class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
 
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["features_count"], 3)
+        # Anonymous requests read the authorization-prefixed namespace.
         self.assertTrue(
             result["cache_key"].startswith("authz-v1:collection_geojson:key:json:v2:")
         )
@@ -214,6 +219,10 @@ class WasteCollectionGeoJSONWarmTaskTestCase(SimpleTestCase):
 
 
 class WasteCollectionGeoJSONWarmTaskQuerysetTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        ensure_test_default_owner()
+
     @patch("sources.waste_collection.tasks.get_geojson_cache")
     def test_warmup_excludes_published_predecessors(self, mock_get_cache):
         owner = get_user_model().objects.create(username="geojson_warmup_owner")

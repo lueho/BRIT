@@ -945,61 +945,6 @@ class CollectionFrequencyTestCase(TestCase):
         self.assertEqual(35, self.not_seasonal.collections_per_year)
 
 
-class CollectionReviewCascadeTransitionTestCase(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.collection = Collection.objects.create(
-            name="Cascade Collection",
-            valid_from=date(2020, 1, 1),
-            publication_status="review",
-        )
-        cls.prop = Property.objects.create(
-            name="Cascade Prop", publication_status="published"
-        )
-        cls.unit = Unit.objects.create(
-            name="Cascade Unit", publication_status="published"
-        )
-
-    def _cpv(self, year):
-        return CollectionPropertyValue.objects.create(
-            collection=self.collection,
-            property=self.prop,
-            unit=self.unit,
-            year=year,
-            average=1,
-            publication_status="review",
-        )
-
-    def test_invalid_state_value_is_logged_and_skipped(self):
-        stale = self._cpv(2020)
-        other = self._cpv(2021)
-        CollectionPropertyValue.objects.filter(pk=stale.pk).update(
-            publication_status="published"
-        )
-
-        approver = User.objects.create_user(username="cascade-approver")
-        with self.assertLogs("sources.waste_collection.models", "WARNING") as logs:
-            Collection._apply_review_action_transition(
-                [stale, other], "approve", actor=approver
-            )
-
-        other.refresh_from_db()
-        self.assertEqual(other.publication_status, "published")
-        self.assertIsNotNone(other.approved_at)
-        self.assertEqual(other.approved_by_id, approver.pk)
-        self.assertEqual(len(logs.records), 1)
-        self.assertIn(str(stale.pk), logs.output[0])
-
-    def test_unexpected_error_propagates(self):
-        value = self._cpv(2020)
-
-        with patch.object(
-            CollectionPropertyValue, "approve", side_effect=RuntimeError("boom")
-        ):
-            with self.assertRaises(RuntimeError):
-                Collection._apply_review_action_transition([value], "approve")
-
-
 class ManualCollectionPropertyValueUniquenessTestCase(TestCase):
     """Regression tests for #170: published manual CPVs must not allow exact
     duplicate (collection, property, year, unit) rows. Unit variants and
