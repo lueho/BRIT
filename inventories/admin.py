@@ -1,11 +1,13 @@
 import math
 
 from django.contrib import admin
+from django.http import HttpResponse
 from django.urls import reverse
 from django.utils.html import format_html
 
 from utils.object_management.admin import NamedUserCreatedObjectAdmin, PolicyAdminMixin
 
+from .exceptions import BlockedRunningScenario
 from .models import (
     InventoryAlgorithm,
     InventoryAlgorithmParameter,
@@ -18,8 +20,16 @@ from .models import (
 )
 
 
+class _InventoryDependencyAdminMixin:
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        try:
+            return super().changeform_view(request, object_id, form_url, extra_context)
+        except BlockedRunningScenario:
+            return HttpResponse("Evaluation is still in progress.", status=409)
+
+
 @admin.register(InventoryAlgorithm)
-class InventoryAlgorithmAdmin(admin.ModelAdmin):
+class InventoryAlgorithmAdmin(_InventoryDependencyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "geodataset_link", "default", "description")
     search_fields = ("name", "description", "function_name")
     list_filter = ("default",)
@@ -27,7 +37,7 @@ class InventoryAlgorithmAdmin(admin.ModelAdmin):
 
     @staticmethod
     def geodataset_link(obj):
-        url = reverse("admin:inventories_geodataset_change", args=(obj.geodataset.id,))
+        url = reverse("admin:maps_geodataset_change", args=(obj.geodataset.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.geodataset.name)
 
 
@@ -46,7 +56,9 @@ class InventoryAlgorithmParameterAdmin(admin.ModelAdmin):
 
 
 @admin.register(InventoryAlgorithmParameterValue)
-class InventoryAlgorithmParameterValueAdmin(admin.ModelAdmin):
+class InventoryAlgorithmParameterValueAdmin(
+    _InventoryDependencyAdminMixin, admin.ModelAdmin
+):
     list_display = (
         "name",
         "parameter",

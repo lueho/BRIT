@@ -1,12 +1,12 @@
 import logging
-from datetime import date
+from datetime import date, timedelta
 from functools import cached_property
 
 import celery
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
-from django.db import models, transaction
+from django.db import models, router, transaction
 from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
 from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
@@ -25,8 +25,11 @@ from utils.object_management.models import (
     get_default_owner,
 )
 from utils.object_management.permissions import filter_queryset_for_user
+from utils.object_management.policy import publication_states_queryset, scope_queryset
 from utils.object_management.services import perform_transition
 from utils.properties.models import PropertyValue
+
+from .projection_queries import visible_measurement_queryset
 
 logger = logging.getLogger(__name__)
 
@@ -694,23 +697,27 @@ class Collection(NamedUserCreatedObject):
             .prefetch_related("sources")
         )
 
-        qs = filter_queryset_for_user(qs, user)
+        qs = visible_measurement_queryset(user, qs)
 
         published_status = getattr(
             CollectionPropertyValue, "STATUS_PUBLISHED", "published"
         )
         user_id = getattr(user, "id", None)
+        owned_ids = scope_queryset(user, qs, "owned").values("pk")
+        published_ids = publication_states_queryset(
+            user, qs, [published_status]
+        ).values("pk")
 
         return qs.annotate(
             owner_order=Case(
-                When(owner_id=user_id, then=Value(0)),
+                When(pk__in=owned_ids, then=Value(0)),
                 default=Value(1),
                 output_field=IntegerField(),
             )
             if user_id
             else Value(1),
             publication_order=Case(
-                When(publication_status=published_status, then=Value(0)),
+                When(pk__in=published_ids, then=Value(0)),
                 default=Value(1),
                 output_field=IntegerField(),
             ),
@@ -996,17 +1003,23 @@ class Collection(NamedUserCreatedObject):
 
             super().approve(user=user)
 
-            # Archive only published predecessors — archived records are
-            # public historical data, so an unpublished predecessor must
-            # never be forced public here.
             for predecessor in predecessors:
-                if predecessor.publication_status == self.STATUS_PUBLISHED:
-                    perform_transition(
-                        user,
-                        predecessor,
-                        "archive",
-                        expected_revision=predecessor.content_revision,
-                    )
+                # Only published predecessors archive (archived is public
+                # data); the governed transition runs BEFORE closing
+                # validity so a denied archive rolls everything back.
+                if predecessor.publication_status != self.STATUS_PUBLISHED:
+                    continue
+                locked = perform_transition(
+                    user,
+                    predecessor,
+                    "archive",
+                    expected_revision=predecessor.content_revision,
+                )
+                if self.valid_from is not None and (
+                    locked.valid_until is None or locked.valid_until >= self.valid_from
+                ):
+                    locked.valid_until = self.valid_from - timedelta(days=1)
+                    locked.save(update_fields=["valid_until", "lastmodified_at"])
 
     @classmethod
     def public_map_url(cls):
@@ -1057,6 +1070,54 @@ class CollectionPropertyValue(PropertyValue):
         default=False,
         help_text="True when this value was computed from another property (e.g. total ↔ specific via population).",
     )
+    derived_from = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        related_name="generated_values",
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=(
+            "The raw source value this generated projection is derived from. "
+            "Server-controlled; set only by the derivation pipeline."
+        ),
+    )
+
+    # Persisted input fields decisive for whether a linked projection must be
+    # recomputed. Compared against the freshly persisted row under the source
+    # lock, not against unsaved in-memory values.
+    _DERIVED_INPUT_FIELDS = (
+        "collection_id",
+        "year",
+        "property_id",
+        "unit_id",
+        "average",
+        "is_derived",
+    )
+
+    def save(self, *args, **kwargs):
+        using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+        kwargs["using"] = using
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and not update_fields:
+            return
+        if self.is_derived:
+            return super().save(*args, **kwargs)
+        with transaction.atomic(using=using):
+            previous = None
+            if self.pk is not None:
+                previous = (
+                    CollectionPropertyValue.objects.using(using)
+                    .select_for_update(no_key=True)
+                    .filter(pk=self.pk)
+                    .values(*self._DERIVED_INPUT_FIELDS)
+                    .first()
+                )
+            self._derived_previous_inputs = previous
+            try:
+                return super().save(*args, **kwargs)
+            finally:
+                del self._derived_previous_inputs
 
     def get_breadcrumb_object_label(self):
         label = f"{self.property}: {self.display_average}"
@@ -1082,14 +1143,13 @@ class CollectionPropertyValue(PropertyValue):
     class Meta(PropertyValue.Meta):
         constraints = [
             models.UniqueConstraint(
-                fields=["collection", "property", "year"],
-                condition=Q(is_derived=True),
-                name="soilcom_unique_derived_cpv_per_key",
+                fields=["derived_from"],
+                condition=Q(is_derived=True, derived_from__isnull=False),
+                name="wc_unique_generated_cpv_source",
             ),
-            models.UniqueConstraint(
-                fields=["collection", "property"],
-                condition=Q(is_derived=True, year__isnull=True),
-                name="soilcom_unique_derived_cpv_per_key_null_year",
+            models.CheckConstraint(
+                condition=Q(is_derived=True) | Q(derived_from__isnull=True),
+                name="soilcom_cpv_raw_without_source_pointer",
             ),
             models.UniqueConstraint(
                 fields=["collection", "property", "year", "unit"],

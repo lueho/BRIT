@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from django.apps import apps
 from django.db import connection
+from django.db.models.deletion import ProtectedError
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
@@ -952,3 +953,133 @@ class ScenarioEnclosingRegionGeodatasetTestCase(TestCase):
         self.assertQuerySetEqual(
             self.scenario.default_inventory_algorithms(), [self.country_algorithm]
         )
+
+
+class InventoryAlgorithmDeletionProtectionTests(TestCase):
+    """Inventory algorithm definitions referenced by scenarios must be
+    protected from deletion; unreferenced definitions remain deletable."""
+
+    def setUp(self):
+        self.region = Region.objects.create(name="Protection Region")
+        self.geodataset = GeoDataset.objects.create(
+            name="Protection Dataset", region=self.region
+        )
+        self.feedstock = Material.objects.create(name="Protection Feedstock")
+        self.scenario = Scenario.objects.create(
+            name="Protection Scenario", region=self.region
+        )
+        self.algorithm = InventoryAlgorithm.objects.create(
+            name="Used Algorithm",
+            function_name="used_algo",
+            geodataset=self.geodataset,
+        )
+
+    def _configure(self, algorithm=None, scenario=None):
+        return ScenarioInventoryConfiguration.objects.create(
+            scenario=scenario or self.scenario,
+            feedstock=self.feedstock,
+            geodataset=self.geodataset,
+            inventory_algorithm=algorithm or self.algorithm,
+        )
+
+    def test_configured_algorithm_instance_delete_protected(self):
+        config = self._configure()
+        with self.assertRaises(ProtectedError):
+            self.algorithm.delete()
+        self.assertTrue(
+            InventoryAlgorithm.objects.filter(pk=self.algorithm.pk).exists()
+        )
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(pk=config.pk).exists()
+        )
+        self.assertTrue(Scenario.objects.filter(pk=self.scenario.pk).exists())
+
+    def test_mixed_queryset_delete_preserves_used_and_unused(self):
+        self._configure()
+        unused = InventoryAlgorithm.objects.create(
+            name="Unused Algorithm",
+            function_name="unused_algo",
+            geodataset=self.geodataset,
+        )
+        with self.assertRaises(ProtectedError):
+            InventoryAlgorithm.objects.filter(
+                pk__in=[self.algorithm.pk, unused.pk]
+            ).delete()
+        self.assertTrue(
+            InventoryAlgorithm.objects.filter(pk=self.algorithm.pk).exists()
+        )
+        self.assertTrue(InventoryAlgorithm.objects.filter(pk=unused.pk).exists())
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(
+                inventory_algorithm=self.algorithm
+            ).exists()
+        )
+
+    def test_unreferenced_algorithm_deletable(self):
+        algorithm_pk = self.algorithm.pk
+        self.algorithm.delete()
+        self.assertFalse(InventoryAlgorithm.objects.filter(pk=algorithm_pk).exists())
+
+    def test_removing_configuration_releases_protection(self):
+        config = self._configure()
+        config_pk = config.pk
+        algorithm_pk = self.algorithm.pk
+        config.delete()
+        self.assertFalse(
+            ScenarioInventoryConfiguration.objects.filter(pk=config_pk).exists()
+        )
+        self.algorithm.delete()
+        self.assertFalse(InventoryAlgorithm.objects.filter(pk=algorithm_pk).exists())
+
+    def test_two_scenarios_independent_protection(self):
+        self._configure(scenario=self.scenario)
+        other = Scenario.objects.create(name="Other Scenario", region=self.region)
+        other_config = self._configure(scenario=other)
+        scenario_pk = self.scenario.pk
+        other_pk = other.pk
+        algorithm_pk = self.algorithm.pk
+        self.scenario.delete()
+        self.assertFalse(Scenario.objects.filter(pk=scenario_pk).exists())
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(pk=other_config.pk).exists()
+        )
+        with self.assertRaises(ProtectedError):
+            self.algorithm.delete()
+        other.delete()
+        self.assertFalse(Scenario.objects.filter(pk=other_pk).exists())
+        self.algorithm.delete()
+        self.assertFalse(InventoryAlgorithm.objects.filter(pk=algorithm_pk).exists())
+
+    def test_failed_algorithm_pointer_alone_protects(self):
+        algorithm_pk = self.algorithm.pk
+        status = self.scenario.scenariostatus
+        status.status = ScenarioStatus.Status.FAILED
+        status.failed_algorithm = self.algorithm
+        status.save(update_fields=["status", "failed_algorithm"])
+        with self.assertRaises(ProtectedError):
+            self.algorithm.delete()
+        self.scenario.set_status(ScenarioStatus.Status.CHANGED)
+        self.algorithm.delete()
+        self.assertFalse(InventoryAlgorithm.objects.filter(pk=algorithm_pk).exists())
+
+    def test_running_task_pointer_alone_protects(self):
+        RunningTask.objects.create(
+            scenario=self.scenario, algorithm=self.algorithm, uuid=uuid4()
+        )
+        with self.assertRaises(ProtectedError):
+            self.algorithm.delete()
+        self.assertTrue(RunningTask.objects.filter(scenario=self.scenario).exists())
+        self.assertTrue(Scenario.objects.filter(pk=self.scenario.pk).exists())
+
+    def test_parent_geodataset_delete_protected_by_used_algorithm(self):
+        config = self._configure()
+        with self.assertRaises(ProtectedError):
+            self.geodataset.delete()
+        self.assertTrue(GeoDataset.objects.filter(pk=self.geodataset.pk).exists())
+        self.assertTrue(
+            InventoryAlgorithm.objects.filter(pk=self.algorithm.pk).exists()
+        )
+        self.assertTrue(
+            ScenarioInventoryConfiguration.objects.filter(pk=config.pk).exists()
+        )
+        self.assertTrue(Scenario.objects.filter(pk=self.scenario.pk).exists())

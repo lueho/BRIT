@@ -49,6 +49,20 @@
 {% endblock hero_meta_items %}
 {% block layout_class %}{% if visible_related_collections %}sdv2-layout{% else %}sdv2-layout sdv2-layout-full{% endif %}{% endblock layout_class %}
 {% block detail_sections %}
+  {% if generated_value_source %}
+    <section class="sdv2-section-panel" aria-label="Generated value source">
+      <div class="sdv2-section-header">
+        <div class="sdv2-section-heading">
+          <h2 class="sdv2-section-title">{% trans "Generated Value (Read-Only)" %}</h2>
+        </div>
+      </div>
+      <p class="mb-0">
+        This calculated value follows the permissions and review of its
+        <a href="{{ generated_value_source.get_absolute_url }}">raw source evidence</a>.
+        Edit or review the source when your permissions and its state allow it.
+      </p>
+    </section>
+  {% endif %}
   <section class="sdv2-section-panel" aria-label="Value details">
     <div class="sdv2-section-header">
       <div class="sdv2-section-heading">
@@ -75,8 +89,8 @@
         </div>
       {% endif %}
       <div>
-        <dt>{% trans "Owner" %}</dt>
-        <dd>{{ object.owner }}</dd>
+        <dt>{% if generated_value_source %}{% trans "Source owner" %}{% else %}{% trans "Owner" %}{% endif %}</dt>
+        <dd>{% if generated_value_source %}{{ generated_value_source.owner }}{% else %}{{ object.owner }}{% endif %}</dd>
       </div>
     </dl>
   </section>

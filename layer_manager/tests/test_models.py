@@ -1,6 +1,7 @@
 from django.apps import apps
 from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Point, Polygon
 from django.db import IntegrityError, connection, transaction
+from django.db.models.deletion import ProtectedError
 from django.db.models.query import QuerySet
 from django.test import TestCase
 
@@ -359,3 +360,54 @@ class LayerAggregatedDistributionTestCase(TestCase):
         )
         with self.assertRaises(DistributionShare.MultipleObjectsReturned):
             _ = self.aggregated_distribution.serialized
+
+
+class LayerAlgorithmDeletionProtectionTests(TestCase):
+    """A stored result layer alone protects its algorithm from deletion,
+    whether the layer is live or staged."""
+
+    def setUp(self):
+        self.region = Region.objects.create(name="Layer Protection Region")
+        self.geodataset = GeoDataset.objects.create(
+            name="Layer Protection Dataset", region=self.region
+        )
+        self.feedstock = Material.objects.create(name="Layer Protection Feedstock")
+        self.scenario = Scenario.objects.create(
+            name="Layer Protection Scenario", region=self.region
+        )
+        self.algorithm = InventoryAlgorithm.objects.create(
+            name="Layer Used Algorithm",
+            function_name="layer_used_algo",
+            geodataset=self.geodataset,
+        )
+
+    def _create_layer(self, staged):
+        return Layer.objects.create(
+            name="protected layer",
+            scenario=self.scenario,
+            feedstock=self.feedstock,
+            algorithm=self.algorithm,
+            geom_type="Point",
+            table_name=f"protected_layer_{staged}",
+            staged=staged,
+        )
+
+    def test_live_layer_alone_protects_algorithm(self):
+        layer = self._create_layer(staged=False)
+        with self.assertRaises(ProtectedError):
+            self.algorithm.delete()
+        self.assertTrue(
+            InventoryAlgorithm.objects.filter(pk=self.algorithm.pk).exists()
+        )
+        self.assertTrue(Layer.all_objects.filter(pk=layer.pk).exists())
+        self.assertTrue(Scenario.objects.filter(pk=self.scenario.pk).exists())
+
+    def test_staged_layer_alone_protects_algorithm(self):
+        layer = self._create_layer(staged=True)
+        with self.assertRaises(ProtectedError):
+            self.algorithm.delete()
+        self.assertTrue(
+            InventoryAlgorithm.objects.filter(pk=self.algorithm.pk).exists()
+        )
+        self.assertTrue(Layer.all_objects.filter(pk=layer.pk).exists())
+        self.assertTrue(Scenario.objects.filter(pk=self.scenario.pk).exists())

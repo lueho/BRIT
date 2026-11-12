@@ -60,6 +60,7 @@ from sources.waste_collection.serializers import (
     CollectorGeometrySerializer,
     WasteCollectionGeometrySerializer,
 )
+from sources.waste_collection.services import flyer_title, resolve_flyer
 from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import (
     UserCreatedObjectPermission,
@@ -68,6 +69,11 @@ from utils.object_management.permissions import (
     get_object_policy,
 )
 from utils.object_management.policy import is_active_actor, is_admin
+from utils.object_management.services import (
+    _fresh_actor,
+    content_mutation,
+    validate_references,
+)
 from utils.object_management.viewsets import UserCreatedObjectViewSet
 
 logger = logging.getLogger(__name__)
@@ -473,13 +479,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     @staticmethod
     def _flyer_title(url):
         """Return a short title derived from the URL hostname (max 255 chars)."""
-        from urllib.parse import urlparse
-
-        try:
-            hostname = urlparse(url).hostname or url
-        except Exception:
-            hostname = url
-        return hostname[:255]
+        return flyer_title(url)
 
     @staticmethod
     def _attach_sources_and_flyers(
@@ -489,13 +489,22 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         *,
         replace_sources=False,
         replace_flyers=False,
+        actor,
     ):
-        """Attach bibliography sources and flyer URLs to ``collection``."""
+        """Attach bibliography sources and flyer URLs to ``collection``.
+
+        Every submitted source must be readable by the acting user; flyer
+        URLs resolve through the shared flyer service, which enforces read
+        access on existing rows and create capability plus actor ownership
+        on new rows.
+        """
         if sources is not None:
             sources = list(sources)
         if flyer_urls is not None:
             flyer_urls = list(flyer_urls)
 
+        if sources:
+            validate_references(actor, list(sources))
         if sources is not None:
             if replace_sources:
                 collection.sources.set(sources)
@@ -506,15 +515,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         for url in flyer_urls or []:
             if len(url) > 2083:
                 continue
-
-            flyer, _ = WasteFlyer.objects.get_or_create_by_url(
-                url=url,
-                defaults={
-                    "owner": collection.owner,
-                    "title": CollectionViewSet._flyer_title(url),
-                    "publication_status": "private",
-                },
-            )
+            flyer, _created = resolve_flyer(actor, url)
             flyers.append(flyer)
 
         if flyer_urls is not None:
@@ -707,7 +708,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         return mismatches
 
     @staticmethod
-    def _apply_collection_mutation_update(collection, data):
+    def _apply_collection_mutation_update(collection, data, actor):
         scalar_fields = (
             "collector",
             "frequency",
@@ -718,6 +719,8 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             "min_bin_size",
             "required_bin_capacity",
             "required_bin_capacity_reference",
+            "access_control_bp",
+            "access_control_pap",
             "description",
         )
         touched_scalar_fields = []
@@ -743,6 +746,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 flyer_urls=data.get("flyer_urls") if "flyer_urls" in data else None,
                 replace_sources="sources" in data,
                 replace_flyers=data.get("replace_flyer_urls", False),
+                actor=actor,
             )
 
     @staticmethod
@@ -911,30 +915,31 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         actor = self._require_authenticated_actor(request)
         collection = self.get_object()
 
-        if collection.owner_id != actor.id:
-            raise PermissionDenied(
-                "Only the collection owner may use the programmatic update endpoint."
-            )
-
         serializer = CollectionMutationUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        mismatches = self._collection_identity_mismatches(collection, data)
-        if mismatches:
-            return Response(
-                {
-                    "detail": "Target collection no longer matches the expected identity.",
-                    "mismatches": mismatches,
-                },
-                status=status.HTTP_409_CONFLICT,
-            )
-
-        with transaction.atomic():
-            self._apply_collection_mutation_update(collection, data)
+        try:
+            with content_mutation(actor, collection, action="edit") as locked:
+                mismatches = self._collection_identity_mismatches(locked, data)
+                if mismatches:
+                    return Response(
+                        {
+                            "detail": "Target collection no longer matches the expected identity.",
+                            "mismatches": mismatches,
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                actor = _fresh_actor(request.user)
+                validate_references(actor, data)
+                self._apply_collection_mutation_update(locked, data, actor)
+        except DjangoValidationError as exc:
+            raise ValidationError(
+                getattr(exc, "message_dict", None) or exc.messages
+            ) from exc
 
         response_payload = {
-            **self._serialize_mutation_response(collection, False),
+            **self._serialize_mutation_response(locked, False),
             "updated": True,
         }
 
@@ -1253,6 +1258,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 collection,
                 sources=data.get("sources", []),
                 flyer_urls=data.get("flyer_urls", []),
+                actor=self._require_authenticated_actor(request),
             )
             submitted = self._submit_for_review_if_requested(
                 request,
@@ -1375,6 +1381,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
                 collection,
                 sources=data.get("sources", default_sources),
                 flyer_urls=data.get("flyer_urls", default_flyer_urls),
+                actor=self._require_authenticated_actor(request),
             )
             submitted = self._submit_for_review_if_requested(
                 request,

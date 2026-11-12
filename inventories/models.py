@@ -1,5 +1,7 @@
 import importlib
 import pkgutil
+import uuid
+from contextlib import contextmanager
 
 from celery.result import AsyncResult
 from celery.states import READY_STATES
@@ -8,7 +10,7 @@ from django.contrib.gis.db.models.functions import Intersection
 from django.core.validators import RegexValidator
 from django.db import models, transaction
 from django.db.models.query import QuerySet
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 
@@ -184,6 +186,12 @@ class InventoryAlgorithm(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        # Wrap the UPDATE in an atomic so the post-save guard's row locks stay
+        # held through the write and any invalidation rolls back atomically.
+        with transaction.atomic():
+            return super().save(*args, **kwargs)
+
 
 class InventoryAlgorithmParameter(models.Model):
     descriptive_name = models.CharField(max_length=56)
@@ -241,6 +249,12 @@ class InventoryAlgorithmParameterValue(models.Model):
         elif self.type == 2:
             return f"{self.name}"
         return self.name
+
+    def save(self, *args, **kwargs):
+        # Wrap the UPDATE in an atomic so the post-save guard and the
+        # parameter-default fanout stay inside one transaction.
+        with transaction.atomic():
+            return super().save(*args, **kwargs)
 
 
 @receiver(pre_save, sender=InventoryAlgorithmParameterValue)
@@ -315,9 +329,10 @@ class ScenarioStatus(models.Model):
         InventoryAlgorithm,
         blank=True,
         null=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
     )
     failure_message = models.TextField(blank=True)
+    run_id = models.UUIDField(null=True, blank=True, db_index=True)
 
     def __str__(self):
         return f"Status of Scenario {self.scenario}: {self.status}"
@@ -351,6 +366,12 @@ class Scenario(NamedUserCreatedObject):
     def status(self, status: ScenarioStatus.Status):
         self.set_status(status)
 
+    def save(self, *args, **kwargs):
+        # Wrap the UPDATE in an atomic so the pre_save evaluation guard's row
+        # locks stay held through the write.
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+
     def set_status(self, status):
         if isinstance(status, ScenarioStatus.Status):
             self.scenariostatus.status = status
@@ -359,6 +380,9 @@ class Scenario(NamedUserCreatedObject):
                 self.scenariostatus.failed_algorithm = None
                 self.scenariostatus.failure_message = ""
                 update_fields.extend(["failed_algorithm", "failure_message"])
+            if status == ScenarioStatus.Status.CHANGED:
+                self.scenariostatus.run_id = None
+                update_fields.append("run_id")
             self.scenariostatus.save(update_fields=update_fields)
 
     def available_feedstocks(self):
@@ -774,34 +798,24 @@ def block_running_scenario(sender, instance, **kwargs):
     if instance.pk is None:
         return
 
-    with transaction.atomic():
-        scenario_status = (
-            ScenarioStatus.objects.select_for_update()
-            .filter(scenario_id=instance.pk)
-            .first()
-        )
-        if scenario_status is None:
+    with locked_scenario_evaluation(instance.pk) as locked:
+        if locked is None:
             return
+        _, scenario_status, running_tasks = locked
 
-        if scenario_status.status != ScenarioStatus.Status.RUNNING:
-            return
-
-        running_tasks = list(
-            RunningTask.objects.select_for_update().filter(scenario_id=instance.pk)
-        )
         if not running_tasks:
-            raise BlockedRunningScenario
-
-        stale_task_ids = []
-        for task in running_tasks:
-            if AsyncResult(str(task.uuid)).state not in READY_STATES:
+            if scenario_status.status == ScenarioStatus.Status.RUNNING:
                 raise BlockedRunningScenario
-            stale_task_ids.append(task.id)
+            return
 
-        if stale_task_ids:
-            RunningTask.objects.filter(id__in=stale_task_ids).delete()
-        scenario_status.status = ScenarioStatus.Status.CHANGED
-        scenario_status.save(update_fields=["status"])
+        for task in running_tasks:
+            if is_backend_task_active(task.uuid):
+                raise BlockedRunningScenario
+
+        # Recover an orphaned RUNNING attempt without changing settled failure
+        # diagnostics for metadata-only edits.
+        if scenario_status.status == ScenarioStatus.Status.RUNNING:
+            instance.scenariostatus = _invalidate_evaluation(instance.pk)
 
 
 SCENARIO_EVALUATION_INPUT_FIELDS = ("region", "catchment")
@@ -837,7 +851,10 @@ def manage_scenario_status(sender, instance, created, **kwargs):
     if created:
         ScenarioStatus.objects.create(scenario=instance)
     elif getattr(instance, "_evaluation_inputs_changed", True):
-        instance.set_status(ScenarioStatus.Status.CHANGED)
+        evaluation = _invalidate_evaluation(instance.pk)
+        if evaluation is None:
+            raise BlockedRunningScenario
+        instance.scenariostatus = evaluation
 
 
 class ScenarioInventoryConfiguration(models.Model):
@@ -855,7 +872,7 @@ class ScenarioInventoryConfiguration(models.Model):
     )
     geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)
     inventory_algorithm = models.ForeignKey(
-        InventoryAlgorithm, on_delete=models.CASCADE
+        InventoryAlgorithm, on_delete=models.PROTECT
     )
     inventory_parameter = models.ForeignKey(
         InventoryAlgorithmParameter, on_delete=models.CASCADE, null=True
@@ -865,16 +882,19 @@ class ScenarioInventoryConfiguration(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        self.scenario.set_status(ScenarioStatus.Status.CHANGED)
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            if _evaluation_input_locked(self.scenario_id):
+                raise BlockedRunningScenario
+            super().save(*args, **kwargs)
+            _invalidate_evaluation(self.scenario_id)
 
     def get_absolute_url(self):
         return reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
 
 
 def _mark_referencing_scenarios_changed(model_class, instance):
-    """Set status to CHANGED for all scenarios that reference the given instance
-    through ScenarioInventoryConfiguration."""
+    """Invalidate all scenarios referencing the given instance through
+    ScenarioInventoryConfiguration, guarding against active evaluation work."""
     field_map = {
         InventoryAlgorithm: "inventory_algorithm",
         InventoryAlgorithmParameterValue: "inventory_value",
@@ -882,13 +902,17 @@ def _mark_referencing_scenarios_changed(model_class, instance):
     fk_field = field_map.get(model_class)
     if fk_field is None:
         return
-    scenario_ids = (
+    scenario_ids = list(
         ScenarioInventoryConfiguration.objects.filter(**{fk_field: instance})
         .values_list("scenario_id", flat=True)
         .distinct()
+        .order_by("scenario_id")
     )
-    for scenario in Scenario.objects.filter(id__in=scenario_ids):
-        scenario.set_status(ScenarioStatus.Status.CHANGED)
+    for scenario_id in scenario_ids:
+        if _evaluation_input_locked(scenario_id):
+            raise BlockedRunningScenario
+    for scenario_id in scenario_ids:
+        _invalidate_evaluation(scenario_id)
 
 
 @receiver(post_save, sender=InventoryAlgorithm)
@@ -906,6 +930,104 @@ def propagate_parameter_value_change_to_scenarios(sender, instance, created, **k
 class RunningTask(models.Model):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
     algorithm = models.ForeignKey(
-        InventoryAlgorithm, on_delete=models.CASCADE, null=True
+        InventoryAlgorithm, on_delete=models.PROTECT, null=True
     )
     uuid = models.UUIDField(primary_key=False)
+    run_id = models.UUIDField(null=True, blank=True, db_index=True)
+
+
+def is_current_inventory_run(scenario_status, run_id):
+    """True only when `run_id` parses to the status's non-null current UUID."""
+    if scenario_status.run_id is None or run_id is None:
+        return False
+    try:
+        return scenario_status.run_id == uuid.UUID(str(run_id))
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+
+def is_backend_task_active(task_uuid):
+    """True while the result backend reports a non-terminal state.
+
+    PENDING/STARTED/RETRY and unknown results all count as active; only
+    READY_STATES are settled.
+    """
+    return AsyncResult(str(task_uuid)).state not in READY_STATES
+
+
+@contextmanager
+def locked_scenario_evaluation(scenario_id):
+    """Lock scenario -> status -> ordered running tasks; yield None if gone."""
+    with transaction.atomic():
+        scenario = Scenario.objects.select_for_update().filter(pk=scenario_id).first()
+        if scenario is None:
+            yield None
+            return
+        scenario_status = (
+            ScenarioStatus.objects.select_for_update()
+            .filter(scenario_id=scenario_id)
+            .first()
+        )
+        if scenario_status is None:
+            yield None
+            return
+        running_tasks = list(
+            RunningTask.objects.select_for_update()
+            .filter(scenario_id=scenario_id)
+            .order_by("pk")
+        )
+        yield scenario, scenario_status, running_tasks
+
+
+def _evaluation_input_locked(scenario_id):
+    """True when active or pending evaluation work blocks input changes.
+
+    A pending RUNNING claim without task rows, any non-READY row, or a
+    missing status row for an existing scenario all fail closed. A quiescent
+    stale RUNNING (every row READY) is still allowed so the invalidation can
+    recover it.
+    """
+    with locked_scenario_evaluation(scenario_id) as locked:
+        if locked is None:
+            return True
+        _, scenario_status, running_tasks = locked
+        if (
+            scenario_status.status == ScenarioStatus.Status.RUNNING
+            and not running_tasks
+        ):
+            return True
+        return any(is_backend_task_active(task.uuid) for task in running_tasks)
+
+
+def _invalidate_evaluation(scenario_id):
+    """Quiescent input change: clear settled markers/staging, mark CHANGED.
+
+    Returns the locked status for the caller to cache, or None when the
+    scenario/status row is gone.
+    """
+    with locked_scenario_evaluation(scenario_id) as locked:
+        if locked is None:
+            return
+        scenario, scenario_status, running_tasks = locked
+        RunningTask.objects.filter(id__in=[task.id for task in running_tasks]).delete()
+        for layer in scenario.layer_set(manager="all_objects").filter(staged=True):
+            layer.delete()
+        scenario.scenariostatus = scenario_status
+        scenario.set_status(ScenarioStatus.Status.CHANGED)
+        return scenario_status
+
+
+@receiver(pre_delete, sender=ScenarioInventoryConfiguration)
+def block_config_delete_while_active(sender, instance, **kwargs):
+    """Config deletes block while that scenario has active evaluation work."""
+    if Scenario.objects.filter(pk=instance.scenario_id).exists() and (
+        _evaluation_input_locked(instance.scenario_id)
+    ):
+        raise BlockedRunningScenario
+
+
+@receiver(post_delete, sender=ScenarioInventoryConfiguration)
+def invalidate_after_config_delete(sender, instance, **kwargs):
+    """Inside the caller's transaction, clear settled markers/staging + CHANGED."""
+    if Scenario.objects.filter(pk=instance.scenario_id).exists():
+        _invalidate_evaluation(instance.scenario_id)

@@ -16,10 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from utils.forms import TomSelectFormsetHelper
-from utils.object_management.permissions import (
-    UserCreatedObjectPermission,
-    get_object_policy,
-)
+from utils.object_management.permissions import UserCreatedObjectPermission
 from utils.object_management.policy import decide, visible_queryset
 from utils.object_management.services import _fresh_actor, content_mutation
 from utils.object_management.templatetags.moderation_tags import safe_back_url
@@ -566,12 +563,10 @@ class SourceCheckUrlView(LoginRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         self.object = get_object_or_404(self.model, pk=kwargs.get("pk"))
-        policy = get_object_policy(request.user, self.object, request=request)
-        if not (
-            policy.get("is_owner")
-            or policy.get("is_staff")
-            or policy.get("is_moderator")
-        ):
+        # Central gate: active actor + change_source capability + read
+        # access on the target. url_valid/url_checked are audit-exempt, so no
+        # content boundary is needed — but the decision itself is not.
+        if not decide(request.user, "check_url", self.object).allowed:
             raise PermissionDenied
 
         task = check_source_url.delay(self.object.pk)
@@ -599,8 +594,9 @@ class SourceListCheckUrlsView(PermissionRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         params = request.GET.copy()
+        params.pop("csrfmiddlewaretoken", None)
         params.pop("page", None)
-        task = self.check_task.delay(params)
+        task = self.check_task.delay(params, request.user.pk)
         response_data = {"task_id": task.task_id}
         return HttpResponse(json.dumps(response_data), content_type="application/json")
 

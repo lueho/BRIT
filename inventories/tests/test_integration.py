@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from django.apps import apps
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
@@ -12,6 +14,7 @@ from inventories.models import (
     InventoryAlgorithmParameterValue,
     InventoryAmountShare,
     Scenario,
+    ScenarioStatus,
 )
 from inventories.tasks import finalize_inventory, run_inventory_algorithm
 from layer_manager.models import Layer
@@ -267,10 +270,18 @@ class InventoryExecutionIntegrationTests(TestCase):
         self.assertEqual(execution_plan[0]["kwargs"]["feedstock_id"], material.id)
         self.assertEqual(execution_plan[0]["kwargs"]["sample_series_id"], feedstock.id)
 
+        run_id = uuid4()
+        scenario.set_status(ScenarioStatus.Status.RUNNING)
+        scenario.scenariostatus.run_id = run_id
+        scenario.scenariostatus.save(update_fields=["run_id"])
         self.assertTrue(
-            run_inventory_algorithm.run(algorithm.id, **execution_plan[0]["kwargs"])
+            run_inventory_algorithm.run(
+                algorithm.id, run_id=str(run_id), **execution_plan[0]["kwargs"]
+            )
         )
-        finalize_inventory.run([True], scenario.id, [[algorithm.id, material.id]])
+        finalize_inventory.run(
+            [True], scenario.id, str(run_id), [[algorithm.id, material.id]]
+        )
 
         return Layer.objects.get(
             scenario=scenario, feedstock=material, algorithm=algorithm

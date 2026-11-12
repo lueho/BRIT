@@ -1,10 +1,7 @@
 from crispy_forms.helper import FormHelper
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
-from django.views.generic import UpdateView
-from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
 from maps.views import CatchmentAutocompleteView, GeoDataSetPublishedFilteredMapView
 from materials.models import Composition, MaterialComponentGroup
@@ -33,23 +30,20 @@ from sources.greenhouses.models import (
 )
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.modal import is_ajax
-from utils.object_management.access import UserOwnsObjectMixin
-from utils.object_management.permissions import (
-    filter_queryset_for_user,
-    get_object_policy,
-)
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
+    UserCreatedObjectCreateWithInlinesView,
     UserCreatedObjectDetailView,
     UserCreatedObjectModalCreateView,
     UserCreatedObjectModalDeleteView,
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
+    UserCreatedObjectUpdateWithInlinesView,
 )
-from utils.views import NextOrSuccessUrlMixin
 
 
 class CulturePublishedListView(PublishedObjectFilterView):
@@ -138,7 +132,16 @@ class GreenhouseModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Greenhouse
 
 
-class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateWithInlinesView):
+class GreenhouseGrowthCycleCreateView(UserCreatedObjectCreateWithInlinesView):
+    """Inline growth-cycle create bound to the posted greenhouse.
+
+    The cycle is an owned child of its ``greenhouse``: the bound create
+    adapter resolves the parent from the validated form, locks it under
+    ``content_mutation``, and re-decides the owned-child create inside the
+    write boundary. The advisory gate requires at least one editable
+    greenhouse.
+    """
+
     model = GreenhouseGrowthCycle
     inlines = [
         GrowthTimestepInline,
@@ -154,7 +157,7 @@ class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateWithInlinesView)
         return self.object.get_absolute_url()
 
 
-class GrowthCycleModalCreateView(UserPassesTestMixin, UserCreatedObjectModalCreateView):
+class GrowthCycleModalCreateView(UserCreatedObjectModalCreateView):
     form_class = GrowthCycleCreateForm
     permission_required = "greenhouses.add_greenhousegrowthcycle"
     greenhouse = None
@@ -163,11 +166,10 @@ class GrowthCycleModalCreateView(UserPassesTestMixin, UserCreatedObjectModalCrea
         self.greenhouse = get_object_or_404(Greenhouse, pk=kwargs["pk"])
         return super().dispatch(request, *args, **kwargs)
 
-    def test_func(self):
-        policy = get_object_policy(
-            self.request.user, self.greenhouse, request=self.request
-        )
-        return policy["can_manage_samples"]
+    def get_policy_parent(self):
+        # Advisory and authoritative create gates both decide against the
+        # greenhouse resolved from the URL.
+        return self.greenhouse
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -204,12 +206,24 @@ class GrowthCycleModalCreateView(UserPassesTestMixin, UserCreatedObjectModalCrea
             return HttpResponse(status=204)
 
         form.instance.group_settings = group_settings
-        form.instance.owner = self.request.user
-        self.object = form.save()
-        for timestep in form.cleaned_data["timesteps"]:
+        # ``timesteps`` carries the shared seed distributions (private,
+        # default-owner rows). Like the season formset rows of the frequency
+        # boundary they are child writes of this create, not governed
+        # cross-references — they leave the form's validated reference
+        # surface here and are written inside the boundary instead.
+        self._timesteps = form.cleaned_data.pop("timesteps")
+        return super().form_valid(form)
+
+    def _call_super_form_valid(self, form):
+        # The bound create adapter persists the cycle inside a
+        # ``content_mutation`` on the parent greenhouse: the timestep rows
+        # and the cycle ordering write inside the same atomic boundary so
+        # the parent's snapshot captures the whole compound change.
+        response = super()._call_super_form_valid(form)
+        for timestep in self._timesteps:
             self.object.add_timestep(timestep)
         self.object.greenhouse.sort_growth_cycles()
-        return HttpResponseRedirect(self.get_success_url())
+        return response
 
 
 class GrowthCycleDetailView(UserCreatedObjectDetailView):
@@ -233,12 +247,7 @@ class GrowthCycleModalDeleteView(UserCreatedObjectModalDeleteView):
         return reverse("greenhouse-detail", kwargs={"pk": self.object.greenhouse.pk})
 
 
-class GrowthTimeStepSetModalUpdateView(
-    LoginRequiredMixin,
-    UserOwnsObjectMixin,
-    NextOrSuccessUrlMixin,
-    UpdateWithInlinesView,
-):
+class GrowthTimeStepSetModalUpdateView(UserCreatedObjectUpdateWithInlinesView):
     model = GrowthTimeStepSet
     inlines = [
         InlineGrowthShare,
@@ -247,38 +256,33 @@ class GrowthTimeStepSetModalUpdateView(
     template_name = "modal_form_with_formset.html"
 
     def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
         inline_helper = GrowthShareFormSetHelper()
         inline_helper.form_tag = False
         form_helper = FormHelper()
         form_helper.form_tag = False
-        context = {
-            "form_title": "Change the composition",
-            "submit_button_text": "Save",
-            "inline_helper": inline_helper,
-            "form_helper": form_helper,
-        }
-        context.update(kwargs)
-        return super().get_context_data(**context)
+        context.update(
+            {
+                "form_title": "Change the composition",
+                "submit_button_text": "Save",
+                "inline_helper": inline_helper,
+                "form_helper": form_helper,
+            }
+        )
+        return context
 
 
-class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
+class UpdateGreenhouseGrowthCycleValuesView(UserCreatedObjectUpdateView):
     model = GreenhouseGrowthCycle
     form_class = UpdateGreenhouseGrowthCycleValuesForm
     template_name = "greenhouses/greenhouse_growth_cycle_update_values.html"
     object = None
-
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        return super().form_valid(form)
 
     def get_object(self, **kwargs):
         return GreenhouseGrowthCycle.objects.get(id=self.kwargs.get("cycle_pk"))
 
     def get_success_url(self):
         return reverse("greenhouse-detail", kwargs={"pk": self.kwargs.get("pk")})
-
-    def get_initial(self):
-        return {"material": self.object.material, "component": self.object.component}
 
 
 class NantesGreenhousesCatchmentAutocompleteView(CatchmentAutocompleteView):

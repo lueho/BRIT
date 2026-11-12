@@ -12,6 +12,7 @@ from django.utils.functional import cached_property
 
 from ..models import CRUDUrlsMixin
 from ..transaction_scope import current_scope, scope_is_active
+from .registry import KIND_GENERATED, record_policy
 
 
 def _default_owner_username():
@@ -457,6 +458,9 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         ]
 
     def _is_publishing_transition(self):
+        policy = record_policy(self)
+        if policy is not None and policy.kind == KIND_GENERATED:
+            return False
         loaded_status = getattr(self, "_loaded_publication_status", None)
         return (
             self.publication_status == self.STATUS_PUBLISHED

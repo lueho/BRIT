@@ -72,6 +72,10 @@ def export_user_created_object_to_file(
             base_qs = spec.model.objects.none()
         else:
             base_qs = spec.model.objects.all()
+    # Narrow the raw scope before form validation so invalid scope choices
+    # cannot be silently ignored; a valid scope may then be applied again.
+    if has_publication_status and "scope" in qdict:
+        base_qs = apply_scope_filter(base_qs, qdict["scope"], user=user)
 
     # Filtersets with user-dependent filters (e.g. visible related names) read
     # ``request.user``; give them the export's user instead of no request.

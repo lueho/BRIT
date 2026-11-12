@@ -57,13 +57,23 @@ class AnalyticalMethodModelFormTestCase(TestCase):
 
 
 class AddComponentGroupModalModelFormTestCase(TestCase):
+    """Choice querysets are scoped to records readable by the form's
+    requester; instantiated without a request only public rows qualify."""
+
     @classmethod
     def setUpTestData(cls):
         Material.objects.create(name="Test Material")
-        MaterialComponentGroup.objects.create(name="Test Group 1")
-        MaterialComponentGroup.objects.create(name="Test Group 2")
+        MaterialComponentGroup.objects.create(
+            name="Test Group 1", publication_status="published"
+        )
+        MaterialComponentGroup.objects.create(
+            name="Test Group 2", publication_status="published"
+        )
         cls.material = Material.objects.get(name="Test Material")
         cls.group1 = MaterialComponentGroup.objects.get(name="Test Group 1")
+        cls.default_component = MaterialComponent.objects.default()
+        cls.default_component.publication_status = "published"
+        cls.default_component.save(update_fields=["publication_status"])
 
     def test_initial_group_queryset_has_only_unused_groups(self):
         sample_series = SampleSeries.objects.create(material=self.material)
@@ -72,6 +82,17 @@ class AddComponentGroupModalModelFormTestCase(TestCase):
         self.assertQuerySetEqual(
             form.fields["group"].queryset.order_by("id"),
             MaterialComponentGroup.objects.filter(name="Test Group 2").order_by("id"),
+        )
+
+    def test_initial_group_queryset_excludes_unreadable_groups(self):
+        MaterialComponentGroup.objects.create(
+            name="Private Group", publication_status="private"
+        )
+        sample_series = SampleSeries.objects.create(material=self.material)
+        form = AddCompositionModalForm(instance=sample_series)
+        self.assertNotIn(
+            "Private Group",
+            [group.name for group in form.fields["group"].queryset],
         )
 
     def test_initial_fractions_of_queryset_has_only_used_components(self):

@@ -8,6 +8,10 @@ from django.dispatch import receiver
 
 from maps.signals import clear_geojson_cache_pattern
 
+from .derived_values import (
+    create_or_update_derived_cpv,
+    delete_derived_cpv,
+)
 from .models import Collection
 
 logger = logging.getLogger(__name__)
@@ -150,19 +154,17 @@ def invalidate_collection_geojson_cache(sender, instance, **kwargs):
 
 
 def sync_derived_cpv_on_save(sender, instance, **kwargs):
-    """Create or update the derived counterpart when a source CPV is saved."""
+    """Maintain or invalidate only this source's explicitly linked output."""
+    if instance.is_derived or kwargs.get("raw"):
+        return
     try:
-        from .derived_values import (
-            create_or_update_derived_cpv,
-            is_convertible_property,
-        )
-
-        if instance.is_derived:
-            return
-        if not is_convertible_property(instance.property_id):
-            return
-
-        create_or_update_derived_cpv(instance)
+        # Run for all raw saves: changing away from a convertible property
+        # must invalidate the old linked output too.
+        previous = getattr(instance, "_derived_previous_inputs", None)
+        if previous is not None:
+            create_or_update_derived_cpv(instance, previous_inputs=previous)
+        else:
+            create_or_update_derived_cpv(instance)
     except ImproperlyConfigured as exc:
         logger.debug(
             "Skipping derived CPV sync for CollectionPropertyValue id=%s: %s",
@@ -170,31 +172,17 @@ def sync_derived_cpv_on_save(sender, instance, **kwargs):
             exc,
         )
     except Exception:
+        # The generator invalidates under its raw lock before raising. Repeating
+        # cleanup here could delete a newer worker's subsequently valid output.
         logger.exception(
             "Failed to sync derived CPV for CollectionPropertyValue id=%s",
             instance.pk,
         )
+        raise
 
 
 def sync_derived_cpv_on_delete(sender, instance, **kwargs):
-    """Delete derived counterparts when a source CPV is deleted."""
-    try:
-        from .derived_values import delete_derived_cpv, is_convertible_property
-
-        if instance.is_derived:
-            return
-        if not is_convertible_property(instance.property_id):
-            return
-
-        delete_derived_cpv(instance)
-    except ImproperlyConfigured as exc:
-        logger.debug(
-            "Skipping derived CPV delete sync for CollectionPropertyValue id=%s: %s",
-            instance.pk,
-            exc,
-        )
-    except Exception:
-        logger.exception(
-            "Failed to delete derived CPV for CollectionPropertyValue id=%s",
-            instance.pk,
-        )
+    """Delete linked output even if the raw source is no longer convertible."""
+    if instance.is_derived:
+        return
+    delete_derived_cpv(instance)
