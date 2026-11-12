@@ -172,7 +172,6 @@ class SourceBibtexArticleImportForm(SimpleForm):
                     for message in self._flatten_validation_messages(exc)
                 ]
             ) from exc
-        source.update_abbreviation()
         return source
 
     @staticmethod
