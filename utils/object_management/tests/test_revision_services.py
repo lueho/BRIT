@@ -1987,10 +1987,18 @@ class OwnedMtiFacetTests(TestCase):
         self.assertEqual(nuts.content_revision, 2)
 
 
-class TransitionCascadeTests(RevisionServiceBase):
+class SourceReviewCascadeBoundaryTests(RevisionServiceBase):
+    """Source review transitions must not cascade to linked Authors.
+
+    The ``cascade_review_action`` contract was deliberately removed from
+    ``Source``: linked Authors are independent reviewable records, so the
+    boundary must hold even when the transition service or the HTML review
+    view explicitly asks for a cascade. Independence itself is covered
+    exhaustively in ``bibliography.tests.test_source_author_cascade``.
+    """
+
     def setUp(self):
         super().setUp()
-        self.moderator.user_permissions.add(_perm(Source, "can_moderate_source"))
         self.source = Source.objects.create(
             title="Cascading Source", owner=self.owner, publication_status="private"
         )
@@ -1999,65 +2007,15 @@ class TransitionCascadeTests(RevisionServiceBase):
         )
         SourceAuthor.objects.create(source=self.source, author=self.author, position=1)
 
-    def test_submit_and_approve_cascade_to_linked_authors(self):
+    def test_service_transition_does_not_cascade_when_requested(self):
         perform_transition(self.owner, self.source, "submit", cascade=True)
-        self.author.refresh_from_db()
-        self.assertEqual(self.author.publication_status, "review")
-
-        self.source.refresh_from_db()
-        perform_transition(
-            self.moderator,
-            self.source,
-            "approve",
-            expected_revision=self.source.content_revision,
-            cascade=True,
-        )
         self.source.refresh_from_db()
         self.author.refresh_from_db()
-        self.assertEqual(self.source.publication_status, "published")
-        self.assertEqual(self.author.publication_status, "published")
-        self.assertEqual(self.author.approved_by, self.moderator)
-
-    def test_withdraw_cascades_to_linked_authors(self):
-        perform_transition(self.owner, self.source, "submit", cascade=True)
-        perform_transition(self.owner, self.source, "withdraw", cascade=True)
-        self.author.refresh_from_db()
-        self.assertEqual(self.author.publication_status, "private")
-
-    def test_expected_cascade_failure_is_logged_and_transition_kept(self):
-        with (
-            self.assertLogs(
-                "utils.object_management.services", level="WARNING"
-            ) as logs,
-            patch.object(
-                Source,
-                "cascade_review_action",
-                side_effect=ValidationError("cascade broke"),
-            ),
-        ):
-            perform_transition(self.owner, self.source, "submit", cascade=True)
-        self.source.refresh_from_db()
         self.assertEqual(self.source.publication_status, "review")
-        self.assertIn("Review action cascade failed", logs.output[0])
-
-    def test_unexpected_cascade_failure_rolls_back_transition(self):
-        with (
-            patch.object(
-                Source, "cascade_review_action", side_effect=RuntimeError("boom")
-            ),
-            self.assertRaises(RuntimeError),
-        ):
-            perform_transition(self.owner, self.source, "submit", cascade=True)
-        self.source.refresh_from_db()
-        self.assertEqual(self.source.publication_status, "private")
-        self.assertFalse(_actions_for(self.source, "submitted").exists())
-
-    def test_service_does_not_cascade_unless_requested(self):
-        perform_transition(self.owner, self.source, "submit")
-        self.author.refresh_from_db()
         self.assertEqual(self.author.publication_status, "private")
+        self.assertFalse(_actions_for(self.author).exists())
 
-    def test_html_review_action_cascades_to_linked_authors(self):
+    def test_html_review_action_does_not_cascade_to_linked_authors(self):
         self.client.force_login(self.owner)
         response = self.client.post(
             reverse(
@@ -2072,4 +2030,4 @@ class TransitionCascadeTests(RevisionServiceBase):
         self.source.refresh_from_db()
         self.author.refresh_from_db()
         self.assertEqual(self.source.publication_status, "review")
-        self.assertEqual(self.author.publication_status, "review")
+        self.assertEqual(self.author.publication_status, "private")

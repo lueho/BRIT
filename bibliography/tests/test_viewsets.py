@@ -21,7 +21,15 @@ class AuthorViewSetPermissionTestCase(ViewSetWithPermissionsTestCase):
             "suffix": "Jr.",
             "preferred_citation": "J.F.K. Jr.",
         }
-        self.author = Author.objects.create(**self.author_data)
+        self.author = Author.objects.create(
+            **self.author_data, publication_status="published"
+        )
+        self.member_author = Author.objects.create(
+            owner=self.member,
+            first_names="Member",
+            last_names="Owned",
+            publication_status="private",
+        )
 
     def test_list_200_ok_for_anonymous(self):
         response = self.client.get(reverse("api-author-list"))
@@ -95,9 +103,10 @@ class AuthorViewSetPermissionTestCase(ViewSetWithPermissionsTestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_update_200_ok_for_member(self):
+        # member owns this private record: change_author + ownership allows edit.
         self.client.force_login(self.member)
         response = self.client.put(
-            reverse("api-author-detail", args=[self.author.id]),
+            reverse("api-author-detail", args=[self.member_author.id]),
             self.author_data,
             content_type="application/json",
         )
@@ -117,9 +126,11 @@ class AuthorViewSetPermissionTestCase(ViewSetWithPermissionsTestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_delete_204_no_content_for_member(self):
+        # member owns this private record: delete_author + ownership allows
+        # cleanup; the frozen published record stays denied for writes.
         self.client.force_login(self.member)
         response = self.client.delete(
-            reverse("api-author-detail", args=[self.author.id])
+            reverse("api-author-detail", args=[self.member_author.id])
         )
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 

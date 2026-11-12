@@ -1,3 +1,6 @@
+from io import StringIO
+
+from django.core.management import call_command
 from django.test import TestCase
 
 from utils.object_management.models import User
@@ -42,6 +45,11 @@ class ParseBibtexCitaviEntryTestCase(TestCase):
 
 
 class SourceBibtexCitaviImportFormTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls._role_output = StringIO()
+        call_command("sync_roles", "--apply", stdout=cls._role_output)
+
     def test_form_creates_article_source_from_citavi_style_fields(self):
         owner = User.objects.create(username="owner")
         jane = Author.objects.create(

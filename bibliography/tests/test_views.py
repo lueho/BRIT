@@ -1,9 +1,7 @@
 import json
-import time
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission
-from django.core import signing
 from django.db.models.signals import post_save
 from django.urls import reverse
 from django.utils.html import escape
@@ -1159,7 +1157,7 @@ class SourceListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
 
 
 class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ["add_source"]
+    member_permissions = ["add_source", "delete_source"]
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         response = self.client.post(
@@ -1258,7 +1256,7 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(source_author.position, 1)
         self.assertEqual(payload["label"], "Lovelace, A.. Inline source")
 
-    def test_post_skips_letterless_inline_authors(self):
+    def test_post_rejects_letterless_inline_authors(self):
         add_author_permission = Permission.objects.get(codename="add_author")
         self.member.user_permissions.add(add_author_permission)
         self.client.force_login(self.member)
@@ -1281,13 +1279,13 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 201)
-        source = Source.objects.get(pk=response.json()["id"])
-        self.assertEqual(
-            list(source.authors.values_list("last_names", flat=True)), ["Lovelace"]
-        )
+        # Letterless author entries are invalid input: the whole request
+        # rejects with 400 and persists nothing (no partial rows).
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Source.objects.exists())
         self.assertFalse(Author.objects.filter(last_names="70").exists())
         self.assertFalse(Author.objects.filter(organization_name="30.379").exists())
+        self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
 
     def test_post_http_201_creates_source_and_new_author_when_permitted(self):
         add_author_permission = Permission.objects.get(codename="add_author")
@@ -1320,8 +1318,8 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.member.user_permissions.add(add_author_permission)
         self.client.force_login(self.member)
 
-        with patch.object(Source.objects, "create") as mock_create:
-            mock_create.side_effect = RuntimeError("simulated failure")
+        with patch.object(Source, "save") as mock_save:
+            mock_save.side_effect = RuntimeError("simulated failure")
             with (
                 self.assertLogs("django.request", level="ERROR"),
                 self.assertRaises(RuntimeError),
@@ -1460,6 +1458,9 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 302)
 
     def test_delete_http_200_owner_can_delete_own_unpublished_source(self):
+        self.member.user_permissions.add(
+            Permission.objects.get(codename="delete_source")
+        )
         self.client.force_login(self.member)
         source = Source.objects.create(owner=self.member, title="To delete")
 
@@ -1488,7 +1489,7 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
             content_type="application/json",
         )
 
-    def test_delete_with_cleanup_token_removes_authors_created_with_source(self):
+    def test_delete_retains_authors_created_with_source(self):
         self.member.user_permissions.add(Permission.objects.get(codename="add_author"))
         self.client.force_login(self.member)
         existing = Author.objects.create(
@@ -1501,13 +1502,15 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self._quick_delete(
             {
                 "id": created["id"],
-                "author_cleanup_token": created["author_cleanup_token"],
+                "author_cleanup_token": "obsolete-client-token",
             }
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Source.objects.filter(pk=created["id"]).exists())
-        self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
+        # Authors are independent reviewable records: the source deletion must
+        # retain both the referenced and the freshly created author.
+        self.assertTrue(Author.objects.filter(last_names="Lovelace").exists())
         self.assertTrue(Author.objects.filter(pk=existing.pk).exists())
 
     def test_delete_keeps_created_author_unlinked_from_source_beforehand(self):
@@ -1521,33 +1524,12 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self._quick_delete(
             {
                 "id": created["id"],
-                "author_cleanup_token": created["author_cleanup_token"],
+                "author_cleanup_token": "obsolete-client-token",
             }
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(Author.objects.filter(last_names="Lovelace").exists())
-
-    def test_delete_accepts_cleanup_token_older_than_a_day(self):
-        self.member.user_permissions.add(Permission.objects.get(codename="add_author"))
-        self.client.force_login(self.member)
-        three_days_ago = signing.b62_encode(int(time.time()) - 3 * 86400)
-        with patch.object(
-            signing.TimestampSigner, "timestamp", return_value=three_days_ago
-        ):
-            created = self._quick_create_with_authors(
-                [{"first_names": "Ada", "last_names": "Lovelace"}]
-            )
-
-        response = self._quick_delete(
-            {
-                "id": created["id"],
-                "author_cleanup_token": created["author_cleanup_token"],
-            }
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(Author.objects.filter(last_names="Lovelace").exists())
 
     def test_delete_keeps_created_authors_still_used_by_a_source_or_process(self):
         from processes.models import Process, ProcessAuthor
@@ -1572,7 +1554,7 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self._quick_delete(
             {
                 "id": created["id"],
-                "author_cleanup_token": created["author_cleanup_token"],
+                "author_cleanup_token": "obsolete-client-token",
             }
         )
 
@@ -1596,7 +1578,7 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
             {
                 "id": second.pk,
                 "author_ids": [unrelated.pk],
-                "author_cleanup_token": first["author_cleanup_token"],
+                "author_cleanup_token": "forged-token",
             }
         )
         tampered = self._quick_delete(
@@ -1610,6 +1592,25 @@ class SourceQuickCreateViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertTrue(Author.objects.filter(pk=unrelated.pk).exists())
         self.assertTrue(Author.objects.filter(last_names="Lovelace").exists())
+
+    def test_create_reuses_readable_author_by_name_without_add_permission(self):
+        """A by-name author match is reused; only genuinely new authors need
+        the create capability, and deleting the source retains the author."""
+        # member has add_source but no add_author capability.
+        existing = Author.objects.create(
+            owner=self.member, first_names="Ada", last_names="Lovelace"
+        )
+        self.client.force_login(self.member)
+
+        created = self._quick_create_with_authors(
+            [{"first_names": "Ada", "last_names": "Lovelace"}]
+        )
+        source = Source.objects.get(pk=created["id"])
+        self.assertEqual(source.authors.get().pk, existing.pk)
+
+        response = self._quick_delete({"id": created["id"]})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Author.objects.filter(pk=existing.pk).exists())
 
     def test_delete_keeps_authors_when_no_cleanup_token_is_sent(self):
         self.client.force_login(self.member)

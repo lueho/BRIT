@@ -1,5 +1,8 @@
+from io import StringIO
+
 from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.test import TestCase
 
 from utils.object_management.models import User
@@ -9,6 +12,11 @@ from ..models import Author
 
 
 class SourceBibtexArticleImportFormTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls._role_output = StringIO()
+        call_command("sync_roles", "--apply", stdout=cls._role_output)
+
     def test_form_resolves_braced_corporate_author_as_organization(self):
         owner = User.objects.create(username="owner")
         organization = Author.objects.create(
@@ -36,7 +44,6 @@ class SourceBibtexArticleImportFormTestCase(TestCase):
 
     def test_form_skips_letterless_authors(self):
         owner = User.objects.create(username="owner")
-        owner.user_permissions.add(Permission.objects.get(codename="add_author"))
         form = SourceBibtexArticleImportForm(
             data={
                 "bibtex_entry": """
@@ -163,7 +170,6 @@ class SourceBibtexArticleImportFormTestCase(TestCase):
 
     def test_form_creates_missing_authors_when_user_has_permission(self):
         owner = User.objects.create(username="owner")
-        owner.user_permissions.add(Permission.objects.get(codename="add_author"))
         form = SourceBibtexArticleImportForm(
             data={
                 "bibtex_entry": """
@@ -190,6 +196,8 @@ class SourceBibtexArticleImportFormTestCase(TestCase):
 
     def test_form_requires_add_author_permission_for_missing_authors(self):
         owner = User.objects.create(username="owner")
+        owner.groups.clear()
+        owner.user_permissions.add(Permission.objects.get(codename="add_source"))
         form = SourceBibtexArticleImportForm(
             data={
                 "bibtex_entry": """

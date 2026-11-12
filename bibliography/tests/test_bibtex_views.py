@@ -84,3 +84,31 @@ class SourceBibtexArticleImportViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(source.year, 1843)
         self.assertEqual(source.sourceauthors.count(), 1)
         self.assertEqual(source.sourceauthors.get().author_id, author.pk)
+
+    def test_post_with_invalid_model_field_shows_form_error(self):
+        self.client.force_login(self.member)
+        Author.objects.create(
+            owner=self.member,
+            first_names="Ada",
+            last_names="Lovelace",
+        )
+
+        response = self.client.post(
+            reverse("source-bibtex-article-import"),
+            data={
+                "bibtex_entry": """
+                @article{Lovelace1843,
+                    author = {Lovelace, Ada},
+                    title = {Notes on the Analytical Engine},
+                    journal = {Scientific Memoirs},
+                    year = {1843},
+                    url = {not a url}
+                }
+                """,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Source.objects.exists())
+        self.assertContains(response, "Notes on the Analytical Engine")
+        self.assertContains(response, "Enter a valid URL.")
