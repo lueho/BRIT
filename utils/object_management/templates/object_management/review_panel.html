@@ -113,8 +113,8 @@
           </button>
         </form>
       {% endif %}
-      {# Owner actions (owners only) via policy #}
-      {% if policy.is_owner %}
+      {# Transition actions — each capability is its own authoritative gate #}
+      {% if policy.can_submit_review or policy.can_withdraw_review %}
         {% if policy.is_declined %}
           {% if policy.can_submit_review %}
             <form method="post"
@@ -168,6 +168,9 @@
           {% endif %}
         {% endif %}
       {% endif %}
+      <span class="small text-muted align-self-center me-1">
+        {% trans "Content revision" %} {{ object.content_revision }}
+      </span>
       {# Moderator actions via policy #}
       {% if policy.is_in_review %}
         {% if policy.can_approve %}

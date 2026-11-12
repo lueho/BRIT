@@ -30,10 +30,12 @@ class ReviewQueueAPIView(APIView):
         django_request = getattr(request, "_request", request)
         dashboard_view = ReviewDashboardView()
         dashboard_view.request = django_request
-        dashboard_view.paginate_by = 50
-        dashboard_view._available_models_cache = None
 
-        items = dashboard_view.collect_review_items()
+        collector = dashboard_view.collector
+        references, querysets = collector.references(
+            dashboard_view.get_available_models()
+        )
+        items = collector.hydrate(references, querysets)
         payload = [self._serialize_item(request.user, item) for item in items]
 
         return Response({"count": len(payload), "results": payload})
@@ -70,7 +72,9 @@ class ReviewQueueAPIView(APIView):
             "name": str(item),
             "owner_id": getattr(item, "owner_id", None),
             "publication_status": getattr(item, "publication_status", None),
-            "submitted_at": getattr(item, "submitted_at", None),
+            "submitted_at": getattr(
+                item, "review_submitted_at", getattr(item, "submitted_at", None)
+            ),
             "lastmodified_at": getattr(item, "lastmodified_at", None),
             "content_revision": getattr(item, "content_revision", None),
             "my_last_reviewed_revision": last_reviewed_revision(user, item),

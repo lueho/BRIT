@@ -41,7 +41,7 @@
       {% elif policy.can_view_review_activity %}
         <a class="dropdown-item"
            href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
-          <i class="fas fa-clipboard-check"></i> Review activity
+          <i class="fas fa-clipboard-check"></i> {% if policy.can_approve %}Review for approval{% else %}Review activity{% endif %}
         </a>
       {% endif %}
 
@@ -113,16 +113,6 @@
             </form>
           {% endif %}
 
-          {% if policy.can_approve %}
-            <form method="post"
-                  action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
-                  class="m-0 p-0">
-              {% csrf_token %}
-              <button type="submit" class="dropdown-item text-start text-success">
-                <i class="fas fa-check"></i> Approve
-              </button>
-            </form>
-          {% endif %}
           {% if policy.can_reject %}
             <form method="post"
                   action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
@@ -144,16 +134,6 @@
               {% csrf_token %}
               <button type="submit" class="dropdown-item text-start text-warning">
                 <i class="fas fa-rotate-left"></i> Withdraw from Review
-              </button>
-            </form>
-          {% endif %}
-          {% if policy.can_approve %}
-            <form method="post"
-                  action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request|path_without_return_params|urlencode }}"
-                  class="m-0 p-0">
-              {% csrf_token %}
-              <button type="submit" class="dropdown-item text-start text-success">
-                <i class="fas fa-check"></i> Approve
               </button>
             </form>
           {% endif %}

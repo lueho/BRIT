@@ -978,12 +978,17 @@ def editable_queryset(user, queryset):
     )
 
 
-def reviewable_queryset(user, queryset):
+def reviewable_queryset(user, queryset, *, scope="review"):
     """Return rows of ``queryset`` the user may review (moderate).
 
-    Restricted to records in ``review`` status for users holding the model's
-    moderation permission or administrator status, excluding the user's own
-    records, which four-eyes review never lets them resolve.
+    ``scope`` selects the state inspected: ``"review"`` (the default) is the
+    pending moderation queue; ``"declined"`` is the follow-up history for the
+    same actors — declined rows are never approvable. Unknown, blank, or
+    ``None`` scopes fail closed.
+
+    In all scopes only users holding the model's moderation permission or
+    administrator status see rows, and the user's own records are excluded —
+    four-eyes review never lets them resolve their own submissions.
     """
     model = queryset.model
     policy = model_policy(model)
@@ -996,7 +1001,9 @@ def reviewable_queryset(user, queryset):
         actor.admin or _has_perm(actor.user, _model_permission(model, "can_moderate"))
     ):
         return queryset.none()
-    queryset = queryset.filter(publication_status=_STATUS_REVIEW)
+    if scope not in (_STATUS_REVIEW, _STATUS_DECLINED):
+        return queryset.none()
+    queryset = queryset.filter(publication_status=scope)
     if actor.pk is not None:
         # Four-eyes: own submissions can be neither approved nor rejected.
         queryset = queryset.exclude(owner_id=actor.pk)
