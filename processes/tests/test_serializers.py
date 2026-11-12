@@ -3,9 +3,11 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.contrib.auth.models import AnonymousUser, User
+from django.test import RequestFactory, TestCase
+from django.urls import reverse
 
-from bibliography.models import Author
+from bibliography.models import Author, Licence, Source, SourceAuthor
 from materials.models import Material
 from utils.properties.models import Unit
 
@@ -250,3 +252,127 @@ class ProcessDetailSerializerTestCase(TestCase):
         self.assertEqual(len(data["output_materials"]), 1)
         self.assertEqual(data["input_materials"][0]["name"], "Wood Chips")
         self.assertEqual(data["output_materials"][0]["name"], "Bio-oil")
+
+
+class ProcessSourceReferenceContextTestCase(TestCase):
+    """get_sources must propagate request context so nested Source refs scope."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user("psc-owner")
+        cls.outsider = User.objects.create_user("psc-outsider")
+        cls.foreign = User.objects.create_user("psc-foreign")
+        for u in (cls.owner, cls.outsider, cls.foreign):
+            u.groups.clear()
+        cls.licence = Licence.objects.create(
+            name="psc-lic", owner=cls.owner, publication_status="private"
+        )
+        cls.a_pub = Author.objects.create(
+            last_names="PubA", owner=cls.owner, publication_status="published"
+        )
+        cls.a_own = Author.objects.create(
+            last_names="OwnB", owner=cls.owner, publication_status="private"
+        )
+        cls.a_for = Author.objects.create(
+            last_names="ForC", owner=cls.foreign, publication_status="private"
+        )
+        cls.source = Source.objects.create(
+            title="ProcessEvidence",
+            year="2024",
+            citation_key="PINNEDKEY",
+            owner=cls.owner,
+            publication_status="published",
+            licence=cls.licence,
+        )
+        SourceAuthor.objects.create(source=cls.source, author=cls.a_pub, position=1)
+        SourceAuthor.objects.create(source=cls.source, author=cls.a_own, position=2)
+        SourceAuthor.objects.create(source=cls.source, author=cls.a_for, position=3)
+        cls.foreign_source = Source.objects.create(
+            title="ForeignSrc",
+            owner=cls.foreign,
+            publication_status="private",
+            year="2024",
+        )
+        cls.process = Process.objects.create(
+            name="ContextProcess",
+            owner=cls.owner,
+            publication_status="published",
+        )
+        cls.process.sources.add(cls.source)
+        cls.process.sources.add(cls.foreign_source)
+
+    def _ctx(self, user):
+        req = RequestFactory().get("/x/")
+        req.user = user
+        return {"request": req}
+
+    def _source_entry(self, data):
+        return next(s for s in data["sources"] if s["id"] == self.source.pk)
+
+    def test_owner_context_propagates(self):
+        for ser_cls in (ProcessListSerializer, ProcessDetailSerializer):
+            with self.subTest(ser=ser_cls.__name__):
+                data = ser_cls(self.process, context=self._ctx(self.owner)).data
+                self.assertEqual([s["id"] for s in data["sources"]], [self.source.pk])
+                entry = self._source_entry(data)
+                ids = [a["id"] for a in entry["authors"]]
+                self.assertEqual(ids, [self.a_pub.pk, self.a_own.pk])
+                self.assertEqual(entry["licence"]["id"], self.licence.pk)
+                self.assertEqual(entry["licence"]["name"], "psc-lic")
+
+    def test_anon_outsider_and_no_context_scope(self):
+        for label, ctx in (
+            ("anon", self._ctx(AnonymousUser())),
+            ("outsider", self._ctx(self.outsider)),
+            ("none", {}),
+        ):
+            for ser_cls in (ProcessListSerializer, ProcessDetailSerializer):
+                with self.subTest(label=label, ser=ser_cls.__name__):
+                    data = ser_cls(self.process, context=ctx).data
+                    self.assertEqual(
+                        [s["id"] for s in data["sources"]], [self.source.pk]
+                    )
+                    entry = self._source_entry(data)
+                    self.assertEqual(
+                        [a["id"] for a in entry["authors"]], [self.a_pub.pk]
+                    )
+                    self.assertIsNone(entry["licence"])
+
+    def test_http_owner_list_and_detail(self):
+        self.client.force_login(self.owner)
+        for url in (
+            reverse("processes:api-process-list"),
+            reverse("processes:api-process-detail", kwargs={"pk": self.process.pk}),
+        ):
+            resp = self.client.get(url)
+            self.assertEqual(resp.status_code, 200)
+            body = resp.json()
+            if isinstance(body, list):
+                entry = next(p for p in body if p["id"] == self.process.pk)
+            else:
+                entry = body
+            self.assertEqual([s["id"] for s in entry["sources"]], [self.source.pk])
+            src = self._source_entry(entry)
+            self.assertEqual(
+                [a["id"] for a in src["authors"]], [self.a_pub.pk, self.a_own.pk]
+            )
+            self.assertEqual(src["licence"]["id"], self.licence.pk)
+
+    def test_http_anonymous_list_and_detail(self):
+        for url in (
+            reverse("processes:api-process-list"),
+            reverse("processes:api-process-detail", kwargs={"pk": self.process.pk}),
+        ):
+            resp = self.client.get(url)
+            self.assertEqual(resp.status_code, 200)
+            body = resp.json()
+            if isinstance(body, list):
+                entry = next(p for p in body if p["id"] == self.process.pk)
+            else:
+                entry = body
+            src = self._source_entry(entry)
+            self.assertEqual([a["id"] for a in src["authors"]], [self.a_pub.pk])
+            self.assertIsNone(src["licence"])
+            self.assertNotIn(
+                self.foreign_source.pk, [s["id"] for s in entry["sources"]]
+            )
