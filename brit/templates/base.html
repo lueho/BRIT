@@ -38,7 +38,8 @@
     {% block custom_style %}
     {% endblock custom_style %}
   </head>
-  <body class="sb-nav-fixed{% block body_class %}{% endblock body_class %}">
+  <body id="page-top"
+        class="sb-nav-fixed{% block body_class %}{% endblock body_class %}">
     {% include "partials/_topbar.html" %}
     <div id="layoutSidenav">
       <div id="layoutSidenav_nav">{% include "partials/_sidebar.html" %}</div>
@@ -145,8 +146,8 @@
       </div>
     </div>
     <!-- Scroll to Top Button-->
-    <a class="scroll-to-top rounded" href="#page-top">
-      <i class="fas fa-angle-up"></i>
+    <a class="scroll-to-top rounded" href="#page-top" aria-label="Back to top">
+      <i class="fas fa-angle-up" aria-hidden="true"></i>
     </a>
     <!-- Logout Modal-->
     <div class="modal fade"

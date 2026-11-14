@@ -1217,3 +1217,20 @@ class AppShellDesignSystemTests(SimpleTestCase):
         for template in ("base.html", "base_iframe.html"):
             with self.subTest(template=template):
                 self.assertNotIn("fonts.googleapis.com", render_to_string(template))
+
+    def test_empty_card_footers_are_hidden_even_with_flex_utilities(self):
+        css = self._theme_css()
+
+        self.assertRegex(
+            css, r"\.card-footer:not\(:has\(\*\)\)\s*\{\s*display:\s*none\s*!important"
+        )
+
+    def test_scroll_to_top_is_a_floating_control_with_a_target(self):
+        css = self._theme_css()
+        base = (Path(settings.BASE_DIR) / "brit/templates/base.html").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertRegex(css, r"\.scroll-to-top\s*\{[^}]*position:\s*fixed")
+        self.assertIn('id="page-top"', base)
+        self.assertIn('href="#page-top"', base)

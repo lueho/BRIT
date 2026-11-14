@@ -8658,7 +8658,7 @@ main .row.justify-content-center > [class*=col-xl-4] > .card > .card-body.p-5 {
 }
 
 .card-footer:not(:has(*)) {
-  display: none;
+  display: none !important;
 }
 
 .settings-page {
@@ -8900,6 +8900,11 @@ main .row.justify-content-center > [class*=col-xl-4] > .card > .card-body.p-5 {
   color: var(--brit-text-muted);
   font-size: 0.8125rem;
 }
+@media (max-width: 767.98px) {
+  .site-footer {
+    padding-right: 3rem;
+  }
+}
 .site-footer .site-footer-inner {
   display: flex;
   flex-wrap: wrap;
@@ -8923,8 +8928,47 @@ main .row.justify-content-center > [class*=col-xl-4] > .card > .card-body.p-5 {
 }
 
 .scroll-to-top {
-  border-radius: 10px !important;
-  background-color: var(--brit-forest) !important;
+  position: fixed;
+  right: 1rem;
+  bottom: 3.75rem;
+}
+@media (max-width: 767.98px) {
+  .scroll-to-top {
+    bottom: 1rem;
+  }
+}
+.scroll-to-top {
+  z-index: 1030;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #fff;
+  background-color: var(--brit-forest);
+  border-radius: var(--brit-radius) !important;
+  box-shadow: var(--brit-shadow);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+.scroll-to-top.is-visible {
+  opacity: 0.9;
+  visibility: visible;
+}
+.scroll-to-top:hover, .scroll-to-top:focus-visible {
+  color: #fff;
+  opacity: 1;
+  background-color: var(--brit-forest-raised);
+}
+
+body:has(.cookie-bar) .scroll-to-top {
+  right: 31rem;
+}
+@media (max-width: 767.98px) {
+  body:has(.cookie-bar) .scroll-to-top {
+    display: none;
+  }
 }
 
 /*# sourceMappingURL=brit-theme.css.map */
