@@ -3,42 +3,41 @@
     z-index: 1050; /* Ensure it's above other elements but below modals */
 }
 
+/* Compact consent card docked bottom-right so it does not cover page content. */
+.cookie-bar {
+    left: auto;
+    width: 100%;
+    max-width: 30rem;
+    padding: 1rem !important;
+}
+
+.cookie-bar > div {
+    border-color: var(--brit-border, var(--bs-border-color)) !important;
+    border-radius: var(--brit-radius-lg, 14px) !important;
+    box-shadow: var(--brit-shadow-lg, 0 16px 40px rgba(29, 48, 37, .14)) !important;
+}
+
+.cookie-bar > div > .p-3 {
+    padding: 1.125rem 1.25rem !important;
+}
+
+.cookie-bar .flex-lg-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+}
+
+.cookie-bar h5 {
+    font-size: 1rem;
+    color: var(--brit-text, inherit) !important;
+}
+
+.cookie-bar .justify-content-center {
+    justify-content: flex-start !important;
+}
+
 .cookie-bar .btn {
-    border-radius: 0.375rem; /* Match Bootstrap's default border radius */
-    font-weight: 500;
-    min-width: 100px; /* Ensure buttons have consistent width */
-}
-
-.cookie-bar .btn-primary {
-    background-color: var(--bs-primary, #4B7156);
-    border-color: var(--bs-primary, #4B7156);
-}
-
-.cookie-bar .btn-primary:hover {
-    background-color: var(--bs-success, #376046);
-    border-color: var(--bs-success, #376046);
-}
-
-.cookie-bar .btn-outline-primary {
-    color: var(--bs-primary, #4B7156);
-    border-color: var(--bs-primary, #4B7156);
-}
-
-.cookie-bar .btn-outline-primary:hover {
-    background-color: var(--bs-primary, #4B7156);
-    border-color: var(--bs-primary, #4B7156);
-    color: #fff;
-}
-
-.cookie-bar .btn-outline-secondary {
-    color: var(--bs-secondary, #A0C7A6);
-    border-color: var(--bs-secondary, #A0C7A6);
-}
-
-.cookie-bar .btn-outline-secondary:hover {
-    background-color: var(--bs-secondary, #A0C7A6);
-    border-color: var(--bs-secondary, #A0C7A6);
-    color: #fff;
+    font-size: .875rem;
+    padding: .3rem .75rem;
 }
 
 /* Responsive adjustments */

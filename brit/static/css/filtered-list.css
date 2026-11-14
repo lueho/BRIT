@@ -46,21 +46,29 @@
 
 /* Sidebar tabs: improve visual appeal and mobile behavior */
 .sidebar-tabs {
-  gap: .5rem;
+  gap: .25rem;
   flex-wrap: nowrap;
   /* keep tabs on one line */
   overflow-x: auto;
-  /* allow horizontal scroll if needed */
-  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--brit-border, var(--bs-border-color));
+  padding: .375rem .75rem 0 !important;
 }
 
+.sidebar-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+/* Underline tabs: the sidebar switcher belongs to its card header. */
 .sidebar-tabs .nav-link {
-  border-radius: 999px;
-  border: 1px solid var(--bs-border-color);
-  font-weight: 500;
-  padding: .25rem .75rem;
-  background-color: var(--bs-body-bg);
-  color: var(--bs-body-color);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  font-size: .875rem;
+  font-weight: 600;
+  padding: .625rem .625rem .5rem;
+  background-color: transparent;
+  color: var(--brit-text-muted, var(--bs-secondary-color));
   white-space: nowrap;
   /* prevent label wrap inside buttons */
 }
@@ -71,14 +79,12 @@
 
 .sidebar-tabs .nav-link:hover {
   color: var(--bs-primary);
-  border-color: rgba(var(--bs-primary-rgb), .35);
-  background-color: rgba(var(--bs-primary-rgb), .05);
 }
 
 .sidebar-tabs .nav-link.active {
-  color: var(--bs-white);
-  background-color: var(--bs-primary);
-  border-color: var(--bs-primary);
+  color: var(--bs-success);
+  background-color: transparent;
+  border-bottom-color: var(--bs-primary);
 }
 
 .sidebar-tabs .nav-link:focus-visible {

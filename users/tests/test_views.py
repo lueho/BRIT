@@ -180,6 +180,23 @@ class ReviewNotificationPreferenceViewTests(TestCase):
         self.assertTrue(response.context["review_notifications_enabled"])
         self.assertFalse(UserProfile.objects.filter(user=self.user).exists())
 
+    def test_profile_page_groups_account_settings_into_sections(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("user_profile"))
+
+        for heading in (
+            "Account",
+            "E-mail notifications",
+            "Exports",
+            "Access to all my objects",
+            "Security",
+        ):
+            with self.subTest(heading=heading):
+                self.assertContains(response, f">{heading}</h3>")
+        self.assertContains(response, reverse("auth_password_change"))
+        self.assertContains(response, reverse("user-export-list"))
+        self.assertContains(response, "pref@example.com")
+
     def test_post_only_changes_own_profile_even_with_forged_user_id(self):
         other = User.objects.create_user(
             username="other-pref", email="other-pref@example.com"

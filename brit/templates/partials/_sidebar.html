@@ -2,9 +2,9 @@
 <nav class="sb-sidenav accordion sb-sidenav-light" id="sidenavAccordion">
   <div class="sb-sidenav-menu">
     <div class="nav">
-      <a class="nav-link" href="{% url 'home' %}">
+      <a class="nav-link{% nav_active 'home' %}" href="{% url 'home' %}">
         <div class="sb-nav-link-icon">
-          <i class="fas fa-tachometer-alt"></i>
+          <i class="fas fa-house"></i>
         </div>
         <span class="sb-nav-link-text">Home</span>
       </a>
@@ -39,7 +39,7 @@
       </a>
       <a class="nav-link{% nav_active 'sources' %}" href="{% url 'sources-explorer' %}">
         <div class="sb-nav-link-icon">
-          <i class="fas fa-expand-arrows-alt"></i>
+          <i class="fas fa-diagram-project"></i>
         </div>
         <span class="sb-nav-link-text">Sources</span>
       </a>
