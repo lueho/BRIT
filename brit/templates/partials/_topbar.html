@@ -2,10 +2,17 @@
 <nav class="sb-topnav navbar navbar-expand topnav-brand-sage">
   <a class="navbar-brand ps-3"
      href="{% url 'home' %}"
-     title="Bioresource Information Tool">BRIT</a>
-  <button class="order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle">
+     title="Bioresource Information Tool">
+    <span class="brand-mark" aria-hidden="true"><i class="fas fa-seedling"></i></span>
+    <span>BRIT</span>
+  </a>
+  <button class="order-1 order-lg-0 me-3 me-lg-0"
+          id="sidebarToggle"
+          type="button"
+          aria-label="Toggle navigation">
     <i class="fas fa-bars"></i>
   </button>
+  <span class="brand-tagline d-none d-md-inline ms-3">Bioresource Information Tool</span>
   <ul class="navbar-nav ms-auto me-3 me-lg-4">
     <li class="nav-item dropdown">
       <a class="nav-link dropdown-toggle"
@@ -13,7 +20,15 @@
          href="#"
          role="button"
          data-bs-toggle="dropdown"
-         aria-expanded="false"><i class="fas fa-user fa-fw"></i></a>
+         aria-expanded="false"
+         aria-label="Account menu">
+        <i class="fas fa-circle-user fa-fw"></i>
+        {% if user.is_authenticated %}
+          <span class="d-none d-sm-inline">{{ user.username }}</span>
+        {% else %}
+          <span class="d-none d-sm-inline">Account</span>
+        {% endif %}
+      </a>
       <ul class="dropdown-menu dropdown-menu-end"
           aria-labelledby="navbarDropdown">
         {% if user.is_authenticated %}

@@ -1,0 +1,168 @@
+//
+// Shared page patterns
+//
+// Explorer, list, detail and form pages are built from the same few blocks.
+// These rules give those blocks one look regardless of the module template
+// that renders them.
+//
+
+// ── Page title block (explorers, static pages) ───────────────────────
+main h1,
+main .h1 {
+  font-size: 1.625rem;
+  letter-spacing: -0.02em;
+}
+
+main h2,
+main .h2 {
+  letter-spacing: -0.015em;
+}
+
+.explorer-section-heading {
+  color: var(--brit-text-subtle) !important;
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+}
+
+// ── Sibling navigation ───────────────────────────────────────────────
+// Page-level pills render as a neutral segmented control so they match the
+// scope and view toggles in list card headers.
+main .nav-pills:not(.sidebar-tabs) {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  background-color: var(--brit-surface-alt);
+  border: 1px solid var(--brit-border);
+  border-radius: 10px;
+
+  .nav-link {
+    padding: 0.3rem 0.8rem;
+    color: var(--brit-text-muted);
+    font-size: 0.875rem;
+    font-weight: 550;
+    border-radius: 7px;
+
+    &:hover { color: var(--brit-text); }
+
+    &.active {
+      background-color: var(--brit-surface);
+      color: var(--brit-accent-strong);
+      box-shadow: var(--brit-shadow-sm);
+    }
+  }
+}
+
+// ── Label / value fields in detail cards and detail modals ───────────
+p.card-text > strong:first-child,
+.modal-body p > strong:first-child {
+  display: block;
+  margin-bottom: 0.125rem;
+  color: var(--brit-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+
+  + br { display: none; }
+}
+
+.detail-layout-card {
+  .card-header h5 { font-size: 1.125rem; }
+
+  .card-body > p.card-text { margin-bottom: 0.875rem; }
+}
+
+// ── Forms ────────────────────────────────────────────────────────────
+// Forms keep a readable measure instead of stretching across wide monitors.
+.form-layout-card {
+  max-width: 60rem;
+}
+
+.form-layout-card,
+.modal-body {
+  .asteriskField {
+    margin-left: 0.15rem;
+    color: #{$danger};
+  }
+}
+
+// ── Notices ──────────────────────────────────────────────────────────
+.list-intro,
+.module-intro {
+  border-color: var(--brit-border);
+  background-color: var(--brit-surface);
+}
+
+// ── Narrow single-card pages (sign-in, registration, profile) ────────
+main .row.justify-content-center > [class*="col-xl-4"] > .card > .card-body.p-5 {
+  padding: 1.75rem !important;
+}
+
+// ── Error pages ──────────────────────────────────────────────────────
+.error {
+  color: var(--brit-border-strong);
+  font-size: 6rem;
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  margin-top: 4rem;
+  margin-bottom: 1rem;
+  width: auto;
+
+  &::before,
+  &::after { display: none; }
+}
+
+// Cards whose footer block renders nothing do not show an empty bar.
+.card-footer:not(:has(*)) {
+  display: none !important;
+}
+
+// ── Settings pages (profile) ─────────────────────────────────────────
+.settings-page {
+  max-width: 52rem;
+}
+
+.settings-section {
+  display: grid;
+  grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
+  gap: 0.75rem 2rem;
+  align-items: center;
+  padding: 1.125rem 1.25rem;
+
+  + .settings-section { border-top: 1px solid var(--brit-border); }
+
+  > :last-child { justify-self: start; }
+
+  @include media-breakpoint-down(md) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.settings-section-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+
+.settings-section-help {
+  margin: 0.125rem 0 0;
+  color: var(--brit-text-muted);
+  font-size: 0.8125rem;
+}
+
+.settings-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2.5rem;
+
+  dt {
+    color: var(--brit-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 550;
+  }
+}
