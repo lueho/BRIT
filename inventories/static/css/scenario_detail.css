@@ -30,7 +30,7 @@
 }
 
 .sri-status-2 {
-  border-left-color: #0dcaf0;
+  border-left-color: var(--bs-secondary);
 }
 
 .sri-status-3 {

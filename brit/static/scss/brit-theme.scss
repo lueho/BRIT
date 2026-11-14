@@ -34,6 +34,7 @@
 @import "../lib/bootstrap/scss/utilities/api";
 
 // 8. Add additional custom code here
+@import "design-tokens";
 @import "global";
 @import "components/cards";
 @import "components/typography";
@@ -60,3 +61,8 @@
 @import "navigation/sidenav/sidenav-light";
 
 @import "sidebar-brand";
+
+// 9. Shared component skin and app shell, last so they win the cascade
+@import "components/surfaces";
+@import "components/page-patterns";
+@import "layout/shell";
