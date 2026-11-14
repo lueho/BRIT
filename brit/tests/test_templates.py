@@ -85,6 +85,15 @@ class SharedUiUtilsScriptTests(SimpleTestCase):
         self.assertIn("js/ui_utils.min.js", html)
 
 
+class TomSelectRequiredFeedbackScriptTests(SimpleTestCase):
+    """TomSelect hides the real field, so required-field errors need this
+    script to be shown on the visible control."""
+
+    def test_base_template_includes_required_feedback_script(self):
+        html = render_to_string("base.html")
+        self.assertIn("js/tomselect-required-feedback.min.js", html)
+
+
 class SitemapItemsTestCase(SimpleTestCase):
     def test_sources_explorer_is_canonical_sitemap_entry(self):
         self.assertIn("/sources/explorer/", get_sitemap_items())
