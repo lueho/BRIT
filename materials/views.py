@@ -966,7 +966,7 @@ class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = MaterialPropertyValue
 
     def get_success_url(self):
-        next_url = get_safe_next_url(self.request)
+        next_url = self.get_next_url()
         if next_url:
             return next_url
         related_sample = self.object.related_sample
@@ -1012,7 +1012,7 @@ class ComponentMeasurementModalDeleteView(UserCreatedObjectModalDeleteView):
     model = ComponentMeasurement
 
     def get_success_url(self):
-        next_url = get_safe_next_url(self.request)
+        next_url = self.get_next_url()
         if next_url:
             return next_url
         return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
@@ -2317,7 +2317,7 @@ class CompositionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Composition
 
     def get_success_url(self):
-        next_url = get_safe_next_url(self.request)
+        next_url = self.get_next_url()
         if next_url:
             return next_url
         return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})

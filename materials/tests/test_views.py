@@ -2068,6 +2068,10 @@ class SampleSeriesCRUDViewsTestCase(
         self._detach_series_samples()
         super().test_delete_view_post_unpublished_as_staff_user()
 
+    def test_delete_view_post_ignores_next_url_of_deleted_object(self):
+        self._detach_series_samples()
+        super().test_delete_view_post_ignores_next_url_of_deleted_object()
+
 
 # ----------- Sample Series Utilities ----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -3019,6 +3023,10 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     def test_delete_view_post_unpublished_as_staff_user(self):
         self._clear_sample_evidence()
         super().test_delete_view_post_unpublished_as_staff_user()
+
+    def test_delete_view_post_ignores_next_url_of_deleted_object(self):
+        self._clear_sample_evidence()
+        super().test_delete_view_post_ignores_next_url_of_deleted_object()
 
     @classmethod
     def create_related_objects(cls):
