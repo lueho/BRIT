@@ -216,6 +216,11 @@
   color: var(--brit-text-muted);
   font-size: 0.8125rem;
 
+  // The footer wraps on small screens; keep its text clear of the back-to-top control.
+  @include media-breakpoint-down(md) {
+    padding-right: 3rem;
+  }
+
   .site-footer-inner {
     display: flex;
     flex-wrap: wrap;
@@ -241,6 +246,46 @@
 }
 
 .scroll-to-top {
-  border-radius: 10px !important;
-  background-color: var(--brit-forest) !important;
+  position: fixed;
+  right: 1rem;
+  // Sits above the one-line footer so it never covers the footer links.
+  bottom: 3.75rem;
+
+  @include media-breakpoint-down(md) {
+    bottom: 1rem;
+  }
+  z-index: 1030;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #fff;
+  background-color: var(--brit-forest);
+  border-radius: var(--brit-radius) !important;
+  box-shadow: var(--brit-shadow);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+
+  &.is-visible {
+    opacity: 0.9;
+    visibility: visible;
+  }
+
+  &:hover,
+  &:focus-visible {
+    color: #fff;
+    opacity: 1;
+    background-color: var(--brit-forest-raised);
+  }
+}
+
+// The consent notice docks bottom-right; keep the control clear of it.
+body:has(.cookie-bar) .scroll-to-top {
+  right: 31rem;
+
+  @include media-breakpoint-down(md) {
+    display: none;
+  }
 }

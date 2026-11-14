@@ -20,4 +20,16 @@ window.addEventListener('DOMContentLoaded', event => {
             localStorage.setItem('sb|sidebar-toggle', document.body.classList.contains('sb-sidenav-toggled'));
         });
     }
+
+    // Reveal the back-to-top control once the page has been scrolled.
+    const scrollToTop = document.querySelector('.scroll-to-top');
+    if (scrollToTop) {
+        const update = () => scrollToTop.classList.toggle('is-visible', window.scrollY > 400);
+        window.addEventListener('scroll', update, { passive: true });
+        update();
+        scrollToTop.addEventListener('click', event => {
+            event.preventDefault();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
 });

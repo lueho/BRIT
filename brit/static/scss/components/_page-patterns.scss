@@ -114,7 +114,7 @@ main .row.justify-content-center > [class*="col-xl-4"] > .card > .card-body.p-5 
 
 // Cards whose footer block renders nothing do not show an empty bar.
 .card-footer:not(:has(*)) {
-  display: none;
+  display: none !important;
 }
 
 // ── Settings pages (profile) ─────────────────────────────────────────
