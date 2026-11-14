@@ -334,8 +334,14 @@ test("a superseded loadLayers call does not render its companion layers", async 
     assert.deepEqual(rendered, [["region", { id: 2 }], ["summary", { id: 2 }]]);
 });
 
-function fakeBounds(tag) {
-    return { tag, isValid: () => true };
+function fakeBounds(tag, { point = false } = {}) {
+    const corner = (lat) => ({ lat, equals: (other) => other.lat === lat });
+    return {
+        tag,
+        isValid: () => true,
+        getSouthWest: () => corner(0),
+        getNorthEast: () => corner(point ? 0 : 1),
+    };
 }
 
 function setupFeatureRendering() {
@@ -409,10 +415,14 @@ function fakeLayer(bounds) {
     };
 }
 
-function setupBoundsScenario({ sandbox, window, mapConfig }) {
+function setupBoundsScenario({ sandbox, window, mapConfig, pointFeature = false }) {
     mapConfig.adjustBoundsToLayer = "region";
     const fitted = [];
-    const fakeMap = { fitBounds: (b) => fitted.push(b), removeLayer() {} };
+    const fitOptions = [];
+    const fakeMap = {
+        fitBounds: (b, options) => { fitted.push(b); fitOptions.push(options); },
+        removeLayer() {},
+    };
     window.listeners["map:init"]({ detail: { map: fakeMap } });
 
     const regionBounds = fakeBounds("region");
@@ -420,7 +430,7 @@ function setupBoundsScenario({ sandbox, window, mapConfig }) {
     sandbox.L = { geoJson: () => regionLayer };
     sandbox.renderRegion({ type: "FeatureCollection", features: [] });
 
-    const featureBounds = fakeBounds("features");
+    const featureBounds = fakeBounds("features", { point: pointFeature });
     const featuresLayer = fakeLayer(featureBounds);
     sandbox.createFeaturesLayer = () => featuresLayer;
     const geoJson = {
@@ -431,7 +441,7 @@ function setupBoundsScenario({ sandbox, window, mapConfig }) {
             properties: {},
         }],
     };
-    return { fitted, regionBounds, featureBounds, geoJson };
+    return { fitted, fitOptions, regionBounds, featureBounds, geoJson };
 }
 
 test("adjustMapBounds zooms to the filtered feature selection", () => {
@@ -445,6 +455,33 @@ test("adjustMapBounds zooms to the filtered feature selection", () => {
 
     assert.equal(fitted.length, 1);
     assert.equal(fitted[0], featureBounds);
+});
+
+test("adjustMapBounds caps the zoom at a level the basemap has tiles for", () => {
+    const { sandbox, window, mapConfig } = setup();
+    const { fitOptions, geoJson } = setupBoundsScenario({
+        sandbox, window, mapConfig,
+    });
+    sandbox.renderFeatures(geoJson);
+
+    sandbox.adjustMapBounds(new URLSearchParams({ name: "oak" }));
+
+    // OpenStreetMap serves tiles up to zoom 19; the map itself allows 22.
+    assert.equal(fitOptions.length, 1);
+    assert.equal(fitOptions[0]?.maxZoom, 18);
+});
+
+test("adjustMapBounds keeps the surroundings of a single point in view", () => {
+    const { sandbox, window, mapConfig } = setup();
+    const { fitOptions, geoJson } = setupBoundsScenario({
+        sandbox, window, mapConfig, pointFeature: true,
+    });
+    sandbox.renderFeatures(geoJson);
+
+    sandbox.adjustMapBounds(new URLSearchParams({ name: "oak" }));
+
+    assert.equal(fitOptions.length, 1);
+    assert.equal(fitOptions[0]?.maxZoom, 16);
 });
 
 test("adjustMapBounds keeps the configured layer when unconstrained", () => {
