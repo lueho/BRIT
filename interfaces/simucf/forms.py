@@ -9,6 +9,10 @@ from .models import InputMaterial
 
 
 class SimuCFModelForm(SimpleForm):
+    reference_choices_policy_exempt = (
+        "InputMaterial choices are explicitly filtered for the requesting user."
+    )
+
     input_material = ModelChoiceField(queryset=InputMaterial.objects.all())
     amount = DecimalField(min_value=1, initial=100, label="Amount (FM) [kg]")
     length_of_treatment = IntegerField(

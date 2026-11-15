@@ -1,6 +1,6 @@
 from django.forms import NumberInput
 
-from ..forms import SimpleModelForm
+from ..forms import SimpleModelForm, UserCreatedObjectFormMixin
 from .models import Property, Unit
 
 
@@ -19,7 +19,7 @@ class NumericMeasurementFieldsFormMixin:
             field.widget.attrs["step"] = "any"
 
 
-class UnitModelForm(SimpleModelForm):
+class UnitModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     class Meta:
         model = Unit
         fields = [
@@ -31,7 +31,7 @@ class UnitModelForm(SimpleModelForm):
         ]
 
 
-class PropertyModelForm(SimpleModelForm):
+class PropertyModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     """Form for the generic ``Property`` table used in shared or transitional flows."""
 
     class Meta:

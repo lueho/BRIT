@@ -206,13 +206,27 @@ that expose governed models. Verified policy adapters declare
 `policy_enforced = True`; a route that is intentionally outside the policy
 must declare a non-empty explanatory `policy_exempt` string. `E020` reports an
 uncovered governed route, `E021` reports a public DRF route with no governed
-model or coverage, and `E022` reports governed model-choice filters outside
-`BaseCrispyFilterSet`.
+model or coverage, `E022` reports governed model-choice filters outside
+`PolicyScopedChoicesMixin`, and `E023` reports routed governed form choices
+without `UserCreatedObjectFormMixin` or a reasoned `reference_choices_policy_exempt`.
 
-`BaseCrispyFilterSet` applies the shared read policy to governed
+`PolicyScopedChoicesMixin` applies the shared read policy to governed
 `ModelChoiceFilter` and `ModelMultipleChoiceFilter` querysets before the form is
-built. This is the default for both authenticated and anonymous requests;
-purpose-specific scoping may further narrow those policy-visible choices.
+built; `BaseCrispyFilterSet` inherits it. This is the default for both
+authenticated and anonymous requests; purpose-specific scoping may further
+narrow those policy-visible choices.
+
+Forms inheriting `UserCreatedObjectFormMixin` likewise filter every governed,
+non-public-catalogue `ModelChoiceField` and `ModelMultipleChoiceField` on GET
+and POST. Update forms retain existing references, while posted IDs are narrowed
+after visibility filtering so inaccessible values fail validation. Routed views
+should pass `request` through `get_form_kwargs`; without one, choices use
+anonymous visibility. A form that uses another verified reference-choice
+boundary may declare a non-empty `reference_choices_policy_exempt` reason.
+
+Check-url task IDs are bound to the initiating session. Source and waste-flyer
+progress endpoints return 404 when the requested task ID is not stored in that
+session.
 
 ## Source-bound collection projections
 

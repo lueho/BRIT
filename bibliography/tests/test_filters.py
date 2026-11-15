@@ -14,6 +14,13 @@ class SourceFilterTestCase(TestCase):
     author1 = None
     source = None
 
+    def setUp(self):
+        self.filter_user = User.objects.create_superuser(
+            username="source-filter-test",
+            email="source-filter-test@example.com",
+            password="test-password",
+        )
+
     @classmethod
     def setUpTestData(cls):
         cls.author1 = Author.objects.create(first_names="One", last_names="Test Author")
@@ -48,7 +55,8 @@ class SourceFilterTestCase(TestCase):
         request = factory.get(
             reverse("source-detail", kwargs={"pk": self.source.pk}), filter_params
         )
-        qs = SourceFilter(request.GET, Source.objects.all()).qs
+        request.user = self.filter_user
+        qs = SourceFilter(request.GET, Source.objects.all(), request=request).qs
         self.assertEqual(1, qs.count())
         self.assertEqual(self.source, qs.first())
 
@@ -58,7 +66,8 @@ class SourceFilterTestCase(TestCase):
         request = factory.get(
             reverse("source-detail", kwargs={"pk": self.source.pk}), filter_params
         )
-        qs = SourceFilter(request.GET, Source.objects.all()).qs
+        request.user = self.filter_user
+        qs = SourceFilter(request.GET, Source.objects.all(), request=request).qs
         self.assertEqual(1, qs.count())
         self.assertEqual(self.source, qs.first())
 
@@ -68,7 +77,8 @@ class SourceFilterTestCase(TestCase):
         request = factory.get(
             reverse("source-detail", kwargs={"pk": self.source.pk}), filter_params
         )
-        qs = SourceFilter(request.GET, Source.objects.all()).qs
+        request.user = self.filter_user
+        qs = SourceFilter(request.GET, Source.objects.all(), request=request).qs
         self.assertEqual(2, qs.count())
 
     def test_type_filter(self):
@@ -77,7 +87,8 @@ class SourceFilterTestCase(TestCase):
         request = factory.get(
             reverse("source-detail", kwargs={"pk": self.source.pk}), filter_params
         )
-        qs = SourceFilter(request.GET, Source.objects.all()).qs
+        request.user = self.filter_user
+        qs = SourceFilter(request.GET, Source.objects.all(), request=request).qs
         self.assertEqual(1, qs.count())
         self.assertEqual(self.source2, qs.first())
 
@@ -89,7 +100,8 @@ class SourceFilterTestCase(TestCase):
         request = factory.get(
             reverse("source-detail", kwargs={"pk": self.source.pk}), filter_params
         )
-        qs = SourceFilter(request.GET, Source.objects.all()).qs
+        request.user = self.filter_user
+        qs = SourceFilter(request.GET, Source.objects.all(), request=request).qs
         self.assertEqual(1, qs.count())
         self.assertEqual(2021, qs.first().year)
 
@@ -99,7 +111,8 @@ class SourceFilterTestCase(TestCase):
         request = factory.get(
             reverse("source-detail", kwargs={"pk": self.source.pk}), filter_params
         )
-        qs = SourceFilter(request.GET, Source.objects.all()).qs
+        request.user = self.filter_user
+        qs = SourceFilter(request.GET, Source.objects.all(), request=request).qs
         self.assertEqual(1, qs.count())
         self.assertEqual(self.source, qs.first())
 

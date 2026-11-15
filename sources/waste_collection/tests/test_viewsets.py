@@ -5618,6 +5618,23 @@ class WasteAtlasPublicationScopingTests(APITestCase):
         self.assertNotIn(self.private_catchment.id, ids)
         self.assertNotIn(self.review_catchment.id, ids)
 
+    def test_anonymous_atlas_endpoints_hide_other_users_private_records(self):
+        self.client.logout()
+
+        collection_system = self._get("collection_system")
+        catchment_geojson = self._get("catchment_geojson")
+
+        self.assertEqual(collection_system.status_code, status.HTTP_200_OK)
+        self.assertEqual(catchment_geojson.status_code, status.HTTP_200_OK)
+        self.assertNotIn(
+            self.private_catchment.id,
+            self._catchment_ids(collection_system),
+        )
+        self.assertNotIn(
+            self.private_catchment.id,
+            self._catchment_ids(catchment_geojson),
+        )
+
     def test_catchment_geojson_includes_selected_collection_detail_url(self):
         response = self._get(
             "catchment_geojson",

@@ -1,12 +1,16 @@
 from unittest.mock import patch
 
+from django import forms
 from django.test import SimpleTestCase, override_settings
 from django.urls import path
 from django_filters import FilterSet, ModelChoiceFilter
+from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from sources.waste_collection.models import Collection
+from utils.filters import PolicyScopedChoicesMixin
+from utils.forms import UserCreatedObjectFormMixin
 from utils.object_management import checks
 
 urlpatterns = []
@@ -24,6 +28,20 @@ class ExemptCollectionView(APIView):
 class PublicAPIView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
+
+
+class ThirdPartyAPIView(APIView):
+    __module__ = "third_party.api.views"
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+
+class UnscopedChoiceForm(forms.Form):
+    collection = forms.ModelChoiceField(queryset=Collection.objects.all())
+
+
+class ScopedChoiceForm(UserCreatedObjectFormMixin, forms.Form):
+    collection = forms.ModelChoiceField(queryset=Collection.objects.all())
 
 
 class PolicyRouteCoverageTests(SimpleTestCase):
@@ -62,6 +80,43 @@ class PolicyRouteCoverageTests(SimpleTestCase):
 
         self.assertTrue(any(error.id == "object_management.E021" for error in errors))
 
+    def test_public_api_outside_project_packages_does_not_report_e021(self):
+        errors = self.run_route_check(ThirdPartyAPIView)
+
+        self.assertFalse(any(error.id == "object_management.E021" for error in errors))
+
+    def test_obtain_auth_token_is_not_a_project_e021_finding(self):
+        errors = self.run_route_check(ObtainAuthToken)
+
+        self.assertFalse(any(error.id == "object_management.E021" for error in errors))
+
+    def test_governed_choice_form_without_policy_mixin_reports_e023(self):
+        class UncoveredChoiceView(APIView):
+            form_class = UnscopedChoiceForm
+
+        errors = self.run_route_check(UncoveredChoiceView)
+
+        self.assertTrue(any(error.id == "object_management.E023" for error in errors))
+
+    def test_governed_choice_form_with_policy_mixin_is_covered(self):
+        class CoveredChoiceView(APIView):
+            form_class = ScopedChoiceForm
+
+        errors = self.run_route_check(CoveredChoiceView)
+
+        self.assertFalse(any(error.id == "object_management.E023" for error in errors))
+
+    def test_governed_choice_form_with_reasoned_exemption_is_covered(self):
+        class ExemptChoiceView(APIView):
+            form_class = UnscopedChoiceForm
+            reference_choices_policy_exempt = (
+                "Choices are filtered by a dedicated policy-aware adapter."
+            )
+
+        errors = self.run_route_check(ExemptChoiceView)
+
+        self.assertFalse(any(error.id == "object_management.E023" for error in errors))
+
     def test_governed_reference_filter_outside_base_reports_e022(self):
         class UncoveredReferenceFilterSet(FilterSet):
             collection = ModelChoiceFilter(queryset=Collection.objects.all())
@@ -84,5 +139,23 @@ class PolicyRouteCoverageTests(SimpleTestCase):
                 "UncoveredReferenceFilterSet" in error.msg
                 for error in errors
                 if error.id == "object_management.E022"
+            )
+        )
+
+    def test_governed_reference_filter_with_policy_mixin_is_covered(self):
+        class ScopedReferenceFilterSet(PolicyScopedChoicesMixin, FilterSet):
+            collection = ModelChoiceFilter(queryset=Collection.objects.all())
+
+            class Meta:
+                model = Collection
+                fields = ()
+
+        errors = checks.policy_route_coverage_check(None)
+
+        self.assertFalse(
+            any(
+                error.id == "object_management.E022"
+                and "ScopedReferenceFilterSet" in error.msg
+                for error in errors
             )
         )

@@ -4,6 +4,7 @@ import types
 
 from crispy_forms.layout import Layout
 from django import forms
+from django.db.models import Q
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.forms import (
     TomSelectModelChoiceField,
@@ -17,6 +18,7 @@ from utils.forms import (
     QuerysetTomSelectModelChoiceField,
     QuerysetTomSelectModelMultipleChoiceField,
     SimpleModelForm,
+    UserCreatedObjectFormMixin,
     WorkspaceReferenceScopeMixin,
     WorkspaceSectionFormSet,
     image_metadata_section,
@@ -71,7 +73,7 @@ class ProcessCategoryModalModelForm(ModalModelFormMixin, ProcessCategoryModelFor
 # ==============================================================================
 
 
-class ProcessModelForm(SimpleModelForm):
+class ProcessModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     # Note: When config with URL is provided, TomSelect validates via the autocomplete
     # endpoint. For proper queryset validation in forms, we override in __init__.
     categories = TomSelectModelMultipleChoiceField(
@@ -117,10 +119,6 @@ class ProcessModelForm(SimpleModelForm):
             queryset = filter_queryset_for_user(
                 ProcessCategory.objects.all(), request.user
             ).exclude(publication_status=ProcessCategory.STATUS_ARCHIVED)
-            if self.instance.pk:
-                queryset = queryset | ProcessCategory.objects.filter(
-                    pk__in=self.instance.categories.all()
-                )
             categories_field.queryset = queryset.distinct()
             # TomSelect fields re-resolve their queryset from the widget
             # during clean(); pin the widget to the scoped queryset.
@@ -199,7 +197,9 @@ class ProcessSourceInlineForm(forms.ModelForm):
 
             qs = filter_queryset_for_user(Source.objects.all(), request.user)
             if self.instance and self.instance.pk and self.instance.source_id:
-                qs = qs | Source.objects.filter(pk=self.instance.source_id)
+                qs = Source.objects.filter(
+                    Q(pk__in=qs.values("pk")) | Q(pk=self.instance.source_id)
+                )
             self.fields["source"].queryset = qs
 
 
@@ -277,7 +277,9 @@ class ProcessInfoResourceInlineForm(forms.ModelForm):
 # ==============================================================================
 
 
-class ProcessMaintenanceForm(WorkspaceReferenceScopeMixin, SimpleModelForm):
+class ProcessMaintenanceForm(
+    UserCreatedObjectFormMixin, WorkspaceReferenceScopeMixin, SimpleModelForm
+):
     categories = QuerysetTomSelectModelMultipleChoiceField(
         queryset=ProcessCategory.objects.all(),
         required=False,
@@ -303,11 +305,9 @@ class ProcessMaintenanceForm(WorkspaceReferenceScopeMixin, SimpleModelForm):
                 publication_status=ProcessCategory.STATUS_ARCHIVED
             )
             if self.instance.pk:
-                queryset = (
-                    queryset
-                    | ProcessCategory.objects.filter(
-                        pk__in=self.instance.categories.all()
-                    ).distinct()
+                queryset = ProcessCategory.objects.filter(
+                    Q(pk__in=queryset.values("pk"))
+                    | Q(pk__in=self.instance.categories.values("pk"))
                 )
             categories_field.queryset = queryset.distinct()
             categories_field.widget.get_queryset = lambda field=categories_field: (

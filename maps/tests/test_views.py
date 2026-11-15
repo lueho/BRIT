@@ -597,6 +597,21 @@ class RegionMapViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(self.url)
         self.assertContains(response, reverse("region-create"))
 
+    def test_map_queryset_hides_another_users_private_region(self):
+        private_region = Region.objects.create(
+            name="Another user's private region",
+            owner=self.outsider,
+            publication_status="private",
+        )
+
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            response.context["filter"].qs.filter(pk=private_region.pk).exists()
+        )
+
 
 # ----------- Catchment CRUD--------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------

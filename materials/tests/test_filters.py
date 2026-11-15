@@ -36,7 +36,31 @@ from ..models import (
 )
 
 
+def _use_superuser_filter_request(test_case, filter_class_name):
+    user = User.objects.create_superuser(
+        username="filter-test-user",
+        email="filter-test@example.com",
+        password="test-password",
+    )
+    request = RequestFactory().get("/")
+    request.user = user
+    filter_class = globals()[filter_class_name]
+
+    class RequestScopedFilterSet(filter_class):
+        def __init__(self, *args, **kwargs):
+            kwargs.setdefault("request", request)
+            super().__init__(*args, **kwargs)
+
+    patcher = patch(f"{__name__}.{filter_class_name}", RequestScopedFilterSet)
+    patcher.start()
+    test_case.addCleanup(patcher.stop)
+
+
 class SampleFilterTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        _use_superuser_filter_request(self, "SampleFilter")
+
     @classmethod
     def setUpTestData(cls):
         substrate_category_name = get_sample_substrate_category_name()
@@ -604,6 +628,10 @@ class SampleFilterTestCase(TestCase):
 
 
 class SampleGroupFilterTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        _use_superuser_filter_request(self, "SampleFilter")
+
     @classmethod
     def setUpTestData(cls):
         cls.material_a = Material.objects.create(name="Group Filter Material A")
@@ -650,6 +678,10 @@ class SampleGroupFilterTestCase(TestCase):
 
 
 class RelatedListFilterTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        _use_superuser_filter_request(self, "MaterialComponentListFilter")
+
     @classmethod
     def setUpTestData(cls):
         cls.category = MaterialCategory.objects.create(name="Target category")

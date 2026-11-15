@@ -21,7 +21,7 @@ from django.db.models.signals import post_save
 from django.forms.formsets import BaseFormSet
 from django.http import JsonResponse
 from django.http.request import MultiValueDict, QueryDict
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import Client, RequestFactory, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -1381,10 +1381,14 @@ class CollectionListQueryTestCase(TestCase):
         )
         cls.collector = Collector.objects.create(name="List collector", owner=cls.owner)
         cls.category = WasteCategory.objects.create(
-            name="List category", owner=cls.owner
+            name="List category",
+            owner=cls.owner,
+            publication_status="published",
         )
         cls.system = CollectionSystem.objects.create(
-            name="List system", owner=cls.owner
+            name="List system",
+            owner=cls.owner,
+            publication_status="published",
         )
         cls.published = Collection.objects.bulk_create(
             [
@@ -1479,6 +1483,16 @@ class CollectionListQueryTestCase(TestCase):
             owner=self.other_owner,
             publication_status="private",
         )
+        private_category = WasteCategory.objects.create(
+            name="Hidden filter category",
+            owner=self.other_owner,
+            publication_status="private",
+        )
+        private_system = CollectionSystem.objects.create(
+            name="Hidden filter system",
+            owner=self.other_owner,
+            publication_status="private",
+        )
         private_fee_system = FeeSystem.objects.create(
             name="Hidden filter fee system",
             owner=self.other_owner,
@@ -1494,8 +1508,8 @@ class CollectionListQueryTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         for private_name in (
-            "List category",
-            "List system",
+            private_category.name,
+            private_system.name,
             private_component.name,
             private_fee_system.name,
             private_collection.name,
@@ -4114,6 +4128,95 @@ class WasteFlyerListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(mock_delay.call_args.args[1], self.member.pk)
         self.assertEqual(response.json()["task_id"], "scheduler-task-id")
 
+    @patch("sources.waste_collection.views.AsyncResult")
+    @patch("sources.waste_collection.views.check_wasteflyer_urls.delay")
+    def test_list_task_id_is_stored_for_progress(self, mock_delay, mock_result):
+        mock_delay.return_value.task_id = "stored-scheduler-task-id"
+        mock_result.return_value.state = "PENDING"
+        mock_result.return_value.info = None
+        self.client.force_login(self.member)
+
+        start_response = self.client.get(reverse("wasteflyer-list-check-urls"))
+        progress_response = self.client.get(
+            reverse(
+                "wasteflyer-list-check-urls-progress",
+                kwargs={"task_id": "stored-scheduler-task-id"},
+            )
+        )
+
+        self.assertEqual(start_response.status_code, 200)
+        self.assertEqual(progress_response.status_code, 200)
+        mock_result.assert_called_once_with("stored-scheduler-task-id")
+
+
+class WasteFlyerCheckUrlProgressViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ["change_wasteflyer"]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.flyer = WasteFlyer.objects.create(
+            title="Published progress flyer",
+            abbreviation="PPF",
+            owner=cls.owner,
+            publication_status="published",
+        )
+
+    @patch("sources.waste_collection.views.AsyncResult")
+    @patch("sources.waste_collection.views.check_wasteflyer_url")
+    def test_single_check_task_is_stored_for_progress(self, mock_task, mock_result):
+        mock_task.delay.return_value.task_id = "single-flyer-task-id"
+        mock_result.return_value.state = "PENDING"
+        mock_result.return_value.info = None
+        self.client.force_login(self.member)
+
+        start_response = self.client.get(
+            reverse("wasteflyer-check-url", kwargs={"pk": self.flyer.pk})
+        )
+        progress_response = self.client.get(
+            reverse(
+                "wasteflyer-check-url-progress",
+                kwargs={"task_id": "single-flyer-task-id"},
+            )
+        )
+
+        self.assertEqual(start_response.status_code, 200)
+        self.assertEqual(progress_response.status_code, 200)
+        mock_result.assert_called_once_with("single-flyer-task-id")
+
+    @patch("sources.waste_collection.views.AsyncResult")
+    def test_task_progress_is_not_available_to_another_session(self, mock_result):
+        self.client.force_login(self.member)
+        session = self.client.session
+        session["wasteflyer_check_url_task_ids"] = ["single-flyer-task-id"]
+        session.save()
+        other_client = Client()
+        other_client.force_login(self.outsider)
+
+        response = other_client.get(
+            reverse(
+                "wasteflyer-check-url-progress",
+                kwargs={"task_id": "single-flyer-task-id"},
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+        mock_result.assert_not_called()
+
+    @patch("sources.waste_collection.views.AsyncResult")
+    def test_unknown_task_id_returns_404(self, mock_result):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "wasteflyer-check-url-progress",
+                kwargs={"task_id": "unknown-flyer-task-id"},
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+        mock_result.assert_not_called()
+
 
 class WasteFlyerListCheckUrlsProgressViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "change_wasteflyer"
@@ -4135,6 +4238,9 @@ class WasteFlyerListCheckUrlsProgressViewTestCase(ViewWithPermissionsTestCase):
         mock_async_result.side_effect = [scheduler_result, callback_result]
 
         self.client.force_login(self.member)
+        session = self.client.session
+        session["wasteflyer_check_url_task_ids"] = ["scheduler-task-id"]
+        session.save()
         response = self.client.get(
             reverse(
                 "wasteflyer-list-check-urls-progress",
@@ -4150,6 +4256,25 @@ class WasteFlyerListCheckUrlsProgressViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(mock_async_result.call_count, 2)
         mock_async_result.assert_any_call("scheduler-task-id")
         mock_async_result.assert_any_call("callback-task-id")
+
+    @patch("sources.waste_collection.views.AsyncResult")
+    def test_task_progress_is_not_available_to_another_session(self, mock_async_result):
+        self.client.force_login(self.member)
+        session = self.client.session
+        session["wasteflyer_check_url_task_ids"] = ["scheduler-task-id"]
+        session.save()
+        other_client = Client()
+        other_client.force_login(self.outsider)
+
+        response = other_client.get(
+            reverse(
+                "wasteflyer-list-check-urls-progress",
+                kwargs={"task_id": "scheduler-task-id"},
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+        mock_async_result.assert_not_called()
 
 
 # --- Regression tests -------------------------------------------------------------------------------------------------

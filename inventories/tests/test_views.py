@@ -742,7 +742,9 @@ class GenericAlgorithmAddViewTestCase(TestCase):
     def test_feedstock_without_registered_algorithm_is_selectable(self):
         """The add form must offer materials that no algorithm references
         yet — the generic flow is how they get their first algorithm."""
-        new_material = Material.objects.create(name="Brand New Material")
+        new_material = Material.objects.create(
+            name="Brand New Material", owner=self.owner
+        )
         self.client.force_login(self.owner)
         response = self.client.get(self._url())
         self.assertEqual(response.status_code, 200)

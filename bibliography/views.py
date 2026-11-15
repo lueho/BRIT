@@ -6,7 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Q
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.views import View
@@ -15,6 +15,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from utils.file_export.views import _store_task_id
 from utils.forms import TomSelectFormsetHelper
 from utils.object_management.permissions import UserCreatedObjectPermission
 from utils.object_management.policy import decide, visible_queryset
@@ -62,6 +63,8 @@ from .services import (
     source_is_referenced,
 )
 from .tasks import check_source_url, check_source_urls
+
+SOURCE_CHECK_URL_SESSION_KEY = "source_check_url_task_ids"
 
 
 class BibliographyExplorerView(BreadcrumbContextMixin, TemplateView):
@@ -543,6 +546,7 @@ class SourceCreateAPIView(APIView):
     queryset = Source.objects.all()
     permission_classes = [UserCreatedObjectPermission]
     action = "create"
+    policy_enforced = True
 
     def post(self, request, *args, **kwargs):
         serializer = SourceCreateSerializer(
@@ -560,6 +564,7 @@ class SourceCreateAPIView(APIView):
 class SourceCheckUrlView(LoginRequiredMixin, View):
     object = None
     model = Source
+    policy_enforced = True
 
     def get(self, request, *args, **kwargs):
         self.object = get_object_or_404(self.model, pk=kwargs.get("pk"))
@@ -570,6 +575,7 @@ class SourceCheckUrlView(LoginRequiredMixin, View):
             raise PermissionDenied
 
         task = check_source_url.delay(self.object.pk)
+        _store_task_id(request, task.task_id, session_key=SOURCE_CHECK_URL_SESSION_KEY)
         response_data = {"task_id": task.task_id}
         return HttpResponse(json.dumps(response_data), content_type="application/json")
 
@@ -577,6 +583,8 @@ class SourceCheckUrlView(LoginRequiredMixin, View):
 class SourceCheckUrlProgressView(LoginRequiredMixin, View):
     @staticmethod
     def get(request, task_id):
+        if task_id not in request.session.get(SOURCE_CHECK_URL_SESSION_KEY, ()):
+            raise Http404
         result = AsyncResult(task_id)
         response_data = {
             "state": result.state,
@@ -591,12 +599,14 @@ class SourceListCheckUrlsView(PermissionRequiredMixin, View):
     success_url = None
     permission_required = "bibliography.change_source"
     check_task = check_source_urls
+    policy_enforced = True
 
     def get(self, request, *args, **kwargs):
         params = request.GET.copy()
         params.pop("csrfmiddlewaretoken", None)
         params.pop("page", None)
         task = self.check_task.delay(params, request.user.pk)
+        _store_task_id(request, task.task_id, session_key=SOURCE_CHECK_URL_SESSION_KEY)
         response_data = {"task_id": task.task_id}
         return HttpResponse(json.dumps(response_data), content_type="application/json")
 

@@ -608,6 +608,7 @@ class GeoDataSetRuntimePermissionMixin:
     _dataset = None
     _runtime_adapter = None
     apply_user_visibility_filter = True
+    policy_enforced = True
 
     def get_runtime_adapter(self):
         if self._runtime_adapter is None:
@@ -1153,6 +1154,10 @@ class RegionMapView(LoginRequiredMixin, MapMixin, FilterView):
     template_name = "region_map.html"
     filterset_class = RegionFilterSet
     map_title = "Regions"
+    policy_enforced = True
+
+    def get_queryset(self):
+        return filter_queryset_for_user(Region.objects.all(), self.request.user)
 
 
 class RegionDetailView(MapMixin, UserCreatedObjectDetailView):

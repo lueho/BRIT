@@ -2915,6 +2915,7 @@ class UserCreatedObjectModalArchiveView(
 
     template_name = "modal_archive.html"
     success_message = "Successfully archived."
+    policy_enforced = True
 
     def test_func(self):
         """Centralized permission check via UserCreatedObjectPermission.has_archive_permission."""

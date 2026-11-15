@@ -320,12 +320,18 @@ class IsMaintainer(permissions.BasePermission):
 
 
 class WasteAtlasViewSet(GeoJSONAnonThrottleMixin, viewsets.ViewSet):
+    # _atlas_queryset, _publication_q, _supporting_queryset, and
+    # _map_property_value_q delegate to central policy.
+    policy_enforced = True
     permission_classes = [permissions.AllowAny]
     throttle_classes = [AtlasScopedRateThrottle]
     throttle_scope = "waste_atlas"
 
 
 class WasteAtlasGenericViewSet(GeoJSONAnonThrottleMixin, viewsets.GenericViewSet):
+    # _atlas_queryset, _publication_q, _supporting_queryset, and
+    # _map_property_value_q delegate to central policy.
+    policy_enforced = True
     permission_classes = [permissions.AllowAny]
     throttle_classes = [AtlasScopedRateThrottle]
     throttle_scope = "waste_atlas"

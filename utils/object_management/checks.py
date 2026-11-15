@@ -1,4 +1,5 @@
 import inspect
+from pathlib import Path
 
 from django.apps import apps
 from django.core.checks import Error, register
@@ -259,8 +260,26 @@ def _view_path(view_class):
     return f"{view_class.__module__}.{view_class.__qualname__}"
 
 
+def _project_packages():
+    project_root = Path(__file__).resolve().parents[2]
+    packages = []
+    for config in apps.get_app_configs():
+        try:
+            Path(config.path).resolve().relative_to(project_root)
+        except ValueError:
+            continue
+        packages.append(config.name)
+    return tuple(packages)
+
+
+def _is_project_module(module):
+    return any(
+        module == package or module.startswith(f"{package}.")
+        for package in _project_packages()
+    )
+
+
 def _project_filtersets():
-    project_packages = tuple(config.name for config in apps.get_app_configs())
     pending = list(FilterSet.__subclasses__())
     seen = set()
     while pending:
@@ -269,11 +288,7 @@ def _project_filtersets():
             continue
         seen.add(filterset)
         pending.extend(filterset.__subclasses__())
-        module = filterset.__module__
-        if any(
-            module == package or module.startswith(f"{package}.")
-            for package in project_packages
-        ):
+        if _is_project_module(filterset.__module__):
             yield filterset
 
 
@@ -293,15 +308,31 @@ def _governed_choice_filters(filterset):
             yield name, model
 
 
+def _governed_choice_fields(form_class):
+    if not inspect.isclass(form_class):
+        return
+    from django.forms import ModelChoiceField, ModelMultipleChoiceField
+
+    for name, field in getattr(form_class, "base_fields", {}).items():
+        if not isinstance(field, (ModelChoiceField, ModelMultipleChoiceField)):
+            continue
+        model = getattr(getattr(field, "queryset", None), "model", None)
+        policy = model_policy(model)
+        if policy is not None and policy.kind != KIND_PUBLIC_CATALOGUE:
+            yield name, model
+
+
 @register("object_management")
 def policy_route_coverage_check(app_configs, **kwargs):
-    from utils.filters import BaseCrispyFilterSet
+    from utils.filters import PolicyScopedChoicesMixin
+    from utils.forms import UserCreatedObjectFormMixin
 
     errors = []
     for route, view_class in _route_view_classes(get_resolver().url_patterns):
         view_path = _view_path(view_class)
         models = _governed_models(view_class)
         covered = _has_policy_coverage(view_class)
+        is_project_view = _is_project_module(view_class.__module__)
         if not covered:
             for model in models:
                 errors.append(
@@ -316,7 +347,12 @@ def policy_route_coverage_check(app_configs, **kwargs):
                         id="object_management.E020",
                     )
                 )
-        if not models and not covered and inspect.isclass(view_class):
+        if (
+            not models
+            and not covered
+            and is_project_view
+            and inspect.isclass(view_class)
+        ):
             try:
                 is_api_view = issubclass(view_class, APIView)
             except TypeError:
@@ -343,9 +379,33 @@ def policy_route_coverage_check(app_configs, **kwargs):
                             id="object_management.E021",
                         )
                     )
+        form_class = getattr(view_class, "form_class", None)
+        if (
+            not is_project_view
+            or not inspect.isclass(form_class)
+            or issubclass(form_class, UserCreatedObjectFormMixin)
+        ):
+            continue
+        exemption = getattr(view_class, "reference_choices_policy_exempt", None)
+        if not (isinstance(exemption, str) and exemption.strip()):
+            exemption = getattr(form_class, "reference_choices_policy_exempt", None)
+        if isinstance(exemption, str) and exemption.strip():
+            continue
+        for name, model in _governed_choice_fields(form_class):
+            errors.append(
+                Error(
+                    f"Route {route!r} uses {view_path} form field {name} with an "
+                    f"unscoped choice for governed model {model._meta.label_lower}.",
+                    hint=(
+                        "Inherit UserCreatedObjectFormMixin or provide a reasoned "
+                        "reference_choices_policy_exempt string."
+                    ),
+                    id="object_management.E023",
+                )
+            )
 
     for filterset in _project_filtersets():
-        if issubclass(filterset, BaseCrispyFilterSet):
+        if issubclass(filterset, PolicyScopedChoicesMixin):
             continue
         exemption = getattr(filterset, "reference_choices_policy_exempt", None)
         if isinstance(exemption, str) and exemption.strip():
@@ -357,7 +417,7 @@ def policy_route_coverage_check(app_configs, **kwargs):
                     f"FilterSet {filterset_path}.{name} has an unscoped choice for "
                     f"governed model {model._meta.label_lower}.",
                     hint=(
-                        "Inherit BaseCrispyFilterSet or provide a reasoned "
+                        "Inherit PolicyScopedChoicesMixin or provide a reasoned "
                         "reference_choices_policy_exempt string."
                     ),
                     id="object_management.E022",

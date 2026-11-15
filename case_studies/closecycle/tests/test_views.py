@@ -79,6 +79,21 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
                     )
             self.assertContains(response, f'data-formset-id="{prefix}"', count=1)
 
+    def test_create_get_hides_another_users_private_sample_choice(self):
+        material = Material.objects.create(name="Form choice material")
+        sample = Sample.objects.create(
+            name="Another user's private sample",
+            material=material,
+            owner=self.owner_user,
+            publication_status="private",
+        )
+
+        self.client.force_login(self.user_with_add_perm)
+        response = self.client.get(self.get_create_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, sample.name)
+
     def test_create_and_update_forms_load_leaflet_for_the_location_widget(self):
         """The geometry widget needs Leaflet and leaflet-draw on the page."""
         pages = (

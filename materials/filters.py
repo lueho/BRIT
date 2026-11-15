@@ -13,6 +13,7 @@ from django_tomselect.widgets import TomSelectModelWidget
 from maps.models import Location, Region
 from utils.filters import (
     FreeTextSearchFilterMixin,
+    PolicyScopedChoicesMixin,
     UserCreatedObjectScopedFilterSet,
 )
 from utils.object_management.permissions import filter_queryset_for_user
@@ -38,7 +39,7 @@ def sampled_substrate_material_q(substrate_category):
     return Q(categories=substrate_category) | Q(samples__isnull=False)
 
 
-class MaterialFilterSet(rf_filters.FilterSet):
+class MaterialFilterSet(PolicyScopedChoicesMixin, rf_filters.FilterSet):
     class Meta:
         model = Material
         fields = {"name": ["iexact", "icontains"], "categories": ["iexact"]}
@@ -248,7 +249,7 @@ class AnalyticalMethodListFilter(UserCreatedObjectScopedFilterSet):
         )
 
 
-class CompositionFilterSet(rf_filters.FilterSet):
+class CompositionFilterSet(PolicyScopedChoicesMixin, rf_filters.FilterSet):
     class Meta:
         model = Composition
         fields = (
@@ -559,7 +560,7 @@ class SampleGroupFilter(UserCreatedObjectScopedFilterSet):
         fields = ("scope", "kind")
 
 
-class SampleFilterSet(rf_filters.FilterSet):
+class SampleFilterSet(PolicyScopedChoicesMixin, rf_filters.FilterSet):
     class Meta:
         model = Sample
         fields = (
@@ -571,13 +572,13 @@ class SampleFilterSet(rf_filters.FilterSet):
         )
 
 
-class SampleSeriesFilterSet(rf_filters.FilterSet):
+class SampleSeriesFilterSet(PolicyScopedChoicesMixin, rf_filters.FilterSet):
     class Meta:
         model = SampleSeries
         fields = ("material",)
 
 
-class SampleGroupFilterSet(rf_filters.FilterSet):
+class SampleGroupFilterSet(PolicyScopedChoicesMixin, rf_filters.FilterSet):
     class Meta:
         model = SampleGroup
         fields = ("kind", "samples")

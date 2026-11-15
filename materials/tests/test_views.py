@@ -5090,10 +5090,13 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
         self.client.force_login(self.user_with_add_perm)
         data = self.create_object_data.copy()
         data.update(self.related_objects_post_data())
+        initial_count = self.model.objects.count()
 
         response = self.client.post(self.get_create_url(), data)
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].has_error("sample", "invalid_choice"))
+        self.assertEqual(self.model.objects.count(), initial_count)
 
     def test_update_view_redirects_to_next_url(self):
         self.client.force_login(self.owner_user)
@@ -5164,7 +5167,8 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
             self.get_update_url(self.unpublished_object.pk), data
         )
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].has_error("sample", "invalid_choice"))
         self.unpublished_object.refresh_from_db()
         self.assertEqual(self.unpublished_object.sample, source)
 
@@ -5210,10 +5214,13 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
         self.client.force_login(self.user_with_add_perm)
         data = self.create_object_data.copy()
         data.update(self.related_objects_post_data())
+        initial_count = self.model.objects.count()
 
         response = self.client.post(self.get_modal_create_url(), data)
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].has_error("sample", "invalid_choice"))
+        self.assertEqual(self.model.objects.count(), initial_count)
 
     def test_update_view_rejects_new_sample_user_cannot_manage(self):
         target_sample = Sample.objects.create(
@@ -5231,7 +5238,8 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
             data,
         )
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].has_error("sample", "invalid_choice"))
         self.unpublished_object.refresh_from_db()
         self.assertEqual(
             self.unpublished_object.sample,
@@ -5420,7 +5428,12 @@ class AddSeasonalVariationViewTestCase(ViewWithPermissionsTestCase):
             self.get_url(), self.post_data(distribution=foreign_distribution)
         )
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            response.context["form"].has_error(
+                "temporal_distribution", "invalid_choice"
+            )
+        )
         self.assertNotIn(foreign_distribution, self.series.temporal_distributions.all())
         self.assertEqual(self.series.samples.count(), sample_count)
 

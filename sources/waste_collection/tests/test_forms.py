@@ -2002,9 +2002,8 @@ class CollectionModelFormPermissionTestCase(TestCase):
         form = CollectionModelForm(data=dict_to_querydict(form_data), request=request)
         self.assertFalse(form.is_valid())
         self.assertIn("sources", form.errors)
-        # Check that the error message mentions permission
-        error_msg = str(form.errors["sources"])
-        self.assertIn("permission", error_msg.lower())
+        self.assertTrue(form.has_error("sources", "invalid_choice"))
+        self.assertNotIn("Private Source", str(form.errors["sources"]))
 
     def test_form_accepts_public_source(self):
         """Test that form accepts a published source accessible to all users."""

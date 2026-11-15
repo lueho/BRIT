@@ -132,7 +132,7 @@ class ComponentGroupModalModelForm(ModalModelFormMixin, ComponentGroupModelForm)
     pass
 
 
-class MaterialPropertyModelForm(SimpleModelForm):
+class MaterialPropertyModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     comparable_property = TomSelectModelChoiceField(
         queryset=MaterialProperty.objects.all(),
         required=False,
@@ -511,7 +511,7 @@ class AnalyticalMethodModelForm(
         )
 
 
-class SampleSeriesModelForm(SimpleModelForm):
+class SampleSeriesModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper.layout = Layout(
@@ -606,7 +606,9 @@ class SampleGroupModalModelForm(ModalModelFormMixin, SampleGroupModelForm):
     pass
 
 
-class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
+class SampleSeriesAddTemporalDistributionModalModelForm(
+    UserCreatedObjectFormMixin, ModalModelForm
+):
     distribution = ModelChoiceField(queryset=TemporalDistribution.objects.all())
 
     class Meta:
@@ -1046,7 +1048,7 @@ SAMPLE_SECTIONS = {
 }
 
 
-class CompositionModelForm(SimpleModelForm):
+class CompositionModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     class Meta:
         model = Composition
         fields = ("group", "sample", "fractions_of")
@@ -1085,7 +1087,7 @@ class SampleAddCompositionForm(UserCreatedObjectFormMixin, SimpleModelForm):
         self.fields["fractions_of"].empty_label = None
 
 
-class AddCompositionModalForm(ModalModelForm):
+class AddCompositionModalForm(UserCreatedObjectFormMixin, ModalModelForm):
     group = ModelChoiceField(queryset=MaterialComponentGroup.objects.all())
     fractions_of = ModelChoiceField(queryset=MaterialComponent.objects.all())
 
@@ -1115,7 +1117,7 @@ class AddCompositionModalForm(ModalModelForm):
         self.fields["fractions_of"].empty_label = None
 
 
-class AddSeasonalVariationForm(ModalForm):
+class AddSeasonalVariationForm(UserCreatedObjectFormMixin, ModalForm):
     temporal_distribution = ModelChoiceField(
         queryset=TemporalDistribution.objects.all()
     )

@@ -477,6 +477,10 @@ class ScenarioAddInventoryAlgorithmView(
     template_name = "scenario_configuration_add.html"
     object = None
     scenario_kwarg = "pk"
+    policy_enforced = True
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "request": self.request}
 
     def post(self, request, *args, **kwargs):
         scenario = get_object_or_404(Scenario, id=self.kwargs.get("pk"))
@@ -728,6 +732,10 @@ class ScenarioAlgorithmConfigurationUpdateView(
     form_class = ScenarioInventoryConfigurationUpdateForm
     template_name = "scenario_configuration_update.html"
     object = None
+    policy_enforced = True
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "request": self.request}
 
     def post(self, request, *args, **kwargs):
         scenario = get_object_or_404(Scenario, id=self.kwargs.get("scenario_pk"))
@@ -1067,6 +1075,7 @@ class ResultLayerGeoJSONAPI(APIView):
     """GeoJSON feature collection of a scenario result layer for Leaflet maps."""
 
     permission_classes = (AllowAny,)
+    policy_enforced = True
 
     def get(self, request, layer_name):
         layer = get_visible_result_layer(request.user, layer_name)
@@ -1087,6 +1096,7 @@ class ResultLayerVersionAPI(APIView):
     """Version token used by maps.js to revalidate cached result geometries."""
 
     permission_classes = (AllowAny,)
+    policy_enforced = True
 
     def get(self, request, layer_name):
         layer = get_visible_result_layer(request.user, layer_name)
