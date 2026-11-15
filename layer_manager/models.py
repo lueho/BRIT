@@ -4,7 +4,12 @@ from django.db import connection, models
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
-from inventories.models import InventoryAlgorithm, Scenario, is_current_inventory_run
+from inventories.models import (
+    InventoryAlgorithm,
+    InventoryStream,
+    Scenario,
+    is_current_inventory_run,
+)
 from materials.models import Material, MaterialComponent, SampleSeries
 
 from .exceptions import InvalidGeometryType, NoFeaturesProvided, TableAlreadyExists
@@ -109,14 +114,20 @@ class LayerManager(models.Manager):
             if kwargs["geom_type"] not in self.supported_geometry_types:
                 raise InvalidGeometryType(kwargs["geom_type"])
 
-            kwargs["table_name"] = (
-                "result_of_scenario_"
-                + str(kwargs["scenario"].id)
-                + "_algorithm_"
-                + str(kwargs["algorithm"].id)
-                + "_feedstock_"
-                + str(kwargs["feedstock"].id)
-            )
+            if kwargs.get("stream") is not None:
+                kwargs["table_name"] = (
+                    f"result_of_scenario_{kwargs['scenario'].id}"
+                    f"_stream_{kwargs['stream'].id}"
+                )
+            else:
+                kwargs["table_name"] = (
+                    "result_of_scenario_"
+                    + str(kwargs["scenario"].id)
+                    + "_algorithm_"
+                    + str(kwargs["algorithm"].id)
+                    + "_feedstock_"
+                    + str(kwargs["feedstock"].id)
+                )
             if staged:
                 kwargs["table_name"] = self._staged_table_name(kwargs["table_name"])
             kwargs["staged"] = staged
@@ -175,7 +186,12 @@ class Layer(models.Model):
     sample_series = models.ForeignKey(
         SampleSeries, on_delete=models.SET_NULL, blank=True, null=True
     )
-    algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.PROTECT)
+    algorithm = models.ForeignKey(
+        InventoryAlgorithm, on_delete=models.PROTECT, blank=True, null=True
+    )
+    stream = models.ForeignKey(
+        InventoryStream, on_delete=models.SET_NULL, blank=True, null=True
+    )
     layer_fields = models.ManyToManyField(LayerField)
     staged = models.BooleanField(default=False)
     run_id = models.UUIDField(null=True, blank=True, db_index=True)
@@ -314,11 +330,17 @@ class Layer(models.Model):
             schema_editor.delete_model(feature_collection)
 
     def publish(self):
-        """Replaces the live layer of the same scenario, algorithm and feedstock."""
+        """Replaces the live layer of the same stream, or of the same
+        scenario, algorithm and feedstock."""
+        if self.algorithm_id is None:
+            replaced = {"stream_id": self.stream_id}
+        else:
+            replaced = {
+                "algorithm_id": self.algorithm_id,
+                "feedstock_id": self.feedstock_id,
+            }
         for layer in Layer.objects.filter(
-            scenario_id=self.scenario_id,
-            algorithm_id=self.algorithm_id,
-            feedstock_id=self.feedstock_id,
+            scenario_id=self.scenario_id, **replaced
         ).exclude(pk=self.pk):
             layer.delete()
         self.staged = False
@@ -347,7 +369,8 @@ class Layer(models.Model):
             self.table_name == kwargs["table_name"],
             self.geom_type == kwargs["geom_type"],
             self.scenario == kwargs["scenario"],
-            self.algorithm == kwargs["algorithm"],
+            self.algorithm == kwargs.get("algorithm"),
+            self.stream == kwargs.get("stream"),
             fields == kwargs["fields"],
             (self.run_id is None and kwargs.get("run_id") is None)
             or is_current_inventory_run(self, kwargs.get("run_id")),
