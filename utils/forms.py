@@ -1,4 +1,5 @@
 import json
+from collections.abc import Iterable
 from functools import wraps
 
 from crispy_forms.helper import FormHelper
@@ -462,13 +463,18 @@ class UserCreatedObjectFormMixin:
 
             if getattr(self, "is_bound", False):
                 data_key = self.add_prefix(field_name)
-                values = (
-                    self.data.getlist(data_key)
-                    if data_key in self.data and hasattr(self.data, "getlist")
-                    else [self.data.get(data_key)]
-                    if data_key in self.data
-                    else []
-                )
+                if data_key not in self.data:
+                    values = []
+                elif hasattr(self.data, "getlist"):
+                    values = self.data.getlist(data_key)
+                else:
+                    value = self.data.get(data_key)
+                    values = (
+                        value
+                        if isinstance(value, Iterable)
+                        and not isinstance(value, (str, bytes))
+                        else [value]
+                    )
                 submitted_ids = set()
                 for value in values:
                     if value:

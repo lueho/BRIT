@@ -6,6 +6,8 @@ from django.test import TestCase
 
 from sources.waste_collection.models import Collection
 from utils.object_management.models import User
+from utils.properties.forms import PropertyModelForm
+from utils.properties.models import Property, Unit
 
 from ..forms import UserCreatedObjectFormMixin
 
@@ -28,6 +30,30 @@ class UserCreatedObjectFormMixinChoiceTests(TestCase):
             owner=cls.owner,
             publication_status="private",
         )
+        cls.unit_1 = Unit.objects.create(
+            name="Existing form unit",
+            symbol="ef",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.unit_2 = Unit.objects.create(
+            name="New form unit",
+            symbol="nf",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.unreadable_unit = Unit.objects.create(
+            name="Unreadable form unit",
+            symbol="uf",
+            owner=cls.outsider,
+            publication_status="private",
+        )
+        cls.property = Property.objects.create(
+            name="Form choice property",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.property.allowed_units.add(cls.unit_1)
 
     def test_get_choices_are_filtered_for_anonymous_user(self):
         form = CollectionChoiceForm(
@@ -81,3 +107,37 @@ class UserCreatedObjectFormMixinChoiceTests(TestCase):
             .queryset.filter(pk=self.private_collection.pk)
             .exists()
         )
+
+    def test_dict_multiple_choice_values_keep_new_readable_units(self):
+        form = PropertyModelForm(
+            data={
+                "name": "Updated form choice property",
+                "allowed_units": [self.unit_1.pk, self.unit_2.pk],
+                "description": self.property.description,
+            },
+            instance=self.property,
+            request=SimpleNamespace(user=self.owner),
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertCountEqual(
+            form.cleaned_data["allowed_units"], [self.unit_1, self.unit_2]
+        )
+        form.save()
+        self.assertCountEqual(
+            self.property.allowed_units.all(), [self.unit_1, self.unit_2]
+        )
+
+    def test_dict_multiple_choice_values_reject_unreadable_units(self):
+        form = PropertyModelForm(
+            data={
+                "name": "Updated form choice property",
+                "allowed_units": [self.unit_1.pk, self.unreadable_unit.pk],
+                "description": self.property.description,
+            },
+            instance=self.property,
+            request=SimpleNamespace(user=self.owner),
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("allowed_units", form.errors)
