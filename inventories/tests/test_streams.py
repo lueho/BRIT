@@ -6,11 +6,13 @@ from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.test import TestCase
+from django.urls import reverse
 
 from inventories.evaluator import BaseKind, Condition, Term
 from inventories.exceptions import BlockedRunningScenario
 from inventories.models import (
     InventoryStream,
+    RunningTask,
     Scenario,
     ScenarioConfigurationError,
     ScenarioStatus,
@@ -22,6 +24,7 @@ from layer_manager.models import Layer
 from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material
 from sources.greenhouses.models import NantesGreenhouses
+from utils.object_management.models import User
 
 
 def aggregated_value(layer, name):
@@ -266,3 +269,79 @@ class StreamEvaluationTestCase(StreamTestBase):
         stream = self.direct_stream()
         plan = self.scenario.stream_execution_plan()
         self.assertEqual([entry.id for entry in plan], [stream.id])
+
+
+class StreamResultPageTestCase(StreamTestBase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.owner = User.objects.create_user(username="stream-owner")
+        cls.scenario.owner = cls.owner
+        cls.scenario.save()
+
+    def publish_layer(self):
+        stream = self.count_stream()
+        run_id = uuid4()
+        self.set_status(ScenarioStatus.Status.RUNNING, run_id)
+        run_inventory_stream.run(
+            stream.id, scenario_id=self.scenario.id, run_id=str(run_id)
+        )
+        finalize_inventory.run(
+            [True], self.scenario.id, str(run_id), [["stream", stream.id]]
+        )
+        return Layer.objects.get(stream=stream)
+
+    def test_result_page_shows_the_stream_layer_and_links_its_map(self):
+        layer = self.publish_layer()
+        map_url = reverse(
+            "scenario-result-layer-map",
+            kwargs={"pk": self.scenario.pk, "layer_pk": layer.pk},
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("scenario-result", kwargs={"pk": self.scenario.pk})
+        )
+        self.assertContains(response, "Number of features")
+        self.assertContains(response, "Dataset: Greenhouses")
+        self.assertContains(response, map_url)
+
+        response = self.client.get(map_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Number of features")
+
+    def test_layer_map_is_hidden_from_other_users(self):
+        layer = self.publish_layer()
+        self.client.force_login(User.objects.create_user(username="stream-stranger"))
+        response = self.client.get(
+            reverse(
+                "scenario-result-layer-map",
+                kwargs={"pk": self.scenario.pk, "layer_pk": layer.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_failed_page_names_the_failed_stream(self):
+        stream = self.direct_stream(name="Reported amount")
+        self.set_status(ScenarioStatus.Status.FAILED, uuid4())
+        scenario_status = self.scenario.scenariostatus
+        scenario_status.failed_stream = stream
+        scenario_status.save(update_fields=["failed_stream"])
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("scenario-result", kwargs={"pk": self.scenario.pk})
+        )
+        self.assertContains(response, "Failed inventory: Reported amount")
+
+    def test_progress_page_lists_running_streams(self):
+        stream = self.direct_stream(name="Reported amount")
+        run_id = uuid4()
+        self.set_status(ScenarioStatus.Status.RUNNING, run_id)
+        RunningTask.objects.create(
+            scenario=self.scenario, uuid=uuid4(), stream=stream, run_id=run_id
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("scenario-result", kwargs={"pk": self.scenario.pk})
+        )
+        self.assertContains(response, "Reported amount")

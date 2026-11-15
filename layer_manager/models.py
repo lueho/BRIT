@@ -305,9 +305,26 @@ class Layer(models.Model):
 
     def feature_table_url(self):
         return reverse(
-            "scenario-result-map",
-            kwargs={"pk": self.scenario.id, "algo_pk": self.algorithm.id},
+            "scenario-result-layer-map",
+            kwargs={"pk": self.scenario_id, "layer_pk": self.pk},
         )
+
+    @property
+    def method_label(self):
+        """How the layer was produced: its algorithm or its stream."""
+        if self.algorithm_id is not None:
+            return self.algorithm.name
+        return self.stream.label if self.stream_id is not None else self.name
+
+    @property
+    def geodataset(self):
+        source = self.algorithm if self.algorithm_id is not None else self.stream
+        return getattr(source, "geodataset", None)
+
+    @property
+    def source_label(self):
+        geodataset = self.geodataset
+        return geodataset.name if geodataset is not None else self.method_label
 
     def delete(self, **kwargs):
         self.delete_feature_table()

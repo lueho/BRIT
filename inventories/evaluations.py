@@ -161,6 +161,7 @@ class ScenarioResult:
             layer_summaries[layer] = {
                 "feedstock": layer.feedstock,
                 "algorithm": layer.algorithm,
+                "stream": layer.stream,
                 "aggregated_values": list(layer.layeraggregatedvalue_set.all()),
                 "map_link": layer.feature_table_url,
             }

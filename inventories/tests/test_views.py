@@ -25,10 +25,12 @@ from ..models import (
     InventoryAlgorithm,
     InventoryAlgorithmParameter,
     InventoryAlgorithmParameterValue,
+    InventoryStream,
     RunningTask,
     Scenario,
     ScenarioInventoryConfiguration,
     ScenarioStatus,
+    StreamFactor,
 )
 from ..views import (
     InventoryAlgorithmAutocompleteView,
@@ -341,22 +343,24 @@ class GeoDatasetFunctionsAPITestCase(TestCase):
             reverse("api-geodataset-functions", kwargs={"geodataset_pk": dataset.pk})
         )
 
-    def test_point_dataset_offers_count_based(self):
+    def test_point_dataset_offers_feature_count(self):
         response = self._get(self.point_dataset)
         self.assertEqual(response.status_code, 200)
-        names = [f["function_name"] for f in response.json()["functions"]]
-        self.assertEqual(names, ["count_based_production"])
+        kinds = [f["base_kind"] for f in response.json()["functions"]]
+        self.assertIn("feature_count", kinds)
+        self.assertNotIn("area", kinds)
 
-    def test_polygon_dataset_offers_area_based(self):
+    def test_polygon_dataset_offers_area(self):
         response = self._get(self.polygon_dataset)
         self.assertEqual(response.status_code, 200)
-        names = [f["function_name"] for f in response.json()["functions"]]
-        self.assertEqual(names, ["area_based_production"])
+        kinds = [f["base_kind"] for f in response.json()["functions"]]
+        self.assertIn("area", kinds)
+        self.assertNotIn("feature_count", kinds)
 
     def test_response_includes_labels(self):
         response = self._get(self.point_dataset)
         functions = response.json()["functions"]
-        self.assertEqual(functions[0]["name"], "Count-based production")
+        self.assertEqual(functions[0]["name"], "Number of features")
 
     def test_anonymous_is_denied(self):
         response = self.client.get(
@@ -472,79 +476,96 @@ class GenericAlgorithmAddViewTestCase(TestCase):
         self.client.force_login(self.owner)
         return self.client.post(self._url(), data)
 
-    def test_creates_algorithm_config_and_parameters(self):
+    def _stream(self):
+        return InventoryStream.objects.get(scenario=self.scenario)
+
+    def test_creates_stream_with_named_factors(self):
         response = self._post(
             kwarg_name=["point_yield", "availability"],
             kwarg_value=["12.5", "0.8"],
+            kwarg_standard_deviation=["1.5", ""],
             kwarg_unit=["kg / year", ""],
         )
         self.assertEqual(response.status_code, 302)
 
-        algorithm = InventoryAlgorithm.objects.get(
-            geodataset=self.point_dataset,
-            function_name="count_based_production",
-        )
-        self.assertEqual(algorithm.source_module, "inventories.algorithms")
-        self.assertIn(self.material, algorithm.feedstocks.all())
-
-        configs = ScenarioInventoryConfiguration.objects.filter(
-            scenario=self.scenario, inventory_algorithm=algorithm
-        )
-        self.assertEqual(configs.count(), 2)
-        param_names = set(
-            configs.values_list("inventory_parameter__short_name", flat=True)
-        )
-        self.assertEqual(param_names, {"point_yield", "availability"})
-
-        plan = self.scenario.inventory_execution_plan()
-        kwargs = plan[0]["kwargs"]
-        self.assertEqual(kwargs["point_yield"]["value"], 12.5)
-        self.assertEqual(kwargs["point_yield"]["unit"], "kg / year")
-        self.assertEqual(kwargs["availability"]["value"], 0.8)
-
-    def test_reusing_algorithm_on_second_post(self):
-        self._post(kwarg_name=["f1"], kwarg_value=["1.0"], kwarg_unit=[""])
-        response = self._post(kwarg_name=["f1"], kwarg_value=["2.0"], kwarg_unit=["kg"])
-        self.assertEqual(response.status_code, 302)
+        stream = self._stream()
+        self.assertEqual(stream.base_kind, "feature_count")
+        self.assertEqual(stream.geodataset, self.point_dataset)
+        self.assertEqual(stream.material, self.material)
         self.assertEqual(
-            InventoryAlgorithm.objects.filter(
-                geodataset=self.point_dataset,
-                function_name="count_based_production",
-            ).count(),
-            1,
+            list(
+                stream.factors.values_list(
+                    "symbol", "value", "standard_deviation", "unit"
+                )
+            ),
+            [("point_yield", 12.5, 1.5, "kg / year"), ("availability", 0.8, None, "")],
         )
-
-    def test_no_kwargs_still_configures_algorithm(self):
-        response = self._post()
-        self.assertEqual(response.status_code, 302)
-        algorithm = InventoryAlgorithm.objects.get(
-            geodataset=self.point_dataset,
-            function_name="count_based_production",
-        )
-        self.assertTrue(
-            ScenarioInventoryConfiguration.objects.filter(
-                scenario=self.scenario, inventory_algorithm=algorithm
-            ).exists()
-        )
-
-    def test_geometry_mismatch_returns_400(self):
-        response = self._post(generic_function="area_based_production")
-        self.assertEqual(response.status_code, 400)
-        self.assertFalse(
-            InventoryAlgorithm.objects.filter(
-                geodataset=self.point_dataset,
-                function_name="area_based_production",
-            ).exists()
-        )
-
-    def test_dataset_outside_region_returns_400(self):
-        response = self._post(geodataset=self.other_region_dataset.pk)
-        self.assertIn(response.status_code, [400, 404])
+        # Generic inventories are stored as data, not as algorithm records.
+        self.assertFalse(InventoryAlgorithm.objects.exists())
         self.assertFalse(
             ScenarioInventoryConfiguration.objects.filter(
                 scenario=self.scenario
             ).exists()
         )
+        self.assertEqual(self.scenario.stream_execution_plan(), [stream])
+
+    def test_second_post_adds_a_second_stream(self):
+        self._post(kwarg_name=["f1"], kwarg_value=["1.0"], kwarg_unit=[""])
+        response = self._post(kwarg_name=["f1"], kwarg_value=["2.0"], kwarg_unit=["kg"])
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            sorted(
+                StreamFactor.objects.filter(
+                    stream__scenario=self.scenario
+                ).values_list("value", "unit")
+            ),
+            [(1.0, ""), (2.0, "kg")],
+        )
+
+    def test_no_kwargs_still_creates_stream(self):
+        response = self._post()
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(self._stream().factors.exists())
+
+    def test_base_kind_choice_creates_stream(self):
+        response = self._post(generic_function="", algorithm_choice="stream:area")
+        self.assertEqual(response.status_code, 400)
+        response = self._post(
+            generic_function="", algorithm_choice="stream:feature_count"
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self._stream().base_kind, "feature_count")
+
+    def test_column_sum_stream_requires_a_numeric_column(self):
+        response = self._post(generic_function="", algorithm_choice="stream:column_sum")
+        self.assertEqual(response.status_code, 400)
+        response = self._post(
+            generic_function="",
+            algorithm_choice="stream:column_sum",
+            base_column="culture_1",
+        )
+        self.assertEqual(response.status_code, 400)
+        response = self._post(
+            generic_function="",
+            algorithm_choice="stream:column_sum",
+            base_column="surface_ha",
+            base_unit="hectare",
+        )
+        self.assertEqual(response.status_code, 302)
+        stream = self._stream()
+        self.assertEqual(stream.base_kind, "column_sum")
+        self.assertEqual(stream.base_column, "surface_ha")
+        self.assertEqual(stream.base_unit, "hectare")
+
+    def test_geometry_mismatch_returns_400(self):
+        response = self._post(generic_function="area_based_production")
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(InventoryStream.objects.exists())
+
+    def test_dataset_outside_region_returns_400(self):
+        response = self._post(geodataset=self.other_region_dataset.pk)
+        self.assertIn(response.status_code, [400, 404])
+        self.assertFalse(InventoryStream.objects.exists())
 
     def test_invalid_kwarg_name_returns_400(self):
         response = self._post(
@@ -554,6 +575,13 @@ class GenericAlgorithmAddViewTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_duplicate_factor_name_returns_400(self):
+        response = self._post(
+            kwarg_name=["share", "share"], kwarg_value=["1.0", "0.5"]
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(InventoryStream.objects.exists())
+
     def test_non_numeric_kwarg_value_returns_400(self):
         response = self._post(
             kwarg_name=["yield"],
@@ -561,17 +589,13 @@ class GenericAlgorithmAddViewTestCase(TestCase):
             kwarg_unit=["kg"],
         )
         self.assertEqual(response.status_code, 400)
-        self.assertFalse(
-            ScenarioInventoryConfiguration.objects.filter(
-                scenario=self.scenario
-            ).exists()
-        )
+        self.assertFalse(InventoryStream.objects.exists())
 
     def test_unknown_function_returns_400(self):
         response = self._post(generic_function="definitely_not_a_function")
         self.assertEqual(response.status_code, 400)
 
-    def test_feature_filter_creates_selection_parameter(self):
+    def test_feature_filter_creates_stream_filter(self):
         response = self._post(
             filter_column="culture_1",
             filter_value="Tomato",
@@ -580,22 +604,26 @@ class GenericAlgorithmAddViewTestCase(TestCase):
             kwarg_unit=["kg"],
         )
         self.assertEqual(response.status_code, 302)
-        algorithm = InventoryAlgorithm.objects.get(
-            geodataset=self.point_dataset,
-            function_name="count_based_production",
-        )
-        param = InventoryAlgorithmParameter.objects.get(
-            inventory_algorithm=algorithm, short_name="feature_filter"
-        )
-        value = param.inventoryalgorithmparametervalue_set.get()
         self.assertEqual(
-            value.type, InventoryAlgorithmParameterValue.ValueType.SELECTION
+            list(self._stream().filters.values_list("column", "operator", "value")),
+            [("culture_1", "eq", "Tomato")],
         )
-        self.assertEqual(value.name, "culture_1=Tomato")
-        plan = self.scenario.inventory_execution_plan()
-        self.assertEqual(
-            plan[0]["kwargs"]["feature_filter"]["selection"], "culture_1=Tomato"
+
+    def test_feature_filter_accepts_an_operator(self):
+        response = self._post(
+            filter_column="culture_1",
+            filter_operator="in",
+            filter_value="Tomato, Cucumber",
         )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self._stream().filters.get().operator, "in")
+
+    def test_feature_filter_rejects_unknown_operator(self):
+        response = self._post(
+            filter_column="culture_1", filter_operator="like", filter_value="Tom"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(InventoryStream.objects.exists())
 
     def test_feature_filter_rejects_unknown_column(self):
         response = self._post(
@@ -617,127 +645,133 @@ class GenericAlgorithmAddViewTestCase(TestCase):
         self.assertIn("culture_1", columns)
         self.assertNotIn("geom", columns)
 
-    def test_update_config_includes_feature_filter_for_preselection(self):
-        """The update form builds its preselection map from
-        inventory_algorithm_config and the parameters API exposes the
-        scenario's custom values — together they preselect the filter."""
+    def _functions(self, scenario=None):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(
+                "api-geodataset-functions",
+                kwargs={"geodataset_pk": self.point_dataset.pk},
+            )
+            + f"?scenario={(scenario or self.scenario).pk}"
+        )
+        self.assertEqual(response.status_code, 200)
+        return response.json()
+
+    def test_functions_api_offers_base_quantities(self):
+        data = self._functions()
+        self.assertEqual(
+            [f["base_kind"] for f in data["functions"]],
+            ["feature_count", "column_sum"],
+        )
+        self.assertIn("surface_ha", data["numeric_columns"])
+        self.assertNotIn("culture_1", data["numeric_columns"])
+
+    def test_functions_api_includes_factor_presets(self):
+        """Factors already used for this dataset in the scenario are offered
+        as presets for the next stream."""
+        self._post(
+            kwarg_name=["yield"],
+            kwarg_value=["10"],
+            kwarg_unit=["kg"],
+        )
+        function = self._functions()["functions"][0]
+        presets = {p["short_name"]: p for p in function["parameters"]}
+        self.assertIn("yield", presets)
+        self.assertEqual(presets["yield"]["unit"], "kg")
+        self.assertEqual(presets["yield"]["values"][0]["value"], 10.0)
+
+    def test_functions_api_presets_stay_within_the_scenario(self):
+        self._post(kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["kg"])
+        other = Scenario.objects.create(
+            name="Other Gen Scenario",
+            owner=self.owner,
+            region=self.region,
+            catchment=self.scenario.catchment,
+        )
+        function = self._functions(other)["functions"][0]
+        self.assertEqual(function["parameters"], [])
+
+    def test_functions_api_hides_legacy_generic_algorithm_records(self):
+        InventoryAlgorithm.objects.create(
+            name="Count-based production",
+            source_module="inventories.algorithms",
+            function_name="count_based_production",
+            geodataset=self.point_dataset,
+        )
+        self.assertEqual(self._functions()["algorithms"], [])
+
+    def test_remove_stream(self):
+        self._post()
+        stream = self._stream()
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse(
+                "scenario-remove-stream",
+                kwargs={"scenario_pk": self.scenario.pk, "stream_pk": stream.pk},
+            )
+        )
+        self.assertRedirects(
+            response, reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+        )
+        self.assertFalse(InventoryStream.objects.exists())
+
+    def test_remove_stream_requires_edit_permission(self):
+        self._post()
+        stream = self._stream()
+        self.client.force_login(User.objects.create_user(username="gen-outsider"))
+        response = self.client.post(
+            reverse(
+                "scenario-remove-stream",
+                kwargs={"scenario_pk": self.scenario.pk, "stream_pk": stream.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(InventoryStream.objects.exists())
+
+    def test_remove_stream_of_another_scenario_is_not_found(self):
+        self._post()
+        stream = self._stream()
+        other = Scenario.objects.create(
+            name="Other Gen Scenario",
+            owner=self.owner,
+            region=self.region,
+            catchment=self.scenario.catchment,
+        )
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse(
+                "scenario-remove-stream",
+                kwargs={"scenario_pk": other.pk, "stream_pk": stream.pk},
+            )
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(InventoryStream.objects.exists())
+
+    def test_detail_page_lists_the_stream(self):
         self._post(
             filter_column="culture_1",
             filter_value="Tomato",
-            kwarg_name=["yield"],
-            kwarg_value=["10"],
-            kwarg_unit=["kg"],
-        )
-        algorithm = InventoryAlgorithm.objects.get(
-            geodataset=self.point_dataset,
-            function_name="count_based_production",
-        )
-        config = self.scenario.inventory_algorithm_config(algorithm, self.feedstock)
-        preselected = {}
-        for entry in config["parameters"]:
-            preselected.update(entry)
-        self.assertIn("feature_filter", preselected)
-        filter_value_id = preselected["feature_filter"]
-
-        self.client.force_login(self.owner)
-        response = self.client.get(
-            reverse(
-                "api-inventoryalgorithm-parameters",
-                kwargs={"algorithm_pk": algorithm.pk},
-            )
-            + f"?scenario={self.scenario.pk}"
-        )
-        self.assertEqual(response.status_code, 200)
-        params = {p["short_name"]: p for p in response.json()}
-        # The stored custom selection is offered so the select can preselect it.
-        filter_value_ids = [v["id"] for v in params["feature_filter"]["values"]]
-        self.assertIn(filter_value_id, filter_value_ids)
-        # The custom factor value is exposed too, so its select can preselect.
-        self.assertIn(
-            preselected["yield"], [v["id"] for v in params["yield"]["values"]]
-        )
-
-    def test_functions_api_includes_factor_presets(self):
-        """After a dataset+function has been configured once, its factors
-        are offered as presets for the next configuration."""
-        self._post(
-            kwarg_name=["yield"],
-            kwarg_value=["10"],
-            kwarg_unit=["kg"],
+            kwarg_name=["point_yield"],
+            kwarg_value=["12.5"],
+            kwarg_unit=["kg / year"],
         )
         self.client.force_login(self.owner)
         response = self.client.get(
+            reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+        )
+        self.assertContains(response, "Number of features")
+        self.assertContains(response, "point_yield")
+        self.assertContains(response, "culture_1")
+        self.assertContains(
+            response,
             reverse(
-                "api-geodataset-functions",
-                kwargs={"geodataset_pk": self.point_dataset.pk},
-            )
-            + f"?scenario={self.scenario.pk}"
+                "scenario-remove-stream",
+                kwargs={
+                    "scenario_pk": self.scenario.pk,
+                    "stream_pk": self._stream().pk,
+                },
+            ),
         )
-        self.assertEqual(response.status_code, 200)
-        function = response.json()["functions"][0]
-        presets = {p["short_name"]: p for p in function["parameters"]}
-        self.assertIn("yield", presets)
-        self.assertEqual(presets["yield"]["values"][0]["value"], 10.0)
-
-    def test_functions_api_presets_exclude_feature_filter(self):
-        self._post(filter_column="culture_1", filter_value="Tomato")
-        self.client.force_login(self.owner)
-        response = self.client.get(
-            reverse(
-                "api-geodataset-functions",
-                kwargs={"geodataset_pk": self.point_dataset.pk},
-            )
-            + f"?scenario={self.scenario.pk}"
-        )
-        function = response.json()["functions"][0]
-        names = [p["short_name"] for p in function["parameters"]]
-        self.assertNotIn("feature_filter", names)
-
-    def test_preset_value_reused_on_post(self):
-        """Picking a preset in the factor editor posts kwarg_preset with the
-        existing value id — the config reuses it instead of duplicating."""
-        self._post(kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["kg"])
-        preset_value = InventoryAlgorithmParameterValue.objects.get(
-            parameter__short_name="yield", value=10.0
-        )
-        # Configure a second feedstock on the same dataset, reusing the preset.
-        other_feedstock = Material.objects.create(name="Other Material")
-        response = self._post(
-            feedstock=other_feedstock.pk,
-            kwarg_name=["yield"],
-            kwarg_value=["10"],
-            kwarg_preset=[str(preset_value.pk)],
-        )
-        self.assertEqual(response.status_code, 302)
-        config_row = ScenarioInventoryConfiguration.objects.get(
-            scenario=self.scenario,
-            feedstock=other_feedstock,
-            inventory_parameter__short_name="yield",
-        )
-        self.assertEqual(config_row.inventory_value_id, preset_value.pk)
-
-    def test_conflicting_factor_unit_rejected(self):
-        """A shared factor parameter keeps its unit; posting the same factor
-        name with a different unit is rejected instead of silently
-        reinterpreting existing values."""
-        self._post(kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["kg / year"])
-        response = self._post(
-            kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["g / year"]
-        )
-        self.assertEqual(response.status_code, 400)
-        parameter = InventoryAlgorithmParameter.objects.get(short_name="yield")
-        self.assertEqual(parameter.unit, "kg / year")
-
-    def test_missing_unit_can_be_filled_later(self):
-        """A parameter whose unit was never set can receive one later —
-        that does not reinterpret existing values."""
-        self._post(kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=[""])
-        response = self._post(
-            kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["kg / year"]
-        )
-        self.assertEqual(response.status_code, 302)
-        parameter = InventoryAlgorithmParameter.objects.get(short_name="yield")
-        self.assertEqual(parameter.unit, "kg / year")
 
     def test_feedstock_without_registered_algorithm_is_selectable(self):
         """The add form must offer materials that no algorithm references
@@ -770,14 +804,7 @@ class GenericAlgorithmAddViewTestCase(TestCase):
             kwarg_unit=["kg"],
         )
         self.assertIn(response.status_code, [400, 404])
-        self.assertFalse(
-            InventoryAlgorithm.objects.filter(geodataset=private_dataset).exists()
-        )
-        self.assertFalse(
-            ScenarioInventoryConfiguration.objects.filter(
-                scenario=self.scenario
-            ).exists()
-        )
+        self.assertFalse(InventoryStream.objects.exists())
 
     def test_posted_lookup_does_not_fall_back_on_empty_queryset(self):
         """An empty visibility queryset must stay empty — falling back to
@@ -2717,7 +2744,7 @@ class ScenarioEnclosingRegionDatasetViewsTestCase(TestCase):
         response = self._post_generic(self.country_dataset)
         self.assertEqual(response.status_code, 302)
         self.assertTrue(
-            ScenarioInventoryConfiguration.objects.filter(
+            InventoryStream.objects.filter(
                 scenario=self.scenario, geodataset=self.country_dataset
             ).exists()
         )
@@ -2725,8 +2752,4 @@ class ScenarioEnclosingRegionDatasetViewsTestCase(TestCase):
     def test_generic_add_rejects_dataset_of_disjoint_region(self):
         response = self._post_generic(self.elsewhere_dataset)
         self.assertEqual(response.status_code, 400)
-        self.assertFalse(
-            ScenarioInventoryConfiguration.objects.filter(
-                scenario=self.scenario
-            ).exists()
-        )
+        self.assertFalse(InventoryStream.objects.filter(scenario=self.scenario).exists())

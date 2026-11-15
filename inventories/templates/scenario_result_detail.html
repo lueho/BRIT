@@ -22,12 +22,14 @@
               <h2 class="sri-inventory-title">
                 {{ layer.feedstock.name }}
                 <i class="fas fa-arrow-right" aria-hidden="true"></i>
-                {{ layer.algorithm.name }}
+                {{ layer.method_label }}
               </h2>
-              <div class="sri-inventory-dataset">Dataset: {{ layer.algorithm.geodataset }}</div>
+              {% if layer.geodataset %}
+                <div class="sri-inventory-dataset">Dataset: {{ layer.geodataset }}</div>
+              {% endif %}
             </div>
             <a class="sdv2-btn sdv2-btn-primary"
-               href="{% url 'scenario-result-map' layer.scenario_id layer.algorithm_id layer.feedstock_id %}">
+               href="{% if layer.algorithm_id %}{% url 'scenario-result-map' layer.scenario_id layer.algorithm_id layer.feedstock_id %}{% else %}{% url 'scenario-result-layer-map' layer.scenario_id layer.pk %}{% endif %}">
               <i class="fas fa-map" aria-hidden="true"></i> Show result map
             </a>
           </header>

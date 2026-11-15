@@ -20,7 +20,9 @@ from .views import (
     ScenarioInventoryAlgorithmAutocompleteView,
     ScenarioModalDeleteView,
     ScenarioRemoveInventoryAlgorithmView,
+    ScenarioRemoveStreamView,
     ScenarioResultDetailMapView,
+    ScenarioResultLayerMapView,
     ScenarioResultView,
     ScenarioUpdateView,
     SeasonalDistributionCreateView,
@@ -108,6 +110,16 @@ urlpatterns = [
         "scenarios/<int:scenario_pk>/materials/<int:material_pk>/<int:component_pk>/seasonal_distributions/create/",
         SeasonalDistributionCreateView.as_view(),
         name="scenario-seasonal-distribution-create",
+    ),
+    path(
+        "scenarios/<int:scenario_pk>/streams/<int:stream_pk>/remove/",
+        ScenarioRemoveStreamView.as_view(),
+        name="scenario-remove-stream",
+    ),
+    path(
+        "scenarios/<int:pk>/layers/<int:layer_pk>/",
+        ScenarioResultLayerMapView.as_view(),
+        name="scenario-result-layer-map",
     ),
     path(
         "scenarios/<int:pk>/<int:algorithm_pk>/<int:feedstock_pk>/",

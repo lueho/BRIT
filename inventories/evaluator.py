@@ -33,6 +33,32 @@ DATASET_BASE_KINDS = frozenset(
     (BaseKind.FEATURE_COUNT, BaseKind.AREA, BaseKind.COLUMN_SUM)
 )
 
+# The base quantity each legacy generic function measures.
+LEGACY_FUNCTION_BASE_KINDS = {
+    "count_based_production": BaseKind.FEATURE_COUNT,
+    "area_based_production": BaseKind.AREA,
+}
+
+
+def available_base_kinds(geodataset):
+    """Base quantities that can be measured from ``geodataset``.
+
+    The geometry decides between counting and area; a column sum needs a
+    numeric attribute column.
+    """
+    kinds = [
+        LEGACY_FUNCTION_BASE_KINDS[function_name]
+        for function_name in InventoryAlgorithms.generic_functions(geodataset)
+    ]
+    try:
+        has_numeric_column = bool(InventoryAlgorithms.numeric_columns(geodataset))
+    except Exception:
+        has_numeric_column = False
+    if has_numeric_column:
+        kinds.append(BaseKind.COLUMN_SUM)
+    return kinds
+
+
 FILTER_OPERATORS = {
     "eq": "is",
     "ne": "is not",

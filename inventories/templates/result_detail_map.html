@@ -17,13 +17,15 @@
                 <strong>Feedstock:</strong><br>
                 {{ object.feedstock.name }}
             </p>
+            {% if object.geodataset %}
             <p class="card-text">
                 <strong>Dataset:</strong><br>
-                {{ object.algorithm.geodataset.name }}
+                {{ object.geodataset.name }}
             </p>
+            {% endif %}
             <p class="card-text">
-                <strong>Algorithm:</strong><br>
-                {{ object.algorithm.name }}
+                <strong>{% if object.algorithm_id %}Algorithm{% else %}Base quantity{% endif %}:</strong><br>
+                {{ object.method_label }}
             </p>
         </div>
     </div>

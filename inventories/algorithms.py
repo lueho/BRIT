@@ -545,6 +545,33 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
             columns.append({"name": name, "values": [str(v) for v in values]})
         return columns
 
+    _NUMERIC_FIELD_TYPES = (models.IntegerField, models.FloatField, models.DecimalField)
+    _NUMERIC_UDT_NAMES = frozenset(
+        ("int2", "int4", "int8", "float4", "float8", "numeric")
+    )
+
+    @classmethod
+    def numeric_columns(cls, geodataset):
+        """Names of the feature attribute columns that can be summed."""
+        adapter = get_dataset_runtime_adapter(geodataset)
+        if getattr(adapter, "uses_local_relation", False):
+            config = adapter.runtime_configuration
+            return [
+                column["column_name"]
+                for column in adapter._get_existing_columns()
+                if column["udt_name"] in cls._NUMERIC_UDT_NAMES
+                and column["column_name"] != config.primary_key_column
+                and IDENTIFIER_PATTERN.match(column["column_name"])
+            ]
+        return [
+            field.name
+            for field in adapter.model._meta.get_fields()
+            if getattr(field, "concrete", False)
+            and not field.is_relation
+            and not field.primary_key
+            and isinstance(field, cls._NUMERIC_FIELD_TYPES)
+        ]
+
     @classmethod
     def _validate_columns(cls, adapter, columns):
         """Ensure the referenced columns actually exist on the dataset source."""
