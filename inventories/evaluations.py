@@ -86,11 +86,16 @@ class ScenarioResult:
 
     def total_production_per_feedstock(self):
         data = {}
+        units = {}
         unit = None
         for layer in self.layers:
             agg_value = layer.layeraggregatedvalue_set.get(name="Total production")
             unit = agg_value.unit
-            data[layer.feedstock.name] = agg_value.value
+            feedstock = layer.feedstock.name
+            # Several inventories can yield the same material.
+            if units.setdefault(feedstock, unit) != unit:
+                raise UnitMismatchError
+            data[feedstock] = data.get(feedstock, 0) + agg_value.value
         production = DataSet(
             label="Total production per feedstock", data=data, unit=unit
         )

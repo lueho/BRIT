@@ -402,7 +402,7 @@ class LayerAggregatedValue(models.Model):
 
     name = models.CharField(max_length=63)
     value = models.FloatField()
-    unit = models.CharField(max_length=15, blank=True, null=True, default="")
+    unit = models.CharField(max_length=40, blank=True, null=True, default="")
     layer = models.ForeignKey(Layer, on_delete=models.CASCADE)
 
 

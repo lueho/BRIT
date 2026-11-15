@@ -8,6 +8,7 @@ from django.db import transaction
 from django.test import TestCase
 from django.urls import reverse
 
+from inventories.evaluations import ScenarioResult
 from inventories.evaluator import BaseKind, Condition, Term
 from inventories.exceptions import BlockedRunningScenario
 from inventories.models import (
@@ -250,6 +251,41 @@ class StreamEvaluationTestCase(StreamTestBase):
         self.run_stream(kept)
         self.assertFalse(Layer.all_objects.filter(id=removed_layer_id).exists())
         self.assertEqual(Layer.objects.filter(scenario=self.scenario).count(), 1)
+
+    def test_production_per_feedstock_adds_streams_of_one_material(self):
+        first = self.run_stream(self.direct_stream(name="Reported"))
+        second = self.direct_stream(name="Estimated", base_value=40.0)
+        run_id = uuid4()
+        self.set_status(ScenarioStatus.Status.RUNNING, run_id)
+        for stream_id in (first.stream_id, second.id):
+            run_inventory_stream.run(
+                stream_id, scenario_id=self.scenario.id, run_id=str(run_id)
+            )
+        finalize_inventory.run(
+            [True, True],
+            self.scenario.id,
+            str(run_id),
+            [["stream", first.stream_id], ["stream", second.id]],
+        )
+        production = ScenarioResult(self.scenario).total_production_per_feedstock()
+        self.assertEqual(production.data, {"Stream Material": 140.0})
+        self.assertEqual(production.unit, "Mg/a")
+
+    def test_column_sum_with_a_long_base_unit_is_stored(self):
+        NantesGreenhouses.objects.filter(culture_1="Cucumber").update(surface_ha=2.0)
+        stream = InventoryStream.objects.create(
+            scenario=self.scenario,
+            material=self.material,
+            base_kind=BaseKind.COLUMN_SUM,
+            geodataset=self.dataset,
+            base_column="surface_ha",
+            base_unit="kilograms / year",
+        )
+        layer = self.run_stream(stream)
+        total = aggregated_value(layer, "Sum")
+        self.assertEqual(total.unit, "kilograms / year")
+        self.assertAlmostEqual(total.value, 2.0)
+        self.assertAlmostEqual(aggregated_value(layer, "Total production").value, 0.002)
 
     def test_failing_stream_marks_the_scenario_failed(self):
         stream = self.count_stream()

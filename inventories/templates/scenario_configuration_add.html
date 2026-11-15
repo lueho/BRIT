@@ -114,7 +114,7 @@
                     const label = `${param.short_name} = ${value.name || value.value}` +
                         `${value.source ? ` (${value.source})` : ""}`;
                     options.push(
-                        `<option value="${param.short_name}|${value.id}">${escapeHtml(label)}</option>`
+                        `<option value="${value.id}">${escapeHtml(label)}</option>`
                     );
                 }
             }
@@ -137,23 +137,20 @@
             if (!select || !select.value) {
                 return;
             }
-            const [paramName, valueId] = select.value.split("|");
-            const fn = genericFunctions.find(f =>
-                f.parameters && f.parameters.some(p => p.short_name === paramName)
-            );
-            if (!fn) {
-                return;
-            }
-            const param = fn.parameters.find(p => p.short_name === paramName);
-            const value = (param.values || []).find(v => v.id == valueId);
-            if (value) {
-                addKwargRow({
-                    name: paramName,
-                    value: value.value,
-                    standardDeviation: value.standard_deviation,
-                    unit: param.unit,
-                    valueId: value.id,
-                });
+            // Factor ids are unique, while one name can occur with several units.
+            const baseKind = document.getElementById("id_algorithm_choice").value.substring(7);
+            const fn = genericFunctions.find(f => f.base_kind === baseKind);
+            for (const param of (fn ? fn.parameters || [] : [])) {
+                const value = (param.values || []).find(v => String(v.id) === select.value);
+                if (value) {
+                    addKwargRow({
+                        name: param.short_name,
+                        value: value.value,
+                        standardDeviation: value.standard_deviation,
+                        unit: param.unit,
+                    });
+                    break;
+                }
             }
             select.value = "";
         }

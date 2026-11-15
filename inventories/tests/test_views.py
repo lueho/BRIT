@@ -713,6 +713,25 @@ class GenericAlgorithmAddViewTestCase(TestCase):
         )
         self.assertFalse(InventoryStream.objects.exists())
 
+    def test_adding_and_removing_a_stream_bump_the_scenario_revision(self):
+        revision = Scenario.objects.get(pk=self.scenario.pk).content_revision
+        self._post(kwarg_name=["point_yield"], kwarg_value=["12.5"])
+        added = Scenario.objects.get(pk=self.scenario.pk).content_revision
+        self.assertGreater(added, revision)
+
+        self.client.force_login(self.owner)
+        self.client.post(
+            reverse(
+                "scenario-remove-stream",
+                kwargs={
+                    "scenario_pk": self.scenario.pk,
+                    "stream_pk": self._stream().pk,
+                },
+            )
+        )
+        removed = Scenario.objects.get(pk=self.scenario.pk).content_revision
+        self.assertGreater(removed, added)
+
     def test_remove_stream_requires_edit_permission(self):
         self._post()
         stream = self._stream()
