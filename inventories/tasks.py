@@ -16,6 +16,7 @@ from django.db.utils import OperationalError
 from brit.celery import app
 from inventories.models import (
     InventoryAlgorithm,
+    InventoryStream,
     RunningTask,
     ScenarioStatus,
     is_backend_task_active,
@@ -31,11 +32,25 @@ logger = logging.getLogger(__name__)
 def _set_running(scenario_status, run_id):
     scenario_status.status = ScenarioStatus.Status.RUNNING
     scenario_status.failed_algorithm = None
+    scenario_status.failed_stream = None
     scenario_status.failure_message = ""
     scenario_status.run_id = run_id
     scenario_status.save(
-        update_fields=["status", "failed_algorithm", "failure_message", "run_id"]
+        update_fields=[
+            "status",
+            "failed_algorithm",
+            "failed_stream",
+            "failure_message",
+            "run_id",
+        ]
     )
+
+
+def _layer_key(layer):
+    """Identity of a result layer within its scenario, as sent to the callback."""
+    if layer.algorithm_id is None:
+        return ("stream", layer.stream_id)
+    return (layer.algorithm_id, layer.feedstock_id)
 
 
 def _safe_enqueue_settlement(scenario_id, run_id):
@@ -51,12 +66,13 @@ def _safe_enqueue_settlement(scenario_id, run_id):
 
 
 def _header_tasks_ready(running_tasks, run_id):
-    """True when every algorithm-bearing row of `run_id` is backend-terminal."""
+    """True when every algorithm or stream row of `run_id` is backend-terminal."""
     run_id = uuid.UUID(str(run_id))
     headers = [
         task
         for task in running_tasks
-        if task.algorithm_id is not None and task.run_id == run_id
+        if (task.algorithm_id is not None or task.stream_id is not None)
+        and task.run_id == run_id
     ]
     return all(not is_backend_task_active(task.uuid) for task in headers)
 
@@ -102,7 +118,9 @@ def start_inventory_run(scenario_id):
 
 
 @app.task
-def mark_inventory_failed(scenario_id, run_id, algorithm_id=None, failure_message=""):
+def mark_inventory_failed(
+    scenario_id, run_id, algorithm_id=None, failure_message="", stream_id=None
+):
     """Fenced failure write: only mutates while run_id is the current attempt."""
     with locked_scenario_evaluation(scenario_id) as locked:
         if locked is None:
@@ -117,18 +135,26 @@ def mark_inventory_failed(scenario_id, run_id, algorithm_id=None, failure_messag
             return
         scenario_status.status = ScenarioStatus.Status.FAILED
         update_fields = ["status"]
-        if scenario_status.failed_algorithm_id is None:
-            if algorithm_id is not None:
-                # First specific failure writes the algorithm+message pair.
+        recorded = (
+            scenario_status.failed_algorithm_id,
+            scenario_status.failed_stream_id,
+        )
+        if recorded == (None, None):
+            if algorithm_id is not None or stream_id is not None:
+                # First specific failure writes the culprit+message pair.
                 scenario_status.failed_algorithm_id = algorithm_id
-                update_fields.append("failed_algorithm")
+                scenario_status.failed_stream_id = stream_id
                 scenario_status.failure_message = failure_message
-                update_fields.append("failure_message")
+                update_fields += [
+                    "failed_algorithm",
+                    "failed_stream",
+                    "failure_message",
+                ]
             elif failure_message and not scenario_status.failure_message:
                 scenario_status.failure_message = failure_message
                 update_fields.append("failure_message")
         elif (
-            algorithm_id == scenario_status.failed_algorithm_id
+            recorded == (algorithm_id, stream_id)
             and failure_message
             and not scenario_status.failure_message
         ):
@@ -155,6 +181,7 @@ def run_inventory(scenario_id, run_id):
             for layer in Layer.all_objects.filter(scenario_id=scenario_id, staged=True):
                 layer.delete()
             execution_plan = scenario.inventory_execution_plan()
+            streams = scenario.stream_execution_plan()
             signatures = []
             for execution in execution_plan:
                 signature = run_inventory_algorithm.s(
@@ -164,25 +191,34 @@ def run_inventory(scenario_id, run_id):
                 )
                 signature.freeze()
                 signatures.append(signature)
+            for stream in streams:
+                signature = run_inventory_stream.s(
+                    stream.id, scenario_id=scenario_id, run_id=str(run_id)
+                )
+                signature.freeze()
+                signatures.append(signature)
             layer_keys = [
                 [execution["algorithm"].id, execution["kwargs"]["feedstock_id"]]
                 for execution in execution_plan
-            ]
+            ] + [["stream", stream.id] for stream in streams]
             callback = finalize_inventory.s(scenario_id, str(run_id), layer_keys)
             callback.on_error(mark_inventory_failed.si(scenario_id, str(run_id)))
             callback_id = callback.freeze().id
             task_chord = chord(signatures, callback)
+            header_rows = [
+                {"algorithm": execution["algorithm"]} for execution in execution_plan
+            ] + [{"stream": stream} for stream in streams]
             RunningTask.objects.bulk_create(
                 [
                     *(
                         RunningTask(
                             scenario_id=scenario_id,
                             uuid=signature.id,
-                            algorithm=execution["algorithm"],
                             run_id=run_id,
+                            **header,
                         )
-                        for signature, execution in zip(
-                            signatures, execution_plan, strict=True
+                        for signature, header in zip(
+                            signatures, header_rows, strict=True
                         )
                     ),
                     RunningTask(
@@ -255,6 +291,51 @@ def run_inventory_algorithm(self, algorithm_id, *, scenario_id, run_id, **kwargs
     return True
 
 
+@app.task(bind=True, base=InventoryAlgorithmTask)
+def run_inventory_stream(self, stream_id, *, scenario_id, run_id):
+    """Evaluate one stream of the scenario into its staged result layer."""
+
+    def current_run():
+        with locked_scenario_evaluation(scenario_id) as locked:
+            if locked is None:
+                return None
+            scenario, scenario_status, _ = locked
+            if not is_current_inventory_run(scenario_status, run_id) or (
+                scenario_status.status != ScenarioStatus.Status.RUNNING
+            ):
+                return None
+            return scenario, scenario_status
+
+    try:
+        if current_run() is None:
+            return None
+        stream = InventoryStream.objects.select_related(
+            "scenario__catchment", "geodataset", "material", "sample_series"
+        ).get(id=stream_id, scenario_id=scenario_id)
+        results = stream.evaluate()
+        with transaction.atomic():
+            current = current_run()
+            if current is None:
+                return None
+            scenario, scenario_status = current
+            Layer.objects.create_or_replace(
+                staged=True,
+                name=stream.label,
+                scenario=scenario,
+                feedstock=stream.material,
+                sample_series=stream.sample_series,
+                stream=stream,
+                results=results,
+                run_id=scenario_status.run_id,
+            )
+    except Exception as error:
+        mark_inventory_failed.run(
+            scenario_id, run_id, failure_message=str(error), stream_id=stream_id
+        )
+        raise
+    return True
+
+
 @app.task
 def finalize_inventory(results, scenario_id, run_id, layer_keys=None):
     with locked_scenario_evaluation(scenario_id) as locked:
@@ -278,22 +359,25 @@ def finalize_inventory(results, scenario_id, run_id, layer_keys=None):
         for layer in Layer.all_objects.filter(
             scenario_id=scenario_id, staged=True, run_id=scenario_status.run_id
         ):
-            if (
-                current_layers is None
-                or (layer.algorithm_id, layer.feedstock_id) in current_layers
-            ):
+            if current_layers is None or _layer_key(layer) in current_layers:
                 layer.publish()
             else:
                 layer.delete()
         if current_layers is not None:
             for layer in Layer.objects.filter(scenario_id=scenario_id):
-                if (layer.algorithm_id, layer.feedstock_id) not in current_layers:
+                if _layer_key(layer) not in current_layers:
                     layer.delete()
         scenario_status.status = ScenarioStatus.Status.FINISHED
         scenario_status.failed_algorithm = None
+        scenario_status.failed_stream = None
         scenario_status.failure_message = ""
         scenario_status.save(
-            update_fields=["status", "failed_algorithm", "failure_message"]
+            update_fields=[
+                "status",
+                "failed_algorithm",
+                "failed_stream",
+                "failure_message",
+            ]
         )
 
 

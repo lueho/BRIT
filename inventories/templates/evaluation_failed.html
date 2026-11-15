@@ -17,7 +17,9 @@
       <section class="sdv2-section-panel sri-status sri-status-4" aria-labelledby="sri-failed-title">
         <div>
           <h2 class="sdv2-section-title" id="sri-failed-title">The evaluation failed.</h2>
-          {% if object.scenariostatus.failed_algorithm %}
+          {% if object.scenariostatus.failed_stream %}
+            <p class="mb-0">Failed inventory: {{ object.scenariostatus.failed_stream }}</p>
+          {% elif object.scenariostatus.failed_algorithm %}
             <p class="mb-0">Failed algorithm: {{ object.scenariostatus.failed_algorithm }}</p>
           {% endif %}
           {% if policy.can_edit %}

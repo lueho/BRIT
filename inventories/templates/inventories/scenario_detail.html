@@ -39,7 +39,9 @@
         {% elif object.status == 4 %}
           <div>
             <h2 class="sdv2-section-title">The evaluation failed.</h2>
-            {% if object.scenariostatus.failed_algorithm %}
+            {% if object.scenariostatus.failed_stream %}
+              <p class="mb-0">Failed inventory: {{ object.scenariostatus.failed_stream }}</p>
+            {% elif object.scenariostatus.failed_algorithm %}
               <p class="mb-0">Failed algorithm: {{ object.scenariostatus.failed_algorithm }}</p>
             {% endif %}
             {% if policy.can_edit and object.scenariostatus.failure_message %}
@@ -70,11 +72,78 @@
             <a class="sdv2-btn" href="{% url 'scenario-add-configuration' object.pk %}"><i class="fas fa-plus" aria-hidden="true"></i> Add inventory</a>
           {% endif %}
         </div>
-        {% for inventory in inventories %}
+        {% for stream in streams %}
           <article class="sdv2-section-panel sri-inventory">
             <header class="sri-inventory-header">
               <div>
                 <div class="sri-inventory-kicker">Inventory {{ forloop.counter }}</div>
+                <h3 class="sri-inventory-title">
+                  {{ stream.material.name }}
+                  <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                  {{ stream.label }}
+                </h3>
+                {% if stream.geodataset %}
+                  <div class="sri-inventory-dataset">
+                    Dataset: {{ stream.geodataset }}{% if stream.base_column %}, column <code>{{ stream.base_column }}</code>{% if stream.base_unit %} [{{ stream.base_unit }}]{% endif %}{% endif %}
+                  </div>
+                {% endif %}
+                {% for filter in stream.filters.all %}
+                  <div class="sri-inventory-dataset">Only features where <code>{{ filter.column }}</code> {{ filter.get_operator_display }} “{{ filter.value }}”</div>
+                {% endfor %}
+              </div>
+              {% if policy.can_edit %}
+                <div class="sri-inventory-actions">
+                  <form method="post" action="{% url 'scenario-remove-stream' object.pk stream.pk %}" class="m-0">
+                    {% csrf_token %}
+                    <button type="submit" class="sdv2-btn sdv2-btn-sm sdv2-btn-ghost"><i class="fas fa-trash" aria-hidden="true"></i> Remove</button>
+                  </form>
+                </div>
+              {% endif %}
+            </header>
+            {% if stream.factors.all or stream.base_value is not None %}
+              <div class="sri-table-wrap">
+                <table class="sdv2-properties-table sri-parameters">
+                  <thead>
+                    <tr>
+                      <th scope="col">Factor</th>
+                      <th scope="col" class="sdv2-num">Value</th>
+                      <th scope="col" class="sdv2-num">Std. dev.</th>
+                      <th scope="col">Unit</th>
+                      <th scope="col">Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% if stream.base_value is not None %}
+                      <tr>
+                        <th scope="row">amount</th>
+                        <td class="sdv2-num">{{ stream.base_value|floatformat:"-3g" }}</td>
+                        <td class="sdv2-num">{{ stream.base_standard_deviation|default_if_none:"—" }}</td>
+                        <td>{{ stream.base_unit }}</td>
+                        <td>—</td>
+                      </tr>
+                    {% endif %}
+                    {% for factor in stream.factors.all %}
+                      <tr>
+                        <th scope="row">{{ factor.symbol }}</th>
+                        <td class="sdv2-num">{{ factor.value|floatformat:"-3g" }}</td>
+                        <td class="sdv2-num">{% if factor.standard_deviation is None %}—{% else %}{{ factor.standard_deviation|floatformat:"-3g" }}{% endif %}</td>
+                        <td>{{ factor.unit }}</td>
+                        <td>{{ factor.source|default:"—" }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <p class="sri-muted mb-0">This inventory has no factors.</p>
+            {% endif %}
+          </article>
+        {% endfor %}
+        {% for inventory in inventories %}
+          <article class="sdv2-section-panel sri-inventory">
+            <header class="sri-inventory-header">
+              <div>
+                <div class="sri-inventory-kicker">Inventory {{ forloop.counter|add:streams.count }}</div>
                 <h3 class="sri-inventory-title">
                   {{ inventory.feedstock.name }}
                   <i class="fas fa-arrow-right" aria-hidden="true"></i>
@@ -123,9 +192,10 @@
               <p class="sri-muted mb-0">This inventory has no parameters.</p>
             {% endif %}
           </article>
-        {% empty %}
-          <div class="sdv2-section-panel sri-muted">No inventories have been added to this scenario yet.</div>
         {% endfor %}
+        {% if not inventories and not streams %}
+          <div class="sdv2-section-panel sri-muted">No inventories have been added to this scenario yet.</div>
+        {% endif %}
       </section>
     </div>
   </div>

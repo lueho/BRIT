@@ -107,6 +107,20 @@ class NantesGreenhouseProductionTestCase(TestCase):
         self.assertEqual(aggregated_value(result, "Total growth area"), 5.0)
         self.assertEqual(aggregated_value(result, "Total production"), 2.5)
 
+    def test_group_surface_is_spread_over_growth_shares(self):
+        """Pins the seasonal production per component: surface x growth share."""
+        self._greenhouse(surface_ha=2.0)
+        self._greenhouse(surface_ha=3.0)
+
+        (distribution,) = self._run()["aggregated_distributions"]
+
+        self.assertEqual(distribution["name"], "Seasonal production per component")
+        self.assertEqual(distribution["distribution"], self.timestep.distribution_id)
+        (entry,) = distribution["sets"]
+        self.assertEqual(entry["timestep"], self.timestep.id)
+        (share,) = entry["shares"]
+        self.assertEqual(share["average"], 2.5)
+
     def test_no_matching_greenhouses_returns_empty_result(self):
         result = self._run()
 
