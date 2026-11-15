@@ -515,9 +515,9 @@ class GenericAlgorithmAddViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             sorted(
-                StreamFactor.objects.filter(
-                    stream__scenario=self.scenario
-                ).values_list("value", "unit")
+                StreamFactor.objects.filter(stream__scenario=self.scenario).values_list(
+                    "value", "unit"
+                )
             ),
             [(1.0, ""), (2.0, "kg")],
         )
@@ -576,9 +576,7 @@ class GenericAlgorithmAddViewTestCase(TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_duplicate_factor_name_returns_400(self):
-        response = self._post(
-            kwarg_name=["share", "share"], kwarg_value=["1.0", "0.5"]
-        )
+        response = self._post(kwarg_name=["share", "share"], kwarg_value=["1.0", "0.5"])
         self.assertEqual(response.status_code, 400)
         self.assertFalse(InventoryStream.objects.exists())
 
@@ -2752,4 +2750,6 @@ class ScenarioEnclosingRegionDatasetViewsTestCase(TestCase):
     def test_generic_add_rejects_dataset_of_disjoint_region(self):
         response = self._post_generic(self.elsewhere_dataset)
         self.assertEqual(response.status_code, 400)
-        self.assertFalse(InventoryStream.objects.filter(scenario=self.scenario).exists())
+        self.assertFalse(
+            InventoryStream.objects.filter(scenario=self.scenario).exists()
+        )

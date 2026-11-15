@@ -5,21 +5,30 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('inventories', '0014_inventory_streams'),
-        ('layer_manager', '0006_layer_run_id'),
+        ("inventories", "0014_inventory_streams"),
+        ("layer_manager", "0006_layer_run_id"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='layer',
-            name='stream',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='inventories.inventorystream'),
+            model_name="layer",
+            name="stream",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                to="inventories.inventorystream",
+            ),
         ),
         migrations.AlterField(
-            model_name='layer',
-            name='algorithm',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='inventories.inventoryalgorithm'),
+            model_name="layer",
+            name="algorithm",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                to="inventories.inventoryalgorithm",
+            ),
         ),
     ]

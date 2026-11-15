@@ -3,7 +3,7 @@
 from uuid import uuid4
 
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import transaction
 from django.test import TestCase
 from django.urls import reverse
@@ -235,7 +235,9 @@ class StreamEvaluationTestCase(StreamTestBase):
         layers = Layer.objects.filter(scenario=self.scenario)
         self.assertEqual(layers.count(), 2)
         self.assertEqual(
-            sorted(aggregated_value(layer, "Total production").value for layer in layers),
+            sorted(
+                aggregated_value(layer, "Total production").value for layer in layers
+            ),
             [40.0, 100.0],
         )
 
@@ -256,7 +258,7 @@ class StreamEvaluationTestCase(StreamTestBase):
         )
         run_id = uuid4()
         self.set_status(ScenarioStatus.Status.RUNNING, run_id)
-        with self.assertRaises(Exception):
+        with self.assertRaises(ImproperlyConfigured):
             run_inventory_stream.run(
                 stream.id, scenario_id=self.scenario.id, run_id=str(run_id)
             )

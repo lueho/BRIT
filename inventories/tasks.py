@@ -135,14 +135,21 @@ def mark_inventory_failed(
             return
         scenario_status.status = ScenarioStatus.Status.FAILED
         update_fields = ["status"]
-        recorded = (scenario_status.failed_algorithm_id, scenario_status.failed_stream_id)
+        recorded = (
+            scenario_status.failed_algorithm_id,
+            scenario_status.failed_stream_id,
+        )
         if recorded == (None, None):
             if algorithm_id is not None or stream_id is not None:
                 # First specific failure writes the culprit+message pair.
                 scenario_status.failed_algorithm_id = algorithm_id
                 scenario_status.failed_stream_id = stream_id
                 scenario_status.failure_message = failure_message
-                update_fields += ["failed_algorithm", "failed_stream", "failure_message"]
+                update_fields += [
+                    "failed_algorithm",
+                    "failed_stream",
+                    "failure_message",
+                ]
             elif failure_message and not scenario_status.failure_message:
                 scenario_status.failure_message = failure_message
                 update_fields.append("failure_message")

@@ -175,7 +175,13 @@ class HamburgParkProductionTestCase(TestCase):
             anlagenname="Remote park",
             geom=MultiPolygon(
                 Polygon(
-                    ((11, 53.5), (11.01, 53.5), (11.01, 53.51), (11, 53.51), (11, 53.5)),
+                    (
+                        (11, 53.5),
+                        (11.01, 53.5),
+                        (11.01, 53.51),
+                        (11, 53.51),
+                        (11, 53.5),
+                    ),
                     srid=4326,
                 )
             ),

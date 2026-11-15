@@ -716,9 +716,7 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
                     **{f"{column}__in": cls._condition_values(condition)}
                 )
             elif condition.operator in ("gte", "lte"):
-                queryset = queryset.filter(
-                    **{f"{column}__{condition.operator}": value}
-                )
+                queryset = queryset.filter(**{f"{column}__{condition.operator}": value})
             else:
                 queryset = queryset.filter(**{column: value})
         return queryset
