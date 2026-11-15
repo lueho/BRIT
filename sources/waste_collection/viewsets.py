@@ -10,7 +10,7 @@ from django.db.models.functions import Cast
 from django.urls import reverse
 from django.utils import timezone
 from django_filters import rest_framework as rf_filters
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import (
     NotAuthenticated,
@@ -72,7 +72,10 @@ from utils.object_management.services import (
     record_creation,
     validate_references,
 )
-from utils.object_management.viewsets import UserCreatedObjectViewSet
+from utils.object_management.viewsets import (
+    UserCreatedObjectReadOnlyViewSet,
+    UserCreatedObjectViewSet,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1286,7 +1289,7 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         return super().geojson(request, *args, **kwargs)
 
 
-class CollectorViewSet(CachedGeoJSONMixin, viewsets.ReadOnlyModelViewSet):
+class CollectorViewSet(CachedGeoJSONMixin, UserCreatedObjectReadOnlyViewSet):
     """
     Collector viewset with GeoJSON endpoint for QGIS map rendering.
 
@@ -1371,6 +1374,8 @@ class CollectorViewSet(CachedGeoJSONMixin, viewsets.ReadOnlyModelViewSet):
         """Build cache key including country filter and dataset version."""
         params = request.query_params
         country = params.get("country", "all")
+        scope = (params.get("scope") or "published").lower()
+        user = getattr(request, "user", None)
         id_list = params.getlist("id") if hasattr(params, "getlist") else []
         # Embedding the dataset version orphans stale payloads when collector,
         # catchment, region or border data changes, instead of serving them.
@@ -1381,12 +1386,16 @@ class CollectorViewSet(CachedGeoJSONMixin, viewsets.ReadOnlyModelViewSet):
                 ids_sorted = sorted([str(int(x)) for x in id_list])
             except Exception:
                 ids_sorted = sorted([str(x) for x in id_list])
-            return (
+            cache_key = (
                 f"collector_geojson:country:{country}:id:{','.join(ids_sorted)}"
                 f":dv:{dataset_version}"
             )
-
-        return f"collector_geojson:country:{country}:dv:{dataset_version}"
+        else:
+            cache_key = f"collector_geojson:country:{country}:dv:{dataset_version}"
+        if getattr(user, "is_authenticated", False):
+            audience_key = build_collection_cache_key(scope=scope, user=user)
+            return f"{cache_key}:audience:{user.pk}:{audience_key.rsplit(':', 1)[-1]}"
+        return cache_key
 
     def get_geojson_serializer_class(self):
         """Use CollectorGeometrySerializer for GeoJSON endpoint."""

@@ -2,6 +2,7 @@ import hashlib
 import io
 import json
 import re
+from uuid import uuid4
 
 from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
@@ -37,6 +38,7 @@ from maps.models import Catchment, GeoDataset, Region
 from maps.serializers import BaseResultMapSerializer
 from maps.views import GeoDataSetAutocompleteView, MapMixin
 from materials.models import Material, SampleSeries
+from utils.file_export.views import _store_task_id
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.object_management.policy import decide
 from utils.object_management.services import content_mutation
@@ -72,6 +74,8 @@ from .models import (
     ScenarioStatus,
 )
 from .tasks import start_inventory_run
+
+EVALUATION_SESSION_KEY = "evaluation_task_ids"
 
 
 def _get_posted_object_or_404(model, pk, queryset=None):
@@ -262,7 +266,9 @@ class ScenarioDetailView(ScenarioMapMixin, UserCreatedObjectDetailView):
         scenario = self.object
         if not decide(request.user, "edit", scenario).allowed:
             return HttpResponseForbidden()
-        start_inventory_run(scenario.id)
+        task_id = str(uuid4())
+        if start_inventory_run(scenario.id, task_id=task_id):
+            _store_task_id(request, task_id, EVALUATION_SESSION_KEY)
         return redirect("scenario-result", scenario.id)
 
 
@@ -432,6 +438,8 @@ def resolve_parameter_values(request, algorithm, scenario):
 
 @login_required
 def get_evaluation_status(request, task_id=None):
+    if task_id not in request.session.get(EVALUATION_SESSION_KEY, []):
+        raise Http404
     task_result = AsyncResult(task_id)
     result = {
         "task_id": task_id,

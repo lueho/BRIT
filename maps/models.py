@@ -582,7 +582,7 @@ class LauRegionQuerySet(UserCreatedObjectQuerySet):
         regions), so callers can restrict it to rows a user may select.
         Years rank newest first with NULL (unversioned) last, ties go to the
         highest pk, and NULL ``cntr_code`` groups with NULL. Rows with NULL
-        ``lau_id`` are always kept.
+        ``lau_id`` are kept only when present in ``among``.
         """
         candidates = LauRegion.objects.all() if among is None else among
         winner = (
@@ -594,7 +594,10 @@ class LauRegionQuerySet(UserCreatedObjectQuerySet):
             .order_by(F("year").desc(nulls_last=True), "-pk")
             .values("pk")[:1]
         )
-        return self.filter(Q(lau_id__isnull=True) | Q(pk=Subquery(winner)))
+        null_lau_ids = Q(lau_id__isnull=True)
+        if among is not None:
+            null_lau_ids &= Q(pk__in=Subquery(candidates.values("pk")))
+        return self.filter(null_lau_ids | Q(pk=Subquery(winner)))
 
 
 class LauRegionManager(models.Manager.from_queryset(LauRegionQuerySet)):

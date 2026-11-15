@@ -10,6 +10,7 @@ from django.contrib.auth.mixins import (
     PermissionRequiredMixin,
     UserPassesTestMixin,
 )
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Case, IntegerField, Max, Prefetch, Value, When
@@ -1270,7 +1271,18 @@ class CollectionCopyView(CollectionCreateView):
     View for duplicating an existing Collection. Copies all relevant fields and resets instance for new object creation.
     """
 
+    policy_enforced = True
     model = Collection
+    policy_source_action = "duplicate"
+
+    def has_permission(self):
+        if not super().has_permission():
+            return False
+        try:
+            source = self.get_object()
+        except Exception:
+            return False
+        return decide(self.request.user, self.policy_source_action, source).allowed
 
     def get_initial(self):
         """
@@ -1307,18 +1319,7 @@ class CollectionCreateNewVersionView(CollectionCopyView):
     """
 
     predecessor = None
-
-    def has_permission(self):
-        """Require add permission plus the central ``new_version`` decision."""
-        if not super().has_permission():
-            return False
-
-        try:
-            predecessor = self.get_object()
-        except Exception:
-            return False
-
-        return decide(self.request.user, "new_version", predecessor).allowed
+    policy_source_action = "new_version"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -1899,10 +1900,18 @@ class CollectionAddPropertyValueView(
 class CollectionCatchmentAddAggregatedPropertyView(
     AggregatedCollectionPropertyValueCreateView
 ):
+    policy_enforced = True
+
     def get_initial(self):
         initial = super().get_initial()
-        catchment = get_object_or_404(CollectionCatchment, pk=self.kwargs.get("pk"))
-        initial["collections"] = catchment.downstream_collections
+        user = getattr(self.request, "user", AnonymousUser())
+        catchment = get_object_or_404(
+            filter_queryset_for_user(CollectionCatchment.objects.all(), user),
+            pk=self.kwargs.get("pk"),
+        )
+        initial["collections"] = filter_queryset_for_user(
+            catchment.downstream_collections, user
+        )
         return initial
 
 

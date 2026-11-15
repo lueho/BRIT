@@ -992,8 +992,13 @@ class CollectorGeoJSONRenderedPathTests(APITestCase):
             name="Collector Catchment", region=cls.region
         )
         cls.collector = Collector.objects.create(
-            name="Geo Collector", catchment=cls.catchment
+            name="Geo Collector",
+            catchment=cls.catchment,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
         )
+        cls.owner = User.objects.create_user(username="collector-owner")
+        cls.stranger = User.objects.create_user(username="collector-stranger")
+        cls.private_collector_list_url = reverse("api-collector-list")
         cls.url = reverse("api-collector-geojson")
 
     def setUp(self):
@@ -1047,7 +1052,11 @@ class CollectorGeoJSONRenderedPathTests(APITestCase):
             catchment = CollectionCatchment.objects.create(
                 name=f"Stream Catchment {i}", region=self.region
             )
-            Collector.objects.create(name=f"Stream Collector {i}", catchment=catchment)
+            Collector.objects.create(
+                name=f"Stream Collector {i}",
+                catchment=catchment,
+                publication_status=UserCreatedObject.STATUS_PUBLISHED,
+            )
 
         with (
             patch("maps.mixins.STREAMING_THRESHOLD", 0),
@@ -1086,6 +1095,65 @@ class CollectorGeoJSONRenderedPathTests(APITestCase):
             "Renamed Collector",
         )
 
+    def test_private_collector_list_and_detail_are_owner_scoped(self):
+        private_collector = Collector.objects.create(
+            name="Private Geo Collector",
+            catchment=self.catchment,
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        list_response = self.client.get(self.private_collector_list_url)
+        detail_response = self.client.get(
+            reverse("api-collector-detail", args=[private_collector.pk])
+        )
+        self.assertNotIn(
+            private_collector.name,
+            [
+                item["properties"]["collector"]
+                for item in list_response.data["features"]
+            ],
+        )
+        self.assertEqual(detail_response.status_code, status.HTTP_404_NOT_FOUND)
+
+        self.client.force_login(self.owner)
+        owner_list = self.client.get(self.private_collector_list_url)
+        owner_detail = self.client.get(
+            reverse("api-collector-detail", args=[private_collector.pk])
+        )
+        self.assertIn(
+            private_collector.name,
+            [item["properties"]["collector"] for item in owner_list.data["features"]],
+        )
+        self.assertEqual(owner_detail.status_code, status.HTTP_200_OK)
+
+    def test_private_collector_geojson_cache_is_not_shared_with_anonymous(self):
+        private_collector = Collector.objects.create(
+            name="Private Geo Collector",
+            catchment=self.catchment,
+            owner=self.owner,
+            publication_status=UserCreatedObject.STATUS_PRIVATE,
+        )
+        self.client.force_login(self.owner)
+        owner_response = self.client.get(
+            self.url,
+            {"id": private_collector.pk},
+            REMOTE_ADDR="10.9.10.9",
+        )
+        self.assertEqual(owner_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            owner_response.data["features"][0]["properties"]["collector"],
+            private_collector.name,
+        )
+
+        self.client.logout()
+        anonymous_response = self.client.get(
+            self.url,
+            {"id": private_collector.pk},
+            REMOTE_ADDR="10.9.10.9",
+        )
+        self.assertEqual(anonymous_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(anonymous_response.data["features"], [])
+
 
 class CollectorGeoJSONVersionRotationTests(TransactionTestCase):
     """Border edits must rotate the collector dataset version.
@@ -1109,7 +1177,9 @@ class CollectorGeoJSONVersionRotationTests(TransactionTestCase):
             name="Collector Catchment", region=self.region
         )
         self.collector = Collector.objects.create(
-            name="Geo Collector", catchment=self.catchment
+            name="Geo Collector",
+            catchment=self.catchment,
+            publication_status=UserCreatedObject.STATUS_PUBLISHED,
         )
         self.url = reverse("api-collector-geojson")
         caches[settings.GEOJSON_CACHE].clear()

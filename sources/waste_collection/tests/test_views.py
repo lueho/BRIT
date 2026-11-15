@@ -54,6 +54,7 @@ from sources.waste_collection.models import (
     CollectionPropertyValue,
     CollectionSystem,
     Collector,
+    FeeSystem,
     MaterialCategory,
     WasteCategory,
     WasteComponent,
@@ -113,7 +114,6 @@ from ..models import (
     CollectionCountOptions,
     CollectionFrequency,
     CollectionSeason,
-    FeeSystem,
 )
 from ..tasks import cleanup_orphaned_waste_flyers
 
@@ -1468,6 +1468,41 @@ class CollectionListQueryTestCase(TestCase):
         self.assertEqual(actual, expected)
         self.assertNotIn(self.hidden_private.pk, actual)
 
+    def test_anonymous_collection_list_hides_private_reference_choices(self):
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
+        )
+        private_component = WasteComponent.objects.create(
+            name="Hidden filter material",
+            owner=self.other_owner,
+            publication_status="private",
+        )
+        private_fee_system = FeeSystem.objects.create(
+            name="Hidden filter fee system",
+            owner=self.other_owner,
+            publication_status="private",
+        )
+        private_collection = Collection.objects.create(
+            name="Hidden filter collection",
+            owner=self.other_owner,
+            publication_status="private",
+        )
+
+        response = self.client.get(reverse("collection-list"), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        for private_name in (
+            "List category",
+            "List system",
+            private_component.name,
+            private_fee_system.name,
+            private_collection.name,
+        ):
+            with self.subTest(name=private_name):
+                self.assertNotContains(response, private_name)
+
     @patch("utils.file_export.storages.get_file_export_storage")
     @patch("utils.file_export.storages.write_file_for_download", return_value="url")
     @patch("utils.file_export.generic_tasks.export_user_created_object_to_file.delay")
@@ -2581,6 +2616,51 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
+    def test_non_owner_with_add_permission_cannot_copy_private_collection(self):
+        self.client.force_login(self.member)
+        private_collection = Collection.objects.create(
+            name="private-copy-source",
+            owner=self.owner,
+            catchment=self.collection_catchment,
+            collector=self.collector,
+            collection_system=self.collection_system,
+            waste_category=self.waste_category,
+            frequency=self.frequency,
+            publication_status=Collection.STATUS_PRIVATE,
+        )
+        url = reverse(self.url_name, kwargs={"pk": private_collection.pk})
+        initial_count = Collection.objects.count()
+
+        get_response = self.client.get(url)
+        post_response = self.client.post(url, {})
+
+        self.assertEqual(get_response.status_code, 403)
+        self.assertEqual(post_response.status_code, 403)
+        self.assertEqual(Collection.objects.count(), initial_count)
+
+    def test_owner_with_add_permission_can_copy_private_collection(self):
+        self.owner.user_permissions.add(
+            Permission.objects.get(
+                codename="add_collection",
+                content_type__app_label="waste_collection",
+            )
+        )
+        private_collection = Collection.objects.create(
+            name="private-copy-source",
+            owner=self.owner,
+            catchment=self.collection_catchment,
+            collector=self.collector,
+            collection_system=self.collection_system,
+            waste_category=self.waste_category,
+            frequency=self.frequency,
+            publication_status=Collection.STATUS_PRIVATE,
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": private_collection.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(
@@ -3474,6 +3554,42 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
         self.client.force_login(self.member)
         response = self.client.get(reverse(self.url_name, kwargs={"pk": 999999999}))
         self.assertEqual(response.status_code, 404)
+
+    def test_private_catchment_of_another_user_returns_404(self):
+        private_catchment = CollectionCatchment.objects.create(
+            owner=self.outsider,
+            publication_status=CollectionCatchment.STATUS_PRIVATE,
+        )
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": private_catchment.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_initial_collections_exclude_private_downstream_collections(self):
+        private_child = CollectionCatchment.objects.create(
+            parent=self.catchment,
+            owner=self.outsider,
+            publication_status=CollectionCatchment.STATUS_PUBLISHED,
+        )
+        private_collection = Collection.objects.create(
+            name="Private Downstream Collection",
+            catchment=private_child,
+            owner=self.outsider,
+            publication_status=Collection.STATUS_PRIVATE,
+        )
+        request = RequestFactory().get(
+            reverse(self.url_name, kwargs={"pk": self.catchment.pk})
+        )
+        request.user = self.member
+        view = views.CollectionCatchmentAddAggregatedPropertyView()
+        view.setup(request, pk=self.catchment.pk)
+
+        initial = view.get_initial()
+
+        self.assertNotIn(
+            private_collection.pk, initial["collections"].values_list("pk", flat=True)
+        )
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(

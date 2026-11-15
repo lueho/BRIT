@@ -474,6 +474,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
     - Success URL determination (respecting 'next' parameter)
     """
 
+    policy_enforced = True
     permission_method: str | None = None
     permission_denied_message: str = "You don't have permission to perform this action."
     redirect_handlers: dict = {}
@@ -930,6 +931,7 @@ class BaseObjectAccessActionView(LoginRequiredMixin, UserPassesTestMixin, View):
     to 'next' or the object's detail page.
     """
 
+    policy_enforced = True
     permission_method: str | None = None
     permission_denied_message: str = "You don't have permission to perform this action."
 
@@ -1393,6 +1395,8 @@ class UserOwnsObjectMixin(UserPassesTestMixin):
     decision, so editors and lifecycle rules apply uniformly.
     """
 
+    policy_enforced = True
+
     def test_func(self):
         try:
             obj = self.get_object()
@@ -1408,6 +1412,7 @@ class UserOwnsObjectMixin(UserPassesTestMixin):
 
 
 class UserCreatedObjectListMixin:
+    policy_enforced = True
     paginate_by = 10
     header = None
     list_type = None
@@ -1954,6 +1959,7 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
     access.
     """
 
+    policy_enforced = True
     publication_status_field = "publication_status"
     owner_field = "owner"
     published_status = "published"
@@ -1990,6 +1996,7 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
     or ``duplicate`` (mapped onto ``new_version``).
     """
 
+    policy_enforced = True
     publication_status_field = "publication_status"
     owner_field = "owner"
     published_status = "published"
@@ -2043,6 +2050,7 @@ class PolicyPermissionRequiredMixin(PermissionRequiredMixin):
     enforcement.
     """
 
+    policy_enforced = True
     policy_model = None
     policy_action = "create"
 
@@ -3027,6 +3035,7 @@ class WorkspaceSectionUpdateMixin:
     for resource-specific summary data and JSON fields.
     """
 
+    policy_enforced = True
     section_registry = None
     section_formset_class = None
     object_label = "object"
@@ -3175,6 +3184,8 @@ class OwnedObjectModelSelectOptionsView(ModelSelectOptionsView):
     on top of the create affordance that triggered the refresh.
     """
 
+    policy_enforced = True
+
     def get_queryset(self):
         queryset = super().get_queryset()
         if queryset is None:
@@ -3187,6 +3198,7 @@ class OwnedObjectModelSelectOptionsView(ModelSelectOptionsView):
 
 
 class UserCreatedObjectAutocompleteView(AutocompleteModelView):
+    policy_enforced = True
     search_lookups = ["name__icontains"]
     value_fields = [
         "name",

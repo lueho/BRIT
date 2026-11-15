@@ -199,6 +199,21 @@ When permission behavior changes, update all three together:
 2. Regression tests
 3. Canonical doc: `security_permission_validation.md`
 
+## Route coverage enforcement
+
+The `object_management` system checks enforce a policy marker on routed views
+that expose governed models. Verified policy adapters declare
+`policy_enforced = True`; a route that is intentionally outside the policy
+must declare a non-empty explanatory `policy_exempt` string. `E020` reports an
+uncovered governed route, `E021` reports a public DRF route with no governed
+model or coverage, and `E022` reports governed model-choice filters outside
+`BaseCrispyFilterSet`.
+
+`BaseCrispyFilterSet` applies the shared read policy to governed
+`ModelChoiceFilter` and `ModelMultipleChoiceFilter` querysets before the form is
+built. This is the default for both authenticated and anonymous requests;
+purpose-specific scoping may further narrow those policy-visible choices.
+
 ## Source-bound collection projections
 
 *Part 10 draft runtime checkpoint - not a deployment claim.*

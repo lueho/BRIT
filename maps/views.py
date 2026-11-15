@@ -16,6 +16,7 @@ from django.views.generic.edit import FormMixin
 from django_filters.views import FilterView
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed, NotFound, ParseError
+from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView, Response
 
 from maps.geojson_assets import get_static_region_geojson_url
@@ -1600,23 +1601,25 @@ class CatchmentRegionGeometryAPI(APIView):
     and returns the geometry of the associated Region.
     """
 
-    authentication_classes = []
-    permission_classes = []
+    policy_enforced = True
+    permission_classes = [AllowAny]
 
     @staticmethod
     def get(request, *args, **kwargs):
         if "pk" in request.query_params:
             try:
                 # select_related needed for geometry serialization
-                catchment = Catchment.objects.select_related(
-                    "region", "region__borders"
+                catchment = filter_queryset_for_user(
+                    Catchment.objects.select_related("region", "region__borders"),
+                    request.user,
                 ).get(pk=request.query_params.get("pk"))
             except (Catchment.DoesNotExist, ValueError, TypeError) as err:
                 raise NotFound(
                     "A catchment with the provided id does not exist."
                 ) from err
-            regions = Region.objects.select_related("borders").filter(
-                catchment=catchment
+            regions = filter_queryset_for_user(
+                Region.objects.select_related("borders").filter(catchment=catchment),
+                request.user,
             )
             serializer = RegionGeoFeatureModelSerializer(regions, many=True)
             return JsonResponse({"geoJson": serializer.data})
@@ -1625,20 +1628,30 @@ class CatchmentRegionGeometryAPI(APIView):
 
 
 class CatchmentRegionSummaryAPIView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    policy_enforced = True
+    permission_classes = [AllowAny]
 
     @staticmethod
     def get(request, *args, **kwargs):
         if "pk" in request.query_params:
             try:
-                catchment = Catchment.objects.get(pk=request.query_params.get("pk"))
+                catchment = filter_queryset_for_user(
+                    Catchment.objects.all(), request.user
+                ).get(pk=request.query_params.get("pk"))
             except (Catchment.DoesNotExist, ValueError, TypeError) as err:
                 raise NotFound(
                     "A catchment with the provided id does not exist."
                 ) from err
+            region = (
+                filter_queryset_for_user(Region.objects.all(), request.user)
+                .filter(pk=catchment.region_id)
+                .first()
+            )
+            if region is None:
+                return Response({})
+
             try:
-                region = catchment.region.nutsregion
+                region = region.nutsregion
                 serializer = NutsRegionSummarySerializer(
                     region, field_labels_as_keys=True, context={"request": request}
                 )
@@ -1674,8 +1687,8 @@ class NutsRegionPublishedMapView(GeoDataSetPublishedFilteredMapView):
 class BasePedigreeAPI(APIView):
     """Shared validation and traversal helpers for the pedigree option APIs."""
 
-    authentication_classes = []
-    permission_classes = []
+    policy_enforced = True
+    permission_classes = [AllowAny]
 
     @staticmethod
     def validate_params(request, object_label):
@@ -1692,13 +1705,16 @@ class BasePedigreeAPI(APIView):
         return request.query_params["direction"]
 
     @staticmethod
-    def traverse_children(instance, serializer_cls, prefetch=None):
+    def traverse_children(instance, serializer_cls, user, prefetch=None):
         data = {}
         for lvl in range(instance.levl_code + 1, 4):
-            qs = NutsRegion.objects.filter(
-                levl_code=lvl,
-                nuts_id__startswith=instance.nuts_id,
-                version=instance.version_id,
+            qs = filter_queryset_for_user(
+                NutsRegion.objects.filter(
+                    levl_code=lvl,
+                    nuts_id__startswith=instance.nuts_id,
+                    version=instance.version_id,
+                ),
+                user,
             )
             if prefetch:
                 qs = qs.prefetch_related(prefetch)
@@ -1706,10 +1722,18 @@ class BasePedigreeAPI(APIView):
         return data
 
     @staticmethod
-    def traverse_parents(instance, serializer_cls):
+    def traverse_parents(instance, serializer_cls, user):
         data = {}
         for lvl in range(instance.levl_code - 1, -1, -1):
-            instance = instance.parent
+            if instance.parent_id is None:
+                break
+            instance = (
+                filter_queryset_for_user(NutsRegion.objects.all(), user)
+                .filter(pk=instance.parent_id)
+                .first()
+            )
+            if instance is None:
+                break
             data[f"id_level_{lvl}"] = serializer_cls(instance).data
         return data
 
@@ -1724,7 +1748,9 @@ class NutsRegionPedigreeAPI(BasePedigreeAPI):
     def get(request):
         direction = BasePedigreeAPI.validate_params(request, "id of NUTS region")
         try:
-            instance = NutsRegion.objects.get(id=request.query_params["id"])
+            instance = filter_queryset_for_user(
+                NutsRegion.objects.all(), request.user
+            ).get(id=request.query_params["id"])
         except NutsRegion.DoesNotExist as err:
             raise NotFound(
                 "A NUTS region with the provided id does not exist."
@@ -1732,11 +1758,11 @@ class NutsRegionPedigreeAPI(BasePedigreeAPI):
 
         if direction == "children":
             data = BasePedigreeAPI.traverse_children(
-                instance, NutsRegionOptionSerializer
+                instance, NutsRegionOptionSerializer, request.user
             )
         else:
             data = BasePedigreeAPI.traverse_parents(
-                instance, NutsRegionOptionSerializer
+                instance, NutsRegionOptionSerializer, request.user
             )
         return Response(data)
 
@@ -1751,8 +1777,13 @@ class NutsAndLauCatchmentPedigreeAPI(BasePedigreeAPI):
     def get(request):
         direction = BasePedigreeAPI.validate_params(request, "catchment id")
         try:
-            catchment = Catchment.objects.get(id=request.query_params["id"])
-            instance = catchment.region.nutsregion
+            catchment = filter_queryset_for_user(
+                Catchment.objects.all(), request.user
+            ).get(id=request.query_params["id"])
+            instance = filter_queryset_for_user(
+                NutsRegion.objects.all(), request.user
+            ).get(pk=catchment.region_id)
+            instance = instance.region_ptr.nutsregion
         except (Catchment.DoesNotExist, NutsRegion.DoesNotExist, AttributeError) as err:
             raise NotFound(
                 "A NUTS region with the provided id does not exist."
@@ -1763,18 +1794,19 @@ class NutsAndLauCatchmentPedigreeAPI(BasePedigreeAPI):
             data = BasePedigreeAPI.traverse_children(
                 instance,
                 NutsRegionCatchmentOptionSerializer,
+                request.user,
                 prefetch="region_ptr__catchment_set",
             )
             data["id_level_4"] = []
             if instance.levl_code == 3:
                 # Prefetch needed: serializer accesses region_ptr.catchment_set
-                qs = LauRegion.objects.filter(nuts_parent=instance).prefetch_related(
-                    "region_ptr__catchment_set"
-                )
+                qs = filter_queryset_for_user(
+                    LauRegion.objects.filter(nuts_parent=instance), request.user
+                ).prefetch_related("region_ptr__catchment_set")
                 data["id_level_4"] = LauRegionOptionSerializer(qs, many=True).data
         else:
             data = BasePedigreeAPI.traverse_parents(
-                instance, NutsRegionCatchmentOptionSerializer
+                instance, NutsRegionCatchmentOptionSerializer, request.user
             )
         return Response(data)
 

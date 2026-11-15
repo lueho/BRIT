@@ -22,12 +22,12 @@ logger = logging.getLogger(__name__)
 SESSION_KEY = "export_task_ids"
 
 
-def _store_task_id(request, task_id):
+def _store_task_id(request, task_id, session_key=SESSION_KEY):
     """Store a Celery task ID in the session so only the initiating user can poll it."""
     session = getattr(request, "session", None)
     if session is None:
         return
-    pending = session.setdefault(SESSION_KEY, [])
+    pending = session.setdefault(session_key, [])
     pending.append(task_id)
     session.modified = True
 
@@ -49,6 +49,7 @@ class SingleObjectFileExportView(LoginRequiredMixin, SingleObjectMixin, View):
       ``filter_queryset_for_user`` for visibility.
     """
 
+    policy_enforced = True
     task_function = None
 
     def get_task_function(self):
@@ -175,6 +176,7 @@ class GenericUserCreatedObjectExportView(FilteredListFileExportView):
     Subclasses must define model_label (e.g. 'waste_collection.Collection').
     """
 
+    policy_enforced = True
     model_label = None  # e.g. 'waste_collection.Collection'
     include_row_count_estimate = False
     large_export_row_count = 10000
