@@ -6,6 +6,7 @@ import re
 from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
 from django.db.models import Prefetch, Q
 from django.http import (
@@ -37,6 +38,7 @@ from maps.models import Catchment, GeoDataset, Region
 from maps.serializers import BaseResultMapSerializer
 from maps.views import GeoDataSetAutocompleteView, MapMixin
 from materials.models import Material, SampleSeries
+from utils.exceptions import UnitMismatchError
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.object_management.policy import decide
 from utils.object_management.services import content_mutation
@@ -60,6 +62,8 @@ from .evaluator import (
     LEGACY_FUNCTION_BASE_KINDS,
     BaseKind,
     available_base_kinds,
+    chain_base_unit,
+    validate_amount_unit,
 )
 from .exceptions import BlockedRunningScenario, InvalidParameterValue
 from .filters import ScenarioFilterSet
@@ -598,6 +602,13 @@ class ScenarioAddInventoryAlgorithmView(
         symbols = [spec["name"] for spec in factor_specs]
         if len(set(symbols)) != len(symbols):
             return HttpResponseBadRequest("Each factor name may be used only once.")
+        try:
+            validate_amount_unit(
+                chain_base_unit(base_kind, stream_fields.get("base_unit", "")),
+                [spec["unit"] for spec in factor_specs],
+            )
+        except ImproperlyConfigured as exc:
+            return HttpResponseBadRequest(str(exc))
 
         with content_mutation(request.user, scenario, action="edit") as locked_scenario:
             stream = InventoryStream.objects.create(
@@ -1082,6 +1093,7 @@ class ScenarioResultView(ScenarioMapMixin, UserCreatedObjectDetailView):
             .order_by("pk")
         )
         context["charts"] = result.get_charts()
+        context["production_units"] = result.production_units()
         context.update(scenario_presentation_context(scenario, self.request.user))
         return context
 
@@ -1244,7 +1256,13 @@ def download_scenario_result_summary(request, scenario_pk):
     if not decide(request.user, "export", scenario).allowed:
         return HttpResponseForbidden()
     result = ScenarioResult(scenario)
-    with io.StringIO(json.dumps(result.summary_dict(), indent=4)) as file:
+    try:
+        summary = result.summary_dict()
+    except UnitMismatchError:
+        return HttpResponseBadRequest(
+            "The inventories give amounts in different units and cannot be added up."
+        )
+    with io.StringIO(json.dumps(summary, indent=4)) as file:
         response = HttpResponse(file, content_type="application/json")
         response["Content-Disposition"] = (
             f"attachment; filename=scenario_{scenario_pk}_result_summary.json"

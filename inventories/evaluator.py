@@ -104,6 +104,42 @@ class StreamSpec:
     factors: tuple = ()
 
 
+def chain_base_unit(base_kind, base_unit=""):
+    """Unit in which the base quantity enters the chain."""
+    if base_kind == BaseKind.AREA:
+        return "meter ** 2"
+    if base_kind in (BaseKind.COLUMN_SUM, BaseKind.DIRECT):
+        return base_unit or ""
+    return ""
+
+
+def validate_amount_unit(base_unit, factor_units):
+    """Reject a chain that cannot give an amount of material.
+
+    A chain without any unit is accepted as it is.
+    """
+    registry = get_unit_registry()
+    if registry is None:
+        return
+    quantity = registry.Quantity(1.0)
+    for unit in (base_unit, *factor_units):
+        if not unit:
+            continue
+        try:
+            quantity = quantity * registry.Quantity(1.0, unit)
+        except Exception:
+            raise ImproperlyConfigured(f"Unknown unit '{unit}'.") from None
+    if quantity.dimensionless or quantity.check("[mass]"):
+        return
+    if quantity.check("[mass] / [time]"):
+        return
+    raise ImproperlyConfigured(
+        f"The base quantity and its factors give an amount in "
+        f"'{quantity.units:~}'. An inventory needs a mass per year, "
+        f"for example a factor in 'kg / year'."
+    )
+
+
 def evaluate(spec, catchment_geom):
     """Evaluate ``spec`` inside ``catchment_geom`` (EPSG:4326).
 
@@ -122,6 +158,12 @@ def evaluate(spec, catchment_geom):
             raise ImproperlyConfigured(
                 f"Unknown filter operator '{condition.operator}'."
             )
+    validate_amount_unit(
+        chain_base_unit(
+            spec.base_kind, spec.base.unit if spec.base else spec.base_unit
+        ),
+        [term.unit for term in spec.factors],
+    )
     return measure(spec, catchment_geom)
 
 

@@ -69,6 +69,18 @@ class ScenarioResult:
             ]
         )
 
+    def production_units(self):
+        """Units of the layer totals; more than one cannot be added up."""
+        return sorted(
+            {
+                value.unit or ""
+                for layer in self.layers
+                for value in layer.layeraggregatedvalue_set.filter(
+                    name="Total production"
+                )
+            }
+        )
+
     def total_production(self):
         production_value = 0
         unit = None
@@ -105,14 +117,15 @@ class ScenarioResult:
         charts = {}
 
         # Total annual production per feedstock
-        production = self.total_production_per_feedstock()
-        chart = BarChart(
-            id="productionPerFeedstockBarChart",
-            title="Total annual production per feedstock",
-            unit=production.unit,
-        )
-        chart.add_dataset(production)
-        charts.update({"productionPerFeedstockBarChart": chart.as_old_dict()})
+        if len(self.production_units()) <= 1:
+            production = self.total_production_per_feedstock()
+            chart = BarChart(
+                id="productionPerFeedstockBarChart",
+                title="Total annual production per feedstock",
+                unit=production.unit,
+            )
+            chart.add_dataset(production)
+            charts.update({"productionPerFeedstockBarChart": chart.as_old_dict()})
 
         # Composition of total production by component group
         try:

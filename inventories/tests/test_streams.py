@@ -1,5 +1,6 @@
 """Tests for inventory streams: stored definition, invalidation and evaluation."""
 
+from unittest.mock import patch
 from uuid import uuid4
 
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
@@ -8,6 +9,7 @@ from django.db import transaction
 from django.test import TestCase
 from django.urls import reverse
 
+from distributions.models import Timestep
 from inventories.evaluations import ScenarioResult
 from inventories.evaluator import BaseKind, Condition, Term
 from inventories.exceptions import BlockedRunningScenario
@@ -303,6 +305,35 @@ class StreamEvaluationTestCase(StreamTestBase):
         self.assertEqual(scenario_status.failed_stream, stream)
         self.assertIn("no_such_column", scenario_status.failure_message)
 
+    def test_stream_that_yields_no_amount_of_material_fails(self):
+        stream = self.count_stream()
+        StreamFactor.objects.create(
+            stream=stream, symbol="length", value=1.0, unit="meter"
+        )
+        run_id = uuid4()
+        self.set_status(ScenarioStatus.Status.RUNNING, run_id)
+        with self.assertRaises(ImproperlyConfigured):
+            run_inventory_stream.run(
+                stream.id, scenario_id=self.scenario.id, run_id=str(run_id)
+            )
+        scenario_status = ScenarioStatus.objects.get(scenario=self.scenario)
+        self.assertEqual(scenario_status.status, ScenarioStatus.Status.FAILED)
+        self.assertEqual(scenario_status.failed_stream, stream)
+        self.assertIn("mass per year", scenario_status.failure_message)
+
+    def test_share_in_percent_is_a_valid_factor(self):
+        stream = self.count_stream()
+        for order, (symbol, value, unit) in enumerate(
+            (("unit_yield", 500.0, "kg / year"), ("share", 50.0, "percent"))
+        ):
+            StreamFactor.objects.create(
+                stream=stream, symbol=symbol, value=value, unit=unit, order=order
+            )
+        layer = self.run_stream(stream)
+        total = aggregated_value(layer, "Total production")
+        self.assertAlmostEqual(total.value, 0.5)
+        self.assertEqual(total.unit, "Mg/a")
+
     def test_run_inventory_plans_streams(self):
         stream = self.direct_stream()
         plan = self.scenario.stream_execution_plan()
@@ -347,6 +378,40 @@ class StreamResultPageTestCase(StreamTestBase):
         response = self.client.get(map_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Number of features")
+
+    def test_result_page_reports_amounts_in_different_units(self):
+        """A mass and a mass per year cannot be added up into one total."""
+        self.publish_layer()
+        per_year = self.direct_stream(name="Per year")
+        mass = self.direct_stream(name="Mass only", base_unit="Mg")
+        run_id = uuid4()
+        self.set_status(ScenarioStatus.Status.RUNNING, run_id)
+        plan = [["stream", stream.id] for stream in (per_year, mass)]
+        for _kind, stream_id in plan:
+            run_inventory_stream.run(
+                stream_id, scenario_id=self.scenario.id, run_id=str(run_id)
+            )
+        finalize_inventory.run([True, True], self.scenario.id, str(run_id), plan)
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("scenario-result", kwargs={"pk": self.scenario.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "different units")
+        self.assertNotIn("productionPerFeedstockBarChart", response.context["charts"])
+        self.assertContains(response, "Mass only")
+
+        with patch.object(
+            ScenarioResult, "homogenize_timesteps", return_value=[Timestep(name="Year")]
+        ):
+            response = self.client.get(
+                reverse(
+                    "scenario-download-result-summary",
+                    kwargs={"scenario_pk": self.scenario.pk},
+                )
+            )
+        self.assertEqual(response.status_code, 400)
 
     def test_layer_map_is_hidden_from_other_users(self):
         layer = self.publish_layer()

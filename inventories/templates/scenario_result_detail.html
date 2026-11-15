@@ -44,6 +44,11 @@
       {% empty %}
         <section class="sdv2-section-panel sri-muted">This scenario has no stored results.</section>
       {% endfor %}
+      {% if production_units|length > 1 %}
+        <section class="sdv2-section-panel sri-muted" role="status">
+          The inventories give amounts in different units ({% for unit in production_units %}{{ unit|default:"no unit" }}{% if not forloop.last %}, {% endif %}{% endfor %}), so they are not added up. Give every inventory a result in mass per year, for example with a factor in kg / year.
+        </section>
+      {% endif %}
       {% if charts %}
         <div class="sri-charts">
           {% for id, c in charts.items %}

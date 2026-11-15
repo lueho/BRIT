@@ -611,6 +611,9 @@ class GenericAlgorithmAddViewTestCase(TestCase):
             algorithm_choice="stream:column_sum",
             base_column="surface_ha",
             base_unit="hectare",
+            kwarg_name=["area_yield"],
+            kwarg_value=["2"],
+            kwarg_unit=["Mg / hectare / year"],
         )
         self.assertEqual(response.status_code, 302)
         stream = self._stream()
@@ -639,6 +642,14 @@ class GenericAlgorithmAddViewTestCase(TestCase):
     def test_duplicate_factor_name_returns_400(self):
         response = self._post(kwarg_name=["share", "share"], kwarg_value=["1.0", "0.5"])
         self.assertEqual(response.status_code, 400)
+        self.assertFalse(InventoryStream.objects.exists())
+
+    def test_factors_that_yield_no_amount_of_material_return_400(self):
+        response = self._post(
+            kwarg_name=["length"], kwarg_value=["1"], kwarg_unit=["meter"]
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("mass per year", response.content.decode())
         self.assertFalse(InventoryStream.objects.exists())
 
     def test_non_numeric_kwarg_value_returns_400(self):
