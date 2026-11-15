@@ -260,6 +260,25 @@ class ScenarioGeoDataSetAutocompleteFilterTestCase(TestCase):
         ids = [item["id"] for item in response.json()["results"]]
         self.assertIn(self.geodataset.id, ids)
 
+    def test_dataset_with_a_registered_inventory_stays_selectable(self):
+        """Several inventories of one material can be built on one dataset."""
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=self.scenario,
+            feedstock=self.target_material,
+            geodataset=self.geodataset,
+            inventory_algorithm=self.algorithm,
+        )
+        response = self.client.get(
+            reverse("scenario-geodataset-autocomplete"),
+            {
+                "f": f"'feedstock__feedstock_id={self.target_material.id}'",
+                "e": f"'scenario__scenario_id={self.scenario.id}'",
+            },
+        )
+
+        ids = [item["id"] for item in response.json()["results"]]
+        self.assertIn(self.geodataset.id, ids)
+
     def test_widget_wire_format_returns_inventory_algorithm(self):
         """Same wire format applies to the algorithm dropdown
         (geodataset via filter_by, feedstock via exclude_by)."""
@@ -356,6 +375,48 @@ class GeoDatasetFunctionsAPITestCase(TestCase):
         kinds = [f["base_kind"] for f in response.json()["functions"]]
         self.assertIn("area", kinds)
         self.assertNotIn("feature_count", kinds)
+
+    def test_dataset_without_resolvable_source_offers_no_base_quantity(self):
+        """Its features cannot be read, so no base quantity could be evaluated."""
+        dataset = GeoDataset.objects.create(
+            name="Unresolvable",
+            region=self.region,
+            model_name="HamburgGreenAreas",
+            publication_status="published",
+        )
+        response = self._get(dataset)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["functions"], [])
+
+    def test_registered_algorithm_in_use_is_not_offered_again(self):
+        material = Material.objects.create(name="FN Material")
+        scenario = Scenario.objects.create(
+            name="FN Scenario", region=self.region, owner=self.user
+        )
+        used = InventoryAlgorithm.objects.create(
+            name="FN used", geodataset=self.point_dataset
+        )
+        unused = InventoryAlgorithm.objects.create(
+            name="FN unused", geodataset=self.point_dataset
+        )
+        for algorithm in (used, unused):
+            algorithm.feedstocks.add(material)
+        ScenarioInventoryConfiguration.objects.create(
+            scenario=scenario,
+            feedstock=material,
+            geodataset=self.point_dataset,
+            inventory_algorithm=used,
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse(
+                "api-geodataset-functions",
+                kwargs={"geodataset_pk": self.point_dataset.pk},
+            ),
+            {"scenario": scenario.pk, "feedstock": material.pk},
+        )
+        names = [algorithm["name"] for algorithm in response.json()["algorithms"]]
+        self.assertEqual(names, [str(unused)])
 
     def test_response_includes_labels(self):
         response = self._get(self.point_dataset)

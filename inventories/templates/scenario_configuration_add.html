@@ -287,7 +287,9 @@
             const generic = genericFunctions;
             const registered = data.algorithms || [];
             if (generic.length === 0 && registered.length === 0) {
-                container.innerHTML = "";
+                container.innerHTML =
+                    '<p class="text-muted">No inventory method can be applied to this dataset.</p>';
+                document.getElementById("parameterFormContainer").innerHTML = "";
                 return;
             }
             let options = '<option value="">---------</option>';

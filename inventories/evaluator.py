@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 
+from maps.runtime_adapters import get_dataset_runtime_adapter
 from utils.properties.units import get_unit_registry
 
 from .algorithms import PRODUCTION_DEVIATION_NAME, InventoryAlgorithms
@@ -44,8 +45,13 @@ def available_base_kinds(geodataset):
     """Base quantities that can be measured from ``geodataset``.
 
     The geometry decides between counting and area; a column sum needs a
-    numeric attribute column.
+    numeric attribute column. A dataset whose features cannot be read offers
+    none.
     """
+    try:
+        get_dataset_runtime_adapter(geodataset)
+    except ImproperlyConfigured:
+        return []
     kinds = [
         LEGACY_FUNCTION_BASE_KINDS[function_name]
         for function_name in InventoryAlgorithms.generic_functions(geodataset)

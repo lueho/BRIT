@@ -761,11 +761,9 @@ class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
     """GeoDataset autocomplete scoped to datasets covering a scenario's region.
 
     The widget passes the scenario id via either ``filter_by`` or
-    ``exclude_by`` and an optional feedstock id via ``filter_by``. With a
-    feedstock, datasets already configured for that feedstock's material in
-    the scenario are excluded. Without one, every dataset of the scenario
-    region or of a region enclosing it is offered — generic algorithms work
-    on any dataset.
+    ``exclude_by`` and an optional feedstock id via ``filter_by``. Every
+    dataset of the scenario region or of a region enclosing it is offered;
+    several inventories of one material can be built on one dataset.
     """
 
     def apply_filters(self, queryset):
@@ -782,25 +780,10 @@ class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
         except Scenario.DoesNotExist:
             return GeoDataset.objects.none()
 
-        queryset = scenario.compatible_geodatasets(queryset)
+        if feedstock_id and not Material.objects.filter(pk=feedstock_id).exists():
+            return GeoDataset.objects.none()
 
-        if feedstock_id:
-            try:
-                feedstock = Material.objects.get(pk=feedstock_id)
-            except Material.DoesNotExist:
-                return GeoDataset.objects.none()
-            from django.db.models import Exists, OuterRef
-
-            evaluated_q = ScenarioInventoryConfiguration.objects.filter(
-                geodataset=OuterRef("pk"),
-                scenario=scenario,
-                feedstock=feedstock,
-            )
-            queryset = queryset.annotate(already_evaluated=Exists(evaluated_q)).filter(
-                already_evaluated=False
-            )
-
-        return queryset
+        return scenario.compatible_geodatasets(queryset)
 
 
 class ScenarioInventoryAlgorithmAutocompleteView(InventoryAlgorithmAutocompleteView):
@@ -915,6 +898,16 @@ class GeoDatasetFunctionsAPIView(LoginRequiredMixin, APIView):
                 algorithms = algorithms.filter(feedstocks=feedstock)
             except Material.DoesNotExist:
                 algorithms = algorithms.none()
+            else:
+                if scenario_id is not None:
+                    # An algorithm is configured once per material.
+                    algorithms = algorithms.exclude(
+                        pk__in=ScenarioInventoryConfiguration.objects.filter(
+                            scenario_id=scenario_id,
+                            feedstock=feedstock,
+                            geodataset=geodataset,
+                        ).values("inventory_algorithm_id")
+                    )
         try:
             columns = InventoryAlgorithms.feature_columns(geodataset)
         except Exception:
