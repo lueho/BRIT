@@ -31,7 +31,11 @@ class WasteCollectionConfig(AppConfig):
             return
 
         try:
-            from django.db.models.signals import post_delete, post_save
+            from django.db.models.signals import (
+                m2m_changed,
+                post_delete,
+                post_save,
+            )
 
             CollectionPropertyValue = self.get_model("CollectionPropertyValue")
             post_save.connect(
@@ -47,4 +51,28 @@ class WasteCollectionConfig(AppConfig):
         except LookupError:
             logger.warning(
                 "Waste collection signal registration skipped because CollectionPropertyValue could not be resolved."
+            )
+
+        try:
+            AggregatedCollectionPropertyValue = self.get_model(
+                "AggregatedCollectionPropertyValue"
+            )
+            post_save.connect(
+                signal_module.sync_derived_acpv_on_save,
+                sender=AggregatedCollectionPropertyValue,
+                dispatch_uid="waste_collection.sync_derived_acpv_on_save",
+            )
+            post_delete.connect(
+                signal_module.sync_derived_acpv_on_delete,
+                sender=AggregatedCollectionPropertyValue,
+                dispatch_uid="waste_collection.sync_derived_acpv_on_delete",
+            )
+            m2m_changed.connect(
+                signal_module.sync_derived_acpv_on_collections_changed,
+                sender=AggregatedCollectionPropertyValue.collections.through,
+                dispatch_uid="waste_collection.sync_derived_acpv_on_collections_changed",
+            )
+        except LookupError:
+            logger.warning(
+                "Waste collection signal registration skipped because AggregatedCollectionPropertyValue could not be resolved."
             )

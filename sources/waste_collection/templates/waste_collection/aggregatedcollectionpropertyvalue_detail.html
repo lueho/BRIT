@@ -51,6 +51,15 @@
     </div>
 {% endblock detail_header_actions %}
 {% block detail_body %}
+    {% if generated_value_source %}
+        <div class="alert alert-info" role="status">
+            <strong>Generated Value (Read-Only)</strong>
+            <br>
+            This calculated value follows the permissions and review of its
+            <a href="{{ generated_value_source.get_absolute_url }}">raw source evidence</a>.
+            Edit or review the source when your permissions and its state allow it.
+        </div>
+    {% endif %}
     <p class="card-text">
         <strong>Collections:</strong>
         <br>

@@ -83,7 +83,7 @@ def convert_total_to_specific(value, population, ndigits=2):
 class DerivedPropertyConfig:
     specific_property_id: int
     total_property_id: int
-    population_attribute_id: int
+    population_attribute_id: int | None
 
 
 @dataclass(frozen=True)
@@ -152,9 +152,14 @@ def _resolve_named_record_id(
     )
 
 
-@lru_cache(maxsize=1)
-def get_derived_property_config():
-    """Resolve and cache property/attribute IDs required for derivation."""
+@lru_cache(maxsize=2)
+def get_derived_property_config(with_population_attribute=True):
+    """Resolve and cache property/attribute IDs required for derivation.
+
+    The legacy per-collection population ``RegionProperty`` is only required
+    by the CPV pipeline; aggregate denominators resolve through the
+    population service and skip it.
+    """
     specific_property_id = _resolve_named_record_id(
         model=Property,
         id_settings=(
@@ -181,18 +186,22 @@ def get_derived_property_config():
         default_name=_DEFAULT_TOTAL_WASTE_PROPERTY_NAME,
         label="total waste property",
     )
-    population_attribute_id = _resolve_named_record_id(
-        model=RegionProperty,
-        id_settings=(
-            "WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID",
-            "SOILCOM_POPULATION_ATTRIBUTE_ID",
-        ),
-        name_settings=(
-            "WASTE_COLLECTION_POPULATION_ATTRIBUTE_NAME",
-            "SOILCOM_POPULATION_ATTRIBUTE_NAME",
-        ),
-        default_name=_DEFAULT_POPULATION_ATTRIBUTE_NAME,
-        label="population attribute",
+    population_attribute_id = (
+        _resolve_named_record_id(
+            model=RegionProperty,
+            id_settings=(
+                "WASTE_COLLECTION_POPULATION_ATTRIBUTE_ID",
+                "SOILCOM_POPULATION_ATTRIBUTE_ID",
+            ),
+            name_settings=(
+                "WASTE_COLLECTION_POPULATION_ATTRIBUTE_NAME",
+                "SOILCOM_POPULATION_ATTRIBUTE_NAME",
+            ),
+            default_name=_DEFAULT_POPULATION_ATTRIBUTE_NAME,
+            label="population attribute",
+        )
+        if with_population_attribute
+        else None
     )
 
     if specific_property_id == total_property_id:
@@ -207,10 +216,12 @@ def get_derived_property_config():
     )
 
 
-@lru_cache(maxsize=1)
-def get_derived_value_config():
+@lru_cache(maxsize=2)
+def get_derived_value_config(with_population_attribute=True):
     """Resolve and cache full IDs required for derived value computation."""
-    prop_cfg = get_derived_property_config()
+    prop_cfg = get_derived_property_config(
+        with_population_attribute=with_population_attribute
+    )
     specific_unit_id = _resolve_named_record_id(
         model=Unit,
         id_settings=(
@@ -346,7 +357,9 @@ def compute_counterpart_value(cpv):
     return result[:3] if result is not None else None
 
 
-def _calculation_description(cpv, population, *, from_specific):
+def _calculation_description(
+    cpv, population, *, from_specific, source_key="source_cpv"
+):
     """Snapshot the inputs rather than relying on revisable observation rows."""
     observations = []
     for observation in population.observations:
@@ -376,7 +389,7 @@ def _calculation_description(cpv, population, *, from_specific):
                 if from_specific
                 else "total_Mg * 1000 / population"
             ),
-            "source_cpv": {
+            source_key: {
                 "id": cpv.pk,
                 "average": str(cpv.average),
                 "unit_id": cpv.unit_id,
@@ -408,6 +421,7 @@ def _linked_generated_qs(cpv, *, using=None):
 
 def _projection_metadata(source, *, owner=None, publication_status=None):
     """Compatibility metadata copied from the source; never governance."""
+    model = type(source)
     effective_status = (
         source.publication_status if publication_status is None else publication_status
     )
@@ -415,12 +429,12 @@ def _projection_metadata(source, *, owner=None, publication_status=None):
     approved_at = None
     approved_by = None
     if effective_status in (
-        CollectionPropertyValue.STATUS_PUBLISHED,
-        CollectionPropertyValue.STATUS_ARCHIVED,
+        model.STATUS_PUBLISHED,
+        model.STATUS_ARCHIVED,
     ):
         approved_at = source.approved_at
         approved_by = source.approved_by
-    elif effective_status != CollectionPropertyValue.STATUS_REVIEW:
+    elif effective_status != model.STATUS_REVIEW:
         submitted_at = None
     return {
         "owner_id": source.owner_id if owner is None else owner.pk,
