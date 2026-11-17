@@ -24,7 +24,10 @@ class SimuCFModelFormViewTestCase(ViewWithPermissionsTestCase):
         material = Material.objects.create(name="Test Material")
         series = SampleSeries.objects.create(name="Test Series", material=material)
         sample = Sample.objects.create(
-            name="Test Sample", material=material, series=series
+            name="Test Sample",
+            material=material,
+            series=series,
+            publication_status="published",
         )
         cls.sample_pk = sample.pk
         group = MaterialComponentGroup.objects.create(name="Biochemical Composition")
@@ -53,6 +56,25 @@ class SimuCFModelFormViewTestCase(ViewWithPermissionsTestCase):
                 average=Decimal("70"),
             )
 
+        private_sample = Sample.objects.create(
+            name="Private Test Sample",
+            material=material,
+            series=series,
+            owner=cls.owner,
+            publication_status="private",
+        )
+        private_composition = Composition.objects.create(
+            group=group, sample=private_sample
+        )
+        ComponentMeasurement.objects.create(
+            sample=private_sample,
+            group=private_composition.group,
+            component=MaterialComponent.objects.get(name="Carbohydrates"),
+            unit=percent_unit,
+            average=Decimal("70"),
+        )
+        cls.private_input_material_pk = private_sample.pk
+
         cls.input_material = InputMaterial.objects.get(pk=cls.sample_pk)
 
     def test_get_http_200_ok_for_anonymous(self):
@@ -70,3 +92,21 @@ class SimuCFModelFormViewTestCase(ViewWithPermissionsTestCase):
             response.get("Content-Disposition"),
             'attachment; filename="simucf-input.txt"',
         )
+
+    def test_private_input_material_is_hidden_and_rejected_for_anonymous_user(self):
+        url = reverse("simucf-form")
+        get_response = self.client.get(url)
+        self.assertNotContains(get_response, "Private Test Sample")
+
+        post_response = self.client.post(
+            url,
+            data={
+                "input_material": self.private_input_material_pk,
+                "amount": 100,
+                "length_of_treatment": 30,
+            },
+        )
+
+        self.assertEqual(post_response.status_code, 200)
+        self.assertTrue(post_response.context["form"].errors)
+        self.assertNotIn("Content-Disposition", post_response)

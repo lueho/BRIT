@@ -374,7 +374,9 @@ class RegionAttributeValueModelFormTestCase(TestCase):
         region_property = RegionProperty.objects.create(
             name="Population density", publication_status="published"
         )
-        source = Source.objects.create(title="Regional statistics yearbook")
+        source = Source.objects.create(
+            title="Regional statistics yearbook", publication_status="published"
+        )
         data = QueryDict("", mutable=True)
         data.update(
             {

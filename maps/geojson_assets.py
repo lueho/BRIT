@@ -233,6 +233,10 @@ def ensure_static_region_geojson_asset(region):
 class RegionGeoJSONAssetView(APIView):
     permission_classes = (AllowAny,)
     throttle_classes = (GeoJSONAnonThrottle,)
+    policy_exempt = (
+        "Static asset limited to published configured regions via "
+        "is_static_region_geojson_eligible"
+    )
 
     def _validated_region(self, pk, version):
         region = (

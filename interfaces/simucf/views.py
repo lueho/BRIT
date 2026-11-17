@@ -12,6 +12,11 @@ class SimuCFFormView(FormView):
     form_class = SimuCFModelForm
     template_name = "simucf-form.html"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
     def form_valid(self, form):
         template = Template(template_string)
         serializer = SimuCFSerializer(

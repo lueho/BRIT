@@ -4,7 +4,7 @@ from unittest.mock import patch
 from django.contrib.auth.models import Permission
 from django.db.models.signals import post_save
 from django.http import QueryDict
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils.html import escape
 from factory.django import mute_signals
@@ -970,6 +970,28 @@ class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(200, response.status_code)
         mock_task.delay.assert_called_once_with(self.source.pk)
 
+    @patch("bibliography.views.AsyncResult")
+    @patch("bibliography.views.check_source_url")
+    def test_single_check_task_is_stored_for_progress(self, mock_task, mock_result):
+        mock_task.delay.return_value.task_id = "single-source-task-id"
+        mock_result.return_value.state = "PENDING"
+        mock_result.return_value.info = None
+        self.client.force_login(self.owner)
+
+        start_response = self.client.get(
+            reverse("source-check-url", kwargs={"pk": self.source.pk})
+        )
+        progress_response = self.client.get(
+            reverse(
+                "source-check-url-progress",
+                kwargs={"task_id": "single-source-task-id"},
+            )
+        )
+
+        self.assertEqual(start_response.status_code, 200)
+        self.assertEqual(progress_response.status_code, 200)
+        mock_result.assert_called_once_with("single-source-task-id")
+
     @patch("bibliography.views.check_source_url")
     def test_get_http_200_ok_for_staff_with_change_permission(self, mock_task):
         """Administrators still need the model capability; with it, admin
@@ -1024,6 +1046,84 @@ class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
             reverse("source-check-url", kwargs={"pk": missing_pk})
         )
         self.assertEqual(404, response.status_code)
+
+
+class SourceCheckUrlProgressViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ["change_source"]
+
+    @patch("bibliography.views.AsyncResult")
+    def test_task_progress_is_available_to_the_initiating_session(self, mock_result):
+        mock_result.return_value.state = "SUCCESS"
+        mock_result.return_value.info = {"done": True}
+        self.client.force_login(self.member)
+        session = self.client.session
+        session["source_check_url_task_ids"] = ["source-task-id"]
+        session.save()
+
+        response = self.client.get(
+            reverse(
+                "source-check-url-progress",
+                kwargs={"task_id": "source-task-id"},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_result.assert_called_once_with("source-task-id")
+
+    @patch("bibliography.views.AsyncResult")
+    def test_task_progress_is_not_available_to_another_session(self, mock_result):
+        self.client.force_login(self.member)
+        session = self.client.session
+        session["source_check_url_task_ids"] = ["source-task-id"]
+        session.save()
+        other_client = Client()
+        other_client.force_login(self.outsider)
+
+        response = other_client.get(
+            reverse(
+                "source-check-url-progress",
+                kwargs={"task_id": "source-task-id"},
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+        mock_result.assert_not_called()
+
+    @patch("bibliography.views.AsyncResult")
+    def test_unknown_task_id_returns_404(self, mock_result):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "source-check-url-progress",
+                kwargs={"task_id": "unknown-task-id"},
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+        mock_result.assert_not_called()
+
+    @patch("bibliography.views.AsyncResult")
+    @patch("bibliography.views.check_source_urls.delay")
+    def test_list_check_task_can_be_polled_in_the_same_session(
+        self, mock_delay, mock_result
+    ):
+        mock_delay.return_value.task_id = "source-list-task-id"
+        mock_result.return_value.state = "PENDING"
+        mock_result.return_value.info = None
+        self.client.force_login(self.member)
+
+        start_response = self.client.get(reverse("source-list-check-urls"))
+        progress_response = self.client.get(
+            reverse(
+                "source-check-url-progress",
+                kwargs={"task_id": "source-list-task-id"},
+            )
+        )
+
+        self.assertEqual(start_response.status_code, 200)
+        self.assertEqual(progress_response.status_code, 200)
+        mock_result.assert_called_once_with("source-list-task-id")
 
 
 class SourceAutocompleteViewTestCase(ViewWithPermissionsTestCase):

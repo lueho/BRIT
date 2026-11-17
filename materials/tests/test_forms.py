@@ -125,7 +125,9 @@ class ComponentModelFormTestCase(TestCase):
 
     def test_comparable_component_choices_exclude_materials(self):
         material = Material.objects.create(name="Not a component")
-        component = MaterialComponent.objects.create(name="Actual component")
+        component = MaterialComponent.objects.create(
+            name="Actual component", publication_status="published"
+        )
 
         queryset = ComponentModelForm().fields["comparable_component"].queryset
 
@@ -167,10 +169,18 @@ class MaterialPropertyModelFormTestCase(TestCase):
 class MaterialPropertyValueModelFormTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.allowed_unit = Unit.objects.create(name="mg/L")
-        cls.disallowed_unit = Unit.objects.create(name="g/L")
-        cls.default_basis = MaterialComponent.objects.create(name="Dry Matter")
-        cls.property = MaterialProperty.objects.create(name="Nitrogen")
+        cls.allowed_unit = Unit.objects.create(
+            name="mg/L", publication_status="published"
+        )
+        cls.disallowed_unit = Unit.objects.create(
+            name="g/L", publication_status="published"
+        )
+        cls.default_basis = MaterialComponent.objects.create(
+            name="Dry Matter", publication_status="published"
+        )
+        cls.property = MaterialProperty.objects.create(
+            name="Nitrogen", publication_status="published"
+        )
         cls.property.allowed_units.add(cls.allowed_unit)
         cls.property.default_basis_component = cls.default_basis
         cls.property.save(update_fields=["default_basis_component"])
@@ -215,10 +225,13 @@ class MaterialPropertyValueModelFormTestCase(TestCase):
         )
 
     def test_form_defaults_unit_from_property_allowed_units(self):
-        property_obj = MaterialProperty.objects.create(name="Phosphorus")
+        property_obj = MaterialProperty.objects.create(
+            name="Phosphorus", publication_status="published"
+        )
         expected_unit = Unit.objects.create(
             name="Kilogram per cubic metre",
             symbol="kg/m³",
+            publication_status="published",
         )
         property_obj.allowed_units.add(expected_unit)
 
@@ -310,13 +323,22 @@ class ComponentMeasurementModelFormTestCase(TestCase):
         )
 
     def test_unit_choices_are_limited_to_weight_fraction_units(self):
-        percent, _ = Unit.objects.get_or_create(
-            name="%", defaults={"symbol": "percent"}
+        percent, _ = Unit.objects.update_or_create(
+            name="%",
+            defaults={"symbol": "percent", "publication_status": "published"},
         )
-        g_per_kg = Unit.objects.create(name="g/kg", symbol="g/kg")
-        mg_per_l = Unit.objects.create(name="mg/L", symbol="mg/L")
+        g_per_kg = Unit.objects.create(
+            name="g/kg", symbol="g/kg", publication_status="published"
+        )
+        mg_per_l = Unit.objects.create(
+            name="mg/L", symbol="mg/L", publication_status="published"
+        )
         volume_percent, _ = Unit.objects.update_or_create(
-            name="vol%", defaults={"symbol": "volume_percent"}
+            name="vol%",
+            defaults={
+                "symbol": "volume_percent",
+                "publication_status": "published",
+            },
         )
 
         queryset = ComponentMeasurementModelForm().fields["unit"].queryset

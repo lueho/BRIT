@@ -61,7 +61,7 @@ def _header_tasks_ready(running_tasks, run_id):
     return all(not is_backend_task_active(task.uuid) for task in headers)
 
 
-def start_inventory_run(scenario_id):
+def start_inventory_run(scenario_id, task_id=None):
     """Claim the scenario for evaluation and enqueue run_inventory once.
 
     Returns False without enqueueing when a run is already pending or active.
@@ -95,9 +95,15 @@ def start_inventory_run(scenario_id):
             layer.delete()
         new_run_id = uuid.uuid4()
         _set_running(scenario_status, new_run_id)
-        transaction.on_commit(
-            partial(run_inventory.delay, scenario_id, str(new_run_id))
-        )
+        if task_id is None:
+            callback = partial(run_inventory.delay, scenario_id, str(new_run_id))
+        else:
+            callback = partial(
+                run_inventory.apply_async,
+                args=(scenario_id, str(new_run_id)),
+                task_id=task_id,
+            )
+        transaction.on_commit(callback)
     return True
 
 

@@ -1,17 +1,52 @@
 from crispy_forms.helper import FormHelper
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.forms import HiddenInput
-from django_filters import CharFilter, ChoiceFilter, FilterSet, RangeFilter
+from django_filters import (
+    CharFilter,
+    ChoiceFilter,
+    FilterSet,
+    ModelChoiceFilter,
+    ModelMultipleChoiceFilter,
+    RangeFilter,
+)
 
 from utils.fields import NullablePercentageRangeField, NullableRangeField
 from utils.object_management.permissions import (
     apply_scope_filter,
     filter_queryset_for_user,
 )
+from utils.object_management.registry import KIND_PUBLIC_CATALOGUE, model_policy
 
 
-class BaseCrispyFilterSet(FilterSet):
+class PolicyScopedChoicesMixin:
+    def _apply_choice_policy(self):
+        applied = self.__dict__.setdefault("_policy_choice_querysets", {})
+        request = getattr(self, "request", None)
+        user = getattr(request, "user", None) or AnonymousUser()
+        for name, filter_ in self.filters.items():
+            if not isinstance(filter_, (ModelChoiceFilter, ModelMultipleChoiceFilter)):
+                continue
+            if filter_.queryset is None or filter_.queryset is applied.get(name):
+                continue
+            queryset = filter_.get_queryset(request)
+            policy = model_policy(getattr(queryset, "model", None))
+            if policy is None or policy.kind == KIND_PUBLIC_CATALOGUE:
+                continue
+            queryset = filter_queryset_for_user(queryset, user)
+            filter_.queryset = queryset
+            applied[name] = queryset
+            if "field" in filter_.__dict__:
+                filter_.field.queryset = queryset
+
+    @property
+    def form(self):
+        self._apply_choice_policy()
+        return super().form
+
+
+class BaseCrispyFilterSet(PolicyScopedChoicesMixin, FilterSet):
     def get_form_helper(self):
         if hasattr(self, "Meta") and hasattr(self.Meta, "form_helper"):
             return self.Meta.form_helper()

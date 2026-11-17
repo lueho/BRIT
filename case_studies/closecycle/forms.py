@@ -10,12 +10,16 @@ from leaflet.forms.widgets import LeafletWidget
 from maps.views import CatchmentAutocompleteView
 from materials.models import Material, Sample, SampleSeries
 from processes.models import Process
-from utils.forms import DynamicTableInlineFormSetHelper, SimpleModelForm
+from utils.forms import (
+    DynamicTableInlineFormSetHelper,
+    SimpleModelForm,
+    UserCreatedObjectFormMixin,
+)
 
 from .models import Showcase, ShowcaseMaterial, ShowcaseProcess
 
 
-class ShowcaseModelForm(SimpleModelForm):
+class ShowcaseModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",

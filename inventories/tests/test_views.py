@@ -6,7 +6,7 @@ from uuid import uuid4
 from django.contrib.auth.models import AnonymousUser, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.geos import MultiPolygon, Polygon
-from django.test import SimpleTestCase, TestCase
+from django.test import Client, SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils.html import escapejs
 
@@ -742,7 +742,9 @@ class GenericAlgorithmAddViewTestCase(TestCase):
     def test_feedstock_without_registered_algorithm_is_selectable(self):
         """The add form must offer materials that no algorithm references
         yet — the generic flow is how they get their first algorithm."""
-        new_material = Material.objects.create(name="Brand New Material")
+        new_material = Material.objects.create(
+            name="Brand New Material", owner=self.owner
+        )
         self.client.force_login(self.owner)
         response = self.client.get(self._url())
         self.assertEqual(response.status_code, 200)
@@ -1061,9 +1063,49 @@ class EvaluationStatusAuthTests(TestCase):
             username="u",
         )
         self.client.force_login(user)
+        session = self.client.session
+        session["evaluation_task_ids"] = ["fake-task-id"]
+        session.save()
         url = reverse("scenario-evaluation-status", kwargs={"task_id": "fake-task-id"})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
+
+    @patch("inventories.views.AsyncResult")
+    def test_other_users_session_cannot_access_task_id(self, mock_async):
+        mock_async.return_value.status = "PENDING"
+        mock_async.return_value.result = None
+        mock_async.return_value.info = None
+        owner_client = Client()
+        owner_client.force_login(User.objects.create_user(username="task-owner"))
+        session = owner_client.session
+        session["evaluation_task_ids"] = ["owned-task-id"]
+        session.save()
+
+        other_client = Client()
+        other_client.force_login(User.objects.create_user(username="task-outsider"))
+        url = reverse("scenario-evaluation-status", kwargs={"task_id": "owned-task-id"})
+        response = other_client.get(url)
+
+        self.assertEqual(response.status_code, 404)
+        mock_async.assert_not_called()
+
+    @patch("inventories.views.AsyncResult")
+    def test_unknown_task_id_returns_404(self, mock_async):
+        mock_async.return_value.status = "PENDING"
+        mock_async.return_value.result = None
+        mock_async.return_value.info = None
+        self.client.force_login(User.objects.create_user(username="task-user"))
+        session = self.client.session
+        session["evaluation_task_ids"] = ["another-task-id"]
+        session.save()
+
+        url = reverse(
+            "scenario-evaluation-status", kwargs={"task_id": "unknown-task-id"}
+        )
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 404)
+        mock_async.assert_not_called()
 
 
 # ----------- Issue #205: Authorization bypass test --------------------------------------------------------------------
@@ -1580,16 +1622,20 @@ class ScenarioDetailViewRunTestCase(TestCase):
 
     @patch("inventories.views.start_inventory_run")
     def test_post_starts_run_through_serialized_entry_point(self, start_run):
-        response = self.client.post(
-            reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
-        )
+        task_id = uuid4()
+        start_run.return_value = True
+        with patch("inventories.views.uuid4", return_value=task_id):
+            response = self.client.post(
+                reverse("scenario-detail", kwargs={"pk": self.scenario.pk})
+            )
 
         self.assertRedirects(
             response,
             reverse("scenario-result", args=[self.scenario.pk]),
             fetch_redirect_response=False,
         )
-        start_run.assert_called_once_with(self.scenario.pk)
+        start_run.assert_called_once_with(self.scenario.pk, task_id=str(task_id))
+        self.assertEqual(self.client.session["evaluation_task_ids"], [str(task_id)])
 
     @patch("inventories.tasks.run_inventory")
     def test_post_does_not_enqueue_second_run_while_running(self, run_inventory_task):
@@ -1689,7 +1735,9 @@ class ScenarioDetailRunAuthorizationTests(TestCase):
             reverse("scenario-result", kwargs={"pk": self.private_scenario.pk}),
             fetch_redirect_response=False,
         )
-        mock_run.assert_called_once_with(self.private_scenario.pk)
+        mock_run.assert_called_once()
+        self.assertEqual(mock_run.call_args.args, (self.private_scenario.pk,))
+        self.assertIn("task_id", mock_run.call_args.kwargs)
 
     def test_anonymous_can_view_published_scenario_without_run_form(self):
         response = self.client.get(self.detail_url(self.published_scenario))

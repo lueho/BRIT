@@ -1449,9 +1449,9 @@ class StaleActorAndModalDeleteTests(TestCase):
                 "name": "Bound",
                 "allowed_units": [self.foreign_unit.pk],
             },
+            request=request,
             instance=self.prop,
         )
-        form.request = request
         self.assertTrue(form.is_valid(), form.errors)
         # revoke administrator status via a second ORM instance
         User.objects.get(pk=self.owner.pk).groups.remove(
@@ -1586,14 +1586,15 @@ class BoundCreateFreshReferencesTests(TestCase):
     def test_bound_create_revoked_admin_reference_denied(self):
         self.owner.groups.add(self.admin_group)
         PropForm = self._prop_form()
+        request = RequestFactory().post("/")
+        request.user = self.owner
         form = PropForm(
             data={
                 "name": "BoundCreate",
                 "allowed_units": [self.foreign_unit.pk],
             },
-            request=RequestFactory().post("/"),
+            request=request,
         )
-        form.request.user = self.owner
         self.assertTrue(form.is_valid(), form.errors)
         # revoke ONLY administrator status; owner keeps registered add rights
         User.objects.get(pk=self.owner.pk).groups.remove(self.admin_group)
@@ -1606,11 +1607,12 @@ class BoundCreateFreshReferencesTests(TestCase):
     def test_bound_create_transferred_reference_denied(self):
         PropForm = self._prop_form()
         unit = Unit.objects.create(name="owned", symbol="o", owner=self.owner)
+        request = RequestFactory().post("/")
+        request.user = self.owner
         form = PropForm(
             data={"name": "Transfer", "allowed_units": [unit.pk]},
-            request=RequestFactory().post("/"),
+            request=request,
         )
-        form.request.user = self.owner
         self.assertTrue(form.is_valid(), form.errors)
         # unit moves to a stranger between validation and persist
         Unit.objects.filter(pk=unit.pk).update(owner=self.stranger)

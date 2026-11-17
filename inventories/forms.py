@@ -7,7 +7,11 @@ from distributions.models import TemporalDistribution
 from maps.models import GeoDataset
 from maps.views import CatchmentAutocompleteView
 from materials.models import SampleSeries
-from utils.forms import ModalModelFormMixin, SimpleModelForm
+from utils.forms import (
+    ModalModelFormMixin,
+    SimpleModelForm,
+    UserCreatedObjectFormMixin,
+)
 
 from .models import Scenario, ScenarioInventoryConfiguration
 
@@ -78,7 +82,7 @@ class InitialInstanceTomSelectModelChoiceField(TomSelectModelChoiceField):
     widget_class = InitialInstanceTomSelectModelWidget
 
 
-class ScenarioInventoryConfigurationForm(SimpleModelForm):
+class ScenarioInventoryConfigurationForm(UserCreatedObjectFormMixin, SimpleModelForm):
     feedstock = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="material-autocomplete",

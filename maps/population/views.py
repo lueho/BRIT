@@ -49,6 +49,7 @@ class PopulationImportSchemaView(APIView):
 
     authentication_classes = ()
     permission_classes = (AllowAny,)
+    policy_exempt = "Static import JSON schema; serves no record data"
 
     def get(self, request):
         return Response(POPULATION_IMPORT_SCHEMA)

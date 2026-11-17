@@ -597,6 +597,21 @@ class RegionMapViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(self.url)
         self.assertContains(response, reverse("region-create"))
 
+    def test_map_queryset_hides_another_users_private_region(self):
+        private_region = Region.objects.create(
+            name="Another user's private region",
+            owner=self.outsider,
+            publication_status="private",
+        )
+
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            response.context["filter"].qs.filter(pk=private_region.pk).exists()
+        )
+
 
 # ----------- Catchment CRUD--------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -1196,17 +1211,41 @@ class CatchmentRegionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.nuts_region = NutsRegion.objects.create(
-            nuts_id="AB", levl_code=0, name_latn="Nuts Summary Region"
+            nuts_id="AB",
+            levl_code=0,
+            name_latn="Nuts Summary Region",
+            publication_status="published",
         )
-        cls.nuts_catchment = Catchment.objects.create(region=cls.nuts_region.region_ptr)
+        cls.nuts_catchment = Catchment.objects.create(
+            region=cls.nuts_region.region_ptr, publication_status="published"
+        )
         cls.lau_region = LauRegion.objects.create(
             lau_id="L0001",
             lau_name="Lau Summary Region",
             nuts_parent=cls.nuts_region,
+            publication_status="published",
         )
-        cls.lau_catchment = Catchment.objects.create(region=cls.lau_region.region_ptr)
-        cls.plain_region = Region.objects.create(name="Plain Region")
-        cls.plain_catchment = Catchment.objects.create(region=cls.plain_region)
+        cls.lau_catchment = Catchment.objects.create(
+            region=cls.lau_region.region_ptr, publication_status="published"
+        )
+        cls.plain_region = Region.objects.create(
+            name="Plain Region", publication_status="published"
+        )
+        cls.plain_catchment = Catchment.objects.create(
+            region=cls.plain_region, publication_status="published"
+        )
+        cls.private_region = NutsRegion.objects.create(
+            nuts_id="PRV",
+            levl_code=0,
+            name_latn="Private Summary Region",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.private_catchment = Catchment.objects.create(
+            region=cls.private_region.region_ptr,
+            owner=cls.owner,
+            publication_status="private",
+        )
 
     def test_nuts_catchment_returns_summary(self):
         response = self.client.get(
@@ -1253,13 +1292,41 @@ class CatchmentRegionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    def test_private_catchment_summary_is_owner_scoped(self):
+        url = reverse("data.catchment_region_summaries")
+        params = {"pk": self.private_catchment.pk}
+        anonymous_response = self.client.get(url, params)
+        self.client.force_login(self.outsider)
+        stranger_response = self.client.get(url, params)
+        self.client.force_login(self.owner)
+        owner_response = self.client.get(url, params)
+
+        self.assertEqual(anonymous_response.status_code, 404)
+        self.assertEqual(stranger_response.status_code, 404)
+        self.assertEqual(owner_response.status_code, 200)
+        self.assertIn("Private Summary Region", str(owner_response.data))
+
 
 class CatchmentRegionGeometryAPITestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.region = Region.objects.create(name="Geometry Region")
-        cls.catchment = Catchment.objects.create(region=cls.region)
+        cls.region = Region.objects.create(
+            name="Geometry Region", publication_status="published"
+        )
+        cls.catchment = Catchment.objects.create(
+            region=cls.region, publication_status="published"
+        )
+        cls.private_region = Region.objects.create(
+            name="Private Geometry Region",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.private_catchment = Catchment.objects.create(
+            region=cls.private_region,
+            owner=cls.owner,
+            publication_status="private",
+        )
 
     def test_existing_pk_returns_geojson(self):
         response = self.client.get(
@@ -1288,6 +1355,20 @@ class CatchmentRegionGeometryAPITestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    def test_private_catchment_geometry_is_owner_scoped(self):
+        url = reverse("data.catchment_region_geometries")
+        params = {"pk": self.private_catchment.pk}
+        anonymous_response = self.client.get(url, params)
+        self.client.force_login(self.outsider)
+        stranger_response = self.client.get(url, params)
+        self.client.force_login(self.owner)
+        owner_response = self.client.get(url, params)
+
+        self.assertEqual(anonymous_response.status_code, 404)
+        self.assertEqual(stranger_response.status_code, 404)
+        self.assertEqual(owner_response.status_code, 200)
+        self.assertIn("Private Geometry Region", str(owner_response.json()))
+
 
 class NutsRegionPedigreeAPITestCase(ViewWithPermissionsTestCase):
     @classmethod
@@ -1295,6 +1376,20 @@ class NutsRegionPedigreeAPITestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         cls.nuts_region = NutsRegion.objects.create(
             nuts_id="YY", levl_code=0, name_latn="Pedigree Test Region"
+        )
+        cls.private_parent = NutsRegion.objects.create(
+            nuts_id="ZZ",
+            levl_code=0,
+            name_latn="Private Parent",
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.public_child_with_private_parent = NutsRegion.objects.create(
+            nuts_id="ZZ1",
+            levl_code=1,
+            name_latn="Public Child",
+            parent=cls.private_parent,
+            publication_status="published",
         )
 
     def test_non_existent_id_returns_404(self):
@@ -1310,6 +1405,20 @@ class NutsRegionPedigreeAPITestCase(ViewWithPermissionsTestCase):
             {"direction": "children"},
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_private_region_is_not_resolvable_and_private_parent_is_not_traversed(self):
+        url = reverse("data.nuts_region_options")
+        private_response = self.client.get(
+            url,
+            {"id": self.private_parent.pk, "direction": "children"},
+        )
+        parent_response = self.client.get(
+            url,
+            {"id": self.public_child_with_private_parent.pk, "direction": "parents"},
+        )
+
+        self.assertEqual(private_response.status_code, 404)
+        self.assertNotIn("Private Parent", str(parent_response.data))
 
 
 # ----------- Catchment API---------------------------------------------------------------------------------------------
@@ -1346,75 +1455,109 @@ class NutsAndLauCatchmentPedigreeAPITestCase(ViewSetWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         level_0_region = NutsRegion.objects.create(
-            nuts_id="XX", levl_code=0, name_latn="Level 0 Region"
+            nuts_id="XX",
+            levl_code=0,
+            name_latn="Level 0 Region",
+            publication_status="published",
         )
         cls.level_0_catchment = Catchment.objects.create(
-            region=level_0_region.region_ptr
+            region=level_0_region.region_ptr, publication_status="published"
         )
         level_1_region = NutsRegion.objects.create(
             nuts_id="XX0",
             levl_code=1,
             name_latn="Level 1 Region",
             parent=level_0_region,
+            publication_status="published",
         )
         cls.level_1_catchment = Catchment.objects.create(
-            region=level_1_region.region_ptr, parent_region=level_0_region.region_ptr
+            region=level_1_region.region_ptr,
+            parent_region=level_0_region.region_ptr,
+            publication_status="published",
         )
         level_2_region_1 = NutsRegion.objects.create(
             nuts_id="XX00",
             levl_code=2,
             name_latn="Level 2 Region 1",
             parent=level_1_region,
+            publication_status="published",
         )
         cls.level_2_catchment_1 = Catchment.objects.create(
-            region=level_2_region_1.region_ptr, parent_region=level_1_region.region_ptr
+            region=level_2_region_1.region_ptr,
+            parent_region=level_1_region.region_ptr,
+            publication_status="published",
         )
         level_2_region_2 = NutsRegion.objects.create(
             nuts_id="XX01",
             levl_code=2,
             name_latn="Level 2 Region 2",
             parent=level_1_region,
+            publication_status="published",
         )
         cls.level_2_catchment_1 = Catchment.objects.create(
-            region=level_2_region_2.region_ptr, parent_region=level_1_region.region_ptr
+            region=level_2_region_2.region_ptr,
+            parent_region=level_1_region.region_ptr,
+            publication_status="published",
         )
         level_3_region_1 = NutsRegion.objects.create(
             nuts_id="XX000",
             levl_code=3,
             name_latn="Level 3 Region 1",
             parent=level_2_region_1,
+            publication_status="published",
         )
         cls.level_3_catchment_1 = Catchment.objects.create(
             region=level_3_region_1.region_ptr,
             parent_region=level_2_region_1.region_ptr,
+            publication_status="published",
         )
         level_3_region_2 = NutsRegion.objects.create(
             nuts_id="XX011",
             levl_code=3,
             name_latn="Level 3 Region 2",
             parent=level_2_region_2,
+            publication_status="published",
         )
         cls.level_3_catchment_2 = Catchment.objects.create(
             region=level_3_region_2.region_ptr,
             parent_region=level_2_region_2.region_ptr,
+            publication_status="published",
         )
         level_4_region_1 = LauRegion.objects.create(
             lau_id="X00000000",
             lau_name="Level 4 Region 1",
             nuts_parent=level_3_region_1,
+            publication_status="published",
         )
         cls.level_4_catchment_1 = Catchment.objects.create(
             region=level_4_region_1.region_ptr,
             parent_region=level_3_region_1.region_ptr,
+            publication_status="published",
         )
         level_4_region_2 = LauRegion.objects.create(
             lau_id="X00000001",
             lau_name="Level 4 Region 2",
             nuts_parent=level_3_region_2,
+            publication_status="published",
         )
         cls.level_4_catchment_2 = Catchment.objects.create(
             region=level_4_region_2.region_ptr,
             parent_region=level_3_region_2.region_ptr,
+            publication_status="published",
+        )
+        cls.private_child_region = NutsRegion.objects.create(
+            nuts_id="XX9",
+            levl_code=1,
+            name_latn="Private Child Region",
+            parent=level_0_region,
+            owner=cls.owner,
+            publication_status="private",
+        )
+        cls.private_catchment = Catchment.objects.create(
+            region=cls.private_child_region.region_ptr,
+            parent_region=level_0_region.region_ptr,
+            owner=cls.owner,
+            publication_status="private",
         )
 
     def test_get_http_200_ok_for_anonymous(self):
@@ -1479,6 +1622,19 @@ class NutsAndLauCatchmentPedigreeAPITestCase(ViewSetWithPermissionsTestCase):
             {"id": self.level_3_catchment_1.id, "direction": "children"},
         )
         self.assertIn("id_level_4", response.data)
+
+    def test_pedigree_hides_private_child_regions_and_catchments(self):
+        child_response = self.client.get(
+            reverse("data.nuts_lau_catchment_options"),
+            {"id": self.level_0_catchment.pk, "direction": "children"},
+        )
+        private_response = self.client.get(
+            reverse("data.nuts_lau_catchment_options"),
+            {"id": self.private_catchment.pk, "direction": "children"},
+        )
+
+        self.assertNotIn("Private Child Region", str(child_response.data))
+        self.assertEqual(private_response.status_code, 404)
 
 
 # ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------
@@ -1553,12 +1709,24 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         cls.region_3 = Region.objects.create(
             name="Test Region Not In Queryset", publication_status="published"
         )
+        cls.private_null_lau_region = LauRegion.objects.create(
+            name="Private Null LAU Region",
+            lau_id=None,
+            owner=cls.owner,
+            publication_status="private",
+        ).region_ptr
 
     def test_all_lau_regions_with_matching_name_string_in_queryset(self):
         response = self.client.get(self.url, data={"q": "Test"})
         self.assertEqual(200, response.status_code)
         ids = [region["id"] for region in json.loads(response.content)["results"]]
-        self.assertListEqual([lau.id for lau in LauRegion.objects.all()], ids)
+        self.assertListEqual(
+            [
+                lau.id
+                for lau in LauRegion.objects.filter(publication_status="published")
+            ],
+            ids,
+        )
 
     def test_all_lau_region_with_matching_lau_id_in_queryset(self):
         response = self.client.get(self.url, data={"q": "12"})
@@ -1572,7 +1740,13 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(self.url, data={"q": "23"})
         self.assertEqual(200, response.status_code)
         ids = [region["id"] for region in json.loads(response.content)["results"]]
-        self.assertListEqual([lau.id for lau in LauRegion.objects.all()], ids)
+        self.assertListEqual(
+            [
+                lau.id
+                for lau in LauRegion.objects.filter(publication_status="published")
+            ],
+            ids,
+        )
 
     def test_english_name_is_the_label_when_held(self):
         lau = LauRegion.objects.get(lau_id="123")
@@ -1696,6 +1870,16 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(self.url, data={"q": "Hidden Twin"})
         ids = [r["id"] for r in json.loads(response.content)["results"]]
         self.assertListEqual([published.pk], ids)
+
+    def test_private_null_lau_id_region_is_hidden_from_anonymous(self):
+        response = self.client.get(self.url, data={"q": "Private Null LAU"})
+        ids = [r["id"] for r in json.loads(response.content)["results"]]
+        self.assertNotIn(self.private_null_lau_region.pk, ids)
+
+        self.client.force_login(self.owner)
+        owner_response = self.client.get(self.url, data={"q": "Private Null LAU"})
+        owner_ids = [r["id"] for r in json.loads(owner_response.content)["results"]]
+        self.assertIn(self.private_null_lau_region.pk, owner_ids)
 
 
 class RegionAutocompleteEnglishNameTestCase(ViewWithPermissionsTestCase):

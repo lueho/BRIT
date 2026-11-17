@@ -9,6 +9,7 @@ from utils.forms import (
     ModalModelFormMixin,
     SimpleForm,
     SimpleModelForm,
+    UserCreatedObjectFormMixin,
 )
 from utils.object_management.policy import visible_queryset
 
@@ -54,7 +55,7 @@ class LicenceModalModelForm(ModalModelFormMixin, LicenceModelForm):
     pass
 
 
-class SourceModelForm(SimpleModelForm):
+class SourceModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     class Meta:
         model = Source
         fields = (

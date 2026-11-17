@@ -324,7 +324,10 @@ class SampleSeriesModalAddDistributionBoundaryTestCase(ViewWithPermissionsTestCa
         response = self.client.post(
             self.url(), {"distribution": self.private_distribution.pk}
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            response.context["form"].has_error("distribution", "invalid_choice")
+        )
         self.assertEqual(_revision(self.series), revision)
 
     def test_post_authorized_attaches_with_revision_and_audit(self):
@@ -479,7 +482,7 @@ class MaterialPropertyValueAllowedUnitsBoundaryTestCase(ViewWithPermissionsTestC
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.unit = Unit.objects.create(name="GW Unit")
+        cls.unit = Unit.objects.create(name="GW Unit", publication_status="published")
         cls.property = MaterialProperty.objects.create(
             owner=cls.owner, name="GW Property", publication_status="published"
         )

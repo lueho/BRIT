@@ -58,6 +58,7 @@ class PublicAPIRootView(routers.APIRootView):
     """Public entry point listing the atlas data endpoints."""
 
     permission_classes = [permissions.AllowAny]
+    policy_exempt = "API index; serves no record data"
 
 
 class AtlasRouter(routers.DefaultRouter):
