@@ -149,3 +149,72 @@ def validate_region_composition(members, region=None):
                     f"and '{_identifier(member_b)}'.",
                     conflicts=[_identifier(member_a), _identifier(member_b)],
                 )
+
+
+def _provably_disjoint(member_a, member_b):
+    """True when disjointness of a member pair is actually established.
+
+    ``validate_region_composition`` only rejects overlaps it can prove;
+    consumers that combine member territories need the stronger guarantee
+    that each pair is provably disjoint — by administrative ancestry or by
+    a spatial check on complete geometry.
+    """
+    if member_a.geom is not None and member_b.geom is not None:
+        # The composition validator already excluded positive-area overlap
+        # for geometry-bearing pairs.
+        return True
+
+    nuts_a = _as_nuts(member_a)
+    lau_a = None if nuts_a is not None else _as_lau(member_a)
+    nuts_b = _as_nuts(member_b)
+    lau_b = None if nuts_b is not None else _as_lau(member_b)
+
+    if nuts_a is not None and nuts_b is not None:
+        # Distinct NUTS ids with no ancestor relation partition territory;
+        # a missing id cannot be placed administratively.
+        return bool(nuts_a.nuts_id and nuts_b.nuts_id)
+    if lau_a is not None and lau_b is not None:
+        # LAU ids partition municipalities within a country.
+        return lau_a.cntr_code != lau_b.cntr_code or bool(lau_a.lau_id and lau_b.lau_id)
+
+    nuts, lau = (nuts_a, lau_b) if nuts_a is not None else (nuts_b, lau_a)
+    if nuts is None or lau is None or not nuts.nuts_id:
+        return False
+    parent = lau.nuts_parent
+    if parent is None or not parent.nuts_id:
+        # The LAU cannot be anchored inside the NUTS hierarchy.
+        return False
+    # The LAU lives inside its parent's subtree. A NUTS member inside or on
+    # that subtree may share the LAU's territory, and one containing the
+    # parent provably does (both already rejected by the composition
+    # validator); anything outside is disjoint.
+    return (
+        parent.nuts_id != nuts.nuts_id
+        and parent.nuts_id not in _nuts_ancestor_ids(nuts)
+        and nuts.nuts_id not in _nuts_ancestor_ids(parent)
+    )
+
+
+def validate_disjoint_regions(members):
+    """Require that every member pair is *provably* disjoint.
+
+    ``validate_region_composition`` accepts members it cannot prove to
+    overlap — e.g. a LAU with no ``nuts_parent`` and no geometry next to an
+    enclosing NUTS region. Consumers that combine member territories, such
+    as population sums, must not rely on that weaker contract and should
+    run this check in addition.
+
+    Raises :class:`RegionCompositionError` for pairs whose disjointness
+    cannot be established.
+    """
+    members = list(members)
+    for index, member_a in enumerate(members):
+        for member_b in members[index + 1 :]:
+            if _provably_disjoint(member_a, member_b):
+                continue
+            raise RegionCompositionError(
+                f"Cannot verify that components '{_identifier(member_a)}' and "
+                f"'{_identifier(member_b)}' are disjoint; their territories "
+                "must not be combined.",
+                conflicts=[_identifier(member_a), _identifier(member_b)],
+            )

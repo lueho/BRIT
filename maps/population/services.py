@@ -11,7 +11,10 @@ from decimal import Decimal
 from django.utils import timezone
 
 from maps.models import RegionAttributeValue
-from maps.validation import validate_region_composition
+from maps.validation import (
+    validate_disjoint_regions,
+    validate_region_composition,
+)
 
 from .models import (
     PopulationEstimate,
@@ -152,8 +155,9 @@ def resolve_regions_population(regions, year, *, temporal_basis=None):
 
     The region set is deduplicated by primary key so parallel catchments on
     the same territory count once. Sets of more than one region must pass
-    the composition validator — :class:`maps.validation.RegionCompositionError`
-    propagates so callers can distinguish invalid geography from missing
+    the composition validator plus the stricter provable-disjointness
+    check — :class:`maps.validation.RegionCompositionError` propagates so
+    callers can distinguish invalid or unverifiable geography from missing
     data. Every member needs an exact-year resolution of the requested
     temporal basis; a single missing member returns ``None`` for the whole
     combination. Never substitutes another year or geography level.
@@ -170,6 +174,7 @@ def resolve_regions_population(regions, year, *, temporal_basis=None):
     if len(regions) == 1:
         return resolve_population(regions[0], year, temporal_basis=temporal_basis)
     validate_region_composition(regions)
+    validate_disjoint_regions(regions)
     results = [
         resolve_population(region, year, temporal_basis=temporal_basis)
         for region in regions

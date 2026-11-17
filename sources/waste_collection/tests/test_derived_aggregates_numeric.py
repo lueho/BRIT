@@ -7,7 +7,7 @@ from decimal import Decimal
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from maps.models import NutsRegion
+from maps.models import LauRegion, NutsRegion
 from maps.population.models import (
     GeographicScope,
     PopulationDataset,
@@ -305,6 +305,60 @@ class GeneratedAggregateNumericalTests(TestCase):
         self.assertEqual(action, "skipped")
         self.assertFalse(source.generated_values.exists())
         self.assertIn("region", "\n".join(logged.output).lower())
+
+    def test_unlinked_lau_nuts_pair_fails_closed(self):
+        """A LAU without parent link or geometry cannot be proven disjoint."""
+        lau = LauRegion.objects.create(
+            name="agg numeric unlinked lau",
+            lau_id="agg-lau-1",
+            cntr_code="DT",
+            publication_status="published",
+        )
+        PopulationObservation.objects.create(
+            dataset=self.average_dataset,
+            region=lau,
+            year=2024,
+            value=Decimal("1000"),
+        )
+        lau_collection = self._collection(
+            "unlinked-lau", self._catchment("agg numeric lau catchment", lau)
+        )
+        source = self._raw(
+            self.specific,
+            self.specific_unit,
+            "150",
+            [self.collection, lau_collection],
+        )
+        with self.assertLogs(
+            "sources.waste_collection.derived_aggregates", level="WARNING"
+        ) as logged:
+            output, action = create_or_update_derived_acpv(source)
+        self.assertIsNone(output)
+        self.assertEqual(action, "skipped")
+        self.assertFalse(source.generated_values.exists())
+        self.assertIn("region", "\n".join(logged.output).lower())
+
+    def test_linked_lau_and_sibling_nuts_combine(self):
+        """A LAU anchored in a different NUTS subtree is provably disjoint."""
+        lau = LauRegion.objects.create(
+            name="agg numeric linked lau",
+            lau_id="agg-lau-2",
+            cntr_code="DT",
+            nuts_parent=self.region2,
+            publication_status="published",
+        )
+        self._observe(lau, 2024, "500")
+        lau_collection = self._collection(
+            "linked-lau", self._catchment("agg numeric linked catchment", lau)
+        )
+        source = self._raw(
+            self.total,
+            self.total_unit,
+            "110",
+            [self.collection, lau_collection],
+        )
+        # denominator 2000 + 500 = 2500 → 110 Mg * 1000 / 2500 = 44 kg
+        self._assert_output(source, self.specific, self.specific_unit, "44", 2500)
 
     def test_member_without_region_fails_closed(self):
         source = self._raw(
