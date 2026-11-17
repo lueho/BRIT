@@ -160,6 +160,10 @@ PUBLISHED_ATTACHMENT_SCOPES = {
 # true are read-only projections governed by their linked raw source
 # evidence; the class-level policy keeps describing raw records.
 GENERATED_PROJECTIONS = {
+    "waste_collection.aggregatedcollectionpropertyvalue": (
+        "is_derived",
+        "derived_from",
+    ),
     "waste_collection.collectionpropertyvalue": ("is_derived", "derived_from"),
 }
 

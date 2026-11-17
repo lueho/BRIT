@@ -8,6 +8,10 @@ from django.dispatch import receiver
 
 from maps.signals import clear_geojson_cache_pattern
 
+from .derived_aggregates import (
+    create_or_update_derived_acpv,
+    delete_derived_acpv,
+)
 from .derived_values import (
     create_or_update_derived_cpv,
     delete_derived_cpv,
@@ -186,3 +190,98 @@ def sync_derived_cpv_on_delete(sender, instance, **kwargs):
     if instance.is_derived:
         return
     delete_derived_cpv(instance)
+
+
+# ---------------------------------------------------------------------------
+# Derived AggregatedCollectionPropertyValue (specific ↔ total over member
+# catchment regions)
+# ---------------------------------------------------------------------------
+
+
+def _sync_derived_acpv(instance):
+    try:
+        create_or_update_derived_acpv(instance)
+    except ImproperlyConfigured as exc:
+        logger.debug(
+            "Skipping derived ACPV sync for "
+            "AggregatedCollectionPropertyValue id=%s: %s",
+            instance.pk,
+            exc,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to sync derived ACPV for AggregatedCollectionPropertyValue id=%s",
+            instance.pk,
+        )
+        raise
+
+
+def sync_derived_acpv_on_save(sender, instance, **kwargs):
+    """Maintain or invalidate only this source's explicitly linked output."""
+    if instance.is_derived or kwargs.get("raw"):
+        return
+    # Run for all raw saves: changing away from a convertible property must
+    # invalidate the old linked output too.
+    previous = getattr(instance, "_derived_previous_inputs", None)
+    if previous is not None:
+        try:
+            create_or_update_derived_acpv(instance, previous_inputs=previous)
+        except ImproperlyConfigured as exc:
+            logger.debug(
+                "Skipping derived ACPV sync for "
+                "AggregatedCollectionPropertyValue id=%s: %s",
+                instance.pk,
+                exc,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to sync derived ACPV for "
+                "AggregatedCollectionPropertyValue id=%s",
+                instance.pk,
+            )
+            raise
+    else:
+        _sync_derived_acpv(instance)
+
+
+def sync_derived_acpv_on_delete(sender, instance, **kwargs):
+    """Delete linked output even if the raw source is no longer convertible."""
+    if instance.is_derived:
+        return
+    delete_derived_acpv(instance)
+
+
+def sync_derived_acpv_on_collections_changed(
+    sender, instance, action, pk_set, reverse, **kwargs
+):
+    """Recompute when membership changes; the member set is a denominator input."""
+    if not reverse:
+        if getattr(instance, "is_derived", False) or action not in (
+            "post_add",
+            "post_remove",
+            "post_clear",
+        ):
+            return
+        _sync_derived_acpv(instance)
+        return
+    if action == "pre_clear":
+        instance._derived_acpv_pre_clear_ids = list(
+            instance.aggregatedcollectionpropertyvalue_set.filter(
+                is_derived=False
+            ).values_list("pk", flat=True)
+        )
+        return
+    if action not in ("post_add", "post_remove", "post_clear"):
+        return
+    if action == "post_clear":
+        ids = getattr(instance, "_derived_acpv_pre_clear_ids", [])
+    else:
+        ids = list(pk_set or [])
+    if not ids:
+        return
+    from .models import AggregatedCollectionPropertyValue
+
+    for acpv in AggregatedCollectionPropertyValue.objects.filter(
+        pk__in=ids, is_derived=False
+    ):
+        _sync_derived_acpv(acpv)

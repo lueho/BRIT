@@ -1050,6 +1050,11 @@ class AggregatedCollectionPropertyValueCreateView(
 class AggregatedCollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = AggregatedCollectionPropertyValue
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["generated_value_source"] = generated_source(self.object)
+        return context
+
 
 class AggregatedCollectionPropertyValueUpdateView(
     M2MInlineFormSetMixin, UserCreatedObjectUpdateView
