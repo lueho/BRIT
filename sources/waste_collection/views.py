@@ -44,6 +44,7 @@ from maps.views import (
 from sources.waste_collection.filters import (
     CollectionFilterSet,
     CollectionFrequencyListFilter,
+    CollectionListFilterSet,
     CollectionSystemListFilter,
     CollectorFilter,
     FeeSystemListFilter,
@@ -1219,13 +1220,13 @@ class CollectionListMixin(LetterIndexMixin):
 
 class CollectionPublishedListView(CollectionListMixin, PublishedObjectFilterView):
     model = Collection
-    filterset_class = CollectionFilterSet
+    filterset_class = CollectionListFilterSet
     explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionPrivateListView(CollectionListMixin, PrivateObjectFilterView):
     model = Collection
-    filterset_class = CollectionFilterSet
+    filterset_class = CollectionListFilterSet
     explorer_url = reverse_lazy("wastecollection-explorer")
 
 
@@ -1852,7 +1853,7 @@ class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
 
 class CollectionReviewFilterView(CollectionListMixin, ReviewObjectFilterView):
     model = Collection
-    filterset_class = CollectionFilterSet
+    filterset_class = CollectionListFilterSet
     explorer_url = reverse_lazy("wastecollection-explorer")
 
     def get_filterset_kwargs(self, filterset_class=None):
