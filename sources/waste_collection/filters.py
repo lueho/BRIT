@@ -32,7 +32,10 @@ from sources.waste_collection.models import (
     WasteComponent,
     WasteFlyer,
 )
-from sources.waste_collection.projection_queries import visible_measurement_queryset
+from sources.waste_collection.projection_queries import (
+    visible_measurement_maxima,
+    visible_measurement_queryset,
+)
 from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
 from utils.filters import (
     NullableRangeFilter,
@@ -534,7 +537,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         collections = apply_scope_filter(
             self.queryset, self.data.get("scope"), user=actor
         )
-        measurements = visible_measurement_queryset(
+        maxima = visible_measurement_maxima(
             actor,
             CollectionPropertyValue.objects.filter(
                 collection__in=collections,
@@ -542,12 +545,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
                     filter_.property_name for filter_ in property_filters.values()
                 ],
             ),
-        )
-        maxima = measurements.aggregate(
-            **{
-                name: Max("average", filter=Q(property__name=filter_.property_name))
-                for name, filter_ in property_filters.items()
-            }
+            {name: filter_.property_name for name, filter_ in property_filters.items()},
         )
         maxima.update(
             collections.aggregate(
