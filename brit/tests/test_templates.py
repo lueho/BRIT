@@ -1207,10 +1207,10 @@ class AppShellDesignSystemTests(SimpleTestCase):
             with self.subTest(token=token):
                 self.assertIn(token, css)
 
-    def test_topbar_renders_brand_mark_with_full_product_name(self):
+    def test_topbar_renders_product_name(self):
         html = render_to_string("partials/_topbar.html")
 
-        self.assertIn('class="brand-mark"', html)
+        self.assertIn("<span>BRIT</span>", html)
         self.assertIn("Bioresource Information Tool", html)
 
     def test_footer_uses_compact_site_footer(self):

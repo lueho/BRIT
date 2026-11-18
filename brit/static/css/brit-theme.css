@@ -8732,18 +8732,6 @@ main .row.justify-content-center > [class*=col-xl-4] > .card > .card-body.p-5 {
   color: #fff;
   text-decoration: none;
 }
-.sb-topnav.topnav-brand-sage .brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 8px;
-  background-color: #4B7156;
-  color: #fff;
-  font-size: 0.95rem;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
-}
 .sb-topnav.topnav-brand-sage .brand-tagline {
   color: var(--brit-on-forest-muted);
   font-size: 0.8125rem;
