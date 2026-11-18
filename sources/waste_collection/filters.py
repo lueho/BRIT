@@ -303,24 +303,23 @@ class NullableCollectionPropertyValueRangeFilter(NullableRangeFilter):
             getattr(request, "user", None),
             CollectionPropertyValue.objects.filter(property__name=self.property_name),
         )
-        qs = qs.annotate(
-            **{
-                "avg_value": Avg(
-                    "collectionpropertyvalue__average",
-                    filter=Q(collectionpropertyvalue__pk__in=measurements.values("pk")),
-                )
-            }
+        averages = (
+            measurements.order_by()
+            .values("collection_id")
+            .annotate(average_value=Avg("average"))
         )
-
-        filtered = qs.filter(
-            **{
-                "avg_value__gte": value_slice.start,
-                "avg_value__lte": value_slice.stop,
-            }
+        matching = averages.filter(
+            average_value__gte=value_slice.start,
+            average_value__lte=value_slice.stop,
         )
+        predicate = Q(pk__in=matching.values("collection_id"))
         if include_nulls:
-            filtered = filtered | qs.filter(**{"avg_value__isnull": True})
-        return filtered
+            predicate |= ~Q(
+                pk__in=averages.filter(average_value__isnull=False).values(
+                    "collection_id"
+                )
+            )
+        return qs.filter(predicate)
 
 
 class ConnectionRateFilter(NullableCollectionPropertyValueRangeFilter):
@@ -656,6 +655,14 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         return qs.filter(forbidden_materials__in=values).distinct()
 
 
+class CollectionListFilterSet(CollectionFilterSet):
+    def filter_queryset(self, queryset):
+        filtered = super().filter_queryset(queryset)
+        if filtered.query.distinct or filtered.query.group_by:
+            return queryset.filter(pk__in=filtered.order_by().values("pk"))
+        return filtered
+
+
 class CollectionExtendedFilterSet(CollectionFilterSet):
     """Allow the extended collection list to return all visible collections."""
 
@@ -724,6 +731,7 @@ __all__ = [
     "CollectionFilterFormHelper",
     "CollectionFilterSet",
     "CollectionFrequencyListFilter",
+    "CollectionListFilterSet",
     "CollectionsPerYearFilter",
     "ConnectionRateFilter",
     "CollectionSystemListFilter",
