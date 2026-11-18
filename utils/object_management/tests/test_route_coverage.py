@@ -45,8 +45,8 @@ class ScopedChoiceForm(UserCreatedObjectFormMixin, forms.Form):
 
 
 class PolicyRouteCoverageTests(SimpleTestCase):
-    def run_route_check(self, view_class):
-        patterns = [path("synthetic/", view_class.as_view())]
+    def run_route_check(self, view_class=None):
+        patterns = [path("synthetic/", view_class.as_view())] if view_class else []
         with (
             patch(f"{__name__}.urlpatterns", patterns),
             override_settings(ROOT_URLCONF=__name__),
@@ -131,7 +131,7 @@ class PolicyRouteCoverageTests(SimpleTestCase):
             "",
             create=True,
         ):
-            errors = checks.policy_route_coverage_check(None)
+            errors = self.run_route_check()
 
         self.assertTrue(any(error.id == "object_management.E022" for error in errors))
         self.assertTrue(
@@ -150,7 +150,7 @@ class PolicyRouteCoverageTests(SimpleTestCase):
                 model = Collection
                 fields = ()
 
-        errors = checks.policy_route_coverage_check(None)
+        errors = self.run_route_check()
 
         self.assertFalse(
             any(
