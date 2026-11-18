@@ -3207,6 +3207,12 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
     ordering = ["name"]
     allow_anonymous = True
     page_size = 15
+    allowed_ordering_fields = ()
+    # Request filter lookups (``f``) this view applies, exactly as the widget
+    # sends them (``<dependent_field>__<lookup>``). ``scope__name`` is always
+    # accepted; any other lookup fails closed so the filter cannot traverse
+    # into owners, password hashes or private related records.
+    filter_lookups = ()
 
     def __init_subclass__(cls, **kwargs):
         """Preserve inherited search_lookups/value_fields that the upstream
@@ -3255,6 +3261,14 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
                 except ImproperlyConfigured:
                     return queryset.none()
                 continue
+
+            if lookup not in self.filter_lookups:
+                logger.warning(
+                    "Rejected TomSelect filter lookup %r on %s.",
+                    lookup,
+                    type(self).__name__,
+                )
+                return queryset.none()
 
             if not value:
                 continue
