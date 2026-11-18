@@ -5,6 +5,7 @@ import re
 import time
 from collections import defaultdict, namedtuple
 from datetime import date, timedelta
+from functools import lru_cache
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlencode
@@ -84,6 +85,7 @@ from sources.waste_collection.waste_atlas.map_selection import (
     build_overview_directory_context,
 )
 from sources.waste_collection.waste_atlas.pages import MAP_PAGES
+from sources.waste_collection.waste_atlas.templatetags import atlas_navigation
 from sources.waste_collection.waste_atlas.templatetags.atlas_tags import (
     RENDER_TIME_RESOLVED_KEYS,
 )
@@ -6267,14 +6269,23 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
 class WasteAtlasMapPageSweepMixin:
     """Render sweeps over a shard of the waste atlas page registry.
 
-    Rendering a map page costs roughly a second, so sweeping all of
-    ``MAP_PAGES`` in a single test case parks ~25 minutes of renders on
-    one parallel worker. These tests iterate a per-class shard of the
-    registry so the parallel test runner splits the work evenly.
+    The per-class shards distribute whole-page renders across workers.
     """
 
     shard_index = 0
     shard_count = 4
+
+    def setUp(self):
+        super().setUp()
+        # Keep the real markup while reusing identical navigation formatting
+        # across this sweep's pages, whose selected region and theme vary.
+        self.enterContext(
+            patch.object(
+                atlas_navigation,
+                "format_html",
+                lru_cache(maxsize=4096)(atlas_navigation.format_html),
+            )
+        )
 
     @classmethod
     def _sweep_pages(cls):
