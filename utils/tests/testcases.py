@@ -1352,6 +1352,26 @@ class AbstractTestCases:
                 response, self.get_delete_success_url(publication_status="private")
             )
 
+        def test_delete_view_post_ignores_next_url_of_deleted_object(self):
+            """The detail page passes itself as ``next``; it is gone after deletion."""
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            if not self.detail_view:
+                self.skipTest("Detail view is not enabled for this test case.")
+            self.client.force_login(self.owner_user)
+            detail_url = self.get_detail_url(self.unpublished_object.pk)
+            response = self.client.post(
+                f"{self.get_delete_url(self.unpublished_object.pk)}?next={detail_url}",
+                {"next": detail_url},
+                follow=True,
+            )
+            self.assertFalse(
+                self.model.objects.filter(pk=self.unpublished_object.pk).exists()
+            )
+            self.assertRedirects(
+                response, self.get_delete_success_url(publication_status="private")
+            )
+
         def test_delete_view_get_unpublished_as_non_owner(self):
             if not self.delete_view:
                 self.skipTest("Delete view is not enabled for this test case.")

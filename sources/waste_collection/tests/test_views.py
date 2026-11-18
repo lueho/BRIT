@@ -867,6 +867,10 @@ class CollectionFrequencyCRUDViewsTestCase(
         self._detach_count_options()
         super().test_delete_view_post_unpublished_as_staff_user()
 
+    def test_delete_view_post_ignores_next_url_of_deleted_object(self):
+        self._detach_count_options()
+        super().test_delete_view_post_ignores_next_url_of_deleted_object()
+
     def test_update_ignores_unchanged_empty_extra_season_form(self):
         frequency = CollectionFrequency.objects.create(
             owner=self.owner_user,

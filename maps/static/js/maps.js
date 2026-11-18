@@ -794,6 +794,17 @@ function renderFeatures(geoJson) {
     featuresLayer.addTo(map);
 }
 
+// The map allows zoom 22, but the OpenStreetMap basemap has no tiles beyond 19.
+const FIT_BOUNDS_MAX_ZOOM = 18;
+// A single point has no extent, so a fit would zoom all the way in; keep
+// enough of its surroundings in view to locate it.
+const FIT_POINT_MAX_ZOOM = 16;
+
+function fitBoundsOptions(bounds) {
+    const isPoint = bounds.getSouthWest().equals(bounds.getNorthEast());
+    return { maxZoom: isPoint ? FIT_POINT_MAX_ZOOM : FIT_BOUNDS_MAX_ZOOM };
+}
+
 function adjustMapBounds(filterParameters) {
     const layerPriorities = [
         { key: 'region', layer: regionLayer },
@@ -822,7 +833,7 @@ function adjustMapBounds(filterParameters) {
             try {
                 const bounds = layer.getBounds();
                 if (bounds.isValid()) {
-                    map.fitBounds(bounds);
+                    map.fitBounds(bounds, fitBoundsOptions(bounds));
                     return true;
                 }
             } catch (error) {

@@ -36,7 +36,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string, select_template
-from django.urls import NoReverseMatch, reverse
+from django.urls import NoReverseMatch, Resolver404, resolve, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.text import capfirst
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
@@ -2975,9 +2975,34 @@ class UserCreatedObjectModalDeleteView(
         )
         return context
 
+    def get_next_url(self):
+        """Return the safe ``next`` URL unless it is a page of the deleted object.
+
+        Detail pages pass themselves as ``next``; that page no longer exists
+        once the object is deleted.
+        """
+        next_url = get_safe_next_url(self.request)
+        if next_url and self._is_page_of_deleted_object(next_url):
+            return None
+        return next_url
+
+    def _is_page_of_deleted_object(self, url):
+        if not self.object:
+            return False
+        try:
+            match = resolve(urlparse(url).path)
+        except Resolver404:
+            return False
+        model = getattr(getattr(match.func, "view_class", None), "model", None)
+        return (
+            model is not None
+            and model._meta.concrete_model is self.object._meta.concrete_model
+            and str(match.kwargs.get("pk")) == str(self.object.pk)
+        )
+
     def get_success_url(self):
         # Respect a safe 'next' parameter from POST or GET first
-        next_url = get_safe_next_url(self.request)
+        next_url = self.get_next_url()
         if next_url:
             return next_url
 
