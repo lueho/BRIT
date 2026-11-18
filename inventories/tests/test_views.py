@@ -167,6 +167,7 @@ class UserCreatedObjectAutocompleteViewFilterTests(SimpleTestCase):
     def setUp(self):
         self.view = UserCreatedObjectAutocompleteView()
         self.view.request = SimpleNamespace(user=AnonymousUser())
+        self.view.filter_lookups = ("owner_id", "parent__invalid")
 
     def test_invalid_language_code_filter_fails_closed(self):
         queryset = Mock()

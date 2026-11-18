@@ -211,6 +211,8 @@ class UserAutocompleteView(AutocompleteModelView):
     value_fields = ["id", "username"]
     ordering = ["username"]
     page_size = 15
+    allowed_filter_fields = ()
+    allowed_ordering_fields = ()
 
     def hook_queryset(self, queryset):
         """Filter to only active users."""

@@ -1406,6 +1406,7 @@ class CatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
     geodataset_model_name = None
     # Matches a region's own catchment and the catchments created inside it.
     IN_REGION_LOOKUP = "in_region"
+    filter_lookups = (f"region__{IN_REGION_LOOKUP}", "region__name")
 
     def filter_by_lookup(self, queryset, lookup, value):
         if _tomselect_lookup_name(lookup) == self.IN_REGION_LOOKUP:

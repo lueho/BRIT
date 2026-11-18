@@ -146,6 +146,8 @@ class InventoryAlgorithmAutocompleteView(AutocompleteModelView):
     ordering = ["name"]
     allow_anonymous = True
     page_size = 15
+    allowed_filter_fields = ()
+    allowed_ordering_fields = ()
 
     def __init_subclass__(cls, **kwargs):
         """Preserve inherited search/value fields across subclasses.
