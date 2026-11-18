@@ -4,7 +4,10 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser, Permission, User
+from django.db import connection
+from django.db.models import Max, Q
 from django.test import RequestFactory, TestCase
+from django.test.utils import CaptureQueriesContext
 
 from sources.waste_collection.derived_values import create_or_update_derived_cpv
 from sources.waste_collection.filters import (
@@ -18,6 +21,10 @@ from sources.waste_collection.models import (
     CollectionFrequency,
     CollectionPropertyValue,
     CollectionSeason,
+)
+from sources.waste_collection.projection_queries import (
+    visible_measurement_maxima,
+    visible_measurement_queryset,
 )
 from sources.waste_collection.serializers import (
     CollectionFlatSerializer,
@@ -204,6 +211,77 @@ class GeneratedConsumerNumericalTests(TestCase):
                 request=request,
             )
         self.assertEqual(filters.filters["spec_waste_collected"].range_max, 150)
+
+    def test_slider_maxima_preserve_source_visibility_and_manual_precedence(self):
+        staff = User.objects.create_user("slider-staff", is_staff=True)
+        public = self._raw(self.total, self.total_unit, "300", state="published")
+        self._assert_output(public, self.specific, self.specific_unit, "150")
+        self._raw(self.specific, self.specific_unit, "900")
+        private = self._raw(self.total, self.total_unit, "1000", owner=staff, year=2025)
+        create_or_update_derived_cpv(private, publication_status="published")
+        CollectionPropertyValue.objects.filter(derived_from=private).update(average=500)
+        for actor, expected in (
+            (AnonymousUser(), 150),
+            (self.owner, 900),
+            (staff, 500),
+        ):
+            with self.subTest(actor=actor):
+                request = RequestFactory().get("/")
+                request.user = actor
+                with (
+                    patch.object(
+                        CollectionFilterSet.base_filters["spec_waste_collected"],
+                        "property_name",
+                        self.specific.name,
+                    ),
+                    CaptureQueriesContext(connection) as queries,
+                ):
+                    filters = CollectionFilterSet(
+                        queryset=Collection.objects.filter(pk=self.collection.pk),
+                        request=request,
+                    )
+                self.assertEqual(
+                    filters.filters["spec_waste_collected"].range_max, expected
+                )
+                aggregate = next(
+                    query["sql"]
+                    for query in queries
+                    if "MAX(" in query["sql"] and "average" in query["sql"]
+                )
+                self.assertIn("BOOL_OR", aggregate)
+                self.assertNotIn("EXISTS", aggregate)
+
+    def test_window_maxima_match_precedence_for_null_years_units_and_empty_sets(self):
+        source = self._raw(self.total, self.total_unit, "300", state="published")
+        generated = self._assert_output(
+            source, self.specific, self.specific_unit, "150"
+        )
+        CollectionPropertyValue.objects.filter(pk__in=[source.pk, generated.pk]).update(
+            year=None
+        )
+        self._raw(self.specific, self.specific_unit, "20", state="published", year=None)
+        self._raw(self.specific, self.total_unit, "75", state="archived", year=None)
+        self._raw(self.specific, self.specific_unit, "900")
+        staff = User.objects.create_user("window-staff", is_staff=True)
+        admin = User.objects.create_superuser("window-admin")
+        property_names = {"specific": self.specific.name, "total": self.total.name}
+        for actor in (AnonymousUser(), self.owner, staff, admin):
+            for queryset in (
+                CollectionPropertyValue.objects.all(),
+                CollectionPropertyValue.objects.filter(property=self.specific),
+                CollectionPropertyValue.objects.none(),
+            ):
+                with self.subTest(actor=actor, query=queryset.query):
+                    expected = visible_measurement_queryset(actor, queryset).aggregate(
+                        **{
+                            name: Max("average", filter=Q(property__name=property_name))
+                            for name, property_name in property_names.items()
+                        }
+                    )
+                    self.assertEqual(
+                        visible_measurement_maxima(actor, queryset, property_names),
+                        expected,
+                    )
 
     def test_frequency_slider_ignores_an_unreadable_frequency(self):
         public_frequency = CollectionFrequency.objects.create(

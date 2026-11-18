@@ -1,6 +1,7 @@
 """Measurement precedence within an already-authorized CPV queryset."""
 
-from django.db.models import Exists, IntegerField, OuterRef, Q, Value
+from django.contrib.postgres.aggregates import BoolOr
+from django.db.models import Exists, F, IntegerField, Max, OuterRef, Q, Value, Window
 from django.db.models.functions import Coalesce
 
 from utils.object_management.policy import visible_queryset
@@ -9,6 +10,31 @@ from utils.object_management.policy import visible_queryset
 def visible_measurement_queryset(user, queryset):
     """Authorize first, then apply measurement precedence without broadening."""
     return preferred_measurement_queryset(visible_queryset(user, queryset))
+
+
+def visible_measurement_maxima(user, queryset, property_names):
+    """Aggregate authorized evidence without repeating visibility per key."""
+    measurements = (
+        visible_queryset(user, queryset)
+        .annotate(
+            _has_visible_manual=Window(
+                expression=BoolOr(Q(is_derived=False)),
+                partition_by=[
+                    F("collection_id"),
+                    F("property_id"),
+                    Coalesce("year", Value(-1), output_field=IntegerField()),
+                    F("unit_id"),
+                ],
+            )
+        )
+        .filter(Q(is_derived=False) | Q(_has_visible_manual=False))
+    )
+    return measurements.aggregate(
+        **{
+            name: Max("average", filter=Q(property__name=property_name))
+            for name, property_name in property_names.items()
+        }
+    )
 
 
 def preferred_measurement_queryset(queryset):
