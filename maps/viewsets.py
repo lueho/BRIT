@@ -1,3 +1,4 @@
+from datetime import date
 from types import SimpleNamespace
 
 from django.db.models import Count, Max, Prefetch
@@ -23,14 +24,17 @@ from .models import (
     Region,
     RegionAttributeTextValue,
     RegionAttributeValue,
+    dated_region_geom_expression,
 )
 from .serializers import (
+    CatchmentDatedGeoFeatureSerializer,
     CatchmentGeoFeatureModelSerializer,
     CatchmentModelSerializer,
     LocationGeoFeatureModelSerializer,
     LocationModelSerializer,
     NutsRegionGeometrySerializer,
     NutsRegionSummarySerializer,
+    RegionDatedGeoFeatureSerializer,
     RegionGeoFeatureModelSerializer,
     RegionModelSerializer,
 )
@@ -62,12 +66,55 @@ class LocationViewSet(UserCreatedObjectViewSet):
         return Response(serializer.data)
 
 
+def _parse_geojson_date(request):
+    """Parse the optional ``?date=YYYY-MM-DD`` geometry resolution date."""
+    raw = request.query_params.get("date") if request else None
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except (TypeError, ValueError) as err:
+        raise ValidationError({"date": "Expected an ISO date (YYYY-MM-DD)."}) from err
+
+
 class RegionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
-    geojson_geometry_field = "borders__geom"
     queryset = Region.objects.select_related("borders").all()
     serializer_class = RegionModelSerializer
     filterset_class = RegionFilterSet
     geojson_throttle_classes = (GeoJSONAnonThrottle,)
+
+    @property
+    def geojson_geometry_field(self):
+        if getattr(self, "_geojson_date", None) is not None:
+            return "dated_geom"
+        return "borders__geom"
+
+    def get_geojson_queryset(self):
+        queryset = super().get_queryset()
+        self._geojson_date = _parse_geojson_date(self.request)
+        if self._geojson_date is None:
+            return queryset
+        return queryset.annotate(
+            dated_geom=dated_region_geom_expression(self._geojson_date)
+        ).exclude(dated_geom__isnull=True)
+
+    def get_geojson_serializer_class(self):
+        if getattr(self, "_geojson_date", None) is not None:
+            return RegionDatedGeoFeatureSerializer
+        return RegionGeoFeatureModelSerializer
+
+    def _version_aggregates(self):
+        aggregates = super()._version_aggregates()
+        if getattr(self, "_geojson_date", None) is not None:
+            aggregates["max_boundary_mod"] = Max("boundaries__lastmodified_at")
+        return aggregates
+
+    def _version_timestamp(self, agg):
+        ts = super()._version_timestamp(agg)
+        boundary_mod = agg.get("max_boundary_mod")
+        if boundary_mod:
+            ts = max(ts, int(boundary_mod.timestamp()))
+        return ts
 
     def get_cache_key(self, request):
         filters = request.query_params.dict()
@@ -147,11 +194,32 @@ class RegionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
 
 
 class CatchmentViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
-    geojson_geometry_field = "region__borders__geom"
     queryset = Catchment.objects.select_related("region", "region__borders").all()
     serializer_class = CatchmentModelSerializer
     filterset_class = CatchmentFilterSet
     geojson_throttle_classes = (GeoJSONAnonThrottle,)
+
+    @property
+    def geojson_geometry_field(self):
+        if getattr(self, "_geojson_date", None) is not None:
+            return "dated_geom"
+        return "region__borders__geom"
+
+    def get_geojson_queryset(self):
+        queryset = super().get_queryset()
+        self._geojson_date = _parse_geojson_date(self.request)
+        if self._geojson_date is None:
+            return queryset
+        return queryset.annotate(
+            dated_geom=dated_region_geom_expression(
+                self._geojson_date, region_path="region"
+            )
+        ).exclude(dated_geom__isnull=True)
+
+    def get_geojson_serializer_class(self):
+        if getattr(self, "_geojson_date", None) is not None:
+            return CatchmentDatedGeoFeatureSerializer
+        return CatchmentGeoFeatureModelSerializer
 
     def get_cache_key(self, request):
         filters = request.query_params.dict()
@@ -161,16 +229,22 @@ class CatchmentViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     def _version_aggregates(self):
         """Catchment geometries derive from the related Region geometry, so the
         version additionally tracks the related Region modification time."""
-        return {
+        aggregates = {
             **super()._version_aggregates(),
             "max_region_mod": Max("region__lastmodified_at"),
         }
+        if getattr(self, "_geojson_date", None) is not None:
+            aggregates["max_boundary_mod"] = Max("region__boundaries__lastmodified_at")
+        return aggregates
 
     def _version_timestamp(self, agg):
         ts = super()._version_timestamp(agg)
         region_mod = agg.get("max_region_mod")
         if region_mod:
             ts = max(ts, int(region_mod.timestamp()))
+        boundary_mod = agg.get("max_boundary_mod")
+        if boundary_mod:
+            ts = max(ts, int(boundary_mod.timestamp()))
         return ts
 
     def get_serializer_class(self):

@@ -15,7 +15,17 @@ from django.core.exceptions import (
 )
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
-from django.db.models import F, Func, OuterRef, Q, Subquery, Value
+from django.db.models import (
+    Case,
+    Exists,
+    F,
+    Func,
+    OuterRef,
+    Q,
+    Subquery,
+    Value,
+    When,
+)
 from django.db.models.functions import Coalesce
 from django.db.models.signals import m2m_changed, post_delete, post_save, pre_save
 from django.dispatch import receiver
@@ -337,6 +347,26 @@ class Region(NamedUserCreatedObject):
         if self.borders:
             return self.borders.geom
         return None  # Return None if no borders are associated
+
+    def geom_on(self, on_date):
+        """Return the region geometry valid on ``on_date``.
+
+        Regions with published/archived boundary rows resolve to the
+        boundary valid on that date, or ``None`` when none is valid (e.g. a
+        dissolved municipality after its dissolution). Regions without
+        visible boundary rows fall back to their timeless ``borders``.
+        """
+        boundaries = self.boundaries.filter(
+            publication_status__in=("published", "archived")
+        )
+        if boundaries.exists():
+            boundary = (
+                boundaries.valid_on(on_date)
+                .order_by(F("valid_from").desc(nulls_last=True), "-pk")
+                .first()
+            )
+            return boundary.geom if boundary else None
+        return self.geom
 
     @geom.setter
     def geom(self, value):
@@ -993,6 +1023,109 @@ def protect_published_catchment_revision_members(
 def delete_unused_custom_region(sender, instance, **kwargs):
     if not instance.region.catchment_set.exists() and instance.type == "custom":
         instance.region.delete()
+
+
+class RegionBoundaryQuerySet(UserCreatedObjectQuerySet):
+    def valid_on(self, on_date):
+        """Return boundaries whose half-open period contains ``on_date``."""
+        return self.filter(
+            Q(valid_from__lte=on_date) | Q(valid_from__isnull=True),
+            Q(valid_to__gt=on_date) | Q(valid_to__isnull=True),
+        )
+
+
+class RegionBoundaryManager(UserCreatedObjectManager):
+    def get_queryset(self):
+        return RegionBoundaryQuerySet(self.model, using=self._db)
+
+    def valid_on(self, on_date):
+        return self.get_queryset().valid_on(on_date)
+
+
+class RegionBoundary(NamedUserCreatedObject):
+    """Effective-dated boundary for a :class:`Region`.
+
+    Regions without visible boundary rows keep drawing their timeless
+    ``borders`` geometry. Once a region has published or archived boundary
+    rows, map layers resolve the row whose half-open ``[valid_from,
+    valid_to)`` period contains the requested date; when no row is valid the
+    region resolves to no geometry at all, which is how dissolved
+    municipalities stop rendering after their dissolution date.
+    """
+
+    region = models.ForeignKey(
+        Region, on_delete=models.CASCADE, related_name="boundaries"
+    )
+    valid_from = models.DateField(blank=True, null=True)
+    valid_to = models.DateField(blank=True, null=True)
+    geom = MultiPolygonField(srid=4326)
+    sources = models.ManyToManyField(Source, blank=True)
+
+    objects = RegionBoundaryManager()
+
+    class Meta(NamedUserCreatedObject.Meta):
+        ordering = ["region_id", "valid_from", "id"]
+        indexes = [models.Index(fields=["region", "valid_from", "valid_to"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(valid_from__isnull=True)
+                    | Q(valid_to__isnull=True)
+                    | Q(valid_from__lt=F("valid_to"))
+                ),
+                name="region_boundary_valid_period_valid",
+            ),
+            ExclusionConstraint(
+                name="region_boundary_no_public_period_overlap",
+                expressions=[
+                    ("region", RangeOperators.EQUAL),
+                    (
+                        Func(
+                            F("valid_from"),
+                            F("valid_to"),
+                            function="DATERANGE",
+                            output_field=DateRangeField(),
+                        ),
+                        RangeOperators.OVERLAPS,
+                    ),
+                ],
+                condition=Q(publication_status__in=("published", "archived")),
+            ),
+        ]
+
+    def __str__(self):
+        return self.name if self.name else f"Boundary of {self.region}"
+
+
+def dated_region_geom_expression(on_date, region_path=""):
+    """ORM expression resolving a region's geometry valid on ``on_date``.
+
+    ``region_path`` is the relation path from the queryset's model to the
+    region (empty for ``Region`` itself, ``"region"`` for ``Catchment``).
+    Yields the visible boundary valid on the date when the region has
+    published/archived boundaries, else its timeless ``borders`` geometry.
+    """
+
+    region_ref = OuterRef(region_path or "pk")
+    borders_path = f"{region_path}__borders__geom" if region_path else "borders__geom"
+    boundaries = RegionBoundary.objects.filter(
+        region=region_ref,
+        publication_status__in=("published", "archived"),
+    )
+    dated = boundaries.valid_on(on_date).order_by(
+        F("valid_from").desc(nulls_last=True), "-pk"
+    )
+    return Case(
+        When(
+            Exists(boundaries),
+            then=Subquery(
+                dated.values("geom")[:1],
+                output_field=MultiPolygonField(srid=4326),
+            ),
+        ),
+        default=F(borders_path),
+        output_field=MultiPolygonField(srid=4326),
+    )
 
 
 class GeoDataset(NamedUserCreatedObject):

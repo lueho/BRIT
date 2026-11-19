@@ -37,6 +37,7 @@ from maps.models import (
     NutsRegion,
     RegionAttributeValue,
     RegionProperty,
+    dated_region_geom_expression,
 )
 from maps.population.models import TemporalBasis
 from maps.population.services import population_values_by_region
@@ -510,7 +511,9 @@ def _with_catchment_revision(queryset, year, user=None):
                 revisions.values("geom")[:1],
                 output_field=MultiPolygonField(srid=4326),
             ),
-            F("region__borders__geom"),
+            dated_region_geom_expression(
+                _atlas_reference_date(year), region_path="region"
+            ),
             output_field=MultiPolygonField(srid=4326),
         ),
     ).exclude(atlas_geom__isnull=True)
@@ -559,13 +562,21 @@ def _revision_snapshots(catchment_ids, year, user=None):
 
     missing_ids = catchment_ids - snapshots.keys()
     if missing_ids:
+        reference_date = _atlas_reference_date(year)
         for catchment in CollectionCatchment.objects.filter(
-            pk__in=missing_ids, region__borders__geom__isnull=False
+            pk__in=missing_ids
         ).select_related("region__borders"):
+            geom = (
+                catchment.region.geom_on(reference_date)
+                if catchment.region_id
+                else None
+            )
+            if geom is None:
+                continue
             snapshots[catchment.pk] = {
                 "revision_id": None,
                 "catchment_name": catchment.name,
-                "geom": catchment.region.borders.geom,
+                "geom": geom,
             }
     return snapshots
 
@@ -2552,21 +2563,21 @@ def _get_acpv_outline_geojson(
         catchment.id: catchment
         for catchment in CollectionCatchment.objects.filter(
             id__in=[cid for cids in catchment_ids_by_group.values() for cid in cids],
-            region__borders__isnull=False,
         ).select_related("region", "region__borders")
     }
 
     features = []
+    reference_date = _atlas_reference_date(year)
     for group_key in sorted(catchment_ids_by_group):
         group_catchment_ids = sorted(catchment_ids_by_group[group_key])
-        geoms = [
-            catchments[catchment_id].region.borders.geom
-            for catchment_id in group_catchment_ids
-            if catchment_id in catchments
-            and catchments[catchment_id].region
-            and catchments[catchment_id].region.borders
-            and catchments[catchment_id].region.borders.geom
-        ]
+        geoms = []
+        for catchment_id in group_catchment_ids:
+            catchment = catchments.get(catchment_id)
+            if not catchment or not catchment.region_id:
+                continue
+            geom = catchment.region.geom_on(reference_date)
+            if geom is not None:
+                geoms.append(geom)
         if not geoms:
             continue
 
