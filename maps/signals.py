@@ -18,7 +18,9 @@ from .models import (
     Region,
     RegionAttributeTextValue,
     RegionAttributeValue,
+    RegionBoundary,
     _lock_geodataset_rows,
+    invalidate_region_boundary_caches,
 )
 
 logger = logging.getLogger(__name__)
@@ -106,6 +108,19 @@ def invalidate_region_cache(sender, instance, **kwargs):
     # Invalidate NUTS cache if the region has an associated NUTS region.
     if hasattr(instance, "nutsregion"):
         clear_geojson_cache_pattern("nuts_geojson:*")
+
+
+@receiver(post_save, sender=RegionBoundary)
+@receiver(post_delete, sender=RegionBoundary)
+def invalidate_region_boundary_cache(sender, instance, **kwargs):
+    """Invalidate cached GeoJSON when a RegionBoundary changes.
+
+    Date-aware region and catchment responses resolve through boundary rows,
+    so every boundary edit must drop both namespaces the same way a Region
+    edit does. The atlas change-overlay cache versions its keys from boundary
+    modification times and does not need clearing.
+    """
+    invalidate_region_boundary_caches(getattr(instance, "region_id", None))
 
 
 @receiver(post_save, sender=RegionAttributeValue)

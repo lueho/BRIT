@@ -36,6 +36,7 @@ from maps.models import (
     LauRegion,
     NutsRegion,
     RegionAttributeValue,
+    RegionBoundary,
     RegionProperty,
     dated_region_geom_expression,
 )
@@ -563,20 +564,20 @@ def _revision_snapshots(catchment_ids, year, user=None):
     missing_ids = catchment_ids - snapshots.keys()
     if missing_ids:
         reference_date = _atlas_reference_date(year)
-        for catchment in CollectionCatchment.objects.filter(
-            pk__in=missing_ids
-        ).select_related("region__borders"):
-            geom = (
-                catchment.region.geom_on(reference_date)
-                if catchment.region_id
-                else None
+        fallback_catchments = (
+            CollectionCatchment.objects.filter(pk__in=missing_ids)
+            .annotate(
+                dated_geom=dated_region_geom_expression(
+                    reference_date, region_path="region"
+                )
             )
-            if geom is None:
-                continue
+            .exclude(dated_geom__isnull=True)
+        )
+        for catchment in fallback_catchments:
             snapshots[catchment.pk] = {
                 "revision_id": None,
                 "catchment_name": catchment.name,
-                "geom": geom,
+                "geom": catchment.dated_geom,
             }
     return snapshots
 
@@ -625,12 +626,20 @@ def _change_overlay_cache_key(from_ids, from_year, to_ids, to_year, user=None):
         .aggregate(count=Count("pk"), latest=Max("lastmodified_at"))
     )
     latest = versions["latest"]
+    # Boundary edits version the key the same way revision edits do, so the
+    # dated region-geometry fallback cannot serve a stale overlay.
+    boundary_latest = RegionBoundary.objects.filter(
+        region_id__in=CollectionCatchment.objects.filter(pk__in=catchment_ids).values(
+            "region_id"
+        )
+    ).aggregate(latest=Max("lastmodified_at"))["latest"]
     fingerprint = ":".join(
         (
             ",".join(str(pk) for pk in sorted(from_ids)),
             ",".join(str(pk) for pk in sorted(to_ids)),
             str(versions["count"] or 0),
             str(int(latest.timestamp()) if latest else 0),
+            str(int(boundary_latest.timestamp()) if boundary_latest else 0),
         )
     )
     digest = hashlib.sha1(fingerprint.encode("utf-8")).hexdigest()[:16]
@@ -2559,25 +2568,26 @@ def _get_acpv_outline_geojson(
     if not catchment_ids_by_group:
         return _build_feature_collection([])
 
+    reference_date = _atlas_reference_date(year)
     catchments = {
         catchment.id: catchment
         for catchment in CollectionCatchment.objects.filter(
             id__in=[cid for cids in catchment_ids_by_group.values() for cid in cids],
-        ).select_related("region", "region__borders")
+        ).annotate(
+            dated_geom=dated_region_geom_expression(
+                reference_date, region_path="region"
+            )
+        )
     }
 
     features = []
-    reference_date = _atlas_reference_date(year)
     for group_key in sorted(catchment_ids_by_group):
         group_catchment_ids = sorted(catchment_ids_by_group[group_key])
         geoms = []
         for catchment_id in group_catchment_ids:
             catchment = catchments.get(catchment_id)
-            if not catchment or not catchment.region_id:
-                continue
-            geom = catchment.region.geom_on(reference_date)
-            if geom is not None:
-                geoms.append(geom)
+            if catchment is not None and catchment.dated_geom is not None:
+                geoms.append(catchment.dated_geom)
         if not geoms:
             continue
 

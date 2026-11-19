@@ -135,6 +135,14 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
+                    "predecessors",
+                    models.ManyToManyField(
+                        blank=True,
+                        related_name="successors",
+                        to="maps.regionboundary",
+                    ),
+                ),
+                (
                     "sources",
                     models.ManyToManyField(blank=True, to="bibliography.source"),
                 ),

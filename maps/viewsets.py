@@ -1,7 +1,7 @@
 from datetime import date
 from types import SimpleNamespace
 
-from django.db.models import Count, Max, Prefetch
+from django.db.models import Count, Max, OuterRef, Prefetch, Subquery
 from django.http import HttpResponseRedirect
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -24,6 +24,7 @@ from .models import (
     Region,
     RegionAttributeTextValue,
     RegionAttributeValue,
+    RegionBoundary,
     dated_region_geom_expression,
 )
 from .serializers import (
@@ -89,6 +90,22 @@ class RegionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             return "dated_geom"
         return "borders__geom"
 
+    @property
+    def geojson_point_field(self):
+        # ``dated_geom`` is an annotation: the streaming renderer defers the
+        # concrete raw geometry path while serializing the annotation.
+        if getattr(self, "_geojson_date", None) is not None:
+            return "borders__geom"
+        return None
+
+    @property
+    def geojson_bbox_geometry_field(self):
+        # The viewport filter must apply to the resolved dated geometry, not
+        # the timeless borders.
+        if getattr(self, "_geojson_date", None) is not None:
+            return "dated_geom"
+        return None
+
     def get_geojson_queryset(self):
         queryset = super().get_queryset()
         self._geojson_date = _parse_geojson_date(self.request)
@@ -106,7 +123,18 @@ class RegionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     def _version_aggregates(self):
         aggregates = super()._version_aggregates()
         if getattr(self, "_geojson_date", None) is not None:
-            aggregates["max_boundary_mod"] = Max("boundaries__lastmodified_at")
+            # A boundaries join would multiply rows into Count and num_points;
+            # a correlated subquery keeps one row per region.
+            aggregates["max_boundary_mod"] = Max(
+                Subquery(
+                    RegionBoundary.objects.filter(
+                        region=OuterRef("pk"),
+                        publication_status__in=("published", "archived"),
+                    )
+                    .order_by("-lastmodified_at")
+                    .values("lastmodified_at")[:1]
+                )
+            )
         return aggregates
 
     def _version_timestamp(self, agg):
@@ -205,6 +233,22 @@ class CatchmentViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             return "dated_geom"
         return "region__borders__geom"
 
+    @property
+    def geojson_point_field(self):
+        # ``dated_geom`` is an annotation: the streaming renderer defers the
+        # concrete raw geometry path while serializing the annotation.
+        if getattr(self, "_geojson_date", None) is not None:
+            return "region__borders__geom"
+        return None
+
+    @property
+    def geojson_bbox_geometry_field(self):
+        # The viewport filter must apply to the resolved dated geometry, not
+        # the timeless borders.
+        if getattr(self, "_geojson_date", None) is not None:
+            return "dated_geom"
+        return None
+
     def get_geojson_queryset(self):
         queryset = super().get_queryset()
         self._geojson_date = _parse_geojson_date(self.request)
@@ -234,7 +278,18 @@ class CatchmentViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             "max_region_mod": Max("region__lastmodified_at"),
         }
         if getattr(self, "_geojson_date", None) is not None:
-            aggregates["max_boundary_mod"] = Max("region__boundaries__lastmodified_at")
+            # A boundaries join would multiply rows into Count and num_points;
+            # a correlated subquery keeps one row per catchment.
+            aggregates["max_boundary_mod"] = Max(
+                Subquery(
+                    RegionBoundary.objects.filter(
+                        region=OuterRef("region_id"),
+                        publication_status__in=("published", "archived"),
+                    )
+                    .order_by("-lastmodified_at")
+                    .values("lastmodified_at")[:1]
+                )
+            )
         return aggregates
 
     def _version_timestamp(self, agg):

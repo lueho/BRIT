@@ -1051,7 +1051,21 @@ class RegionBoundary(NamedUserCreatedObject):
     valid_to)`` period contains the requested date; when no row is valid the
     region resolves to no geometry at all, which is how dissolved
     municipalities stop rendering after their dissolution date.
+
+    Published and archived rows are immutable snapshots, like
+    :class:`CatchmentRevision`. Replacing a boundary requires a successor
+    row linked through ``predecessors``; approving it transactionally closes
+    the linked predecessor's period instead of violating the overlap
+    constraint.
     """
+
+    IMMUTABLE_STATUSES = ("published", "archived")
+    IMMUTABLE_FIELDS = (
+        "region_id",
+        "valid_from",
+        "valid_to",
+        "geom",
+    )
 
     region = models.ForeignKey(
         Region, on_delete=models.CASCADE, related_name="boundaries"
@@ -1059,6 +1073,9 @@ class RegionBoundary(NamedUserCreatedObject):
     valid_from = models.DateField(blank=True, null=True)
     valid_to = models.DateField(blank=True, null=True)
     geom = MultiPolygonField(srid=4326)
+    predecessors = models.ManyToManyField(
+        "self", blank=True, symmetrical=False, related_name="successors"
+    )
     sources = models.ManyToManyField(Source, blank=True)
 
     objects = RegionBoundaryManager()
@@ -1093,8 +1110,140 @@ class RegionBoundary(NamedUserCreatedObject):
             ),
         ]
 
+    def clean(self):
+        super().clean()
+        errors = {}
+        immutable_error = self._immutable_change_error()
+        if immutable_error:
+            errors["__all__"] = immutable_error
+        if self.valid_from and self.valid_to and self.valid_from >= self.valid_to:
+            errors["valid_to"] = "Valid to must be later than valid from."
+        if self.geom is None or self.geom.empty:
+            errors["geom"] = "A non-empty boundary geometry is required."
+        elif not self.geom.valid:
+            errors["geom"] = "Boundary geometry must be valid."
+        if errors:
+            raise ValidationError(errors)
+
+    def _immutable_change_error(self):
+        """Return the immutability message when a locked snapshot is edited."""
+        if not self.pk:
+            return None
+        previous = type(self).objects.filter(pk=self.pk).first()
+        if (
+            previous is None
+            or previous.publication_status not in self.IMMUTABLE_STATUSES
+        ):
+            return None
+        changed = any(
+            getattr(previous, field_name) != getattr(self, field_name)
+            for field_name in self.IMMUTABLE_FIELDS
+        )
+        if not changed:
+            return None
+        return "Published region boundaries are immutable; create a successor."
+
+    def save(self, *args, **kwargs):
+        immutable_error = self._immutable_change_error()
+        if immutable_error:
+            raise ValidationError(immutable_error)
+        super().save(*args, **kwargs)
+
+    def approve(self, user=None):
+        with transaction.atomic():
+            self.full_clean()
+            self._close_superseded_boundaries()
+            self._validate_public_period_available()
+            result = super().approve(user=user)
+        invalidate_region_boundary_caches(self.region_id)
+        return result
+
+    def _validate_public_period_available(self):
+        overlapping = (
+            type(self)
+            .objects.filter(
+                region_id=self.region_id,
+                publication_status__in=self.IMMUTABLE_STATUSES,
+            )
+            .exclude(pk=self.pk)
+        )
+        if self.valid_from is not None:
+            overlapping = overlapping.filter(
+                Q(valid_to__gt=self.valid_from) | Q(valid_to__isnull=True)
+            )
+        if self.valid_to is not None:
+            overlapping = overlapping.filter(
+                Q(valid_from__lt=self.valid_to) | Q(valid_from__isnull=True)
+            )
+        if overlapping.exists():
+            raise ValidationError(
+                "This region boundary overlaps a published period. Link the "
+                "current boundary as its predecessor or correct the dates."
+            )
+
+    def _close_superseded_boundaries(self):
+        """End same-region predecessors immediately before publication.
+
+        Cross-region predecessors record lineage for municipal transfers,
+        splits, and mergers but do not imply that the source region's own
+        boundary history changes.
+        """
+        predecessors = (
+            type(self)
+            .objects.select_for_update()
+            .filter(
+                successors=self,
+                region_id=self.region_id,
+                publication_status__in=self.IMMUTABLE_STATUSES,
+            )
+        )
+        if not predecessors.exists():
+            return
+        if self.valid_from is None:
+            raise ValidationError(
+                {"valid_from": "A successor boundary needs a valid-from date."}
+            )
+        for predecessor in predecessors:
+            if (
+                predecessor.valid_from is not None
+                and predecessor.valid_from >= self.valid_from
+            ):
+                raise ValidationError(
+                    {"valid_from": "A successor must start after its predecessor."}
+                )
+            if (
+                predecessor.valid_to is not None
+                and predecessor.valid_to <= self.valid_from
+            ):
+                continue
+            type(self).objects.filter(pk=predecessor.pk).update(
+                valid_to=self.valid_from,
+                publication_status=self.STATUS_ARCHIVED,
+                lastmodified_at=timezone.now(),
+            )
+
     def __str__(self):
         return self.name if self.name else f"Boundary of {self.region}"
+
+
+def invalidate_region_boundary_caches(region_id):
+    """Drop cached GeoJSON payloads affected by a boundary change.
+
+    Called from ``post_save``/``post_delete`` receivers and from approval
+    paths that update predecessor rows via ``QuerySet.update()`` — which
+    bypasses model signals.
+    """
+    from .signals import (
+        clear_geojson_cache_pattern,
+        get_geojson_cache,
+        safe_cache_delete,
+    )
+
+    geojson_cache = get_geojson_cache()
+    if region_id:
+        safe_cache_delete(geojson_cache, f"region_geojson:id:{region_id}")
+    clear_geojson_cache_pattern("region_geojson:*")
+    clear_geojson_cache_pattern("catchment_geojson:*")
 
 
 def dated_region_geom_expression(on_date, region_path=""):

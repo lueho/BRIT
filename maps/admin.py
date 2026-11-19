@@ -164,6 +164,7 @@ class RegionBoundaryModelAdmin(PolicyAdminMixin, GISModelAdmin):
     list_filter = ("publication_status",)
     search_fields = ("name", "region__name", "description")
     autocomplete_fields = ("region", "sources")
+    filter_horizontal = ("predecessors",)
     readonly_fields = (
         "publication_status",
         "submitted_at",

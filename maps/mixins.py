@@ -217,10 +217,21 @@ class CachedGeoJSONMixin:
             return f"{AUTHZ_GEOJSON_CACHE_PREFIX}{cache_key}"
         return None
 
+    # Optional explicit geometry path for bbox filtering. ViewSets whose
+    # served geometry is an annotation (e.g. ``dated_geom``) set this so the
+    # viewport filter applies to the resolved geometry instead of a stale
+    # raw field — annotations support spatial lookups directly.
+    geojson_bbox_geometry_field = None
+
     def _apply_bbox_filter(self, queryset, bbox):
         """Apply bounding box filter to queryset if bbox is provided."""
         if bbox is None:
             return queryset
+        bbox_field = getattr(self, "geojson_bbox_geometry_field", None)
+        if callable(bbox_field):
+            bbox_field = bbox_field()
+        if bbox_field:
+            return queryset.filter(**{f"{bbox_field}__intersects": bbox})
         # Try the declared geometry paths first, then common field names.
         # ``geojson_point_field`` holds the raw geometry path when
         # ``geojson_geometry_field`` is an annotation (e.g. a simplified
