@@ -1,6 +1,7 @@
+from datetime import date
 from types import SimpleNamespace
 
-from django.db.models import Count, Max, Prefetch
+from django.db.models import Count, Max, OuterRef, Prefetch, Subquery
 from django.http import HttpResponseRedirect
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -23,19 +24,24 @@ from .models import (
     Region,
     RegionAttributeTextValue,
     RegionAttributeValue,
+    RegionBoundary,
+    dated_region_geom_expression,
 )
 from .serializers import (
+    CatchmentDatedGeoFeatureSerializer,
     CatchmentGeoFeatureModelSerializer,
     CatchmentModelSerializer,
     LocationGeoFeatureModelSerializer,
     LocationModelSerializer,
     NutsRegionGeometrySerializer,
     NutsRegionSummarySerializer,
+    RegionDatedGeoFeatureSerializer,
     RegionGeoFeatureModelSerializer,
     RegionModelSerializer,
 )
 from .throttling import GeoJSONAnonThrottle
 from .utils import (
+    geojson_version_token,
     get_catchment_cache_key,
     get_nuts_region_cache_key,
     get_region_cache_key,
@@ -62,17 +68,99 @@ class LocationViewSet(UserCreatedObjectViewSet):
         return Response(serializer.data)
 
 
-class RegionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
-    geojson_geometry_field = "borders__geom"
+def _parse_geojson_date(request):
+    """Parse the optional ``?date=YYYY-MM-DD`` geometry resolution date."""
+    raw = request.query_params.get("date") if request else None
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except (TypeError, ValueError) as err:
+        raise ValidationError({"date": "Expected an ISO date (YYYY-MM-DD)."}) from err
+
+
+class DatedRegionGeoJSONMixin(CachedGeoJSONMixin):
+    """Resolve the same region boundary for rendering, viewport and size checks."""
+
+    region_path = ""
+    dated_serializer_class = None
+
+    @property
+    def geojson_geometry_field(self):
+        return self.geojson_bbox_geometry_field or self.geojson_defer_field
+
+    @property
+    def geojson_bbox_geometry_field(self):
+        if getattr(self, "_geojson_date", None) is not None:
+            return "dated_geom"
+        return None
+
+    def get_geojson_queryset(self):
+        queryset = super().get_queryset()
+        self._geojson_date = _parse_geojson_date(self.request)
+        if self._geojson_date is None:
+            return queryset
+        return queryset.annotate(
+            dated_geom=dated_region_geom_expression(
+                self._geojson_date, self.region_path
+            )
+        ).exclude(dated_geom__isnull=True)
+
+    def get_geojson_serializer_class(self):
+        if getattr(self, "_geojson_date", None) is not None:
+            return self.dated_serializer_class
+        return super().get_geojson_serializer_class()
+
+    def get_stats_queryset(self, request):
+        queryset = super().get_stats_queryset(request)
+        if self._geojson_date is None:
+            return queryset
+        # Resolve the correlated lookup on the feature row before Django wraps
+        # the dated geometry query to aggregate its vertices.
+        boundaries = RegionBoundary.objects.filter(
+            region=OuterRef(self.region_path or "pk"),
+            publication_status__in=RegionBoundary.IMMUTABLE_STATUSES,
+        )
+        return queryset.annotate(
+            boundary_modified=Subquery(
+                boundaries.order_by("-lastmodified_at").values("lastmodified_at")[:1]
+            )
+        )
+
+    def _version_aggregates(self):
+        aggregates = super()._version_aggregates()
+        if getattr(self, "_geojson_date", None) is not None:
+            aggregates["max_boundary_mod"] = Max("boundary_modified")
+        return aggregates
+
+    def _version_token(self, agg):
+        if "max_boundary_mod" in agg:
+            # Preserve subsecond precision and track each dependency independently.
+            timestamps = tuple(
+                agg.get(k) for k in ("max_mod", "max_region_mod", "max_boundary_mod")
+            )
+            return geojson_version_token(agg, timestamps)
+        return super()._version_token(agg)
+
+    def _audience_cache_key(self, request, cache_key):
+        scoped = super()._audience_cache_key(request, cache_key)
+        if scoped is not None and request.query_params.get("date"):
+            # A reader finishing after invalidation can only refill its old version.
+            return f"{scoped}:dv:{self.get_dataset_version(request)}"
+        return scoped
+
+
+class RegionViewSet(DatedRegionGeoJSONMixin, UserCreatedObjectViewSet):
     queryset = Region.objects.select_related("borders").all()
     serializer_class = RegionModelSerializer
     filterset_class = RegionFilterSet
     geojson_throttle_classes = (GeoJSONAnonThrottle,)
+    geojson_defer_field = "borders__geom"
+    dated_serializer_class = RegionDatedGeoFeatureSerializer
 
     def get_cache_key(self, request):
         filters = request.query_params.dict()
-        region_id = filters.get("id")
-        return get_region_cache_key(region_id, filters)
+        return get_region_cache_key(filters.get("id"), filters)
 
     def get_serializer_class(self):
         if self.action == "geojson":
@@ -146,12 +234,15 @@ class RegionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         return Response(summary_data)
 
 
-class CatchmentViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
-    geojson_geometry_field = "region__borders__geom"
+class CatchmentViewSet(DatedRegionGeoJSONMixin, UserCreatedObjectViewSet):
     queryset = Catchment.objects.select_related("region", "region__borders").all()
     serializer_class = CatchmentModelSerializer
     filterset_class = CatchmentFilterSet
     geojson_throttle_classes = (GeoJSONAnonThrottle,)
+
+    region_path = "region"
+    geojson_defer_field = "region__borders__geom"
+    dated_serializer_class = CatchmentDatedGeoFeatureSerializer
 
     def get_cache_key(self, request):
         filters = request.query_params.dict()

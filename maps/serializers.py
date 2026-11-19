@@ -4,9 +4,10 @@ from rest_framework.serializers import (
     ModelSerializer,
     SerializerMethodField,
 )
+from rest_framework_gis.fields import GeometrySerializerMethodField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
-from utils.serializers import FieldLabelModelSerializer
+from utils.serializers import FieldLabelModelSerializer, SimplifiedGeometryMixin
 
 from .models import (
     Catchment,
@@ -184,6 +185,15 @@ class RegionGeoFeatureModelSerializer(GeoFeatureModelSerializer):
         fields = ["id", "name", "country", "description"]
 
 
+class RegionDatedGeoFeatureSerializer(
+    SimplifiedGeometryMixin, RegionGeoFeatureModelSerializer
+):
+    """Serializes the ``dated_geom`` annotation resolved for ?date= requests."""
+
+    geom = GeometrySerializerMethodField()
+    geom_fallback_attrs = ("dated_geom", "geom")
+
+
 class BaseResultMapSerializer(GeoFeatureModelSerializer):
     """
     This is a base class that can be used to serialize features from automatically generated tables that have their own
@@ -208,6 +218,15 @@ class CatchmentGeoFeatureModelSerializer(GeoFeatureModelSerializer):
         model = GeoreferencedCatchment
         geo_field = "geom"
         fields = ["id", "name", "type", "description", "level"]
+
+
+class CatchmentDatedGeoFeatureSerializer(
+    SimplifiedGeometryMixin, CatchmentGeoFeatureModelSerializer
+):
+    """Serializes the ``dated_geom`` annotation resolved for ?date= requests."""
+
+    geom = GeometrySerializerMethodField()
+    geom_fallback_attrs = ("dated_geom", "geom")
 
 
 class CatchmentQuerySerializer(ModelSerializer):

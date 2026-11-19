@@ -43,6 +43,7 @@ REVIEWABLE_MODELS = frozenset(
         "maps.maplayerstyle",
         "maps.nutsregion",
         "maps.region",
+        "maps.regionboundary",
         "maps.regionattributetextvalue",
         "maps.regionattributevalue",
         "maps.regionproperty",
@@ -90,6 +91,7 @@ CURATED_MODELS = frozenset(
         "maps.maplayerconfiguration",
         "maps.maplayerstyle",
         "maps.nutsregion",
+        "maps.regionboundary",
     }
 )
 

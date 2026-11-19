@@ -161,6 +161,7 @@ class CachedGeoJSONMixin:
     geojson_throttled_actions = ("geojson", "version")
     geojson_geometry_field = None
     geojson_point_field = None
+    geojson_defer_field = None
 
     def get_throttles(self):
         if (
@@ -217,10 +218,21 @@ class CachedGeoJSONMixin:
             return f"{AUTHZ_GEOJSON_CACHE_PREFIX}{cache_key}"
         return None
 
+    # Optional explicit geometry path for bbox filtering. ViewSets whose
+    # served geometry is an annotation (e.g. ``dated_geom``) set this so the
+    # viewport filter applies to the resolved geometry instead of a stale
+    # raw field — annotations support spatial lookups directly.
+    geojson_bbox_geometry_field = None
+
     def _apply_bbox_filter(self, queryset, bbox):
         """Apply bounding box filter to queryset if bbox is provided."""
         if bbox is None:
             return queryset
+        bbox_field = getattr(self, "geojson_bbox_geometry_field", None)
+        if callable(bbox_field):
+            bbox_field = bbox_field()
+        if bbox_field:
+            return queryset.filter(**{f"{bbox_field}__intersects": bbox})
         # Try the declared geometry paths first, then common field names.
         # ``geojson_point_field`` holds the raw geometry path when
         # ``geojson_geometry_field`` is an annotation (e.g. a simplified
@@ -448,7 +460,7 @@ class CachedGeoJSONMixin:
             serializer_class,
             self.geojson_geometry_field,
             context={"request": self.request},
-            geometry_defer_field=self.geojson_point_field,
+            geometry_defer_field=self.geojson_defer_field or self.geojson_point_field,
         )
         buffer = bytearray()
         try:

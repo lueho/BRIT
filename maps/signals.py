@@ -18,6 +18,7 @@ from .models import (
     Region,
     RegionAttributeTextValue,
     RegionAttributeValue,
+    RegionBoundary,
     _lock_geodataset_rows,
 )
 
@@ -106,6 +107,19 @@ def invalidate_region_cache(sender, instance, **kwargs):
     # Invalidate NUTS cache if the region has an associated NUTS region.
     if hasattr(instance, "nutsregion"):
         clear_geojson_cache_pattern("nuts_geojson:*")
+
+
+@receiver(post_save, sender=RegionBoundary)
+@receiver(post_delete, sender=RegionBoundary)
+def invalidate_region_boundary_cache(sender, instance, using=None, **kwargs):
+    """Discard dependent GeoJSON only after the boundary transaction commits."""
+
+    def invalidate():
+        clear_geojson_cache_pattern("region_geojson:*")
+        clear_geojson_cache_pattern("catchment_geojson:*")
+        clear_geojson_cache_pattern("waste_atlas_change_overlay:*")
+
+    transaction.on_commit(invalidate, using=using)
 
 
 @receiver(post_save, sender=RegionAttributeValue)

@@ -15,7 +15,17 @@ from django.core.exceptions import (
 )
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
-from django.db.models import F, Func, OuterRef, Q, Subquery, Value
+from django.db.models import (
+    Case,
+    Exists,
+    F,
+    Func,
+    OuterRef,
+    Q,
+    Subquery,
+    Value,
+    When,
+)
 from django.db.models.functions import Coalesce
 from django.db.models.signals import m2m_changed, post_delete, post_save, pre_save
 from django.dispatch import receiver
@@ -337,6 +347,26 @@ class Region(NamedUserCreatedObject):
         if self.borders:
             return self.borders.geom
         return None  # Return None if no borders are associated
+
+    def geom_on(self, on_date):
+        """Return the region geometry valid on ``on_date``.
+
+        Regions with published/archived boundary rows resolve to the
+        boundary valid on that date, or ``None`` when none is valid (e.g. a
+        dissolved municipality after its dissolution). Regions without
+        visible boundary rows fall back to their timeless ``borders``.
+        """
+        boundaries = self.boundaries.filter(
+            publication_status__in=("published", "archived")
+        )
+        if boundaries.exists():
+            boundary = (
+                boundaries.valid_on(on_date)
+                .order_by(F("valid_from").desc(nulls_last=True), "-pk")
+                .first()
+            )
+            return boundary.geom if boundary else None
+        return self.geom
 
     @geom.setter
     def geom(self, value):
@@ -993,6 +1023,281 @@ def protect_published_catchment_revision_members(
 def delete_unused_custom_region(sender, instance, **kwargs):
     if not instance.region.catchment_set.exists() and instance.type == "custom":
         instance.region.delete()
+
+
+class RegionBoundaryQuerySet(UserCreatedObjectQuerySet):
+    def valid_on(self, on_date):
+        """Return boundaries whose half-open period contains ``on_date``."""
+        return self.filter(
+            Q(valid_from__lte=on_date) | Q(valid_from__isnull=True),
+            Q(valid_to__gt=on_date) | Q(valid_to__isnull=True),
+        )
+
+
+class RegionBoundaryManager(UserCreatedObjectManager):
+    def get_queryset(self):
+        return RegionBoundaryQuerySet(self.model, using=self._db)
+
+    def valid_on(self, on_date):
+        return self.get_queryset().valid_on(on_date)
+
+
+class RegionBoundary(NamedUserCreatedObject):
+    """Effective-dated boundary for a :class:`Region`.
+
+    Regions without visible boundary rows keep drawing their timeless
+    ``borders`` geometry. Once a region has published or archived boundary
+    rows, map layers resolve the row whose half-open ``[valid_from,
+    valid_to)`` period contains the requested date; when no row is valid the
+    region resolves to no geometry at all, which is how dissolved
+    municipalities stop rendering after their dissolution date.
+
+    Published and archived rows are immutable snapshots, like
+    :class:`CatchmentRevision`. Replacing a boundary requires a successor
+    row linked through ``predecessors``; approving it transactionally closes
+    the linked predecessor's period instead of violating the overlap
+    constraint.
+    """
+
+    IMMUTABLE_STATUSES = ("published", "archived")
+    IMMUTABLE_FIELDS = (
+        "region_id",
+        "valid_from",
+        "valid_to",
+        "geom",
+        "is_dissolution",
+    )
+
+    region = models.ForeignKey(
+        Region, on_delete=models.CASCADE, related_name="boundaries"
+    )
+    valid_from = models.DateField(blank=True, null=True)
+    valid_to = models.DateField(blank=True, null=True)
+    is_dissolution = models.BooleanField(
+        default=False,
+        help_text="Record the end of a municipality. Set valid from to its dissolution date, leave geometry empty, and link the preceding boundary.",
+    )
+    geom = MultiPolygonField(srid=4326, null=True, blank=True)
+    predecessors = models.ManyToManyField(
+        "self", blank=True, symmetrical=False, related_name="successors"
+    )
+    sources = models.ManyToManyField(Source, blank=True)
+
+    objects = RegionBoundaryManager()
+
+    class Meta(NamedUserCreatedObject.Meta):
+        ordering = ["region_id", "valid_from", "id"]
+        indexes = [models.Index(fields=["region", "valid_from", "valid_to"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(is_dissolution=False, geom__isnull=False)
+                    | Q(
+                        is_dissolution=True, geom__isnull=True, valid_from__isnull=False
+                    )
+                ),
+                name="region_boundary_geometry_or_dissolution",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(valid_from__isnull=True)
+                    | Q(valid_to__isnull=True)
+                    | Q(valid_from__lt=F("valid_to"))
+                ),
+                name="region_boundary_valid_period_valid",
+            ),
+            ExclusionConstraint(
+                name="region_boundary_no_public_period_overlap",
+                expressions=[
+                    ("region", RangeOperators.EQUAL),
+                    (
+                        Func(
+                            F("valid_from"),
+                            F("valid_to"),
+                            function="DATERANGE",
+                            output_field=DateRangeField(),
+                        ),
+                        RangeOperators.OVERLAPS,
+                    ),
+                ],
+                condition=Q(publication_status__in=("published", "archived")),
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        immutable_error = self._immutable_change_error()
+        if immutable_error:
+            errors["__all__"] = immutable_error
+        if self.valid_from and self.valid_to and self.valid_from >= self.valid_to:
+            errors["valid_to"] = "Valid to must be later than valid from."
+        if self.is_dissolution:
+            if self.valid_from is None:
+                errors["valid_from"] = "A dissolution date is required."
+            if self.geom is not None:
+                errors["geom"] = "Leave geometry empty for a dissolution."
+        elif self.geom is None or self.geom.empty:
+            errors["geom"] = "A non-empty boundary geometry is required."
+        elif not self.geom.valid:
+            errors["geom"] = "Boundary geometry must be valid."
+        if errors:
+            raise ValidationError(errors)
+
+    def _immutable_change_error(self):
+        """Return the immutability message when a locked snapshot is edited."""
+        if not self.pk:
+            return None
+        previous = type(self).objects.filter(pk=self.pk).first()
+        if (
+            previous is None
+            or previous.publication_status not in self.IMMUTABLE_STATUSES
+        ):
+            return None
+        changed = any(
+            getattr(previous, field_name) != getattr(self, field_name)
+            for field_name in self.IMMUTABLE_FIELDS
+        )
+        if not changed:
+            return None
+        return "Published region boundaries are immutable; create a successor."
+
+    def save(self, *args, **kwargs):
+        immutable_error = self._immutable_change_error()
+        if immutable_error:
+            raise ValidationError(immutable_error)
+        super().save(*args, **kwargs)
+
+    def _lock_review_dependencies(self, action):
+        if action == "approve":
+            # Serialize competing approvals even when there is no predecessor yet.
+            Region.objects.select_for_update(no_key=True).only("pk").get(
+                pk=self.region_id
+            )
+
+    def approve(self, user=None):
+        with transaction.atomic():
+            self._lock_and_validate_transition(
+                (self.STATUS_REVIEW,), "Only objects in review can be approved."
+            )
+            self._lock_review_dependencies("approve")
+            self.full_clean()
+            if (
+                self.is_dissolution
+                and not self.predecessors.filter(
+                    Q(valid_from__lt=self.valid_from) | Q(valid_from__isnull=True),
+                    Q(valid_to__gte=self.valid_from) | Q(valid_to__isnull=True),
+                    region_id=self.region_id,
+                    publication_status__in=self.IMMUTABLE_STATUSES,
+                    is_dissolution=False,
+                ).exists()
+            ):
+                raise ValidationError(
+                    "Link the boundary in effect immediately before dissolution."
+                )
+            self._close_superseded_boundaries(user)
+            self._validate_public_period_available()
+            return super().approve(user=user)
+
+    def _validate_public_period_available(self):
+        overlapping = (
+            type(self)
+            .objects.filter(
+                region_id=self.region_id,
+                publication_status__in=self.IMMUTABLE_STATUSES,
+            )
+            .exclude(pk=self.pk)
+        )
+        if self.valid_from is not None:
+            overlapping = overlapping.filter(
+                Q(valid_to__gt=self.valid_from) | Q(valid_to__isnull=True)
+            )
+        if self.valid_to is not None:
+            overlapping = overlapping.filter(
+                Q(valid_from__lt=self.valid_to) | Q(valid_from__isnull=True)
+            )
+        if overlapping.exists():
+            raise ValidationError(
+                "This region boundary overlaps a published period. Link the "
+                "current boundary as its predecessor or correct the dates."
+            )
+
+    def _close_superseded_boundaries(self, user):
+        """End same-region predecessors immediately before publication.
+
+        Cross-region predecessors record lineage for municipal transfers,
+        splits, and mergers but do not imply that the source region's own
+        boundary history changes.
+        """
+        from utils.object_management.services import perform_transition
+
+        predecessors = (
+            self.predecessors.select_for_update()
+            .filter(region_id=self.region_id, publication_status=self.STATUS_PUBLISHED)
+            .order_by("pk")
+        )
+        for predecessor in predecessors:
+            if self.valid_from is None:
+                raise ValidationError(
+                    {"valid_from": "A successor boundary needs a valid-from date."}
+                )
+            if (
+                predecessor.valid_from is not None
+                and predecessor.valid_from >= self.valid_from
+            ):
+                raise ValidationError(
+                    {"valid_from": "A successor must start after its predecessor."}
+                )
+            if (
+                predecessor.valid_to is not None
+                and predecessor.valid_to <= self.valid_from
+            ):
+                continue
+            archived = perform_transition(
+                user,
+                predecessor,
+                "archive",
+                expected_revision=predecessor.content_revision,
+                comment=f"Superseded by boundary {self.pk} on {self.valid_from}.",
+            )
+            # This governed closure is the sole edit allowed to a frozen period.
+            type(self).objects.filter(pk=archived.pk).update(
+                valid_to=self.valid_from, lastmodified_at=timezone.now()
+            )
+
+    def __str__(self):
+        return self.name if self.name else f"Boundary of {self.region}"
+
+
+def dated_region_geom_expression(on_date, region_path=""):
+    """ORM expression resolving a region's geometry valid on ``on_date``.
+
+    ``region_path`` is the relation path from the queryset's model to the
+    region (empty for ``Region`` itself, ``"region"`` for ``Catchment``).
+    Yields the visible boundary valid on the date when the region has
+    published/archived boundaries, else its timeless ``borders`` geometry.
+    """
+
+    region_ref = OuterRef(region_path or "pk")
+    borders_path = f"{region_path}__borders__geom" if region_path else "borders__geom"
+    boundaries = RegionBoundary.objects.filter(
+        region=region_ref,
+        publication_status__in=("published", "archived"),
+    )
+    dated = boundaries.valid_on(on_date).order_by(
+        F("valid_from").desc(nulls_last=True), "-pk"
+    )
+    return Case(
+        When(
+            Exists(boundaries),
+            then=Subquery(
+                dated.values("geom")[:1],
+                output_field=MultiPolygonField(srid=4326),
+            ),
+        ),
+        default=F(borders_path),
+        output_field=MultiPolygonField(srid=4326),
+    )
 
 
 class GeoDataset(NamedUserCreatedObject):

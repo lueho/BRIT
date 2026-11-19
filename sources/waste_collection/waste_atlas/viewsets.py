@@ -36,7 +36,9 @@ from maps.models import (
     LauRegion,
     NutsRegion,
     RegionAttributeValue,
+    RegionBoundary,
     RegionProperty,
+    dated_region_geom_expression,
 )
 from maps.population.models import TemporalBasis
 from maps.population.services import population_values_by_region
@@ -510,7 +512,9 @@ def _with_catchment_revision(queryset, year, user=None):
                 revisions.values("geom")[:1],
                 output_field=MultiPolygonField(srid=4326),
             ),
-            F("region__borders__geom"),
+            dated_region_geom_expression(
+                _atlas_reference_date(year), region_path="region"
+            ),
             output_field=MultiPolygonField(srid=4326),
         ),
     ).exclude(atlas_geom__isnull=True)
@@ -559,13 +563,21 @@ def _revision_snapshots(catchment_ids, year, user=None):
 
     missing_ids = catchment_ids - snapshots.keys()
     if missing_ids:
-        for catchment in CollectionCatchment.objects.filter(
-            pk__in=missing_ids, region__borders__geom__isnull=False
-        ).select_related("region__borders"):
+        reference_date = _atlas_reference_date(year)
+        fallback_catchments = (
+            CollectionCatchment.objects.filter(pk__in=missing_ids)
+            .annotate(
+                dated_geom=dated_region_geom_expression(
+                    reference_date, region_path="region"
+                )
+            )
+            .exclude(dated_geom__isnull=True)
+        )
+        for catchment in fallback_catchments:
             snapshots[catchment.pk] = {
                 "revision_id": None,
                 "catchment_name": catchment.name,
-                "geom": catchment.region.borders.geom,
+                "geom": catchment.dated_geom,
             }
     return snapshots
 
@@ -614,12 +626,22 @@ def _change_overlay_cache_key(from_ids, from_year, to_ids, to_year, user=None):
         .aggregate(count=Count("pk"), latest=Max("lastmodified_at"))
     )
     latest = versions["latest"]
+    # Boundary edits version the key the same way revision edits do, so the
+    # dated region-geometry fallback cannot serve a stale overlay.
+    boundary_versions = RegionBoundary.objects.filter(
+        publication_status__in=RegionBoundary.IMMUTABLE_STATUSES,
+        region_id__in=CollectionCatchment.objects.filter(pk__in=catchment_ids).values(
+            "region_id"
+        ),
+    ).aggregate(count=Count("pk"), latest=Max("lastmodified_at"))
     fingerprint = ":".join(
         (
             ",".join(str(pk) for pk in sorted(from_ids)),
             ",".join(str(pk) for pk in sorted(to_ids)),
             str(versions["count"] or 0),
-            str(int(latest.timestamp()) if latest else 0),
+            str(latest),
+            str(boundary_versions["count"]),
+            str(boundary_versions["latest"]),
         )
     )
     digest = hashlib.sha1(fingerprint.encode("utf-8")).hexdigest()[:16]
@@ -2548,25 +2570,16 @@ def _get_acpv_outline_geojson(
     if not catchment_ids_by_group:
         return _build_feature_collection([])
 
-    catchments = {
-        catchment.id: catchment
-        for catchment in CollectionCatchment.objects.filter(
-            id__in=[cid for cids in catchment_ids_by_group.values() for cid in cids],
-            region__borders__isnull=False,
-        ).select_related("region", "region__borders")
-    }
+    catchment_ids = {cid for ids in catchment_ids_by_group.values() for cid in ids}
+    catchments = CollectionCatchment.objects.filter(pk__in=catchment_ids)
+    geometries = dict(
+        _with_catchment_revision(catchments, year, user).values_list("pk", "atlas_geom")
+    )
 
     features = []
     for group_key in sorted(catchment_ids_by_group):
         group_catchment_ids = sorted(catchment_ids_by_group[group_key])
-        geoms = [
-            catchments[catchment_id].region.borders.geom
-            for catchment_id in group_catchment_ids
-            if catchment_id in catchments
-            and catchments[catchment_id].region
-            and catchments[catchment_id].region.borders
-            and catchments[catchment_id].region.borders.geom
-        ]
+        geoms = [geometries[pk] for pk in group_catchment_ids if pk in geometries]
         if not geoms:
             continue
 
