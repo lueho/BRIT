@@ -186,7 +186,9 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         self.assertContains(response, 'name="category_q"')
         self.assertContains(response, 'value="Thermo"')
 
-    def test_catalogue_scope_links_keep_search_and_filters(self):
+    def test_catalogue_scope_toggle_navigates_to_category_lists(self):
+        """The scope toggle switches category views like on other BRIT lists;
+        the Published button stays on the catalogue and keeps context."""
         self.client.force_login(self.owner)
         params = {
             "scope": "published",
@@ -196,12 +198,12 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         }
         response = self.client.get(reverse("processes:processcategory-list"), params)
         self.assertEqual(response.status_code, 200)
-        private_url = (
-            f"{reverse('processes:processcategory-list')}"
-            f"?categories={self.category.pk}&amp;categories={self.other_category.pk}"
-            f"&amp;scope=private&amp;category_q=Thermo"
+        self.assertContains(
+            response,
+            f'href="{reverse("processes:processcategory-list-owned")}?scope=private"',
         )
-        self.assertContains(response, f'href="{private_url}"')
+        self.assertContains(response, "scope=published")
+        self.assertContains(response, "category_q=Thermo")
         self.assertNotContains(response, "page=1")
 
     def test_catalogue_reset_search_keeps_process_filters(self):
