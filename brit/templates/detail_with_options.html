@@ -6,8 +6,6 @@
 {% endblock title %}
 {% block content %}
   {# Obsolete rejection card removed: owners of declined items are redirected to the review feedback view #}
-  {% block detail_nav %}
-  {% endblock detail_nav %}
   <div class="row my-4">
     <div class="col-lg-8">
       <div class="card shadow detail-layout-card">
@@ -46,6 +44,8 @@
               {% endblock detail_header_primary_actions %}
             {% endblock detail_header_actions %}
           </div>
+          {% block detail_nav %}
+          {% endblock detail_nav %}
         </div>
         {% block detail_top_image %}
         {% endblock detail_top_image %}
