@@ -157,6 +157,7 @@ class RegionBoundaryModelAdmin(PolicyAdminMixin, GISModelAdmin):
     list_display = (
         "name",
         "region",
+        "is_dissolution",
         "valid_from",
         "valid_to",
         "publication_status",

@@ -1,17 +1,20 @@
 """Effective-dated region boundaries (year-accurate municipality geometry)."""
 
 import json
-from datetime import date
-from unittest.mock import call, patch
+from datetime import UTC, date, datetime
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.gis.geos import GEOSGeometry, MultiPolygon
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.test import TestCase
 from django.urls import reverse
 
 from maps.models import (
     Catchment,
+    CatchmentRevision,
     GeoPolygon,
     Region,
     RegionBoundary,
@@ -19,7 +22,8 @@ from maps.models import (
 )
 from maps.serializers import RegionDatedGeoFeatureSerializer
 from maps.utils import iter_geojson_features
-from utils.object_management.models import UserCreatedObject
+from utils.object_management.models import ReviewAction, UserCreatedObject
+from utils.object_management.services import perform_transition
 
 
 def square(xmin, ymin, xmax, ymax):
@@ -228,8 +232,18 @@ class RegionBoundaryWorkflowTests(TestCase):
         successor.predecessors.add(predecessor)
         successor.submit_for_review()
 
-        approver = User.objects.create(username="boundary_approver")
-        successor.approve(user=approver)
+        approver = User.objects.create(username="boundary_approver", is_superuser=True)
+        perform_transition(
+            approver, successor, "approve", expected_revision=successor.content_revision
+        )
+        self.assertTrue(
+            ReviewAction.objects.filter(
+                content_type=ContentType.objects.get_for_model(RegionBoundary),
+                object_id=predecessor.pk,
+                action=ReviewAction.ACTION_ARCHIVED,
+                user=approver,
+            ).exists()
+        )
 
         predecessor.refresh_from_db()
         successor.refresh_from_db()
@@ -242,6 +256,72 @@ class RegionBoundaryWorkflowTests(TestCase):
         )
         self.assertEqual(region.geom_on(date(2023, 12, 31)), square(0, 0, 1, 1))
         self.assertEqual(region.geom_on(date(2024, 1, 1)), square(0, 0, 2, 1))
+
+    def test_approval_preserves_archived_history_and_rolls_back_other_closures(self):
+        region = region_with_borders("Historical overlap", square(0, 0, 1, 1))
+        current = self._published_boundary(region, valid_to=date(2025, 1, 1))
+        archived = self._published_boundary(
+            region,
+            valid_from=date(2025, 1, 1),
+            publication_status="archived",
+        )
+        successor = RegionBoundary.objects.create(
+            region=region,
+            name="Overlapping",
+            valid_from=date(2024, 1, 1),
+            geom=square(0, 0, 2, 1),
+        )
+        successor.predecessors.add(current, archived)
+        successor.submit_for_review()
+        approver = User.objects.create(username="boundary_approver", is_superuser=True)
+        with self.assertRaisesMessage(ValidationError, "overlaps"):
+            perform_transition(
+                approver,
+                successor,
+                "approve",
+                expected_revision=successor.content_revision,
+            )
+        current.refresh_from_db()
+        archived.refresh_from_db()
+        successor.refresh_from_db()
+        self.assertEqual(
+            (current.publication_status, current.valid_to),
+            ("published", date(2025, 1, 1)),
+        )
+        self.assertIsNone(archived.valid_to)
+        self.assertEqual(successor.publication_status, "review")
+        self.assertFalse(
+            ReviewAction.objects.filter(
+                action=ReviewAction.ACTION_ARCHIVED, user=approver
+            ).exists()
+        )
+
+    def test_reviewed_dissolution_ends_an_open_boundary_without_a_successor_shape(self):
+        region = region_with_borders("Retired municipality", square(5, 5, 6, 6))
+        previous = self._published_boundary(region)
+        dissolution = RegionBoundary.objects.create(
+            region=region,
+            name="Dissolution",
+            valid_from=date(2025, 1, 1),
+            is_dissolution=True,
+        )
+        dissolution.predecessors.add(previous)
+        dissolution.submit_for_review()
+        moderator = User.objects.create(
+            username="boundary_moderator", is_superuser=True
+        )
+        perform_transition(
+            moderator,
+            dissolution,
+            "approve",
+            expected_revision=dissolution.content_revision,
+        )
+        self.assertEqual(region.geom_on(date(2024, 12, 31)), previous.geom)
+        self.assertIsNone(region.geom_on(date(2025, 1, 1)))
+        response = self.client.get(
+            reverse("api-region-geojson"), {"id": region.pk, "date": "2025-01-01"}
+        )
+        self.assertEqual(response.json()["features"], [])
 
     def test_approving_overlapping_boundary_requires_predecessor_link(self):
         region = region_with_borders("Overlap region", square(0, 0, 1, 1))
@@ -291,7 +371,7 @@ class RegionDatedGeoJSONStreamingTests(TestCase):
             region=cls.region,
             name="Post-merger",
             valid_from=date(2024, 1, 1),
-            geom=square(0, 0, 2, 1),
+            geom=MultiPolygon(square(0, 0, 2, 1)[0], square(3, 0, 4, 1)[0], srid=4326),
             publication_status=UserCreatedObject.STATUS_PUBLISHED,
         )
 
@@ -320,6 +400,26 @@ class RegionDatedGeoJSONStreamingTests(TestCase):
         data = json.loads(b"".join(response.streaming_content))
         ring = data["features"][0]["geometry"]["coordinates"][0][0]
         self.assertIn([2.0, 1.0], ring)
+
+    def test_vertex_threshold_counts_the_served_boundary_on_both_endpoints(self):
+        catchment = Catchment.objects.create(
+            region=self.region, name="Dated catchment", publication_status="published"
+        )
+        with patch("maps.mixins.GEOJSON_MAX_BUFFERED_POINTS", 6):
+            for basename, pk in (
+                ("region", self.region.pk),
+                ("catchment", catchment.pk),
+            ):
+                with self.subTest(endpoint=basename):
+                    response = self.client.get(
+                        reverse(f"api-{basename}-geojson"),
+                        {"id": pk, "date": "2024-06-01"},
+                    )
+                    self.assertEqual(response["X-Cache-Status"], "STREAM")
+                    geometries = json.loads(b"".join(response.streaming_content))[
+                        "features"
+                    ]
+                    self.assertEqual(len(geometries[0]["geometry"]["coordinates"]), 2)
 
 
 class RegionDatedGeoJSONBboxTests(TestCase):
@@ -377,29 +477,85 @@ class RegionDatedStatsTests(TestCase):
 
 
 class RegionBoundaryCacheInvalidationTests(TestCase):
-    def test_boundary_save_and_delete_clear_geojson_caches(self):
-        boundary = RegionBoundary(
-            region_id=123,
-            name="Cached boundary",
-            geom=square(0, 0, 1, 1),
+    def test_boundary_invalidation_waits_for_commit_and_skips_rollbacks(self):
+        region = region_with_borders("Caches", square(0, 0, 1, 1))
+        with patch("maps.signals.clear_geojson_cache_pattern") as clear:
+            with self.captureOnCommitCallbacks(execute=True):
+                with transaction.atomic():
+                    RegionBoundary.objects.create(
+                        region=region, name="Rolled back", geom=square(0, 0, 2, 1)
+                    )
+                    transaction.set_rollback(True)
+            clear.assert_not_called()
+            with self.captureOnCommitCallbacks(execute=True):
+                boundary = RegionBoundary.objects.create(
+                    region=region, name="Effective", geom=square(0, 0, 2, 1)
+                )
+                clear.assert_not_called()
+            patterns = [
+                "region_geojson:*",
+                "catchment_geojson:*",
+                "waste_atlas_change_overlay:*",
+            ]
+            self.assertEqual([call.args[0] for call in clear.call_args_list], patterns)
+            clear.reset_mock()
+            with self.captureOnCommitCallbacks(execute=True):
+                boundary.delete()
+                clear.assert_not_called()
+            self.assertEqual([call.args[0] for call in clear.call_args_list], patterns)
+
+    def test_subsecond_publication_rotates_overlay_and_geojson_payload(self):
+        from sources.waste_collection.waste_atlas.viewsets import (
+            _change_overlay_cache_key,
         )
-        with (
-            patch("maps.signals.get_geojson_cache"),
-            patch("maps.signals.clear_geojson_cache_pattern") as clear_pattern,
+
+        region = region_with_borders("Subsecond publication", square(0, 0, 1, 1))
+        catchment = Catchment.objects.create(region=region, name="Coverage")
+        ids = {catchment.pk}
+        url = reverse("api-region-geojson")
+        params = {"id": region.pk, "date": "2024-06-01"}
+        stamp = datetime(2024, 1, 1, 12, tzinfo=UTC)
+        with patch(
+            "ambient_toolbox.models.now", return_value=stamp.replace(microsecond=100)
         ):
-            from django.db.models.signals import post_delete, post_save
-
-            post_save.send(sender=RegionBoundary, instance=boundary)
-            post_delete.send(sender=RegionBoundary, instance=boundary)
-
-        self.assertEqual(
-            clear_pattern.call_args_list,
-            [
-                call("region_geojson:*"),
-                call("catchment_geojson:*"),
-                call("region_geojson:*"),
-                call("catchment_geojson:*"),
-            ],
+            previous = RegionBoundary.objects.create(
+                region=region,
+                name="Earlier",
+                geom=square(0, 0, 2, 1),
+                publication_status="published",
+            )
+        successor = RegionBoundary.objects.create(
+            region=region,
+            name="Successor",
+            valid_from=date(2024, 1, 1),
+            geom=square(0, 0, 3, 1),
+        )
+        successor.predecessors.add(previous)
+        successor.submit_for_review()
+        approver = User.objects.create(username="boundary_approver", is_superuser=True)
+        before_key = _change_overlay_cache_key(ids, 2023, ids, 2024)
+        before = self.client.get(url, params)
+        self.assertEqual(before.status_code, 200)
+        self.assertIn(
+            [2.0, 1.0], before.json()["features"][0]["geometry"]["coordinates"][0][0]
+        )
+        # TestCase keeps on_commit callbacks pending, so the previous payload still exists.
+        published_at = stamp.replace(microsecond=200)
+        with (
+            patch("ambient_toolbox.models.now", return_value=published_at),
+            patch("maps.models.timezone.now", return_value=published_at),
+        ):
+            perform_transition(
+                approver,
+                successor,
+                "approve",
+                expected_revision=successor.content_revision,
+            )
+        self.assertNotEqual(before_key, _change_overlay_cache_key(ids, 2023, ids, 2024))
+        after = self.client.get(url, params)
+        self.assertNotEqual(before["X-Data-Version"], after["X-Data-Version"])
+        self.assertIn(
+            [3.0, 1.0], after.json()["features"][0]["geometry"]["coordinates"][0][0]
         )
 
 
@@ -420,3 +576,35 @@ class AtlasFallbackBatchTests(TestCase):
         with self.assertNumQueries(2):
             snapshots = _revision_snapshots(ids, 2024)
         self.assertEqual(len(snapshots), 3)
+
+    def test_acpv_outline_uses_the_same_effective_revision_as_the_map(self):
+        from sources.waste_collection.models import CollectionCatchment
+        from sources.waste_collection.waste_atlas import viewsets as atlas
+
+        region = region_with_borders("Dissolved municipality", square(0, 0, 1, 1))
+        RegionBoundary.objects.create(
+            region=region,
+            name="Until dissolution",
+            valid_to=date(2024, 1, 1),
+            geom=square(0, 0, 1, 1),
+            publication_status="published",
+        )
+        catchment = CollectionCatchment.objects.create(
+            region=region, name="Continuing collection area"
+        )
+        revision = CatchmentRevision.objects.create(
+            catchment=catchment,
+            name="Recorded service area",
+            geom=square(2, 0, 4, 1),
+            publication_status="published",
+        )
+        rows = [{"acpv_group_key": "group", "catchment_id": catchment.pk}]
+        with (
+            patch.object(atlas, "_get_collection_amount", return_value=rows),
+            self.assertNumQueries(1),
+        ):
+            outlines = atlas._get_acpv_outline_geojson("DE", 2024, ())
+        (feature,) = outlines["features"]
+        self.assertTrue(
+            GEOSGeometry(json.dumps(feature["geometry"])).equals(revision.geom)
+        )

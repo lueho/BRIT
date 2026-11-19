@@ -161,6 +161,7 @@ class CachedGeoJSONMixin:
     geojson_throttled_actions = ("geojson", "version")
     geojson_geometry_field = None
     geojson_point_field = None
+    geojson_defer_field = None
 
     def get_throttles(self):
         if (
@@ -459,7 +460,7 @@ class CachedGeoJSONMixin:
             serializer_class,
             self.geojson_geometry_field,
             context={"request": self.request},
-            geometry_defer_field=self.geojson_point_field,
+            geometry_defer_field=self.geojson_defer_field or self.geojson_point_field,
         )
         buffer = bytearray()
         try:

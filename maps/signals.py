@@ -20,7 +20,6 @@ from .models import (
     RegionAttributeValue,
     RegionBoundary,
     _lock_geodataset_rows,
-    invalidate_region_boundary_caches,
 )
 
 logger = logging.getLogger(__name__)
@@ -112,15 +111,15 @@ def invalidate_region_cache(sender, instance, **kwargs):
 
 @receiver(post_save, sender=RegionBoundary)
 @receiver(post_delete, sender=RegionBoundary)
-def invalidate_region_boundary_cache(sender, instance, **kwargs):
-    """Invalidate cached GeoJSON when a RegionBoundary changes.
+def invalidate_region_boundary_cache(sender, instance, using=None, **kwargs):
+    """Discard dependent GeoJSON only after the boundary transaction commits."""
 
-    Date-aware region and catchment responses resolve through boundary rows,
-    so every boundary edit must drop both namespaces the same way a Region
-    edit does. The atlas change-overlay cache versions its keys from boundary
-    modification times and does not need clearing.
-    """
-    invalidate_region_boundary_caches(getattr(instance, "region_id", None))
+    def invalidate():
+        clear_geojson_cache_pattern("region_geojson:*")
+        clear_geojson_cache_pattern("catchment_geojson:*")
+        clear_geojson_cache_pattern("waste_atlas_change_overlay:*")
+
+    transaction.on_commit(invalidate, using=using)
 
 
 @receiver(post_save, sender=RegionAttributeValue)

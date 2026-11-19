@@ -628,18 +628,20 @@ def _change_overlay_cache_key(from_ids, from_year, to_ids, to_year, user=None):
     latest = versions["latest"]
     # Boundary edits version the key the same way revision edits do, so the
     # dated region-geometry fallback cannot serve a stale overlay.
-    boundary_latest = RegionBoundary.objects.filter(
+    boundary_versions = RegionBoundary.objects.filter(
+        publication_status__in=RegionBoundary.IMMUTABLE_STATUSES,
         region_id__in=CollectionCatchment.objects.filter(pk__in=catchment_ids).values(
             "region_id"
-        )
-    ).aggregate(latest=Max("lastmodified_at"))["latest"]
+        ),
+    ).aggregate(count=Count("pk"), latest=Max("lastmodified_at"))
     fingerprint = ":".join(
         (
             ",".join(str(pk) for pk in sorted(from_ids)),
             ",".join(str(pk) for pk in sorted(to_ids)),
             str(versions["count"] or 0),
-            str(int(latest.timestamp()) if latest else 0),
-            str(int(boundary_latest.timestamp()) if boundary_latest else 0),
+            str(latest),
+            str(boundary_versions["count"]),
+            str(boundary_versions["latest"]),
         )
     )
     digest = hashlib.sha1(fingerprint.encode("utf-8")).hexdigest()[:16]
@@ -2568,26 +2570,16 @@ def _get_acpv_outline_geojson(
     if not catchment_ids_by_group:
         return _build_feature_collection([])
 
-    reference_date = _atlas_reference_date(year)
-    catchments = {
-        catchment.id: catchment
-        for catchment in CollectionCatchment.objects.filter(
-            id__in=[cid for cids in catchment_ids_by_group.values() for cid in cids],
-        ).annotate(
-            dated_geom=dated_region_geom_expression(
-                reference_date, region_path="region"
-            )
-        )
-    }
+    catchment_ids = {cid for ids in catchment_ids_by_group.values() for cid in ids}
+    catchments = CollectionCatchment.objects.filter(pk__in=catchment_ids)
+    geometries = dict(
+        _with_catchment_revision(catchments, year, user).values_list("pk", "atlas_geom")
+    )
 
     features = []
     for group_key in sorted(catchment_ids_by_group):
         group_catchment_ids = sorted(catchment_ids_by_group[group_key])
-        geoms = []
-        for catchment_id in group_catchment_ids:
-            catchment = catchments.get(catchment_id)
-            if catchment is not None and catchment.dated_geom is not None:
-                geoms.append(catchment.dated_geom)
+        geoms = [geometries[pk] for pk in group_catchment_ids if pk in geometries]
         if not geoms:
             continue
 
