@@ -1446,7 +1446,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertContains(response, "Process flow chart")
 
     def test_detail_view_uses_sdv2_layout(self):
-        """Process detail renders the sdv2 detail-page layout like samples."""
+        """Process detail keeps the sdv2 interior inside the standard skeleton."""
         self.client.force_login(self.owner_user)
 
         response = self.client.get(
@@ -1458,21 +1458,35 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         self.assertIn('class="sdv2"', content)
         self.assertIn("sdv2-hero", content)
         self.assertIn("sdv2-hero-title", content)
-        self.assertIn("sdv2-rail", content)
+        self.assertNotIn("sdv2-rail", content)
         self.assertIn("sample_detail_v2.min.css", content)
-        self.assertNotIn("detail-layout-card", content)
+        self.assertIn("detail-layout-card", content)
 
-    def test_detail_view_hides_action_rail_for_anonymous(self):
-        """Anonymous readers get the minimalist layout without the action rail."""
+    def test_detail_view_anchors_context_nav_in_card_header(self):
+        """The compact context nav lives inside the card header, not floating."""
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(
+            reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertRegex(content, r"(?s)card-header.*?sdv2-context-nav.*?card-body")
+        self.assertNotRegex(content, r"(?s)sdv2-context-nav.*?detail-layout-card")
+
+    def test_detail_view_shows_context_nav_for_anonymous(self):
+        """Anonymous readers still get context navigation, without an action rail."""
         response = self.client.get(
             reverse(self.view_detail_name, kwargs={"pk": self.published_object.pk})
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "sdv2-rail")
+        self.assertContains(response, "sdv2-context-nav")
 
-    def test_review_detail_view_does_not_link_back_to_itself(self):
-        """On the review page the rail must not offer a link back to itself."""
+    def test_review_detail_view_hides_context_nav(self):
+        """The review page is a moderation context: no process context nav."""
         declined_process = self.model.objects.create(
             name="Declined test process",
             owner=self.owner_user,
@@ -1490,8 +1504,7 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         response = self.client.get(review_url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Review feedback")
-        self.assertNotContains(response, f'href="{review_url}')
+        self.assertNotContains(response, "sdv2-context-nav")
 
     def test_detail_view_section_headings_are_emphasized(self):
         self.published_object.description = "Visible description"
@@ -2467,7 +2480,7 @@ class ProcessWorkshopJourneyViewsTestCase(TestCase):
         self.assertContains(reading_response, "Draft recorded during the workshop")
         self.assertContains(reading_response, "Workshop feedstock")
         self.assertContains(reading_response, "Workshop product")
-        self.assertContains(reading_response, "sdv2-status-private")
+        self.assertContains(reading_response, "review-status-private")
 
         owned_response = self.client.get(
             reverse("processes:process-list-owned"), {"scope": "private"}
