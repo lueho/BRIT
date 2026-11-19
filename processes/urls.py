@@ -26,6 +26,11 @@ urlpatterns = [
         name="processcategory-list",
     ),
     path(
+        "categories/gallery/",
+        views.ProcessCategoryCatalogueView.as_view(),
+        name="processcategory-gallery",
+    ),
+    path(
         "categories/user/",
         views.ProcessCategoryPrivateListView.as_view(),
         name="processcategory-list-owned",

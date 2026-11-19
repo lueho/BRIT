@@ -118,7 +118,7 @@
 }
 
 #summary-container .url-link {
-    color: #0066cc;
+    color: var(--bs-success);
     text-decoration: none;
     white-space: nowrap;
     overflow: hidden;

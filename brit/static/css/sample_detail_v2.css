@@ -1,16 +1,16 @@
 /* Sample detail v2 — scoped styles for the experimental narrative layout. */
 
 .sdv2 {
-  --sdv2-bg: #f5f7f6;
-  --sdv2-surface: #ffffff;
-  --sdv2-surface-alt: #f0f3f1;
-  --sdv2-border: #dfe6e1;
-  --sdv2-border-strong: #c7d2ca;
-  --sdv2-text: #25302a;
-  --sdv2-text-muted: #617068;
-  --sdv2-text-subtle: #829087;
+  --sdv2-bg: var(--brit-canvas, #f5f7f6);
+  --sdv2-surface: var(--brit-surface, #ffffff);
+  --sdv2-surface-alt: var(--brit-surface-alt, #f0f3f1);
+  --sdv2-border: var(--brit-border, #dfe6e1);
+  --sdv2-border-strong: var(--brit-border-strong, #c7d2ca);
+  --sdv2-text: var(--brit-text, #25302a);
+  --sdv2-text-muted: var(--brit-text-muted, #617068);
+  --sdv2-text-subtle: var(--brit-text-subtle, #829087);
   --sdv2-accent-derived: var(--bs-primary, #4b7156);
-  --sdv2-accent-derived-soft: #eaf1ec;
+  --sdv2-accent-derived-soft: var(--brit-accent-soft, #eaf1ec);
   --sdv2-accent-raw: #926b2f;
   --sdv2-accent-raw-soft: #f7f0e5;
   --sdv2-accent-positive: #347148;
@@ -18,10 +18,10 @@
   --sdv2-accent-danger: #b4433c;
   --sdv2-radius-sm: 6px;
   --sdv2-radius: 10px;
-  --sdv2-radius-lg: 16px;
+  --sdv2-radius-lg: var(--brit-radius-lg, 14px);
   --sdv2-control-h: 2.125rem;
   --sdv2-control-h-sm: 1.75rem;
-  --sdv2-shadow-sm: 0 1px 2px rgba(29, 48, 37, 0.05);
+  --sdv2-shadow-sm: var(--brit-shadow-sm, 0 1px 2px rgba(29, 48, 37, 0.06));
   --sdv2-shadow: 0 10px 32px rgba(29, 48, 37, 0.07);
   --sdv2-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --sdv2-anchor-offset: calc(

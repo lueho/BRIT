@@ -5,9 +5,9 @@
 
 {% block title %}BRIT | Process Categories{% endblock %}
 
-{% block list_intro %}
-    {% process_discovery_nav "categories" compact=True %}
-{% endblock list_intro %}
+{% block list_card_header_lead %}
+    {% process_discovery_nav "categories" show_scopes=False %}
+{% endblock list_card_header_lead %}
 
 {% block list_table_head %}
 <thead>

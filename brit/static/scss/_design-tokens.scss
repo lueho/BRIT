@@ -1,0 +1,50 @@
+//
+// BRIT design tokens
+//
+// One shared visual language for every module. The values originate from the
+// sectioned detail layout ("sdv2") and are promoted here so legacy Bootstrap
+// card pages, the app shell and the sectioned pages render from the same
+// palette, radii, shadows and type scale.
+//
+
+:root {
+  --brit-canvas: #f5f7f6;
+  --brit-surface: #ffffff;
+  --brit-surface-alt: #f0f3f1;
+  --brit-border: #dfe6e1;
+  --brit-border-strong: #c7d2ca;
+  --brit-text: #25302a;
+  --brit-text-muted: #617068;
+  --brit-text-subtle: #829087;
+  --brit-accent: #{$primary};
+  --brit-accent-strong: #{$success};
+  --brit-accent-soft: #eaf1ec;
+  --brit-forest: #1d3327;
+  --brit-forest-raised: #274333;
+  --brit-on-forest: rgba(255, 255, 255, 0.78);
+  --brit-on-forest-muted: rgba(255, 255, 255, 0.5);
+  --brit-radius-sm: 6px;
+  --brit-radius: 10px;
+  --brit-radius-lg: 14px;
+  --brit-shadow-sm: 0 1px 2px rgba(29, 48, 37, 0.06);
+  --brit-shadow: 0 8px 24px rgba(29, 48, 37, 0.08);
+  --brit-shadow-lg: 0 16px 40px rgba(29, 48, 37, 0.14);
+  --brit-focus-ring: 0 0 0 0.2rem rgba(#{red($primary)}, #{green($primary)}, #{blue($primary)}, 0.25);
+  --brit-font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+
+  // Re-point the Bootstrap variables that the CDN build compiled with stock
+  // values, so components we do not restyle individually still match.
+  --bs-body-color: var(--brit-text);
+  --bs-body-font-family: var(--brit-font-sans);
+  --bs-border-color: var(--brit-border);
+  --bs-border-radius: var(--brit-radius-sm);
+  --bs-border-radius-lg: var(--brit-radius);
+  --bs-secondary-color: var(--brit-text-muted);
+  --bs-tertiary-bg: var(--brit-surface-alt);
+  --bs-link-color: var(--brit-accent-strong);
+  --bs-link-hover-color: #{darken($success, 10%)};
+  --bs-focus-ring-color: rgba(#{red($primary)}, #{green($primary)}, #{blue($primary)}, 0.25);
+  --bs-box-shadow: var(--brit-shadow);
+  --bs-box-shadow-sm: var(--brit-shadow-sm);
+  --bs-box-shadow-lg: var(--brit-shadow-lg);
+}

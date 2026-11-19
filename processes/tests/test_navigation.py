@@ -69,13 +69,17 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         self.assertContains(response, f'href="{reverse("processes:explorer")}"')
 
     def test_anonymous_nav_has_no_review_or_mine_links(self):
-        response = self.client.get(reverse("processes:processcategory-list"))
+        response = self.client.get(
+            reverse("processes:processcategory-list"), {"scope": "published"}
+        )
         self.assertNotContains(response, "process-list-review")
         self.assertNotContains(response, ">Mine</a>")
 
     def test_member_without_process_moderation_has_no_review_link(self):
         self.client.force_login(self.owner)
-        response = self.client.get(reverse("processes:processcategory-list"))
+        response = self.client.get(
+            reverse("processes:processcategory-list"), {"scope": "published"}
+        )
         self.assertNotContains(response, "process-list-review")
         self.assertNotContains(response, "scope=review")
 
@@ -87,7 +91,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         )
         self.client.force_login(self.moderator)
         response = self.client.get(
-            reverse("processes:processcategory-list"), {"scope": "review"}
+            reverse("processes:processcategory-gallery"), {"scope": "review"}
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Thermochemical")
@@ -98,10 +102,17 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
 
     def test_anonymous_supplied_private_scope_normalizes_to_published(self):
         response = self.client.get(
-            reverse("processes:processcategory-list"), {"scope": "private"}
+            reverse("processes:processcategory-gallery"), {"scope": "private"}
         )
-        self.assertNotContains(response, "scope=private")
-        self.assertNotContains(response, "scope=review")
+        self.assertContains(response, 'name="scope" value="published"')
+        self.assertNotContains(response, reverse("processes:process-list-owned"))
+        self.assertNotContains(response, reverse("processes:process-list-review"))
+        self.assertNotContains(
+            response, reverse("processes:processcategory-list-owned")
+        )
+        self.assertNotContains(
+            response, reverse("processes:processcategory-list-review")
+        )
         self.assertContains(
             response,
             f'href="{reverse("processes:processcategory-list")}?scope=published"',
@@ -109,10 +120,9 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
 
     def test_anonymous_supplied_review_scope_normalizes_to_published(self):
         response = self.client.get(
-            reverse("processes:processcategory-list"), {"scope": "review"}
+            reverse("processes:processcategory-gallery"), {"scope": "review"}
         )
-        self.assertNotContains(response, "scope=review")
-        self.assertNotContains(response, "scope=private")
+        self.assertContains(response, 'name="scope" value="published"')
         view_processes = f"{reverse('processes:process-list')}?"
         self.assertContains(response, view_processes)
         self.assertNotContains(response, reverse("processes:process-list-review"))
@@ -120,9 +130,9 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
     def test_non_moderator_supplied_review_scope_normalizes_to_published(self):
         self.client.force_login(self.owner)
         response = self.client.get(
-            reverse("processes:processcategory-list"), {"scope": "review"}
+            reverse("processes:processcategory-gallery"), {"scope": "review"}
         )
-        self.assertNotContains(response, "scope=review")
+        self.assertContains(response, 'name="scope" value="published"')
         self.assertNotContains(response, reverse("processes:process-list-review"))
 
     def test_anonymous_return_context_scope_is_normalized(self):
@@ -137,7 +147,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
             owner=self.owner,
             publication_status="published",
         )
-        response = self.client.get(reverse("processes:processcategory-list"))
+        response = self.client.get(reverse("processes:processcategory-gallery"))
         self.assertEqual(response.status_code, 200)
         names = [c.name for c in response.context["categories"]]
         self.assertEqual(names, sorted(names))
@@ -152,12 +162,12 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
 
     def test_catalogue_search_filters_by_name_only(self):
         response = self.client.get(
-            reverse("processes:processcategory-list"), {"category_q": "Thermo"}
+            reverse("processes:processcategory-gallery"), {"category_q": "Thermo"}
         )
         self.assertContains(response, "Thermochemical")
         self.assertNotContains(response, "Biochemical")
         response = self.client.get(
-            reverse("processes:processcategory-list"), {"category_q": "x"}
+            reverse("processes:processcategory-gallery"), {"category_q": "x"}
         )
         for url in self._hrefs(response):
             if "processes/list" in url or re.search(r"categories/\d+/", url):
@@ -172,7 +182,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
             "input_material": "5",
             "output_material": "7",
         }
-        response = self.client.get(reverse("processes:processcategory-list"), params)
+        response = self.client.get(reverse("processes:processcategory-gallery"), params)
         self.assertEqual(response.status_code, 200)
         for key, value in (
             ("name", "dig"),
@@ -186,7 +196,9 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         self.assertContains(response, 'name="category_q"')
         self.assertContains(response, 'value="Thermo"')
 
-    def test_catalogue_scope_links_keep_search_and_filters(self):
+    def test_catalogue_scope_toggle_navigates_to_category_lists(self):
+        """The scope toggle switches category views like on other BRIT lists;
+        the Published button stays on the catalogue and keeps context."""
         self.client.force_login(self.owner)
         params = {
             "scope": "published",
@@ -194,15 +206,14 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
             "categories": [str(self.category.pk), str(self.other_category.pk)],
             "page": "1",
         }
-        response = self.client.get(reverse("processes:processcategory-list"), params)
+        response = self.client.get(reverse("processes:processcategory-gallery"), params)
         self.assertEqual(response.status_code, 200)
-        private_url = (
-            f"{reverse('processes:processcategory-list')}"
-            f"?categories={self.category.pk}&amp;categories={self.other_category.pk}"
-            f"&amp;scope=private&amp;category_q=Thermo"
+        self.assertContains(
+            response,
+            f'href="{reverse("processes:processcategory-list-owned")}?',
         )
-        self.assertContains(response, f'href="{private_url}"')
-        self.assertNotContains(response, "page=1")
+        self.assertContains(response, "scope=published")
+        self.assertContains(response, "category_q=Thermo")
 
     def test_catalogue_reset_search_keeps_process_filters(self):
         params = {
@@ -211,9 +222,9 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
             "name": "dig",
         }
         self.client.force_login(self.owner)
-        response = self.client.get(reverse("processes:processcategory-list"), params)
+        response = self.client.get(reverse("processes:processcategory-gallery"), params)
         reset = (
-            f"{reverse('processes:processcategory-list')}?name=dig&amp;scope=private"
+            f"{reverse('processes:processcategory-gallery')}?name=dig&amp;scope=private"
         )
         self.assertContains(response, f'href="{reset}"')
         self.assertNotIn("category_q", reset)
@@ -221,7 +232,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
     def test_catalogue_view_processes_links_to_scoped_filtered_list(self):
         self.client.force_login(self.moderator)
         response = self.client.get(
-            reverse("processes:processcategory-list"),
+            reverse("processes:processcategory-gallery"),
             {"scope": "review", "name": "dig"},
         )
         expected = (
@@ -235,7 +246,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         restrict the published category cards."""
         self.client.force_login(self.moderator)
         response = self.client.get(
-            reverse("processes:processcategory-list"),
+            reverse("processes:processcategory-gallery"),
             {"scope": "review", "name": "dig"},
         )
         self.assertEqual(response.status_code, 200)
@@ -247,7 +258,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         """About this category must scope to the clicked category, not carry
         a previously selected category into the detail gallery."""
         params = {"scope": "published", "categories": [str(self.category.pk)]}
-        response = self.client.get(reverse("processes:processcategory-list"), params)
+        response = self.client.get(reverse("processes:processcategory-gallery"), params)
         expected = (
             reverse(
                 "processes:processcategory-detail",
@@ -269,7 +280,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         )
         process_b.categories.add(self.other_category)
         response = self.client.get(
-            reverse("processes:processcategory-list"),
+            reverse("processes:processcategory-gallery"),
             {"categories": [str(self.category.pk)]},
         )
         about_b = (
@@ -286,13 +297,13 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         self.assertNotContains(response, "Process A")
 
     def test_catalogue_secondary_management_links(self):
-        response = self.client.get(reverse("processes:processcategory-list"))
+        response = self.client.get(reverse("processes:processcategory-gallery"))
         self.assertNotContains(
             response, reverse("processes:processcategory-list-owned")
         )
         self.assertNotContains(response, reverse("processes:processcategory-create"))
         self.client.force_login(self.owner)
-        response = self.client.get(reverse("processes:processcategory-list"))
+        response = self.client.get(reverse("processes:processcategory-gallery"))
         self.assertContains(response, reverse("processes:processcategory-list-owned"))
         self.assertNotContains(response, reverse("processes:processcategory-create"))
         self.owner.user_permissions.add(
@@ -301,7 +312,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
                 codename="add_processcategory",
             )
         )
-        response = self.client.get(reverse("processes:processcategory-list"))
+        response = self.client.get(reverse("processes:processcategory-gallery"))
         self.assertContains(response, reverse("processes:processcategory-create"))
 
     def test_category_management_lists_show_compact_discovery_nav(self):
@@ -332,7 +343,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
                     f'href="{reverse("processes:processcategory-list")}?scope={scope}"',
                 )
                 catalogue = self.client.get(
-                    reverse("processes:processcategory-list"), {"scope": scope}
+                    reverse("processes:processcategory-gallery"), {"scope": scope}
                 )
                 expected = (
                     f"{reverse('processes:process-list-owned')}"
@@ -349,12 +360,15 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         for scope in ("owned", "shared"):
             with self.subTest(scope=scope):
                 response = self.client.get(
-                    reverse("processes:processcategory-list"), {"scope": scope}
+                    reverse("processes:processcategory-gallery"), {"scope": scope}
                 )
                 self.assertEqual(response.status_code, 200)
-                self.assertNotContains(response, "scope=" + scope)
+                self.assertContains(response, 'name="scope" value="published"')
                 self.assertNotContains(
                     response, reverse("processes:process-list-owned")
+                )
+                self.assertNotContains(
+                    response, reverse("processes:processcategory-list-owned")
                 )
 
     def test_category_management_lists_without_scope_keep_route_scope(self):
