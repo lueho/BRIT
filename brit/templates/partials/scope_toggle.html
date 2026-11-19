@@ -1,8 +1,6 @@
 {% load moderation_tags %}
 {% load user_created_object_tags %}
-{# Shared Published / Workspace / Review scope toggle for filtered lists.
-   Expects ``scope_toggle_urls`` in context: a dict of hrefs keyed by scope,
-   provided by the ``scope_toggle_urls`` tag or a per-module override. #}
+{# Shared Published/Workspace/Review toggle; expects ``scope_toggle_urls`` dict in context. #}
 {% if user.is_authenticated and object_list.model|is_user_created %}
   <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
     <a class="btn btn-outline-secondary {% if list_type == 'published' %}active disabled{% endif %}"
