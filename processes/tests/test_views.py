@@ -1005,7 +1005,7 @@ class ProcessCategoryCRUDViewsTestCase(
         published_process.categories.add(self.published_object)
         private_process.categories.add(self.published_object)
 
-        response = self.client.get(reverse(self.view_published_list_name))
+        response = self.client.get(reverse("processes:processcategory-gallery"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Published Test Category")

@@ -156,11 +156,23 @@ class ProcessCategoryListViewMixin:
     filterset_class = ProcessCategoryFilter
     paginate_by = 20
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if getattr(self, "list_type", None) == "published":
+            context["public_gallery_url"] = reverse("processes:processcategory-gallery")
+        return context
+
 
 class ProcessCategoryPublishedListView(
+    ProcessCategoryListViewMixin, PublishedObjectFilterView
+):
+    """Standard filtered list of published ProcessCategory objects."""
+
+
+class ProcessCategoryCatalogueView(
     ProcessCategoryListViewMixin, PublishedObjectListView
 ):
-    """Public catalogue of published ProcessCategory objects.
+    """Gallery representation of published ProcessCategory objects.
 
     The ``category_q`` query parameter drives the category-name search; the
     process discovery scope carried in ``scope`` never restricts the category
@@ -169,17 +181,21 @@ class ProcessCategoryPublishedListView(
 
     template_name = "processes/processcategory_catalogue.html"
 
+    def _search_query(self):
+        return (self.request.GET.get("category_q") or "").strip()
+
     def get_queryset(self):
         queryset = super().get_queryset()
-        query = (self.request.GET.get("category_q") or "").strip()
+        query = self._search_query()
         if query:
             queryset = queryset.filter(name__icontains=query)
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["category_q"] = (self.request.GET.get("category_q") or "").strip()
+        context["category_q"] = self._search_query()
         context["discovery_scope"] = discovery_context(self.request)["scope"]
+        context["representation_mode"] = "gallery"
         return context
 
 

@@ -12,6 +12,7 @@ from ..navigation import (
     category_detail_url,
     category_process_list_url,
     discovery_context,
+    gallery_url,
     process_scope_url,
     scope_switch_url,
     validated_return_url,
@@ -140,10 +141,18 @@ def process_scope_nav(context):
 
 @register.simple_tag(takes_context=True)
 def process_categories_url(context):
-    """Category catalogue URL for the current scope and filters."""
+    """Category list URL for the current scope and filters."""
     nav = discovery_context(context.get("request"))
     scope = _resolved_scope(context, nav)
     return categories_url(scope, nav["filters"])
+
+
+@register.simple_tag(takes_context=True)
+def process_gallery_url(context):
+    """Category gallery URL for the current scope and filters."""
+    nav = discovery_context(context.get("request"))
+    scope = _resolved_scope(context, nav)
+    return gallery_url(scope, nav["filters"])
 
 
 @register.simple_tag(takes_context=True)

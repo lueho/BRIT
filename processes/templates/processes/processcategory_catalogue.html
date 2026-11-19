@@ -32,7 +32,7 @@
                 {% if category_q %}
                     <p class="text-muted mb-0">
                         No categories match "{{ category_q }}".
-                        {% process_categories_url as reset_url %}
+                        {% process_gallery_url as reset_url %}
                         <a href="{{ reset_url }}">Reset search</a>
                     </p>
                 {% else %}
@@ -62,7 +62,7 @@
                aria-label="Search categories by name">
         <div class="d-flex justify-content-end gap-2 mt-2">
             <button type="submit" class="btn btn-sm btn-primary">Filter</button>
-            {% process_categories_url as catalogue_reset_url %}
+            {% process_gallery_url as catalogue_reset_url %}
             <a class="btn btn-sm btn-outline-secondary"
                href="{{ catalogue_reset_url }}"
                aria-label="Reset search">Reset</a>
