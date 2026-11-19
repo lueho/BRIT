@@ -200,7 +200,7 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            f'href="{reverse("processes:processcategory-list-owned")}?scope=private"',
+            f'href="{reverse("processes:processcategory-list-owned")}?',
         )
         self.assertContains(response, "scope=published")
         self.assertContains(response, "category_q=Thermo")

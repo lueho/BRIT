@@ -1,182 +1,71 @@
-{% extends "base.html" %}
-{% load custom_tags %}
-{% load moderation_tags %}
+{% extends "filtered_list.html" %}
 {% load process_navigation %}
+
 {% block title %}BRIT | Process Categories{% endblock %}
-{% block content %}
-  <div class="row">
-    <div class="col-lg-8 order-2 order-lg-1">
-      <div class="card shadow">
-        <div class="card-header py-3">
-          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-            {% process_discovery_nav "categories" show_scopes=False %}
-            <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
-              {% process_scope_nav as scope_nav %}
-              {% if user.is_authenticated %}
-                <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
-                  <a class="btn btn-outline-secondary active disabled"
-                     role="button"
-                     title="Show published categories"
-                     aria-pressed="true"
-                     aria-disabled="true" tabindex="-1"
-                     href="{{ scope_nav.nav_scope_urls.published }}">
-                    Published
-                  </a>
-                  <a class="btn btn-outline-secondary"
-                     role="button"
-                     title="Show my workspace categories"
-                     aria-pressed="false"
-                     href="{% url 'processes:processcategory-list-owned' %}?scope=private">
-                    Workspace
-                  </a>
-                  {% if user|can_moderate:object_list.model %}
-                    <a class="btn btn-outline-secondary"
-                       role="button"
-                       title="Show categories pending review"
-                       aria-pressed="false"
-                       href="{% url 'processes:processcategory-list-review' %}?scope=review">
-                      Review
-                    </a>
-                  {% endif %}
-                </div>
-              {% endif %}
-              {% if explorer_url %}
-                <a class="btn btn-sm btn-outline-secondary"
-                   href="{{ explorer_url }}"
-                   title="Open Explorer">
-                  <i class="fas fa-table-cells-large"></i> Explorer
-                </a>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-        <div class="card-body">
-          {% if page_obj %}
-            <p class="text-muted small mb-2">
-              Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
-            </p>
-          {% endif %}
-          <div class="row row-cols-1 row-cols-md-2 g-3">
-            {% for category in categories %}
-              <div class="col">
+
+{% block list_card_header_lead %}
+    {% process_discovery_nav "categories" show_scopes=False %}
+{% endblock list_card_header_lead %}
+
+{% block list_table %}
+    <div class="row row-cols-1 row-cols-md-2 g-3">
+        {% for category in categories %}
+            <div class="col">
                 <div class="card h-100">
-                  <div class="card-body">
-                    <h6 class="card-title">{{ category.name }}</h6>
-                    <p class="card-text text-muted small">
-                      {{ category.description|default:"No description provided."|truncatewords:20 }}
-                    </p>
-                  </div>
-                  <div class="card-footer d-flex gap-2">
-                    {% process_category_filter_url category as view_processes_url %}
-                    {% process_category_about_url category as about_url %}
-                    <a class="btn btn-sm btn-outline-primary"
-                       href="{{ view_processes_url }}">View processes</a>
-                    <a class="btn btn-sm btn-outline-secondary" href="{{ about_url }}">About this category</a>
-                  </div>
+                    <div class="card-body">
+                        <h6 class="card-title">{{ category.name }}</h6>
+                        <p class="card-text text-muted small">
+                            {{ category.description|default:"No description provided."|truncatewords:20 }}
+                        </p>
+                    </div>
+                    <div class="card-footer d-flex gap-2">
+                        {% process_category_filter_url category as view_processes_url %}
+                        {% process_category_about_url category as about_url %}
+                        <a class="btn btn-sm btn-outline-primary"
+                           href="{{ view_processes_url }}">View processes</a>
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ about_url }}">About this category</a>
+                    </div>
                 </div>
-              </div>
-            {% empty %}
-              <div class="col">
+            </div>
+        {% empty %}
+            <div class="col">
                 {% if category_q %}
-                  <p class="text-muted mb-0">
-                    No categories match "{{ category_q }}".
-                    {% process_categories_url as reset_url %}
-                    <a href="{{ reset_url }}">Reset search</a>
-                  </p>
+                    <p class="text-muted mb-0">
+                        No categories match "{{ category_q }}".
+                        {% process_categories_url as reset_url %}
+                        <a href="{{ reset_url }}">Reset search</a>
+                    </p>
                 {% else %}
-                  <p class="text-muted mb-0">No categories published yet.</p>
+                    <p class="text-muted mb-0">No categories published yet.</p>
                 {% endif %}
-              </div>
+            </div>
+        {% endfor %}
+    </div>
+{% endblock list_table %}
+
+{% block filters_pane_body %}
+    <form method="get">
+        <input type="hidden" name="scope" value="{{ discovery_scope }}">
+        {% process_filter_params as filter_params %}
+        {% for key, values in filter_params.lists %}
+            {% for value in values %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
             {% endfor %}
-          </div>
-          {% include "partials/_pagination.html" %}
+        {% endfor %}
+        <label class="form-label small text-muted mb-1" for="category-search">Category name</label>
+        <input type="search"
+               id="category-search"
+               name="category_q"
+               class="form-control form-control-sm"
+               placeholder="Search by category name..."
+               value="{{ category_q }}"
+               aria-label="Search categories by name">
+        <div class="d-flex justify-content-end gap-2 mt-2">
+            <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+            {% process_categories_url as catalogue_reset_url %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{{ catalogue_reset_url }}"
+               aria-label="Reset search">Reset</a>
         </div>
-      </div>
-    </div>
-    <div class="col-lg-4 order-1 order-lg-2">
-      <div class="card shadow filter-sticky">
-        <div class="card-header p-0 border-0 bg-body-tertiary">
-          <ul class="nav nav-pills sidebar-tabs px-3 pt-3 pb-2"
-              id="sidebarTabs"
-              role="tablist">
-            <li class="nav-item" role="presentation">
-              <button class="nav-link active"
-                      id="filters-tab"
-                      data-bs-toggle="tab"
-                      data-bs-target="#filters-pane"
-                      type="button"
-                      role="tab"
-                      aria-controls="filters-pane"
-                      aria-selected="true">
-                <i class="fas fa-filter"></i> Filters
-              </button>
-            </li>
-            <li class="nav-item" role="presentation">
-              <button class="nav-link"
-                      id="options-tab"
-                      data-bs-toggle="tab"
-                      data-bs-target="#options-pane"
-                      type="button"
-                      role="tab"
-                      aria-controls="options-pane"
-                      aria-selected="false">
-                <i class="fas fa-gear"></i> Options
-              </button>
-            </li>
-          </ul>
-        </div>
-        <div class="card-body">
-          <div class="tab-content">
-            <div class="tab-pane fade show active"
-                 id="filters-pane"
-                 role="tabpanel"
-                 aria-labelledby="filters-tab"
-                 tabindex="0">
-              <form method="get">
-                <input type="hidden" name="scope" value="{{ discovery_scope }}">
-                {% process_filter_params as filter_params %}
-                {% for key, values in filter_params.lists %}
-                  {% for value in values %}
-                    <input type="hidden" name="{{ key }}" value="{{ value }}">
-                  {% endfor %}
-                {% endfor %}
-                <label class="form-label small text-muted mb-1" for="category-search">Category name</label>
-                <input type="search"
-                       id="category-search"
-                       name="category_q"
-                       class="form-control form-control-sm"
-                       placeholder="Search by category name..."
-                       value="{{ category_q }}"
-                       aria-label="Search categories by name">
-                <div class="d-flex justify-content-end gap-2 mt-2">
-                  <button type="submit" class="btn btn-sm btn-primary">Filter</button>
-                  {% process_categories_url as catalogue_reset_url %}
-                  <a class="btn btn-sm btn-outline-secondary"
-                     href="{{ catalogue_reset_url }}"
-                     aria-label="Reset search">Reset</a>
-                </div>
-              </form>
-            </div>
-            <div class="tab-pane fade"
-                 id="options-pane"
-                 role="tabpanel"
-                 aria-labelledby="options-tab"
-                 tabindex="0">
-              {% model_creation_policy object_list.model as create_policy %}
-              {% if create_policy.allowed %}
-                <a class="btn btn-success w-100 mb-2"
-                   href="{{ object_list.model.create_url }}"
-                   aria-label="Create new category">
-                  <i class="fas fa-plus"></i> Create new category
-                </a>
-              {% endif %}
-              {% if not user.is_authenticated %}
-                <p class="text-muted small mt-3 mb-0">Log in to enable export and additional options.</p>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-{% endblock content %}
+    </form>
+{% endblock filters_pane_body %}
