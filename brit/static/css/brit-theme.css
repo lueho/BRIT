@@ -8607,6 +8607,13 @@ main .nav-pills:not(.sidebar-tabs) .nav-link.active {
   box-shadow: var(--brit-shadow-sm);
 }
 
+.process-discovery-nav {
+  margin-bottom: 1rem;
+}
+.card-header .process-discovery-nav {
+  margin-bottom: 0;
+}
+
 p.card-text > strong:first-child,
 .modal-body p > strong:first-child {
   display: block;

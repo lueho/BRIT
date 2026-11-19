@@ -10,7 +10,6 @@
 {% endblock title %}
 
 {% block list_intro %}
-    {% process_discovery_nav "processes" %}
     <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
          role="region"
          aria-label="Module introduction">
@@ -28,15 +27,9 @@
     </div>
 {% endblock list_intro %}
 
-{% block list_card_header %}
-    {% if list_type == 'private' %}
-        <strong>Workspace processes</strong>
-    {% elif list_type == 'review' %}
-        <strong>Processes in review</strong>
-    {% else %}
-        <strong>Processes</strong>
-    {% endif %}
-{% endblock list_card_header %}
+{% block list_card_header_lead %}
+    {% process_discovery_nav "processes" %}
+{% endblock list_card_header_lead %}
 
 {% block list_primary_actions %}
     {% if create_permission in perms or user.is_staff %}

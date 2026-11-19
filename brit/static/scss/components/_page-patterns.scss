@@ -53,6 +53,16 @@ main .nav-pills:not(.sidebar-tabs) {
   }
 }
 
+// Process discovery nav keeps its flow spacing but drops it when used as the
+// lead element of a list card header.
+.process-discovery-nav {
+  margin-bottom: 1rem;
+
+  .card-header & {
+    margin-bottom: 0;
+  }
+}
+
 // ── Label / value fields in detail cards and detail modals ───────────
 p.card-text > strong:first-child,
 .modal-body p > strong:first-child {

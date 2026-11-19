@@ -2244,26 +2244,34 @@ class ProcessWorkshopJourneyViewsTestCase(TestCase):
         self.assertNotContains(response, "Add process")
         self.assertNotContains(response, create_url)
 
-    def test_list_heading_matches_scope(self):
+    def test_list_scope_indicated_by_active_scope_toggle(self):
         private_response = self.client.get(
             reverse("processes:process-list-owned"), {"scope": "private"}
         )
-        self.assertContains(
-            private_response, "<strong>Workspace processes</strong>", html=True
+        self.assertRegex(
+            private_response.content.decode(),
+            r"(?s)card-header py-3.*?process-discovery-nav",
+        )
+        self.assertRegex(
+            private_response.content.decode(),
+            r'title="Show only my items"\s+aria-pressed="true"',
         )
 
         published_response = self.client.get(
             reverse("processes:process-list"), {"scope": "published"}
         )
-        self.assertContains(published_response, "<strong>Processes</strong>", html=True)
-        self.assertNotContains(published_response, "Workspace processes")
+        self.assertRegex(
+            published_response.content.decode(),
+            r'title="Show published items"\s+aria-pressed="true"',
+        )
 
         self.client.force_login(self.moderator)
         review_response = self.client.get(
             reverse("processes:process-list-review"), {"scope": "review"}
         )
-        self.assertContains(
-            review_response, "<strong>Processes in review</strong>", html=True
+        self.assertRegex(
+            review_response.content.decode(),
+            r'title="Show items pending review"\s+aria-pressed="true"',
         )
 
     def test_detail_nav_shows_compact_discovery_links_for_all_readers(self):

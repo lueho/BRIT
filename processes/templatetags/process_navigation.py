@@ -79,15 +79,18 @@ def _nav_context(context, section):
 @register.inclusion_tag(
     "processes/includes/process_discovery_nav.html", takes_context=True
 )
-def process_discovery_nav(context, section, compact=False):
+def process_discovery_nav(context, section, compact=False, show_scopes=None):
     """Render the Processes | Categories discovery navigation.
 
     ``section`` is ``"processes"`` or ``"categories"`` and marks the active
     tab. ``compact`` renders only the two section links, for the shared
-    detail context navigation.
+    detail context navigation. ``show_scopes`` overrides whether the scope
+    pill row is rendered (default: only on the ``categories`` section).
     """
     nav = _nav_context(context, section)
     nav["nav_compact"] = compact
+    if show_scopes is not None:
+        nav["nav_show_scopes"] = show_scopes
     return nav
 
 
