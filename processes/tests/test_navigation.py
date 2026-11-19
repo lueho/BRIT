@@ -555,6 +555,18 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         self.assertNotContains(response, "Related Categories (")
         self.assertContains(response, "Pyrolysis")
 
+    def test_category_detail_anchors_nav_inside_card_header(self):
+        url = reverse(
+            "processes:processcategory-detail", kwargs={"pk": self.category.pk}
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertRegex(
+            content, r"(?s)card-header.*?process-discovery-nav.*?card-body"
+        )
+        self.assertNotRegex(content, r"(?s)process-discovery-nav.*?detail-layout-card")
+
     def test_category_detail_explicit_review_scope_shows_review_gallery(self):
         review_process = Process.objects.create(
             name="Review Process", owner=self.owner, publication_status="review"

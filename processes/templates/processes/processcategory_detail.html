@@ -5,7 +5,9 @@
     BRIT | Process Category: {{ object.name }}
 {% endblock title %}
 {% block detail_nav %}
-    {% process_discovery_nav "categories" %}
+    <div class="w-100">
+        {% process_discovery_nav "categories" %}
+    </div>
 {% endblock detail_nav %}
 {% block detail_body %}
     <dl class="row">
