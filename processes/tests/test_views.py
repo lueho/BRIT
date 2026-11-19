@@ -2218,16 +2218,15 @@ class ProcessWorkshopJourneyViewsTestCase(TestCase):
             "process_materials-0-quantity_unit": "",
         }
 
-    def test_process_list_shows_prominent_add_process_action(self):
+    def test_process_list_offers_create_in_options_pane(self):
         response = self.client.get(
             reverse("processes:process-list"), {"scope": "published"}
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Add process")
+        self.assertNotContains(response, "Add process")
+        self.assertContains(response, 'id="options-pane"')
         self.assertContains(response, f'href="{reverse("processes:process-create")}"')
-        self.assertNotContains(response, 'id="options-tab"')
-        self.assertNotContains(response, 'id="options-pane"')
 
     def test_add_process_hidden_for_anonymous_and_users_without_permission(self):
         url = reverse("processes:process-list")

@@ -31,15 +31,6 @@
     {% process_discovery_nav "processes" %}
 {% endblock list_card_header_lead %}
 
-{% block list_primary_actions %}
-    {% if create_permission in perms or user.is_staff %}
-        <a class="btn btn-primary btn-sm"
-           href="{% url 'processes:process-create' %}">
-            <i class="fas fa-plus"></i> Add process
-        </a>
-    {% endif %}
-{% endblock list_primary_actions %}
-
 {% block scope_toggle %}
     {% if user.is_authenticated %}
         <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
@@ -159,17 +150,3 @@
         </div>
     </div>
 {% endblock list_table %}
-
-{% block options_tab_button %}
-    {% if list_type == 'private' %}{{ block.super }}{% endif %}
-{% endblock options_tab_button %}
-
-{% block options_tab_pane %}
-    {% if list_type == 'private' %}{{ block.super }}{% endif %}
-{% endblock options_tab_pane %}
-
-{% block options_pane_body %}
-    {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
-        {% include "object_management/bulk_access_toolbar.html" with heading="Manage access for selected items" %}
-    {% endif %}
-{% endblock options_pane_body %}
