@@ -10,6 +10,9 @@ page, then defers to the model's regular detail template content.
   {{ block.super }}
 {% endblock detail_header_actions %}
 
+{# List-navigation controls do not belong on a review detail page. #}
+{% block detail_nav %}{% endblock detail_nav %}
+
 {% block detail_header_review_actions %}
   {# Detail view button - always goes to object's detail page #}
   {% with detail_url=object.get_absolute_url %}
