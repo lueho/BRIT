@@ -629,15 +629,12 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         self.client.force_login(self.moderator)
         response = self.client.get(review_url, {"next": next_url})
         self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            f'href="{reverse("processes:process-list-review")}'
-            '?name=Mod&amp;scope=review"',
-        )
+        self.assertNotContains(response, "sdv2-context-nav")
+        self.assertNotContains(response, "Back to results")
 
     def test_category_detail_next_back_returns_to_category_page(self):
-        """A gallery link into the review context must keep the category
-        page as the 'Back to results' target and restore its context."""
+        """A gallery link into the review context still carries the return
+        context, but the review page itself renders no context nav."""
         review_process = Process.objects.create(
             name="Moderated Process", owner=self.owner, publication_status="review"
         )
@@ -661,9 +658,8 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         self.assertIn("next=", target)
         response = self.client.get(target)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, f'href="{category_url.replace("&", "&amp;")}"')
-        self.assertContains(response, "scope=review")
-        self.assertContains(response, f"categories={self.category.pk}")
+        self.assertNotContains(response, "sdv2-context-nav")
+        self.assertNotContains(response, f'href="{category_url.replace("&", "&amp;")}"')
 
     def test_public_detail_back_returns_to_category_page(self):
         category_url = (
