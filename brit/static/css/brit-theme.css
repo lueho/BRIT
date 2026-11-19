@@ -7418,6 +7418,10 @@ body {
   object-fit: cover;
 }
 
+.card-img-top img {
+  height: auto;
+}
+
 .sample-gallery-placeholder {
   aspect-ratio: 16/9;
 }
