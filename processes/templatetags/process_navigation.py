@@ -128,6 +128,17 @@ def process_filter_params(context):
 
 
 @register.simple_tag(takes_context=True)
+def process_scope_nav(context):
+    """Discovery-scope state for scope toggle controls.
+
+    Returns the resolved ``nav_scope``, per-scope ``nav_scope_urls`` (same-page
+    carrier links that keep search and filters), and the ``nav_show_private`` /
+    ``nav_show_review`` visibility flags.
+    """
+    return _nav_context(context, "categories")
+
+
+@register.simple_tag(takes_context=True)
 def process_categories_url(context):
     """Category catalogue URL for the current scope and filters."""
     nav = discovery_context(context.get("request"))

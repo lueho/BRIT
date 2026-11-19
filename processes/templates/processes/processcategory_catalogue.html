@@ -4,36 +4,74 @@
 {% load process_navigation %}
 {% block title %}BRIT | Process Categories{% endblock %}
 {% block content %}
-  {% process_discovery_nav "categories" %}
   <div class="row">
     <div class="col-lg-8">
       <div class="card shadow mb-3">
-        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+        <div class="card-header py-3">
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <h5 class="mb-0">Process categories</h5>
-            <form method="get" class="d-flex gap-2" role="search">
-              <input type="hidden" name="scope" value="{{ discovery_scope }}">
-              {% process_filter_params as filter_params %}
-              {% for key, values in filter_params.lists %}
-                {% for value in values %}
-                  <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% process_discovery_nav "categories" show_scopes=False %}
+            <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
+              {% if create_permission in perms or user.is_staff %}
+                <a class="btn btn-primary btn-sm"
+                   href="{% url 'processes:processcategory-create' %}">
+                  <i class="fas fa-plus"></i> Add category
+                </a>
+              {% endif %}
+              <form method="get" class="d-flex gap-2" role="search">
+                <input type="hidden" name="scope" value="{{ discovery_scope }}">
+                {% process_filter_params as filter_params %}
+                {% for key, values in filter_params.lists %}
+                  {% for value in values %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                  {% endfor %}
                 {% endfor %}
-              {% endfor %}
-              <input type="search"
-                     name="category_q"
-                     class="form-control form-control-sm"
-                     placeholder="Search by category name..."
-                     value="{{ category_q }}"
-                     aria-label="Search categories by name">
-              <button type="submit" class="btn btn-sm btn-primary">Search</button>
-            </form>
-            {% if explorer_url %}
-              <a class="btn btn-sm btn-outline-secondary"
-                 href="{{ explorer_url }}"
-                 title="Open Explorer">
-                <i class="fas fa-table-cells-large"></i> Explorer
-              </a>
-            {% endif %}
+                <input type="search"
+                       name="category_q"
+                       class="form-control form-control-sm"
+                       placeholder="Search by category name..."
+                       value="{{ category_q }}"
+                       aria-label="Search categories by name">
+                <button type="submit" class="btn btn-sm btn-primary">Search</button>
+              </form>
+              {% process_scope_nav as scope_nav %}
+              {% if user.is_authenticated %}
+                <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
+                  <a class="btn btn-outline-secondary {% if scope_nav.nav_scope == 'published' %}active disabled{% endif %}"
+                     role="button"
+                     title="Browse with published scope"
+                     aria-pressed="{% if scope_nav.nav_scope == 'published' %}true{% else %}false{% endif %}"
+                     {% if scope_nav.nav_scope == 'published' %}aria-disabled="true" tabindex="-1"{% endif %}
+                     href="{{ scope_nav.nav_scope_urls.published }}">
+                    Published
+                  </a>
+                  <a class="btn btn-outline-secondary {% if scope_nav.nav_scope == 'private' %}active disabled{% endif %}"
+                     role="button"
+                     title="Browse with workspace scope"
+                     aria-pressed="{% if scope_nav.nav_scope == 'private' %}true{% else %}false{% endif %}"
+                     {% if scope_nav.nav_scope == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
+                     href="{{ scope_nav.nav_scope_urls.private }}">
+                    Workspace
+                  </a>
+                  {% if scope_nav.nav_show_review %}
+                    <a class="btn btn-outline-secondary {% if scope_nav.nav_scope == 'review' %}active disabled{% endif %}"
+                       role="button"
+                       title="Browse with review scope"
+                       aria-pressed="{% if scope_nav.nav_scope == 'review' %}true{% else %}false{% endif %}"
+                       {% if scope_nav.nav_scope == 'review' %}aria-disabled="true" tabindex="-1"{% endif %}
+                       href="{{ scope_nav.nav_scope_urls.review }}">
+                      Review
+                    </a>
+                  {% endif %}
+                </div>
+              {% endif %}
+              {% if explorer_url %}
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="{{ explorer_url }}"
+                   title="Open Explorer">
+                  <i class="fas fa-table-cells-large"></i> Explorer
+                </a>
+              {% endif %}
+            </div>
           </div>
         </div>
         <div class="card-body">
@@ -72,20 +110,16 @@
           </div>
           {% include "partials/_pagination.html" %}
         </div>
-        <div class="card-footer d-flex flex-wrap gap-2">
-          {% if user.is_authenticated %}
+        {% if user.is_authenticated %}
+          <div class="card-footer d-flex flex-wrap gap-2">
             <a class="btn btn-sm btn-outline-secondary"
                href="{% url 'processes:processcategory-list-owned' %}?scope=private">My categories</a>
-          {% endif %}
-          {% if user|can_moderate:object_list.model %}
-            <a class="btn btn-sm btn-outline-secondary"
-               href="{% url 'processes:processcategory-list-review' %}?scope=review">Categories in review</a>
-          {% endif %}
-          {% if create_permission in perms or user.is_staff %}
-            <a class="btn btn-sm btn-outline-success"
-               href="{% url 'processes:processcategory-create' %}">Add category</a>
-          {% endif %}
-        </div>
+            {% if user|can_moderate:object_list.model %}
+              <a class="btn btn-sm btn-outline-secondary"
+                 href="{% url 'processes:processcategory-list-review' %}?scope=review">Categories in review</a>
+            {% endif %}
+          </div>
+        {% endif %}
       </div>
     </div>
   </div>
