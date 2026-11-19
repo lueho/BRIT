@@ -588,6 +588,32 @@ class ProcessDiscoveryNavigationTestCase(TestCase):
         self.assertContains(response, "Private Process")
         self.assertContains(response, "Review Process")
 
+    def test_review_detail_hides_discovery_nav(self):
+        review_category = ProcessCategory.objects.create(
+            name="Pending Category",
+            owner=self.owner,
+            publication_status="review",
+        )
+        self.moderator.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="processes",
+                codename="can_moderate_processcategory",
+            )
+        )
+        review_url = reverse(
+            "object_management:review_item_detail",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(
+                    ProcessCategory
+                ).pk,
+                "object_id": review_category.pk,
+            },
+        )
+        self.client.force_login(self.moderator)
+        response = self.client.get(review_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "process-discovery-nav")
+
     def test_review_detail_next_context_is_preserved(self):
         review_process = Process.objects.create(
             name="Moderated Process", owner=self.owner, publication_status="review"
