@@ -1,0 +1,35 @@
+{% load moderation_tags %}
+{% load user_created_object_tags %}
+{# Shared Published / Workspace / Review scope toggle for filtered lists.
+   Expects ``scope_toggle_urls`` in context: a dict of hrefs keyed by scope,
+   provided by the ``scope_toggle_urls`` tag or a per-module override. #}
+{% if user.is_authenticated and object_list.model|is_user_created %}
+  <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
+    <a class="btn btn-outline-secondary {% if list_type == 'published' %}active disabled{% endif %}"
+       role="button"
+       title="Show published items"
+       aria-pressed="{% if list_type == 'published' %}true{% else %}false{% endif %}"
+       {% if list_type == 'published' %}aria-disabled="true" tabindex="-1"{% endif %}
+       href="{{ scope_toggle_urls.published }}">
+      Published
+    </a>
+    <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
+       role="button"
+       title="Show my workspace records"
+       aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
+       {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
+       href="{{ scope_toggle_urls.private }}">
+      Workspace
+    </a>
+    {% if user|can_moderate:object_list.model and scope_toggle_urls.review %}
+      <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
+         role="button"
+         title="Show items pending review"
+         aria-pressed="{% if list_type == 'review' %}true{% else %}false{% endif %}"
+         {% if list_type == 'review' %}aria-disabled="true" tabindex="-1"{% endif %}
+         href="{{ scope_toggle_urls.review }}">
+        Review
+      </a>
+    {% endif %}
+  </div>
+{% endif %}

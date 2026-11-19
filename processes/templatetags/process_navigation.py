@@ -123,6 +123,20 @@ def process_scope_switch_url(context, scope):
 
 
 @register.simple_tag(takes_context=True)
+def process_scope_toggle_urls(context):
+    """Scope-toggle URLs for the process list.
+
+    Uses ``scope_switch_url`` so repeated filter values such as multiple
+    ``categories`` selections survive a scope switch.
+    """
+    request = context.get("request")
+    return {
+        scope: scope_switch_url(request, scope)
+        for scope in ("published", "private", "review")
+    }
+
+
+@register.simple_tag(takes_context=True)
 def process_filter_params(context):
     """QueryDict of preserved process filter parameters for the request."""
     return discovery_context(context.get("request"))["filters"]

@@ -2253,7 +2253,7 @@ class ProcessWorkshopJourneyViewsTestCase(TestCase):
         )
         self.assertRegex(
             private_response.content.decode(),
-            r'title="Show only my items"\s+aria-pressed="true"',
+            r'title="Show my workspace records"\s+aria-pressed="true"',
         )
 
         published_response = self.client.get(
