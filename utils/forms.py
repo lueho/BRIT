@@ -1,13 +1,19 @@
 import json
+from collections.abc import Iterable
+from functools import wraps
 
 from crispy_forms.helper import FormHelper
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.db.models import Q
 from django.forms import (
     BaseFormSet,
     BaseInlineFormSet,
     BaseModelFormSet,
     Form,
+    ModelChoiceField,
     ModelForm,
+    ModelMultipleChoiceField,
     formset_factory,
     modelformset_factory,
 )
@@ -19,6 +25,7 @@ from django_tomselect.forms import (
 from utils.modal import CreateUpdateAjaxMixin, PopRequestMixin
 
 from .object_management.permissions import filter_queryset_for_user
+from .object_management.registry import KIND_PUBLIC_CATALOGUE, model_policy
 from .object_management.services import is_independent_evidence_model
 from .widgets import (
     CreateEnabledTomSelectModelMultipleWidget,
@@ -383,97 +390,112 @@ class UserCreatedObjectFormMixin:
     - Will validate any field containing UserCreatedObject instances
     """
 
+    reference_choice_instance_fields = {}
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        init = cls.__dict__.get("__init__")
+        if init is None or getattr(init, "_policy_choices_wrapped", False):
+            return
+
+        @wraps(init)
+        def init_with_policy_choices(self, *args, **kwargs):
+            init(self, *args, **kwargs)
+            self._apply_policy_choice_querysets()
+
+        init_with_policy_choices._policy_choices_wrapped = True
+        cls.__init__ = init_with_policy_choices
+
     def __init__(self, *args, **kwargs):
-        """Capture request and adjust UserCreatedObject field querysets."""
-        from django.db.models import Q
-        from django.forms import ModelChoiceField, ModelMultipleChoiceField
-
-        from utils.object_management.models import UserCreatedObject
-
-        # Capture request for permission validation in clean()
-        # Only pop request if PopRequestMixin is NOT in the MRO (it will pop it itself)
+        """Capture the request and scope governed choice fields."""
         has_pop_request_mixin = any(
             cls.__name__ == "PopRequestMixin" for cls in self.__class__.__mro__
         )
 
         if not has_pop_request_mixin:
-            # Pop it ourselves if PopRequestMixin isn't present
             request = kwargs.pop("request", None)
-            if request:
+            if request is not None:
                 self.request = request
             elif not hasattr(self, "request"):
                 self.request = None
 
-        # Get data before super().__init__ consumes it
-        data = kwargs.get("data")
-
         super().__init__(*args, **kwargs)
+        self._apply_policy_choice_querysets()
 
-        # If PopRequestMixin is in the MRO, it has already set self.request during super().__init__()
+    def _apply_policy_choice_querysets(self):
+        request = getattr(self, "request", None)
+        user = getattr(request, "user", None) or AnonymousUser()
+        instance = getattr(self, "instance", None)
 
-        # After fields are initialized, adjust querysets for all UserCreatedObject fields
-        # to include submitted values (prevents Django field validation from rejecting
-        # them before our clean() method can run permission checks)
-        if data:
-            for field_name, field in self.fields.items():
-                # Only process ModelChoiceField and ModelMultipleChoiceField
-                if not isinstance(field, ModelChoiceField | ModelMultipleChoiceField):
-                    continue
+        for field_name, field in self.fields.items():
+            if not isinstance(field, (ModelChoiceField, ModelMultipleChoiceField)):
+                continue
+            queryset = field.queryset
+            if queryset is None:
+                continue
+            model = getattr(queryset, "model", None)
+            if model is None:
+                continue
+            policy = model_policy(model)
+            if policy is None or policy.kind == KIND_PUBLIC_CATALOGUE:
+                continue
 
-                # Get the model from the queryset
-                # Even TomSelect fields should have queryset initialized by now
+            visible_queryset = filter_queryset_for_user(queryset, user)
+            existing_ids = set()
+            if instance is not None and getattr(instance, "pk", None):
+                instance_field_name = self.reference_choice_instance_fields.get(
+                    field_name, field_name
+                )
                 try:
-                    if field.queryset is None:
-                        # Some fields may have None queryset - skip them
-                        continue
-                    model = field.queryset.model
-                except (AttributeError, TypeError):
-                    continue
+                    value = getattr(instance, instance_field_name)
+                except AttributeError:
+                    value = None
+                if hasattr(value, "all"):
+                    existing_ids.update(value.values_list("pk", flat=True))
+                elif getattr(value, "pk", None):
+                    existing_ids.add(value.pk)
 
-                # Check if this field references UserCreatedObject
-                try:
-                    if not issubclass(model, UserCreatedObject):
-                        continue
-                except TypeError:
-                    continue
+            field_queryset = visible_queryset
+            if existing_ids:
+                field_queryset = model._default_manager.using(queryset.db).filter(
+                    Q(pk__in=visible_queryset.values("pk")) | Q(pk__in=existing_ids)
+                )
 
-                # Collect submitted IDs for this field
-                submitted_ids = set()
+            if getattr(self, "is_bound", False):
                 data_key = self.add_prefix(field_name)
-
-                # Handle both single and multiple choice fields
-                if data_key in data:
+                if data_key not in self.data:
+                    values = []
+                elif hasattr(self.data, "getlist"):
+                    values = self.data.getlist(data_key)
+                else:
+                    value = self.data.get(data_key)
                     values = (
-                        data.getlist(data_key)
-                        if hasattr(data, "getlist")
-                        else [data.get(data_key)]
+                        value
+                        if isinstance(value, Iterable)
+                        and not isinstance(value, (str, bytes))
+                        else [value]
                     )
-                    for val in values:
-                        if val:
-                            try:
-                                submitted_ids.add(int(val))
-                            except (ValueError, TypeError):
-                                pass
+                submitted_ids = set()
+                for value in values:
+                    if value:
+                        try:
+                            submitted_ids.add(model._meta.pk.to_python(value))
+                        except (TypeError, ValueError, ValidationError):
+                            continue
+                if submitted_ids or existing_ids:
+                    submitted_queryset = visible_queryset.filter(pk__in=submitted_ids)
+                    field_queryset = submitted_queryset
+                    if existing_ids:
+                        field_queryset = model._default_manager.using(
+                            queryset.db
+                        ).filter(
+                            Q(pk__in=submitted_queryset.values("pk"))
+                            | Q(pk__in=existing_ids)
+                        )
 
-                # Collect existing IDs (for update forms)
-                existing_ids = set()
-                if self.instance and self.instance.pk:
-                    if hasattr(self.instance, field_name):
-                        attr = getattr(self.instance, field_name)
-                        if hasattr(attr, "all"):  # M2M field
-                            existing_ids.update(attr.values_list("pk", flat=True))
-                        elif hasattr(attr, "pk"):  # FK field
-                            existing_ids.add(attr.pk)
-
-                # Narrow to submitted choices the field allows, plus existing ones
-                all_ids = submitted_ids | existing_ids
-                if all_ids:
-                    field.queryset = model.objects.filter(
-                        Q(pk__in=field.queryset.filter(pk__in=submitted_ids))
-                        | Q(pk__in=existing_ids)
-                    )
-                    if hasattr(field.widget, "get_queryset"):
-                        field.widget.get_queryset = lambda field=field: field.queryset
+            field.queryset = field_queryset
+            if hasattr(field.widget, "get_queryset"):
+                field.widget.get_queryset = lambda field=field: field.queryset
 
     def clean(self):
         """

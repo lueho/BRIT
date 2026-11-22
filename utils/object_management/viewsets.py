@@ -3,6 +3,7 @@ from django.db import transaction
 from django.db.models import Model
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
@@ -185,6 +186,28 @@ class GlobalObjectViewSet(ModelViewSet):
     permission_classes = [GlobalObjectPermission]
 
 
+class UserCreatedObjectReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
+    policy_enforced = True
+    queryset = None
+    serializer_class = None
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = self.queryset
+        scope = self.request.query_params.get("scope")
+        if scope is None:
+            return filter_queryset_for_user(queryset, user)
+        return apply_scope_filter(queryset, scope, user=user)
+
+    def get_object(self):
+        queryset = filter_queryset_for_user(self.queryset, self.request.user)
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        lookup_value = self.kwargs.get(lookup_url_kwarg)
+        obj = get_object_or_404(queryset, **{self.lookup_field: lookup_value})
+        self.check_object_permissions(self.request, obj)
+        return obj
+
+
 class UserCreatedObjectViewSet(viewsets.ModelViewSet):
     """
     Base viewset for all user-created objects.
@@ -192,6 +215,7 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
     """
 
     permission_classes = [UserCreatedObjectPermission]
+    policy_enforced = True
     serializer_class = None  # Must be set in the concrete viewset
     queryset = None  # Must be set in the concrete viewset
 
@@ -216,8 +240,6 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         Objects the user may not read resolve to 404 instead of leaking existence; the
         object-level permission check still gates the requested action.
         """
-        from django.shortcuts import get_object_or_404
-
         base_qs = filter_queryset_for_user(self.queryset, self.request.user)
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
         lookup_value = self.kwargs.get(lookup_url_kwarg)

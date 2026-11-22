@@ -699,3 +699,25 @@ class RegionEnglishNameTestCase(TestCase):
     def test_custom_region_display_name_falls_back_to_name(self):
         region = Region.objects.create(name="Meine Region", country="DE")
         self.assertEqual(region.display_name, "Meine Region")
+
+    def test_current_among_excludes_null_lau_id_rows_outside_candidates(self):
+        public_region = LauRegion.objects.create(
+            name="Selectable LAU",
+            lau_id="SELECTABLE",
+            publication_status="published",
+        )
+        private_null_region = LauRegion.objects.create(
+            name="Private NULL LAU",
+            lau_id=None,
+            publication_status="private",
+        )
+
+        current = LauRegion.objects.current(
+            among=LauRegion.objects.filter(
+                pk=public_region.pk,
+                publication_status="published",
+            )
+        )
+
+        self.assertIn(public_region, current)
+        self.assertNotIn(private_null_region, current)

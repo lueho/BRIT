@@ -130,14 +130,14 @@ class RevisionMigrationGraphTests(SimpleTestCase):
     """
 
     EXPECTED_LEAVES = {
-        "maps": ("maps", "0023_catchment_content_revision_and_more"),
+        "maps": ("maps", "0024_regionboundary"),
         "materials": (
             "materials",
             "0036_analyticalmethod_content_revision_and_more",
         ),
         "waste_collection": (
             "waste_collection",
-            "0013_collectionpropertyvalue_derived_from",
+            "0014_aggregatedcollectionpropertyvalue_derived_from_and_more",
         ),
         "object_management": ("object_management", "0009_alter_reviewaction_action"),
     }

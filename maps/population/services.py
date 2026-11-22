@@ -11,7 +11,10 @@ from decimal import Decimal
 from django.utils import timezone
 
 from maps.models import RegionAttributeValue
-from maps.validation import validate_region_composition
+from maps.validation import (
+    validate_disjoint_regions,
+    validate_region_composition,
+)
 
 from .models import (
     PopulationEstimate,
@@ -144,6 +147,47 @@ def resolve_composed_population(region, year, *, temporal_basis=None):
         return None
 
     observations = [best[member.pk] for member in members]
+    return _summed_result(observations, year)
+
+
+def resolve_regions_population(regions, year, *, temporal_basis=None):
+    """Resolve the combined population of distinct, non-overlapping regions.
+
+    The region set is deduplicated by primary key so parallel catchments on
+    the same territory count once. Sets of more than one region must pass
+    the composition validator plus the stricter provable-disjointness
+    check — :class:`maps.validation.RegionCompositionError` propagates so
+    callers can distinguish invalid or unverifiable geography from missing
+    data. Every member needs an exact-year resolution of the requested
+    temporal basis; a single missing member returns ``None`` for the whole
+    combination. Never substitutes another year or geography level.
+    """
+    regions = list(
+        {
+            region.pk: region
+            for region in regions
+            if region is not None and region.pk is not None
+        }.values()
+    )
+    if not regions or year is None:
+        return None
+    if len(regions) == 1:
+        return resolve_population(regions[0], year, temporal_basis=temporal_basis)
+    validate_region_composition(regions)
+    validate_disjoint_regions(regions)
+    results = [
+        resolve_population(region, year, temporal_basis=temporal_basis)
+        for region in regions
+    ]
+    if any(result is None for result in results):
+        return None
+    if any(not result.observations for result in results):
+        # Every resolution path here is observation-backed; a result without
+        # an observation cannot be recombined faithfully.
+        return None
+    observations = [
+        observation for result in results for observation in result.observations
+    ]
     return _summed_result(observations, year)
 
 

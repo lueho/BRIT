@@ -10,7 +10,6 @@
 {% endblock title %}
 
 {% block list_intro %}
-    {% process_discovery_nav "processes" %}
     <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
          role="region"
          aria-label="Module introduction">
@@ -28,56 +27,13 @@
     </div>
 {% endblock list_intro %}
 
-{% block list_card_header %}
-    {% if list_type == 'private' %}
-        <strong>Workspace processes</strong>
-    {% elif list_type == 'review' %}
-        <strong>Processes in review</strong>
-    {% else %}
-        <strong>Processes</strong>
-    {% endif %}
-{% endblock list_card_header %}
-
-{% block list_primary_actions %}
-    {% if create_permission in perms or user.is_staff %}
-        <a class="btn btn-primary btn-sm"
-           href="{% url 'processes:process-create' %}">
-            <i class="fas fa-plus"></i> Add process
-        </a>
-    {% endif %}
-{% endblock list_primary_actions %}
+{% block list_card_header_lead %}
+    {% process_discovery_nav "processes" %}
+{% endblock list_card_header_lead %}
 
 {% block scope_toggle %}
-    {% if user.is_authenticated %}
-        <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
-            <a class="btn btn-outline-secondary {% if list_type == 'published' %}active disabled{% endif %}"
-               role="button"
-               title="Show published items"
-               aria-pressed="{% if list_type == 'published' %}true{% else %}false{% endif %}"
-               {% if list_type == 'published' %}aria-disabled="true" tabindex="-1"{% endif %}
-               href="{% process_scope_switch_url 'published' %}">
-                Published
-            </a>
-            <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
-               role="button"
-               title="Show only my items"
-               aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
-               {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
-               href="{% process_scope_switch_url 'private' %}">
-                Workspace
-            </a>
-            {% if user|can_moderate:object_list.model and review_representation_url %}
-                <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
-                   role="button"
-                   title="Show items pending review"
-                   aria-pressed="{% if list_type == 'review' %}true{% else %}false{% endif %}"
-                   {% if list_type == 'review' %}aria-disabled="true" tabindex="-1"{% endif %}
-                   href="{% process_scope_switch_url 'review' %}">
-                    Review
-                </a>
-            {% endif %}
-        </div>
-    {% endif %}
+    {% process_scope_toggle_urls as scope_toggle_urls %}
+    {% include "partials/scope_toggle.html" %}
 {% endblock scope_toggle %}
 
 {% block list_table %}
@@ -166,17 +122,3 @@
         </div>
     </div>
 {% endblock list_table %}
-
-{% block options_tab_button %}
-    {% if list_type == 'private' %}{{ block.super }}{% endif %}
-{% endblock options_tab_button %}
-
-{% block options_tab_pane %}
-    {% if list_type == 'private' %}{{ block.super }}{% endif %}
-{% endblock options_tab_pane %}
-
-{% block options_pane_body %}
-    {% if list_type == 'private' and object_list.model|is_user_created and user.is_authenticated %}
-        {% include "object_management/bulk_access_toolbar.html" with heading="Manage access for selected items" %}
-    {% endif %}
-{% endblock options_pane_body %}

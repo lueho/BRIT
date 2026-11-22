@@ -85,6 +85,15 @@ class SharedUiUtilsScriptTests(SimpleTestCase):
         self.assertIn("js/ui_utils.min.js", html)
 
 
+class TomSelectRequiredFeedbackScriptTests(SimpleTestCase):
+    """TomSelect hides the real field, so required-field errors need this
+    script to be shown on the visible control."""
+
+    def test_base_template_includes_required_feedback_script(self):
+        html = render_to_string("base.html")
+        self.assertIn("js/tomselect-required-feedback.min.js", html)
+
+
 class SitemapItemsTestCase(SimpleTestCase):
     def test_sources_explorer_is_canonical_sitemap_entry(self):
         self.assertIn("/sources/explorer/", get_sitemap_items())
@@ -259,7 +268,10 @@ class BreadcrumbModuleLandingTests(TestCase):
             '<li aria-current="page" class="breadcrumb-item active">Utilities</li>',
             html=True,
         )
-        self.assertContains(response, '<h5 class="mb-0">Utilities</h5>', html=True)
+        self.assertContains(
+            response, '<h2 class="mb-2">Utilities Explorer</h2>', html=True
+        )
+        self.assertContains(response, "explorer-card")
 
 
 class BreadcrumbStaticPageTests(TestCase):
@@ -1116,6 +1128,11 @@ class SidebarNavigationTests(TestCase):
     def _active_link(url):
         return f'<a class="nav-link active" href="{url}"'
 
+    def test_home_page_marks_home_nav_active(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertContains(response, self._active_link(reverse("home")), html=False)
+
     def test_bibliography_sidebar_links_to_source_list(self):
         response = self.client.get(reverse("home"))
 
@@ -1164,3 +1181,65 @@ class SidebarNavigationTests(TestCase):
         response = self.client.get(reverse("about"))
 
         self.assertContains(response, self._active_link(reverse("about")), html=False)
+
+
+class AppShellDesignSystemTests(SimpleTestCase):
+    """The shell (top bar, footer, theme) is shared by every module, so the
+    design system must be declared there once instead of per page."""
+
+    def _theme_css(self):
+        return (Path(settings.BASE_DIR) / "brit/static/css/brit-theme.css").read_text(
+            encoding="utf-8"
+        )
+
+    def test_theme_declares_shared_design_tokens(self):
+        css = self._theme_css()
+
+        for token in (
+            "--brit-canvas:",
+            "--brit-surface:",
+            "--brit-border:",
+            "--brit-text:",
+            "--brit-accent:",
+            "--brit-radius:",
+            "--brit-shadow-sm:",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, css)
+
+    def test_topbar_renders_product_name(self):
+        html = render_to_string("partials/_topbar.html")
+
+        self.assertIn("<span>BRIT</span>", html)
+        self.assertIn("Bioresource Information Tool", html)
+
+    def test_footer_uses_compact_site_footer(self):
+        html = render_to_string("partials/_footer.html")
+
+        self.assertIn('class="site-footer mt-auto"', html)
+        self.assertIn(reverse("privacypolicy"), html)
+        self.assertIn(reverse("about"), html)
+        self.assertIn("https://github.com/lueho/BRIT", html)
+        self.assertNotIn("bg-light", html)
+
+    def test_base_layouts_do_not_load_unused_google_font(self):
+        for template in ("base.html", "base_iframe.html"):
+            with self.subTest(template=template):
+                self.assertNotIn("fonts.googleapis.com", render_to_string(template))
+
+    def test_empty_card_footers_are_hidden_even_with_flex_utilities(self):
+        css = self._theme_css()
+
+        self.assertRegex(
+            css, r"\.card-footer:not\(:has\(\*\)\)\s*\{\s*display:\s*none\s*!important"
+        )
+
+    def test_scroll_to_top_is_a_floating_control_with_a_target(self):
+        css = self._theme_css()
+        base = (Path(settings.BASE_DIR) / "brit/templates/base.html").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertRegex(css, r"\.scroll-to-top\s*\{[^}]*position:\s*fixed")
+        self.assertIn('id="page-top"', base)
+        self.assertIn('href="#page-top"', base)

@@ -4,7 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_save
 from django.forms import HiddenInput
 from django.test import TestCase
-from django_filters import ChoiceFilter
+from django_filters import ChoiceFilter, ModelChoiceFilter
 from factory.django import mute_signals
 
 from sources.waste_collection.models import Collection
@@ -30,6 +30,20 @@ class DummyFilterSet(BaseCrispyFilterSet):
         form_helper = CustomFormHelper
 
 
+class GovernedChoiceFilterSet(BaseCrispyFilterSet):
+    collection = ModelChoiceFilter(queryset=Collection.objects.none())
+
+    class Meta:
+        model = Collection
+        fields = ()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        filter_ = self.filters["collection"]
+        filter_.field.queryset = filter_.get_queryset(self.request)
+        filter_.queryset = lambda request: Collection.objects.all()
+
+
 class BaseCrispyFilterSetTestCase(TestCase):
     def test_get_form_helper(self):
         filter_set = DummyFilterSet(queryset=DummyModel.objects.all())
@@ -47,6 +61,23 @@ class BaseCrispyFilterSetTestCase(TestCase):
         filter_set = DummyFilterSet(queryset=DummyModel.objects.all())
         form = filter_set.form
         self.assertFalse(form.helper.form_tag)
+
+    def test_governed_choice_queryset_is_filtered_before_form_build(self):
+        owner = User.objects.create_user(username="filter-owner")
+        private = Collection.objects.create(
+            name="Private filter choice", owner=owner, publication_status="private"
+        )
+        filter_set = GovernedChoiceFilterSet(
+            queryset=Collection.objects.all(),
+            request=type("Request", (), {"user": AnonymousUser()})(),
+        )
+
+        choices = list(filter_set.form.fields["collection"].choices)
+
+        self.assertNotIn(str(private.pk), [str(value) for value, _ in choices if value])
+        self.assertFalse(
+            filter_set.filters["collection"].queryset.filter(pk=private.pk).exists()
+        )
 
 
 class TestNullableRangeFilter(TestCase):

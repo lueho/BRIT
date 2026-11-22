@@ -655,12 +655,7 @@ class CollectionModelForm(
         self.helper = self.Meta.form_helper_class(self)
 
     def _scope_reference_querysets(self):
-        """Restrict declared reference choices to what the request user may read.
-
-        ``UserCreatedObjectFormMixin`` already validates posted references in
-        ``clean()``; without a request the declared querysets stay unscoped
-        for non-view consumers.
-        """
+        """Restrict custom reference querysets to what the requester may read."""
         user = getattr(getattr(self, "request", None), "user", None)
         if user is None:
             return
@@ -864,6 +859,8 @@ class CollectionAddWasteSampleForm(UserCreatedObjectFormMixin, SimpleForm):
 
 
 class CollectionRemoveWasteSampleForm(UserCreatedObjectFormMixin, SimpleModelForm):
+    reference_choice_instance_fields = {"sample": "samples"}
+
     sample = ModelChoiceField(
         queryset=Sample.objects.all(),
         label="Sample",
@@ -906,6 +903,8 @@ class CollectionAddPredecessorForm(UserCreatedObjectFormMixin, SimpleModelForm):
 
 
 class CollectionRemovePredecessorForm(UserCreatedObjectFormMixin, SimpleModelForm):
+    reference_choice_instance_fields = {"predecessor": "predecessors"}
+
     predecessor = ModelChoiceField(queryset=Collection.objects.all())
 
     class Meta:

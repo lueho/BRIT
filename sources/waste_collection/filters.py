@@ -32,7 +32,10 @@ from sources.waste_collection.models import (
     WasteComponent,
     WasteFlyer,
 )
-from sources.waste_collection.projection_queries import visible_measurement_queryset
+from sources.waste_collection.projection_queries import (
+    visible_measurement_maxima,
+    visible_measurement_queryset,
+)
 from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
 from utils.filters import (
     NullableRangeFilter,
@@ -303,24 +306,23 @@ class NullableCollectionPropertyValueRangeFilter(NullableRangeFilter):
             getattr(request, "user", None),
             CollectionPropertyValue.objects.filter(property__name=self.property_name),
         )
-        qs = qs.annotate(
-            **{
-                "avg_value": Avg(
-                    "collectionpropertyvalue__average",
-                    filter=Q(collectionpropertyvalue__pk__in=measurements.values("pk")),
-                )
-            }
+        averages = (
+            measurements.order_by()
+            .values("collection_id")
+            .annotate(average_value=Avg("average"))
         )
-
-        filtered = qs.filter(
-            **{
-                "avg_value__gte": value_slice.start,
-                "avg_value__lte": value_slice.stop,
-            }
+        matching = averages.filter(
+            average_value__gte=value_slice.start,
+            average_value__lte=value_slice.stop,
         )
+        predicate = Q(pk__in=matching.values("collection_id"))
         if include_nulls:
-            filtered = filtered | qs.filter(**{"avg_value__isnull": True})
-        return filtered
+            predicate |= ~Q(
+                pk__in=averages.filter(average_value__isnull=False).values(
+                    "collection_id"
+                )
+            )
+        return qs.filter(predicate)
 
 
 class ConnectionRateFilter(NullableCollectionPropertyValueRangeFilter):
@@ -534,7 +536,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         collections = apply_scope_filter(
             self.queryset, self.data.get("scope"), user=actor
         )
-        measurements = visible_measurement_queryset(
+        maxima = visible_measurement_maxima(
             actor,
             CollectionPropertyValue.objects.filter(
                 collection__in=collections,
@@ -542,12 +544,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
                     filter_.property_name for filter_ in property_filters.values()
                 ],
             ),
-        )
-        maxima = measurements.aggregate(
-            **{
-                name: Max("average", filter=Q(property__name=filter_.property_name))
-                for name, filter_ in property_filters.items()
-            }
+            {name: filter_.property_name for name, filter_ in property_filters.items()},
         )
         maxima.update(
             collections.aggregate(
@@ -656,6 +653,14 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         return qs.filter(forbidden_materials__in=values).distinct()
 
 
+class CollectionListFilterSet(CollectionFilterSet):
+    def filter_queryset(self, queryset):
+        filtered = super().filter_queryset(queryset)
+        if filtered.query.distinct or filtered.query.group_by:
+            return queryset.filter(pk__in=filtered.order_by().values("pk"))
+        return filtered
+
+
 class CollectionExtendedFilterSet(CollectionFilterSet):
     """Allow the extended collection list to return all visible collections."""
 
@@ -724,6 +729,7 @@ __all__ = [
     "CollectionFilterFormHelper",
     "CollectionFilterSet",
     "CollectionFrequencyListFilter",
+    "CollectionListFilterSet",
     "CollectionsPerYearFilter",
     "ConnectionRateFilter",
     "CollectionSystemListFilter",

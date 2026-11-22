@@ -132,6 +132,34 @@ Required regression coverage:
 9. Compound creation rejects inaccessible references and rolls back all partial writes.
 10. Explicit model classification/role drift checks; no new model inherits a contributor grant automatically.
 
+## Route coverage enforcement
+
+The `object_management` Django system checks enforce policy coverage at startup,
+migration, test, and explicit check time. `E020` identifies routed views that
+declare a governed model without policy coverage; `E021` identifies public DRF
+routes with no governed model or coverage; and `E022` identifies FilterSets
+whose governed model-choice filters do not inherit
+`PolicyScopedChoicesMixin`. `E023` identifies routed forms whose governed
+model-choice fields lack `UserCreatedObjectFormMixin` or a reasoned exemption.
+
+Policy adapters set `policy_enforced = True` only when the adapter itself
+enforces the shared decision/queryset policy. A hand-written view may set that
+marker only after verifying its read or write boundary. Intentional exceptions
+must instead set a non-empty, explanatory `policy_exempt` string; empty
+booleans or unexplained exemptions do not satisfy the check. Governed filter
+choices inherit `PolicyScopedChoicesMixin` (normally through
+`BaseCrispyFilterSet`) so their choices are filtered for the requesting user,
+including anonymous requests, before the form is built. Governed
+`ModelChoiceField` and `ModelMultipleChoiceField` choices on forms inheriting
+`UserCreatedObjectFormMixin` are filtered on GET and POST; update forms retain
+their current references, while submitted IDs are narrowed only after policy
+filtering. Views should pass `request` in `get_form_kwargs`; a missing request
+uses anonymous visibility. Intentional non-mixin reference choices require a
+non-empty `reference_choices_policy_exempt` reason.
+
+Check-url task progress IDs are stored in the initiating session. Progress
+endpoints return 404 for IDs that are unknown to that session.
+
 ## Rollout
 
 Before public-archive rollout, audit legacy archived records: older collection-version approval could archive unpublished predecessors. Archived status alone is not proof that such a legacy record was previously published. Resolve ambiguous records through the explicitly approved data-management workflow before deployment; do not fabricate approval history or silently change production records.

@@ -37,6 +37,7 @@ NAV_SECTION_APP_LABELS = {
 }
 
 NAV_SECTION_URL_NAMES = {
+    "home": {"home"},
     "learning": {"learning"},
     "r-analysis": {"r-analysis"},
     "about": {"about"},

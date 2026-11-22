@@ -1,54 +1,84 @@
-{% extends 'base_single_card.html' %}
-
-{% block title %}BRIT user profile{% endblock %}
-
-{% block card_header %}Your User Profile{% endblock %}
-
-{% block card_body %}
-
-    <div>
-        <p><b>Username:</b> {{ user.username }}</p>
-        <p><b>E-Mail:</b> {{ user.email }}</p>
-        <p><b>Account management:</b></p>
+{% extends "base.html" %}
+{% block title %}
+  BRIT | Your profile
+{% endblock title %}
+{% block content %}
+  <div class="settings-page">
+    <div class="mb-3">
+      <h2 class="mb-1">Your profile</h2>
+      <p class="text-muted mb-0">Account details, notifications and access to the records you own.</p>
     </div>
-
-    <div class="pt-3">
-        <p><b>E-mail notifications:</b>
-            Review e-mails are {% if not review_notifications_enabled %}currently disabled{% else %}enabled{% endif %}.
-        </p>
+    <div class="card settings-card">
+      <section class="settings-section" aria-labelledby="profile-account">
+        <div class="settings-section-intro">
+          <h3 class="settings-section-title" id="profile-account">Account</h3>
+          <p class="settings-section-help">Your sign-in identity on BRIT.</p>
+        </div>
+        <dl class="settings-facts mb-0">
+          <div>
+            <dt>Username</dt>
+            <dd>{{ user.username }}</dd>
+          </div>
+          <div>
+            <dt>E-mail</dt>
+            <dd>{{ user.email|default:"—" }}</dd>
+          </div>
+        </dl>
+      </section>
+      <section class="settings-section" aria-labelledby="profile-notifications">
+        <div class="settings-section-intro">
+          <h3 class="settings-section-title" id="profile-notifications">E-mail notifications</h3>
+          <p class="settings-section-help">
+            Review e-mails are
+            <strong>{% if review_notifications_enabled %}enabled{% else %}currently disabled{% endif %}</strong>.
+          </p>
+        </div>
         <form method="post" action="{% url 'review_notification_preference' %}">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-outline-primary w-100">
-                {% if review_notifications_enabled %}
-                    Disable review e-mails
-                {% else %}
-                    Enable review e-mails
-                {% endif %}
-            </button>
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-secondary btn-sm">
+            {% if review_notifications_enabled %}
+              Disable review e-mails
+            {% else %}
+              Enable review e-mails
+            {% endif %}
+          </button>
         </form>
-    </div>
-
-    <div class="pt-3">
-        <a href="{% url 'user-export-list' %}" class="btn btn-outline-primary w-100">
-            My exports
+      </section>
+      <section class="settings-section" aria-labelledby="profile-exports">
+        <div class="settings-section-intro">
+          <h3 class="settings-section-title" id="profile-exports">Exports</h3>
+          <p class="settings-section-help">Files you exported from lists and maps.</p>
+        </div>
+        <a href="{% url 'user-export-list' %}"
+           class="btn btn-outline-secondary btn-sm">
+          <i class="fas fa-file-export" aria-hidden="true"></i> My exports
         </a>
-    </div>
-
-    <div class="pt-3">
-        <p><b>Access to all my objects:</b></p>
+      </section>
+      <section class="settings-section" aria-labelledby="profile-access">
+        <div class="settings-section-intro">
+          <h3 class="settings-section-title" id="profile-access">Access to all my objects</h3>
+          <p class="settings-section-help">
+            Grant or revoke edit access, or transfer ownership, for every record you own.
+          </p>
+        </div>
         {% include "object_management/bulk_access_toolbar.html" with all_owned=True %}
+      </section>
+      <section class="settings-section" aria-labelledby="profile-security">
+        <div class="settings-section-intro">
+          <h3 class="settings-section-title" id="profile-security">Security</h3>
+          <p class="settings-section-help">Change your password or permanently delete your account.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{% url 'auth_password_change' %}"
+             class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-key" aria-hidden="true"></i> Change password
+          </a>
+          <a href="{% url 'user_delete' pk=user.pk %}"
+             class="btn btn-outline-danger btn-sm modal-link">
+            <i class="fas fa-trash" aria-hidden="true"></i> Delete account
+          </a>
+        </div>
+      </section>
     </div>
-
-    <div class="pt-3">
-        <a href="{% url 'auth_password_change' %}" class="btn btn-primary w-100">
-            Change password
-        </a>
-    </div>
-
-    <div class="pt-3">
-        <a href="{% url 'user_delete' pk=user.pk %}" class="btn btn-danger w-100 modal-link">
-            Delete Account
-        </a>
-    </div>
-
-{% endblock card_body %}
+  </div>
+{% endblock content %}

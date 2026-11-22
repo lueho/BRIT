@@ -36,7 +36,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string, select_template
-from django.urls import NoReverseMatch, reverse
+from django.urls import NoReverseMatch, Resolver404, resolve, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.text import capfirst
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
@@ -474,6 +474,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
     - Success URL determination (respecting 'next' parameter)
     """
 
+    policy_enforced = True
     permission_method: str | None = None
     permission_denied_message: str = "You don't have permission to perform this action."
     redirect_handlers: dict = {}
@@ -930,6 +931,7 @@ class BaseObjectAccessActionView(LoginRequiredMixin, UserPassesTestMixin, View):
     to 'next' or the object's detail page.
     """
 
+    policy_enforced = True
     permission_method: str | None = None
     permission_denied_message: str = "You don't have permission to perform this action."
 
@@ -1393,6 +1395,8 @@ class UserOwnsObjectMixin(UserPassesTestMixin):
     decision, so editors and lifecycle rules apply uniformly.
     """
 
+    policy_enforced = True
+
     def test_func(self):
         try:
             obj = self.get_object()
@@ -1408,6 +1412,7 @@ class UserOwnsObjectMixin(UserPassesTestMixin):
 
 
 class UserCreatedObjectListMixin:
+    policy_enforced = True
     paginate_by = 10
     header = None
     list_type = None
@@ -1954,6 +1959,7 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
     access.
     """
 
+    policy_enforced = True
     publication_status_field = "publication_status"
     owner_field = "owner"
     published_status = "published"
@@ -1990,6 +1996,7 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
     or ``duplicate`` (mapped onto ``new_version``).
     """
 
+    policy_enforced = True
     publication_status_field = "publication_status"
     owner_field = "owner"
     published_status = "published"
@@ -2043,6 +2050,7 @@ class PolicyPermissionRequiredMixin(PermissionRequiredMixin):
     enforcement.
     """
 
+    policy_enforced = True
     policy_model = None
     policy_action = "create"
 
@@ -2907,6 +2915,7 @@ class UserCreatedObjectModalArchiveView(
 
     template_name = "modal_archive.html"
     success_message = "Successfully archived."
+    policy_enforced = True
 
     def test_func(self):
         """Centralized permission check via UserCreatedObjectPermission.has_archive_permission."""
@@ -2966,9 +2975,34 @@ class UserCreatedObjectModalDeleteView(
         )
         return context
 
+    def get_next_url(self):
+        """Return the safe ``next`` URL unless it is a page of the deleted object.
+
+        Detail pages pass themselves as ``next``; that page no longer exists
+        once the object is deleted.
+        """
+        next_url = get_safe_next_url(self.request)
+        if next_url and self._is_page_of_deleted_object(next_url):
+            return None
+        return next_url
+
+    def _is_page_of_deleted_object(self, url):
+        if not self.object:
+            return False
+        try:
+            match = resolve(urlparse(url).path)
+        except Resolver404:
+            return False
+        model = getattr(getattr(match.func, "view_class", None), "model", None)
+        return (
+            model is not None
+            and model._meta.concrete_model is self.object._meta.concrete_model
+            and str(match.kwargs.get("pk")) == str(self.object.pk)
+        )
+
     def get_success_url(self):
         # Respect a safe 'next' parameter from POST or GET first
-        next_url = get_safe_next_url(self.request)
+        next_url = self.get_next_url()
         if next_url:
             return next_url
 
@@ -3027,6 +3061,7 @@ class WorkspaceSectionUpdateMixin:
     for resource-specific summary data and JSON fields.
     """
 
+    policy_enforced = True
     section_registry = None
     section_formset_class = None
     object_label = "object"
@@ -3175,6 +3210,8 @@ class OwnedObjectModelSelectOptionsView(ModelSelectOptionsView):
     on top of the create affordance that triggered the refresh.
     """
 
+    policy_enforced = True
+
     def get_queryset(self):
         queryset = super().get_queryset()
         if queryset is None:
@@ -3187,6 +3224,7 @@ class OwnedObjectModelSelectOptionsView(ModelSelectOptionsView):
 
 
 class UserCreatedObjectAutocompleteView(AutocompleteModelView):
+    policy_enforced = True
     search_lookups = ["name__icontains"]
     value_fields = [
         "name",
@@ -3194,6 +3232,12 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
     ordering = ["name"]
     allow_anonymous = True
     page_size = 15
+    allowed_ordering_fields = ()
+    # Request filter lookups (``f``) this view applies, exactly as the widget
+    # sends them (``<dependent_field>__<lookup>``). ``scope__name`` is always
+    # accepted; any other lookup fails closed so the filter cannot traverse
+    # into owners, password hashes or private related records.
+    filter_lookups = ()
 
     def __init_subclass__(cls, **kwargs):
         """Preserve inherited search_lookups/value_fields that the upstream
@@ -3242,6 +3286,14 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
                 except ImproperlyConfigured:
                     return queryset.none()
                 continue
+
+            if lookup not in self.filter_lookups:
+                logger.warning(
+                    "Rejected TomSelect filter lookup %r on %s.",
+                    lookup,
+                    type(self).__name__,
+                )
+                return queryset.none()
 
             if not value:
                 continue

@@ -39,6 +39,12 @@ body {
     object-fit: cover;
 }
 
+// Card-top images carry width/height attributes for aspect-ratio hints; the
+// height hint must not survive w-100 or the image stretches.
+.card-img-top img {
+    height: auto;
+}
+
 .sample-gallery-placeholder {
     aspect-ratio: 16 / 9;
 }

@@ -48,6 +48,10 @@ class ShowcaseViewSetTestCase(TestCase):
         response = self.client.get(reverse("api-showcase-summaries"))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_non_numeric_detail_lookup_returns_404(self):
+        response = self.client.get("/closecycle/api/showcase/summary/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_list_excludes_private_showcases_for_anonymous(self):
         response = self.client.get(reverse("api-showcase-list"))
         self.assertEqual(response.status_code, status.HTTP_200_OK)

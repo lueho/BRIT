@@ -5,6 +5,7 @@ import re
 import time
 from collections import defaultdict, namedtuple
 from datetime import date, timedelta
+from functools import lru_cache
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlencode
@@ -21,7 +22,7 @@ from django.db.models.signals import post_save
 from django.forms.formsets import BaseFormSet
 from django.http import JsonResponse
 from django.http.request import MultiValueDict, QueryDict
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import Client, RequestFactory, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -54,6 +55,7 @@ from sources.waste_collection.models import (
     CollectionPropertyValue,
     CollectionSystem,
     Collector,
+    FeeSystem,
     MaterialCategory,
     WasteCategory,
     WasteComponent,
@@ -83,6 +85,7 @@ from sources.waste_collection.waste_atlas.map_selection import (
     build_overview_directory_context,
 )
 from sources.waste_collection.waste_atlas.pages import MAP_PAGES
+from sources.waste_collection.waste_atlas.templatetags import atlas_navigation
 from sources.waste_collection.waste_atlas.templatetags.atlas_tags import (
     RENDER_TIME_RESOLVED_KEYS,
 )
@@ -113,7 +116,6 @@ from ..models import (
     CollectionCountOptions,
     CollectionFrequency,
     CollectionSeason,
-    FeeSystem,
 )
 from ..tasks import cleanup_orphaned_waste_flyers
 
@@ -865,6 +867,10 @@ class CollectionFrequencyCRUDViewsTestCase(
         self._detach_count_options()
         super().test_delete_view_post_unpublished_as_staff_user()
 
+    def test_delete_view_post_ignores_next_url_of_deleted_object(self):
+        self._detach_count_options()
+        super().test_delete_view_post_ignores_next_url_of_deleted_object()
+
     def test_update_ignores_unchanged_empty_extra_season_form(self):
         frequency = CollectionFrequency.objects.create(
             owner=self.owner_user,
@@ -1381,10 +1387,14 @@ class CollectionListQueryTestCase(TestCase):
         )
         cls.collector = Collector.objects.create(name="List collector", owner=cls.owner)
         cls.category = WasteCategory.objects.create(
-            name="List category", owner=cls.owner
+            name="List category",
+            owner=cls.owner,
+            publication_status="published",
         )
         cls.system = CollectionSystem.objects.create(
-            name="List system", owner=cls.owner
+            name="List system",
+            owner=cls.owner,
+            publication_status="published",
         )
         cls.published = Collection.objects.bulk_create(
             [
@@ -1467,6 +1477,51 @@ class CollectionListQueryTestCase(TestCase):
         expected.extend([self.owned_private.pk, self.shared_private.pk])
         self.assertEqual(actual, expected)
         self.assertNotIn(self.hidden_private.pk, actual)
+
+    def test_anonymous_collection_list_hides_private_reference_choices(self):
+        MaterialCategory.objects.get_or_create(
+            owner=get_default_owner(),
+            name="Biowaste component",
+            defaults={"publication_status": "published"},
+        )
+        private_component = WasteComponent.objects.create(
+            name="Hidden filter material",
+            owner=self.other_owner,
+            publication_status="private",
+        )
+        private_category = WasteCategory.objects.create(
+            name="Hidden filter category",
+            owner=self.other_owner,
+            publication_status="private",
+        )
+        private_system = CollectionSystem.objects.create(
+            name="Hidden filter system",
+            owner=self.other_owner,
+            publication_status="private",
+        )
+        private_fee_system = FeeSystem.objects.create(
+            name="Hidden filter fee system",
+            owner=self.other_owner,
+            publication_status="private",
+        )
+        private_collection = Collection.objects.create(
+            name="Hidden filter collection",
+            owner=self.other_owner,
+            publication_status="private",
+        )
+
+        response = self.client.get(reverse("collection-list"), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        for private_name in (
+            private_category.name,
+            private_system.name,
+            private_component.name,
+            private_fee_system.name,
+            private_collection.name,
+        ):
+            with self.subTest(name=private_name):
+                self.assertNotContains(response, private_name)
 
     @patch("utils.file_export.storages.get_file_export_storage")
     @patch("utils.file_export.storages.write_file_for_download", return_value="url")
@@ -2581,6 +2636,51 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
+    def test_non_owner_with_add_permission_cannot_copy_private_collection(self):
+        self.client.force_login(self.member)
+        private_collection = Collection.objects.create(
+            name="private-copy-source",
+            owner=self.owner,
+            catchment=self.collection_catchment,
+            collector=self.collector,
+            collection_system=self.collection_system,
+            waste_category=self.waste_category,
+            frequency=self.frequency,
+            publication_status=Collection.STATUS_PRIVATE,
+        )
+        url = reverse(self.url_name, kwargs={"pk": private_collection.pk})
+        initial_count = Collection.objects.count()
+
+        get_response = self.client.get(url)
+        post_response = self.client.post(url, {})
+
+        self.assertEqual(get_response.status_code, 403)
+        self.assertEqual(post_response.status_code, 403)
+        self.assertEqual(Collection.objects.count(), initial_count)
+
+    def test_owner_with_add_permission_can_copy_private_collection(self):
+        self.owner.user_permissions.add(
+            Permission.objects.get(
+                codename="add_collection",
+                content_type__app_label="waste_collection",
+            )
+        )
+        private_collection = Collection.objects.create(
+            name="private-copy-source",
+            owner=self.owner,
+            catchment=self.collection_catchment,
+            collector=self.collector,
+            collection_system=self.collection_system,
+            waste_category=self.waste_category,
+            frequency=self.frequency,
+            publication_status=Collection.STATUS_PRIVATE,
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": private_collection.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(
@@ -3475,6 +3575,42 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
         response = self.client.get(reverse(self.url_name, kwargs={"pk": 999999999}))
         self.assertEqual(response.status_code, 404)
 
+    def test_private_catchment_of_another_user_returns_404(self):
+        private_catchment = CollectionCatchment.objects.create(
+            owner=self.outsider,
+            publication_status=CollectionCatchment.STATUS_PRIVATE,
+        )
+        self.client.force_login(self.member)
+        response = self.client.get(
+            reverse(self.url_name, kwargs={"pk": private_catchment.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_initial_collections_exclude_private_downstream_collections(self):
+        private_child = CollectionCatchment.objects.create(
+            parent=self.catchment,
+            owner=self.outsider,
+            publication_status=CollectionCatchment.STATUS_PUBLISHED,
+        )
+        private_collection = Collection.objects.create(
+            name="Private Downstream Collection",
+            catchment=private_child,
+            owner=self.outsider,
+            publication_status=Collection.STATUS_PRIVATE,
+        )
+        request = RequestFactory().get(
+            reverse(self.url_name, kwargs={"pk": self.catchment.pk})
+        )
+        request.user = self.member
+        view = views.CollectionCatchmentAddAggregatedPropertyView()
+        view.setup(request, pk=self.catchment.pk)
+
+        initial = view.get_initial()
+
+        self.assertNotIn(
+            private_collection.pk, initial["collections"].values_list("pk", flat=True)
+        )
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(
             reverse(self.url_name, kwargs={"pk": self.catchment.pk})
@@ -3998,6 +4134,95 @@ class WasteFlyerListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(mock_delay.call_args.args[1], self.member.pk)
         self.assertEqual(response.json()["task_id"], "scheduler-task-id")
 
+    @patch("sources.waste_collection.views.AsyncResult")
+    @patch("sources.waste_collection.views.check_wasteflyer_urls.delay")
+    def test_list_task_id_is_stored_for_progress(self, mock_delay, mock_result):
+        mock_delay.return_value.task_id = "stored-scheduler-task-id"
+        mock_result.return_value.state = "PENDING"
+        mock_result.return_value.info = None
+        self.client.force_login(self.member)
+
+        start_response = self.client.get(reverse("wasteflyer-list-check-urls"))
+        progress_response = self.client.get(
+            reverse(
+                "wasteflyer-list-check-urls-progress",
+                kwargs={"task_id": "stored-scheduler-task-id"},
+            )
+        )
+
+        self.assertEqual(start_response.status_code, 200)
+        self.assertEqual(progress_response.status_code, 200)
+        mock_result.assert_called_once_with("stored-scheduler-task-id")
+
+
+class WasteFlyerCheckUrlProgressViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ["change_wasteflyer"]
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.flyer = WasteFlyer.objects.create(
+            title="Published progress flyer",
+            abbreviation="PPF",
+            owner=cls.owner,
+            publication_status="published",
+        )
+
+    @patch("sources.waste_collection.views.AsyncResult")
+    @patch("sources.waste_collection.views.check_wasteflyer_url")
+    def test_single_check_task_is_stored_for_progress(self, mock_task, mock_result):
+        mock_task.delay.return_value.task_id = "single-flyer-task-id"
+        mock_result.return_value.state = "PENDING"
+        mock_result.return_value.info = None
+        self.client.force_login(self.member)
+
+        start_response = self.client.get(
+            reverse("wasteflyer-check-url", kwargs={"pk": self.flyer.pk})
+        )
+        progress_response = self.client.get(
+            reverse(
+                "wasteflyer-check-url-progress",
+                kwargs={"task_id": "single-flyer-task-id"},
+            )
+        )
+
+        self.assertEqual(start_response.status_code, 200)
+        self.assertEqual(progress_response.status_code, 200)
+        mock_result.assert_called_once_with("single-flyer-task-id")
+
+    @patch("sources.waste_collection.views.AsyncResult")
+    def test_task_progress_is_not_available_to_another_session(self, mock_result):
+        self.client.force_login(self.member)
+        session = self.client.session
+        session["wasteflyer_check_url_task_ids"] = ["single-flyer-task-id"]
+        session.save()
+        other_client = Client()
+        other_client.force_login(self.outsider)
+
+        response = other_client.get(
+            reverse(
+                "wasteflyer-check-url-progress",
+                kwargs={"task_id": "single-flyer-task-id"},
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+        mock_result.assert_not_called()
+
+    @patch("sources.waste_collection.views.AsyncResult")
+    def test_unknown_task_id_returns_404(self, mock_result):
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "wasteflyer-check-url-progress",
+                kwargs={"task_id": "unknown-flyer-task-id"},
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+        mock_result.assert_not_called()
+
 
 class WasteFlyerListCheckUrlsProgressViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "change_wasteflyer"
@@ -4019,6 +4244,9 @@ class WasteFlyerListCheckUrlsProgressViewTestCase(ViewWithPermissionsTestCase):
         mock_async_result.side_effect = [scheduler_result, callback_result]
 
         self.client.force_login(self.member)
+        session = self.client.session
+        session["wasteflyer_check_url_task_ids"] = ["scheduler-task-id"]
+        session.save()
         response = self.client.get(
             reverse(
                 "wasteflyer-list-check-urls-progress",
@@ -4034,6 +4262,25 @@ class WasteFlyerListCheckUrlsProgressViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(mock_async_result.call_count, 2)
         mock_async_result.assert_any_call("scheduler-task-id")
         mock_async_result.assert_any_call("callback-task-id")
+
+    @patch("sources.waste_collection.views.AsyncResult")
+    def test_task_progress_is_not_available_to_another_session(self, mock_async_result):
+        self.client.force_login(self.member)
+        session = self.client.session
+        session["wasteflyer_check_url_task_ids"] = ["scheduler-task-id"]
+        session.save()
+        other_client = Client()
+        other_client.force_login(self.outsider)
+
+        response = other_client.get(
+            reverse(
+                "wasteflyer-list-check-urls-progress",
+                kwargs={"task_id": "scheduler-task-id"},
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+        mock_async_result.assert_not_called()
 
 
 # --- Regression tests -------------------------------------------------------------------------------------------------
@@ -6026,14 +6273,23 @@ class WasteAtlasMapViewsTestCase(WasteAtlasMapViewTestBase):
 class WasteAtlasMapPageSweepMixin:
     """Render sweeps over a shard of the waste atlas page registry.
 
-    Rendering a map page costs roughly a second, so sweeping all of
-    ``MAP_PAGES`` in a single test case parks ~25 minutes of renders on
-    one parallel worker. These tests iterate a per-class shard of the
-    registry so the parallel test runner splits the work evenly.
+    The per-class shards distribute whole-page renders across workers.
     """
 
     shard_index = 0
     shard_count = 4
+
+    def setUp(self):
+        super().setUp()
+        # Keep the real markup while reusing identical navigation formatting
+        # across this sweep's pages, whose selected region and theme vary.
+        self.enterContext(
+            patch.object(
+                atlas_navigation,
+                "format_html",
+                lru_cache(maxsize=4096)(atlas_navigation.format_html),
+            )
+        )
 
     @classmethod
     def _sweep_pages(cls):

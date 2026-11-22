@@ -252,9 +252,15 @@ def scope_switch_url(
 
 
 def categories_url(scope, filters=None):
-    """URL of the category catalogue carrying the process scope and filters."""
+    """URL of the category list carrying the process scope and filters."""
     params = _scoped_params(scope, filters)
     return f"{reverse('processes:processcategory-list')}?{params.urlencode()}"
+
+
+def gallery_url(scope, filters=None):
+    """URL of the category gallery carrying the process scope and filters."""
+    params = _scoped_params(scope, filters)
+    return f"{reverse('processes:processcategory-gallery')}?{params.urlencode()}"
 
 
 def _category_params(category, scope, filters):

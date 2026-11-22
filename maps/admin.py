@@ -27,6 +27,7 @@ from .models import (
     Region,
     RegionAttributeTextValue,
     RegionAttributeValue,
+    RegionBoundary,
     RegionProperty,
 )
 from .runtime_adapters import get_dataset_runtime_adapter
@@ -146,6 +147,56 @@ class CatchmentRevisionModelAdmin(PolicyAdminMixin, GISModelAdmin):
             self.message_user(
                 request,
                 f"Updated {completed} catchment revision(s).",
+                level=messages.SUCCESS,
+            )
+
+
+@admin.register(RegionBoundary)
+class RegionBoundaryModelAdmin(PolicyAdminMixin, GISModelAdmin):
+    actions = ("submit_selected_for_review",)
+    list_display = (
+        "name",
+        "region",
+        "is_dissolution",
+        "valid_from",
+        "valid_to",
+        "publication_status",
+    )
+    list_filter = ("publication_status",)
+    search_fields = ("name", "region__name", "description")
+    autocomplete_fields = ("region", "sources")
+    filter_horizontal = ("predecessors",)
+    readonly_fields = (
+        "publication_status",
+        "submitted_at",
+        "approved_at",
+        "approved_by",
+    )
+
+    @admin.action(description="Submit selected boundaries for review")
+    def submit_selected_for_review(self, request, queryset):
+        completed = 0
+        for boundary in queryset.order_by("valid_from", "pk"):
+            try:
+                perform_transition(request.user, boundary, "submit")
+            except PermissionDenied as error:
+                self.message_user(
+                    request,
+                    f"{boundary}: {error}",
+                    level=messages.ERROR,
+                )
+            except ValidationError as error:
+                self.message_user(
+                    request,
+                    f"{boundary}: {'; '.join(error.messages)}",
+                    level=messages.ERROR,
+                )
+            else:
+                completed += 1
+        if completed:
+            self.message_user(
+                request,
+                f"Updated {completed} region boundary/boundaries.",
                 level=messages.SUCCESS,
             )
 

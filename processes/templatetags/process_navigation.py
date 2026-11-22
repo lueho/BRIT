@@ -12,6 +12,7 @@ from ..navigation import (
     category_detail_url,
     category_process_list_url,
     discovery_context,
+    gallery_url,
     process_scope_url,
     scope_switch_url,
     validated_return_url,
@@ -79,15 +80,18 @@ def _nav_context(context, section):
 @register.inclusion_tag(
     "processes/includes/process_discovery_nav.html", takes_context=True
 )
-def process_discovery_nav(context, section, compact=False):
+def process_discovery_nav(context, section, compact=False, show_scopes=None):
     """Render the Processes | Categories discovery navigation.
 
     ``section`` is ``"processes"`` or ``"categories"`` and marks the active
     tab. ``compact`` renders only the two section links, for the shared
-    detail context navigation.
+    detail context navigation. ``show_scopes`` overrides whether the scope
+    pill row is rendered (default: only on the ``categories`` section).
     """
     nav = _nav_context(context, section)
     nav["nav_compact"] = compact
+    if show_scopes is not None:
+        nav["nav_show_scopes"] = show_scopes
     return nav
 
 
@@ -119,17 +123,50 @@ def process_scope_switch_url(context, scope):
 
 
 @register.simple_tag(takes_context=True)
+def process_scope_toggle_urls(context):
+    """Scope-toggle URLs for the process list.
+
+    Uses ``scope_switch_url`` so repeated filter values such as multiple
+    ``categories`` selections survive a scope switch.
+    """
+    request = context.get("request")
+    return {
+        scope: scope_switch_url(request, scope)
+        for scope in ("published", "private", "review")
+    }
+
+
+@register.simple_tag(takes_context=True)
 def process_filter_params(context):
     """QueryDict of preserved process filter parameters for the request."""
     return discovery_context(context.get("request"))["filters"]
 
 
 @register.simple_tag(takes_context=True)
+def process_scope_nav(context):
+    """Discovery-scope state for scope toggle controls.
+
+    Returns the resolved ``nav_scope``, per-scope ``nav_scope_urls`` (same-page
+    carrier links that keep search and filters), and the ``nav_show_private`` /
+    ``nav_show_review`` visibility flags.
+    """
+    return _nav_context(context, "categories")
+
+
+@register.simple_tag(takes_context=True)
 def process_categories_url(context):
-    """Category catalogue URL for the current scope and filters."""
+    """Category list URL for the current scope and filters."""
     nav = discovery_context(context.get("request"))
     scope = _resolved_scope(context, nav)
     return categories_url(scope, nav["filters"])
+
+
+@register.simple_tag(takes_context=True)
+def process_gallery_url(context):
+    """Category gallery URL for the current scope and filters."""
+    nav = discovery_context(context.get("request"))
+    scope = _resolved_scope(context, nav)
+    return gallery_url(scope, nav["filters"])
 
 
 @register.simple_tag(takes_context=True)

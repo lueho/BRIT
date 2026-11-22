@@ -14,17 +14,22 @@ from sources.greenhouses.models import (
     GrowthShare,
     GrowthTimeStepSet,
 )
-from utils.forms import ModalModelForm, ModalModelFormMixin, SimpleModelForm
+from utils.forms import (
+    ModalModelForm,
+    ModalModelFormMixin,
+    SimpleModelForm,
+    UserCreatedObjectFormMixin,
+)
 from utils.object_management.permissions import filter_queryset_for_user
 
 
-class CultureModelForm(SimpleModelForm):
+class CultureModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     class Meta:
         model = Culture
         fields = ("name", "residue", "description")
 
 
-class CultureModalModelForm(ModalModelForm):
+class CultureModalModelForm(UserCreatedObjectFormMixin, ModalModelForm):
     class Meta:
         model = Culture
         fields = ("name", "residue")
@@ -40,7 +45,7 @@ class GreenhouseModalModelForm(ModalModelFormMixin, GreenhouseModelForm):
     pass
 
 
-class GreenhouseGrowthCycleModelForm(SimpleModelForm):
+class GreenhouseGrowthCycleModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
     class Meta:
         model = GreenhouseGrowthCycle
         fields = ("cycle_number", "culture", "greenhouse")
@@ -57,7 +62,7 @@ class GrowthTimestepInline(InlineFormSetFactory):
     fields = ["owner", "timestep", "growth_cycle"]
 
 
-class GrowthCycleCreateForm(ModalModelForm):
+class GrowthCycleCreateForm(UserCreatedObjectFormMixin, ModalModelForm):
     timesteps = ModelMultipleChoiceField(
         queryset=Timestep.objects.filter(distribution__name="Months of the year")
     )

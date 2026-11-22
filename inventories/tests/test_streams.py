@@ -1,6 +1,5 @@
 """Tests for inventory streams: stored definition, invalidation and evaluation."""
 
-from unittest.mock import patch
 from uuid import uuid4
 
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
@@ -10,7 +9,6 @@ from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
 from brit.templatetags.custom_tags import amount
-from distributions.models import Timestep
 from inventories.evaluations import ScenarioResult
 from inventories.evaluator import BaseKind, Condition, Term
 from inventories.exceptions import BlockedRunningScenario
@@ -453,15 +451,13 @@ class StreamResultPageTestCase(StreamTestBase):
         self.assertNotIn("productionPerFeedstockBarChart", response.context["charts"])
         self.assertContains(response, "Mass only")
 
-        with patch.object(
-            ScenarioResult, "homogenize_timesteps", return_value=[Timestep(name="Year")]
-        ):
-            response = self.client.get(
-                reverse(
-                    "scenario-download-result-summary",
-                    kwargs={"scenario_pk": self.scenario.pk},
-                )
+        # Stream results have no time steps; the summary is refused all the same.
+        response = self.client.get(
+            reverse(
+                "scenario-download-result-summary",
+                kwargs={"scenario_pk": self.scenario.pk},
             )
+        )
         self.assertEqual(response.status_code, 400)
 
     def test_result_page_shows_amounts_below_one_with_their_decimals(self):

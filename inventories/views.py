@@ -2,6 +2,7 @@ import hashlib
 import io
 import json
 import re
+from uuid import uuid4
 
 from celery.result import AsyncResult
 from django.contrib.auth.decorators import login_required
@@ -39,6 +40,7 @@ from maps.serializers import BaseResultMapSerializer
 from maps.views import GeoDataSetAutocompleteView, MapMixin
 from materials.models import Material, SampleSeries
 from utils.exceptions import UnitMismatchError
+from utils.file_export.views import _store_task_id
 from utils.object_management.permissions import filter_queryset_for_user
 from utils.object_management.policy import decide
 from utils.object_management.services import content_mutation
@@ -87,6 +89,8 @@ from .models import (
     StreamFilter,
 )
 from .tasks import start_inventory_run
+
+EVALUATION_SESSION_KEY = "evaluation_task_ids"
 
 
 def _get_posted_object_or_404(model, pk, queryset=None):
@@ -157,6 +161,8 @@ class InventoryAlgorithmAutocompleteView(AutocompleteModelView):
     ordering = ["name"]
     allow_anonymous = True
     page_size = 15
+    allowed_filter_fields = ()
+    allowed_ordering_fields = ()
 
     def __init_subclass__(cls, **kwargs):
         """Preserve inherited search/value fields across subclasses.
@@ -280,7 +286,9 @@ class ScenarioDetailView(ScenarioMapMixin, UserCreatedObjectDetailView):
         scenario = self.object
         if not decide(request.user, "edit", scenario).allowed:
             return HttpResponseForbidden()
-        start_inventory_run(scenario.id)
+        task_id = str(uuid4())
+        if start_inventory_run(scenario.id, task_id=task_id):
+            _store_task_id(request, task_id, EVALUATION_SESSION_KEY)
         return redirect("scenario-result", scenario.id)
 
 
@@ -486,6 +494,8 @@ def resolve_parameter_values(request, algorithm, scenario):
 
 @login_required
 def get_evaluation_status(request, task_id=None):
+    if task_id not in request.session.get(EVALUATION_SESSION_KEY, []):
+        raise Http404
     task_result = AsyncResult(task_id)
     result = {
         "task_id": task_id,
@@ -523,6 +533,10 @@ class ScenarioAddInventoryAlgorithmView(
     template_name = "scenario_configuration_add.html"
     object = None
     scenario_kwarg = "pk"
+    policy_enforced = True
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "request": self.request}
 
     def post(self, request, *args, **kwargs):
         scenario = get_object_or_404(Scenario, id=self.kwargs.get("pk"))
@@ -671,6 +685,10 @@ class ScenarioAlgorithmConfigurationUpdateView(
     form_class = ScenarioInventoryConfigurationUpdateForm
     template_name = "scenario_configuration_update.html"
     object = None
+    policy_enforced = True
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "request": self.request}
 
     def post(self, request, *args, **kwargs):
         scenario = get_object_or_404(Scenario, id=self.kwargs.get("scenario_pk"))
@@ -1041,6 +1059,7 @@ class ResultLayerGeoJSONAPI(APIView):
     """GeoJSON feature collection of a scenario result layer for Leaflet maps."""
 
     permission_classes = (AllowAny,)
+    policy_enforced = True
 
     def get(self, request, layer_name):
         layer = get_visible_result_layer(request.user, layer_name)
@@ -1061,6 +1080,7 @@ class ResultLayerVersionAPI(APIView):
     """Version token used by maps.js to revalidate cached result geometries."""
 
     permission_classes = (AllowAny,)
+    policy_enforced = True
 
     def get(self, request, layer_name):
         layer = get_visible_result_layer(request.user, layer_name)
@@ -1256,12 +1276,17 @@ def download_scenario_result_summary(request, scenario_pk):
     if not decide(request.user, "export", scenario).allowed:
         return HttpResponseForbidden()
     result = ScenarioResult(scenario)
+    mixed_units = HttpResponseBadRequest(
+        "The inventories give amounts in different units and cannot be added up."
+    )
+    # Without time steps the summary never adds the amounts up, so the units
+    # are checked up front as well.
+    if len(result.production_units()) > 1:
+        return mixed_units
     try:
         summary = result.summary_dict()
     except UnitMismatchError:
-        return HttpResponseBadRequest(
-            "The inventories give amounts in different units and cannot be added up."
-        )
+        return mixed_units
     with io.StringIO(json.dumps(summary, indent=4)) as file:
         response = HttpResponse(file, content_type="application/json")
         response["Content-Disposition"] = (

@@ -966,7 +966,7 @@ class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = MaterialPropertyValue
 
     def get_success_url(self):
-        next_url = get_safe_next_url(self.request)
+        next_url = self.get_next_url()
         if next_url:
             return next_url
         related_sample = self.object.related_sample
@@ -1012,7 +1012,7 @@ class ComponentMeasurementModalDeleteView(UserCreatedObjectModalDeleteView):
     model = ComponentMeasurement
 
     def get_success_url(self):
-        next_url = get_safe_next_url(self.request)
+        next_url = self.get_next_url()
         if next_url:
             return next_url
         return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
@@ -2317,7 +2317,7 @@ class CompositionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Composition
 
     def get_success_url(self):
-        next_url = get_safe_next_url(self.request)
+        next_url = self.get_next_url()
         if next_url:
             return next_url
         return reverse("sample-detail", kwargs={"pk": self.object.sample.pk})
@@ -2481,6 +2481,7 @@ class AddCompositionView(
     form_class = AddCompositionModalForm
     template_name = "modal_form.html"
     success_message = "Composition successfully added."
+    policy_enforced = True
 
     def test_func(self):
         """Advisory object check: the operation attaches a composition child
@@ -2564,11 +2565,9 @@ class AddSeasonalVariationView(
 
     def get_form(self, **kwargs):
         form = super().get_form(**kwargs)
-        form.fields[
-            "temporal_distribution"
-        ].queryset = TemporalDistribution.objects.exclude(
-            id__in=self.get_object().blocked_distribution_ids
-        )
+        form.fields["temporal_distribution"].queryset = filter_queryset_for_user(
+            TemporalDistribution.objects.all(), self.request.user
+        ).exclude(id__in=self.get_object().blocked_distribution_ids)
         return form
 
     def get_context_data(self, **kwargs):

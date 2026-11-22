@@ -50,6 +50,7 @@ class NutsImportSchemaView(APIView):
 
     authentication_classes = ()
     permission_classes = (AllowAny,)
+    policy_exempt = "Static import JSON schema; serves no record data"
 
     def get(self, request):
         return Response(NUTS_IMPORT_SCHEMA)

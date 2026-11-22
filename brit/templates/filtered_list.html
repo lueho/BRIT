@@ -17,17 +17,19 @@
       <div class="card shadow">
         <div class="card-header py-3">
           <div class="d-flex align-items-center justify-content-between">
-            <h5 class="mb-0">
-              {% block list_card_header %}
-                {% if header %}
-                  {{ header }}
-                {% elif list_type == 'private' %}
-                  My {{ object_list.model.get_verbose_name_plural }}
-                {% else %}
-                  {{ object_list.model.get_verbose_name_plural|capfirst }}
-                {% endif %}
-              {% endblock list_card_header %}
-            </h5>
+            {% block list_card_header_lead %}
+              <h5 class="mb-0">
+                {% block list_card_header %}
+                  {% if header %}
+                    {{ header }}
+                  {% elif list_type == 'private' %}
+                    My {{ object_list.model.get_verbose_name_plural }}
+                  {% else %}
+                    {{ object_list.model.get_verbose_name_plural|capfirst }}
+                  {% endif %}
+                {% endblock list_card_header %}
+              </h5>
+            {% endblock list_card_header_lead %}
             <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
               {% block list_primary_actions %}
               {% endblock list_primary_actions %}
@@ -35,36 +37,8 @@
               {% include "partials/representation_switcher.html" %}
               {# Scope toggle – visible for authenticated users and only for UserCreatedObject models #}
               {% block scope_toggle %}
-                {% if user.is_authenticated and object_list.model|is_user_created %}
-                  <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
-                    <a class="btn btn-outline-secondary {% if list_type == 'published' %}active disabled{% endif %}"
-                       role="button"
-                       title="Show published items"
-                       aria-pressed="{% if list_type == 'published' %}true{% else %}false{% endif %}"
-                       {% if list_type == 'published' %}aria-disabled="true" tabindex="-1"{% endif %}
-                       href="{{ public_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
-                      Published
-                    </a>
-                    <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
-                       role="button"
-                       title="Show my workspace records"
-                       aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
-                       {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
-                       href="{{ private_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
-                      Workspace
-                    </a>
-                    {% if user|can_moderate:object_list.model and review_representation_url %}
-                      <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
-                         role="button"
-                         title="Show items pending review"
-                         aria-pressed="{% if list_type == 'review' %}true{% else %}false{% endif %}"
-                         {% if list_type == 'review' %}aria-disabled="true" tabindex="-1"{% endif %}
-                         href="{{ review_representation_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review">
-                        Review
-                      </a>
-                    {% endif %}
-                  </div>
-                {% endif %}
+                {% scope_toggle_urls as scope_toggle_urls %}
+                {% include "partials/scope_toggle.html" %}
               {% endblock scope_toggle %}
               {% if explorer_url %}
                 <a class="btn btn-sm btn-outline-secondary"

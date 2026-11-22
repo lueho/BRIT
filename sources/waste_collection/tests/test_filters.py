@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
@@ -43,6 +44,26 @@ from ..models import (
 )
 
 
+def _use_superuser_filter_request(test_case, filter_class_name):
+    user = User.objects.create_superuser(
+        username="waste-filter-test",
+        email="waste-filter-test@example.com",
+        password="test-password",
+    )
+    request = RequestFactory().get("/")
+    request.user = user
+    filter_class = globals()[filter_class_name]
+
+    class RequestScopedFilterSet(filter_class):
+        def __init__(self, *args, **kwargs):
+            kwargs.setdefault("request", request)
+            super().__init__(*args, **kwargs)
+
+    patcher = patch(f"{__name__}.{filter_class_name}", RequestScopedFilterSet)
+    patcher.start()
+    test_case.addCleanup(patcher.stop)
+
+
 class WasteFlyerFilterTestCase(TestCase):
     catchment = None
 
@@ -69,7 +90,7 @@ class WasteFlyerFilterTestCase(TestCase):
         collection.flyers.add(WasteFlyer.objects.get(citation_key="WF3"))
 
     def setUp(self):
-        pass
+        _use_superuser_filter_request(self, "WasteFlyerFilter")
 
     def test_filter_form_has_no_formtags(self):
         filter_ = WasteFlyerFilter(queryset=WasteFlyer.objects.all())
@@ -494,11 +515,13 @@ class CollectionFilterMetadataTestCase(TestCase):
         self.assertEqual(widget.attrs["data-step"], 0.5)
 
     def test_api_mode_does_not_query_slider_metadata_or_choices(self):
+        self.owner.get_all_permissions()
         with self.assertNumQueries(0):
             filters = self.get_filters({"scope": "published"}, skip_min_max=True)
             self.assertIn("allowed_materials", filters.form.fields)
 
     def test_material_checkboxes_share_one_query_per_filterset(self):
+        self.owner.get_all_permissions()
         filters = self.get_filters({"scope": "published"}, skip_min_max=True)
 
         with self.assertNumQueries(1):
@@ -713,6 +736,8 @@ class CollectionFilterTestCase(TestCase):
         )
 
     def setUp(self):
+        super().setUp()
+        _use_superuser_filter_request(self, "CollectionFilterSet")
         self.data = {
             field_name: field.initial
             for field_name, field in CollectionFilterSet().form.fields.items()
@@ -726,7 +751,9 @@ class CollectionFilterTestCase(TestCase):
 
     def test_catchment_filter(self):
         self.data.update({"catchment": self.catchment.pk})
-        qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
+        filters = CollectionFilterSet(self.data, queryset=Collection.objects.all())
+        self.assertTrue(filters.is_valid(), filters.errors)
+        qs = filters.qs
         self.assertEqual(3, qs.count())
 
     def test_filter_includes_child_catchments(self):
@@ -782,14 +809,18 @@ class CollectionFilterTestCase(TestCase):
 
     def test_allowed_materials_filter_matches_selected_material(self):
         self.data.update({"allowed_materials": [self.allowed_material_b.pk]})
-        qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
+        filters = CollectionFilterSet(self.data, queryset=Collection.objects.all())
+        self.assertTrue(filters.is_valid(), filters.errors)
+        qs = filters.qs
         self.assertIn(self.collection1, qs)
         self.assertIn(self.child_collection, qs)
         self.assertNotIn(self.collection2, qs)
 
     def test_forbidden_materials_filter_matches_selected_material(self):
         self.data.update({"forbidden_materials": [self.forbidden_material_y.pk]})
-        qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
+        filters = CollectionFilterSet(self.data, queryset=Collection.objects.all())
+        self.assertTrue(filters.is_valid(), filters.errors)
+        qs = filters.qs
         self.assertNotIn(self.collection1, qs)
         self.assertNotIn(self.collection2, qs)
         self.assertIn(self.child_collection, qs)
@@ -801,7 +832,9 @@ class CollectionFilterTestCase(TestCase):
                 "forbidden_materials": [self.forbidden_material_y.pk],
             }
         )
-        qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
+        filters = CollectionFilterSet(self.data, queryset=Collection.objects.all())
+        self.assertTrue(filters.is_valid(), filters.errors)
+        qs = filters.qs
         self.assertQuerySetEqual(qs, [self.child_collection], ordered=False)
 
     def test_connection_rate_range_filter_fields_exists_in_filter_and_form(self):

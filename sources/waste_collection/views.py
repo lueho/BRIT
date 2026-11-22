@@ -10,11 +10,12 @@ from django.contrib.auth.mixins import (
     PermissionRequiredMixin,
     UserPassesTestMixin,
 )
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Case, IntegerField, Max, Prefetch, Value, When
 from django.forms.models import model_to_dict
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
@@ -43,6 +44,7 @@ from maps.views import (
 from sources.waste_collection.filters import (
     CollectionFilterSet,
     CollectionFrequencyListFilter,
+    CollectionListFilterSet,
     CollectionSystemListFilter,
     CollectorFilter,
     FeeSystemListFilter,
@@ -98,7 +100,10 @@ from sources.waste_collection.models import (
 )
 from sources.waste_collection.projection_queries import preferred_measurement_queryset
 from sources.waste_collection.tasks import check_wasteflyer_url, check_wasteflyer_urls
-from utils.file_export.views import GenericUserCreatedObjectExportView
+from utils.file_export.views import (
+    GenericUserCreatedObjectExportView,
+    _store_task_id,
+)
 from utils.forms import M2MInlineFormSetMixin
 from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import filter_queryset_for_user
@@ -134,6 +139,8 @@ from utils.object_management.views import (
     WithdrawFromReviewView,
 )
 from utils.views import BreadcrumbContextMixin, LetterIndexMixin
+
+WASTE_FLYER_CHECK_URL_SESSION_KEY = "wasteflyer_check_url_task_ids"
 
 logger = logging.getLogger(__name__)
 
@@ -577,6 +584,7 @@ class WasteFlyerModalDeleteView(SourceModalDeleteView):
 
 class WasteFlyerCheckUrlView(SourceCheckUrlView):
     model = WasteFlyer
+    policy_enforced = True
 
     def get(self, request, *args, **kwargs):
         self.object = get_object_or_404(self.model, pk=kwargs.get("pk"))
@@ -587,6 +595,11 @@ class WasteFlyerCheckUrlView(SourceCheckUrlView):
             raise PermissionDenied
 
         task = check_wasteflyer_url.delay(self.object.pk)
+        _store_task_id(
+            request,
+            task.task_id,
+            session_key=WASTE_FLYER_CHECK_URL_SESSION_KEY,
+        )
         response_data = {"task_id": task.task_id}
         return HttpResponse(json.dumps(response_data), content_type="application/json")
 
@@ -594,6 +607,8 @@ class WasteFlyerCheckUrlView(SourceCheckUrlView):
 class WasteFlyerCheckUrlProgressView(LoginRequiredMixin, View):
     @staticmethod
     def get(request, task_id):
+        if task_id not in request.session.get(WASTE_FLYER_CHECK_URL_SESSION_KEY, ()):
+            raise Http404
         result = AsyncResult(task_id)
         response_data = {
             "state": result.state,
@@ -606,6 +621,7 @@ class WasteFlyerListCheckUrlsView(PermissionRequiredMixin, View):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
     permission_required = "waste_collection.change_wasteflyer"
+    policy_enforced = True
 
     @staticmethod
     def get(request, *args, **kwargs):
@@ -613,6 +629,11 @@ class WasteFlyerListCheckUrlsView(PermissionRequiredMixin, View):
         params.pop("csrfmiddlewaretoken", None)
         params.pop("page", None)
         task = check_wasteflyer_urls.delay(params, request.user.pk)
+        _store_task_id(
+            request,
+            task.task_id,
+            session_key=WASTE_FLYER_CHECK_URL_SESSION_KEY,
+        )
         response_data = {"task_id": task.task_id}
         return HttpResponse(json.dumps(response_data), content_type="application/json")
 
@@ -620,6 +641,8 @@ class WasteFlyerListCheckUrlsView(PermissionRequiredMixin, View):
 class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
     @staticmethod
     def get(request, task_id):
+        if task_id not in request.session.get(WASTE_FLYER_CHECK_URL_SESSION_KEY, ()):
+            raise Http404
         scheduler_result = AsyncResult(task_id)
 
         # The scheduler task returns the callback task id. Once available, poll the
@@ -1028,6 +1051,11 @@ class AggregatedCollectionPropertyValueCreateView(
 class AggregatedCollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = AggregatedCollectionPropertyValue
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["generated_value_source"] = generated_source(self.object)
+        return context
+
 
 class AggregatedCollectionPropertyValueUpdateView(
     M2MInlineFormSetMixin, UserCreatedObjectUpdateView
@@ -1192,13 +1220,13 @@ class CollectionListMixin(LetterIndexMixin):
 
 class CollectionPublishedListView(CollectionListMixin, PublishedObjectFilterView):
     model = Collection
-    filterset_class = CollectionFilterSet
+    filterset_class = CollectionListFilterSet
     explorer_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionPrivateListView(CollectionListMixin, PrivateObjectFilterView):
     model = Collection
-    filterset_class = CollectionFilterSet
+    filterset_class = CollectionListFilterSet
     explorer_url = reverse_lazy("wastecollection-explorer")
 
 
@@ -1270,7 +1298,18 @@ class CollectionCopyView(CollectionCreateView):
     View for duplicating an existing Collection. Copies all relevant fields and resets instance for new object creation.
     """
 
+    policy_enforced = True
     model = Collection
+    policy_source_action = "duplicate"
+
+    def has_permission(self):
+        if not super().has_permission():
+            return False
+        try:
+            source = self.get_object()
+        except Exception:
+            return False
+        return decide(self.request.user, self.policy_source_action, source).allowed
 
     def get_initial(self):
         """
@@ -1307,18 +1346,7 @@ class CollectionCreateNewVersionView(CollectionCopyView):
     """
 
     predecessor = None
-
-    def has_permission(self):
-        """Require add permission plus the central ``new_version`` decision."""
-        if not super().has_permission():
-            return False
-
-        try:
-            predecessor = self.get_object()
-        except Exception:
-            return False
-
-        return decide(self.request.user, "new_version", predecessor).allowed
+    policy_source_action = "new_version"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -1825,7 +1853,7 @@ class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
 
 class CollectionReviewFilterView(CollectionListMixin, ReviewObjectFilterView):
     model = Collection
-    filterset_class = CollectionFilterSet
+    filterset_class = CollectionListFilterSet
     explorer_url = reverse_lazy("wastecollection-explorer")
 
     def get_filterset_kwargs(self, filterset_class=None):
@@ -1899,10 +1927,18 @@ class CollectionAddPropertyValueView(
 class CollectionCatchmentAddAggregatedPropertyView(
     AggregatedCollectionPropertyValueCreateView
 ):
+    policy_enforced = True
+
     def get_initial(self):
         initial = super().get_initial()
-        catchment = get_object_or_404(CollectionCatchment, pk=self.kwargs.get("pk"))
-        initial["collections"] = catchment.downstream_collections
+        user = getattr(self.request, "user", AnonymousUser())
+        catchment = get_object_or_404(
+            filter_queryset_for_user(CollectionCatchment.objects.all(), user),
+            pk=self.kwargs.get("pk"),
+        )
+        initial["collections"] = filter_queryset_for_user(
+            catchment.downstream_collections, user
+        )
         return initial
 
 

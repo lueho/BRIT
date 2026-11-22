@@ -1116,6 +1116,70 @@ class AggregatedCollectionPropertyValue(PropertyValue):
         help_text="Sources or references for this property value.",
     )
     year = models.PositiveSmallIntegerField(null=True, validators=[YEAR_VALIDATOR])
+    is_derived = models.BooleanField(
+        default=False,
+        help_text="True when this value was computed from another aggregate (e.g. total ↔ specific via combined catchment population).",
+    )
+    derived_from = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        related_name="generated_values",
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=(
+            "The raw source aggregate this generated projection is derived "
+            "from. Server-controlled; set only by the derivation pipeline."
+        ),
+    )
+
+    # Persisted scalar input fields decisive for whether a linked projection
+    # must be recomputed. Collection membership is an input too but changes
+    # through the collections through-model, which signals recomputation.
+    _DERIVED_INPUT_FIELDS = (
+        "year",
+        "property_id",
+        "unit_id",
+        "average",
+        "is_derived",
+    )
+
+    def save(self, *args, **kwargs):
+        using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+        kwargs["using"] = using
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and not update_fields:
+            return
+        if self.is_derived:
+            return super().save(*args, **kwargs)
+        with transaction.atomic(using=using):
+            previous = None
+            if self.pk is not None:
+                previous = (
+                    AggregatedCollectionPropertyValue.objects.using(using)
+                    .select_for_update(no_key=True)
+                    .filter(pk=self.pk)
+                    .values(*self._DERIVED_INPUT_FIELDS)
+                    .first()
+                )
+            self._derived_previous_inputs = previous
+            try:
+                return super().save(*args, **kwargs)
+            finally:
+                del self._derived_previous_inputs
+
+    class Meta(PropertyValue.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                fields=["derived_from"],
+                condition=Q(is_derived=True, derived_from__isnull=False),
+                name="wc_unique_generated_acpv_source",
+            ),
+            models.CheckConstraint(
+                condition=Q(is_derived=True) | Q(derived_from__isnull=True),
+                name="wc_acpv_raw_without_source_pointer",
+            ),
+        ]
 
 
 def _schedule_wasteflyer_url_check(flyer_ids):
