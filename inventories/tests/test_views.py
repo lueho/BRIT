@@ -674,6 +674,13 @@ class GenericAlgorithmAddViewTestCase(TestCase):
         self.assertIn("mass per year", response.content.decode())
         self.assertFalse(InventoryStream.objects.exists())
 
+    def test_add_form_has_a_place_for_the_reason_of_a_rejection(self):
+        """A rejected inventory is reported in the form, not on a bare page."""
+        self.client.force_login(self.owner)
+        response = self.client.get(self._url())
+        self.assertContains(response, 'id="inventoryFormError"')
+        self.assertContains(response, 'form.addEventListener("submit"')
+
     def test_datasets_are_offered_before_a_feedstock_is_chosen(self):
         """The dataset select must not wait for the feedstock field."""
         self.client.force_login(self.owner)

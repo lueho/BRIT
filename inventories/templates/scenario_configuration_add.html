@@ -3,6 +3,7 @@
 {% block extra_post_form_content %}
     <div id="algorithmChoiceContainer" class="form-group"></div>
     <div id="parameterFormContainer" class="form-group"></div>
+    <div id="inventoryFormError" class="alert alert-danger" role="alert" hidden></div>
 {% endblock extra_post_form_content %}
 
 {% block cancel_button %}
@@ -254,7 +255,7 @@
                 presetSelect.addEventListener("change", onPresetSelect);
             }
             // Leave the factor list empty until a factor is explicitly added —
-            // factor-free and preset-only configurations must stay submittable.
+            // preset-only configurations must stay submittable.
         }
 
         async function loadRegisteredAlgorithmParameters(algorithmId) {
@@ -344,6 +345,40 @@
                 console.error("Error loading algorithms:", err);
             }
         }
+
+        // A rejected inventory is reported in place, so the entries are kept.
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const errorBox = document.getElementById("inventoryFormError");
+            const submitButton = form.querySelector("[type=submit]");
+            errorBox.hidden = true;
+            submitButton.disabled = true;
+            let message = "The inventory could not be saved. Please try again.";
+            try {
+                const response = await fetch(form.action || window.location.href, {
+                    method: "POST",
+                    body: new FormData(form, event.submitter),
+                    credentials: "same-origin",
+                });
+                if (response.ok) {
+                    window.location.assign(response.url);
+                    return;
+                }
+                if (response.status === 400) {
+                    const reason = (await response.text()).trim();
+                    // The view answers in plain text; an error page is not shown.
+                    if (reason && !reason.startsWith("<")) {
+                        message = reason;
+                    }
+                }
+            } catch (err) {
+                console.error("Error saving the inventory:", err);
+            }
+            errorBox.textContent = message;
+            errorBox.hidden = false;
+            errorBox.scrollIntoView({block: "nearest"});
+            submitButton.disabled = false;
+        });
 
         for (const fieldId of ["id_geodataset", "id_feedstock"]) {
             const field = document.getElementById(fieldId);
