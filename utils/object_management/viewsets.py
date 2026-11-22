@@ -3,6 +3,7 @@ from django.db import transaction
 from django.db.models import Model
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
@@ -199,8 +200,6 @@ class UserCreatedObjectReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
         return apply_scope_filter(queryset, scope, user=user)
 
     def get_object(self):
-        from django.shortcuts import get_object_or_404
-
         queryset = filter_queryset_for_user(self.queryset, self.request.user)
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
         lookup_value = self.kwargs.get(lookup_url_kwarg)
@@ -241,8 +240,6 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         Objects the user may not read resolve to 404 instead of leaking existence; the
         object-level permission check still gates the requested action.
         """
-        from django.shortcuts import get_object_or_404
-
         base_qs = filter_queryset_for_user(self.queryset, self.request.user)
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
         lookup_value = self.kwargs.get(lookup_url_kwarg)

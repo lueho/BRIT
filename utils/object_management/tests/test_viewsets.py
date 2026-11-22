@@ -15,7 +15,11 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from utils.properties.models import Property
 
 from ..permissions import UserCreatedObjectPermission
-from ..viewsets import GlobalObjectViewSet, UserCreatedObjectViewSet
+from ..viewsets import (
+    GlobalObjectViewSet,
+    UserCreatedObjectReadOnlyViewSet,
+    UserCreatedObjectViewSet,
+)
 from .models import TestGlobalObject
 
 
@@ -251,6 +255,22 @@ class GlobalObjectViewSetTests(BaseAPITestCase):
 class PropertyViewSet(UserCreatedObjectViewSet):
     queryset = Property.objects.all()
     serializer_class = UserObjectSerializer
+
+
+class ReadOnlyPropertyViewSet(UserCreatedObjectReadOnlyViewSet):
+    queryset = Property.objects.all()
+    serializer_class = UserObjectSerializer
+
+
+class UserCreatedObjectInvalidLookupTests(BaseAPITestCase):
+    def test_non_numeric_pk_returns_404(self):
+        for viewset in (PropertyViewSet, ReadOnlyPropertyViewSet):
+            with self.subTest(viewset=viewset.__name__):
+                view = viewset.as_view({"get": "retrieve"})
+                request = self._build_request("get", "/summary/")
+                force_authenticate(request, user=self.regular_user)
+                response = view(request, pk="summary")
+                self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 def _grant(user, codename, model=Property):
