@@ -114,9 +114,10 @@ def chain_base_unit(base_kind, base_unit=""):
 
 
 def validate_amount_unit(base_unit, factor_units):
-    """Reject a chain that cannot give an amount of material.
+    """Reject a chain that does not give a mass per time.
 
-    A chain without any unit is accepted as it is.
+    Amounts of several inventories are added up, so each has to be a mass
+    flow; it is reported in ``Mg/a``.
     """
     registry = get_unit_registry()
     if registry is None:
@@ -129,14 +130,25 @@ def validate_amount_unit(base_unit, factor_units):
             quantity = quantity * registry.Quantity(1.0, unit)
         except Exception:
             raise ImproperlyConfigured(f"Unknown unit '{unit}'.") from None
-    if quantity.dimensionless or quantity.check("[mass]"):
-        return
     if quantity.check("[mass] / [time]"):
         return
+    if quantity.dimensionless:
+        given = "an amount without a unit"
+    else:
+        given = f"an amount in '{quantity.units:~}'"
     raise ImproperlyConfigured(
-        f"The base quantity and its factors give an amount in "
-        f"'{quantity.units:~}'. An inventory needs a mass per year, "
-        f"for example a factor in 'kg / year'."
+        f"The base quantity and its factors give {given}. An inventory needs "
+        f"a mass per year, for example a factor in 'kg / year'."
+    )
+
+
+def validate_units(spec):
+    """Check that the chain of ``spec`` gives a mass per time."""
+    validate_amount_unit(
+        chain_base_unit(
+            spec.base_kind, spec.base.unit if spec.base else spec.base_unit
+        ),
+        [term.unit for term in spec.factors],
     )
 
 
@@ -158,12 +170,6 @@ def evaluate(spec, catchment_geom):
             raise ImproperlyConfigured(
                 f"Unknown filter operator '{condition.operator}'."
             )
-    validate_amount_unit(
-        chain_base_unit(
-            spec.base_kind, spec.base.unit if spec.base else spec.base_unit
-        ),
-        [term.unit for term in spec.factors],
-    )
     return measure(spec, catchment_geom)
 
 

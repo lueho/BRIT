@@ -22,7 +22,14 @@ from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material, SampleSeries
 from utils.object_management.models import NamedUserCreatedObject
 
-from .evaluator import FILTER_OPERATORS, BaseKind, Condition, StreamSpec, Term
+from .evaluator import (
+    FILTER_OPERATORS,
+    BaseKind,
+    Condition,
+    StreamSpec,
+    Term,
+    validate_units,
+)
 from .evaluator import evaluate as evaluate_stream_spec
 from .exceptions import BlockedRunningScenario
 
@@ -1057,7 +1064,9 @@ class InventoryStream(ScenarioEvaluationInput):
         geom = self.scenario.catchment.geom
         if geom is None or geom.empty:
             raise ValueError("A catchment boundary is required for evaluation.")
-        return evaluate_stream_spec(self.spec(), geom.transform(4326, clone=True))
+        spec = self.spec()
+        validate_units(spec)
+        return evaluate_stream_spec(spec, geom.transform(4326, clone=True))
 
     def __str__(self):
         return f"{self.label} ({self.material})"

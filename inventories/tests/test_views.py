@@ -533,6 +533,11 @@ class GenericAlgorithmAddViewTestCase(TestCase):
             "geodataset": self.point_dataset.pk,
             "generic_function": "count_based_production",
         }
+        if "kwarg_name" not in overrides:
+            # A chain has to give a mass per year.
+            data.update(
+                kwarg_name=["unit_yield"], kwarg_value=["1"], kwarg_unit=["Mg / year"]
+            )
         data.update(overrides)
         self.client.force_login(self.owner)
         return self.client.post(self._url(), data)
@@ -571,8 +576,10 @@ class GenericAlgorithmAddViewTestCase(TestCase):
         self.assertEqual(self.scenario.stream_execution_plan(), [stream])
 
     def test_second_post_adds_a_second_stream(self):
-        self._post(kwarg_name=["f1"], kwarg_value=["1.0"], kwarg_unit=[""])
-        response = self._post(kwarg_name=["f1"], kwarg_value=["2.0"], kwarg_unit=["kg"])
+        self._post(kwarg_name=["f1"], kwarg_value=["1.0"], kwarg_unit=["Mg / year"])
+        response = self._post(
+            kwarg_name=["f1"], kwarg_value=["2.0"], kwarg_unit=["kg / year"]
+        )
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             sorted(
@@ -580,13 +587,13 @@ class GenericAlgorithmAddViewTestCase(TestCase):
                     "value", "unit"
                 )
             ),
-            [(1.0, ""), (2.0, "kg")],
+            [(1.0, "Mg / year"), (2.0, "kg / year")],
         )
 
-    def test_no_kwargs_still_creates_stream(self):
-        response = self._post()
-        self.assertEqual(response.status_code, 302)
-        self.assertFalse(self._stream().factors.exists())
+    def test_no_factors_return_400(self):
+        response = self._post(kwarg_name=[])
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(InventoryStream.objects.exists())
 
     def test_base_kind_choice_creates_stream(self):
         response = self._post(generic_function="", algorithm_choice="stream:area")
@@ -652,6 +659,29 @@ class GenericAlgorithmAddViewTestCase(TestCase):
         self.assertIn("mass per year", response.content.decode())
         self.assertFalse(InventoryStream.objects.exists())
 
+    def test_factors_without_any_unit_return_400(self):
+        response = self._post(kwarg_name=["point_yield"], kwarg_value=["2"])
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("without a unit", response.content.decode())
+        self.assertFalse(InventoryStream.objects.exists())
+
+    def test_factors_that_yield_a_mass_without_time_return_400(self):
+        response = self._post(
+            kwarg_name=["point_yield"], kwarg_value=["2"], kwarg_unit=["kg"]
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("mass per year", response.content.decode())
+        self.assertFalse(InventoryStream.objects.exists())
+
+    def test_datasets_are_offered_before_a_feedstock_is_chosen(self):
+        """The dataset select must not wait for the feedstock field."""
+        self.client.force_login(self.owner)
+        response = self.client.get(self._url())
+        self.assertEqual(response.status_code, 200)
+        widget = response.context["form"].fields["geodataset"].widget
+        self.assertFalse(widget.filter_by)
+        self.assertEqual(tuple(widget.exclude_by), ("scenario", "scenario_id"))
+
     def test_non_numeric_kwarg_value_returns_400(self):
         response = self._post(
             kwarg_name=["yield"],
@@ -671,7 +701,7 @@ class GenericAlgorithmAddViewTestCase(TestCase):
             filter_value="Tomato",
             kwarg_name=["yield"],
             kwarg_value=["10"],
-            kwarg_unit=["kg"],
+            kwarg_unit=["kg / year"],
         )
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
@@ -742,16 +772,16 @@ class GenericAlgorithmAddViewTestCase(TestCase):
         self._post(
             kwarg_name=["yield"],
             kwarg_value=["10"],
-            kwarg_unit=["kg"],
+            kwarg_unit=["kg / year"],
         )
         function = self._functions()["functions"][0]
         presets = {p["short_name"]: p for p in function["parameters"]}
         self.assertIn("yield", presets)
-        self.assertEqual(presets["yield"]["unit"], "kg")
+        self.assertEqual(presets["yield"]["unit"], "kg / year")
         self.assertEqual(presets["yield"]["values"][0]["value"], 10.0)
 
     def test_functions_api_presets_stay_within_the_scenario(self):
-        self._post(kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["kg"])
+        self._post(kwarg_name=["yield"], kwarg_value=["10"], kwarg_unit=["kg / year"])
         other = Scenario.objects.create(
             name="Other Gen Scenario",
             owner=self.owner,
@@ -787,7 +817,9 @@ class GenericAlgorithmAddViewTestCase(TestCase):
 
     def test_adding_and_removing_a_stream_bump_the_scenario_revision(self):
         revision = Scenario.objects.get(pk=self.scenario.pk).content_revision
-        self._post(kwarg_name=["point_yield"], kwarg_value=["12.5"])
+        self._post(
+            kwarg_name=["point_yield"], kwarg_value=["12.5"], kwarg_unit=["kg / year"]
+        )
         added = Scenario.objects.get(pk=self.scenario.pk).content_revision
         self.assertGreater(added, revision)
 
@@ -2826,6 +2858,9 @@ class ScenarioEnclosingRegionDatasetViewsTestCase(TestCase):
                 "feedstock": self.feedstock.pk,
                 "geodataset": geodataset.pk,
                 "generic_function": "count_based_production",
+                "kwarg_name": ["unit_yield"],
+                "kwarg_value": ["1"],
+                "kwarg_unit": ["Mg / year"],
             },
         )
 

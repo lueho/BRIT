@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load moderation_tags %}
+{% load custom_tags %}
 {% block title %}
   BRIT | Inventories | {{ object.name }} | Results
 {% endblock title %}
@@ -36,7 +37,7 @@
           {% if layer.layeraggregatedvalue_set.all %}
             <dl class="sri-kpis">
               {% for aggregate in layer.layeraggregatedvalue_set.all %}
-                <div class="sri-kpi"><dt>{{ aggregate.name }}</dt><dd><span class="sri-kpi-value">{{ aggregate.value|floatformat:"-1g" }}</span><span class="sri-kpi-unit">{{ aggregate.unit }}</span></dd></div>
+                <div class="sri-kpi"><dt>{{ aggregate.name }}</dt><dd><span class="sri-kpi-value">{{ aggregate.value|amount }}</span><span class="sri-kpi-unit">{{ aggregate.unit }}</span></dd></div>
               {% endfor %}
             </dl>
           {% endif %}
@@ -46,7 +47,7 @@
       {% endfor %}
       {% if production_units|length > 1 %}
         <section class="sdv2-section-panel sri-muted" role="status">
-          The inventories give amounts in different units ({% for unit in production_units %}{{ unit|default:"no unit" }}{% if not forloop.last %}, {% endif %}{% endfor %}), so they are not added up. Give every inventory a result in mass per year, for example with a factor in kg / year.
+          The inventories give amounts in different units ({% for unit in production_units %}{{ unit|default:"no unit" }}{% if not forloop.last %}, {% endif %}{% endfor %}), so they are not added up. Evaluate the scenario again to get every amount in mass per year.
         </section>
       {% endif %}
       {% if charts %}

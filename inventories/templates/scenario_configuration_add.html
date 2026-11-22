@@ -89,7 +89,7 @@
                 <input type="number" step="any" class="form-control" name="kwarg_standard_deviation"
                        placeholder="Std. dev. (optional)">
                 <input type="text" class="form-control" name="kwarg_unit"
-                       placeholder="Unit (optional, e.g. kg / hectare / year)" maxlength="40">
+                       placeholder="Unit (e.g. kg / year, percent)" maxlength="40">
                 <button type="button" class="btn btn-outline-danger remove-kwarg">Remove</button>
             `;
             if (preset) {
@@ -236,7 +236,10 @@
                 ${renderFeatureFilter()}
                 <h3>Factors</h3>
                 <p class="text-muted">The base quantity is multiplied by each factor,
-                    e.g. a yield per feature or hectare and a collectable share.</p>
+                    e.g. a yield per feature or hectare and a collectable share.
+                    Together they have to give a mass per year, so at least one factor
+                    needs a unit such as <code>kg / year</code> or
+                    <code>kg / hectare / year</code>.</p>
                 ${renderPresetPicker(baseKind)}
                 <div id="kwargRows"></div>
                 <button type="button" id="addKwarg" class="btn btn-outline-primary">Add factor</button>

@@ -106,10 +106,8 @@ class ScenarioInventoryConfigurationForm(SimpleModelForm):
         config=TomSelectConfig(
             url="scenario-geodataset-autocomplete",
             label_field="name",
-            filter_by=(
-                "feedstock",
-                "feedstock_id",
-            ),
+            # No dependency on the feedstock field: an empty dependent field
+            # would keep the select from loading any dataset.
             exclude_by=(
                 "scenario",
                 "scenario_id",
