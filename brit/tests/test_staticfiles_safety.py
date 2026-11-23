@@ -600,11 +600,28 @@ class CheckManifestFilesTests(StaticfilesSafetyTestBase):
 
 
 class GuardedCommandDiscoveryTests(SimpleTestCase):
-    def _run_script(self, script, settings_module):
-        return run_settings_probe(
-            script,
+    def test_testrunner_discovers_safe_commands_with_stock_collectstatic(self):
+        completed = run_settings_probe(
+            """
+import brit.settings.testrunner as t
+import brit.settings.settings as base
+
+assert "collectfasta" not in t.INSTALLED_APPS
+assert "collectfasta" not in base.INSTALLED_APPS
+assert "collectfasta" not in t.CACHES
+
+import django
+
+django.setup()
+from django.core.management import get_commands
+
+commands = get_commands()
+assert commands["collectstatic_safe"] == "brit"
+assert commands["verify_staticfiles"] == "brit"
+assert commands["collectstatic"] == "django.contrib.staticfiles"
+""",
             env={
-                "DJANGO_SETTINGS_MODULE": settings_module,
+                "DJANGO_SETTINGS_MODULE": "brit.settings.testrunner",
                 "SECRET_KEY": "test-secret-key",
                 "REDIS_URL": "redis://localhost:6379/0",
                 "AWS_STORAGE_BUCKET_NAME": "brit-test-assets",
@@ -616,26 +633,4 @@ class GuardedCommandDiscoveryTests(SimpleTestCase):
             },
         )
 
-    def test_production_discovers_safe_commands(self):
-        completed = self._run_script(
-            "import django; django.setup(); "
-            "from django.core.management import get_commands; "
-            "commands = get_commands(); "
-            "assert commands['collectstatic_safe'] == 'brit'; "
-            "assert commands['verify_staticfiles'] == 'brit'; "
-            "assert commands['collectstatic'] == 'collectfasta'",
-            "brit.settings.heroku",
-        )
-        self.assertEqual(completed.returncode, 0, completed.stderr)
-
-    def test_testrunner_discovers_safe_commands_with_stock_collectstatic(self):
-        completed = self._run_script(
-            "import django; django.setup(); "
-            "from django.core.management import get_commands; "
-            "commands = get_commands(); "
-            "assert commands['collectstatic_safe'] == 'brit'; "
-            "assert commands['verify_staticfiles'] == 'brit'; "
-            "assert commands['collectstatic'] == 'django.contrib.staticfiles'",
-            "brit.settings.testrunner",
-        )
         self.assertEqual(completed.returncode, 0, completed.stderr)

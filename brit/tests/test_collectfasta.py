@@ -46,7 +46,11 @@ import django
 django.setup()
 from django.core.management import get_commands
 
-snapshot["collectstatic_owner"] = get_commands()["collectstatic"]
+commands = get_commands()
+snapshot["collectstatic_owner"] = commands["collectstatic"]
+snapshot["safe_command_owners"] = {
+    name: commands.get(name) for name in ("collectstatic_safe", "verify_staticfiles")
+}
 print(json.dumps(snapshot))
 """
 
@@ -68,11 +72,11 @@ class CollectfastaProductionSettingsTests(SimpleTestCase):
         cls.snapshot = json.loads(completed.stdout)
 
     @classmethod
-    def run_production_script(cls, script, settings_module="brit.settings.heroku"):
+    def run_production_script(cls, script):
         return run_settings_probe(
             script,
             env={
-                "DJANGO_SETTINGS_MODULE": settings_module,
+                "DJANGO_SETTINGS_MODULE": "brit.settings.heroku",
                 "SECRET_KEY": "test-secret-key",
                 "REDIS_URL": "redis://localhost:6379/0",
                 "AWS_STORAGE_BUCKET_NAME": "brit-test-assets",
@@ -86,6 +90,12 @@ class CollectfastaProductionSettingsTests(SimpleTestCase):
 
     def test_collectstatic_command_is_owned_by_collectfasta(self):
         self.assertEqual(self.snapshot["collectstatic_owner"], "collectfasta")
+
+    def test_production_discovers_safe_commands(self):
+        self.assertEqual(
+            self.snapshot["safe_command_owners"],
+            {"collectstatic_safe": "brit", "verify_staticfiles": "brit"},
+        )
 
     def test_collectfasta_is_installed_before_staticfiles(self):
         installed_apps = self.snapshot["installed_apps"]
@@ -124,20 +134,6 @@ class CollectfastaProductionSettingsTests(SimpleTestCase):
         self.assertEqual(alias["OPTIONS"]["MAX_ENTRIES"], 10000)
         self.assertFalse(self.snapshot["base_has_collectfasta_cache"])
         self.assertFalse(self.snapshot["base_default_options_has_max_entries"])
-
-    def test_collectstatic_stays_stock_in_testrunner(self):
-        completed = self.run_production_script(
-            "import brit.settings.testrunner as t; "
-            "import brit.settings.settings as base; "
-            "assert 'collectfasta' not in t.INSTALLED_APPS; "
-            "assert 'collectfasta' not in base.INSTALLED_APPS; "
-            "assert 'collectfasta' not in t.CACHES; "
-            "import django; django.setup(); "
-            "from django.core.management import get_commands; "
-            "assert get_commands()['collectstatic'] == 'django.contrib.staticfiles'",
-            settings_module="brit.settings.testrunner",
-        )
-        self.assertEqual(completed.returncode, 0, completed.stderr)
 
 
 class CollectfastaManifestUploadTests(SimpleTestCase):
