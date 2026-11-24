@@ -7,6 +7,7 @@ from celery.result import AsyncResult
 from celery.states import READY_STATES
 from django.contrib.auth.models import User
 from django.contrib.gis.db.models.functions import Intersection
+from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models, transaction
 from django.db.models.query import QuerySet
@@ -21,6 +22,15 @@ from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material, SampleSeries
 from utils.object_management.models import NamedUserCreatedObject
 
+from .evaluator import (
+    FILTER_OPERATORS,
+    BaseKind,
+    Condition,
+    StreamSpec,
+    Term,
+    validate_units,
+)
+from .evaluator import evaluate as evaluate_stream_spec
 from .exceptions import BlockedRunningScenario
 
 REGION_COVERAGE_THRESHOLD = 0.99
@@ -331,6 +341,12 @@ class ScenarioStatus(models.Model):
         null=True,
         on_delete=models.PROTECT,
     )
+    failed_stream = models.ForeignKey(
+        "InventoryStream",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+    )
     failure_message = models.TextField(blank=True)
     run_id = models.UUIDField(null=True, blank=True, db_index=True)
 
@@ -378,8 +394,11 @@ class Scenario(NamedUserCreatedObject):
             update_fields = ["status"]
             if status != ScenarioStatus.Status.FAILED:
                 self.scenariostatus.failed_algorithm = None
+                self.scenariostatus.failed_stream = None
                 self.scenariostatus.failure_message = ""
-                update_fields.extend(["failed_algorithm", "failure_message"])
+                update_fields.extend(
+                    ["failed_algorithm", "failed_stream", "failure_message"]
+                )
             if status == ScenarioStatus.Status.CHANGED:
                 self.scenariostatus.run_id = None
                 update_fields.append("run_id")
@@ -613,8 +632,10 @@ class Scenario(NamedUserCreatedObject):
 
     def is_valid_configuration(self):
         configuration = self.configuration()
-        # At least one entry for a scenario
+        # At least one algorithm entry or stream for a scenario
         if not configuration:
+            if self.streams.exists():
+                return
             raise ScenarioConfigurationError("The scenario is not configured.")
 
         # Get all inventory algorithms that are used in this scenario
@@ -709,6 +730,10 @@ class Scenario(NamedUserCreatedObject):
             for feedstock_config in inventory_config.values()
             for execution in feedstock_config.values()
         ]
+
+    def stream_execution_plan(self):
+        """The streams evaluated next to the algorithm executions."""
+        return list(self.streams.order_by("pk"))
 
     def serialize_inventory_execution_plan(self, execution_plan):
         inventory_config = {}
@@ -927,10 +952,211 @@ def propagate_parameter_value_change_to_scenarios(sender, instance, created, **k
         _mark_referencing_scenarios_changed(InventoryAlgorithmParameterValue, instance)
 
 
+STREAM_SYMBOL_VALIDATOR = RegexValidator(
+    r"^[A-Za-z_]\w{0,27}$",
+    "Use letters, digits and underscores only, starting with a letter "
+    "(max 28 characters).",
+)
+
+
+class ScenarioEvaluationInput(models.Model):
+    """A record whose change invalidates the evaluation of its scenario.
+
+    Writes are refused while the scenario is being evaluated; cascaded
+    deletes are covered by the signal receivers below.
+    """
+
+    class Meta:
+        abstract = True
+
+    def evaluated_scenario_id(self):
+        raise NotImplementedError
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            scenario_id = self.evaluated_scenario_id()
+            if _evaluation_input_locked(scenario_id):
+                raise BlockedRunningScenario
+            super().save(*args, **kwargs)
+            _invalidate_evaluation(scenario_id)
+
+
+class InventoryStream(ScenarioEvaluationInput):
+    """The arising of one material in the catchment of a scenario.
+
+    amount = base quantity x factor_1 x factor_2 x ...
+
+    The definition is plain data: which quantity is measured in the catchment
+    (or entered directly), which features count, and the named factors that
+    convert it into a mass flow. See :mod:`inventories.evaluator`.
+    """
+
+    scenario = models.ForeignKey(
+        Scenario, on_delete=models.CASCADE, related_name="streams"
+    )
+    material = models.ForeignKey(Material, on_delete=models.CASCADE)
+    sample_series = models.ForeignKey(
+        SampleSeries,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        help_text="Optional temporal profile and composition of the material.",
+    )
+    name = models.CharField(max_length=56, blank=True)
+    base_kind = models.CharField(max_length=20, choices=BaseKind.choices)
+    geodataset = models.ForeignKey(
+        GeoDataset, on_delete=models.CASCADE, blank=True, null=True
+    )
+    base_column = models.CharField(max_length=63, blank=True)
+    base_value = models.FloatField(blank=True, null=True)
+    base_standard_deviation = models.FloatField(blank=True, null=True)
+    base_unit = models.CharField(max_length=40, blank=True)
+
+    class Meta:
+        ordering = ["pk"]
+
+    def evaluated_scenario_id(self):
+        return self.scenario_id
+
+    @property
+    def label(self):
+        return self.name or self.get_base_kind_display()
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.base_kind == BaseKind.DIRECT:
+            if self.base_value is None:
+                errors["base_value"] = "Enter the amount."
+        elif self.geodataset_id is None:
+            errors["geodataset"] = "This base quantity requires a geodataset."
+        if self.base_kind == BaseKind.COLUMN_SUM and not self.base_column:
+            errors["base_column"] = "Choose the column to sum."
+        if errors:
+            raise ValidationError(errors)
+
+    def spec(self):
+        """The stored definition as input of the evaluator."""
+        base = None
+        if self.base_kind == BaseKind.DIRECT and self.base_value is not None:
+            base = Term(
+                "amount",
+                self.base_value,
+                self.base_standard_deviation,
+                self.base_unit,
+            )
+        return StreamSpec(
+            base_kind=self.base_kind,
+            geodataset=self.geodataset,
+            base_column=self.base_column,
+            base_unit=self.base_unit,
+            base=base,
+            filters=tuple(
+                Condition(f.column, f.operator, f.value) for f in self.filters.all()
+            ),
+            factors=tuple(
+                Term(f.symbol, f.value, f.standard_deviation, f.unit)
+                for f in self.factors.all()
+            ),
+        )
+
+    def evaluate(self):
+        geom = self.scenario.catchment.geom
+        if geom is None or geom.empty:
+            raise ValueError("A catchment boundary is required for evaluation.")
+        spec = self.spec()
+        validate_units(spec)
+        return evaluate_stream_spec(spec, geom.transform(4326, clone=True))
+
+    def __str__(self):
+        return f"{self.label} ({self.material})"
+
+
+class StreamFactor(ScenarioEvaluationInput):
+    """A named term of the factor chain of a stream."""
+
+    stream = models.ForeignKey(
+        InventoryStream, on_delete=models.CASCADE, related_name="factors"
+    )
+    symbol = models.CharField(max_length=28, validators=[STREAM_SYMBOL_VALIDATOR])
+    value = models.FloatField()
+    standard_deviation = models.FloatField(blank=True, null=True)
+    unit = models.CharField(max_length=40, blank=True)
+    source = models.CharField(max_length=200, blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["stream", "symbol"], name="unique_stream_factor_symbol"
+            )
+        ]
+
+    def evaluated_scenario_id(self):
+        return self.stream.scenario_id
+
+    def __str__(self):
+        return f"{self.symbol} = {self.value} {self.unit}".strip()
+
+
+class StreamFilter(ScenarioEvaluationInput):
+    """Restricts the features of the stream's geodataset by one column."""
+
+    stream = models.ForeignKey(
+        InventoryStream, on_delete=models.CASCADE, related_name="filters"
+    )
+    column = models.CharField(max_length=63)
+    operator = models.CharField(
+        max_length=3, choices=list(FILTER_OPERATORS.items()), default="eq"
+    )
+    value = models.CharField(max_length=255)
+
+    class Meta:
+        ordering = ["pk"]
+
+    def evaluated_scenario_id(self):
+        return self.stream.scenario_id
+
+    def __str__(self):
+        return f"{self.column} {self.get_operator_display()} {self.value}"
+
+
+def _deleted_input_scenario_id(instance):
+    """Scenario of a deleted input, or None when it is deleted along with it."""
+    try:
+        scenario_id = instance.evaluated_scenario_id()
+    except InventoryStream.DoesNotExist:
+        return None
+    if Scenario.objects.filter(pk=scenario_id).exists():
+        return scenario_id
+    return None
+
+
+def block_input_delete_while_active(sender, instance, **kwargs):
+    scenario_id = _deleted_input_scenario_id(instance)
+    if scenario_id is not None and _evaluation_input_locked(scenario_id):
+        raise BlockedRunningScenario
+
+
+def invalidate_after_input_delete(sender, instance, **kwargs):
+    scenario_id = _deleted_input_scenario_id(instance)
+    if scenario_id is not None:
+        _invalidate_evaluation(scenario_id)
+
+
+for _input_model in (InventoryStream, StreamFactor, StreamFilter):
+    pre_delete.connect(block_input_delete_while_active, sender=_input_model)
+    post_delete.connect(invalidate_after_input_delete, sender=_input_model)
+
+
 class RunningTask(models.Model):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
     algorithm = models.ForeignKey(
         InventoryAlgorithm, on_delete=models.PROTECT, null=True
+    )
+    stream = models.ForeignKey(
+        InventoryStream, on_delete=models.CASCADE, null=True, blank=True
     )
     uuid = models.UUIDField(primary_key=False)
     run_id = models.UUIDField(null=True, blank=True, db_index=True)

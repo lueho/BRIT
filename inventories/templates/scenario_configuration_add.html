@@ -3,6 +3,7 @@
 {% block extra_post_form_content %}
     <div id="algorithmChoiceContainer" class="form-group"></div>
     <div id="parameterFormContainer" class="form-group"></div>
+    <div id="inventoryFormError" class="alert alert-danger" role="alert" hidden></div>
 {% endblock extra_post_form_content %}
 
 {% block cancel_button %}
@@ -83,14 +84,13 @@
             row.innerHTML = `
                 <input type="text" class="form-control" name="kwarg_name"
                        placeholder="Factor name (e.g. area_yield)" maxlength="28"
-                       pattern="\\w{1,28}" required>
+                       pattern="[A-Za-z_]\\w{0,27}" required>
                 <input type="number" step="any" class="form-control" name="kwarg_value"
                        placeholder="Value" required>
                 <input type="number" step="any" class="form-control" name="kwarg_standard_deviation"
                        placeholder="Std. dev. (optional)">
                 <input type="text" class="form-control" name="kwarg_unit"
-                       placeholder="Unit (optional, e.g. kg / hectare / year)" maxlength="20">
-                <input type="hidden" name="kwarg_preset" value="${preset ? preset.valueId : ""}">
+                       placeholder="Unit (e.g. kg / year, percent)" maxlength="40">
                 <button type="button" class="btn btn-outline-danger remove-kwarg">Remove</button>
             `;
             if (preset) {
@@ -99,14 +99,6 @@
                 inputs[1].value = preset.value;
                 inputs[2].value = preset.standardDeviation ?? "";
                 inputs[3].value = preset.unit ?? "";
-                // Editing the row turns it back into a custom value.
-                inputs.forEach((input, i) => {
-                    if (i < 4) {
-                        input.addEventListener("input", () => {
-                            row.querySelector('input[name="kwarg_preset"]').value = "";
-                        });
-                    }
-                });
             }
             row.querySelector(".remove-kwarg").addEventListener("click", () => row.remove());
             rows.appendChild(row);
@@ -114,8 +106,8 @@
 
         let genericFunctions = [];
 
-        function renderPresetPicker(functionName) {
-            const fn = genericFunctions.find(f => f.function_name === functionName);
+        function renderPresetPicker(baseKind) {
+            const fn = genericFunctions.find(f => f.base_kind === baseKind);
             const parameters = fn ? fn.parameters || [] : [];
             const options = [];
             for (const param of parameters) {
@@ -123,7 +115,7 @@
                     const label = `${param.short_name} = ${value.name || value.value}` +
                         `${value.source ? ` (${value.source})` : ""}`;
                     options.push(
-                        `<option value="${param.short_name}|${value.id}">${escapeHtml(label)}</option>`
+                        `<option value="${value.id}">${escapeHtml(label)}</option>`
                     );
                 }
             }
@@ -146,28 +138,49 @@
             if (!select || !select.value) {
                 return;
             }
-            const [paramName, valueId] = select.value.split("|");
-            const fn = genericFunctions.find(f =>
-                f.parameters && f.parameters.some(p => p.short_name === paramName)
-            );
-            if (!fn) {
-                return;
-            }
-            const param = fn.parameters.find(p => p.short_name === paramName);
-            const value = (param.values || []).find(v => v.id == valueId);
-            if (value) {
-                addKwargRow({
-                    name: paramName,
-                    value: value.value,
-                    standardDeviation: value.standard_deviation,
-                    unit: param.unit,
-                    valueId: value.id,
-                });
+            // Factor ids are unique, while one name can occur with several units.
+            const baseKind = document.getElementById("id_algorithm_choice").value.substring(7);
+            const fn = genericFunctions.find(f => f.base_kind === baseKind);
+            for (const param of (fn ? fn.parameters || [] : [])) {
+                const value = (param.values || []).find(v => String(v.id) === select.value);
+                if (value) {
+                    addKwargRow({
+                        name: param.short_name,
+                        value: value.value,
+                        standardDeviation: value.standard_deviation,
+                        unit: param.unit,
+                    });
+                    break;
+                }
             }
             select.value = "";
         }
 
         let datasetColumns = [];
+
+        let numericColumns = [];
+        let filterOperators = [];
+
+        function renderBaseColumn(baseKind) {
+            if (baseKind !== "column_sum") {
+                return "";
+            }
+            const options = numericColumns
+                .map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)
+                .join("");
+            return `
+                <h3>Base quantity</h3>
+                <p class="text-muted">The values of this column are summed over the
+                    features inside the catchment.</p>
+                <div class="form-row mb-2">
+                    <select id="id_base_column" class="select form-control" name="base_column" required>
+                        <option value="">-- column --</option>${options}
+                    </select>
+                    <input type="text" class="form-control" name="base_unit" maxlength="40"
+                           placeholder="Unit of the column (optional, e.g. hectare)">
+                </div>
+            `;
+        }
 
         function renderFeatureFilter() {
             if (!datasetColumns.length) {
@@ -176,44 +189,59 @@
             const options = datasetColumns
                 .map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`)
                 .join("");
+            const operators = filterOperators
+                .map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`)
+                .join("");
             return `
                 <h3>Feature filter (optional)</h3>
                 <p class="text-muted">Restrict the inventory to a subset of features —
-                    e.g. one crop of a parcels dataset.</p>
+                    e.g. one crop of a parcels dataset. Separate several values with commas
+                    for “is one of”.</p>
                 <div class="form-row mb-2">
                     <select id="id_filter_column" class="select form-control" name="filter_column">
                         <option value="">-- all features --</option>${options}
                     </select>
-                    <select id="id_filter_value" class="select form-control" name="filter_value" disabled>
-                        <option value="">-- value --</option>
+                    <select id="id_filter_operator" class="select form-control" name="filter_operator">
+                        ${operators}
                     </select>
+                    <input type="text" id="id_filter_value" class="form-control" name="filter_value"
+                           list="id_filter_value_options" maxlength="255" placeholder="Value" disabled>
+                    <datalist id="id_filter_value_options"></datalist>
                 </div>
             `;
         }
 
         function onFilterColumnChange() {
             const columnSelect = document.getElementById("id_filter_column");
-            const valueSelect = document.getElementById("id_filter_value");
+            const valueInput = document.getElementById("id_filter_value");
+            const valueOptions = document.getElementById("id_filter_value_options");
             const column = datasetColumns.find(c => c.name === columnSelect.value);
+            valueInput.value = "";
             if (!column) {
-                valueSelect.innerHTML = '<option value="">-- value --</option>';
-                valueSelect.disabled = true;
+                valueOptions.innerHTML = "";
+                valueInput.disabled = true;
+                valueInput.required = false;
                 return;
             }
-            const options = (column.values || [])
-                .map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`)
+            valueOptions.innerHTML = (column.values || [])
+                .map(v => `<option value="${escapeHtml(v)}"></option>`)
                 .join("");
-            valueSelect.innerHTML = `<option value="">-- value --</option>${options}`;
-            valueSelect.disabled = false;
+            valueInput.disabled = false;
+            valueInput.required = true;
         }
 
-        function renderKwargEditor(functionName) {
+        function renderKwargEditor(baseKind) {
             const container = document.getElementById("parameterFormContainer");
             container.innerHTML = `
+                ${renderBaseColumn(baseKind)}
                 ${renderFeatureFilter()}
                 <h3>Factors</h3>
-                <p class="text-muted">Each factor is multiplied into the production chain.</p>
-                ${renderPresetPicker(functionName)}
+                <p class="text-muted">The base quantity is multiplied by each factor,
+                    e.g. a yield per feature or hectare and a collectable share.
+                    Together they have to give a mass per year, so at least one factor
+                    needs a unit such as <code>kg / year</code> or
+                    <code>kg / hectare / year</code>.</p>
+                ${renderPresetPicker(baseKind)}
                 <div id="kwargRows"></div>
                 <button type="button" id="addKwarg" class="btn btn-outline-primary">Add factor</button>
             `;
@@ -227,7 +255,7 @@
                 presetSelect.addEventListener("change", onPresetSelect);
             }
             // Leave the factor list empty until a factor is explicitly added —
-            // factor-free and preset-only configurations must stay submittable.
+            // preset-only configurations must stay submittable.
         }
 
         async function loadRegisteredAlgorithmParameters(algorithmId) {
@@ -245,8 +273,8 @@
         function onAlgorithmChoiceChange() {
             const select = document.getElementById("id_algorithm_choice");
             const value = select ? select.value : "";
-            if (value.startsWith("generic:")) {
-                renderKwargEditor(value.substring(8));
+            if (value.startsWith("stream:")) {
+                renderKwargEditor(value.substring(7));
             } else if (value.startsWith("algo:")) {
                 loadRegisteredAlgorithmParameters(value.substring(5));
             } else {
@@ -254,21 +282,33 @@
             }
         }
 
-        function renderAlgorithmChoices(data) {
+        let loadedGeodatasetId = "";
+
+        function renderAlgorithmChoices(data, geodatasetId) {
             const container = document.getElementById("algorithmChoiceContainer");
+            // The feedstock only changes which dataset algorithms are offered:
+            // a method chosen for the same dataset keeps its entries.
+            const previousChoice = document.getElementById("id_algorithm_choice");
+            const keptChoice =
+                previousChoice && geodatasetId === loadedGeodatasetId ? previousChoice.value : "";
+            loadedGeodatasetId = geodatasetId;
             datasetColumns = data.columns || [];
+            numericColumns = data.numeric_columns || [];
+            filterOperators = data.filter_operators || [];
             genericFunctions = data.functions || [];
             const generic = genericFunctions;
             const registered = data.algorithms || [];
             if (generic.length === 0 && registered.length === 0) {
-                container.innerHTML = "";
+                container.innerHTML =
+                    '<p class="text-muted">No inventory method can be applied to this dataset.</p>';
+                document.getElementById("parameterFormContainer").innerHTML = "";
                 return;
             }
             let options = '<option value="">---------</option>';
             if (generic.length > 0) {
-                options += '<optgroup label="Generic algorithms">';
+                options += '<optgroup label="Base quantity × factors">';
                 for (const fn of generic) {
-                    options += `<option value="generic:${escapeHtml(fn.function_name)}">${escapeHtml(fn.name)}</option>`;
+                    options += `<option value="stream:${escapeHtml(fn.base_kind)}">${escapeHtml(fn.name)}</option>`;
                 }
                 options += "</optgroup>";
             }
@@ -280,14 +320,17 @@
                 options += "</optgroup>";
             }
             container.innerHTML = `
-                <label class="requiredField" for="id_algorithm_choice">Inventory algorithm</label>
+                <label class="requiredField" for="id_algorithm_choice">Inventory method</label>
                 <select id="id_algorithm_choice" class="select form-control" name="algorithm_choice" required>
                     ${options}
                 </select>
             `;
-            document
-                .getElementById("id_algorithm_choice")
-                .addEventListener("change", onAlgorithmChoiceChange);
+            const choice = document.getElementById("id_algorithm_choice");
+            choice.addEventListener("change", onAlgorithmChoiceChange);
+            if (keptChoice && Array.from(choice.options).some((option) => option.value === keptChoice)) {
+                choice.value = keptChoice;
+                return;
+            }
             document.getElementById("parameterFormContainer").innerHTML = "";
         }
 
@@ -296,6 +339,7 @@
             const feedstockField = document.getElementById("id_feedstock");
             const geodatasetId = geodatasetField ? geodatasetField.value : "";
             if (!geodatasetId) {
+                loadedGeodatasetId = "";
                 document.getElementById("algorithmChoiceContainer").innerHTML = "";
                 document.getElementById("parameterFormContainer").innerHTML = "";
                 return;
@@ -307,12 +351,46 @@
             try {
                 const response = await fetch(url);
                 if (response.ok) {
-                    renderAlgorithmChoices(await response.json());
+                    renderAlgorithmChoices(await response.json(), geodatasetId);
                 }
             } catch (err) {
                 console.error("Error loading algorithms:", err);
             }
         }
+
+        // A rejected inventory is reported in place, so the entries are kept.
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const errorBox = document.getElementById("inventoryFormError");
+            const submitButton = form.querySelector("[type=submit]");
+            errorBox.hidden = true;
+            submitButton.disabled = true;
+            let message = "The inventory could not be saved. Please try again.";
+            try {
+                const response = await fetch(form.action || window.location.href, {
+                    method: "POST",
+                    body: new FormData(form, event.submitter),
+                    credentials: "same-origin",
+                });
+                if (response.ok) {
+                    window.location.assign(response.url);
+                    return;
+                }
+                if (response.status === 400 || response.status === 409) {
+                    const reason = (await response.text()).trim();
+                    // The view answers in plain text; an error page is not shown.
+                    if (reason && !reason.startsWith("<")) {
+                        message = reason;
+                    }
+                }
+            } catch (err) {
+                console.error("Error saving the inventory:", err);
+            }
+            errorBox.textContent = message;
+            errorBox.hidden = false;
+            errorBox.scrollIntoView({block: "nearest"});
+            submitButton.disabled = false;
+        });
 
         for (const fieldId of ["id_geodataset", "id_feedstock"]) {
             const field = document.getElementById(fieldId);

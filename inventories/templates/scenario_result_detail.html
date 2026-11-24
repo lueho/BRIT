@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load moderation_tags %}
+{% load custom_tags %}
 {% block title %}
   BRIT | Inventories | {{ object.name }} | Results
 {% endblock title %}
@@ -22,19 +23,21 @@
               <h2 class="sri-inventory-title">
                 {{ layer.feedstock.name }}
                 <i class="fas fa-arrow-right" aria-hidden="true"></i>
-                {{ layer.algorithm.name }}
+                {{ layer.method_label }}
               </h2>
-              <div class="sri-inventory-dataset">Dataset: {{ layer.algorithm.geodataset }}</div>
+              {% if layer.geodataset %}
+                <div class="sri-inventory-dataset">Dataset: {{ layer.geodataset }}</div>
+              {% endif %}
             </div>
             <a class="sdv2-btn sdv2-btn-primary"
-               href="{% url 'scenario-result-map' layer.scenario_id layer.algorithm_id layer.feedstock_id %}">
+               href="{% if layer.algorithm_id %}{% url 'scenario-result-map' layer.scenario_id layer.algorithm_id layer.feedstock_id %}{% else %}{% url 'scenario-result-layer-map' layer.scenario_id layer.pk %}{% endif %}">
               <i class="fas fa-map" aria-hidden="true"></i> Show result map
             </a>
           </header>
           {% if layer.layeraggregatedvalue_set.all %}
             <dl class="sri-kpis">
               {% for aggregate in layer.layeraggregatedvalue_set.all %}
-                <div class="sri-kpi"><dt>{{ aggregate.name }}</dt><dd><span class="sri-kpi-value">{{ aggregate.value|floatformat:"-1g" }}</span><span class="sri-kpi-unit">{{ aggregate.unit }}</span></dd></div>
+                <div class="sri-kpi"><dt>{{ aggregate.name }}</dt><dd><span class="sri-kpi-value">{{ aggregate.value|amount }}</span><span class="sri-kpi-unit">{{ aggregate.unit }}</span></dd></div>
               {% endfor %}
             </dl>
           {% endif %}
@@ -42,6 +45,11 @@
       {% empty %}
         <section class="sdv2-section-panel sri-muted">This scenario has no stored results.</section>
       {% endfor %}
+      {% if production_units|length > 1 %}
+        <section class="sdv2-section-panel sri-muted" role="status">
+          The inventories give amounts in different units ({% for unit in production_units %}{{ unit|default:"no unit" }}{% if not forloop.last %}, {% endif %}{% endfor %}), so they are not added up. Evaluate the scenario again to get every amount in mass per year.
+        </section>
+      {% endif %}
       {% if charts %}
         <div class="sri-charts">
           {% for id, c in charts.items %}

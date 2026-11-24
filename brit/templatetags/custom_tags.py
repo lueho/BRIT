@@ -2,6 +2,7 @@ from decimal import Decimal, InvalidOperation
 
 from django import template
 from django.apps import apps
+from django.template.defaultfilters import floatformat
 
 register = template.Library()
 
@@ -79,6 +80,26 @@ def nav_active(context, section):
     if _resolved_app_label(match) in NAV_SECTION_APP_LABELS.get(section, set()):
         return " active"
     return ""
+
+
+@register.filter
+def amount(value):
+    """Format a quantity without trailing zeros.
+
+    Three decimals at most; below one, three significant digits.
+    """
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return value
+    if not number.is_finite():
+        return value
+    if abs(number) >= 1 or number == 0:
+        rounded = round(number, 3)
+    else:
+        rounded = round(number, 2 - number.adjusted())
+    decimals = max(0, -rounded.normalize().as_tuple().exponent)
+    return floatformat(rounded, f"{decimals}g")
 
 
 @register.filter
