@@ -29,7 +29,10 @@ GEOMETRY_SCHEMA = {
         "type": {"enum": ["Polygon", "MultiPolygon"]},
         "coordinates": {"type": "array"},
     },
-    "description": "GeoJSON geometry in EPSG:4326.",
+    "description": (
+        "GeoJSON geometry in EPSG:4326. Required when a row is created; "
+        "omit it on updates to keep the borders BRIT already holds."
+    ),
 }
 
 LAU_IMPORT_SCHEMA = {

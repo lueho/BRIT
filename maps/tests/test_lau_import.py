@@ -208,6 +208,59 @@ class LauImportApiTestCase(TestCase):
         self.assertEqual(imported.lau_name, "Flensburg")
         self.assertEqual(imported.name_en, "Flensburg city")
 
+    def test_a_new_row_without_geometry_is_an_error(self):
+        response = self.post(self.payload([lau("01001000", geometry=None)]))
+        self.assertEqual(response.status_code, 400, response.json())
+        self.assertIn("needs a geometry", str(response.json()["errors"]))
+        self.assertFalse(LauRegion.objects.exists())
+
+    def test_an_update_without_geometry_keeps_the_borders(self):
+        self.post(self.payload([lau("01001000")]))
+        imported = LauRegion.objects.get(lau_id="01001000", year=2018)
+        response = self.post(
+            self.payload(
+                [
+                    {
+                        "cntr_code": "DE",
+                        "lau_id": "01001000",
+                        "lau_name": "Flensburg neu",
+                        "nuts_parent_id": "DEF01",
+                    }
+                ]
+            )
+        )
+        self.assertEqual(response.json()["updated"], 1, response.json())
+        imported.refresh_from_db()
+        self.assertIsNotNone(imported.borders_id)
+        self.assertEqual(imported.lau_name, "Flensburg neu")
+
+    def test_a_blank_lau_name_resets_name_to_the_lau_id(self):
+        self.post(self.payload([lau("01001000")]))
+        response = self.post(self.payload([lau("01001000", name="")]))
+        self.assertEqual(response.json()["updated"], 1, response.json())
+        imported = LauRegion.objects.get(lau_id="01001000", year=2018)
+        self.assertEqual(imported.lau_name, "")
+        self.assertEqual(imported.name, "01001000")
+
+    def test_a_parent_change_on_a_catchment_region_warns(self):
+        NutsRegion.objects.create(
+            name="Kreis Rendsburg",
+            country="DE",
+            nuts_id="DEF03",
+            levl_code=3,
+            cntr_code="DE",
+            version=self.v2024,
+        )
+        self.post(self.payload([lau("01001000")]))
+        imported = LauRegion.objects.get(lau_id="01001000", year=2018)
+        Catchment.objects.create(name="catch", region=imported, type="lau")
+        response = self.post(self.payload([lau("01001000", nuts_parent_id="DEF03")]))
+        warnings = str(response.json()["warnings"])
+        self.assertIn("nuts_parent changed", warnings)
+        self.assertIn("01001000", warnings)
+        imported.refresh_from_db()
+        self.assertEqual(imported.nuts_parent.nuts_id, "DEF03")
+
     def test_the_same_lau_id_in_another_year_is_untouched(self):
         self.post(self.payload([lau("01001000")], year=2018))
         response = self.post(

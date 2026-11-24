@@ -8,10 +8,10 @@ from unittest.mock import Mock, patch
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.gis.geos import GEOSGeometry
-from django.test import TestCase, TransactionTestCase, override_settings
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from maps.models import NutsRegion, NutsVintage
+from maps.models import LauRegion, NutsRegion, NutsVintage
 
 GEOMETRY = {
     "type": "MultiPolygon",
@@ -130,6 +130,55 @@ class ImportBodySizeTestCase(TestCase):
         response = self.post(reverse("nuts:import"), "{not json")
         self.assertEqual(response.status_code, 400)
 
+    def test_a_3d_geometry_is_imported_as_2d(self):
+        """GeoJSON may carry [lon, lat, elev] positions; BRIT stores 2D."""
+        polygon_3d = {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [6.0, 47.0, 3.0],
+                    [15.0, 47.0, 3.0],
+                    [15.0, 55.0, 3.0],
+                    [6.0, 55.0, 3.0],
+                    [6.0, 47.0, 3.0],
+                ]
+            ],
+        }
+        response = self.post(
+            reverse("nuts:import"),
+            json.dumps(
+                {
+                    "schema_version": "1.0",
+                    "vintage": {"year": 2010},
+                    "regions": [nuts_region("DE3D", 0, polygon_3d)],
+                }
+            ),
+        )
+        self.assertEqual(response.status_code, 201, response.json())
+        self.assertFalse(NutsRegion.objects.get(nuts_id="DE3D").borders.geom.hasz)
+
+        NutsVintage.objects.get_or_create(year=2024)
+        response = self.post(
+            reverse("lau:import"),
+            json.dumps(
+                {
+                    "schema_version": "1.0",
+                    "vintage": {"year": 2018, "nuts_year": 2024},
+                    "regions": [
+                        {
+                            "cntr_code": "DE",
+                            "lau_id": "03003000",
+                            "lau_name": "Elevated",
+                            "nuts_parent_id": None,
+                            "geometry": polygon_3d,
+                        }
+                    ],
+                }
+            ),
+        )
+        self.assertEqual(response.status_code, 201, response.json())
+        self.assertFalse(LauRegion.objects.get(lau_id="03003000").borders.geom.hasz)
+
     def test_a_non_integer_content_length_does_not_500(self):
         """A junk CONTENT_LENGTH is treated as unknown; the read cap still
         enforces the limit."""
@@ -143,11 +192,12 @@ class ImportBodySizeTestCase(TestCase):
         self.assertEqual(result, {"a": 1})
 
 
-class DeferredGeojsonInvalidationTestCase(TransactionTestCase):
+class DeferredGeojsonInvalidationTestCase(TestCase):
     """An N-row import must flush each distinct pattern once, not N times.
 
-    TransactionTestCase commits for real: on_commit callbacks (and hence the
-    deferred flush) never fire inside TestCase's wrapping transaction.
+    TestCase keeps the import's atomic block as a savepoint, so
+    ``captureOnCommitCallbacks`` can run the deferred flush the way a real
+    commit would — and a rolled-back import never registers its callbacks.
     """
 
     def setUp(self):
@@ -173,9 +223,10 @@ class DeferredGeojsonInvalidationTestCase(TransactionTestCase):
         }
         self.client.force_login(self.user)
         with patch("maps.signals.get_geojson_cache", return_value=geojson_cache):
-            response = self.client.post(
-                self.url, payload, content_type="application/json"
-            )
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    self.url, payload, content_type="application/json"
+                )
         self.assertEqual(response.status_code, 201, response.json())
 
         calls = geojson_cache.delete_pattern.call_args_list
@@ -189,9 +240,10 @@ class DeferredGeojsonInvalidationTestCase(TransactionTestCase):
         geojson_cache.reset_mock()
         payload["regions"] = [nuts_region("D00A", 0, OTHER_GEOMETRY, cntr_code="DE")]
         with patch("maps.signals.get_geojson_cache", return_value=geojson_cache):
-            response = self.client.post(
-                self.url, payload, content_type="application/json"
-            )
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    self.url, payload, content_type="application/json"
+                )
         self.assertEqual(response.json()["errors"], [])
         patterns = {str(c.args[0]) for c in geojson_cache.delete_pattern.call_args_list}
         self.assertIn("region_geojson:*", patterns)
@@ -209,14 +261,15 @@ class DeferredGeojsonInvalidationTestCase(TransactionTestCase):
         geojson_cache = Mock()
         geojson_cache.delete_pattern = Mock(return_value=0)
         with patch("maps.signals.get_geojson_cache", return_value=geojson_cache):
-            with deferred_geojson_invalidation():
-                for pattern in (
-                    "nuts_geojson:*",
-                    "nuts_geojson:parent:3:*",
-                    "nuts_geojson:id:3",
-                    "lau_geojson:*",
-                ):
-                    clear_geojson_cache_pattern(pattern)
+            with self.captureOnCommitCallbacks(execute=True):
+                with deferred_geojson_invalidation():
+                    for pattern in (
+                        "nuts_geojson:*",
+                        "nuts_geojson:parent:3:*",
+                        "nuts_geojson:id:3",
+                        "lau_geojson:*",
+                    ):
+                        clear_geojson_cache_pattern(pattern)
 
         called = {str(c.args[0]) for c in geojson_cache.delete_pattern.call_args_list}
         self.assertEqual(
@@ -240,7 +293,10 @@ class DeferredGeojsonInvalidationTestCase(TransactionTestCase):
         }
         self.client.force_login(self.user)
         with patch("maps.signals.get_geojson_cache", return_value=geojson_cache):
-            self.client.post(self.url, payload, content_type="application/json")
+            with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                self.client.post(self.url, payload, content_type="application/json")
+        # A rolled-back import never registers its deferred flushes.
+        self.assertEqual(callbacks, [])
         geojson_cache.delete_pattern.assert_not_called()
 
 
@@ -299,3 +355,79 @@ class SharedGeoPolygonGuardTestCase(TestCase):
                 GEOSGeometry(json.dumps(OTHER_GEOMETRY), srid=4326)
             )
         )
+
+
+class GeometryChangeCacheFlushTestCase(TestCase):
+    """A geometry change must flush region and catchment GeoJSON caches.
+
+    The GeoPolygon post_save receiver only sees updates to a polygon a Region
+    already points at; attaching a fresh GeoPolygon (new row or shared-polygon
+    replacement) would otherwise leave stale tiles behind.
+    """
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("lau-loader")
+        self.user.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="maps",
+                codename__in=("add_lauregion", "change_lauregion"),
+            )
+        )
+        self.vintage = NutsVintage.objects.create(year=2024)
+        self.url = reverse("lau:import")
+
+    def post(self, regions):
+        self.client.force_login(self.user)
+        return self.client.post(
+            self.url,
+            {
+                "schema_version": "1.0",
+                "vintage": {"year": 2018, "nuts_year": 2024},
+                "regions": regions,
+            },
+            content_type="application/json",
+        )
+
+    def lau_row(self, geometry=GEOMETRY):
+        return {
+            "cntr_code": "DE",
+            "lau_id": "01001000",
+            "lau_name": "Flensburg",
+            "nuts_parent_id": None,
+            "geometry": geometry,
+        }
+
+    def test_creating_a_row_with_geometry_flushes_the_region_caches(self):
+        geojson_cache = Mock()
+        geojson_cache.delete_pattern = Mock(return_value=0)
+        with patch("maps.signals.get_geojson_cache", return_value=geojson_cache):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.post([self.lau_row()])
+        self.assertEqual(response.json()["created"], 1, response.json())
+        patterns = {str(c.args[0]) for c in geojson_cache.delete_pattern.call_args_list}
+        self.assertIn("region_geojson:*", patterns)
+        self.assertIn("catchment_geojson:*", patterns)
+
+    def test_a_shared_polygon_replacement_flushes_the_region_caches(self):
+        response = self.post([self.lau_row()])
+        self.assertEqual(response.json()["created"], 1, response.json())
+        imported = LauRegion.objects.get(lau_id="01001000", year=2018)
+        LauRegion.objects.create(
+            name="Sharer",
+            country="DE",
+            cntr_code="DE",
+            lau_id="02002000",
+            year=2018,
+            owner=self.user,
+            borders=imported.borders,
+        )
+
+        geojson_cache = Mock()
+        geojson_cache.delete_pattern = Mock(return_value=0)
+        with patch("maps.signals.get_geojson_cache", return_value=geojson_cache):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.post([self.lau_row(OTHER_GEOMETRY)])
+        self.assertEqual(response.json()["updated"], 1, response.json())
+        patterns = {str(c.args[0]) for c in geojson_cache.delete_pattern.call_args_list}
+        self.assertIn("region_geojson:*", patterns)
+        self.assertIn("catchment_geojson:*", patterns)

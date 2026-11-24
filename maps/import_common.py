@@ -16,6 +16,7 @@ from rest_framework.exceptions import APIException, ParseError
 from rest_framework.parsers import BaseParser, get_encoding
 
 from maps.models import GeoPolygon, Region
+from maps.signals import clear_geojson_cache_pattern
 
 
 class ImportBodyTooLarge(APIException):
@@ -59,7 +60,7 @@ class ImportJSONParser(BaseParser):
         try:
             return json.loads(raw.decode(encoding))
         except (UnicodeDecodeError, ValueError) as error:
-            raise ParseError(f"JSON parse error - {error}") from error
+            raise ParseError("JSON parse error.") from error
 
 
 class GeometryField(serializers.JSONField):
@@ -71,7 +72,12 @@ class GeometryField(serializers.JSONField):
         try:
             geometry = GEOSGeometry(raw, srid=4326)
         except (GDALException, GEOSException, ValueError, TypeError) as error:
-            raise serializers.ValidationError(f"Invalid geometry: {error}") from error
+            raise serializers.ValidationError("Invalid geometry.") from error
+        if geometry.hasz:
+            ogr = geometry.ogr.clone()
+            ogr.set_3d(False)
+            geometry = ogr.geos
+            geometry.srid = 4326
         if geometry.geom_type == "Polygon":
             geometry = MultiPolygon(geometry, srid=4326)
         if geometry.geom_type != "MultiPolygon":
@@ -101,19 +107,24 @@ def _upsert_geometry(region, geometry):
     """
     if geometry is None:
         return False
-    if region.borders is None:
-        region.borders = GeoPolygon.objects.create(geom=geometry)
-        return True
-    if region.borders.geom is not None and region.borders.geom.equals_exact(geometry):
+    if (
+        region.borders is not None
+        and region.borders.geom is not None
+        and region.borders.geom.equals_exact(geometry)
+    ):
         return False
-    shared = (
+    if region.borders is None or (
         Region.objects.filter(borders_id=region.borders_id)
         .exclude(pk=region.pk)
         .exists()
-    )
-    if shared:
+    ):
         region.borders = GeoPolygon.objects.create(geom=geometry)
-        return True
-    region.borders.geom = geometry
-    region.borders.save(update_fields=["geom"])
+    else:
+        region.borders.geom = geometry
+        region.borders.save(update_fields=["geom"])
+    # The GeoPolygon post_save receiver misses a fresh polygon (no Region
+    # references it yet), so a changed border always invalidates the
+    # region-level tiles itself.
+    clear_geojson_cache_pattern("region_geojson:*")
+    clear_geojson_cache_pattern("catchment_geojson:*")
     return True
