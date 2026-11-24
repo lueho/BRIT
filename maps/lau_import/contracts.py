@@ -89,7 +89,7 @@ LAU_IMPORT_SCHEMA = {
                 "properties": {
                     "cntr_code": {"type": "string", "maxLength": 2},
                     "lau_id": {"type": "string", "maxLength": 13},
-                    "lau_name": {"type": "string", "maxLength": 113},
+                    "lau_name": {"type": "string", "maxLength": 255},
                     "name_en": {
                         "type": "string",
                         "maxLength": 113,

@@ -279,6 +279,28 @@ class LauImportApiTestCase(TestCase):
         self.assertEqual(imported.lau_name, "")
         self.assertEqual(imported.name, "01001000")
 
+    def test_a_138_char_lau_name_is_stored_unchanged(self):
+        long_name = (
+            "UNIÃO DAS FREGUESIAS DE ALANDROAL (NOSSA SENHORA DA CONCEIÇÃO), "
+            "SÃO BRÁS DOS MATOS (MINA DO BUGALHO) E JUROMENHA (NOSSA SENHORA "
+            "DO LORETO)"
+        )
+        self.assertEqual(len(long_name), 138)
+        response = self.post(
+            self.payload(
+                [lau("070107", cntr_code="PT", name=long_name, nuts_parent_id=None)]
+            )
+        )
+        self.assertEqual(response.status_code, 201, response.json())
+        imported = LauRegion.objects.get(cntr_code="PT", lau_id="070107")
+        self.assertEqual(imported.lau_name, long_name)
+        self.assertEqual(imported.name, long_name)
+
+    def test_a_256_char_lau_name_is_an_error(self):
+        response = self.post(self.payload([lau("01001000", name="x" * 256)]))
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(LauRegion.objects.exists())
+
     def test_a_parent_change_on_a_catchment_region_warns(self):
         NutsRegion.objects.create(
             name="Kreis Rendsburg",

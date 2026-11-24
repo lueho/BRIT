@@ -638,7 +638,7 @@ class LauRegion(Region):
     objects = LauRegionManager()
     cntr_code = models.CharField(max_length=2, blank=True, null=True)
     lau_id = models.CharField(max_length=13, blank=True, null=True)
-    lau_name = models.CharField(max_length=113, blank=True, null=True)
+    lau_name = models.CharField(max_length=255, blank=True, null=True)
     year = models.IntegerField(blank=True, null=True)
     nuts_parent = models.ForeignKey(
         NutsRegion, related_name="lau_children", on_delete=models.PROTECT, null=True
