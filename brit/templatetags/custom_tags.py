@@ -18,7 +18,7 @@ def user_in_group(user, group_name):
 # domain plugins mounted under their own path prefixes); stand-alone pages
 # are matched by URL name instead.
 NAV_SECTION_APP_LABELS = {
-    "maps": {"maps", "population", "nuts_import"},
+    "maps": {"maps", "population", "nuts_import", "lau_import"},
     "materials": {"materials"},
     "sources": {
         "sources",

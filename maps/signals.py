@@ -1,4 +1,6 @@
+import contextvars
 import logging
+from contextlib import contextmanager
 
 from django.conf import settings
 from django.core.cache import caches
@@ -34,6 +36,36 @@ def get_geojson_cache():
     return caches[cache_alias]
 
 
+_pending_geojson_patterns = contextvars.ContextVar(
+    "pending_geojson_patterns", default=None
+)
+
+
+@contextmanager
+def deferred_geojson_invalidation():
+    """Collect GeoJSON cache invalidations and flush each pattern once.
+
+    A bulk import saves thousands of Region/LauRegion/GeoPolygon rows, each of
+    which would otherwise trigger a pattern SCAN delete. Inside this context
+    ``clear_geojson_cache_pattern`` only records the pattern; on exit the
+    distinct set is flushed once via ``transaction.on_commit``, so a rolled
+    back import (dry run or failure) flushes nothing.
+    """
+    pending = set()
+    token = _pending_geojson_patterns.set(pending)
+    try:
+        yield
+    finally:
+        _pending_geojson_patterns.reset(token)
+    covered = {
+        p
+        for p in pending
+        if any(p != q and q.endswith("*") and p.startswith(q[:-1]) for q in pending)
+    }
+    for pattern in sorted(pending - covered):
+        transaction.on_commit(lambda p=pattern: clear_geojson_cache_pattern(p))
+
+
 def clear_geojson_cache_pattern(pattern: str) -> None:
     """
     Clear cache keys matching the given pattern.
@@ -45,6 +77,11 @@ def clear_geojson_cache_pattern(pattern: str) -> None:
     For backends without pattern support (e.g. LocMemCache used in tests),
     falls back to ``cache.clear()`` which drops the entire cache namespace.
     """
+    pending = _pending_geojson_patterns.get()
+    if pending is not None:
+        pending.add(pattern)
+        return
+
     from .utils import AUTHZ_GEOJSON_CACHE_PREFIX
 
     geojson_cache = get_geojson_cache()
