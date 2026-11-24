@@ -14,7 +14,13 @@ from ..forms import (
     RegionMergeFormSet,
     RegionModelForm,
 )
-from ..models import GeoDataset, LauRegion, Region, RegionProperty
+from ..models import GeoDataset, GeoPolygon, LauRegion, Region, RegionProperty
+
+
+def lau_borders():
+    return GeoPolygon.objects.create(
+        geom=MultiPolygon(Polygon(((0, 0), (0, 1), (1, 1), (1, 0), (0, 0))))
+    )
 
 
 class GeoDataSetModelFormTestCase(TestCase):
@@ -175,11 +181,15 @@ class TestRegionMergeFormset(TestCase):
     @classmethod
     def setUpTestData(cls):
         lau = LauRegion.objects.create(
-            name="Test Region 1", publication_status="published"
+            name="Test Region 1",
+            publication_status="published",
+            borders=lau_borders(),
         )
         cls.region_1 = lau.region_ptr
         lau = LauRegion.objects.create(
-            name="Test Region 2", publication_status="published"
+            name="Test Region 2",
+            publication_status="published",
+            borders=lau_borders(),
         )
         cls.region_2 = lau.region_ptr
         cls.region_3 = Region.objects.create(
@@ -193,6 +203,7 @@ class TestRegionMergeFormset(TestCase):
             cntr_code="DE",
             year=2021,
             publication_status="published",
+            borders=lau_borders(),
         )
         new = LauRegion.objects.create(
             name="Twin 2025",
@@ -200,6 +211,7 @@ class TestRegionMergeFormset(TestCase):
             cntr_code="DE",
             year=2025,
             publication_status="published",
+            borders=lau_borders(),
         )
         FormSet = formset_factory(RegionMergeForm, formset=RegionMergeFormSet)
         qs = FormSet().forms[0].fields["region"].queryset
@@ -214,6 +226,7 @@ class TestRegionMergeFormset(TestCase):
             cntr_code="DE",
             year=2021,
             publication_status="published",
+            borders=lau_borders(),
         )
         private = LauRegion.objects.create(
             name="Hidden Twin 2025",
@@ -221,6 +234,7 @@ class TestRegionMergeFormset(TestCase):
             cntr_code="DE",
             year=2025,
             publication_status="private",
+            borders=lau_borders(),
         )
         FormSet = formset_factory(RegionMergeForm, formset=RegionMergeFormSet)
         qs = FormSet().forms[0].fields["region"].queryset
@@ -236,6 +250,7 @@ class TestRegionMergeFormset(TestCase):
             cntr_code="DE",
             year=2021,
             publication_status="published",
+            borders=lau_borders(),
         )
         private = LauRegion.objects.create(
             name="Owned Twin 2025",
@@ -244,12 +259,53 @@ class TestRegionMergeFormset(TestCase):
             year=2025,
             owner=owner,
             publication_status="private",
+            borders=lau_borders(),
         )
         FormSet = formset_factory(RegionMergeForm, formset=RegionMergeFormSet)
         qs = FormSet(form_kwargs={"user": owner}).forms[0].fields["region"].queryset
         ids = list(qs.values_list("pk", flat=True))
         self.assertIn(private.region_ptr_id, ids)
         self.assertNotIn(published.region_ptr_id, ids)
+
+    def test_a_borderless_newest_vintage_yields_to_the_bordered_row(self):
+        old = LauRegion.objects.create(
+            name="Bordered 2021",
+            lau_id="03106000",
+            cntr_code="DE",
+            year=2021,
+            publication_status="published",
+            borders=lau_borders(),
+        )
+        new = LauRegion.objects.create(
+            name="Borderless 2025",
+            lau_id="03106000",
+            cntr_code="DE",
+            year=2025,
+            publication_status="published",
+        )
+        FormSet = formset_factory(RegionMergeForm, formset=RegionMergeFormSet)
+        qs = FormSet().forms[0].fields["region"].queryset
+        ids = list(qs.values_list("pk", flat=True))
+        self.assertIn(old.region_ptr_id, ids)
+        self.assertNotIn(new.region_ptr_id, ids)
+        form = RegionMergeForm(data={"region": old.region_ptr_id})
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_a_code_with_only_a_borderless_row_is_not_selectable(self):
+        borderless = LauRegion.objects.create(
+            name="Borderless Only",
+            lau_id="03107000",
+            cntr_code="DE",
+            year=2025,
+            publication_status="published",
+        )
+        FormSet = formset_factory(RegionMergeForm, formset=RegionMergeFormSet)
+        qs = FormSet().forms[0].fields["region"].queryset
+        self.assertNotIn(
+            borderless.region_ptr_id, list(qs.values_list("pk", flat=True))
+        )
+        form = RegionMergeForm(data={"region": borderless.region_ptr_id})
+        self.assertFalse(form.is_valid())
 
     def test_formset_has_lauregions_as_queryset(self):
         data = {

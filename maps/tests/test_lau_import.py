@@ -214,6 +214,21 @@ class LauImportApiTestCase(TestCase):
         self.assertIn("needs a geometry", str(response.json()["errors"]))
         self.assertFalse(LauRegion.objects.exists())
 
+    def test_a_new_row_with_omitted_geometry_is_an_error(self):
+        row = lau("01001000")
+        del row["geometry"]
+        response = self.post(self.payload([row]))
+        self.assertEqual(response.status_code, 400, response.json())
+        self.assertIn("needs a geometry", str(response.json()["errors"]))
+        self.assertFalse(LauRegion.objects.exists())
+
+    def test_a_mixed_batch_rolls_back_on_a_missing_geometry(self):
+        response = self.post(
+            self.payload([lau("01001000"), lau("01002000", geometry=None)])
+        )
+        self.assertEqual(response.status_code, 400, response.json())
+        self.assertFalse(LauRegion.objects.exists())
+
     def test_an_update_without_geometry_keeps_the_borders(self):
         self.post(self.payload([lau("01001000")]))
         imported = LauRegion.objects.get(lau_id="01001000", year=2018)
@@ -232,6 +247,28 @@ class LauImportApiTestCase(TestCase):
         self.assertEqual(response.json()["updated"], 1, response.json())
         imported.refresh_from_db()
         self.assertIsNotNone(imported.borders_id)
+        self.assertEqual(imported.lau_name, "Flensburg neu")
+
+    def test_an_update_with_null_geometry_keeps_the_borders(self):
+        self.post(self.payload([lau("01001000")]))
+        imported = LauRegion.objects.get(lau_id="01001000", year=2018)
+        borders_id = imported.borders_id
+        response = self.post(
+            self.payload(
+                [
+                    {
+                        "cntr_code": "DE",
+                        "lau_id": "01001000",
+                        "lau_name": "Flensburg neu",
+                        "nuts_parent_id": "DEF01",
+                        "geometry": None,
+                    }
+                ]
+            )
+        )
+        self.assertEqual(response.json()["updated"], 1, response.json())
+        imported.refresh_from_db()
+        self.assertEqual(imported.borders_id, borders_id)
         self.assertEqual(imported.lau_name, "Flensburg neu")
 
     def test_a_blank_lau_name_resets_name_to_the_lau_id(self):

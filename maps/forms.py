@@ -443,10 +443,18 @@ class CatchmentCreateMergeLauForm(SimpleModelForm):
 
 
 def selectable_current_lau_regions(user):
-    """Newest LAU vintage per code among non-archived rows ``user`` may see."""
-    candidates = filter_queryset_for_user(
-        LauRegion.objects.all(), user or AnonymousUser()
-    ).exclude(publication_status=LauRegion.STATUS_ARCHIVED)
+    """Newest bordered LAU vintage per code among non-archived rows ``user`` may see.
+
+    Rows without borders cannot feed a merge (there is nothing to draw the
+    new geometry from), so a code whose newest vintage is borderless offers
+    its newest *bordered* row instead, and a code with no bordered row is not
+    selectable at all.
+    """
+    candidates = (
+        filter_queryset_for_user(LauRegion.objects.all(), user or AnonymousUser())
+        .exclude(publication_status=LauRegion.STATUS_ARCHIVED)
+        .filter(borders__isnull=False)
+    )
     return LauRegion.objects.current(among=candidates)
 
 

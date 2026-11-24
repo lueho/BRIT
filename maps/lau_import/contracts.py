@@ -13,6 +13,11 @@ vintage (``vintage.nuts_year``), which must already exist.
 The JSON Schema below documents the ``1.0`` payload and is served at
 ``GET /lau/api/import/schema/``.
 
+Within ``1.0``, ``geometry`` may be omitted or null on rows BRIT already
+holds — the stored borders are kept — but it is required for a row BRIT does
+not hold yet. A new row without a geometry is a row-level error that rolls
+back the whole batch.
+
 Versioning policy: ``SCHEMA_VERSION`` is a compatibility marker, not a
 changelog. Adding an optional field stays within the current version, because
 every payload that was valid before remains valid. Renaming or removing a

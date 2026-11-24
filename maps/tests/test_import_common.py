@@ -408,6 +408,22 @@ class GeometryChangeCacheFlushTestCase(TestCase):
         self.assertIn("region_geojson:*", patterns)
         self.assertIn("catchment_geojson:*", patterns)
 
+    def test_a_name_only_change_flushes_the_region_caches(self):
+        response = self.post([self.lau_row()])
+        self.assertEqual(response.json()["created"], 1, response.json())
+
+        geojson_cache = Mock()
+        geojson_cache.delete_pattern = Mock(return_value=0)
+        row = self.lau_row()
+        del row["geometry"]
+        row["lau_name"] = "Flensburg renamed"
+        with patch("maps.signals.get_geojson_cache", return_value=geojson_cache):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.post([row])
+        self.assertEqual(response.json()["updated"], 1, response.json())
+        patterns = {str(c.args[0]) for c in geojson_cache.delete_pattern.call_args_list}
+        self.assertIn("region_geojson:*", patterns)
+
     def test_a_shared_polygon_replacement_flushes_the_region_caches(self):
         response = self.post([self.lau_row()])
         self.assertEqual(response.json()["created"], 1, response.json())
