@@ -15,7 +15,6 @@ from django.db import transaction
 from maps.import_common import _Rollback, _upsert_geometry
 from maps.models import (
     Catchment,
-    GeoPolygon,
     LauRegion,
     NutsRegion,
     NutsVintage,
@@ -122,6 +121,7 @@ def import_lau_payload(payload, user=None, dry_run=False):
             }
 
             geometry_changed_ids = []
+            reparented_ids = {}
             lau_ids = {}
             for row in rows:
                 _upsert_lau(
@@ -133,6 +133,7 @@ def import_lau_payload(payload, user=None, dry_run=False):
                     user,
                     report,
                     geometry_changed_ids,
+                    reparented_ids,
                     lau_ids,
                 )
 
@@ -148,6 +149,22 @@ def import_lau_payload(payload, user=None, dry_run=False):
                     "Geometry changed on LAU regions referenced by catchments "
                     "or composite regions: " + ", ".join(referenced[:50])
                 )
+
+            if reparented_ids:
+                with_catchments = set(
+                    Catchment.objects.filter(region_id__in=reparented_ids).values_list(
+                        "region_id", flat=True
+                    )
+                )
+                affected = [
+                    reparented_ids[pk] for pk in reparented_ids if pk in with_catchments
+                ]
+                if affected:
+                    report.warnings.append(
+                        "nuts_parent changed for LAU regions with catchments; "
+                        "catchment tree parents were not updated: "
+                        + ", ".join(affected[:50])
+                    )
 
             if report.errors:
                 raise _Rollback
@@ -169,6 +186,7 @@ def _upsert_lau(
     user,
     report,
     geometry_changed_ids,
+    reparented_ids,
     lau_ids,
 ):
     key = (row["cntr_code"], row["lau_id"])
@@ -215,6 +233,11 @@ def _upsert_lau(
             return
 
     if row_existing is None:
+        if not row.get("geometry"):
+            # A boundaryless row still becomes the newest vintage in the merge
+            # picker, where a missing border crashes create_region_borders.
+            report.errors.append(f"{label}: a new LAU region needs a geometry")
+            return
         region = LauRegion(
             lau_id=row["lau_id"],
             cntr_code=row["cntr_code"],
@@ -230,11 +253,7 @@ def _upsert_lau(
             publication_status=LauRegion.STATUS_PUBLISHED,
             **{name: row[name] for name in ("name_en",) if name in row},
         )
-        region.borders = (
-            GeoPolygon.objects.create(geom=row["geometry"])
-            if row.get("geometry")
-            else None
-        )
+        _upsert_geometry(region, row.get("geometry"))
         region.save()
         report.created += 1
         return
@@ -248,12 +267,15 @@ def _upsert_lau(
     ]
     for name in changed:
         setattr(row_existing, name, row[name])
-    if row.get("lau_name") and row_existing.name != row["lau_name"]:
-        row_existing.name = row["lau_name"]
-        changed.append("name")
+    if "lau_name" in row:
+        name = row["lau_name"] or row["lau_id"]
+        if row_existing.name != name:
+            row_existing.name = name
+            changed.append("name")
     if row_existing.nuts_parent_id != (parent.pk if parent else None):
         row_existing.nuts_parent = parent
         changed.append("nuts_parent")
+        reparented_ids[row_existing.pk] = row["lau_id"]
     if row_existing.publication_status != LauRegion.STATUS_PUBLISHED:
         row_existing.publication_status = LauRegion.STATUS_PUBLISHED
         changed.append("publication_status")

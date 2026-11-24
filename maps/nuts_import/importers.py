@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from django.db import transaction
 
 from maps.import_common import _Rollback, _upsert_geometry
-from maps.models import GeoPolygon, NutsRegion, NutsVintage
+from maps.models import NutsRegion, NutsVintage
 from maps.signals import deferred_geojson_invalidation
 
 FIELDS = (
@@ -112,11 +112,7 @@ def _upsert_region(data, vintage, user, report, dry_run=False):
             parent=parent,
             **{name: data.get(name) for name in FIELDS},
         )
-        region.borders = (
-            GeoPolygon.objects.create(geom=data["geometry"])
-            if data.get("geometry")
-            else None
-        )
+        _upsert_geometry(region, data.get("geometry"))
         region.save()
         report.created += 1
         return

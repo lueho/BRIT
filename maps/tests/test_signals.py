@@ -4,9 +4,33 @@ from django.db.models.signals import post_delete, post_save
 from django.test import SimpleTestCase
 
 from maps.models import (
+    LauRegion,
+    NutsRegion,
     RegionAttributeTextValue,
     RegionAttributeValue,
 )
+
+
+class SubclassRegionGeoJSONCacheInvalidationTests(SimpleTestCase):
+    """Django only notifies the concrete sender: a LauRegion or NutsRegion
+    save never reaches the ``sender=Region`` receiver, so the subclass
+    receivers must drop the region namespace themselves."""
+
+    def test_a_lau_region_save_clears_the_region_namespace(self):
+        instance = LauRegion(id=5, owner_id=1)
+        geojson_cache = Mock()
+        with patch("maps.signals.get_geojson_cache", return_value=geojson_cache):
+            post_save.send(sender=LauRegion, instance=instance)
+        geojson_cache.delete.assert_any_call("region_geojson:id:5")
+        geojson_cache.delete_pattern.assert_any_call("region_geojson:*")
+
+    def test_a_nuts_region_save_clears_the_region_namespace(self):
+        instance = NutsRegion(id=7, owner_id=1)
+        geojson_cache = Mock()
+        with patch("maps.signals.get_geojson_cache", return_value=geojson_cache):
+            post_save.send(sender=NutsRegion, instance=instance)
+        geojson_cache.delete.assert_any_call("region_geojson:id:7")
+        geojson_cache.delete_pattern.assert_any_call("region_geojson:*")
 
 
 class RegionAttributeGeoJSONCacheInvalidationTests(SimpleTestCase):

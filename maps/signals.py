@@ -125,6 +125,19 @@ def safe_cache_delete(cache, key: str) -> None:
         logger.exception(f"Error deleting cache key '{key}': {e}")
 
 
+def _invalidate_region_namespace(geojson_cache, instance):
+    """Drop the region namespace entries for one region row.
+
+    Django notifies only the concrete sender, so a LauRegion or NutsRegion
+    save never reaches the ``sender=Region`` receiver; the subclass receivers
+    call this too.
+    """
+    safe_cache_delete(geojson_cache, f"region_geojson:id:{instance.id}")
+
+    # Broad invalidation for any keys using the region namespace.
+    clear_geojson_cache_pattern("region_geojson:*")
+
+
 @receiver(post_save, sender=Region)
 @receiver(post_delete, sender=Region)
 def invalidate_region_cache(sender, instance, **kwargs):
@@ -133,10 +146,7 @@ def invalidate_region_cache(sender, instance, **kwargs):
     Clears both the specific region cache and any broad region filters.
     """
     geojson_cache = get_geojson_cache()
-    safe_cache_delete(geojson_cache, f"region_geojson:id:{instance.id}")
-
-    # Broad invalidation for any keys using the region namespace.
-    clear_geojson_cache_pattern("region_geojson:*")
+    _invalidate_region_namespace(geojson_cache, instance)
 
     # Catchment geometries depend on the underlying region geometries.
     clear_geojson_cache_pattern("catchment_geojson:*")
@@ -212,6 +222,7 @@ def invalidate_nuts_region_cache(sender, instance, **kwargs):
     Invalidate NUTS region cache when a NutsRegion instance is saved or deleted.
     """
     geojson_cache = get_geojson_cache()
+    _invalidate_region_namespace(geojson_cache, instance)
     safe_cache_delete(geojson_cache, f"nuts_geojson:id:{instance.id}")
     clear_geojson_cache_pattern("nuts_geojson:*")
 
@@ -311,6 +322,9 @@ def invalidate_lau_region_cache(sender, instance, **kwargs):
     For LAU regions, this example assumes separate cache keys (e.g., 'lau_geojson:*').
     Adjust the key patterns if LAU regions should also trigger invalidation of related NUTS caches.
     """
+    geojson_cache = get_geojson_cache()
+    _invalidate_region_namespace(geojson_cache, instance)
+
     # Invalidate the LAU-specific cache keys.
     clear_geojson_cache_pattern("lau_geojson:*")
 

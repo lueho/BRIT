@@ -59,6 +59,12 @@ from ..views import MapMixin
 from ..viewsets import RegionViewSet
 
 
+def lau_borders():
+    return GeoPolygon.objects.create(
+        geom=MultiPolygon(Polygon(((0, 0), (0, 1), (1, 1), (1, 0), (0, 0))))
+    )
+
+
 class DummyBaseView:
     def get_context_data(self):
         return {}
@@ -1701,10 +1707,16 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.region_1 = LauRegion.objects.create(
-            name="Test Region 1", lau_id="123", publication_status="published"
+            name="Test Region 1",
+            lau_id="123",
+            publication_status="published",
+            borders=lau_borders(),
         ).region_ptr
         cls.region_2 = LauRegion.objects.create(
-            name="Test Region 2", lau_id="234", publication_status="published"
+            name="Test Region 2",
+            lau_id="234",
+            publication_status="published",
+            borders=lau_borders(),
         ).region_ptr
         cls.region_3 = Region.objects.create(
             name="Test Region Not In Queryset", publication_status="published"
@@ -1714,6 +1726,7 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
             lau_id=None,
             owner=cls.owner,
             publication_status="private",
+            borders=lau_borders(),
         ).region_ptr
 
     def test_all_lau_regions_with_matching_name_string_in_queryset(self):
@@ -1783,6 +1796,7 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
             cntr_code="DE",
             year=2021,
             publication_status="published",
+            borders=lau_borders(),
         )
         lau_2025 = LauRegion.objects.create(
             name="Salzgitter 2025",
@@ -1790,11 +1804,46 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
             cntr_code="DE",
             year=2025,
             publication_status="published",
+            borders=lau_borders(),
         )
         response = self.client.get(self.url, data={"q": "Salzgitter"})
         self.assertEqual(200, response.status_code)
         ids = [r["id"] for r in json.loads(response.content)["results"]]
         self.assertListEqual([lau_2025.pk], ids)
+
+    def test_a_borderless_newest_vintage_yields_to_the_bordered_row(self):
+        LauRegion.objects.create(
+            name="Bordered Twin 2021",
+            lau_id="03106000",
+            cntr_code="DE",
+            year=2021,
+            publication_status="published",
+            borders=lau_borders(),
+        )
+        LauRegion.objects.create(
+            name="Borderless Twin 2025",
+            lau_id="03106000",
+            cntr_code="DE",
+            year=2025,
+            publication_status="published",
+        )
+        response = self.client.get(self.url, data={"q": "Twin"})
+        ids = [r["id"] for r in json.loads(response.content)["results"]]
+        self.assertListEqual(
+            [LauRegion.objects.get(year=2021, lau_id="03106000").pk], ids
+        )
+
+    def test_a_borderless_only_row_is_not_offered(self):
+        borderless = LauRegion.objects.create(
+            name="Borderless Only",
+            lau_id="03107000",
+            cntr_code="DE",
+            year=2025,
+            publication_status="published",
+        )
+        response = self.client.get(self.url, data={"q": "Borderless"})
+        ids = [r["id"] for r in json.loads(response.content)["results"]]
+        self.assertNotIn(borderless.pk, ids)
 
     def test_unversioned_row_shown_when_no_versioned_twin(self):
         lau_old = LauRegion.objects.create(
@@ -1803,6 +1852,7 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
             cntr_code="NL",
             year=None,
             publication_status="published",
+            borders=lau_borders(),
         )
         response = self.client.get(self.url, data={"q": "Old Only"})
         ids = [r["id"] for r in json.loads(response.content)["results"]]
@@ -1815,6 +1865,7 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
             cntr_code=None,
             year=2025,
             publication_status="published",
+            borders=lau_borders(),
         )
         response = self.client.get(self.url, data={"q": "No Country"})
         ids = [r["id"] for r in json.loads(response.content)["results"]]
@@ -1827,6 +1878,7 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
             cntr_code=None,
             year=2021,
             publication_status="published",
+            borders=lau_borders(),
         )
         new = LauRegion.objects.create(
             name="Null Twin 2025",
@@ -1834,6 +1886,7 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
             cntr_code=None,
             year=2025,
             publication_status="published",
+            borders=lau_borders(),
         )
         response = self.client.get(self.url, data={"q": "Null Twin"})
         ids = [r["id"] for r in json.loads(response.content)["results"]]
@@ -1850,6 +1903,7 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
                 cntr_code=None,
                 year=2025,
                 publication_status="published",
+                borders=lau_borders(),
             )
         response = self.client.get(self.url, data={"q": "Same Year Twin"})
         ids = [r["id"] for r in json.loads(response.content)["results"]]
@@ -1862,6 +1916,7 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
             cntr_code="DE",
             year=2021,
             publication_status="published",
+            borders=lau_borders(),
         )
         LauRegion.objects.create(
             name="Hidden Twin 2025",
@@ -1869,6 +1924,7 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
             cntr_code="DE",
             year=2025,
             publication_status="private",
+            borders=lau_borders(),
         )
         response = self.client.get(self.url, data={"q": "Hidden Twin"})
         ids = [r["id"] for r in json.loads(response.content)["results"]]
