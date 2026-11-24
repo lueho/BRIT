@@ -644,6 +644,14 @@ class LauRegion(Region):
         NutsRegion, related_name="lau_children", on_delete=models.PROTECT, null=True
     )
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["cntr_code", "lau_id", "year"],
+                name="unique_lau_region_per_vintage",
+            )
+        ]
+
     @property
     def display_name(self):
         """English where known, else the LAU source name."""

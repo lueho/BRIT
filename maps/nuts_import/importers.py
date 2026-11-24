@@ -10,7 +10,9 @@ from dataclasses import dataclass, field
 
 from django.db import transaction
 
+from maps.import_common import _Rollback, _upsert_geometry
 from maps.models import GeoPolygon, NutsRegion, NutsVintage
+from maps.signals import deferred_geojson_invalidation
 
 FIELDS = (
     "levl_code",
@@ -53,20 +55,6 @@ def _set_current(vintage):
     if not vintage.is_current:
         vintage.is_current = True
         vintage.save(update_fields=["is_current"])
-
-
-def _upsert_geometry(region, geometry):
-    """Store the borders, returning whether they changed."""
-    if geometry is None:
-        return False
-    if region.borders is None:
-        region.borders = GeoPolygon.objects.create(geom=geometry)
-        return True
-    if region.borders.geom is not None and region.borders.geom.equals_exact(geometry):
-        return False
-    region.borders.geom = geometry
-    region.borders.save(update_fields=["geom"])
-    return True
 
 
 def _resolve_parent(data, vintage, report, dry_run):
@@ -168,7 +156,7 @@ def import_nuts_payload(payload, user=None, dry_run=False):
     )
 
     try:
-        with transaction.atomic():
+        with transaction.atomic(), deferred_geojson_invalidation():
             vintage, created = NutsVintage.objects.get_or_create(
                 year=vintage_data["year"],
                 defaults={"source_release": vintage_data["source_release"]},
@@ -197,7 +185,3 @@ def import_nuts_payload(payload, user=None, dry_run=False):
         pass
 
     return report
-
-
-class _Rollback(Exception):
-    """Raised to undo a dry run or a failed import inside its transaction."""

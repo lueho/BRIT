@@ -7,14 +7,12 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from maps.import_common import ImportJSONParser, _truthy
+
 from .contracts import NUTS_IMPORT_SCHEMA
 from .importers import import_nuts_payload
 from .permissions import CanImportNutsRegions
 from .serializers import NutsImportSerializer
-
-
-def _truthy(value):
-    return str(value).lower() in ("1", "true", "yes", "on")
 
 
 class NutsImportView(APIView):
@@ -26,6 +24,7 @@ class NutsImportView(APIView):
     """
 
     permission_classes = (CanImportNutsRegions,)
+    parser_classes = (ImportJSONParser,)
 
     def post(self, request):
         serializer = NutsImportSerializer(data=request.data)

@@ -1,11 +1,8 @@
 """Serializers implementing the versioned NUTS vintage import contract."""
 
-import json
-
-from django.contrib.gis.gdal.error import GDALException
-from django.contrib.gis.geos import GEOSGeometry, MultiPolygon
-from django.contrib.gis.geos.error import GEOSException
 from rest_framework import serializers
+
+from maps.import_common import GeometryField
 
 from .contracts import SCHEMA_VERSION
 
@@ -16,27 +13,6 @@ class ImportVintageSerializer(serializers.Serializer):
         max_length=100, required=False, allow_blank=True, default=""
     )
     is_current = serializers.BooleanField(required=False, default=False)
-
-
-class GeometryField(serializers.JSONField):
-    """A GeoJSON polygon, stored as the MultiPolygon BRIT keeps borders in."""
-
-    def to_internal_value(self, data):
-        data = super().to_internal_value(data)
-        raw = data if isinstance(data, str) else json.dumps(data)
-        try:
-            geometry = GEOSGeometry(raw, srid=4326)
-        except (GDALException, GEOSException, ValueError, TypeError) as error:
-            raise serializers.ValidationError(f"Invalid geometry: {error}") from error
-        if geometry.geom_type == "Polygon":
-            geometry = MultiPolygon(geometry, srid=4326)
-        if geometry.geom_type != "MultiPolygon":
-            raise serializers.ValidationError(
-                f"Expected a Polygon or MultiPolygon, got {geometry.geom_type}."
-            )
-        if geometry.empty:
-            raise serializers.ValidationError("A geometry without any parts.")
-        return geometry
 
 
 class ImportRegionSerializer(serializers.Serializer):

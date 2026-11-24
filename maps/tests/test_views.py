@@ -1840,11 +1840,14 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertListEqual([new.pk], ids)
 
     def test_same_year_twins_listed_once(self):
+        # unique_lau_region_per_vintage forbids same-year twins with a country;
+        # NULL cntr_code rows remain distinct to the constraint, so the
+        # tie-break still has to pick one.
         for _ in range(2):
             LauRegion.objects.create(
                 name="Same Year Twin",
                 lau_id="03103000",
-                cntr_code="DE",
+                cntr_code=None,
                 year=2025,
                 publication_status="published",
             )

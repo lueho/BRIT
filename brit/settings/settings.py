@@ -410,3 +410,9 @@ REVIEW_DASHBOARD_PRIORITY_MODELS = [
 
 # Number of items to display per page in review dashboard
 REVIEW_DASHBOARD_PAGE_SIZE = 20
+
+# Body-size limit for the bulk import endpoints only. The global
+# DATA_UPLOAD_MAX_MEMORY_SIZE stays at Django's default; operator imports
+# legitimately exceed it (a single Norway NUTS-0 geometry is ~3.2 MB), and the
+# import views enforce this via maps.import_common.ImportJSONParser.
+IMPORT_API_MAX_BODY_SIZE = 25 * 1024 * 1024

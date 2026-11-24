@@ -130,7 +130,7 @@ class RevisionMigrationGraphTests(SimpleTestCase):
     """
 
     EXPECTED_LEAVES = {
-        "maps": ("maps", "0024_regionboundary"),
+        "maps": ("maps", "0025_alter_lauregion_options_and_more"),
         "materials": (
             "materials",
             "0036_analyticalmethod_content_revision_and_more",
