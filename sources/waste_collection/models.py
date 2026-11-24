@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models, router, transaction
 from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
+from django.db.models.expressions import RawSQL
 from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
@@ -46,13 +47,22 @@ class CollectionCatchment(Catchment):
 
     @property
     def downstream_collections(self):
-        qs = Collection.objects.filter(
-            catchment__in=self.descendants(include_self=True)
+        subtree_ids = RawSQL(
+            """
+            WITH RECURSIVE subtree(id) AS (
+                SELECT id FROM maps_catchment WHERE id = %s
+                UNION
+                SELECT child.id
+                FROM maps_catchment AS child
+                JOIN subtree AS parent ON child.parent_id = parent.id
+            )
+            SELECT id FROM subtree
+            """,
+            (self.pk,),
         )
-        qs = qs.select_related(
+        return Collection.objects.filter(catchment_id__in=subtree_ids).select_related(
             "catchment", "collector", "waste_category", "collection_system"
         )
-        return qs
 
     @property
     def upstream_collections(self):

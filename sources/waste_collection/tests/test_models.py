@@ -3,9 +3,10 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import signals
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from factory.django import mute_signals
 
 from distributions.models import Period, TemporalDistribution, Timestep
@@ -160,6 +161,16 @@ class CollectionCatchmentTestCase(TestCase):
     def test_downstream_collections_excludes_unrelated_collection(self):
         collections = self.catchment.downstream_collections
         self.assertNotIn(self.unrelated_collection, collections)
+
+    def test_downstream_collections_reads_only_the_requested_subtree(self):
+        with CaptureQueriesContext(connection) as queries:
+            collections = list(self.child_catchment.downstream_collections)
+
+        self.assertCountEqual(
+            collections, [self.child_collection, self.grandchild_collection]
+        )
+        self.assertEqual(len(queries), 1)
+        self.assertNotIn("tree_path", queries[0]["sql"])
 
     def test_downstream_collections_reflects_collections_added_after_access(self):
         list(self.catchment.downstream_collections)
