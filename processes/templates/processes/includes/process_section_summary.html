@@ -53,16 +53,19 @@
     {% endfor %}
   </ul>
 {% elif section.key == 'references' %}
-  <h3 class="h6">Corresponding authors</h3>
+  <h3 class="h6">Authors</h3>
   <ul class="list-unstyled">
     {% for link in object.process_authors.all %}
       <li class="mb-2">
         <span class="fw-semibold">{{ link.author }}</span>
         {% if link.author.institution %}<span>({{ link.author.institution }})</span>{% endif %}
-        {% if link.author.contact_email %}<a href="mailto:{{ link.author.contact_email }}">{{ link.author.contact_email }}</a>{% endif %}
+        {% if link.is_corresponding %}
+          <span class="badge text-bg-light">Corresponding author</span>
+          {% if link.author.contact_email %}<a href="mailto:{{ link.author.contact_email }}">{{ link.author.contact_email }}</a>{% endif %}
+        {% endif %}
       </li>
     {% empty %}
-      <li class="text-muted">No corresponding authors added yet.</li>
+      <li class="text-muted">No authors added yet.</li>
     {% endfor %}
   </ul>
   <h3 class="h6">Bibliography</h3>

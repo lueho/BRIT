@@ -172,7 +172,7 @@ class ProcessAuthorInlineForm(forms.ModelForm):
 
     class Meta:
         model = ProcessAuthor
-        fields = ("author",)
+        fields = ("author", "is_corresponding")
 
 
 class ProcessSourceInlineForm(forms.ModelForm):
@@ -479,8 +479,8 @@ PROCESS_SECTIONS = {
             (
                 ProcessAuthorSectionForm,
                 {
-                    "heading": "Corresponding authors",
-                    "add_label": "Add corresponding author",
+                    "heading": "Authors",
+                    "add_label": "Add author",
                 },
             ),
             (

@@ -6,11 +6,13 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
+from bibliography.models import Author
 from materials.models import Material
 from utils.properties.models import Unit
 
 from ..models import (
     Process,
+    ProcessAuthor,
     ProcessCategory,
     ProcessInfoResource,
     ProcessLink,
@@ -215,6 +217,30 @@ class ProcessModelTestCase(TestCase):
 
         self.assertEqual(input_names, [self.material_in.name])
         self.assertEqual(output_names, [self.material_out.name])
+
+    def test_corresponding_authors_are_ordered_subset_of_content_authors(self):
+        process = Process.objects.create(name="Hydrolysis", owner=self.owner)
+        corresponding = Author.objects.create(
+            first_names="Ada", last_names="Corresponding", owner=self.owner
+        )
+        contributor = Author.objects.create(
+            first_names="Grace", last_names="Contributor", owner=self.owner
+        )
+        ProcessAuthor.objects.create(
+            process=process,
+            author=contributor,
+            position=2,
+        )
+        ProcessAuthor.objects.create(
+            process=process,
+            author=corresponding,
+            position=1,
+            is_corresponding=True,
+        )
+
+        self.assertEqual(process.authors_ordered(), [corresponding, contributor])
+        self.assertEqual(process.corresponding_authors_ordered(), [corresponding])
+        self.assertFalse(ProcessAuthor.objects.get(author=contributor).is_corresponding)
 
     def test_process_link_url_validation(self):
         process = Process.objects.create(name="Anaerobic Digestion", owner=self.owner)
