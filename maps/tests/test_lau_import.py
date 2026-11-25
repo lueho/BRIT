@@ -379,6 +379,71 @@ class LauImportApiTestCase(TestCase):
         )
         self.assertIsNone(LauRegion.objects.get(lau_id="01001000").nuts_parent_id)
 
+    def test_an_omitted_parent_keeps_the_stored_one(self):
+        self.post(self.payload([lau("01001000")]))
+        imported = LauRegion.objects.get(lau_id="01001000", year=2018)
+        Catchment.objects.create(name="catch", region=imported, type="lau")
+        response = self.post(self.payload([{"cntr_code": "DE", "lau_id": "01001000"}]))
+        self.assertEqual(response.status_code, 200, response.json())
+        report = response.json()
+        self.assertEqual(report["unchanged"], 1)
+        self.assertEqual(report["without_parent"], 0)
+        self.assertNotIn("nuts_parent changed", str(report["warnings"]))
+        imported.refresh_from_db()
+        self.assertEqual(imported.nuts_parent_id, self.de3_2024.pk)
+
+    def test_an_explicit_null_parent_clears_the_stored_one(self):
+        self.post(self.payload([lau("01001000")]))
+        response = self.post(
+            self.payload(
+                [
+                    {
+                        "cntr_code": "DE",
+                        "lau_id": "01001000",
+                        "nuts_parent_id": None,
+                    }
+                ]
+            )
+        )
+        self.assertEqual(response.status_code, 200, response.json())
+        report = response.json()
+        self.assertEqual((report["updated"], report["without_parent"]), (1, 1))
+        self.assertIsNone(LauRegion.objects.get(lau_id="01001000").nuts_parent_id)
+
+    def test_an_omitted_parent_on_create_stores_no_parent(self):
+        response = self.post(
+            self.payload(
+                [
+                    {
+                        "cntr_code": "DE",
+                        "lau_id": "01001000",
+                        "geometry": DE_GEOMETRY,
+                    }
+                ]
+            )
+        )
+        self.assertEqual(response.status_code, 201, response.json())
+        self.assertEqual(response.json()["without_parent"], 1)
+        self.assertIsNone(LauRegion.objects.get(lau_id="01001000").nuts_parent_id)
+
+    def test_the_cross_vintage_guard_applies_with_an_omitted_parent(self):
+        lau_row = LauRegion.objects.create(
+            name="Flensburg",
+            country="DE",
+            cntr_code="DE",
+            lau_id="01001000",
+            lau_name="Flensburg",
+            year=2018,
+            nuts_parent=self.de3_2021,
+        )
+        response = self.post(
+            self.payload([{"cntr_code": "DE", "lau_id": "01001000"}], nuts_year=2024)
+        )
+        self.assertEqual(response.status_code, 400, response.json())
+        self.assertIn("2021", str(response.json()["errors"]))
+        lau_row.refresh_from_db()
+        self.assertEqual(lau_row.nuts_parent_id, self.de3_2021.pk)
+
     def test_a_geometry_change_on_a_referenced_region_warns(self):
         self.post(self.payload([lau("01001000")]))
         imported = LauRegion.objects.get(lau_id="01001000", year=2018)

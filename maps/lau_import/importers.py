@@ -102,7 +102,7 @@ def import_lau_payload(payload, user=None, dry_run=False):
                 raise _Rollback
 
             parent_codes = {
-                row["nuts_parent_id"] for row in rows if row["nuts_parent_id"]
+                row.get("nuts_parent_id") for row in rows if row.get("nuts_parent_id")
             }
             parents = {
                 p.nuts_id: p
@@ -194,9 +194,7 @@ def _upsert_lau(
 
     parent = None
     parent_id = row.get("nuts_parent_id")
-    if parent_id is None:
-        report.without_parent += 1
-    else:
+    if parent_id is not None:
         candidate = parents.get(parent_id)
         if candidate is None:
             report.errors.append(
@@ -231,6 +229,11 @@ def _upsert_lau(
                 "reparenting is not allowed"
             )
             return
+
+    # An explicit null means the source has no parent for this LAU; an
+    # omitted key only lands here on create, where it means the same.
+    if parent_id is None and ("nuts_parent_id" in row or row_existing is None):
+        report.without_parent += 1
 
     if row_existing is None:
         if not row.get("geometry"):
@@ -272,7 +275,12 @@ def _upsert_lau(
         if row_existing.name != name:
             row_existing.name = name
             changed.append("name")
-    if row_existing.nuts_parent_id != (parent.pk if parent else None):
+    # An omitted key keeps the stored parent: missing source evidence must
+    # not overwrite what BRIT holds, only explicit evidence (code or null)
+    # may reparent or clear.
+    if "nuts_parent_id" in row and row_existing.nuts_parent_id != (
+        parent.pk if parent else None
+    ):
         row_existing.nuts_parent = parent
         changed.append("nuts_parent")
         reparented_ids[row_existing.pk] = row["lau_id"]
