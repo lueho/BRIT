@@ -143,9 +143,26 @@ def _unavailable_group_composition(sample, group, composition_setting, code, mes
 def _build_raw_derived_group_composition(
     *, sample, group, measurements, composition_setting
 ):
-    measurements = list(measurements)
-    if not measurements:
+    raw_measurements = list(measurements)
+    if not raw_measurements:
         return None
+
+    def unavailable(code, message):
+        return _unavailable_group_composition(
+            sample, group, composition_setting, code, message
+        )
+
+    measurements = [
+        measurement
+        for measurement in raw_measurements
+        if not measurement.excluded_from_normalization
+    ]
+    excluded_measurement_count = len(raw_measurements) - len(measurements)
+    if not measurements:
+        return unavailable(
+            "all_measurements_excluded",
+            "All measurements in this group are excluded from normalization. Raw measurements remain unchanged.",
+        )
     other_component = MaterialComponent.objects.other()
     excluded_aggregate_names = set()
     observations = []
@@ -158,11 +175,6 @@ def _build_raw_derived_group_composition(
         observations.append(measurement)
     if not observations:
         return None
-
-    def unavailable(code, message):
-        return _unavailable_group_composition(
-            sample, group, composition_setting, code, message
-        )
 
     if not group.is_compositional:
         return unavailable(
@@ -284,6 +296,19 @@ def _build_raw_derived_group_composition(
 
     warnings = []
     warning_codes = []
+    if excluded_measurement_count:
+        if excluded_measurement_count == 1:
+            message = (
+                "1 measurement is excluded from normalization; "
+                "it remains available in the raw data."
+            )
+        else:
+            message = (
+                f"{excluded_measurement_count} measurements are excluded from "
+                "normalization; they remain available in the raw data."
+            )
+        warnings.append(message)
+        warning_codes.append("measurements_excluded_from_normalization")
     if censored_counts:
         warnings.append(_censored_values_warning(censored_counts))
         warning_codes.append("censored_values_approximated_as_zero")

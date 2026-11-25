@@ -1610,6 +1610,14 @@ class ComponentMeasurement(
         blank=True,
         help_text="Number of samples/replicates (n) used for the measurement.",
     )
+    excluded_from_normalization = models.BooleanField(
+        "exclude from normalization",
+        default=False,
+        help_text=(
+            "Keep this raw measurement but ignore it when deriving normalized "
+            "compositions."
+        ),
+    )
 
     class Meta:
         ordering = ["component__name", "id"]
@@ -1639,6 +1647,7 @@ class ComponentMeasurement(
             average=self.average,
             standard_deviation=self.standard_deviation,
             sample_size=self.sample_size,
+            excluded_from_normalization=self.excluded_from_normalization,
             **self.measurement_metadata_kwargs(),
         )
         duplicate.sources.set(self.sources.all())

@@ -295,6 +295,11 @@ class ComponentMeasurementModelFormTestCase(TestCase):
             self.assertIn(field, form.fields)
         self.assertEqual(form.fields["detection_limit"].label, "Limit value")
 
+    def test_form_includes_excluded_from_normalization_field(self):
+        form = ComponentMeasurementModelForm()
+
+        self.assertIn("excluded_from_normalization", form.fields)
+
     def test_below_detection_limit_rejects_quantification_and_reporting_limits(self):
         for limit_type in ("loq", "rl"):
             with self.subTest(limit_type=limit_type):

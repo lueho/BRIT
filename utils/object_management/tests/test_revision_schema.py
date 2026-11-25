@@ -133,7 +133,7 @@ class RevisionMigrationGraphTests(SimpleTestCase):
         "maps": ("maps", "0026_widen_lau_name"),
         "materials": (
             "materials",
-            "0036_analyticalmethod_content_revision_and_more",
+            "0037_componentmeasurement_excluded_from_normalization",
         ),
         "waste_collection": (
             "waste_collection",

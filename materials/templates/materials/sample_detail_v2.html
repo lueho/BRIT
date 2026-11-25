@@ -584,6 +584,10 @@
                               <tr>
                                 <td>
                                   <span class="sdv2-raw-component">{{ measurement.component.name }}</span>
+                                  {% if measurement.excluded_from_normalization %}
+                                    <span class="badge text-bg-secondary ms-1"
+                                          title="Stored as raw data but ignored when deriving normalized compositions">Excluded from normalization</span>
+                                  {% endif %}
                                   {% if measurement.canonical_component.pk != measurement.component.pk %}
                                     <span class="sdv2-alias-chip"
                                           title="Canonical: {{ measurement.canonical_component.name }}">
@@ -690,6 +694,7 @@
                   </p>
                   <ul>
                     <li>Only compositional groups with one consistent basis and one observation per component are normalized. Other groups retain their raw measurement tables.</li>
+                    <li>Measurements marked <em>Exclude from normalization</em> remain stored and visible as raw data but are ignored when checking basis compatibility and duplicate observations and when calculating normalized shares.</li>
                     <li>Less-than and below-detection-limit observations, i.e. values below a stated limit of detection (LOD), method detection limit (MDL), limit of quantification (LOQ) or reporting limit (RL), contribute zero to aggregation as an explicit approximation; their stored values are not changed. The limit type is marked next to the value; select the marker to show the full limit type and stated limit. Other qualified values require a separate aggregation policy.</li>
                     <li>All measurements are first converted to weight percent (e.g. g/kg → %, mg/kg → %); component measurements only accept weight-fraction units.</li>
                     <li>If the raw shares sum to more than 100%, all shares are scaled down proportionally.</li>

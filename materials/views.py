@@ -2382,6 +2382,8 @@ def ensure_derived_composition_settings(sample, owner):
         if measurement.group_id in composition_settings_by_group:
             continue
         groups.setdefault(measurement.group_id, measurement.group)
+        if measurement.excluded_from_normalization:
+            continue
         if (
             measurement.component_id != other_component.pk
             and not measurement.component.is_aggregate

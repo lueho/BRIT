@@ -776,6 +776,7 @@ class ComponentMeasurementReadSerializer(
             "average",
             "standard_deviation",
             "sample_size",
+            "excluded_from_normalization",
             "comment",
         ) + MEASUREMENT_METADATA_FIELDS
 
@@ -795,6 +796,7 @@ class ComponentMeasurementWriteSerializer(ModelSerializer):
             "average",
             "standard_deviation",
             "sample_size",
+            "excluded_from_normalization",
             "comment",
         )
 
