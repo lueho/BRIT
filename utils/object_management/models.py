@@ -541,6 +541,10 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         # Backward compatibility shim
         return self.submit_for_review()
 
+    def get_submit_review_warning(self, user):
+        """Optional warning shown after a successful submit-for-review action."""
+        return None
+
     def withdraw_from_review(self):
         with transaction.atomic():
             self._lock_and_validate_transition(

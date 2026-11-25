@@ -15,7 +15,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.api import MessageFailure
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import (
-    FieldDoesNotExist,
     FieldError,
     ImproperlyConfigured,
     ObjectDoesNotExist,
@@ -702,6 +701,12 @@ class SubmitForReviewView(BaseReviewActionView):
     action_attr_name = "submit_for_review"
     review_action = ReviewAction.ACTION_SUBMITTED
 
+    def post_action_hook(self, request, previous_status=None):
+        super().post_action_hook(request, previous_status)
+        warning = self.object.get_submit_review_warning(request.user)
+        if warning:
+            messages.warning(request, warning)
+
     def post(self, request, *args, **kwargs):  # type: ignore[override]
         """Handle preflight AJAX from modal-forms so real POST carries checkbox."""
         try:
@@ -794,19 +799,6 @@ class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
         context = super().get_context_data(**kwargs)
         # Pass through 'next' if provided in the opener link; templates will append it to the form action
         context["next_url"] = get_safe_next_url(self.request)
-        obj = context.get("object")
-        action = getattr(self, "action_attr_name", None)
-        if obj is not None and action and hasattr(obj, "affected_author_count"):
-            try:
-                context["cascade_author_count"] = obj.affected_author_count(action)
-            except (
-                AttributeError,
-                TypeError,
-                FieldDoesNotExist,
-                FieldError,
-                DatabaseError,
-            ):
-                context["cascade_author_count"] = 0
         expected = self._parse_revision_param(self.request.GET.get("expected_revision"))
         context["expected_revision"] = expected
         context["expected_revision_bound"] = expected is not None

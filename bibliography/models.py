@@ -3,12 +3,15 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
+from django.utils.html import format_html, format_html_join
+from django.utils.translation import ngettext
 
 from utils.object_management.models import (
     NamedUserCreatedObject,
     UserCreatedObject,
     UserCreatedObjectManager,
 )
+from utils.object_management.policy import visible_queryset
 
 from .utils import (
     DOI_FORMAT_MESSAGE,
@@ -364,6 +367,38 @@ class Source(UserCreatedObject):
     @property
     def authors_ordered(self):
         return [sa.author for sa in self.ordered_authors()]
+
+    def get_submit_review_warning(self, user):
+        visible_private_author_ids = set(
+            visible_queryset(user, self.authors.all())
+            .filter(publication_status=UserCreatedObject.STATUS_PRIVATE)
+            .values_list("pk", flat=True)
+        )
+        private_authors = [
+            source_author.author
+            for source_author in self.ordered_authors()
+            if source_author.author.pk in visible_private_author_ids
+        ]
+        if not private_authors:
+            return None
+        author_links = format_html_join(
+            ", ",
+            '<a href="{}">{}</a>',
+            ((author.get_absolute_url(), str(author)) for author in private_authors),
+        )
+        return format_html(
+            ngettext(
+                "{count} linked author is private and was not submitted for review "
+                "automatically: {author_links}. Submit it separately if it should "
+                "be reviewed.",
+                "{count} linked authors are private and were not submitted for "
+                "review automatically: {author_links}. Submit them separately if "
+                "they should be reviewed.",
+                len(private_authors),
+            ),
+            count=len(private_authors),
+            author_links=author_links,
+        )
 
     def __str__(self):
         return self.citation_key or self.title or f"Source #{self.pk}"
