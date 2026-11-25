@@ -2,6 +2,9 @@ import json
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.messages import constants as message_levels
+from django.contrib.messages import get_messages
 from django.db.models.signals import post_save
 from django.http import QueryDict
 from django.test import Client, TestCase
@@ -778,6 +781,177 @@ class SourceCRUDViewsTestCase(
         self.assertSetEqual(
             author_ids, {self.source_author_1.author.pk, self.source_author_2.author.pk}
         )
+
+
+class SourceSubmitForReviewWarningTestCase(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username="source-submit-owner")
+        self.source = Source.objects.create(
+            owner=self.owner,
+            title="Source with independent authors",
+            publication_status="private",
+        )
+
+    def _submit_source(self, follow=False):
+        url = reverse(
+            "object_management:submit_for_review",
+            kwargs={
+                "content_type_id": ContentType.objects.get_for_model(Source).pk,
+                "object_id": self.source.pk,
+            },
+        )
+        self.client.force_login(self.owner)
+        return self.client.post(url, follow=follow)
+
+    def _warnings(self, response):
+        return [
+            str(message)
+            for message in get_messages(response.wsgi_request)
+            if message.level == message_levels.WARNING
+        ]
+
+    def _author_link(self, author):
+        return f'<a href="{reverse("author-detail", args=[author.pk])}">{author}</a>'
+
+    def test_submit_warns_that_private_linked_authors_are_not_submitted(self):
+        private_authors = [
+            Author.objects.create(
+                owner=self.owner,
+                first_names="Ada",
+                last_names="Lovelace",
+                publication_status="private",
+            ),
+            Author.objects.create(
+                owner=self.owner,
+                first_names="Grace",
+                last_names="Hopper",
+                publication_status="private",
+            ),
+        ]
+        other_status_authors = [
+            Author.objects.create(
+                owner=self.owner,
+                first_names="Katherine",
+                last_names="Johnson",
+                publication_status="review",
+            ),
+            Author.objects.create(
+                owner=self.owner,
+                first_names="Mary",
+                last_names="Jackson",
+                publication_status="published",
+            ),
+            Author.objects.create(
+                owner=self.owner,
+                first_names="Dorothy",
+                last_names="Vaughan",
+                publication_status="declined",
+            ),
+        ]
+        for position, author in enumerate(private_authors + other_status_authors, 1):
+            SourceAuthor.objects.create(
+                source=self.source, author=author, position=position
+            )
+
+        response = self._submit_source()
+
+        self.assertEqual(response.status_code, 302)
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.publication_status, "review")
+        for author in private_authors:
+            author.refresh_from_db()
+            self.assertEqual(author.publication_status, "private")
+        author_links = ", ".join(
+            self._author_link(author) for author in private_authors
+        )
+        self.assertEqual(
+            self._warnings(response),
+            [
+                "2 linked authors are private and were not submitted for review "
+                f"automatically: {author_links}. Submit them separately if they "
+                "should be reviewed."
+            ],
+        )
+
+    def test_submit_warning_excludes_private_authors_not_visible_to_actor(self):
+        visible_private_author = Author.objects.create(
+            owner=self.owner,
+            first_names="Ada",
+            last_names="Lovelace",
+            publication_status="private",
+        )
+        other_owner = User.objects.create_user(username="other-author-owner")
+        hidden_private_author = Author.objects.create(
+            owner=other_owner,
+            first_names="Hidden",
+            last_names="Author",
+            publication_status="private",
+        )
+        SourceAuthor.objects.create(
+            source=self.source, author=visible_private_author, position=1
+        )
+        SourceAuthor.objects.create(
+            source=self.source, author=hidden_private_author, position=2
+        )
+
+        response = self._submit_source()
+
+        self.assertEqual(response.status_code, 302)
+        author_link = self._author_link(visible_private_author)
+        self.assertEqual(
+            self._warnings(response),
+            [
+                "1 linked author is private and was not submitted for review "
+                f"automatically: {author_link}. Submit it separately if it should "
+                "be reviewed."
+            ],
+        )
+
+    def test_submit_warning_escapes_linked_author_names(self):
+        author = Author.objects.create(
+            owner=self.owner,
+            first_names="<b>Ada</b>",
+            last_names="<script>alert(1)</script>",
+            publication_status="private",
+        )
+        SourceAuthor.objects.create(source=self.source, author=author, position=1)
+
+        response = self._submit_source()
+
+        warning = self._warnings(response)[0]
+        self.assertIn(
+            "&lt;script&gt;alert(1)&lt;/script&gt;, &lt;b&gt;Ada&lt;/b&gt;", warning
+        )
+        self.assertNotIn("<script>alert(1)</script>", warning)
+        self.assertNotIn("<b>Ada</b>", warning)
+
+    def test_submit_warning_renders_linked_author_html(self):
+        author = Author.objects.create(
+            owner=self.owner,
+            first_names="Ada",
+            last_names="Lovelace",
+            publication_status="private",
+        )
+        SourceAuthor.objects.create(source=self.source, author=author, position=1)
+
+        response = self._submit_source(follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self._author_link(author))
+
+    def test_submit_without_private_linked_authors_has_no_private_author_warning(self):
+        author = Author.objects.create(
+            owner=self.owner,
+            first_names="Katherine",
+            last_names="Johnson",
+            publication_status="published",
+        )
+        SourceAuthor.objects.create(source=self.source, author=author, position=1)
+
+        response = self._submit_source()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self._warnings(response), [])
 
 
 class SourceReviewListRegressionTest(ViewWithPermissionsTestCase):
