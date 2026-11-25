@@ -18,6 +18,12 @@ holds — the stored borders are kept — but it is required for a row BRIT does
 not hold yet. A new row without a geometry is a row-level error that rolls
 back the whole batch.
 
+Within ``1.0``, ``nuts_parent_id`` may also be omitted: on a row BRIT holds,
+the stored parent is then left untouched, while an explicit ``null`` clears
+it. On a new row, omitted and ``null`` both store no parent. Producers send
+the key only when their source assigns or denies a parent, so missing source
+evidence never overwrites stored data.
+
 Versioning policy: ``SCHEMA_VERSION`` is a compatibility marker, not a
 changelog. Adding an optional field stays within the current version, because
 every payload that was valid before remains valid. Renaming or removing a
@@ -84,7 +90,7 @@ LAU_IMPORT_SCHEMA = {
             ),
             "items": {
                 "type": "object",
-                "required": ["cntr_code", "lau_id", "nuts_parent_id"],
+                "required": ["cntr_code", "lau_id"],
                 "additionalProperties": False,
                 "properties": {
                     "cntr_code": {"type": "string", "maxLength": 2},
@@ -103,7 +109,9 @@ LAU_IMPORT_SCHEMA = {
                         "maxLength": 5,
                         "description": (
                             "NUTS-3 region of the declared NUTS vintage this "
-                            "LAU belongs to, or null where none applies."
+                            "LAU belongs to, or null where none applies. "
+                            "Omitted preserves the stored parent on update "
+                            "and stores no parent on create."
                         ),
                     },
                     "geometry": {**GEOMETRY_SCHEMA, "type": ["object", "null"]},
