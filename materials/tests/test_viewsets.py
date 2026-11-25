@@ -1354,6 +1354,7 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
                     "component": self.component.pk,
                     "unit": self.unit.pk,
                     "average": "5.0",
+                    "excluded_from_normalization": True,
                 }
             ),
             content_type=JSON,
@@ -1365,6 +1366,7 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
                 component=self.component,
                 average=Decimal("5.0"),
                 owner=self.member,
+                excluded_from_normalization=True,
             ).exists()
         )
 
@@ -1471,12 +1473,13 @@ class ComponentMeasurementViewSetTestCase(ViewSetWithPermissionsTestCase):
                 "api-componentmeasurement-detail",
                 kwargs={"pk": self.private_measurement.pk},
             ),
-            data=json.dumps({"average": "25.0"}),
+            data=json.dumps({"average": "25.0", "excluded_from_normalization": True}),
             content_type=JSON,
         )
         self.assertEqual(response.status_code, 200)
         self.private_measurement.refresh_from_db()
         self.assertEqual(self.private_measurement.average, Decimal("25.0"))
+        self.assertTrue(self.private_measurement.excluded_from_normalization)
 
     # --- delete ---
 

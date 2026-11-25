@@ -1040,6 +1040,24 @@ class SampleTestCase(TestCase):
 
         self.assertIn(raw_component, self.sample.components)
 
+    def test_duplicate_preserves_measurement_normalization_exclusions(self):
+        raw_component = MaterialComponent.objects.create(name="Excluded Raw Component")
+        unit = Unit.objects.create(name="Exclusion test percent")
+        ComponentMeasurement.objects.create(
+            sample=self.sample,
+            group=self.default_group,
+            component=raw_component,
+            unit=unit,
+            average=Decimal("42.0"),
+            excluded_from_normalization=True,
+        )
+        creator = User.objects.create(username="measurement-exclusion-copier")
+
+        duplicate = self.sample.duplicate(creator)
+
+        copied = duplicate.component_measurements.get(component=raw_component)
+        self.assertTrue(copied.excluded_from_normalization)
+
     def test_display_image_metadata_uses_sample_values(self):
         self.sample.image = SimpleUploadedFile(
             "sample.jpg", b"image content", content_type="image/jpeg"

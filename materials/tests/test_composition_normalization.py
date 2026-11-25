@@ -451,6 +451,59 @@ class SampleCompositionNormalizationTestCase(TestCase):
             composition["warning_codes"], ["repeated_component_measurements"]
         )
 
+    def test_excluded_measurement_does_not_block_or_contribute_to_normalization(self):
+        sample, group = self._sample_with_group("Excluded Duplicate Basis")
+        dm = MaterialComponent.objects.create(name="Dry matter", owner=self.owner)
+        fm = MaterialComponent.objects.create(name="Fresh matter", owner=self.owner)
+        carbon = MaterialComponent.objects.create(name="Carbon", owner=self.owner)
+        self._measure(sample, group, carbon, "40", basis=dm)
+        excluded = self._measure(
+            sample,
+            group,
+            carbon,
+            "42",
+            basis=fm,
+            excluded_from_normalization=True,
+        )
+        self._measure(sample, group, "Nitrogen", "10", basis=dm)
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(composition["normalization_status"], "normalized")
+        self.assertEqual(
+            [
+                (share["component_name"], share["percent"])
+                for share in composition["shares"]
+            ],
+            [("Carbon", 40.0), ("Nitrogen", 10.0), ("Other", 50.0)],
+        )
+        self.assertIn(
+            "measurements_excluded_from_normalization", composition["warning_codes"]
+        )
+        self.assertIn(
+            "1 measurement is excluded from normalization; it remains available in the raw data.",
+            composition["warnings"],
+        )
+        excluded.refresh_from_db()
+        self.assertEqual(excluded.average, Decimal("42"))
+        self.assertTrue(excluded.excluded_from_normalization)
+
+    def test_group_with_only_excluded_measurements_remains_available_as_raw_data(self):
+        sample, group = self._sample_with_group("Only Excluded")
+        self._measure(
+            sample,
+            group,
+            "Carbon",
+            "40",
+            excluded_from_normalization=True,
+        )
+
+        composition = get_sample_normalized_compositions(sample)[0]
+
+        self.assertEqual(composition["shares"], [])
+        self.assertEqual(composition["normalization_status"], "unavailable")
+        self.assertEqual(composition["warning_codes"], ["all_measurements_excluded"])
+
     def test_censored_measurements_are_approximated_as_zero(self):
         sample, group = self._sample_with_group("Censored")
         self._measure(sample, group, "Carbon", "40")

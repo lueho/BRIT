@@ -105,6 +105,30 @@ class ComponentMeasurementWriteSerializerTestCase(TestCase):
 
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
+    def test_accepts_excluded_from_normalization(self):
+        unit, _ = Unit.objects.get_or_create(name="%", defaults={"symbol": "%"})
+        data = self._data(unit)
+        data["excluded_from_normalization"] = True
+        serializer = ComponentMeasurementWriteSerializer(data=data)
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertTrue(serializer.validated_data["excluded_from_normalization"])
+
+    def test_read_serializer_includes_excluded_from_normalization(self):
+        unit, _ = Unit.objects.get_or_create(name="%", defaults={"symbol": "%"})
+        measurement = ComponentMeasurement.objects.create(
+            sample=self.sample,
+            group=self.group,
+            component=self.component,
+            unit=unit,
+            average=Decimal("12.0"),
+            excluded_from_normalization=True,
+        )
+
+        data = ComponentMeasurementReadSerializer(measurement).data
+
+        self.assertTrue(data["excluded_from_normalization"])
+
 
 class MaterialPropertySerializerTestCase(TestCase):
     @classmethod

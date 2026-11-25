@@ -262,6 +262,7 @@ class ComponentMeasurementModelForm(
             "average",
             "standard_deviation",
             "sample_size",
+            "excluded_from_normalization",
             "value_qualifier",
             "limit_type",
             "detection_limit",

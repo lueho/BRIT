@@ -1459,6 +1459,46 @@ class ComponentMeasurementUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(self.measurement.average, Decimal("14.25"))
         self.assertEqual(self.measurement.sample_size, 3)
         self.assertEqual(self.measurement.comment, "Updated from sample detail")
+        self.assertFalse(self.measurement.excluded_from_normalization)
+
+    def test_update_view_saves_normalization_exclusion(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            reverse("componentmeasurement-update", kwargs={"pk": self.measurement.pk}),
+            data={
+                "group": self.group.pk,
+                "component": self.component.pk,
+                "basis_component": "",
+                "analytical_method": "",
+                "sources": [],
+                "unit": self.unit.pk,
+                "average": "14.25",
+                "standard_deviation": "0.75",
+                "sample_size": "3",
+                "excluded_from_normalization": "on",
+                "comment": "Updated from sample detail",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("sample-detail", kwargs={"pk": self.sample.pk}),
+        )
+        self.measurement.refresh_from_db()
+        self.assertTrue(self.measurement.excluded_from_normalization)
+
+    def test_sample_detail_marks_measurement_excluded_from_normalization(self):
+        self.measurement.excluded_from_normalization = True
+        self.measurement.save(update_fields=["excluded_from_normalization"])
+        self.client.force_login(self.owner)
+
+        response = self.client.get(
+            reverse("sample-detail", kwargs={"pk": self.sample.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Excluded from normalization")
 
     def test_update_view_redirects_to_next_url(self):
         self.client.force_login(self.owner)
@@ -3941,6 +3981,26 @@ class SampleMeasurementWorkspaceTestCase(TestCase):
         new = self.sample.component_measurements.get(component=self.moisture)
         self.assertEqual(list(new.sources.all()), [self.source])
 
+    def test_measurements_post_saves_normalization_exclusion(self):
+        response = self.client.post(
+            self.section_url("measurements"),
+            self.measurement_formset(
+                [
+                    self.measurement_row(
+                        id=str(self.measurement.pk),
+                        excluded_from_normalization="on",
+                    )
+                ],
+                initial=1,
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(response.json()["saved"])
+        self.measurement.refresh_from_db()
+        self.assertTrue(self.measurement.excluded_from_normalization)
+
     def test_measurements_post_changes_group_of_existing_row(self):
         other_group = MaterialComponentGroup.objects.create(
             owner=self.editor,
@@ -6036,6 +6096,61 @@ class DerivedCompositionOrderViewTestCase(ViewWithPermissionsTestCase):
         self.assertNotContains(
             detail_response,
             "The configured composition basis differs from the measurement basis.",
+        )
+
+    def test_order_down_basis_inference_ignores_excluded_measurements(self):
+        dry_matter = MaterialComponent.objects.create(
+            owner=self.member,
+            name="Dry Matter",
+            publication_status="published",
+        )
+        fresh_matter = MaterialComponent.objects.create(
+            owner=self.member,
+            name="Fresh Matter",
+            publication_status="published",
+        )
+        organic_measurements = self.sample.component_measurements.filter(
+            group=self.organic_group
+        ).order_by("id")
+        organic_measurements.filter(pk=organic_measurements[0].pk).update(
+            basis_component=dry_matter
+        )
+        organic_measurements.filter(pk=organic_measurements[1].pk).update(
+            basis_component=fresh_matter,
+            excluded_from_normalization=True,
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "derived-composition-order-down",
+                kwargs={"sample_pk": self.sample.pk, "group_pk": self.organic_group.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            self.sample.compositions.get(group=self.organic_group).fractions_of,
+            dry_matter,
+        )
+
+    def test_order_down_creates_settings_when_all_group_measurements_are_excluded(self):
+        self.sample.component_measurements.filter(group=self.organic_group).update(
+            excluded_from_normalization=True
+        )
+        self.client.force_login(self.member)
+
+        response = self.client.get(
+            reverse(
+                "derived-composition-order-down",
+                kwargs={"sample_pk": self.sample.pk, "group_pk": self.organic_group.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            self.sample.compositions.get(group=self.organic_group).fractions_of,
+            MaterialComponent.objects.default(),
         )
 
     def test_order_down_redirects_to_next_url(self):
