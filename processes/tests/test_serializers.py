@@ -253,6 +253,17 @@ class ProcessDetailSerializerTestCase(TestCase):
         self.assertEqual(data["input_materials"][0]["name"], "Wood Chips")
         self.assertEqual(data["output_materials"][0]["name"], "Bio-oil")
 
+    def test_process_serializers_expose_corresponding_author_subset(self):
+        link = self.process.process_authors.get(author=self.author_1)
+        link.is_corresponding = True
+        link.save()
+
+        for serializer_class in (ProcessListSerializer, ProcessDetailSerializer):
+            with self.subTest(serializer=serializer_class.__name__):
+                data = serializer_class(self.process).data
+                self.assertEqual(data["authors"], [self.author_1.pk, self.author_2.pk])
+                self.assertEqual(data["corresponding_authors"], [self.author_1.pk])
+
 
 class ProcessSourceReferenceContextTestCase(TestCase):
     """get_sources must propagate request context so nested Source refs scope."""

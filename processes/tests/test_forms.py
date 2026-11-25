@@ -134,6 +134,40 @@ class ProcessFormTestCase(TestCase):
             [(self.author_2.pk, 1), (self.author_1.pk, 2)],
         )
 
+    def test_author_formset_saves_corresponding_flag(self):
+        process = Process.objects.create(name="Test Process")
+        formset_class = inlineformset_factory(
+            Process,
+            ProcessAuthor,
+            form=ProcessAuthorSectionForm,
+            formset=ProcessSectionFormSet,
+            extra=0,
+            can_delete=True,
+        )
+        formset = formset_class(
+            data={
+                "process_authors-TOTAL_FORMS": "2",
+                "process_authors-INITIAL_FORMS": "0",
+                "process_authors-MIN_NUM_FORMS": "0",
+                "process_authors-MAX_NUM_FORMS": "1000",
+                "process_authors-0-author": str(self.author_1.pk),
+                "process_authors-0-is_corresponding": "on",
+                "process_authors-1-author": str(self.author_2.pk),
+            },
+            instance=process,
+            prefix="process_authors",
+        )
+
+        self.assertTrue(formset.is_valid(), formset.errors)
+        formset.save()
+
+        self.assertTrue(
+            ProcessAuthor.objects.get(author=self.author_1).is_corresponding
+        )
+        self.assertFalse(
+            ProcessAuthor.objects.get(author=self.author_2).is_corresponding
+        )
+
     def test_source_formset_rejects_duplicate_sources(self):
         process = Process.objects.create(name="Test Process")
         formset_class = inlineformset_factory(

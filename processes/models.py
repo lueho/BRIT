@@ -127,7 +127,7 @@ class Process(NamedUserCreatedObject):
         blank=True,
         through="ProcessAuthor",
         related_name="processes",
-        help_text="Authors or contributors shown on the process detail page.",
+        help_text="People who contributed to the process content.",
     )
     mechanism = models.CharField(
         max_length=255,
@@ -242,6 +242,15 @@ class Process(NamedUserCreatedObject):
     def authors_ordered(self):
         return [process_author.author for process_author in self.ordered_authors()]
 
+    def ordered_corresponding_authors(self):
+        return self.ordered_authors().filter(is_corresponding=True)
+
+    def corresponding_authors_ordered(self):
+        return [
+            process_author.author
+            for process_author in self.ordered_corresponding_authors()
+        ]
+
     def ordered_sources(self):
         return self.process_sources.order_by("order", "id").select_related("source")
 
@@ -263,6 +272,11 @@ class ProcessAuthor(models.Model):
         related_name="process_author_links",
     )
     position = models.PositiveIntegerField(default=1)
+    is_corresponding = models.BooleanField(
+        default=False,
+        verbose_name="corresponding author",
+        help_text="Responsible contact whose contact data is shown publicly.",
+    )
 
     class Meta:
         ordering = ["position", "author_id", "id"]

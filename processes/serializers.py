@@ -207,11 +207,28 @@ class ScopedRelatedObjectsMixin:
             link for link in obj.process_materials.all() if link.material_id in visible
         ]
 
+    def _visible_ordered_author_links(self, obj):
+        cache = getattr(self, "_visible_ordered_author_links_cache", None)
+        if cache is None:
+            cache = self._visible_ordered_author_links_cache = {}
+        if obj.pk not in cache:
+            visible = self._visible_pks(Author)
+            cache[obj.pk] = [
+                link for link in obj.ordered_authors() if link.author_id in visible
+            ]
+        return cache[obj.pk]
+
     def get_authors(self, obj):
         """Get author ids in explicit process author order."""
 
-        visible = self._visible_pks(Author)
-        return [a.pk for a in obj.authors_ordered() if a.pk in visible]
+        return [link.author_id for link in self._visible_ordered_author_links(obj)]
+
+    def get_corresponding_authors(self, obj):
+        return [
+            link.author_id
+            for link in self._visible_ordered_author_links(obj)
+            if link.is_corresponding
+        ]
 
 
 class ProcessListSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerializer):
@@ -220,6 +237,7 @@ class ProcessListSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerializ
     categories = serializers.SerializerMethodField()
     sources = serializers.SerializerMethodField()
     authors = serializers.SerializerMethodField()
+    corresponding_authors = serializers.SerializerMethodField()
     owner_name = serializers.CharField(source="owner.username", read_only=True)
 
     class Meta:
@@ -230,6 +248,7 @@ class ProcessListSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerializ
             "categories",
             "short_description",
             "authors",
+            "corresponding_authors",
             "sources",
             "mechanism",
             "image",
@@ -267,6 +286,7 @@ class ProcessDetailSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerial
     categories = serializers.SerializerMethodField()
     sources = serializers.SerializerMethodField()
     authors = serializers.SerializerMethodField()
+    corresponding_authors = serializers.SerializerMethodField()
     owner_name = serializers.CharField(source="owner.username", read_only=True)
 
     # Related objects
@@ -289,6 +309,7 @@ class ProcessDetailSerializer(ScopedRelatedObjectsMixin, serializers.ModelSerial
             "categories",
             "short_description",
             "authors",
+            "corresponding_authors",
             "mechanism",
             "description",
             "process_technology",

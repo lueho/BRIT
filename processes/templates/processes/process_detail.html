@@ -63,13 +63,16 @@
         <h1 class="sdv2-hero-title">{{ object.name }}</h1>
         {% if process_authors %}
           <div class="small text-muted my-3">
-            <div class="sdv2-meta-label mb-1">Corresponding authors</div>
+            <div class="sdv2-meta-label mb-1">Authors</div>
             {% for process_author in process_authors %}
               {% with author=process_author.author %}
                 <div class="mb-1">
                   <span class="fw-semibold">{{ author }}</span>
                   {% if author.institution %}<span>({{ author.institution }})</span>{% endif %}
-                  {% if author.contact_email %}<a class="text-break" href="mailto:{{ author.contact_email }}">{{ author.contact_email }}</a>{% endif %}
+                  {% if process_author.is_corresponding %}
+                    <span class="badge text-bg-light">Corresponding author</span>
+                    {% if author.contact_email %}<a class="text-break" href="mailto:{{ author.contact_email }}">{{ author.contact_email }}</a>{% endif %}
+                  {% endif %}
                 </div>
               {% endwith %}
             {% endfor %}

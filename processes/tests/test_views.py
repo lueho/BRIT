@@ -634,6 +634,69 @@ class ProcessMaintenanceViewsTestCase(TestCase):
         self.assertFalse(self.process.process_authors.exists())
         self.assertFalse(self.process.process_sources.exists())
 
+    def test_reference_section_saves_corresponding_flag(self):
+        author = Author.objects.create(
+            first_names="Ada",
+            last_names="Example",
+            owner=self.owner,
+            publication_status="published",
+        )
+
+        response = self.client.post(
+            self.section_url("references"),
+            {
+                "process_authors-TOTAL_FORMS": "1",
+                "process_authors-INITIAL_FORMS": "0",
+                "process_authors-MIN_NUM_FORMS": "0",
+                "process_authors-MAX_NUM_FORMS": "1000",
+                "process_authors-0-author": str(author.pk),
+                "process_authors-0-is_corresponding": "on",
+                "process_sources-TOTAL_FORMS": "0",
+                "process_sources-INITIAL_FORMS": "0",
+                "process_sources-MIN_NUM_FORMS": "0",
+                "process_sources-MAX_NUM_FORMS": "1000",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(self.process.process_authors.get().is_corresponding)
+
+    def test_reference_summary_distinguishes_corresponding_authors(self):
+        corresponding = Author.objects.create(
+            first_names="Ada",
+            last_names="Example",
+            contact_email="corresponding@example.com",
+            owner=self.owner,
+            publication_status="published",
+        )
+        contributor = Author.objects.create(
+            first_names="Grace",
+            last_names="Contributor",
+            contact_email="contributor@example.com",
+            owner=self.owner,
+            publication_status="published",
+        )
+        ProcessAuthor.objects.create(
+            process=self.process,
+            author=contributor,
+            position=2,
+        )
+        ProcessAuthor.objects.create(
+            process=self.process,
+            author=corresponding,
+            position=1,
+            is_corresponding=True,
+        )
+
+        response = self.client.get(f"{self.process.get_absolute_url()}?mode=edit")
+
+        self.assertContains(response, "Authors")
+        self.assertContains(response, "Example, Ada")
+        self.assertContains(response, "Contributor, Grace")
+        self.assertContains(response, "Corresponding author")
+        self.assertContains(response, 'href="mailto:corresponding@example.com"')
+        self.assertNotContains(response, "contributor@example.com")
+
     def test_missing_management_form_does_not_clear_existing_rows(self):
         response = self.client.post(self.section_url("inputs"), {})
         self.assertEqual(response.status_code, 200)
@@ -1283,7 +1346,8 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
                 institution="Research institute",
                 contact_email="author@example.com",
                 owner=self.owner_user,
-            )
+            ),
+            through_defaults={"is_corresponding": True},
         )
         for role in (ProcessMaterial.Role.INPUT, ProcessMaterial.Role.OUTPUT):
             ProcessMaterial.objects.create(
@@ -2827,19 +2891,41 @@ class ProcessContributorMotivationViewsTestCase(TestCase):
         self.assertNotContains(response, "workshop-author")
         self.assertNotContains(response, "Contributed by")
 
-    def test_reading_view_labels_contributors_as_corresponding_authors(self):
-        author = Author.objects.create(
+    def test_reading_view_distinguishes_content_and_corresponding_authors(self):
+        corresponding = Author.objects.create(
             first_names="Ada",
             last_names="Example",
+            contact_email="corresponding@example.com",
             owner=self.participant,
             publication_status="published",
         )
-        ProcessAuthor.objects.create(process=self.process, author=author)
+        contributor = Author.objects.create(
+            first_names="Grace",
+            last_names="Contributor",
+            contact_email="contributor@example.com",
+            owner=self.participant,
+            publication_status="published",
+        )
+        ProcessAuthor.objects.create(
+            process=self.process,
+            author=contributor,
+            position=2,
+        )
+        ProcessAuthor.objects.create(
+            process=self.process,
+            author=corresponding,
+            position=1,
+            is_corresponding=True,
+        )
 
         response = self.client.get(self.detail_url())
 
-        self.assertContains(response, "Corresponding authors")
+        self.assertContains(response, "Authors")
         self.assertContains(response, "Example, Ada")
+        self.assertContains(response, "Contributor, Grace")
+        self.assertContains(response, "Corresponding author")
+        self.assertContains(response, 'href="mailto:corresponding@example.com"')
+        self.assertNotContains(response, "contributor@example.com")
 
     def test_reading_view_shows_last_update(self):
         Process.objects.filter(pk=self.process.pk).update(
