@@ -21,7 +21,7 @@ class ImportLauRegionSerializer(serializers.Serializer):
 
     cntr_code = serializers.CharField(max_length=2)
     lau_id = serializers.CharField(max_length=13)
-    lau_name = serializers.CharField(max_length=113, required=False, allow_blank=True)
+    lau_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     name_en = serializers.CharField(max_length=113, required=False, allow_blank=True)
     # The key is required so a producer must state the parent deliberately;
     # the value may still be null for a LAU without one.
